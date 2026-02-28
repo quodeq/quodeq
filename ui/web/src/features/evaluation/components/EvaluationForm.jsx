@@ -1,42 +1,10 @@
 import { useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
-
-const DISCIPLINE_OPTIONS = [
-  'backend_springboot_java',
-  'backend_springboot_kotlin',
-  'backend_typescript_lambdas',
-  'cli_bash',
-  'frontend_nextjs',
-  'frontend_react',
-  'infrastructure',
-  'mobile_android',
-  'mobile_ios',
-  'nodejs',
-];
-
-const DIMENSION_OPTIONS = [
-  { name: 'Affordability',   short: 'aff',  code: 'affordability' },
-  { name: 'Availability',    short: 'avl',  code: 'availability' },
-  { name: 'Configurability', short: 'cfg',  code: 'configurability' },
-  { name: 'Efficiency',      short: 'eff',  code: 'efficiency' },
-  { name: 'Evolvability',    short: 'evo',  code: 'evolvability' },
-  { name: 'Extensibility',   short: 'ext',  code: 'extensibility' },
-  { name: 'Flexibility',     short: 'flx',  code: 'flexibility' },
-  { name: 'Maintainability', short: 'mnt',  code: 'maintainability' },
-  { name: 'Performance',     short: 'perf', code: 'performance' },
-  { name: 'Recoverability',  short: 'rcv',  code: 'recoverability' },
-  { name: 'Resilience',      short: 'res',  code: 'resilience' },
-  { name: 'Robustness',      short: 'rob',  code: 'robustness' },
-  { name: 'Scalability',     short: 'scl',  code: 'scalability' },
-  { name: 'Simplicity',      short: 'sim',  code: 'simplicity' },
-  { name: 'Usability',       short: 'usx',  code: 'usability' },
-];
+import { DIMENSION_OPTIONS } from '../constants.js';
 
 export default function EvaluationForm({ onStart, disabled }) {
   const [repo, setRepo] = useState('');
-  const [discipline, setDiscipline] = useState('');
   const [selectedDimensions, setSelectedDimensions] = useState([]);
-  const [numerical, setNumerical] = useState(true);
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
 
   function toggleDimension(code) {
@@ -49,9 +17,8 @@ export default function EvaluationForm({ onStart, disabled }) {
     e.preventDefault();
     onStart({
       repo,
-      discipline: discipline || undefined,
       dimensions: selectedDimensions.join(','),
-      numerical,
+      numerical: true,
     });
     setRepo('');
   }
@@ -60,6 +27,8 @@ export default function EvaluationForm({ onStart, disabled }) {
     setRepo(path);
     setFolderBrowserOpen(false);
   }
+
+  const canSubmit = !disabled && !!repo && selectedDimensions.length > 0;
 
   return (
     <>
@@ -100,56 +69,43 @@ export default function EvaluationForm({ onStart, disabled }) {
           </div>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="eval-form-discipline">Discipline (optional)</label>
-          <select
-            id="eval-form-discipline"
-            value={discipline}
-            onChange={(e) => setDiscipline(e.target.value)}
-          >
-            <option value="">— None —</option>
-            {DISCIPLINE_OPTIONS.map((d) => (
-              <option key={d} value={d}>{d}</option>
-            ))}
-          </select>
-        </div>
-
-        <div className="form-group">
-          <label>Dimensions to Evaluate</label>
-          <div className="dimension-grid">
-            {DIMENSION_OPTIONS.map((dim) => (
-              <button
-                key={dim.code}
-                type="button"
-                className={`dimension-chip-btn ${selectedDimensions.includes(dim.code) ? 'selected' : ''}`}
-                onClick={() => toggleDimension(dim.code)}
-              >
-                <span className="dim-code">{dim.short}</span>
-                <span className="dim-name">{dim.name}</span>
-              </button>
-            ))}
+        {repo && (
+          <div className="form-group">
+            <div className="dimension-label-row">
+              <label>Dimensions</label>
+              <div className="dimension-chip-actions">
+                <button
+                  type="button"
+                  className="dim-action-btn"
+                  onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.map((d) => d.code))}
+                >
+                  Select all
+                </button>
+                <button
+                  type="button"
+                  className="dim-action-btn"
+                  onClick={() => setSelectedDimensions([])}
+                >
+                  Clear
+                </button>
+              </div>
+            </div>
+            <div className="dimension-grid">
+              {DIMENSION_OPTIONS.map((dim) => (
+                <button
+                  key={dim.code}
+                  type="button"
+                  className={`dimension-chip-btn${selectedDimensions.includes(dim.code) ? ' selected' : ''}`}
+                  onClick={() => toggleDimension(dim.code)}
+                >
+                  {dim.name}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="dimension-chip-actions">
-            <button type="button" onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.map((d) => d.code))}>
-              Select All
-            </button>
-            <button type="button" onClick={() => setSelectedDimensions([])}>
-              Clear
-            </button>
-          </div>
-        </div>
+        )}
 
-        <label className="checkbox-row" htmlFor="eval-form-numerical">
-          <input
-            id="eval-form-numerical"
-            type="checkbox"
-            checked={numerical}
-            onChange={(e) => setNumerical(e.target.checked)}
-          />
-          Enable numerical scoring (0-10 scale)
-        </label>
-
-        <button type="submit" className="evaluate-submit-btn" disabled={disabled}>
+        <button type="submit" className="evaluate-submit-btn" disabled={!canSubmit}>
           {disabled ? 'Running Evaluation...' : 'Start Evaluation'}
         </button>
       </form>

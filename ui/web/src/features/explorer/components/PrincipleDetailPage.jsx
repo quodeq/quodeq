@@ -128,33 +128,35 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
         <h3 className="section-title file-detail-title">{principle.principle}</h3>
       </div>
       <section className="panel file-detail-summary-panel">
-        <div className="file-detail-stats">
-          <span className="file-detail-stat">
-            <strong>{totalViolations}</strong> violations
-          </span>
-          {principle.critical > 0 && (
-            <>
-              <span className="file-detail-stat-sep">·</span>
-              <span className="file-detail-stat severity-tag critical">{principle.critical} critical</span>
-            </>
-          )}
-          {principle.major > 0 && (
-            <>
-              <span className="file-detail-stat-sep">·</span>
-              <span className="file-detail-stat severity-tag major">{principle.major} major</span>
-            </>
-          )}
-          {principle.minor > 0 && (
-            <>
-              <span className="file-detail-stat-sep">·</span>
-              <span className="file-detail-stat severity-tag minor">{principle.minor} minor</span>
-            </>
-          )}
+        <div className="file-detail-stats-row">
+          <div className="file-detail-stats">
+            <span className="file-detail-stat">
+              <strong>{totalViolations}</strong> violations
+            </span>
+            {principle.critical > 0 && (
+              <>
+                <span className="file-detail-stat-sep">·</span>
+                <span className="file-detail-stat severity-tag critical">{principle.critical} critical</span>
+              </>
+            )}
+            {principle.major > 0 && (
+              <>
+                <span className="file-detail-stat-sep">·</span>
+                <span className="file-detail-stat severity-tag major">{principle.major} major</span>
+              </>
+            )}
+            {principle.minor > 0 && (
+              <>
+                <span className="file-detail-stat-sep">·</span>
+                <span className="file-detail-stat severity-tag minor">{principle.minor} minor</span>
+              </>
+            )}
+          </div>
+          <CopyButton
+            label="Principle fix plan"
+            onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText(principle))}
+          />
         </div>
-        <CopyButton
-          label="Principle fix plan"
-          onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText(principle))}
-        />
       </section>
 
       {SEVERITY_ORDER.map((sev) => {
