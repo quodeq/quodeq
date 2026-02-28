@@ -121,9 +121,6 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
 
   return (
     <>
-      <div className="section-header">
-        <h3 className="section-title file-detail-title">{file.file}</h3>
-      </div>
       <section className="panel file-detail-summary-panel">
         <div className="file-detail-stats">
           <span className="file-detail-stat">
@@ -157,6 +154,10 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
           onClick={() => navigator.clipboard.writeText(buildFilePlanText(file))}
         />
       </section>
+
+      <div className="section-header">
+        <h3 className="section-title file-detail-title">{file.file}</h3>
+      </div>
 
       {SEVERITY_ORDER.map((sev) => {
         const violations = file.violationsBySeverity?.[sev] || [];
