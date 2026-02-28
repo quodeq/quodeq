@@ -354,6 +354,7 @@
 
 .dimension-violations-row .dimension-name {
   flex: 1;
+  min-width: 0;
   font-weight: 500;
   text-transform: capitalize;
   color: var(--color-text-muted);
@@ -409,7 +410,6 @@
 }
 
 .dimensions-panel {
-  margin-bottom: 28px;
   padding: 16px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
@@ -651,22 +651,24 @@
 .run-navigator .run-nav-action {
   display: inline-flex;
   align-items: center;
-  padding: 3px 10px;
+  padding: 4px 10px;
   background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   font-family: var(--font-sans);
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   color: var(--color-text-muted);
   white-space: nowrap;
   cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease;
+  line-height: 1;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }
 
 .run-navigator .run-nav-action:hover:not(:disabled) {
-  border-color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
   color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
 .run-navigator .run-nav-action:disabled {
@@ -680,15 +682,17 @@
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
   overflow: hidden;
+  line-height: 1;
 }
 
 .run-navigator .run-nav-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 3px var(--space-2);
+  padding: 4px 7px;
   background: transparent;
   border: none;
   color: var(--color-text-muted);
@@ -711,11 +715,12 @@
 
 /* Date label inside the pager */
 .run-navigator .run-nav-label {
-  padding: 3px var(--space-3);
+  padding: 4px var(--space-3);
   border-left: 1px solid var(--color-border);
   border-right: 1px solid var(--color-border);
   font-family: var(--font-mono);
   font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
   color: var(--color-text);
   white-space: nowrap;
   min-width: 9ch;
@@ -1286,7 +1291,6 @@
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
 .offending-file-total {
@@ -1297,27 +1301,26 @@
   text-align: right;
 }
 
+.offending-file-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.offending-file-info .offending-file-dims {
+  margin-top: 2px;
+}
+
 .offending-file-dims {
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
   font-size: 0.72rem;
   color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 28%;
-  pointer-events: none;
-}
-
-@media (max-width: 640px) {
-  .offending-file-dims {
-    display: none;
-  }
 }
 
 .offending-file-path {
-  flex: 1;
   min-width: 0;
   font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
   font-size: 0.8rem;
@@ -1943,7 +1946,7 @@
 .dashboard-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  gap: var(--space-6);
 }
 
 /* ── Project selector (in main content area) ──────────── */

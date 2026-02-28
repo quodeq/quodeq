@@ -1,0 +1,92 @@
+import { useState, useEffect } from 'react';
+import { getProjectInfo } from '../../../api/index.js';
+import { DIMENSION_OPTIONS } from '../constants.js';
+
+export default function ReEvaluateCard({ project, onStart, disabled }) {
+  const [info, setInfo] = useState(null);
+  const [selectedDimensions, setSelectedDimensions] = useState([]);
+
+  useEffect(() => {
+    if (!project) return;
+    setInfo(null);
+    getProjectInfo(project)
+      .then(setInfo)
+      .catch(() => setInfo(null));
+  }, [project]);
+
+  if (!info) return null;
+
+  function toggleDimension(code) {
+    setSelectedDimensions((prev) =>
+      prev.includes(code) ? prev.filter((d) => d !== code) : [...prev, code]
+    );
+  }
+
+  function handleStart() {
+    onStart({
+      repo: info.path,
+      dimensions: selectedDimensions.join(','),
+      numerical: true,
+    });
+  }
+
+  const canStart = !disabled && selectedDimensions.length > 0;
+
+  return (
+    <div className="panel evaluate-panel">
+      <div className="panel-header">
+        <h3>Re-evaluate <span className="re-eval-project-name">{project}</span></h3>
+      </div>
+
+      <div className="evaluate-form-large">
+        <div className="re-eval-repo-path">
+          <span className="re-eval-repo-label">{info.location === 'online' ? 'Remote' : 'Local'}</span>
+          <code>{info.path}</code>
+        </div>
+
+        <div className="form-group">
+          <div className="dimension-label-row">
+            <label>Dimensions</label>
+            <div className="dimension-chip-actions">
+              <button
+                type="button"
+                className="dim-action-btn"
+                onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.map((d) => d.code))}
+              >
+                Select all
+              </button>
+              <button
+                type="button"
+                className="dim-action-btn"
+                onClick={() => setSelectedDimensions([])}
+              >
+                Clear
+              </button>
+            </div>
+          </div>
+          <div className="dimension-grid">
+            {DIMENSION_OPTIONS.map((dim) => (
+              <button
+                key={dim.code}
+                type="button"
+                className={`dimension-chip-btn${selectedDimensions.includes(dim.code) ? ' selected' : ''}`}
+                onClick={() => toggleDimension(dim.code)}
+              >
+                {dim.name}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          className="evaluate-submit-btn"
+          disabled={!canStart}
+          onClick={handleStart}
+        >
+          {disabled ? 'Running Evaluation...' : `Re-evaluate ${project}`}
+        </button>
+      </div>
+    </div>
+  );
+}

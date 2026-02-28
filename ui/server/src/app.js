@@ -64,6 +64,17 @@ export function createApp(options = {}) {
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
 
+  // Routes handled by the Node server regardless of whether an action API is present
+  app.get('/api/projects/:project/info', (req, res) => {
+    try {
+      const infoPath = path.join(reportsRoot, req.params.project, 'repository_info.json');
+      const info = JSON.parse(fs.readFileSync(infoPath, 'utf-8'));
+      res.json(info);
+    } catch {
+      res.status(404).json({ error: 'Repository info not found' });
+    }
+  });
+
   if (actionApiBase) {
     app.use('/api', (req, res) => proxyToActionApi(req, res, actionApiBase));
   } else {

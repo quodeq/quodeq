@@ -19,10 +19,12 @@ const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onF
             onClick={onFileClick ? () => onFileClick(f) : undefined}
             title={f.file}
           >
-            <span className="offending-file-path">{f.file}</span>
-            {f.dimensionsStr && (
-              <span className="offending-file-dims">{f.dimensionsStr}</span>
-            )}
+            <div className="offending-file-info">
+              <span className="offending-file-path">{f.file}</span>
+              {f.dimensionsStr && (
+                <span className="offending-file-dims">{f.dimensionsStr}</span>
+              )}
+            </div>
             <strong className="offending-file-total">{f.total}</strong>
             <span className="offending-file-tags">
               {f.critical > 0 && (

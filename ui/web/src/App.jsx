@@ -6,6 +6,7 @@ import RunNavigator from './features/dashboard/components/RunNavigator.jsx';
 import { useEvaluation } from './features/evaluation/hooks/useEvaluation.js';
 import EvaluationForm from './features/evaluation/components/EvaluationForm.jsx';
 import EvaluationStatus from './features/evaluation/components/EvaluationStatus.jsx';
+import ReEvaluateCard from './features/evaluation/components/ReEvaluateCard.jsx';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
@@ -46,12 +47,70 @@ export default function App() {
   // -------------------------------------------------------------------------
   const [navStack, setNavStack] = useState([{ page: 'overview' }]);
 
-  function navPush(entry) { setNavStack((prev) => [...prev, entry]); }
-  function navPop() { setNavStack((prev) => (prev.length > 1 ? prev.slice(0, -1) : prev)); }
-  function navGoTo(index) { setNavStack((prev) => prev.slice(0, index + 1)); }
-  function navReset() { setNavStack([{ page: 'overview' }]); }
+  // Initialize browser history state on mount
+  useEffect(() => {
+    window.history.replaceState({ navIndex: 0, entry: { page: 'overview' } }, '');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Sync browser back/forward buttons with navStack
+  useEffect(() => {
+    function onPopState(e) {
+      const targetIndex = e.state?.navIndex ?? 0;
+      setNavStack((prev) => {
+        if (targetIndex < prev.length - 1) {
+          // Going back
+          return prev.slice(0, targetIndex + 1);
+        }
+        if (targetIndex >= prev.length && e.state?.entry) {
+          // Going forward — restore entry from history state
+          return [...prev.slice(0, targetIndex), e.state.entry];
+        }
+        return prev;
+      });
+    }
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  function navPush(entry) {
+    setNavStack((prev) => {
+      const next = [...prev, entry];
+      window.history.pushState({ navIndex: next.length - 1, entry }, '');
+      return next;
+    });
+  }
+
+  function navPop() {
+    window.history.back(); // popstate handler updates navStack
+  }
+
+  function navGoTo(index) {
+    const steps = navStack.length - 1 - index;
+    if (steps > 0) window.history.go(-steps); // popstate handler updates navStack
+  }
+
+  function navReset() {
+    setNavStack((prev) => {
+      const stepsBack = prev.length - 1;
+      if (stepsBack > 0) window.history.go(-stepsBack);
+      return [{ page: 'overview' }];
+    });
+  }
+
+  function navTab(page) {
+    setNavStack((prev) => {
+      const stepsBack = prev.length - 1;
+      if (stepsBack > 0) window.history.go(-stepsBack);
+      return [{ page }];
+    });
+  }
 
   const activePage = navStack[navStack.length - 1];
+
+  // Scroll to top on every navigation
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [activePage]);
 
   // -------------------------------------------------------------------------
   // Project / run selection
@@ -67,6 +126,8 @@ export default function App() {
         setProjects(list);
         if (list.length > 0 && !selectedProject) {
           setSelectedProject(list[0].name || list[0]);
+        } else if (list.length === 0) {
+          navTab('evaluate');
         }
       })
       .catch(() => {});
@@ -276,9 +337,17 @@ export default function App() {
             </header>
 
             <div className="evaluate-content">
+              {selectedProject && (
+                <ReEvaluateCard
+                  project={selectedProject}
+                  onStart={startEvaluation}
+                  disabled={job?.status === 'running'}
+                />
+              )}
+
               <div className="panel evaluate-panel">
                 <div className="panel-header">
-                  <h3>Repository Details</h3>
+                  <h3>Evaluate a Repository</h3>
                 </div>
                 <EvaluationForm onStart={startEvaluation} disabled={job?.status === 'running'} />
               </div>
@@ -385,7 +454,7 @@ export default function App() {
           <button
             type="button"
             className={`sidebar-nav-item${activeTab === 'overview' ? ' active' : ''}`}
-            onClick={() => setNavStack([{ page: 'overview' }])}
+            onClick={() => navTab('overview')}
             title="Overview"
           >
             {ICON_OVERVIEW}
@@ -395,7 +464,7 @@ export default function App() {
           <button
             type="button"
             className={`sidebar-nav-item${activeTab === 'evaluate' ? ' active' : ''}`}
-            onClick={() => setNavStack([{ page: 'evaluate' }])}
+            onClick={() => navTab('evaluate')}
             title="Evaluate"
           >
             {ICON_EVALUATE}
@@ -408,7 +477,7 @@ export default function App() {
           <button
             type="button"
             className={`sidebar-nav-item${activeTab === 'settings' ? ' active' : ''}`}
-            onClick={() => setNavStack([{ page: 'settings' }])}
+            onClick={() => navTab('settings')}
             title="Settings"
           >
             {ICON_SETTINGS}

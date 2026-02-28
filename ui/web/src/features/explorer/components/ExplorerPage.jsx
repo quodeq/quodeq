@@ -2,8 +2,9 @@ import { useState, useEffect, useMemo } from 'react';
 import { getDimensionEval } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
+import CopyButton from '../../../components/CopyButton.jsx';
 import { gradeColorClass } from '../../../utils/formatters.js';
-import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
+import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 
 export default function ExplorerPage({ project, dimension, runId, onNavigate }) {
   const [evalData, setEvalData] = useState(null);
@@ -47,6 +48,25 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
     return buildTopOffendingFiles([{ dimension: evalData.dimension, violations: allViolations }]);
   }, [evalData, allViolations]);
 
+  const severityCounts = useMemo(() => {
+    const counts = { critical: 0, major: 0, minor: 0 };
+    allViolations.forEach((v) => {
+      const s = (v.severity || 'minor').toLowerCase();
+      if (counts[s] !== undefined) counts[s]++;
+    });
+    return counts;
+  }, [allViolations]);
+
+  const uniquePrinciples = useMemo(
+    () => new Set(allViolations.map((v) => v.principle).filter(Boolean)).size,
+    [allViolations]
+  );
+
+  const totalCompliant = useMemo(
+    () => (evalData?.principles || []).reduce((sum, p) => sum + (p.compliance?.length || 0), 0),
+    [evalData]
+  );
+
   if (loading) return <div className="loading">Loading…</div>;
   if (error) return <div className="inline-error">{error}</div>;
   if (!evalData) return <div className="empty-state"><h2>No data found</h2></div>;
@@ -65,47 +85,80 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
   }
 
   return (
-    <div className="dashboard">
-      {/* Header */}
-      <section className="panel eval-header-panel">
-        <div className="eval-header">
-          <div>
-            <p className="eval-project-label">{evalData.project}</p>
-            <h2 className="eval-dimension-title">{evalData.dimension}</h2>
+    <>
+      <section className="acc-eval-panel panel">
+        <div className="acc-eval-top">
+          <span className="acc-eval-label">{evalData.dimension}</span>
+          {allViolations.length > 0 && (
+            <CopyButton
+              label="Fix plan"
+              onClick={() => navigator.clipboard.writeText(
+                buildDimensionPlanFromViolations(evalData.dimension, allViolations)
+              )}
+            />
+          )}
+        </div>
+
+        <div className="acc-eval-hero">
+          <span className={`acc-eval-grade-chip chip ${gradeColorClass(overallGrade?.grade)}`}>
+            {overallGrade?.grade || '—'}
+          </span>
+          {overallGrade?.score && (
+            <div className="acc-eval-score-row">
+              <span className="acc-eval-score">{overallGrade.score}</span>
+            </div>
+          )}
+        </div>
+
+        <div className="acc-eval-stats-grid">
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Violations</span>
+            <span className="acc-eval-stat-value">{allViolations.length}</span>
+            <div className="acc-eval-tags">
+              {severityCounts.critical > 0 && (
+                <span className="severity-tag critical">{severityCounts.critical} critical</span>
+              )}
+              {severityCounts.major > 0 && (
+                <span className="severity-tag major">{severityCounts.major} major</span>
+              )}
+              {severityCounts.minor > 0 && (
+                <span className="severity-tag minor">{severityCounts.minor} minor</span>
+              )}
+            </div>
           </div>
-          <div className="eval-header-scores">
-            {overallGrade?.score && <span className="overall-score">{overallGrade.score}</span>}
-            <span className={`chip ${gradeColorClass(overallGrade?.grade)}`}>
-              {overallGrade?.grade || 'No grade'}
-            </span>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Files Affected</span>
+            <span className="acc-eval-stat-value">{topFiles.length}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Principles</span>
+            <span className="acc-eval-stat-value">{uniquePrinciples}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Compliant</span>
+            <span className="acc-eval-stat-value">{totalCompliant}</span>
           </div>
         </div>
-        <p className="eval-meta">{evalData.runId}</p>
       </section>
 
-      {/* Executive summary */}
+      {/* Principles list */}
       {principleGrades.length > 0 && (
-        <>
-          <div className="section-header">
-            <h3 className="section-title">Executive Summary</h3>
-          </div>
-          <section className="panel eval-summary-panel">
-            <ul className="exec-summary-list">
-              {principleGrades.map((pg) => (
-                <li
-                  key={pg.principle}
-                  className="exec-summary-row exec-summary-row--clickable"
-                  onClick={() => onNavigate && onNavigate('evalprinciple', { evalPrincipal: buildEvalPrincipal(pg.principle) })}
-                >
-                  <span className="exec-summary-principle">{pg.principle}</span>
-                  {pg.score && <span className="exec-summary-score">{pg.score}</span>}
-                  <span className={`chip small ${gradeColorClass(pg.grade)}`}>{pg.grade || '—'}</span>
-                  <span className="exec-summary-chevron">›</span>
-                </li>
-              ))}
-            </ul>
-          </section>
-        </>
+        <section className="panel eval-summary-panel">
+          <ul className="exec-summary-list">
+            {principleGrades.map((pg) => (
+              <li
+                key={pg.principle}
+                className="exec-summary-row exec-summary-row--clickable"
+                onClick={() => onNavigate && onNavigate('evalprinciple', { evalPrincipal: buildEvalPrincipal(pg.principle) })}
+              >
+                <span className="exec-summary-principle">{pg.principle}</span>
+                {pg.score && <span className="exec-summary-score">{pg.score}</span>}
+                <span className={`chip small ${gradeColorClass(pg.grade)}`}>{pg.grade || '—'}</span>
+                <span className="exec-summary-chevron">›</span>
+              </li>
+            ))}
+          </ul>
+        </section>
       )}
 
       {/* Violations by principle */}
@@ -140,6 +193,6 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
         </>
       )}
 
-    </div>
+    </>
   );
 }
