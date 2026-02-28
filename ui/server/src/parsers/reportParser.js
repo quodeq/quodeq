@@ -451,10 +451,11 @@ function readEvidenceFile(evidencePath) {
       dimension: dimName,
       sourceFileCount: data.source_file_count ?? null,
       date: data.date ?? null,
-      discipline: data.discipline ?? null
+      discipline: data.discipline ?? null,
+      repository: data.repository ?? null
     };
   } catch {
-    return { dimension: dimName, sourceFileCount: null, date: null, discipline: null };
+    return { dimension: dimName, sourceFileCount: null, date: null, discipline: null, repository: null };
   }
 }
 
@@ -499,7 +500,8 @@ function loadRunDimensions(reportsRoot, project, runId) {
     ...d,
     sourceFileCount: evidenceMap.get(d.dimension)?.sourceFileCount ?? null,
     evidenceDate: evidenceMap.get(d.dimension)?.date ?? null,
-    discipline: evidenceMap.get(d.dimension)?.discipline ?? null
+    discipline: evidenceMap.get(d.dimension)?.discipline ?? null,
+    repository: evidenceMap.get(d.dimension)?.repository ?? null
   }));
 
   dimensions.sort((a, b) => a.dimension.localeCompare(b.dimension));
