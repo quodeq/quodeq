@@ -143,9 +143,6 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
 
   return (
     <>
-      <div className="section-header">
-        <h3 className="section-title file-detail-title">{principle}</h3>
-      </div>
       <section className="panel file-detail-summary-panel">
         <div className="file-detail-stats">
           {score && (
@@ -175,6 +172,10 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
           />
         )}
       </section>
+
+      <div className="section-header">
+        <h3 className="section-title file-detail-title">{principle}</h3>
+      </div>
 
       {principleData?.findings && (
         <p className="violation-context-desc" style={{ padding: '0 4px', marginBottom: '4px' }}>
