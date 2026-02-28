@@ -1,0 +1,8 @@
+from codecompass.logging import log_info
+
+
+def test_log_info_format(capsys):
+    log_info("hello")
+    captured = capsys.readouterr()
+    assert "[INFO]" in captured.err
+    assert "hello" in captured.err

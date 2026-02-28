@@ -1,0 +1,181 @@
+import { memo, useState } from 'react';
+import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
+
+const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
+
+function CopyIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  );
+}
+
+function buildPrinciplePlanText(principle) {
+  const totalViolations = principle.total || 0;
+  const lines = [
+    'You are a senior software engineer performing a targeted code review.',
+    'Apply minimal, surgical fixes — no refactoring, no style changes beyond what is required.',
+    '',
+    `# Fix Plan: ${principle.principle}`,
+    '',
+    `**Total violations:** ${totalViolations}`,
+    '',
+    '---',
+    '',
+  ];
+
+  SEVERITY_ORDER.forEach((sev) => {
+    const vs = (principle.violations || []).filter(
+      (v) => (v.severity || 'minor').toLowerCase() === sev
+    );
+    if (vs.length === 0) return;
+    lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);
+    lines.push('');
+    vs.forEach((v, i) => {
+      const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
+      lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
+      if (v.reason) lines.push('', `**Why it's a violation:** ${v.reason}`);
+      if (v.snippet) {
+        lines.push('', '**Affected code:**');
+        lines.push('```');
+        v.snippet.split('\n').forEach((l) => lines.push(l));
+        lines.push('```');
+      }
+      lines.push('');
+    });
+  });
+
+  lines.push('---');
+  lines.push('');
+  lines.push('For each violation above, provide a concrete, step-by-step fix.');
+  lines.push('Return each fix as an exact replacement block or unified diff. No explanations beyond what is needed to apply the fix.');
+  lines.push(PLAN_TEST_INSTRUCTION_GROUP);
+  return lines.join('\n').trim();
+}
+
+function buildViolationPlanText(v, principleName) {
+  const title = principleName || 'Violation';
+  const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
+  const lines = [
+    `# Fix Request: ${title}`,
+    '',
+    `**Severity:** ${v.severity || 'unknown'}`,
+  ];
+  if (loc) lines.push(`**File:** ${loc}`);
+  if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
+  if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
+  lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
+  if (loc) lines.push(`Apply it to \`${loc}\`.`);
+  lines.push(PLAN_TEST_INSTRUCTION_SINGLE);
+  return lines.join('\n').trim();
+}
+
+function CopyButton({ onClick, label }) {
+  const [copied, setCopied] = useState(false);
+  const handleClick = () => {
+    onClick();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button className="detail-copy-btn" onClick={handleClick}>
+      <CopyIcon />
+      {copied ? 'Copied!' : label}
+    </button>
+  );
+}
+
+function ViolationCard({ v, principleName }) {
+  return (
+    <div className={`file-violation-card severity-border-${v.severity}`}>
+      <div className="file-violation-card-header">
+        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        {v.file && (
+          <code className="violation-file">
+            {v.file}{v.line ? `:${v.line}` : ''}
+          </code>
+        )}
+        <CopyButton
+          label="Fix plan"
+          onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v, principleName))}
+        />
+      </div>
+      {v.snippet && (
+        <pre className={`code-snippet violation ${v.severity}`}>{v.snippet}</pre>
+      )}
+      {v.reason && (
+        <p className="violation-context-desc">{v.reason}</p>
+      )}
+    </div>
+  );
+}
+
+const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
+  const totalViolations = principle.total || 0;
+
+  const violationsBySeverity = SEVERITY_ORDER.reduce((acc, sev) => {
+    acc[sev] = (principle.violations || []).filter(
+      (v) => (v.severity || 'minor').toLowerCase() === sev
+    );
+    return acc;
+  }, {});
+
+  return (
+    <>
+      <div className="section-header">
+        <h3 className="section-title file-detail-title">{principle.principle}</h3>
+      </div>
+      <section className="panel file-detail-summary-panel">
+        <div className="file-detail-stats">
+          <span className="file-detail-stat">
+            <strong>{totalViolations}</strong> violations
+          </span>
+          {principle.critical > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat severity-tag critical">{principle.critical} critical</span>
+            </>
+          )}
+          {principle.major > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat severity-tag major">{principle.major} major</span>
+            </>
+          )}
+          {principle.minor > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat severity-tag minor">{principle.minor} minor</span>
+            </>
+          )}
+        </div>
+        <CopyButton
+          label="Principle fix plan"
+          onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText(principle))}
+        />
+      </section>
+
+      {SEVERITY_ORDER.map((sev) => {
+        const violations = violationsBySeverity[sev];
+        if (!violations || violations.length === 0) return null;
+        return (
+          <div key={sev}>
+            <div className="violation-group-header">
+              <span className={`severity-tag ${sev}`}>{sev}</span>
+              <span className="violation-group-count">{violations.length}</span>
+            </div>
+            <section className="panel file-violations-section">
+              {violations.map((v, idx) => (
+                <ViolationCard key={idx} v={v} principleName={principle.principle} />
+              ))}
+            </section>
+          </div>
+        );
+      })}
+    </>
+  );
+});
+
+export default PrincipleDetailPage;

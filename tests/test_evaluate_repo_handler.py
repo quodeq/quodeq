@@ -1,0 +1,35 @@
+from pathlib import Path
+
+import pytest
+
+from codecompass.evaluate.lib.repo_handler import is_repo_url, prepare_repository
+
+
+def test_is_repo_url():
+    assert is_repo_url("http://example.com/repo.git")
+    assert is_repo_url("https://example.com/repo.git")
+    assert is_repo_url("git@example.com:repo.git")
+    assert not is_repo_url("/local/path/to/repo")
+
+
+def test_prepare_repository_local(tmp_path: Path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    assert prepare_repository(str(repo)) == str(repo.resolve())
+
+
+def test_prepare_repository_url_creates_tmp(monkeypatch, tmp_path: Path):
+    called = {}
+
+    def fake_run(cmd, check):
+        called["cmd"] = cmd
+        dest = Path(cmd[-1])
+        dest.mkdir(parents=True, exist_ok=True)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    url = "https://example.com/my-repo.git"
+    dest = prepare_repository(url)
+
+    assert Path(dest).parent.name == "tmp"
+    assert Path(dest).exists()
