@@ -230,6 +230,12 @@
 .file-detail-summary-panel {
   padding: var(--space-4);
   display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.file-detail-stats-row {
+  display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-4);
@@ -249,6 +255,10 @@
 
 .file-detail-title {
   font-family: var(--font-mono);
+  font-size: var(--text-base);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin: 0;
   word-break: break-all;
 }
 
@@ -457,4 +467,123 @@
 @keyframes fadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ── Eval dimension page ──────────────────────────────── */
+
+.eval-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  margin-bottom: calc(-1 * var(--space-4));
+}
+
+.eval-dimension-title {
+  font-size: 1.5rem;
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  text-transform: capitalize;
+  margin: 0;
+}
+
+.eval-header-scores {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.overall-score {
+  font-size: 1.1rem;
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Executive summary list */
+.exec-summary-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.exec-summary-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.exec-summary-row:last-child { border-bottom: none; }
+
+.exec-summary-row--clickable {
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.exec-summary-row--clickable:hover { background: var(--color-surface-alt); }
+
+.exec-summary-principle {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+.exec-summary-score {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.exec-summary-chevron {
+  color: var(--color-text-subtle);
+  font-size: 1rem;
+}
+
+/* Flat violations table */
+.violation-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.violation-table-row {
+  display: grid;
+  grid-template-columns: 90px 1fr 1fr 2fr;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-border);
+  font-size: var(--text-sm);
+}
+
+.violation-table-row:last-child { border-bottom: none; }
+
+.violation-file {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-accent);
+  word-break: break-all;
+}
+
+.violation-principle {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.violation-reason {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.violation-table-row--clickable {
+  cursor: pointer;
+  transition: background 100ms ease;
+}
+
+.violation-table-row--clickable:hover {
+  background: var(--color-surface-alt);
 }

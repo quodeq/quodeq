@@ -22,6 +22,10 @@ export function listProjects() {
   return request('/projects');
 }
 
+export function getProjectInfo(project) {
+  return request(`/projects/${encodeURIComponent(project)}/info`);
+}
+
 export function getDashboard(project, run = 'latest') {
   const q = run ? `?run=${encodeURIComponent(run)}` : '';
   return request(`/projects/${encodeURIComponent(project)}/dashboard${q}`);

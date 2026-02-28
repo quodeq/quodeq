@@ -143,37 +143,37 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
 
   return (
     <>
-      <div className="section-header">
-        <h3 className="section-title file-detail-title">{principle}</h3>
-      </div>
       <section className="panel file-detail-summary-panel">
-        <div className="file-detail-stats">
-          {score && (
-            <>
-              <span className="file-detail-stat"><strong>{score}</strong></span>
-              <span className="file-detail-stat-sep">·</span>
-            </>
-          )}
-          <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
+        <h3 className="file-detail-title">{principle}</h3>
+        <div className="file-detail-stats-row">
+          <div className="file-detail-stats">
+            {score && (
+              <>
+                <span className="file-detail-stat"><strong>{score}</strong></span>
+                <span className="file-detail-stat-sep">·</span>
+              </>
+            )}
+            <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
+            {violations.length > 0 && (
+              <>
+                <span className="file-detail-stat-sep">·</span>
+                <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
+              </>
+            )}
+            {compliance.length > 0 && (
+              <>
+                <span className="file-detail-stat-sep">·</span>
+                <span className="file-detail-stat"><strong>{compliance.length}</strong> compliant</span>
+              </>
+            )}
+          </div>
           {violations.length > 0 && (
-            <>
-              <span className="file-detail-stat-sep">·</span>
-              <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
-            </>
-          )}
-          {compliance.length > 0 && (
-            <>
-              <span className="file-detail-stat-sep">·</span>
-              <span className="file-detail-stat"><strong>{compliance.length}</strong> compliant</span>
-            </>
+            <CopyButton
+              label="Principle fix plan"
+              onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText())}
+            />
           )}
         </div>
-        {violations.length > 0 && (
-          <CopyButton
-            label="Principle fix plan"
-            onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText())}
-          />
-        )}
       </section>
 
       {principleData?.findings && (

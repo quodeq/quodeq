@@ -53,6 +53,25 @@ def _npm_build(path: Path) -> None:
     subprocess.run(["npm", "run", "build"], cwd=str(path), check=True)
 
 
+def _sources_newer_than_dist(web_root: Path, dist_index: Path) -> bool:
+    """Return True if any tracked source file is newer than dist/index.html."""
+    if not dist_index.exists():
+        return True
+    dist_mtime = dist_index.stat().st_mtime
+    watch_dirs = [web_root / "src", web_root / "public"]
+    watch_files = [web_root / "package.json", web_root / "vite.config.js"]
+    for f in watch_files:
+        if f.exists() and f.stat().st_mtime > dist_mtime:
+            return True
+    for d in watch_dirs:
+        if not d.exists():
+            continue
+        for f in d.rglob("*"):
+            if f.is_file() and f.stat().st_mtime > dist_mtime:
+                return True
+    return False
+
+
 def _is_port_open(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         return sock.connect_ex((host, port)) == 0
@@ -185,9 +204,12 @@ def run_dashboard(config: DashboardConfig) -> int:
         _npm_install(repo_root / "ui/server")
 
     if not config.no_build:
-        if config.reinstall or not (static_dist / "index.html").exists():
+        dist_index = static_dist / "index.html"
+        if config.reinstall or _sources_newer_than_dist(repo_root / "ui/web", dist_index):
             log_info("Building web UI (ui/web)...")
             _npm_build(repo_root / "ui/web")
+        else:
+            log_info("Web UI is up to date, skipping build.")
 
     config = DashboardConfig(
         port=config.port,

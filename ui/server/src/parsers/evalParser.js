@@ -154,12 +154,49 @@ function parseFromJson(jsonPath, project, runId, dimension) {
     },
   ];
 
+  // Build per-principle detail by grouping top-level violations and compliance
+  const principleMap = {};
+  for (const p of data.principles ?? []) {
+    principleMap[p.name] = {
+      name:            p.name,
+      score:           p.score ?? null,
+      grade:           p.grade ?? null,
+      violations:      [],
+      compliance:      [],
+      justification:   '',
+      recommendations: [],
+      metrics:         null,
+    };
+  }
+  for (const v of data.violations ?? []) {
+    const key = v.principle;
+    if (!principleMap[key]) {
+      principleMap[key] = { name: key, score: null, grade: null, violations: [], compliance: [], justification: '', recommendations: [], metrics: null };
+    }
+    principleMap[key].violations.push({
+      code:     v.snippet || '',
+      severity: v.severity || 'minor',
+      file:     v.file ? (v.line ? `${v.file}:${v.line}` : v.file) : null,
+      reason:   v.reason || '',
+    });
+  }
+  for (const c of data.compliance ?? []) {
+    const key = c.principle;
+    if (!principleMap[key]) {
+      principleMap[key] = { name: key, score: null, grade: null, violations: [], compliance: [], justification: '', recommendations: [], metrics: null };
+    }
+    principleMap[key].compliance.push(c.snippet || c.reason || '');
+  }
+  const principles = Object.values(principleMap);
+
   return {
     dimension,
     runId,
     project,
     principleGrades,
-    principles:          [],
+    principles,
+    violations:          data.violations ?? [],
+    compliance:          data.compliance ?? [],
     priorityRemediation: { critical: [], major: [], minor: [] },
     rawContent:          null,
   };
