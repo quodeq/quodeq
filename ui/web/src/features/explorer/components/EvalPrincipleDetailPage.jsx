@@ -1,0 +1,252 @@
+import { memo, useState } from 'react';
+import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
+
+const EVAL_SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
+
+const GRADE_TIERS = {
+  exemplary: 'grade-top',
+  good: 'grade-high',
+  proficient: 'grade-high',
+  adequate: 'grade-mid',
+  developing: 'grade-mid',
+  poor: 'grade-low',
+  insufficient: 'grade-low',
+  critical: 'grade-bottom',
+  a: 'grade-top',
+  b: 'grade-high',
+  c: 'grade-mid',
+  d: 'grade-low',
+  f: 'grade-bottom',
+};
+
+function gradeColorClass(grade) {
+  if (!grade) return 'grade-none';
+  const lower = grade.trim().toLowerCase();
+  if (GRADE_TIERS[lower]) return GRADE_TIERS[lower];
+  const first = lower.charAt(0);
+  return GRADE_TIERS[first] || 'grade-none';
+}
+
+function CopyIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2"/>
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+    </svg>
+  );
+}
+
+function CopyButton({ onClick, label }) {
+  const [copied, setCopied] = useState(false);
+  const handleClick = () => {
+    onClick();
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button className="detail-copy-btn" onClick={handleClick}>
+      <CopyIcon />
+      {copied ? 'Copied!' : label}
+    </button>
+  );
+}
+
+const PAGE_SIZE = 20;
+
+const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal }) {
+  const {
+    principleData,
+    principle,
+    score,
+    grade,
+    dimViolations = [],
+    dimCompliance = [],
+  } = evalPrincipal;
+
+  const [showAllCompliance, setShowAllCompliance] = useState(false);
+
+  const violations = (principleData?.violations?.length > 0)
+    ? principleData.violations
+    : dimViolations;
+
+  const compliance = (principleData?.compliance?.length > 0)
+    ? principleData.compliance
+    : dimCompliance.map((c) => c.snippet || c.reason || '').filter(Boolean);
+
+  const violationsBySeverity = EVAL_SEVERITY_ORDER.reduce((acc, sev) => {
+    acc[sev] = violations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
+    return acc;
+  }, {});
+
+  const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
+  const hasMoreCompliance = compliance.length > PAGE_SIZE;
+
+  const buildPrinciplePlanText = () => {
+    const totalViolations = violations.length;
+    const lines = [
+      'You are a senior software engineer performing a targeted code review.',
+      'Apply minimal, surgical fixes — no refactoring, no style changes beyond what is required.',
+      '',
+      `# Fix Plan: ${principle}`,
+      '',
+      `**Total violations:** ${totalViolations}`,
+    ];
+    if (principleData?.findings) lines.push('', `**Context:** ${principleData.findings}`);
+    lines.push('', '---', '');
+
+    EVAL_SEVERITY_ORDER.forEach((sev) => {
+      const vs = violationsBySeverity[sev];
+      if (!vs || vs.length === 0) return;
+      lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);
+      lines.push('');
+      vs.forEach((v, i) => {
+        const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
+        lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
+        const reason = v.reason || v.findings;
+        if (reason) lines.push('', `**Why it's a violation:** ${reason}`);
+        const code = v.code || v.snippet;
+        if (code) {
+          lines.push('', '**Affected code:**');
+          lines.push('```');
+          code.split('\n').forEach((l) => lines.push(l));
+          lines.push('```');
+        }
+        lines.push('');
+      });
+    });
+
+    lines.push('---');
+    lines.push('');
+    lines.push('For each violation above, provide a concrete, step-by-step fix.');
+    lines.push('Return each fix as an exact replacement block or unified diff. No explanations beyond what is needed to apply the fix.');
+    lines.push(PLAN_TEST_INSTRUCTION_GROUP);
+    return lines.join('\n').trim();
+  };
+
+  const buildViolationPlanText = (v) => {
+    const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
+    const lines = [
+      `# Fix Request: ${principle}`,
+      '',
+      `**Severity:** ${v.severity || 'unknown'}`,
+    ];
+    if (loc) lines.push(`**File:** ${loc}`);
+    const code = v.code || v.snippet;
+    if (code) lines.push('', '## Affected Code', '```', code, '```');
+    const reason = v.reason || v.findings;
+    if (reason) lines.push('', "## Why It's a Violation", reason);
+    lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
+    if (loc) lines.push(`Apply it to \`${loc}\`.`);
+    lines.push(PLAN_TEST_INSTRUCTION_SINGLE);
+    return lines.join('\n').trim();
+  };
+
+  return (
+    <>
+      <div className="section-header">
+        <h3 className="section-title file-detail-title">{principle}</h3>
+      </div>
+      <section className="panel file-detail-summary-panel">
+        <div className="file-detail-stats">
+          {score && (
+            <>
+              <span className="file-detail-stat"><strong>{score}</strong></span>
+              <span className="file-detail-stat-sep">·</span>
+            </>
+          )}
+          <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
+          {violations.length > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
+            </>
+          )}
+          {compliance.length > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat"><strong>{compliance.length}</strong> compliant</span>
+            </>
+          )}
+        </div>
+        {violations.length > 0 && (
+          <CopyButton
+            label="Principle fix plan"
+            onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText())}
+          />
+        )}
+      </section>
+
+      {principleData?.findings && (
+        <p className="violation-context-desc" style={{ padding: '0 4px', marginBottom: '4px' }}>
+          {principleData.findings}
+        </p>
+      )}
+      {principleData?.justification && (
+        <p className="violation-context-desc muted" style={{ padding: '0 4px', marginBottom: '12px' }}>
+          {principleData.justification}
+        </p>
+      )}
+
+      {EVAL_SEVERITY_ORDER.map((sev) => {
+        const vs = violationsBySeverity[sev];
+        if (!vs || vs.length === 0) return null;
+        return (
+          <div key={sev}>
+            <div className="violation-group-header">
+              <span className={`severity-tag ${sev}`}>{sev}</span>
+              <span className="violation-group-count">{vs.length}</span>
+            </div>
+            <section className="panel file-violations-section">
+              {vs.map((v, idx) => (
+                <div key={idx} className={`file-violation-card severity-border-${v.severity}`}>
+                  <div className="file-violation-card-header">
+                    <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+                    {v.file && (
+                      <code className="violation-file">
+                        {v.file}{v.line ? `:${v.line}` : ''}
+                      </code>
+                    )}
+                    <CopyButton
+                      label="Fix plan"
+                      onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v))}
+                    />
+                  </div>
+                  {(v.code || v.snippet) && (
+                    <pre className={`code-snippet violation ${v.severity}`}>{v.code || v.snippet}</pre>
+                  )}
+                  {(v.reason || v.findings) && (
+                    <p className="violation-context-desc">{v.reason || v.findings}</p>
+                  )}
+                </div>
+              ))}
+            </section>
+          </div>
+        );
+      })}
+
+      {compliance.length > 0 && (
+        <div>
+          <div className="violation-group-header">
+            <span className="severity-tag compliance">compliance</span>
+            <span className="violation-group-count">{compliance.length}</span>
+          </div>
+          <section className="panel file-violations-section">
+            {displayedCompliance.map((code, idx) => (
+              <pre key={idx} className="code-snippet compliance">{code}</pre>
+            ))}
+          </section>
+          {hasMoreCompliance && (
+            <button
+              className="offending-show-more"
+              onClick={() => setShowAllCompliance((v) => !v)}
+            >
+              {showAllCompliance ? 'Show less' : `Show all ${compliance.length} compliance items`}
+            </button>
+          )}
+        </div>
+      )}
+    </>
+  );
+});
+
+export default EvalPrincipleDetailPage;

@@ -1,0 +1,118 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime, timezone
+import os
+import re
+import threading
+import uuid
+from typing import Any, Iterable
+
+import subprocess
+
+MAX_LOG_LINES = 600
+REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
+
+
+@dataclass
+class Job:
+    job_id: str
+    status: str
+    command: list[str]
+    started_at: str
+    ended_at: str | None
+    exit_code: int | None
+    logs: list[str]
+    output_project: str | None
+    output_run_id: str | None
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "jobId": self.job_id,
+            "status": self.status,
+            "command": " ".join(self.command),
+            "startedAt": self.started_at,
+            "endedAt": self.ended_at,
+            "exitCode": self.exit_code,
+            "logs": list(self.logs),
+            "outputProject": self.output_project,
+            "outputRunId": self.output_run_id,
+        }
+
+
+class JobManager:
+    def __init__(self, spawn_impl=None) -> None:
+        self._spawn = spawn_impl or subprocess.Popen
+        self._jobs: dict[str, Job] = {}
+        self._lock = threading.Lock()
+
+    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
+        job_id = str(uuid.uuid4())
+        job = Job(
+            job_id=job_id,
+            status="running",
+            command=cmd,
+            started_at=datetime.now(timezone.utc).isoformat(),
+            ended_at=None,
+            exit_code=None,
+            logs=[],
+            output_project=None,
+            output_run_id=None,
+        )
+
+        process = self._spawn(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            cwd=cwd,
+            env=env,
+        )
+
+        with self._lock:
+            self._jobs[job_id] = job
+
+        threading.Thread(target=self._consume_stream, args=(job_id, process.stdout), daemon=True).start()
+        threading.Thread(target=self._consume_stream, args=(job_id, process.stderr), daemon=True).start()
+        threading.Thread(target=self._monitor_process, args=(job_id, process), daemon=True).start()
+
+        return job.to_dict()
+
+    def get_job(self, job_id: str) -> dict[str, Any] | None:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job:
+                return None
+            return job.to_dict()
+
+    def _append_log(self, job: Job, line: str) -> None:
+        if not line:
+            return
+        job.logs.append(line)
+        if len(job.logs) > MAX_LOG_LINES:
+            job.logs[:] = job.logs[-MAX_LOG_LINES:]
+        match = REPORT_PATH_RE.search(line)
+        if match:
+            job.output_project = match.group(1)
+            job.output_run_id = match.group(2)
+
+    def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
+        if stream is None:
+            return
+        for line in stream:
+            stripped = line.rstrip("\n")
+            with self._lock:
+                job = self._jobs.get(job_id)
+                if not job:
+                    return
+                self._append_log(job, stripped)
+
+    def _monitor_process(self, job_id: str, process: Any) -> None:
+        exit_code = process.wait()
+        with self._lock:
+            job = self._jobs.get(job_id)
+            if not job:
+                return
+            job.exit_code = exit_code
+            job.ended_at = datetime.now(timezone.utc).isoformat()
+            job.status = "done" if exit_code == 0 else "failed"
