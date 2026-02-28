@@ -410,12 +410,46 @@ def _parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension:
         }
     )
 
+    # Build per-principle detail by grouping top-level violations and compliance
+    principle_map: dict[str, Any] = {}
+    for p in data.get("principles", []):
+        name = p.get("name", "")
+        principle_map[name] = {
+            "name": name,
+            "score": p.get("score"),
+            "grade": p.get("grade"),
+            "violations": [],
+            "compliance": [],
+            "justification": "",
+            "recommendations": [],
+            "metrics": None,
+        }
+    for v in data.get("violations", []):
+        key = v.get("principle", "")
+        if key not in principle_map:
+            principle_map[key] = {"name": key, "score": None, "grade": None, "violations": [], "compliance": [], "justification": "", "recommendations": [], "metrics": None}
+        f = v.get("file")
+        line = v.get("line")
+        principle_map[key]["violations"].append({
+            "code": v.get("snippet", ""),
+            "severity": v.get("severity", "minor"),
+            "file": f"{f}:{line}" if f and line else f,
+            "reason": v.get("reason", ""),
+        })
+    for c in data.get("compliance", []):
+        key = c.get("principle", "")
+        if key not in principle_map:
+            principle_map[key] = {"name": key, "score": None, "grade": None, "violations": [], "compliance": [], "justification": "", "recommendations": [], "metrics": None}
+        principle_map[key]["compliance"].append(c.get("snippet") or c.get("reason") or "")
+
     return {
         "dimension": dimension,
         "runId": run_id,
         "project": project,
         "principleGrades": principle_grades,
-        "principles": [],
+        "principles": list(principle_map.values()),
+        "violations": data.get("violations", []),
+        "compliance": data.get("compliance", []),
         "priorityRemediation": {"critical": [], "major": [], "minor": []},
         "rawContent": None,
     }

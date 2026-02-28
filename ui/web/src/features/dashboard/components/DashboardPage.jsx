@@ -4,7 +4,8 @@ import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from './ViolationsByPrincipleTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
+import CopyButton from '../../../components/CopyButton.jsx';
+import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { formatRunId, gradeColorClass, mostFrequentGrade, splitScore } from '../../../utils/formatters.js';
 
 // ---------------------------------------------------------------------------
@@ -348,45 +349,93 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
     [dashboard]
   );
 
+  const runScoreDelta = useMemo(() => {
+    const prevScores = (dashboard?.dimensions || [])
+      .map((d) => parseFloat(d.previousScore))
+      .filter((v) => !isNaN(v));
+    if (prevScores.length === 0) return null;
+    const prevAvg = prevScores.reduce((a, b) => a + b, 0) / prevScores.length;
+    const currAvg = parseFloat(runSummary.numericAverage);
+    if (isNaN(currAvg)) return null;
+    return (currAvg - prevAvg).toFixed(1);
+  }, [dashboard, runSummary]);
+
+  const runUniquePrinciples = useMemo(() => {
+    const violations = (dashboard?.dimensions || []).flatMap((d) => d.violations || []);
+    return new Set(violations.map((v) => v.principle).filter(Boolean)).size;
+  }, [dashboard]);
+
   if (!dashboard) {
     return <p className="empty-state">Loading run data...</p>;
   }
 
   return (
     <>
-      <section className="overview-summary">
-        <h3 className="run-evaluation-title">{formatRunId(selectedRunId)}</h3>
-        <div className="overview-summary-row">
-          <article className="overview-stat-card overview-stat-grade">
-            <p className="overview-stat-label">Grade</p>
-            <p className="overview-stat-value big">{runSummary.overallGrade}</p>
-            {runSummary.numericAverage && (
-              <p className="overview-stat-sub">{runSummary.numericAverage}/10</p>
-            )}
-          </article>
-          <article className="overview-stat-card">
-            <p className="overview-stat-label">Violations</p>
-            <p className="overview-stat-value">{runSummary.totalViolations}</p>
-            <div className="overview-severity-row">
-              <span className="severity-badge severity-critical">
-                {runSummary.severity.critical} critical
-              </span>
-              <span className="severity-badge severity-major">
-                {runSummary.severity.major} major
-              </span>
-              <span className="severity-badge severity-minor">
-                {runSummary.severity.minor} minor
-              </span>
+      <section className="acc-eval-panel panel">
+        <div className="acc-eval-top">
+          <span className="acc-eval-date">{formatRunId(selectedRunId)}</span>
+          {(dashboard?.dimensions || []).some((d) => (d.violations?.length || 0) > 0) && (
+            <CopyButton
+              label="Fix plan"
+              onClick={() => {
+                const allViolations = (dashboard.dimensions || []).flatMap(
+                  (d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
+                );
+                navigator.clipboard.writeText(
+                  buildDimensionPlanFromViolations(formatRunId(selectedRunId), allViolations)
+                );
+              }}
+            />
+          )}
+        </div>
+
+        <div className="acc-eval-hero">
+          <span className={`acc-eval-grade-chip chip ${gradeColorClass(runSummary.overallGrade)}`}>
+            {runSummary.overallGrade || '—'}
+          </span>
+          <div className="acc-eval-score-row">
+            <span className="acc-eval-score">{runSummary.numericAverage || '—'}</span>
+            <span className="acc-eval-score-denom">/10</span>
+          </div>
+          {runScoreDelta !== null && (
+            <div className="acc-eval-trend">
+              <TrendBadge delta={runScoreDelta} showLabel={true} />
             </div>
-          </article>
-          <article className="overview-stat-card">
-            <p className="overview-stat-label">Compliance</p>
-            <p className="overview-stat-value">{runSummary.totalCompliance}</p>
-          </article>
-          <article className="overview-stat-card">
-            <p className="overview-stat-label">Dimensions</p>
-            <p className="overview-stat-value">{runSummary.dimensionCount}</p>
-          </article>
+          )}
+        </div>
+
+        <div className="acc-eval-stats-grid">
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Violations</span>
+            <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
+            <div className="acc-eval-tags">
+              {(runSummary.severity?.critical || 0) > 0 && (
+                <span className="severity-tag critical">{runSummary.severity.critical} critical</span>
+              )}
+              {(runSummary.severity?.major || 0) > 0 && (
+                <span className="severity-tag major">{runSummary.severity.major} major</span>
+              )}
+              {(runSummary.severity?.minor || 0) > 0 && (
+                <span className="severity-tag minor">{runSummary.severity.minor} minor</span>
+              )}
+            </div>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Files Affected</span>
+            <span className="acc-eval-stat-value">{runTopFiles.length}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Principles</span>
+            <span className="acc-eval-stat-value">{runUniquePrinciples}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Compliant</span>
+            <span className="acc-eval-stat-value">{runSummary.totalCompliance || 0}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Dimensions</span>
+            <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
+          </div>
         </div>
       </section>
 

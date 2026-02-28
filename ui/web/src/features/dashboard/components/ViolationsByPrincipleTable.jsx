@@ -49,10 +49,12 @@ const ViolationsByPrincipleTable = memo(function ViolationsByPrincipleTable({ vi
             className={`offending-file-row${onPrincipleClick ? ' offending-file-row--clickable' : ''}`}
             onClick={onPrincipleClick ? () => onPrincipleClick(p) : undefined}
           >
-            <span className="offending-file-path">{p.principle}</span>
-            {p.dimensionsStr && (
-              <span className="offending-file-dims">{p.dimensionsStr}</span>
-            )}
+            <div className="offending-file-info">
+              <span className="offending-file-path">{p.principle}</span>
+              {p.dimensionsStr && (
+                <span className="offending-file-dims">{p.dimensionsStr}</span>
+              )}
+            </div>
             <strong className="offending-file-total">{p.total}</strong>
             <span className="offending-file-tags">
               {p.critical > 0 && <span className="severity-tag critical">{p.critical} critical</span>}
