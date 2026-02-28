@@ -1,0 +1,316 @@
+/* =============================================================
+   Design Tokens
+   Defines all CSS custom properties for the CodeCompass UI.
+   Organized by layer: primitives → semantic → component-specific.
+   ============================================================= */
+
+/* ── 1. Primitive palette ─────────────────────────────────
+   Raw color values. Never reference these directly in
+   component styles — use the semantic tokens below.
+   ──────────────────────────────────────────────────────── */
+
+:root {
+  /* Sand (light-mode neutral) */
+  --primitive-sand-50:  #faf8f5;
+  --primitive-sand-100: #f4f1ec;
+  --primitive-sand-200: #e8e2d9;
+  --primitive-sand-300: #d4ccc0;
+
+  /* Gray (light-mode text) */
+  --primitive-gray-900: #1a1816;
+  --primitive-gray-700: #3d3a37;
+  --primitive-gray-500: #8a8279;
+  --primitive-gray-400: #a09890;
+
+  /* Coral (accent) */
+  --primitive-coral-700: #b5543a;
+  --primitive-coral-600: #c96442;
+  --primitive-coral-400: #e8795a;
+  --primitive-coral-300: #f08468;
+  --primitive-coral-50:  #fdf0eb;
+
+  /* Red (danger) */
+  --primitive-red-600: #c0392b;
+  --primitive-red-400: #e05c4b;
+
+  /* Green (success) */
+  --primitive-green-700: #2d7a4f;
+  --primitive-green-400: #4caf7d;
+
+  /* Dark palette (dark-mode neutrals) */
+  --primitive-dark-950: #1a1917;
+  --primitive-dark-900: #222120;
+  --primitive-dark-800: #2a2825;
+  --primitive-dark-700: #383532;
+  --primitive-dark-500: #9a9490;
+  --primitive-dark-200: #f0ece6;
+}
+
+/* ── 2. Semantic tokens — Light mode (default) ────────────
+   Maps design intent to primitive values.
+   ──────────────────────────────────────────────────────── */
+
+:root {
+  /* Surface */
+  --color-bg:           var(--primitive-sand-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-sand-100);
+  --color-border:       var(--primitive-sand-200);
+  --color-border-focus: var(--primitive-coral-600);
+
+  /* Text */
+  --color-text:         var(--primitive-gray-900);
+  --color-text-muted:   var(--primitive-gray-500);
+  --color-text-subtle:  var(--primitive-gray-400);
+
+  /* Accent */
+  --color-accent:       var(--primitive-coral-600);
+  --color-accent-hover: var(--primitive-coral-700);
+  --color-accent-soft:  var(--primitive-coral-50);
+
+  /* Status */
+  --color-danger:  var(--primitive-red-600);
+  --color-success: var(--primitive-green-700);
+
+  /* Severity bands */
+  --color-sev-critical-text:   #b91c1c;
+  --color-sev-critical-bg:     rgba(185, 28, 28, 0.08);
+  --color-sev-critical-border: rgba(185, 28, 28, 0.2);
+  --color-sev-major-text:      #b45309;
+  --color-sev-major-bg:        rgba(180, 83, 9, 0.08);
+  --color-sev-major-border:    rgba(180, 83, 9, 0.2);
+  --color-sev-minor-text:      var(--primitive-gray-700);
+  --color-sev-minor-bg:        rgba(61, 58, 55, 0.06);
+  --color-sev-minor-border:    var(--primitive-sand-200);
+
+  /* Grade tier colors */
+  --color-grade-top-text:    #166534;
+  --color-grade-top-bg:      rgba(22, 101, 52, 0.08);
+  --color-grade-high-text:   #0f766e;
+  --color-grade-high-bg:     rgba(15, 118, 110, 0.08);
+  --color-grade-mid-text:    #92400e;
+  --color-grade-mid-bg:      rgba(146, 64, 14, 0.08);
+  --color-grade-low-text:    #9a3412;
+  --color-grade-low-bg:      rgba(154, 52, 18, 0.08);
+  --color-grade-bottom-text: #991b1b;
+  --color-grade-bottom-bg:   rgba(153, 27, 27, 0.08);
+}
+
+/* ── 3. Semantic tokens — Dark mode override ──────────────
+   Applied when OS is set to dark; overridden by explicit
+   html[data-theme] attributes set by the Settings panel.
+   ──────────────────────────────────────────────────────── */
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-bg:           var(--primitive-dark-950);
+    --color-surface:      var(--primitive-dark-900);
+    --color-surface-alt:  var(--primitive-dark-800);
+    --color-border:       var(--primitive-dark-700);
+    --color-border-focus: var(--primitive-coral-400);
+
+    --color-text:         var(--primitive-dark-200);
+    --color-text-muted:   var(--primitive-dark-500);
+    --color-text-subtle:  #706a64;
+
+    --color-accent:       var(--primitive-coral-400);
+    --color-accent-hover: var(--primitive-coral-300);
+    --color-accent-soft:  rgba(232, 121, 90, 0.12);
+
+    --color-danger:  var(--primitive-red-400);
+    --color-success: var(--primitive-green-400);
+
+    --color-sev-critical-text:   #f87171;
+    --color-sev-critical-bg:     rgba(248, 113, 113, 0.1);
+    --color-sev-critical-border: rgba(248, 113, 113, 0.2);
+    --color-sev-major-text:      #fbbf24;
+    --color-sev-major-bg:        rgba(251, 191, 36, 0.1);
+    --color-sev-major-border:    rgba(251, 191, 36, 0.2);
+    --color-sev-minor-text:      var(--primitive-dark-500);
+    --color-sev-minor-bg:        rgba(154, 148, 144, 0.08);
+    --color-sev-minor-border:    var(--primitive-dark-700);
+
+    --color-grade-top-text:    #4ade80;
+    --color-grade-top-bg:      rgba(74, 222, 128, 0.1);
+    --color-grade-high-text:   #2dd4bf;
+    --color-grade-high-bg:     rgba(45, 212, 191, 0.1);
+    --color-grade-mid-text:    #fcd34d;
+    --color-grade-mid-bg:      rgba(252, 211, 77, 0.1);
+    --color-grade-low-text:    #fb923c;
+    --color-grade-low-bg:      rgba(251, 146, 60, 0.1);
+    --color-grade-bottom-text: #f87171;
+    --color-grade-bottom-bg:   rgba(248, 113, 113, 0.1);
+  }
+}
+
+/* ── 4. Explicit theme overrides (user preference) ────────
+   Applied via html[data-theme="dark"|"light"] so the user's
+   choice overrides the OS preference.
+   ──────────────────────────────────────────────────────── */
+
+html[data-theme="dark"]:root {
+  --color-bg:           var(--primitive-dark-950);
+  --color-surface:      var(--primitive-dark-900);
+  --color-surface-alt:  var(--primitive-dark-800);
+  --color-border:       var(--primitive-dark-700);
+  --color-border-focus: var(--primitive-coral-400);
+
+  --color-text:         var(--primitive-dark-200);
+  --color-text-muted:   var(--primitive-dark-500);
+  --color-text-subtle:  #706a64;
+
+  --color-accent:       var(--primitive-coral-400);
+  --color-accent-hover: var(--primitive-coral-300);
+  --color-accent-soft:  rgba(232, 121, 90, 0.12);
+
+  --color-danger:  var(--primitive-red-400);
+  --color-success: var(--primitive-green-400);
+
+  --color-sev-critical-text:   #f87171;
+  --color-sev-critical-bg:     rgba(248, 113, 113, 0.1);
+  --color-sev-critical-border: rgba(248, 113, 113, 0.2);
+  --color-sev-major-text:      #fbbf24;
+  --color-sev-major-bg:        rgba(251, 191, 36, 0.1);
+  --color-sev-major-border:    rgba(251, 191, 36, 0.2);
+  --color-sev-minor-text:      var(--primitive-dark-500);
+  --color-sev-minor-bg:        rgba(154, 148, 144, 0.08);
+  --color-sev-minor-border:    var(--primitive-dark-700);
+
+  --color-grade-top-text:    #4ade80;
+  --color-grade-top-bg:      rgba(74, 222, 128, 0.1);
+  --color-grade-high-text:   #2dd4bf;
+  --color-grade-high-bg:     rgba(45, 212, 191, 0.1);
+  --color-grade-mid-text:    #fcd34d;
+  --color-grade-mid-bg:      rgba(252, 211, 77, 0.1);
+  --color-grade-low-text:    #fb923c;
+  --color-grade-low-bg:      rgba(251, 146, 60, 0.1);
+  --color-grade-bottom-text: #f87171;
+  --color-grade-bottom-bg:   rgba(248, 113, 113, 0.1);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+}
+
+html[data-theme="light"]:root {
+  --color-bg:           var(--primitive-sand-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-sand-100);
+  --color-border:       var(--primitive-sand-200);
+  --color-border-focus: var(--primitive-coral-600);
+
+  --color-text:         var(--primitive-gray-900);
+  --color-text-muted:   var(--primitive-gray-500);
+  --color-text-subtle:  var(--primitive-gray-400);
+
+  --color-accent:       var(--primitive-coral-600);
+  --color-accent-hover: var(--primitive-coral-700);
+  --color-accent-soft:  var(--primitive-coral-50);
+
+  --color-danger:  var(--primitive-red-600);
+  --color-success: var(--primitive-green-700);
+
+  --color-sev-critical-text:   #b91c1c;
+  --color-sev-critical-bg:     rgba(185, 28, 28, 0.08);
+  --color-sev-critical-border: rgba(185, 28, 28, 0.2);
+  --color-sev-major-text:      #b45309;
+  --color-sev-major-bg:        rgba(180, 83, 9, 0.08);
+  --color-sev-major-border:    rgba(180, 83, 9, 0.2);
+  --color-sev-minor-text:      var(--primitive-gray-700);
+  --color-sev-minor-bg:        rgba(61, 58, 55, 0.06);
+  --color-sev-minor-border:    var(--primitive-sand-200);
+
+  --color-grade-top-text:    #166534;
+  --color-grade-top-bg:      rgba(22, 101, 52, 0.08);
+  --color-grade-high-text:   #0f766e;
+  --color-grade-high-bg:     rgba(15, 118, 110, 0.08);
+  --color-grade-mid-text:    #92400e;
+  --color-grade-mid-bg:      rgba(146, 64, 14, 0.08);
+  --color-grade-low-text:    #9a3412;
+  --color-grade-low-bg:      rgba(154, 52, 18, 0.08);
+  --color-grade-bottom-text: #991b1b;
+  --color-grade-bottom-bg:   rgba(153, 27, 27, 0.08);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+}
+
+/* ── 5. Typography ────────────────────────────────────────
+   Font families, scale, line-height, weight.
+   ──────────────────────────────────────────────────────── */
+
+:root {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
+
+  /* Type scale */
+  --text-xs:   0.75rem;
+  --text-sm:   0.875rem;
+  --text-base: 1rem;
+  --text-lg:   1.125rem;
+  --text-xl:   1.375rem;
+  --text-2xl:  1.75rem;
+  --text-3xl:  2.5rem;
+
+  /* Line height */
+  --leading-tight:  1.2;
+  --leading-snug:   1.4;
+  --leading-normal: 1.6;
+
+  /* Weight */
+  --weight-normal:   400;
+  --weight-medium:   500;
+  --weight-semibold: 600;
+}
+
+/* ── 6. Spacing scale ─────────────────────────────────────
+   4px base unit, multiples thereof.
+   ──────────────────────────────────────────────────────── */
+
+:root {
+  --space-1:  4px;
+  --space-2:  8px;
+  --space-3:  12px;
+  --space-4:  16px;
+  --space-5:  20px;
+  --space-6:  24px;
+  --space-8:  32px;
+  --space-10: 40px;
+  --space-12: 48px;
+}
+
+/* ── 7. Border radius ─────────────────────────────────── */
+
+:root {
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+}
+
+/* ── 8. Shadows ───────────────────────────────────────────
+   Light mode only — dark mode uses visible borders instead.
+   ──────────────────────────────────────────────────────── */
+
+:root {
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+  }
+}
+
+/* ── 9. Layout dimensions ─────────────────────────────── */
+
+:root {
+  --sidebar-width:          64px;
+  --sidebar-expanded-width: 240px;
+  --sidebar-transition:     width 200ms ease;
+}

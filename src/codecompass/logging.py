@@ -1,0 +1,32 @@
+import sys
+
+
+BLUE = "\033[0;34m"
+GREEN = "\033[0;32m"
+YELLOW = "\033[1;33m"
+GREY = "\033[0;90m"
+RED = "\033[0;31m"
+NC = "\033[0m"
+
+
+def _log(prefix: str, color: str, message: str) -> None:
+    sys.stderr.write(f"{color}{prefix}{NC} {message}\n")
+
+
+def log_info(message: str) -> None:
+    _log("[INFO]", BLUE, message)
+
+
+def log_success(message: str) -> None:
+    _log("[SUCCESS]", GREEN, message)
+
+
+def log_warning(message: str) -> None:
+    _log("[WARNING]", YELLOW, message)
+
+
+def log_debug(message: str) -> None:
+    _log("[DEBUG]", GREY, message)
+
+def log_error(message: str) -> None:
+    _log("[ERROR]", RED, message)
