@@ -77,6 +77,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
             {lastRelevantLog(job?.logs) ?? 'Starting…'}
           </span>
           <button
+            type="button"
             className="eval-console-toggle"
             onClick={() => setConsoleOpen(o => !o)}
             title={consoleOpen ? 'Hide console' : 'Show console'}

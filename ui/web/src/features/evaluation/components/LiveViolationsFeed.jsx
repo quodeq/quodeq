@@ -9,7 +9,7 @@ function ViolationLiveRow({ violation, index }) {
 
   return (
     <div
-      className={`vlive-row vlive-row--${violation.severity}`}
+      className="vlive-row"
       style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
     >
       <div className="vlive-row-main" onClick={() => setOpen(o => !o)}>
@@ -71,7 +71,7 @@ export default function LiveViolationsFeed({ liveViolations }) {
           <div key={dim} className="vlive-dimension-group">
             <div className="vlive-dimension-label">{dim}</div>
             {violations.map((v, i) => (
-              <ViolationLiveRow key={`${dim}-${i}`} violation={v} index={i} />
+              <ViolationLiveRow key={`${dim}-${v.file}-${v.principle}-${String(v.line ?? '')}`} violation={v} index={i} />
             ))}
           </div>
         );
