@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from codecompass.ports.evaluators import EvaluatorsRepository
+
 
 def resolve_dimension_selection(
     selection: list[str], available: list[str]
@@ -24,5 +26,5 @@ def resolve_dimension_selection(
     return selected, skipped
 
 
-def list_available_dimensions(evaluators_repo: object, discipline: str) -> list[str]:
+def list_available_dimensions(evaluators_repo: EvaluatorsRepository, discipline: str) -> list[str]:
     return sorted(evaluators_repo.list_evaluators(discipline))

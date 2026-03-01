@@ -8,6 +8,7 @@ from pathlib import Path
 from codecompass.config.paths import default_paths
 from codecompass.evaluate.lib.ai_cli import run_ai_cli
 from codecompass.evaluate.lib.common import fail_with_error, log_banner, log_info, log_step, log_success, log_warning
+from codecompass.evaluate.lib.progress import format_end, format_start
 from codecompass.evaluate.lib.dimension_runner import DimensionRunContext, run_dimensions
 from codecompass.evaluate.lib.dimensions import list_available_dimensions, resolve_dimension_selection
 from codecompass.evaluate.lib.discipline_detector import (
@@ -18,8 +19,6 @@ from codecompass.evaluate.lib.evaluation import compute_prompt_hash
 from codecompass.evaluate.lib.practices_runner import build_practices_evaluation
 from codecompass.evaluate.lib.prescan import run_prescan_metrics
 from codecompass.evaluate.lib.repo_handler import is_repo_url, prepare_repository
-from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
-from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
 from codecompass.bootstrap import DataProvider
 from codecompass.ports.data_errors import NotFoundError
 
@@ -35,6 +34,7 @@ class EvaluateConfig:
     no_prescan: bool = False
     numerical: bool = False
     version: str | None = None
+    provider: DataProvider | None = None
 
 
 def ensure_reports_dir(reports_dir: Path, reports_defaulted: bool) -> None:
@@ -109,10 +109,15 @@ def run(config: EvaluateConfig) -> int:
         except DisciplineDetectionError as exc:
             return fail_with_error(str(exc))
 
-    provider = DataProvider(
-        practices=FilesystemPracticesRepository(root=paths.vroot),
-        evaluators=FilesystemEvaluatorsRepository(root=paths.vroot),
-    )
+    if config.provider is not None:
+        provider = config.provider
+    else:
+        from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
+        from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
+        provider = DataProvider(
+            practices=FilesystemPracticesRepository(root=paths.vroot),
+            evaluators=FilesystemEvaluatorsRepository(root=paths.vroot),
+        )
     try:
         available = list_available_dimensions(provider.evaluators, config.discipline)
     except NotFoundError:

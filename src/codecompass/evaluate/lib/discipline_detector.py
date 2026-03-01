@@ -37,8 +37,9 @@ def detect_from_manifest(repo_dir: str) -> str | None:
     raise DisciplineDetectionError("Manifest target missing discipline.")
 
 
-def detect_from_rules(repo_dir: str) -> str | None:
-    registry = _load_registry()
+def detect_from_rules(repo_dir: str, registry: DisciplineRegistry | None = None) -> str | None:
+    if registry is None:
+        registry = _load_registry()
     matches = registry.detect_matches(Path(repo_dir))
     if not matches:
         return None
@@ -49,11 +50,11 @@ def detect_from_rules(repo_dir: str) -> str | None:
     return matches[0]
 
 
-def detect_discipline(repo_dir: str) -> str:
+def detect_discipline(repo_dir: str, registry: DisciplineRegistry | None = None) -> str:
     detected = detect_from_manifest(repo_dir)
     if detected:
         return detected
-    detected = detect_from_rules(repo_dir)
+    detected = detect_from_rules(repo_dir, registry)
     if detected:
         return detected
     raise DisciplineDetectionError(
