@@ -124,6 +124,34 @@
   color: var(--color-text);
 }
 
+/* Header right cluster */
+.job-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Inline cancel — identical pill to the running badge, accent colour, no animation */
+.job-cancel-inline {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: inherit;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border: none;
+  color: var(--color-danger);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.job-cancel-inline:hover {
+  background: color-mix(in srgb, var(--color-danger) 22%, transparent);
+}
+
 /* Status badge */
 .job-status-badge {
   padding: 4px 12px;
