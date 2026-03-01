@@ -1533,7 +1533,7 @@
 
 /* Accordion detail panel */
 .vlive-detail {
-  margin: 0 12px 4px 12px;
+  margin: 0 0 4px;
   padding: 12px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
@@ -1578,12 +1578,69 @@
 .vlive-snippet {
   margin: 0;
   padding: 10px 12px;
-  background: #0d1117;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-family: var(--font-mono);
   font-size: 0.76rem;
-  color: #8bc34a;
+  color: var(--color-text);
   white-space: pre-wrap;
   word-break: break-word;
   line-height: 1.5;
 }
+
+/* Detail rows (explorer detail pages) */
+.vdetail-row {
+  animation: vlive-enter 200ms ease-out both;
+  margin-bottom: var(--space-3);
+}
+
+.vdetail-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-radius: var(--radius-md);
+  cursor: default;
+}
+
+.vdetail-row-main .detail-copy-btn {
+  margin-left: auto;
+}
+
+/* Dimension label inline in the row (file detail page) */
+.vlive-dimension-inline {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* Violations group wrapper in detail pages */
+.vlive-violations-group {
+  margin-bottom: var(--space-4);
+}
+
+/* Title label in violation group headers */
+.violation-group-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+
+/* Severity + compliant left border accents */
+.vdetail-row--critical,
+.vdetail-row--major,
+.vdetail-row--minor,
+.vdetail-row--unknown,
+.vdetail-row--compliant {
+  border-left: 2px solid;
+  padding-left: var(--space-3);
+}
+
+.vdetail-row--critical  { border-color: var(--color-sev-critical-border); }
+.vdetail-row--major     { border-color: var(--color-sev-major-border); }
+.vdetail-row--minor     { border-color: var(--color-sev-minor-border); }
+.vdetail-row--unknown   { border-color: var(--color-border); }
+.vdetail-row--compliant { border-color: var(--color-success); }
