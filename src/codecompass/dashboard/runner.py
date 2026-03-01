@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 import json
 import os
+import signal
 import socket
 import subprocess
 import sys
@@ -99,6 +100,7 @@ def _spawn_action_api(port: int) -> subprocess.Popen:
     return subprocess.Popen(
         [sys.executable, "-m", "codecompass.action_api"],
         env=env,
+        start_new_session=True,
     )
 
 
@@ -185,6 +187,7 @@ def _start_ui_server(config: DashboardConfig, action_api_url: str) -> subprocess
             str(config.port),
         ],
         env=env,
+        start_new_session=True,
     )
 
 
@@ -246,9 +249,25 @@ def run_dashboard(config: DashboardConfig) -> int:
     if config.open_browser:
         webbrowser.open(f"http://localhost:{config.port}")
 
+    def _stop_children() -> None:
+        for proc in (process, action_api_process):
+            if proc and proc.poll() is None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    proc.kill()
+
+    def _handle_tstp(signum, frame) -> None:
+        """Ctrl+Z: shut down cleanly instead of suspending."""
+        _stop_children()
+        sys.exit(0)
+
+    signal.signal(signal.SIGTSTP, _handle_tstp)
+
     try:
         return process.wait()
+    except KeyboardInterrupt:
+        pass
     finally:
-        if action_api_process and action_api_process.poll() is None:
-            action_api_process.terminate()
-            action_api_process.wait()
+        _stop_children()

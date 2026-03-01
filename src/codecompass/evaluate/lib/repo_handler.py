@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import shutil
+import tempfile
 from pathlib import Path
 import subprocess
 
@@ -31,12 +32,9 @@ def _strip_gitignored(src_repo: Path, dest: Path) -> None:
 
 
 def prepare_repository(repo_input: str) -> str:
-    repo_root = Path(__file__).resolve().parents[3]
-    tmp_base = repo_root / "tmp"
-    tmp_base.mkdir(parents=True, exist_ok=True)
-
     if is_repo_url(repo_input):
         repo_name = repo_input.split("/")[-1].replace(".git", "")
+        tmp_base = Path(tempfile.mkdtemp())
         dest = tmp_base / repo_name
         subprocess.run(["git", "clone", repo_input, str(dest)], check=True)
         return str(dest.resolve())
@@ -45,9 +43,7 @@ def prepare_repository(repo_input: str) -> str:
     if not local_path.exists():
         raise FileNotFoundError(f"Local path {local_path} does not exist")
 
-    dest = tmp_base / local_path.name
-    if dest.exists():
-        shutil.rmtree(dest)
+    dest = Path(tempfile.mkdtemp()) / local_path.name
     shutil.copytree(str(local_path), str(dest), ignore=shutil.ignore_patterns(".git"))
     _strip_gitignored(local_path, dest)
     return str(dest.resolve())

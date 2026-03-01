@@ -12,7 +12,7 @@ from codecompass.evaluate.lib.analysis import (
     run_analysis_phase,
     run_scoring_phase,
 )
-from codecompass.evaluate.lib.common import log_error, log_info, log_warning
+from codecompass.evaluate.lib.common import log_error, log_info, log_step, log_warning
 from codecompass.evaluate.lib.evidence import build_evidence_file
 from codecompass.evaluate.lib.evaluator_renderer import (
     extract_analysis_context,
@@ -77,7 +77,7 @@ def run_two_phase_dimension(
         prescan_guidance=prescan_guidance,
     )
 
-    log_info(f"{dimension_tag} Analysis: Gathering evidence (JSONL streaming)...")
+    log_step("Gathering evidence")
 
     # --- Phase 1: Analysis ---
     with (
@@ -109,9 +109,9 @@ def run_two_phase_dimension(
 
         if not stream_ok:
             if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
-                log_info(f"{dimension_tag} Analysis budget reached — proceeding with partial evidence")
+                log_warning("Analysis budget reached — proceeding with partial evidence")
             else:
-                log_error(f"{dimension_tag} Analysis failed with no output")
+                log_error(f"{dimension_tag} Analysis produced no output")
                 return False
 
         # --- Assemble + validate evidence ---
@@ -151,7 +151,7 @@ def run_two_phase_dimension(
             with open(scores_file, "w") as f:
                 json.dump(scores_data, f, indent=2, sort_keys=True)
         except Exception as exc:
-            log_warning(f"{dimension_tag} Score computation failed: {exc}")
+            log_warning(f"Score computation failed: {exc}")
 
     # --- Phase 2: Scoring ---
     scoring_prompt = build_scoring_prompt(
@@ -184,6 +184,6 @@ def run_two_phase_dimension(
             scores_file=scores_file if Path(scores_file).exists() else None,
         )
     except Exception as exc:
-        log_warning(f"{dimension_tag} JSON generation failed — dashboard will fall back to .md: {exc}")
+        log_warning(f"JSON report generation failed — dashboard will fall back to .md: {exc}")
 
     return True

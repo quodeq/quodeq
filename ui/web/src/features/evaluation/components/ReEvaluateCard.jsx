@@ -16,6 +16,9 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
 
   if (!info) return null;
 
+  const available = new Set(info.availableDimensions ?? []);
+  const hasFilter = available.size > 0;
+
   function toggleDimension(code) {
     setSelectedDimensions((prev) =>
       prev.includes(code) ? prev.filter((d) => d !== code) : [...prev, code]
@@ -51,7 +54,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
               <button
                 type="button"
                 className="dim-action-btn"
-                onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.map((d) => d.code))}
+                onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.filter((d) => !hasFilter || available.has(d.code)).map((d) => d.code))}
               >
                 Select all
               </button>
@@ -65,16 +68,21 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
             </div>
           </div>
           <div className="dimension-grid">
-            {DIMENSION_OPTIONS.map((dim) => (
-              <button
-                key={dim.code}
-                type="button"
-                className={`dimension-chip-btn${selectedDimensions.includes(dim.code) ? ' selected' : ''}`}
-                onClick={() => toggleDimension(dim.code)}
-              >
-                {dim.name}
-              </button>
-            ))}
+            {DIMENSION_OPTIONS.map((dim) => {
+              const enabled = !hasFilter || available.has(dim.code);
+              return (
+                <button
+                  key={dim.code}
+                  type="button"
+                  className={`dimension-chip-btn${selectedDimensions.includes(dim.code) ? ' selected' : ''}`}
+                  disabled={!enabled}
+                  title={!enabled ? 'Not available for this discipline' : undefined}
+                  onClick={() => enabled && toggleDimension(dim.code)}
+                >
+                  {dim.name}
+                </button>
+              );
+            })}
           </div>
         </div>
 

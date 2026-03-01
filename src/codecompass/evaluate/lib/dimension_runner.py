@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from codecompass.evaluate.lib.common import log_error, log_info, log_success
+from codecompass.evaluate.lib.common import log_banner, log_divider, log_error, log_info, log_success
 from codecompass.evaluate.lib.evaluation import compute_prompt_hash, run_two_phase_dimension
 from codecompass.evaluate.lib.evaluator_renderer import (
     extract_analysis_context,
@@ -41,11 +41,11 @@ def run_dimensions(dimensions: list[str], ctx: DimensionRunContext) -> tuple[int
     """
     success = 0
     failed = 0
+    total = len(dimensions)
 
-    log_info(f"Starting sequential analysis of {len(dimensions)} dimensions...")
-
-    for dimension in dimensions:
-        mapping_file = ctx.evaluators_dir / ctx.discipline / f"{dimension}.json"
+    for i, dimension in enumerate(dimensions):
+        log_divider(f"[{i + 1}/{total}] {dimension}")
+        evaluator_file = ctx.evaluators_dir / ctx.discipline / f"{dimension}.json"
 
         if not evaluator_file.exists():
             log_error(f"Evaluator file not found: {evaluator_file}")
@@ -66,8 +66,6 @@ def run_dimensions(dimensions: list[str], ctx: DimensionRunContext) -> tuple[int
 
         evidence_file = str(ctx.evidence_dir / f"{dimension}_evidence.json")
         eval_file = str(ctx.evaluation_dir / f"{dimension}_eval.md")
-
-        log_info(f"Evaluating: {dimension}...")
 
         ok = run_two_phase_dimension(
             work_dir=ctx.work_dir,
@@ -95,14 +93,10 @@ def run_dimensions(dimensions: list[str], ctx: DimensionRunContext) -> tuple[int
         if ok:
             success += 1
         else:
-            log_error(f"Failed: {dimension}")
+            log_error(f"[{dimension}] Failed")
             failed += 1
 
-    log_info("=" * 42)
-    log_info("Assessment Complete")
-    log_info("=" * 42)
-    log_success(f"Successful: {success}")
-    if failed:
-        log_error(f"Failed: {failed}")
+    status = f"Assessment complete  ·  {success} passed  ·  {failed} failed"
+    log_banner([status])
 
     return success, failed
