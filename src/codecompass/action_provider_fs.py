@@ -5,6 +5,7 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import shutil
 import sys
 from typing import Any
 
@@ -671,7 +672,7 @@ class FilesystemActionProvider(ActionProvider):
             return _parse_eval_markdown(content, project, run_id, dimension)
         return None
 
-    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str):
+    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None):
         repo_path = Path(repo)
         if not is_repo_url(repo) and not repo_path.exists():
             raise FileNotFoundError(f"Repository not found: {repo}")
@@ -695,8 +696,14 @@ class FilesystemActionProvider(ActionProvider):
         info_dir.mkdir(parents=True, exist_ok=True)
         (info_dir / "repository_info.json").write_text(json.dumps(info))
 
+        env = dict(os.environ)
+        if ai_cmd:
+            env["AI_CMD"] = ai_cmd
+        if ai_model:
+            env["AI_MODEL"] = ai_model
+
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(repo_path.resolve())
-        return self._jobs.start_job(cmd, cwd=cwd, env=dict(os.environ))
+        return self._jobs.start_job(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str):
         return self._jobs.get_job(job_id)
@@ -739,6 +746,67 @@ class FilesystemActionProvider(ActionProvider):
         summary["files"] = files
         summary.pop("byFile", None)
         return summary
+
+    def get_ai_clients(self):
+        candidates = [
+            {"id": "claude", "label": "Claude"},
+            {"id": "codex", "label": "Codex"},
+            {"id": "copilot", "label": "Copilot"},
+        ]
+        return {"clients": [c for c in candidates if shutil.which(c["id"])]}
+
+    def get_client_models(self, client_id: str):
+        if client_id == "claude":
+            return self._get_claude_models()
+        import subprocess
+        if not shutil.which(client_id):
+            return {"models": []}
+        try:
+            result = subprocess.run(
+                [client_id, "/models"],
+                capture_output=True,
+                text=True,
+                timeout=8,
+            )
+            output = result.stdout if result.returncode == 0 else ""
+        except (subprocess.TimeoutExpired, OSError):
+            return {"models": []}
+        models = []
+        for line in output.splitlines():
+            token = line.strip().split()[0] if line.strip() else ""
+            if token and token[0] not in ("#", "=", "-", "[", "("):
+                models.append(token)
+        return {"models": models}
+
+    def _get_claude_models(self):
+        import json
+        import urllib.request
+        # Try direct API call when ANTHROPIC_API_KEY is available
+        api_key = os.environ.get("ANTHROPIC_API_KEY")
+        if api_key:
+            try:
+                req = urllib.request.Request(
+                    "https://api.anthropic.com/v1/models",
+                    headers={
+                        "x-api-key": api_key,
+                        "anthropic-version": "2023-06-01",
+                    },
+                )
+                with urllib.request.urlopen(req, timeout=8) as resp:
+                    data = json.loads(resp.read())
+                models = [m["id"] for m in data.get("data", []) if m.get("id")]
+                if models:
+                    return {"models": models}
+            except Exception:
+                pass
+        # Fall back to a curated list of current models.
+        # Claude Code uses OAuth (web login) — there's no way to call /v1/models
+        # without an API key, so we maintain this list manually.
+        return {"models": [
+            "claude-opus-4-5",
+            "claude-sonnet-4-5",
+            "claude-haiku-4-5",
+        ]}
 
     def browse_repo(self, path: str | None):
         target = Path(path) if path else Path.home()

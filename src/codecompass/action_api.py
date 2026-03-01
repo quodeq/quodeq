@@ -79,6 +79,8 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
                 dimensions=payload.get("dimensions") or "",
                 numerical=bool(payload.get("numerical")),
                 reports_dir=_reports_dir(),
+                ai_cmd=payload.get("aiCmd") or None,
+                ai_model=payload.get("aiModel") or None,
             )
         except FileNotFoundError as exc:
             body, status = _error(str(exc), 400, "INVALID_INPUT")
@@ -100,6 +102,14 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
             body, status = _error("Job not found or not running", 404, "NOT_FOUND")
             return jsonify(body), status
         return jsonify({"ok": True})
+
+    @app.get("/api/ai-clients")
+    def ai_clients():
+        return jsonify(provider.get_ai_clients())
+
+    @app.get("/api/ai-clients/<client_id>/models")
+    def client_models(client_id: str):
+        return jsonify(provider.get_client_models(client_id))
 
     @app.get("/api/browse")
     def browse():
