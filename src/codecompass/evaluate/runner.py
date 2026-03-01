@@ -17,7 +17,7 @@ from codecompass.evaluate.lib.discipline_detector import (
 from codecompass.evaluate.lib.evaluation import compute_prompt_hash
 from codecompass.evaluate.lib.practices_runner import build_practices_evaluation
 from codecompass.evaluate.lib.prescan import run_prescan_metrics
-from codecompass.evaluate.lib.repo_handler import prepare_repository
+from codecompass.evaluate.lib.repo_handler import is_repo_url, prepare_repository
 from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
 from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
 from codecompass.bootstrap import DataProvider
@@ -81,10 +81,16 @@ def run(config: EvaluateConfig) -> int:
 
     ensure_reports_dir(config.reports_dir, config.reports_defaulted)
 
-    try:
-        _repo_path = prepare_repository(config.repo)
-    except FileNotFoundError as exc:
-        return fail_with_error(str(exc))
+    if is_repo_url(config.repo):
+        try:
+            repo_path = prepare_repository(config.repo)
+        except Exception as exc:
+            return fail_with_error(str(exc))
+    else:
+        local = Path(config.repo).resolve()
+        if not local.exists():
+            return fail_with_error(f"Local path {local} does not exist")
+        repo_path = str(local)
 
     paths = default_paths(version=config.version)
     if not config.discipline:
@@ -157,7 +163,7 @@ def run(config: EvaluateConfig) -> int:
         log_success(f"{source_file_count:,} source files")
 
     ctx = DimensionRunContext(
-        work_dir=config.repo,
+        work_dir=repo_path,
         discipline=config.discipline,
         project_name=project_name,
         today=today,
