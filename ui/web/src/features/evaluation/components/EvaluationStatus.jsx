@@ -31,6 +31,10 @@ export default function EvaluationStatus({ job, onDismiss, onCancel }) {
     }
   }, [job?.logs]);
 
+  useEffect(() => {
+    setConsoleOpen(false);
+  }, [job?.jobId]);
+
   if (!job) return null;
 
   const isRunning = job.status === 'running';
