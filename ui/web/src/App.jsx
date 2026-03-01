@@ -28,10 +28,9 @@ const ICON_OVERVIEW = (
 );
 
 const ICON_EVALUATE = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5" />
-    <path d="M2 12l10 5 10-5" />
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="7" />
+    <line x1="16.5" y1="16.5" x2="22" y2="22" />
   </svg>
 );
 
@@ -399,7 +398,7 @@ export default function App() {
               {jobError && <div className="job-error-banner">{jobError}</div>}
               <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={handleEvalDismiss} onCancel={cancelEvaluation} />
 
-              <div className="panel evaluate-help-panel">
+              {!job && <div className="panel evaluate-help-panel">
                 <div className="panel-header">
                   <h3>How It Works</h3>
                 </div>
@@ -426,7 +425,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div>}
             </div>
           </section>
         );
