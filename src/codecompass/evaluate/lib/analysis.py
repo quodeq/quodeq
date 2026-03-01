@@ -187,6 +187,7 @@ def run_analysis_phase(
     env = os.environ.copy()
     if "CODEX_SANDBOX" not in env:
         env["CODEX_SANDBOX"] = "read-only"
+    env.pop("CLAUDECODE", None)  # allow claude to run even when invoked from a Claude Code session
 
     stream_err_file = stream_file + ".err"
     heartbeat_interval = 60
@@ -235,10 +236,14 @@ def run_scoring_phase(
         args.extend(["--model", model])
     args.extend(["-p", scoring_prompt])
 
+    env = os.environ.copy()
+    env.pop("CLAUDECODE", None)  # allow claude to run even when invoked from a Claude Code session
+
     with open(eval_file, "w") as out:
         result = subprocess.run(
             args,
             cwd=work_dir,
+            env=env,
             stdout=out,
             stderr=out,
             stdin=subprocess.DEVNULL,
