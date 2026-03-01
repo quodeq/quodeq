@@ -27,6 +27,12 @@ class DummyProcess:
     def wait(self):
         return self._returncode
 
+    def poll(self):
+        return self._returncode
+
+    def terminate(self):
+        pass
+
 
 def test_run_dashboard_invokes_node(tmp_path: Path, monkeypatch):
     (tmp_path / "reports").mkdir()
@@ -117,7 +123,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     monkeypatch.setattr(
         runner,
         "_start_ui_server",
-        lambda *_args, **_kwargs: type("Dummy", (), {"wait": lambda self: 0})(),
+        lambda *_args, **_kwargs: type("Dummy", (), {"wait": lambda self: 0, "poll": lambda self: 0, "terminate": lambda self: None})(),
     )
 
     config = DashboardConfig(
