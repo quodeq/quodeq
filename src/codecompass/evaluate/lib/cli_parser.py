@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass, field
 
 from codecompass.evaluate.lib.usage import evaluate_usage
@@ -20,8 +21,6 @@ class ParseResult:
 
 
 def parse_cli_args(argv: list[str]) -> ParseResult:
-    import argparse
-
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument("-d", "--dimensions", type=str, default="")
     parser.add_argument("--no-prescan", action="store_true")

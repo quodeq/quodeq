@@ -1,8 +1,9 @@
 from codecompass.ports.data_errors import InvalidDataError, NetworkError, ServerError
+from codecompass.ports.practices import PracticesRepository
 
 
 class HybridPracticesRepository:
-    def __init__(self, web, fs) -> None:
+    def __init__(self, web: PracticesRepository, fs: PracticesRepository) -> None:
         self._web = web
         self._fs = fs
 
