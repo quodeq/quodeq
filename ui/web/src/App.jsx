@@ -389,7 +389,7 @@ export default function App() {
               {!job && (
                 <div className="panel evaluate-panel">
                   <div className="panel-header">
-                    <h3>Evaluate a Repository</h3>
+                    <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
                   </div>
                   <EvaluationForm onStart={handleStartEvaluation} disabled={false} />
                 </div>
