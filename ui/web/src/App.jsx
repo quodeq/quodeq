@@ -220,7 +220,7 @@ export default function App() {
   // -------------------------------------------------------------------------
   // Evaluation
   // -------------------------------------------------------------------------
-  const { job, jobError, startEvaluation, clearJob } = useEvaluation();
+  const { job, jobError, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
 
   function handleEvalDismiss(action) {
     if (action === 'view') {
@@ -337,23 +337,25 @@ export default function App() {
             </header>
 
             <div className="evaluate-content">
-              {selectedProject && (
+              {!job && selectedProject && (
                 <ReEvaluateCard
                   project={selectedProject}
                   onStart={startEvaluation}
-                  disabled={job?.status === 'running'}
+                  disabled={false}
                 />
               )}
 
-              <div className="panel evaluate-panel">
-                <div className="panel-header">
-                  <h3>Evaluate a Repository</h3>
+              {!job && (
+                <div className="panel evaluate-panel">
+                  <div className="panel-header">
+                    <h3>Evaluate a Repository</h3>
+                  </div>
+                  <EvaluationForm onStart={startEvaluation} disabled={false} />
                 </div>
-                <EvaluationForm onStart={startEvaluation} disabled={job?.status === 'running'} />
-              </div>
+              )}
 
               {jobError && <div className="job-error-banner">{jobError}</div>}
-              <EvaluationStatus job={job} onDismiss={handleEvalDismiss} />
+              <EvaluationStatus job={job} onDismiss={handleEvalDismiss} onCancel={cancelEvaluation} />
 
               <div className="panel evaluate-help-panel">
                 <div className="panel-header">

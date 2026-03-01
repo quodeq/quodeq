@@ -26,5 +26,8 @@ class ActionProvider:
     def get_evaluation_status(self, job_id: str):
         raise NotImplementedError
 
+    def cancel_evaluation(self, job_id: str) -> bool:
+        raise NotImplementedError
+
     def browse_repo(self, path: str | None):
         raise NotImplementedError
