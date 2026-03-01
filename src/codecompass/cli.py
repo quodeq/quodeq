@@ -2,11 +2,16 @@ import argparse
 import sys
 from pathlib import Path
 
+from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
+from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
+from codecompass.bootstrap import DataProvider
 from codecompass.config.cli import build_parser as build_config_parser
 from codecompass.config.cli import main as configure_main
+from codecompass.config.paths import default_paths
 from codecompass.dashboard.cli import main as dashboard_main
 from codecompass.evaluate import EvaluateConfig, build_parser as build_evaluate_parser
 from codecompass.evaluate import run as run_evaluate
+from codecompass.evaluate.lib.cli_parser import parse_cli_args
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -44,20 +49,27 @@ def main(argv: list[str] | None = None) -> int:
         return dashboard_main(sub_argv)
     if args._command == "evaluate":
         sub_argv = argv[1:] if argv is not None else sys.argv[2:]
-        reports_defaulted = "--evaluations" not in sub_argv
-        discipline = args.discipline
-        repo = args.repo
-        if repo is None and discipline is not None:
-            repo = discipline
-            discipline = None
-        dimensions = [d.strip() for d in (args.dimensions or "").split(",") if d.strip()]
+        parsed = parse_cli_args(sub_argv)
+        if parsed.errors:
+            for err in parsed.errors:
+                print(err, file=sys.stderr)
+            return 1
+        paths = default_paths(version=parsed.data_version)
+        provider = DataProvider(
+            practices=FilesystemPracticesRepository(root=paths.vroot),
+            evaluators=FilesystemEvaluatorsRepository(root=paths.vroot),
+        )
         config = EvaluateConfig(
-            discipline=discipline,
-            repo=repo,
-            reports_dir=Path(args.evaluations),
-            reports_defaulted=reports_defaulted,
-            dimensions=dimensions,
-            version=getattr(args, "data_version", None),
+            discipline=parsed.discipline,
+            repo=parsed.repo,
+            reports_dir=Path(parsed.reports_dir),
+            reports_defaulted=parsed.reports_defaulted,
+            dimensions=parsed.dimensions,
+            evidence_only=parsed.evidence_only,
+            no_prescan=parsed.no_prescan,
+            numerical=parsed.numerical,
+            version=parsed.data_version,
+            provider=provider,
         )
         return run_evaluate(config)
     if args._command == "configure":
