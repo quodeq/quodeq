@@ -479,6 +479,49 @@ class FilesystemActionProvider(ActionProvider):
         projects.sort(key=lambda item: item["name"])
         return {"projects": projects}
 
+    def get_project_info(self, reports_dir: str, project: str):
+        info_path = Path(reports_dir) / project / "repository_info.json"
+        if not info_path.exists():
+            return None
+        try:
+            info = json.loads(info_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return None
+
+        discipline = info.get("discipline")
+
+        # Discipline may be null for projects evaluated via CLI — infer it from
+        # the most recent evidence file, which always records the discipline.
+        if not discipline:
+            reports_root = Path(reports_dir)
+            for run in sorted(_safe_read_dir(reports_root / project), key=lambda e: e.name, reverse=True):
+                if not run.is_dir():
+                    continue
+                for ev in _safe_read_dir(reports_root / project / run.name / "evidence"):
+                    if ev.name.endswith("_evidence.json"):
+                        try:
+                            d = json.loads(Path(ev.path).read_text()).get("discipline")
+                            if d:
+                                discipline = d
+                        except Exception:
+                            pass
+                if discipline:
+                    break
+
+        available_dimensions: list[str] = []
+        if discipline:
+            try:
+                from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
+                from codecompass.config.paths import default_paths
+                from codecompass.evaluate.lib.dimensions import list_available_dimensions
+                paths = default_paths()
+                evaluators = FilesystemEvaluatorsRepository(root=paths.vroot)
+                available_dimensions = list_available_dimensions(evaluators, discipline)
+            except Exception:
+                pass
+
+        return {**info, "discipline": discipline, "availableDimensions": available_dimensions}
+
     def get_dashboard(self, reports_dir: str, project: str, run: str):
         reports_root = Path(reports_dir)
         runs = _list_runs(reports_root, project)
@@ -696,7 +739,7 @@ class FilesystemActionProvider(ActionProvider):
         info_dir.mkdir(parents=True, exist_ok=True)
         (info_dir / "repository_info.json").write_text(json.dumps(info))
 
-        env = dict(os.environ)
+        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
         if ai_cmd:
             env["AI_CMD"] = ai_cmd
         if ai_model:

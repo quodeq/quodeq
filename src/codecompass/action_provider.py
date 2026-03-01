@@ -5,6 +5,9 @@ class ActionProvider:
     def list_projects(self, reports_dir: str):
         raise NotImplementedError
 
+    def get_project_info(self, reports_dir: str, project: str):
+        raise NotImplementedError
+
     def get_dashboard(self, reports_dir: str, project: str, run: str):
         raise NotImplementedError
 

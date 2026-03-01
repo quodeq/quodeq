@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 from codecompass.evaluate.lib.ai_cli_provider import get_ai_cmd, get_ai_model
-from codecompass.evaluate.lib.common import log_error, log_info, log_success, log_warning
+from codecompass.evaluate.lib.common import log_beat, log_error, log_info, log_success, log_warning
 
 
 # ---------------------------------------------------------------------------
@@ -108,12 +108,7 @@ def extract_jsonl_evidence(stream_file: str, jsonl_file: str, dimension: str) ->
             elif etype == "item.completed":
                 process_item_completed_event(data, out, stats)
 
-    events_summary = ", ".join(f"{k}:{v}" for k, v in sorted(event_types.items()))
-    log_info(
-        f"[{dimension}] Extraction: {stats['text_blocks']} text blocks, "
-        f"{stats['total_text_lines']} text lines scanned, "
-        f"{stats['jsonl_lines']} evidence lines found (events: {events_summary})"
-    )
+    pass  # evidence count is reported after assembly
 
 
 def is_stream_valid(stream_file: str) -> bool:
@@ -135,7 +130,7 @@ def is_stream_valid(stream_file: str) -> bool:
 def dump_debug_sample(stream_file: str, debug_stream: str, dimension_tag: str) -> None:
     """Save the stream file as a debug artifact and log a sample of it."""
     shutil.copy(stream_file, debug_stream)
-    log_warning(f"{dimension_tag} No evidence extracted — debug stream saved to {debug_stream}")
+    log_warning(f"No evidence extracted — debug stream saved to {Path(debug_stream).name}")
 
     with open(stream_file) as f:
         for line in f:
@@ -148,8 +143,8 @@ def dump_debug_sample(stream_file: str, debug_stream: str, dimension_tag: str) -
                 for block in d.get("message", {}).get("content", []):
                     if block.get("type") == "text":
                         text = block["text"]
-                        preview = text[:500].replace("\n", "\n    ")
-                        log_info(f"  [DEBUG] Sample text block ({len(text)} chars):\n    {preview}")
+                        preview = text[:400].replace("\n", "\n    ")
+                        log_info(f"  debug sample ({len(text)} chars):\n    {preview}")
                         return
 
             if d.get("type") == "item.completed":
@@ -157,11 +152,11 @@ def dump_debug_sample(stream_file: str, debug_stream: str, dimension_tag: str) -
                 if item.get("type") == "agent_message":
                     text = item.get("text", "")
                     if text:
-                        preview = text[:500].replace("\n", "\n    ")
-                        log_info(f"  [DEBUG] Sample agent_message text ({len(text)} chars):\n    {preview}")
+                        preview = text[:400].replace("\n", "\n    ")
+                        log_info(f"  debug sample ({len(text)} chars):\n    {preview}")
                         return
 
-    log_info("  [DEBUG] No assistant text blocks found in stream")
+    log_info("  debug: no assistant text blocks found in stream")
 
 
 # ---------------------------------------------------------------------------
@@ -193,8 +188,6 @@ def run_analysis_phase(
     if "CODEX_SANDBOX" not in env:
         env["CODEX_SANDBOX"] = "read-only"
 
-    log_info(f"{dimension_tag} Analyzing (this may take a while)...")
-
     stream_err_file = stream_file + ".err"
     heartbeat_interval = 60
     with open(stream_file, "w") as stream_out, open(stream_err_file, "w") as stream_err:
@@ -212,14 +205,9 @@ def run_analysis_phase(
                 process.wait(timeout=heartbeat_interval)
             except subprocess.TimeoutExpired:
                 elapsed += heartbeat_interval
-                stream_size = Path(stream_file).stat().st_size if Path(stream_file).exists() else 0
-                log_info(f"{dimension_tag} Still analyzing... ({elapsed}s elapsed, {stream_size} bytes captured)")
-
-    events = 0
-    if Path(stream_file).exists():
-        with open(stream_file) as f:
-            events = sum(1 for line in f if line.strip())
-    log_info(f"{dimension_tag} Analysis complete ({events} stream events captured).")
+                mins, secs = divmod(elapsed, 60)
+                elapsed_label = f"{mins}m {secs}s" if mins else f"{secs}s"
+                log_beat(f"{elapsed_label} elapsed")
 
 
 def run_scoring_phase(
@@ -234,10 +222,11 @@ def run_scoring_phase(
 
     Returns True on success, False on failure.
     """
+    from codecompass.evaluate.lib.common import log_step
     if has_evidence:
-        log_info(f"{dimension_tag} Scoring...")
+        log_step("Scoring")
     else:
-        log_info(f"{dimension_tag} Scoring (with insufficient evidence — scores will reflect this)...")
+        log_step("Scoring  (no evidence — scores will reflect this)")
 
     cmd = get_ai_cmd()
     model = get_ai_model()
@@ -257,10 +246,8 @@ def run_scoring_phase(
 
     eval_path = Path(eval_file)
     if result.returncode != 0 or not eval_path.exists() or eval_path.stat().st_size == 0:
-        log_error(f"{dimension_tag} Scoring failed (exit code: {result.returncode})")
+        log_error(f"Scoring failed (exit code: {result.returncode})")
         return False
 
-    with open(eval_file) as f:
-        line_count = sum(1 for _ in f)
-    log_success(f"{dimension_tag} Evaluation complete ({line_count} lines) -> {eval_path.name}")
+    log_success(eval_path.name)
     return True

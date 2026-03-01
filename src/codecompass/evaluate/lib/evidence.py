@@ -182,10 +182,13 @@ def assemble_evidence_from_jsonl(
     with open(output_file, "w") as fh:
         json.dump(result, fh, indent=2)
 
-    log_info(
-        f"Assembled {accepted} findings across {len(principles)} principles "
-        f"({rejected} lines skipped, {dropped} duplicates removed)"
-    )
+    extras = []
+    if rejected:
+        extras.append(f"{rejected} skipped")
+    if dropped:
+        extras.append(f"{dropped} duplicates removed")
+    suffix = f"  ({', '.join(extras)})" if extras else ""
+    log_success(f"{accepted} findings across {len(principles)} principles{suffix}")
     return True
 
 
@@ -236,7 +239,6 @@ def validate_evidence_json(file: str) -> bool:
         return False
 
     path.write_text(json.dumps(data, indent=2))
-    log_info(f"Valid evidence JSON: {len(data['principles'])} principles found")
     return True
 
 
@@ -262,17 +264,15 @@ def build_evidence_file(
         source_file_count, analysis_hash, scoring_hash, mapping_hash, codecompass_version,
     )
     if not has_evidence:
-        log_warning(f"{dimension_tag} No valid evidence lines found — scoring will note insufficient evidence")
+        log_warning("No valid evidence found — scoring will note insufficient evidence")
 
     if has_evidence:
         if not validate_evidence_json(evidence_file):
-            log_error(f"{dimension_tag} Assembled evidence JSON validation failed")
+            log_error("Evidence validation failed")
             has_evidence = False
-        else:
-            log_success(f"{dimension_tag} Evidence gathered -> {evidence_file}")
 
     if not has_evidence:
-        log_warning(f"{dimension_tag} Creating minimal evidence file for scoring")
+        log_warning("Creating minimal evidence — scores will reflect insufficient data")
         minimal = {
             "repository": project_name,
             "discipline": discipline,
