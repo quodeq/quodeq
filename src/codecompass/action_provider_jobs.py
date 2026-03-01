@@ -44,6 +44,7 @@ class JobManager:
     def __init__(self, spawn_impl=None) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._jobs: dict[str, Job] = {}
+        self._processes: dict[str, Any] = {}
         self._lock = threading.Lock()
 
     def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
@@ -71,12 +72,25 @@ class JobManager:
 
         with self._lock:
             self._jobs[job_id] = job
+            self._processes[job_id] = process
 
         threading.Thread(target=self._consume_stream, args=(job_id, process.stdout), daemon=True).start()
         threading.Thread(target=self._consume_stream, args=(job_id, process.stderr), daemon=True).start()
         threading.Thread(target=self._monitor_process, args=(job_id, process), daemon=True).start()
 
         return job.to_dict()
+
+    def cancel_job(self, job_id: str) -> bool:
+        with self._lock:
+            job = self._jobs.get(job_id)
+            process = self._processes.get(job_id)
+            if not job or job.status != "running":
+                return False
+            job.status = "cancelled"
+            job.ended_at = datetime.now(timezone.utc).isoformat()
+        if process:
+            process.terminate()
+        return True
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
         with self._lock:
@@ -110,8 +124,9 @@ class JobManager:
     def _monitor_process(self, job_id: str, process: Any) -> None:
         exit_code = process.wait()
         with self._lock:
+            self._processes.pop(job_id, None)
             job = self._jobs.get(job_id)
-            if not job:
+            if not job or job.status == "cancelled":
                 return
             job.exit_code = exit_code
             job.ended_at = datetime.now(timezone.utc).isoformat()

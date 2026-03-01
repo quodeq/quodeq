@@ -701,6 +701,9 @@ class FilesystemActionProvider(ActionProvider):
     def get_evaluation_status(self, job_id: str):
         return self._jobs.get_job(job_id)
 
+    def cancel_evaluation(self, job_id: str) -> bool:
+        return self._jobs.cancel_job(job_id)
+
     def get_violations(self, reports_dir: str, project: str, run_id: str):
         dashboard = self.get_dashboard(reports_dir, project, run_id)
         summary = {
