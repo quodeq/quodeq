@@ -6,7 +6,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from codecompass.evaluate.lib.ai_cli_provider import get_ai_cmd
+from codecompass.evaluate.lib.ai_cli_provider import get_ai_cmd, get_ai_model
 from codecompass.evaluate.lib.common import log_error, log_info, log_success, log_warning
 
 
@@ -179,14 +179,12 @@ def run_analysis_phase(
 ) -> None:
     """Run the AI analysis phase, capturing stream-json output to stream_file."""
     cmd = get_ai_cmd()
+    model = get_ai_model()
     analysis_tools = "Bash,Glob,Grep,Read"
 
-    args = [
-        cmd, "--print",
-        "--output-format", "stream-json",
-        "--verbose",
-        "--tools", analysis_tools,
-    ]
+    args = [cmd, "--print", "--output-format", "stream-json", "--verbose", "--tools", analysis_tools]
+    if model:
+        args.extend(["--model", model])
     if not deep_unrestricted and analysis_budget:
         args.extend(["--max-budget-usd", str(analysis_budget)])
     args.extend(["-p", prompt])
@@ -242,7 +240,11 @@ def run_scoring_phase(
         log_info(f"{dimension_tag} Scoring (with insufficient evidence — scores will reflect this)...")
 
     cmd = get_ai_cmd()
-    args = [cmd, "--print", "--tools", "", "-p", scoring_prompt]
+    model = get_ai_model()
+    args = [cmd, "--print", "--tools", ""]
+    if model:
+        args.extend(["--model", model])
+    args.extend(["-p", scoring_prompt])
 
     with open(eval_file, "w") as out:
         result = subprocess.run(

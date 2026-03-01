@@ -61,3 +61,11 @@ export function browseDirectory(dirPath = '') {
   const q = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';
   return request(`/browse${q}`);
 }
+
+export function getAiClients() {
+  return request('/ai-clients');
+}
+
+export function getClientModels(clientId) {
+  return request(`/ai-clients/${encodeURIComponent(clientId)}/models`);
+}
