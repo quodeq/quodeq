@@ -5,9 +5,11 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import sys
 from typing import Any
+import urllib.request
 
 from codecompass.action_provider import ActionProvider
 from codecompass.action_provider_jobs import JobManager
@@ -50,8 +52,6 @@ def _parse_run_id_date(run_id: str) -> tuple[str | None, str]:
 def _parse_numeric_score(score_text: str | None) -> float | None:
     if not score_text:
         return None
-    import re
-
     match = re.search(r"(\d+(?:\.\d+)?)", str(score_text))
     if not match:
         return None
@@ -87,8 +87,6 @@ def _split_table_row(line: str) -> list[str]:
 
 
 def _is_divider_row(line: str) -> bool:
-    import re
-
     return re.match(r"^\s*\|?\s*[-:]+(\s*\|\s*[-:]+)+\s*\|?\s*$", line) is not None
 
 
@@ -125,8 +123,6 @@ def _parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: st
             grade = None
             if is_four_col:
                 raw = cells[-1]
-                import re
-
                 match = re.match(r"^(\d+(?:\.\d+)?/10)(?:\s+(\w+))?$", raw)
                 if match:
                     score = match.group(1)
@@ -822,8 +818,6 @@ class FilesystemActionProvider(ActionProvider):
         return {"models": models}
 
     def _get_claude_models(self):
-        import json
-        import urllib.request
         # Try direct API call when ANTHROPIC_API_KEY is available
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if api_key:

@@ -17,6 +17,7 @@ from codecompass.evaluate.lib.discipline_detector import (
 from codecompass.evaluate.lib.evaluation import compute_prompt_hash
 from codecompass.evaluate.lib.practices_runner import build_practices_evaluation
 from codecompass.evaluate.lib.prescan import run_prescan_metrics
+from codecompass.evaluate.lib.progress import format_end, format_start
 from codecompass.evaluate.lib.repo_handler import is_repo_url, prepare_repository
 from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
 from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
