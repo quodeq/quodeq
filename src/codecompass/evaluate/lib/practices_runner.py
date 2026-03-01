@@ -3,6 +3,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from codecompass.evaluate.lib.practices import list_practice_files
+from codecompass.ports.practices import PracticesRepository
 
 
 def resolve_selected_practice_names(all_practice_files: list[str], selected_indices: list[int]) -> list[str]:
@@ -46,7 +47,7 @@ def build_practices_prompt(
 def build_practices_evaluation(
     *,
     discipline: str,
-    practices_repo: object,
+    practices_repo: PracticesRepository,
     selected_indices: list[int],
     template: str,
     project_name: str,
@@ -96,7 +97,7 @@ def build_practices_evaluation(
 def run_practices(
     *,
     discipline: str,
-    practices_repo: object,
+    practices_repo: PracticesRepository,
     template: str,
     project_name: str,
     today: str,
