@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { listProjects } from './api/index.js';
+import { listProjects, getAiClients } from './api/index.js';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import RunNavigator from './features/dashboard/components/RunNavigator.jsx';
@@ -13,6 +13,7 @@ import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
 import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
 import EvalPrincipleDetailPage from './features/explorer/components/EvalPrincipleDetailPage.jsx';
 import { formatRunId } from './utils/formatters.js';
+
 
 // ---------------------------------------------------------------------------
 // Icons
@@ -218,9 +219,38 @@ export default function App() {
   }
 
   // -------------------------------------------------------------------------
+  // AI settings
+  // -------------------------------------------------------------------------
+  const [aiCmd, setAiCmd] = useState(localStorage.getItem('cc-ai-cmd') || '');
+  const [availableClients, setAvailableClients] = useState(null);
+
+  useEffect(() => {
+    if (activePage.page !== 'settings' || availableClients !== null) return;
+    getAiClients()
+      .then((data) => {
+        const clients = data.clients || [];
+        setAvailableClients(clients);
+        if (aiCmd && !clients.some((c) => c.id === aiCmd)) {
+          setAiCmd('');
+          localStorage.removeItem('cc-ai-cmd');
+        }
+      })
+      .catch(() => setAvailableClients([]));
+  }, [activePage]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function applyAiCmd(value) {
+    setAiCmd(value);
+    localStorage.setItem('cc-ai-cmd', value);
+  }
+
+  // -------------------------------------------------------------------------
   // Evaluation
   // -------------------------------------------------------------------------
   const { job, jobError, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
+
+  function handleStartEvaluation(payload) {
+    startEvaluation({ ...payload, aiCmd: aiCmd || undefined });
+  }
 
   function handleEvalDismiss(action) {
     if (action === 'view') {
@@ -340,7 +370,7 @@ export default function App() {
               {!job && selectedProject && (
                 <ReEvaluateCard
                   project={selectedProject}
-                  onStart={startEvaluation}
+                  onStart={handleStartEvaluation}
                   disabled={false}
                 />
               )}
@@ -350,7 +380,7 @@ export default function App() {
                   <div className="panel-header">
                     <h3>Evaluate a Repository</h3>
                   </div>
-                  <EvaluationForm onStart={startEvaluation} disabled={false} />
+                  <EvaluationForm onStart={handleStartEvaluation} disabled={false} />
                 </div>
               )}
 
@@ -403,11 +433,25 @@ export default function App() {
         return (
           <div className="settings-page">
             <div className="settings-header">
-              <h1 className="settings-title">Settings</h1>
+              <div className="settings-header-content">
+                <div className="settings-page-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </div>
+                <div>
+                  <h1 className="settings-title">Settings</h1>
+                  <p className="settings-subtitle">Manage your CodeCompass preferences</p>
+                </div>
+              </div>
             </div>
+
             <div className="settings-body">
-              <section className="settings-section">
-                <h2 className="settings-section-title">Appearance</h2>
+              <section className="panel settings-section">
+                <div className="panel-header">
+                  <h2 className="settings-section-title">Appearance</h2>
+                </div>
                 <div className="settings-row">
                   <div className="settings-row-label">
                     <span className="settings-label">Theme</span>
@@ -430,6 +474,69 @@ export default function App() {
                     ))}
                   </div>
                 </div>
+              </section>
+
+              <section className="panel settings-section">
+                <div className="panel-header">
+                  <h2 className="settings-section-title">Analysis</h2>
+                  <p className="settings-section-description">Configure the AI client used when running evaluations</p>
+                </div>
+                <div className={`settings-row${!aiCmd ? ' settings-row--last' : ''}`}>
+                  <div className="settings-row-label">
+                    <span className="settings-label">Client</span>
+                    <span className="settings-description">CLI tool used to run the analysis</span>
+                  </div>
+                  {availableClients === null ? (
+                    <span className="settings-description">Detecting…</span>
+                  ) : availableClients.length > 0 ? (
+                    <div className="theme-toggle">
+                      {availableClients.map(({ id, label }) => (
+                        <button
+                          key={id}
+                          type="button"
+                          className={`theme-toggle-btn${aiCmd === id ? ' active' : ''}`}
+                          onClick={() => applyAiCmd(id)}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+                {availableClients !== null && availableClients.length === 0 && (
+                  <div className="settings-row settings-row--last settings-install-guide">
+                    <div className="settings-row-label">
+                      <span className="settings-label">No AI client detected</span>
+                      <span className="settings-description">
+                        Install one of the supported CLI tools and restart CodeCompass.
+                      </span>
+                    </div>
+                    <div className="settings-install-options">
+                      <div className="settings-install-item">
+                        <span className="settings-install-name">Claude</span>
+                        <code className="settings-install-cmd">npm i -g @anthropic-ai/claude-code</code>
+                      </div>
+                      <div className="settings-install-item">
+                        <span className="settings-install-name">Codex</span>
+                        <code className="settings-install-cmd">npm i -g @openai/codex</code>
+                      </div>
+                      <div className="settings-install-item">
+                        <span className="settings-install-name">Copilot</span>
+                        <code className="settings-install-cmd">gh extension install github/gh-copilot</code>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {aiCmd && (
+                  <div className="settings-row settings-row--last">
+                    <div className="settings-row-label">
+                      <span className="settings-label">Model</span>
+                      <span className="settings-description">
+                        Uses your client's default model. Run <code>{aiCmd} --help</code> to see how to change it.
+                      </span>
+                    </div>
+                  </div>
+                )}
               </section>
             </div>
           </div>
