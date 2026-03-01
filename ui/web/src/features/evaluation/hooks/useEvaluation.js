@@ -18,6 +18,10 @@ export function useEvaluation() {
     };
   }, []);
 
+  useEffect(() => {
+    liveViolationsRef.current = liveViolations;
+  }, [liveViolations]);
+
   function stopPolling() {
     if (pollRef.current) {
       clearInterval(pollRef.current);
@@ -52,11 +56,7 @@ export function useEvaluation() {
           try {
             const data = await getDimensionEval(project, runId, dim);
             if (data?.violations) {
-              setLiveViolations(prev => {
-                const next = { ...prev, [dim]: data.violations };
-                liveViolationsRef.current = next;
-                return next;
-              });
+              setLiveViolations(prev => ({ ...prev, [dim]: data.violations }));
             }
           } catch {
             // dimension not ready yet — silently skip
@@ -77,6 +77,7 @@ export function useEvaluation() {
           stopPolling();
           // one final dimension sweep after job completes
           if (updated.outputProject && updated.outputRunId && !dimPollingStarted) {
+            dimPollingStarted = true;
             startDimensionPolling(updated.outputProject, updated.outputRunId);
           }
         } else if (updated.outputProject && updated.outputRunId && !dimPollingStarted) {
