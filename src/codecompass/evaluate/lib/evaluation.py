@@ -154,20 +154,22 @@ def run_two_phase_dimension(
             log_warning(f"Score computation failed: {exc}")
 
     # --- Phase 2: Scoring ---
+    evidence_content = Path(evidence_file).read_text() if Path(evidence_file).exists() else ""
+    loaded_scores = Path(scores_file).read_text() if Path(scores_file).exists() else ""
     scoring_prompt = build_scoring_prompt(
         template=scoring_template,
         discipline=discipline,
         project_name=project_name,
         today=today,
         eval_file=eval_file,
-        evidence_file=evidence_file,
         standards_content=scoring_standards,
         dimension=dimension,
+        evidence_content=evidence_content,
+        scores_content=loaded_scores,
         analysis_hash=analysis_hash,
         scoring_hash=scoring_hash,
         mapping_hash=mapping_hash,
         codecompass_version=codecompass_version,
-        scores_file=scores_file if Path(scores_file).exists() else None,
         scoring_mode=scoring_mode,
     )
 

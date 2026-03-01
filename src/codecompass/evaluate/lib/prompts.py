@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 
 from codecompass.evaluate.lib.common import log_warning
 
@@ -110,14 +109,14 @@ def build_scoring_prompt(
     project_name: str,
     today: str,
     eval_file: str,
-    evidence_file: str,
     standards_content: str,
     dimension: str,
+    evidence_content: str = "",
+    scores_content: str = "",
     analysis_hash: str = "",
     scoring_hash: str = "",
     mapping_hash: str = "",
     codecompass_version: str = "",
-    scores_file: str | None = None,
     scoring_mode: str = "",
 ) -> str:
     """Build the scoring prompt with evidence injection."""
@@ -135,12 +134,11 @@ def build_scoring_prompt(
 
     # Build and inject scoring skeleton
     evidence_data: dict = {}
-    if os.path.isfile(evidence_file):
+    if evidence_content:
         try:
-            with open(evidence_file) as f:
-                evidence_data = json.load(f)
+            evidence_data = json.loads(evidence_content)
         except Exception as exc:
-            log_warning(f"Could not load evidence file {evidence_file}: {exc}")
+            log_warning(f"Could not parse evidence content: {exc}")
 
     effective_mode = scoring_mode if scoring_mode else detect_scoring_mode(prompt)
     is_numerical = effective_mode == "numerical"
@@ -148,14 +146,8 @@ def build_scoring_prompt(
     prompt = prompt.replace("{{SCORING_SKELETON}}", skeleton)
 
     # Inject precomputed scores
-    scores_content = "No precomputed scores available — compute scores manually using the rules below."
-    if scores_file and os.path.isfile(scores_file):
-        try:
-            with open(scores_file) as f:
-                scores_content = f.read()
-        except Exception as exc:
-            log_warning(f"Could not load scores file {scores_file}: {exc}")
-    prompt = prompt.replace("{{PRECOMPUTED_SCORES_JSON}}", scores_content)
+    effective_scores = scores_content if scores_content else "No precomputed scores available — compute scores manually using the rules below."
+    prompt = prompt.replace("{{PRECOMPUTED_SCORES_JSON}}", effective_scores)
 
     # Inject evidence JSON
     evidence_json = json.dumps(evidence_data, indent=2) if evidence_data else "{}"

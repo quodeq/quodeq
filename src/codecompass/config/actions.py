@@ -31,7 +31,10 @@ def resolve_parallel(parallel: str | None, sequential: bool) -> int:
     return int(parallel)
 
 
-def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> None:
+def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
+    if not discipline:
+        log_error("--generate-maps requires a dimension name")
+        return 1
     dimensions = [p.stem for p in paths.dimensions_dir.glob("*.json")]
     for dimension in dimensions:
         output_path = paths.evaluators_dir / discipline / f"{dimension}.json"
