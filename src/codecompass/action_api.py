@@ -93,6 +93,14 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
             return jsonify(body), status
         return jsonify(job)
 
+    @app.delete("/api/evaluations/<job_id>")
+    def cancel_evaluation(job_id: str):
+        ok = provider.cancel_evaluation(job_id)
+        if not ok:
+            body, status = _error("Job not found or not running", 404, "NOT_FOUND")
+            return jsonify(body), status
+        return jsonify({"ok": True})
+
     @app.get("/api/browse")
     def browse():
         path = request.args.get("path")

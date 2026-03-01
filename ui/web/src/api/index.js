@@ -42,6 +42,10 @@ export function getEvaluation(jobId) {
   return request(`/evaluations/${encodeURIComponent(jobId)}`);
 }
 
+export function cancelEvaluation(jobId) {
+  return request(`/evaluations/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+}
+
 export function getAccumulated(project, asOfRun = null) {
   const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
   return request(`/projects/${encodeURIComponent(project)}/accumulated${q}`);
