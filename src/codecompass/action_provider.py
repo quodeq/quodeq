@@ -20,7 +20,7 @@ class ActionProvider:
     def get_violations(self, reports_dir: str, project: str, run_id: str):
         raise NotImplementedError
 
-    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str):
+    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None):
         raise NotImplementedError
 
     def get_evaluation_status(self, job_id: str):
@@ -30,4 +30,10 @@ class ActionProvider:
         raise NotImplementedError
 
     def browse_repo(self, path: str | None):
+        raise NotImplementedError
+
+    def get_ai_clients(self):
+        raise NotImplementedError
+
+    def get_client_models(self, client_id: str):
         raise NotImplementedError
