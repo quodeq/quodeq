@@ -282,7 +282,7 @@
 .eval-status-line {
   flex: 1;
   font-family: var(--font-mono);
-  font-size: 0.78rem;
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
   white-space: nowrap;
   overflow: hidden;
