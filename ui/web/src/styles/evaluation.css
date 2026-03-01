@@ -420,8 +420,9 @@
 }
 
 .dimension-chip-btn:disabled {
-  opacity: 0.5;
+  opacity: 0.35;
   cursor: not-allowed;
+  text-decoration: line-through;
 }
 
 .form-options {

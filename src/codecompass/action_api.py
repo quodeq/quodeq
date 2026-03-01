@@ -29,6 +29,14 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
     def list_projects():
         return jsonify(provider.list_projects(_reports_dir()))
 
+    @app.get("/api/projects/<project>/info")
+    def project_info(project: str):
+        info = provider.get_project_info(_reports_dir(), project)
+        if not info:
+            body, status = _error("Project info not found", 404, "NOT_FOUND")
+            return jsonify(body), status
+        return jsonify(info)
+
     @app.get("/api/projects/<project>/dashboard")
     def dashboard(project: str):
         run = request.args.get("run", "latest")
