@@ -93,6 +93,17 @@ def _choose_action_api_port(start: int = 8001, taken: set[int] | None = None) ->
     return port
 
 
+def _kill_stale_action_api(host: str, port: int) -> None:
+    """Kill any lingering action API processes so the dashboard always loads fresh code."""
+    try:
+        subprocess.run(["pkill", "-f", "codecompass.action_api"], capture_output=True)
+    except OSError:
+        pass
+    deadline = time.monotonic() + 3
+    while _is_port_open(host, port) and time.monotonic() < deadline:
+        time.sleep(0.1)
+
+
 def _spawn_action_api(port: int) -> subprocess.Popen:
     env = os.environ.copy()
     env["CODECOMPASS_ACTION_API_PORT"] = str(port)
@@ -240,6 +251,7 @@ def run_dashboard(config: DashboardConfig) -> int:
     if config.api_forced:
         action_api_url, action_api_process = _ensure_action_api_forced(action_api_host, action_api_port)
     else:
+        _kill_stale_action_api(action_api_host, action_api_port)
         action_api_url, action_api_process = _ensure_action_api(action_api_host, action_api_port)
 
     process = _start_ui_server(config, action_api_url)

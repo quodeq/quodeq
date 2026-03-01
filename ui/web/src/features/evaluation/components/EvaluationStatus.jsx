@@ -49,7 +49,14 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         <div className="job-header-left">
           <h3>{statusTitle(job.status)}</h3>
         </div>
-        <span className={`job-status-badge ${job.status}`}>{job.status}</span>
+        <div className="job-header-right">
+          {isRunning && (
+            <button type="button" className="job-cancel-inline" onClick={onCancel}>
+              Cancel
+            </button>
+          )}
+          <span className={`job-status-badge ${job.status}`}>{job.status}</span>
+        </div>
       </div>
 
       <div className="job-meta">
@@ -99,24 +106,18 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
 
       <LiveViolationsFeed liveViolations={liveViolations} />
 
-      <div className="job-actions">
-        {isRunning ? (
-          <button className="job-cancel-btn" onClick={onCancel}>
-            Cancel
-          </button>
-        ) : (
-          <>
-            {isDone && (
-              <button className="view-results-btn" onClick={() => onDismiss('view')}>
-                View Results
-              </button>
-            )}
-            <button className="job-close-btn" onClick={() => onDismiss('close')}>
-              {isDone ? 'Dismiss' : 'Close'}
+      {!isRunning && (
+        <div className="job-actions">
+          {isDone && (
+            <button className="view-results-btn" onClick={() => onDismiss('view')}>
+              View Results
             </button>
-          </>
-        )}
-      </div>
+          )}
+          <button className="job-close-btn" onClick={() => onDismiss('close')}>
+            {isDone ? 'Dismiss' : 'Close'}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
