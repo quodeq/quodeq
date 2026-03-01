@@ -40,7 +40,7 @@ function ViolationLiveRow({ violation, index }) {
           {violation.reason && (
             <div className="vlive-detail-row">
               <span className="vlive-detail-label">Reason</span>
-              <span className="vlive-detail-value">{violation.reason}</span>
+              <span className="vlive-detail-value vlive-detail-value--prose">{violation.reason}</span>
             </div>
           )}
           {violation.snippet && (
@@ -53,7 +53,7 @@ function ViolationLiveRow({ violation, index }) {
 }
 
 export default function LiveViolationsFeed({ liveViolations }) {
-  const dims = Object.keys(liveViolations);
+  const dims = Object.keys(liveViolations ?? {});
   if (!dims.length) return null;
 
   const totalCount = dims.reduce((sum, d) => sum + (liveViolations[d]?.length ?? 0), 0);
