@@ -826,65 +826,204 @@ textarea:focus {
 }
 
 .settings-header {
-  padding: var(--space-6) var(--space-8) var(--space-4);
+  padding: var(--space-8) var(--space-8) var(--space-6);
   border-bottom: 1px solid var(--color-border);
+}
+
+.settings-header-content {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: 760px;
+}
+
+.settings-page-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: var(--color-accent-soft);
+  border-radius: var(--radius-lg);
+  color: var(--color-accent);
+  flex-shrink: 0;
 }
 
 .settings-title {
-  font-size: var(--text-2xl);
+  font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   color: var(--color-text);
+  margin: 0 0 2px 0;
+}
+
+.settings-subtitle {
   margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
 .settings-body {
-  padding: var(--space-6) var(--space-8);
+  padding: var(--space-8);
   display: flex;
   flex-direction: column;
-  gap: var(--space-8);
-  max-width: 640px;
+  gap: var(--space-5);
+  max-width: 760px;
 }
 
+/* Card: zero out .panel's default padding; rows carry their own */
 .settings-section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-4);
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Section header: override .panel-header from evaluation.css */
+.settings-section .panel-header {
+  padding: var(--space-4) var(--space-6);
+  margin-bottom: 0;
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-surface-alt);
 }
 
 .settings-section-title {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   color: var(--color-text-muted);
   text-transform: uppercase;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.07em;
   margin: 0;
-  padding-bottom: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-section-description {
+  margin: var(--space-1) 0 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
 }
 
 .settings-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-3) 0;
+  gap: var(--space-8);
+  padding: var(--space-5) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-row--last {
+  border-bottom: none;
 }
 
 .settings-row-label {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+  padding-top: 2px;
 }
 
 .settings-label {
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--color-text);
+  line-height: 1.4;
 }
 
 .settings-description {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.settings-description code {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: 1px 5px;
+  color: var(--color-text);
+}
+
+.settings-install-guide {
+  align-items: flex-start;
+  gap: var(--space-6);
+}
+
+.settings-install-options {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.settings-install-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-install-name {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  width: 52px;
+  flex-shrink: 0;
+}
+
+.settings-install-cmd {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-1) var(--space-2);
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+/* Shared field base for controls on the right side of a row */
+.settings-select,
+.settings-input {
+  width: auto;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  min-width: 200px;
+  flex-shrink: 0;
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+
+.settings-select {
+  appearance: none;
+  padding-right: var(--space-8);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9490' stroke-width='2.5'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right var(--space-3) center;
+  cursor: pointer;
+}
+
+.settings-input {
+  cursor: text;
+}
+
+.settings-input::placeholder {
+  color: var(--color-text-subtle);
+}
+
+.settings-select:focus,
+.settings-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 3px var(--color-accent-soft);
+}
+
+.settings-select:hover,
+.settings-input:hover {
+  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
 }
 
 /* ─── Theme toggle ─── */
