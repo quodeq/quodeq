@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 function deriveProjectName(repo) {
   if (!repo) return null;
@@ -14,6 +14,16 @@ function statusTitle(status) {
 
 export default function EvaluationStatus({ job, onDismiss, onCancel }) {
   const logViewerRef = useRef(null);
+  const [consoleOpen, setConsoleOpen] = useState(false);
+
+  function lastRelevantLog(logs) {
+    if (!logs?.length) return null;
+    for (let i = logs.length - 1; i >= 0; i--) {
+      const line = logs[i].trim();
+      if (line.length >= 15) return line;
+    }
+    return null;
+  }
 
   useEffect(() => {
     if (logViewerRef.current) {
@@ -56,11 +66,27 @@ export default function EvaluationStatus({ job, onDismiss, onCancel }) {
         )}
       </div>
 
-      <div className="console-output">
-        <pre ref={logViewerRef}>
-          {job.logs?.length ? job.logs.join('\n') : 'Waiting for output…'}
-        </pre>
-      </div>
+      {isRunning && (
+        <div className="eval-status-row">
+          <span className="eval-status-line">
+            {lastRelevantLog(job?.logs) ?? 'Starting…'}
+          </span>
+          <button
+            className="eval-console-toggle"
+            onClick={() => setConsoleOpen(o => !o)}
+            title={consoleOpen ? 'Hide console' : 'Show console'}
+          >
+            {consoleOpen ? '▴' : '···'}
+          </button>
+        </div>
+      )}
+      {consoleOpen && (
+        <div className="console-output">
+          <pre ref={logViewerRef}>
+            {job.logs?.length ? job.logs.join('\n') : 'Waiting for output…'}
+          </pre>
+        </div>
+      )}
 
       <div className="job-actions">
         {isRunning ? (
