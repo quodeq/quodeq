@@ -353,10 +353,23 @@ export default function App() {
             <header className="evaluate-header">
               <div className="evaluate-header-content">
                 <div className={`evaluate-icon${job?.status === 'running' ? ' running' : ''}`}>
-                  <svg className="eval-icon-glass" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="11" cy="11" r="7" />
-                    <line x1="16.5" y1="16.5" x2="22" y2="22" />
-                  </svg>
+                  {/* Static layer — visible when idle */}
+                  <div className="eval-icon-static">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="7" />
+                      <line x1="16.5" y1="16.5" x2="22" y2="22" />
+                    </svg>
+                  </div>
+                  {/* Animated layer — visible when running */}
+                  <div className="eval-icon-animated">
+                    <span className="eval-file-chip" style={{animationDelay: '0s'}} />
+                    <span className="eval-file-chip" style={{animationDelay: '0.55s'}} />
+                    <span className="eval-file-chip" style={{animationDelay: '1.1s'}} />
+                    <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="7" />
+                      <line x1="16.5" y1="16.5" x2="22" y2="22" />
+                    </svg>
+                  </div>
                 </div>
                 <div>
                   <h1>Evaluate Repository</h1>
