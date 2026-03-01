@@ -467,6 +467,7 @@
 }
 
 .evaluate-icon {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -475,6 +476,70 @@
   background: linear-gradient(135deg, var(--color-accent-soft), color-mix(in srgb, var(--color-accent) 5%, transparent));
   border-radius: 20px;
   color: var(--color-accent);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* --- idle layer --- */
+.eval-icon-static {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 400ms ease;
+}
+
+/* --- animated layer --- */
+.eval-icon-animated {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+
+/* swap on running */
+.evaluate-icon.running .eval-icon-static  { opacity: 0; }
+.evaluate-icon.running .eval-icon-animated { opacity: 1; }
+
+/* floating file chips behind the glass */
+.eval-file-chip {
+  position: absolute;
+  width: 18px;
+  height: 10px;
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-radius: 3px;
+  animation: file-drift 1.65s ease-in-out infinite;
+  opacity: 0;
+}
+
+/* stagger vertical positions */
+.eval-file-chip:nth-child(1) { top: 18px; }
+.eval-file-chip:nth-child(2) { top: 32px; }
+.eval-file-chip:nth-child(3) { top: 46px; }
+
+@keyframes file-drift {
+  0%   { transform: translateX(34px); opacity: 0; }
+  15%  { opacity: 0.7; }
+  85%  { opacity: 0.7; }
+  100% { transform: translateX(-34px); opacity: 0; }
+}
+
+/* glass gently sweeps left→right while running */
+.eval-glass-sweep {
+  position: relative;
+  z-index: 1;
+  animation: glass-sweep 2.5s ease-in-out infinite;
+}
+
+@keyframes glass-sweep {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  40%       { transform: translateX(4px) rotate(3deg); }
+  60%       { transform: translateX(-4px) rotate(-3deg); }
 }
 
 .evaluate-header h1 {
