@@ -22,7 +22,7 @@ def test_evaluate_autodetects_discipline(monkeypatch, tmp_path: Path):
     )
     monkeypatch.setattr(
         "codecompass.evaluate.runner.resolve_dimension_selection",
-        lambda *_args, **_kwargs: ["maintainability"],
+        lambda *_args, **_kwargs: (["maintainability"], []),
     )
 
     config = EvaluateConfig(

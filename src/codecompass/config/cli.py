@@ -8,7 +8,6 @@ from codecompass.config.actions import run_generate_dimensions
 from codecompass.config.actions import run_generate_evaluators
 from codecompass.config.dimensions import render_dimension_table
 from codecompass.config.paths import default_paths
-from codecompass.logging import log_error
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -36,11 +35,7 @@ def main(argv: list[str] | None = None) -> int:
     paths = default_paths(version=args.data_version)
     _ctx = ConfigureContext(paths=paths, max_parallel=resolve_parallel(args.parallel, args.sequential))
     if args.generate_maps is not None:
-        if args.generate_maps == "":
-            log_error("Missing discipline argument for --generate-maps")
-            return 1
-        run_generate_evaluators(args.generate_maps, paths)
-        return 0
+        return run_generate_evaluators(args.generate_maps, paths) or 0
     if args.generate_dimensions:
         run_generate_dimensions(paths)
         return 0

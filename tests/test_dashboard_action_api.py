@@ -72,6 +72,12 @@ def test_force_action_api_host_port(monkeypatch):
             def wait(self):
                 return 0
 
+            def poll(self):
+                return 0
+
+            def terminate(self):
+                pass
+
         return Dummy()
 
     monkeypatch.setattr(runner, "_ensure_action_api_forced", fake_ensure)

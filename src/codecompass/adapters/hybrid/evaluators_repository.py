@@ -1,8 +1,9 @@
 from codecompass.ports.data_errors import InvalidDataError, NetworkError, ServerError
+from codecompass.ports.evaluators import EvaluatorsRepository
 
 
 class HybridEvaluatorsRepository:
-    def __init__(self, web, fs) -> None:
+    def __init__(self, web: EvaluatorsRepository, fs: EvaluatorsRepository) -> None:
         self._web = web
         self._fs = fs
 

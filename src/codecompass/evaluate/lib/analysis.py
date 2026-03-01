@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 from codecompass.evaluate.lib.ai_cli_provider import get_ai_cmd, get_ai_model
-from codecompass.evaluate.lib.common import log_beat, log_error, log_info, log_success, log_warning
+from codecompass.evaluate.lib.common import log_beat, log_error, log_info, log_step, log_success, log_warning
 
 
 # ---------------------------------------------------------------------------
@@ -223,7 +223,6 @@ def run_scoring_phase(
 
     Returns True on success, False on failure.
     """
-    from codecompass.evaluate.lib.common import log_step
     if has_evidence:
         log_step("Scoring")
     else:
