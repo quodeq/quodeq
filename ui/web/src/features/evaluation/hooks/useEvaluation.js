@@ -10,6 +10,7 @@ export function useEvaluation() {
   const dimPollRef = useRef(null);
   const requestedDimensionsRef = useRef([]);
   const liveViolationsRef = useRef({});
+  const partialDimensionsRef = useRef(new Set());
 
   useEffect(() => {
     return () => {
@@ -45,7 +46,7 @@ export function useEvaluation() {
         return;
       }
 
-      const pending = dims.filter(d => !liveViolationsRef.current[d]);
+      const pending = dims.filter(d => !liveViolationsRef.current[d] || partialDimensionsRef.current.has(d));
       if (!pending.length) {
         stopDimensionPolling();
         return;
@@ -56,6 +57,11 @@ export function useEvaluation() {
           try {
             const data = await getDimensionEval(project, runId, dim);
             if (data?.violations) {
+              if (data.partial) {
+                partialDimensionsRef.current.add(dim);
+              } else {
+                partialDimensionsRef.current.delete(dim);
+              }
               setLiveViolations(prev => ({ ...prev, [dim]: data.violations }));
             }
           } catch {
@@ -87,14 +93,19 @@ export function useEvaluation() {
       } catch (err) {
         setJobError(err.message);
         stopPolling();
+        stopDimensionPolling();
       }
     }, 1500);
   }
 
   async function startEvaluationJob(payload) {
     setJobError('');
-    requestedDimensionsRef.current = payload.dimensions ?? [];
+    const rawDims = payload.dimensions ?? [];
+    requestedDimensionsRef.current = typeof rawDims === 'string'
+      ? rawDims.split(',').map(d => d.trim()).filter(Boolean)
+      : rawDims;
     liveViolationsRef.current = {};
+    partialDimensionsRef.current = new Set();
     setLiveViolations({});
     try {
       const created = await startEvaluation(payload);
@@ -113,6 +124,7 @@ export function useEvaluation() {
     setLiveViolations({});
     liveViolationsRef.current = {};
     requestedDimensionsRef.current = [];
+    partialDimensionsRef.current = new Set();
   }
 
   async function cancelEvaluationJob() {

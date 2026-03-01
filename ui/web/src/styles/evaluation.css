@@ -1,6 +1,6 @@
 /* --- Evaluate Screen --- */
 .evaluate-screen {
-  padding: 32px;
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -101,6 +101,7 @@
 /* Job Panel */
 .evaluate-job-panel {
   padding: 24px;
+  min-height: 480px;
 }
 
 .job-header {
@@ -121,22 +122,6 @@
   font-size: var(--text-lg);
   font-weight: var(--weight-semibold);
   color: var(--color-text);
-}
-
-/* Spinner shown while running */
-.job-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
-  border-top-color: var(--color-accent);
-  border-radius: 50%;
-  animation: spin 0.75s linear infinite;
-  flex-shrink: 0;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
 }
 
 /* Status badge */
@@ -233,6 +218,18 @@
 .job-meta-code--muted {
   color: var(--color-text-muted);
   font-size: var(--text-xs);
+}
+
+.job-meta-id-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.job-meta-id-row .job-meta-code {
+  flex: 1;
+  min-width: 0;
 }
 
 /* Console */
@@ -866,7 +863,7 @@
 
 /* --- Evaluate Page (Full Page) --- */
 .evaluate-page {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 40px 20px;
 }
@@ -1493,7 +1490,7 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 180px;
+  max-width: 280px;
 }
 
 .vlive-chevron {

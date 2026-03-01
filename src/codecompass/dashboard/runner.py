@@ -249,8 +249,10 @@ def run_dashboard(config: DashboardConfig) -> int:
     if config.open_browser:
         webbrowser.open(f"http://localhost:{config.port}")
 
+    current_action_api_process = action_api_process
+
     def _stop_children() -> None:
-        for proc in (process, action_api_process):
+        for proc in (process, current_action_api_process):
             if proc and proc.poll() is None:
                 proc.terminate()
                 try:
@@ -266,7 +268,22 @@ def run_dashboard(config: DashboardConfig) -> int:
     signal.signal(signal.SIGTSTP, _handle_tstp)
 
     try:
-        return process.wait()
+        while process.poll() is None:
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            # Restart action API if it crashed
+            if current_action_api_process and current_action_api_process.poll() is not None:
+                if not _action_api_healthy(action_api_url):
+                    log_warning("Action API stopped — restarting…")
+                    try:
+                        _, current_action_api_process = _ensure_action_api(
+                            action_api_host, action_api_port
+                        )
+                        log_success("Action API restarted.")
+                    except Exception as exc:
+                        log_warning(f"Could not restart Action API: {exc}")
     except KeyboardInterrupt:
         pass
     finally:
