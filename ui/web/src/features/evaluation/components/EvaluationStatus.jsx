@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
+import CopyButton from '../../../components/CopyButton.jsx';
 
 function deriveProjectName(repo) {
   if (!repo) return null;
@@ -21,7 +22,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     if (!logs?.length) return null;
     for (let i = logs.length - 1; i >= 0; i--) {
       const line = logs[i].trim();
-      if (line.length >= 15) return line;
+      if (line.startsWith('→') || line.startsWith('✓')) return line;
     }
     return null;
   }
@@ -46,7 +47,6 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     <div className="panel evaluate-job-panel">
       <div className="job-header">
         <div className="job-header-left">
-          {isRunning && <span className="job-spinner" />}
           <h3>{statusTitle(job.status)}</h3>
         </div>
         <span className={`job-status-badge ${job.status}`}>{job.status}</span>
@@ -61,7 +61,10 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         )}
         <div className="job-meta-item">
           <span className="job-meta-label">Job ID</span>
-          <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>
+          <div className="job-meta-id-row">
+            <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>
+            <CopyButton onClick={() => navigator.clipboard.writeText(job.jobId)} />
+          </div>
         </div>
         {job.repo && (
           <div className="job-meta-item job-meta-item--full">
