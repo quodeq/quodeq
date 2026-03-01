@@ -268,6 +268,46 @@
   word-break: break-word;
 }
 
+/* Slim status row */
+.eval-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.eval-status-line {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eval-console-toggle {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+  line-height: 1;
+}
+
+.eval-console-toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
 /* Action row */
 .job-actions {
   margin-top: 20px;
