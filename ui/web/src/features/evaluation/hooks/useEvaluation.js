@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { startEvaluation, getEvaluation } from '../../../api/index.js';
+import { startEvaluation, getEvaluation, cancelEvaluation } from '../../../api/index.js';
 
 export function useEvaluation() {
   const [job, setJob] = useState(null);
@@ -26,7 +26,7 @@ export function useEvaluation() {
     pollRef.current = setInterval(async () => {
       try {
         const updated = await getEvaluation(jobId);
-        setJob(updated);
+        setJob((prev) => ({ ...updated, repo: prev?.repo }));
         if (updated.status !== 'running') {
           stopPolling();
         }
@@ -41,7 +41,7 @@ export function useEvaluation() {
     setJobError('');
     try {
       const created = await startEvaluation(payload);
-      setJob(created);
+      setJob({ ...created, repo: payload.repo });
       startPolling(created.jobId);
     } catch (err) {
       setJobError(err.message);
@@ -54,5 +54,15 @@ export function useEvaluation() {
     stopPolling();
   }
 
-  return { job, jobError, startEvaluation: startEvaluationJob, clearJob };
+  async function cancelEvaluationJob() {
+    if (!job?.jobId) return;
+    try {
+      await cancelEvaluation(job.jobId);
+      clearJob();
+    } catch (err) {
+      setJobError(err.message);
+    }
+  }
+
+  return { job, jobError, startEvaluation: startEvaluationJob, clearJob, cancelEvaluation: cancelEvaluationJob };
 }
