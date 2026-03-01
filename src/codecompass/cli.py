@@ -56,6 +56,7 @@ def main(argv: list[str] | None = None) -> int:
             repo=repo,
             reports_dir=Path(args.evaluations),
             reports_defaulted=reports_defaulted,
+            dimensions=dimensions,
             version=getattr(args, "data_version", None),
         )
         return run_evaluate(config)
