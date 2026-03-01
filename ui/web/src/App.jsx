@@ -246,7 +246,7 @@ export default function App() {
   // -------------------------------------------------------------------------
   // Evaluation
   // -------------------------------------------------------------------------
-  const { job, jobError, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
+  const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
 
   function handleStartEvaluation(payload) {
     startEvaluation({ ...payload, aiCmd: aiCmd || undefined });
@@ -397,7 +397,7 @@ export default function App() {
               )}
 
               {jobError && <div className="job-error-banner">{jobError}</div>}
-              <EvaluationStatus job={job} onDismiss={handleEvalDismiss} onCancel={cancelEvaluation} />
+              <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={handleEvalDismiss} onCancel={cancelEvaluation} />
 
               <div className="panel evaluate-help-panel">
                 <div className="panel-header">

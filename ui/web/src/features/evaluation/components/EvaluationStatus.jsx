@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 
 function deriveProjectName(repo) {
   if (!repo) return null;
@@ -12,7 +13,7 @@ function statusTitle(status) {
   return 'Evaluation Cancelled';
 }
 
-export default function EvaluationStatus({ job, onDismiss, onCancel }) {
+export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel }) {
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
@@ -91,6 +92,8 @@ export default function EvaluationStatus({ job, onDismiss, onCancel }) {
           </pre>
         </div>
       )}
+
+      <LiveViolationsFeed liveViolations={liveViolations} />
 
       <div className="job-actions">
         {isRunning ? (
