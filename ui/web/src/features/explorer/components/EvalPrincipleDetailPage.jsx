@@ -69,9 +69,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
     ? principleData.violations
     : dimViolations;
 
-  const compliance = (principleData?.compliance?.length > 0)
-    ? principleData.compliance
-    : dimCompliance.map((c) => c.snippet || c.reason || '').filter(Boolean);
+  const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet);
 
   const violationsBySeverity = EVAL_SEVERITY_ORDER.reduce((acc, sev) => {
     acc[sev] = violations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
@@ -193,33 +191,44 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         return (
           <div key={sev}>
             <div className="violation-group-header">
-              <span className={`severity-tag ${sev}`}>{sev}</span>
+              <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
               <span className="violation-group-count">{vs.length}</span>
             </div>
-            <section className="panel file-violations-section">
+            <div className="vlive-violations-group">
               {vs.map((v, idx) => (
-                <div key={idx} className={`file-violation-card severity-border-${v.severity}`}>
-                  <div className="file-violation-card-header">
+                <div key={idx} className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}>
+                  <div className="vdetail-row-main">
                     <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
                     {v.file && (
-                      <code className="violation-file">
-                        {v.file}{v.line ? `:${v.line}` : ''}
-                      </code>
+                      <span className="vlive-file">
+                        {v.file.split('/').pop()}
+                      </span>
                     )}
                     <CopyButton
                       label="Fix plan"
                       onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v))}
                     />
                   </div>
-                  {(v.code || v.snippet) && (
-                    <pre className={`code-snippet violation ${v.severity}`}>{v.code || v.snippet}</pre>
-                  )}
-                  {(v.reason || v.findings) && (
-                    <p className="violation-context-desc">{v.reason || v.findings}</p>
-                  )}
+                  <div className="vlive-detail">
+                    {v.file && (
+                      <div className="vlive-detail-row">
+                        <span className="vlive-detail-label">File</span>
+                        <code className="vlive-detail-value">{v.file}{v.line ? `:${v.line}` : ''}</code>
+                      </div>
+                    )}
+                    {(v.reason || v.findings) && (
+                      <div className="vlive-detail-row">
+                        <span className="vlive-detail-label">Reason</span>
+                        <span className="vlive-detail-value vlive-detail-value--prose">{v.reason || v.findings}</span>
+                      </div>
+                    )}
+                    {(v.code || v.snippet) && (
+                      <pre className="vlive-snippet">{v.code || v.snippet}</pre>
+                    )}
+                  </div>
                 </div>
               ))}
-            </section>
+            </div>
           </div>
         );
       })}
@@ -227,14 +236,35 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
       {compliance.length > 0 && (
         <div>
           <div className="violation-group-header">
-            <span className="severity-tag compliance">compliance</span>
+            <span className="violation-group-title">Compliance</span>
             <span className="violation-group-count">{compliance.length}</span>
           </div>
-          <section className="panel file-violations-section">
-            {displayedCompliance.map((code, idx) => (
-              <pre key={idx} className="code-snippet compliance">{code}</pre>
+          <div className="vlive-violations-group">
+            {displayedCompliance.map((c, idx) => (
+              <div key={idx} className="vdetail-row vdetail-row--compliant" style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}>
+                <div className="vdetail-row-main">
+                  {c.file && (
+                    <span className="vlive-file">{c.file.split('/').pop()}</span>
+                  )}
+                </div>
+                <div className="vlive-detail">
+                  {c.file && (
+                    <div className="vlive-detail-row">
+                      <span className="vlive-detail-label">File</span>
+                      <code className="vlive-detail-value">{c.file}{c.line ? `:${c.line}` : ''}</code>
+                    </div>
+                  )}
+                  {c.reason && (
+                    <div className="vlive-detail-row">
+                      <span className="vlive-detail-label">Reason</span>
+                      <span className="vlive-detail-value vlive-detail-value--prose">{c.reason}</span>
+                    </div>
+                  )}
+                  {c.snippet && <pre className="vlive-snippet">{c.snippet}</pre>}
+                </div>
+              </div>
             ))}
-          </section>
+          </div>
           {hasMoreCompliance && (
             <button
               className="offending-show-more"

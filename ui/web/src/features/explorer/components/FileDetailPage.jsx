@@ -88,29 +88,33 @@ function CopyButton({ onClick, label }) {
   );
 }
 
-function ViolationCard({ v }) {
+function ViolationCard({ v, index }) {
   return (
-    <div className={`file-violation-card severity-border-${v.severity}`}>
-      <div className="file-violation-card-header">
+    <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}>
+      <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-        <span className="file-violation-dimension">[{v.dimension}]</span>
-        <span className="file-violation-principle">{v.principle}</span>
+        {v.dimension && <span className="vlive-dimension-inline">[{v.dimension}]</span>}
+        <span className="vlive-principle">{v.principle}</span>
         <CopyButton
           label="Fix plan"
           onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v))}
         />
       </div>
-      {v.file && (
-        <code className="violation-file">
-          {v.file}{v.line ? `:${v.line}` : ''}
-        </code>
-      )}
-      {v.snippet && (
-        <pre className={`code-snippet violation ${v.severity}`}>{v.snippet}</pre>
-      )}
-      {v.reason && (
-        <p className="violation-context-desc">{v.reason}</p>
-      )}
+      <div className="vlive-detail">
+        {v.file && (
+          <div className="vlive-detail-row">
+            <span className="vlive-detail-label">File</span>
+            <code className="vlive-detail-value">{v.file}{v.line ? `:${v.line}` : ''}</code>
+          </div>
+        )}
+        {v.reason && (
+          <div className="vlive-detail-row">
+            <span className="vlive-detail-label">Reason</span>
+            <span className="vlive-detail-value vlive-detail-value--prose">{v.reason}</span>
+          </div>
+        )}
+        {v.snippet && <pre className="vlive-snippet">{v.snippet}</pre>}
+      </div>
     </div>
   );
 }
@@ -164,14 +168,14 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
         return (
           <div key={sev}>
             <div className="violation-group-header">
-              <span className={`severity-tag ${sev}`}>{sev}</span>
+              <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
               <span className="violation-group-count">{violations.length}</span>
             </div>
-            <section className="panel file-violations-section">
+            <div className="vlive-violations-group">
               {violations.map((v, idx) => (
-                <ViolationCard key={idx} v={v} />
+                <ViolationCard key={idx} v={v} index={idx} />
               ))}
-            </section>
+            </div>
           </div>
         );
       })}
