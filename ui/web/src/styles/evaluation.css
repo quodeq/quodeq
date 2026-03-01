@@ -1196,11 +1196,6 @@
   opacity: 0.5;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
 .folder-browser-hint {
   padding: 8px 14px;
   margin-bottom: 8px;
