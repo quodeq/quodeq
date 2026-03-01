@@ -497,6 +497,10 @@
   .dimension-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
+
+  .vlive-file {
+    max-width: 120px;
+  }
 }
 
 /* --- Evaluate Screen Enhancements --- */
@@ -1543,6 +1547,12 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   word-break: break-all;
+}
+
+.vlive-detail-value--prose {
+  font-family: var(--font-sans);
+  word-break: normal;
+  overflow-wrap: break-word;
 }
 
 .vlive-snippet {
