@@ -10,15 +10,13 @@ from codecompass.evaluate.lib.analysis import (
     dump_debug_sample,
     extract_jsonl_evidence,
     run_analysis_phase,
-    run_scoring_phase,
 )
 from codecompass.evaluate.lib.common import log_error, log_info, log_step, log_warning
 from codecompass.evaluate.lib.evidence import build_evidence_file
 from codecompass.evaluate.lib.evaluator_renderer import (
     extract_analysis_context,
-    extract_scoring_context,
 )
-from codecompass.evaluate.lib.prompts import build_analysis_jsonl_prompt, build_scoring_prompt, detect_scoring_mode
+from codecompass.evaluate.lib.prompts import build_analysis_jsonl_prompt, detect_scoring_mode
 from codecompass.evaluate.lib.report_json import write_report_json
 from codecompass.evaluate.lib.scoring import run_scoring
 
@@ -39,7 +37,6 @@ def run_two_phase_dimension(
     analysis_template: str,
     scoring_template: str,
     analysis_standards: str = "",
-    scoring_standards: str = "",
     source_file_count: int = 0,
     analysis_hash: str = "",
     scoring_hash: str = "",
@@ -51,10 +48,10 @@ def run_two_phase_dimension(
     numerical: bool = False,
     mapping_file: str | None = None,
 ) -> bool:
-    """Orchestrate the two-phase evaluation for a single dimension.
+    """Orchestrate the evaluation for a single dimension.
 
     Phase 1: Analysis — AI gathers JSONL evidence by reading the repo.
-    Phase 2: Scoring — AI scores the assembled evidence against the rubric.
+    Phase 2: Deterministic scoring — computes scores from evidence and writes dashboard JSON.
 
     Returns True on success, False on failure.
     """
@@ -152,30 +149,6 @@ def run_two_phase_dimension(
                 json.dump(scores_data, f, indent=2, sort_keys=True)
         except Exception as exc:
             log_warning(f"Score computation failed: {exc}")
-
-    # --- Phase 2: Scoring ---
-    evidence_content = Path(evidence_file).read_text() if Path(evidence_file).exists() else ""
-    loaded_scores = Path(scores_file).read_text() if Path(scores_file).exists() else ""
-    scoring_prompt = build_scoring_prompt(
-        template=scoring_template,
-        discipline=discipline,
-        project_name=project_name,
-        today=today,
-        eval_file=eval_file,
-        standards_content=scoring_standards,
-        dimension=dimension,
-        evidence_content=evidence_content,
-        scores_content=loaded_scores,
-        analysis_hash=analysis_hash,
-        scoring_hash=scoring_hash,
-        mapping_hash=mapping_hash,
-        codecompass_version=codecompass_version,
-        scoring_mode=scoring_mode,
-    )
-
-    ok = run_scoring_phase(work_dir, dimension, scoring_prompt, eval_file, dimension_tag, has_evidence)
-    if not ok:
-        return False
 
     # --- Generate dashboard JSON (non-fatal) ---
     json_out = str(Path(eval_file).parent / f"{dimension}.json")

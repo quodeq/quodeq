@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 from codecompass.evaluate.lib.evidence import DEFAULT_WEIGHT
 
 # ---------------------------------------------------------------------------
@@ -47,7 +49,8 @@ _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 
 # Per-type deduction constants for numerical mode.
 _CRITICAL_PENALTY = 1.0   # per distinct critical violation type, cap 3 types
-_MAJOR_PENALTY = 0.25     # per distinct major violation type, cap 5 types
+_MAJOR_PENALTY = 0.5      # per distinct major violation type, cap 5 types
+_MINOR_PENALTY = 0.1      # per distinct minor violation type
 
 
 # ---------------------------------------------------------------------------
@@ -161,22 +164,27 @@ def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: in
     Rules:
     - Each distinct critical violation type removes 1.0 point; types are capped
       at 3*scale before computing the deduction.
-    - Each distinct major violation type removes 0.25 points; capped at 5*scale.
+    - Each distinct major violation type removes 0.5 points; capped at 5*scale.
+    - Each distinct minor violation type removes 0.1 points; capped at 2*scale.
     - If the raw critical count reaches 3*scale, the score is hard-capped at 3.
     - If the raw major count reaches 5*scale, the score is hard-capped at 5.
     - Both caps may apply simultaneously (take min).
     """
     n_critical = violation_type_counts.get("critical", 0)
     n_major = violation_type_counts.get("major", 0)
+    n_minor = violation_type_counts.get("minor", 0)
 
     critical_type_cap = 3 * scale_multiplier
     major_type_cap = 5 * scale_multiplier
+    minor_type_cap = 2 * scale_multiplier
 
     effective_critical = min(n_critical, critical_type_cap)
     effective_major = min(n_major, major_type_cap)
+    effective_minor = min(n_minor, minor_type_cap)
 
     critical_deduction = effective_critical * _CRITICAL_PENALTY
     major_deduction = effective_major * _MAJOR_PENALTY
+    minor_deduction = effective_minor * _MINOR_PENALTY
 
     cap_from_critical = 3 if n_critical >= critical_type_cap else 10
     cap_from_major = 5 if n_major >= major_type_cap else 10
@@ -184,9 +192,11 @@ def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: in
     return {
         "critical_type_count": n_critical,
         "major_type_count": n_major,
+        "minor_type_count": n_minor,
         "critical_deduction": critical_deduction,
         "major_deduction": major_deduction,
-        "total_deduction": critical_deduction + major_deduction,
+        "minor_deduction": minor_deduction,
+        "total_deduction": critical_deduction + major_deduction + minor_deduction,
         "critical_cap": cap_from_critical,
         "major_cap": cap_from_major,
     }
@@ -343,14 +353,8 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
             deductions = build_deductions(vt_counts, scale_multiplier=scale_mult)
 
             effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
-            adjusted = min(effective_cap, round(base_pts - deductions["total_deduction"]))
-
-            no_serious_violations = (
-                deductions["critical_type_count"] == 0
-                and deductions["major_type_count"] == 0
-            )
-            bonus = 1 if no_serious_violations else 0
-            final_pts = min(10, adjusted + bonus)
+            adjusted = min(effective_cap, math.floor(base_pts - deductions["total_deduction"]))
+            final_pts = max(0, min(10, adjusted))
 
             per_principle[key] = {
                 "display_name": pdata.get("display_name", key),
@@ -358,7 +362,6 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
                 "compliance_percentage": pct,
                 "base_score": base_pts,
                 "deductions": deductions,
-                "minor_only_bonus": bonus,
                 "final_score": final_pts,
                 "grade": score_to_grade_label(final_pts),
                 "taxonomy_used": using_taxonomy,
