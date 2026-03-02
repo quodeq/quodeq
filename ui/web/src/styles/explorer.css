@@ -534,8 +534,14 @@
 
 .exec-summary-score {
   font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
+}
+
+.exec-summary-score-denom {
+  font-size: 0.7em;
+  color: var(--color-text-subtle);
 }
 
 .exec-summary-chevron {
