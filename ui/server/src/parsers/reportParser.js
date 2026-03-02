@@ -832,9 +832,13 @@ export function buildAccumulatedData(reportsRoot, project, asOfRun = null) {
   const runIds = allRuns.map((r) => r.runId);
   if (runIds.length === 0) return null;
 
-  // Collect the latest evaluation per dimension (newest run wins)
+  // Collect the latest evaluation per dimension (newest run wins).
+  // Also collect the previous accumulated state (same logic, skipping the first run)
+  // for a like-for-like overall delta in the trend badge.
   const runLookup = new Map(allRuns.map((r) => [r.runId, r]));
   const latestPerDim = new Map();
+  const prevLatestPerDim = new Map();
+  const newestRunId = runIds[0];
   for (const runId of runIds) {
     const dims = loadRunDimensions(reportsRoot, project, runId);
     const run = runLookup.get(runId);
@@ -846,6 +850,9 @@ export function buildAccumulatedData(reportsRoot, project, asOfRun = null) {
           fromDateISO: run?.dateISO ?? null,
           fromDateLabel: run?.dateLabel ?? null
         });
+      }
+      if (runId !== newestRunId && !prevLatestPerDim.has(dim.dimension)) {
+        prevLatestPerDim.set(dim.dimension, dim);
       }
     }
   }
@@ -886,12 +893,20 @@ export function buildAccumulatedData(reportsRoot, project, asOfRun = null) {
     ? (numScores.reduce((a, b) => a + b, 0) / numScores.length).toFixed(1)
     : null;
 
+  const prevScores = Array.from(prevLatestPerDim.values())
+    .map((d) => numericScore(d.overallScore))
+    .filter((v) => v !== null);
+  const prevAvgScore = prevScores.length > 0
+    ? (prevScores.reduce((a, b) => a + b, 0) / prevScores.length).toFixed(1)
+    : null;
+
   return {
     project,
     dimensions: dimensionsWithTrend,
     summary: {
       overallGrade: mostCommonGrade(grades),
       numericAverage: avgScore,
+      previousNumericAverage: prevAvgScore,
       totalViolations,
       totalCompliance,
       dimensionCount: dimensionsWithTrend.length,
