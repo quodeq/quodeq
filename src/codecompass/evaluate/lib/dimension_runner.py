@@ -53,14 +53,15 @@ def run_dimensions(dimensions: list[str], ctx: DimensionRunContext) -> tuple[int
 
         # Load and extract evaluator contexts
         try:
-            evaluator_data = json.loads(evaluator_file.read_text())
+            evaluator_text = evaluator_file.read_text()
+            evaluator_data = json.loads(evaluator_text)
         except Exception as exc:
             log_error(f"Failed to read evaluator {evaluator_file}: {exc}")
             failed += 1
             continue
 
         analysis_standards = json.dumps(extract_analysis_context(evaluator_data), indent=2)
-        evaluator_hash = compute_prompt_hash(evaluator_file.read_text())
+        evaluator_hash = compute_prompt_hash(evaluator_text)
 
         evidence_file = str(ctx.evidence_dir / f"{dimension}_evidence.json")
         eval_file = str(ctx.evaluation_dir / f"{dimension}_eval.md")
