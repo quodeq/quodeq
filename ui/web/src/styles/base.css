@@ -653,6 +653,12 @@ textarea:focus {
   border-radius: var(--radius-lg);
   padding: var(--space-5);
   box-shadow: var(--shadow-sm);
+  transition: background 150ms ease, border-color 150ms ease;
+}
+
+.panel:hover {
+  background: color-mix(in srgb, var(--color-accent) 3%, var(--color-surface));
+  border-color: color-mix(in srgb, var(--color-accent) 25%, var(--color-border));
 }
 
 .wide-panel {
