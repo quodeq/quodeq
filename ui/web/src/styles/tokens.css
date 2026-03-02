@@ -44,6 +44,27 @@
   --primitive-dark-700: #383532;
   --primitive-dark-500: #9a9490;
   --primitive-dark-200: #f0ece6;
+
+  /* Media brand palette */
+  --primitive-media-red:        #e6463c;
+  --primitive-media-red-dark:   #c93530;
+  --primitive-media-red-light:  #f05855;
+  --primitive-media-pink:       #d23278;
+  --primitive-media-yellow:     #fabb22;
+  --primitive-media-violet:     #783c96;
+  --primitive-media-dark-950:   #161616;
+  --primitive-media-dark-900:   #242424;
+  --primitive-media-dark-800:   #2c2c2c;
+  --primitive-media-dark-700:   #3a3a3a;
+  --primitive-media-dark-500:   #a0a0a0;
+  --primitive-media-dark-200:   #f5f5f5;
+  --primitive-media-light-50:   #f7f7f7;
+  --primitive-media-light-100:  #f0f0f0;
+  --primitive-media-light-200:  #dedede;
+  --primitive-media-light-300:  #c8c8c8;
+  --primitive-media-text-900:   #1c1c1c;
+  --primitive-media-text-500:   #6b6b6b;
+  --primitive-media-text-400:   #9b9b9b;
 }
 
 /* ── 2. Semantic tokens — Light mode (default) ────────────
@@ -234,6 +255,103 @@ html[data-theme="light"]:root {
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+}
+
+/* ── Media themes ─────────────────────────────────────────
+   Media Light / Media Dark — corporate brand colors
+   (Cinnabar red accent, Mine Shaft dark neutrals).
+   ──────────────────────────────────────────────────────── */
+
+html[data-theme="media-light"]:root {
+  --color-bg:           var(--primitive-media-light-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-media-light-100);
+  --color-border:       var(--primitive-media-light-200);
+  --color-border-focus: var(--primitive-media-red);
+
+  --color-text:         var(--primitive-media-text-900);
+  --color-text-muted:   var(--primitive-media-text-500);
+  --color-text-subtle:  var(--primitive-media-text-400);
+
+  --color-accent:       var(--primitive-media-red);
+  --color-accent-hover: var(--primitive-media-red-dark);
+  --color-accent-soft:  rgba(230, 70, 60, 0.08);
+
+  --color-danger:  var(--primitive-media-red-dark);
+  --color-success: #2d7a4f;
+
+  /* Severity — brand-tuned red / yellow / neutral */
+  --color-sev-critical-text:   #c93530;
+  --color-sev-critical-bg:     rgba(230, 70, 60, 0.08);
+  --color-sev-critical-border: rgba(230, 70, 60, 0.22);
+  --color-sev-major-text:      #8a6e00;
+  --color-sev-major-bg:        rgba(250, 187, 34, 0.10);
+  --color-sev-major-border:    rgba(250, 187, 34, 0.28);
+  --color-sev-minor-text:      var(--primitive-media-text-500);
+  --color-sev-minor-bg:        rgba(107, 107, 107, 0.06);
+  --color-sev-minor-border:    var(--primitive-media-light-200);
+
+  /* Grades — green stays semantic, reds/yellows brand-tuned */
+  --color-grade-top-text:    #1a7a3c;
+  --color-grade-top-bg:      rgba(26, 122, 60, 0.08);
+  --color-grade-high-text:   #0f7060;
+  --color-grade-high-bg:     rgba(15, 112, 96, 0.08);
+  --color-grade-mid-text:    #8a6e00;
+  --color-grade-mid-bg:      rgba(250, 187, 34, 0.10);
+  --color-grade-low-text:    #b84038;
+  --color-grade-low-bg:      rgba(230, 70, 60, 0.07);
+  --color-grade-bottom-text: #c93530;
+  --color-grade-bottom-bg:   rgba(230, 70, 60, 0.10);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+}
+
+html[data-theme="media-dark"]:root {
+  --color-bg:           var(--primitive-media-dark-950);
+  --color-surface:      var(--primitive-media-dark-900);
+  --color-surface-alt:  var(--primitive-media-dark-800);
+  --color-border:       var(--primitive-media-dark-700);
+  --color-border-focus: var(--primitive-media-red);
+
+  --color-text:         var(--primitive-media-dark-200);
+  --color-text-muted:   var(--primitive-media-dark-500);
+  --color-text-subtle:  #6c6c6c;
+
+  --color-accent:       var(--primitive-media-red);
+  --color-accent-hover: var(--primitive-media-red-light);
+  --color-accent-soft:  rgba(230, 70, 60, 0.14);
+
+  --color-danger:  var(--primitive-media-red-light);
+  --color-success: #4caf7d;
+
+  /* Severity — brand-tuned red / yellow / neutral */
+  --color-sev-critical-text:   #f05855;
+  --color-sev-critical-bg:     rgba(230, 70, 60, 0.12);
+  --color-sev-critical-border: rgba(230, 70, 60, 0.28);
+  --color-sev-major-text:      #fabb22;
+  --color-sev-major-bg:        rgba(250, 187, 34, 0.12);
+  --color-sev-major-border:    rgba(250, 187, 34, 0.30);
+  --color-sev-minor-text:      var(--primitive-media-dark-500);
+  --color-sev-minor-bg:        rgba(160, 160, 160, 0.08);
+  --color-sev-minor-border:    var(--primitive-media-dark-700);
+
+  /* Grades — green stays semantic, reds/yellows brand-tuned */
+  --color-grade-top-text:    #5ee096;
+  --color-grade-top-bg:      rgba(94, 224, 150, 0.10);
+  --color-grade-high-text:   #26c4a8;
+  --color-grade-high-bg:     rgba(38, 196, 168, 0.10);
+  --color-grade-mid-text:    #fabb22;
+  --color-grade-mid-bg:      rgba(250, 187, 34, 0.12);
+  --color-grade-low-text:    #f07855;
+  --color-grade-low-bg:      rgba(230, 70, 60, 0.10);
+  --color-grade-bottom-text: #f05855;
+  --color-grade-bottom-bg:   rgba(230, 70, 60, 0.14);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
 }
 
 /* ── 5. Typography ────────────────────────────────────────

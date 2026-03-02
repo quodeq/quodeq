@@ -5,7 +5,8 @@ import './styles/index.css';
 
 // Apply saved theme before first render (prevents flash)
 const savedTheme = localStorage.getItem('cc-theme');
-if (savedTheme === 'dark' || savedTheme === 'light') {
+const validThemes = ['dark', 'light', 'media-dark', 'media-light'];
+if (validThemes.includes(savedTheme)) {
   document.documentElement.setAttribute('data-theme', savedTheme);
 }
 
