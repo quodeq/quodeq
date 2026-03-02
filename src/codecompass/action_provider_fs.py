@@ -153,8 +153,7 @@ class FilesystemActionProvider(ActionProvider):
                 summary = _summarize_dimensions(dims)
                 latest_grade = summary.get("overallGrade")
                 latest_score = summary.get("numericAverage")
-                total = sum(d.get("sourceFileCount") or 0 for d in dims)
-                files_count = total if total > 0 else None
+                files_count = next((d.get("sourceFileCount") for d in dims if d.get("sourceFileCount")), None)
             except Exception:
                 pass
             path_exists = Path(path).exists() if location == "local" and path else None

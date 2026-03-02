@@ -249,8 +249,8 @@ export default function App() {
     if (dims.length === 0) return null;
     const discipline = dims.find((d) => d.discipline)?.discipline ?? null;
     const repository = dims.find((d) => d.repository)?.repository ?? null;
-    const totalFiles = dims.reduce((s, d) => s + (d.sourceFileCount || 0), 0);
-    return { discipline, repository, totalFiles: totalFiles || null };
+    const totalFiles = dims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
+    return { discipline, repository, totalFiles };
   }, [accumulated]);
 
   const { selectedDisplayName, selectedProjectParent } = useMemo(() => {
