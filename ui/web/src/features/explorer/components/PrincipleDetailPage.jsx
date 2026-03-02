@@ -3,6 +3,14 @@ import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../..
 
 const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
 
+function parseFileRef(rawFile, rawLine) {
+  if (!rawFile) return { filePath: null, line: rawLine ?? null };
+  const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
+  const filePath = m[1] || rawFile;
+  const line = rawLine ?? (m[2] ? parseInt(m[2], 10) : null);
+  return { filePath, line };
+}
+
 function CopyIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -81,36 +89,57 @@ function CopyButton({ onClick, label }) {
   };
   return (
     <button className="detail-copy-btn" onClick={handleClick}>
-      <CopyIcon />
       {copied ? 'Copied!' : label}
+      <CopyIcon />
+    </button>
+  );
+}
+
+function FileCopyBtn({ display, copyText }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="vlive-detail-file-btn"
+      onClick={() => {
+        navigator.clipboard.writeText(copyText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? 'Copied!' : display}
+      <CopyIcon />
     </button>
   );
 }
 
 function ViolationCard({ v, principleName, index }) {
+  const { filePath, line } = parseFileRef(v.file, v.line);
+  const filename = filePath ? filePath.split('/').pop() : null;
+  const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
+  const ref = line != null ? `${filePath}:${line}` : filePath;
+  const display = line != null ? `${filename}:${line}` : filename;
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}>
       <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-        <span className="vlive-file">
-          {v.file?.split('/').pop() ?? v.file}
-        </span>
+        {filename && <span className="vlive-file">{display}</span>}
         <CopyButton
           label="Fix plan"
           onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v, principleName))}
         />
       </div>
       <div className="vlive-detail">
-        {v.file && (
-          <div className="vlive-detail-row">
-            <span className="vlive-detail-label">File</span>
-            <code className="vlive-detail-value">{v.file}{v.line ? `:${v.line}` : ''}</code>
+        {v.reason && (
+          <div className="vlive-detail-section">
+            <span className="vlive-detail-section-label">Reason</span>
+            <p className="vlive-detail-reason">{v.reason}</p>
           </div>
         )}
-        {v.reason && (
-          <div className="vlive-detail-row">
-            <span className="vlive-detail-label">Reason</span>
-            <span className="vlive-detail-value vlive-detail-value--prose">{v.reason}</span>
+        {filename && (
+          <div className="vlive-detail-meta">
+            {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
+            <FileCopyBtn display={display} copyText={ref} />
           </div>
         )}
         {v.snippet && <pre className="vlive-snippet">{v.snippet}</pre>}

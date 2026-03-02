@@ -20,8 +20,8 @@ export default function CopyButton({ onClick, label }) {
 
   return (
     <button className="detail-copy-btn" onClick={handleClick}>
-      <CopyIcon />
       {copied ? 'Copied!' : label}
+      <CopyIcon />
     </button>
   );
 }

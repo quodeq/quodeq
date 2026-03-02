@@ -21,6 +21,14 @@
   letter-spacing: 0.06em;
 }
 
+.explorer-dimension-title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  letter-spacing: -0.01em;
+  text-transform: capitalize;
+}
+
 .acc-eval-date {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
@@ -62,6 +70,11 @@
 
 .acc-eval-trend .trend-badge-delta { font-size: 0.82rem; }
 .acc-eval-trend .trend-badge-label { font-size: 0.75rem; }
+
+.acc-eval-panel--compact .acc-eval-hero { gap: 10px; }
+.acc-eval-panel--compact .acc-eval-grade-chip { font-size: 1rem !important; padding: 4px 10px !important; }
+.acc-eval-panel--compact .acc-eval-score { font-size: 1.6rem; }
+.acc-eval-panel--compact .acc-eval-score-denom { font-size: 0.85rem; }
 
 .acc-eval-stats-grid {
   display: grid;
@@ -841,28 +854,6 @@
   background: rgba(255, 111, 111, 0.1);
   transform: none;
   filter: none;
-}
-
-.settings-panel {
-  display: grid;
-  grid-template-rows: 0fr;
-  transition: grid-template-rows 250ms ease, opacity 200ms ease;
-  opacity: 0;
-}
-
-.settings-panel > .settings-panel-inner {
-  overflow: hidden;
-}
-
-.settings-panel.visible {
-  grid-template-rows: 1fr;
-  opacity: 1;
-}
-
-.settings-panel-inner {
-  display: grid;
-  gap: 14px;
-  padding-top: 12px;
 }
 
 .filter-section {
@@ -2070,55 +2061,6 @@
   flex-wrap: wrap;
   gap: var(--space-1);
   margin-top: var(--space-1);
-}
-
-/* ── Settings panel toggle (floating button) ──────────── */
-
-.settings-panel-toggle {
-  position: fixed;
-  bottom: var(--space-5);
-  right: var(--space-5);
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-muted);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: var(--shadow-md);
-  transition: background 120ms ease, color 120ms ease, box-shadow 120ms ease;
-  z-index: 100;
-}
-
-.settings-panel-toggle:hover {
-  background: var(--color-surface-alt);
-  color: var(--color-text);
-  box-shadow: var(--shadow-lg);
-}
-
-.settings-panel-title {
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text);
-  margin: 0 0 var(--space-4) 0;
-}
-
-.settings-toggle-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-4);
-  padding: var(--space-2) 0;
-}
-
-.theme-toggle-group {
-  display: flex;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  overflow: hidden;
 }
 
 /* ── DimensionCard missing classes ────────────────────── */
