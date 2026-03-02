@@ -564,22 +564,7 @@ export default function DashboardPage({
   availableRuns = [],
   overviewRunIndex = 0,
 }) {
-  const [themePreference, setThemePreference] = useState(
-    () => localStorage.getItem('cc-theme') ?? 'system'
-  );
-  const [showSettingsPanel, setShowSettingsPanel] = useState(false);
-  const [compareMode, setCompareMode] = useState(false);
   const [focusedDimension, setFocusedDimension] = useState(null);
-
-  const applyTheme = (pref) => {
-    setThemePreference(pref);
-    localStorage.setItem('cc-theme', pref);
-    if (pref === 'system') {
-      document.documentElement.removeAttribute('data-theme');
-    } else {
-      document.documentElement.setAttribute('data-theme', pref);
-    }
-  };
 
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
   const accumulatedDimensions = accumulated?.dimensions || [];
@@ -673,50 +658,6 @@ export default function DashboardPage({
         </>
       )}
 
-      {/* Settings toggle */}
-      <button
-        type="button"
-        className="settings-panel-toggle"
-        onClick={() => setShowSettingsPanel((v) => !v)}
-        title="Settings"
-        aria-label="Toggle settings panel"
-      >
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="3" />
-          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-        </svg>
-      </button>
-
-      {showSettingsPanel && (
-        <aside className="settings-panel panel">
-          <h4 className="settings-panel-title">Settings</h4>
-          <div className="settings-section">
-            <p className="settings-label">Theme</p>
-            <div className="theme-toggle-group">
-              {['light', 'system', 'dark'].map((pref) => (
-                <button
-                  key={pref}
-                  type="button"
-                  className={`theme-toggle-btn${themePreference === pref ? ' active' : ''}`}
-                  onClick={() => applyTheme(pref)}
-                >
-                  {pref.charAt(0).toUpperCase() + pref.slice(1)}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div className="settings-section">
-            <label className="settings-toggle-row">
-              <span className="settings-label">Compare mode</span>
-              <input
-                type="checkbox"
-                checked={compareMode}
-                onChange={(e) => setCompareMode(e.target.checked)}
-              />
-            </label>
-          </div>
-        </aside>
-      )}
     </div>
   );
 }

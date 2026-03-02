@@ -4,6 +4,43 @@ function severityOrder(s) {
   return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
 }
 
+function CopyIcon() {
+  return (
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <rect x="9" y="9" width="13" height="13" rx="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
+function FileCopyBtn({ display, copyText }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="vlive-detail-file-btn"
+      onClick={() => {
+        navigator.clipboard.writeText(copyText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? 'Copied!' : display}
+      <CopyIcon />
+    </button>
+  );
+}
+
+// Parse a raw file string that may or may not carry a trailing :line.
+// Returns { filePath, line } where filePath has no line suffix.
+function parseFileRef(rawFile, rawLine) {
+  if (!rawFile) return { filePath: null, line: rawLine ?? null };
+  const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
+  const filePath = m[1] || rawFile;
+  const line = rawLine ?? (m[2] ? parseInt(m[2], 10) : null);
+  return { filePath, line };
+}
+
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
 
@@ -15,7 +52,7 @@ function ViolationLiveRow({ violation, index }) {
       <div className="vlive-row-main" onClick={() => setOpen(o => !o)}>
         <span className={`severity-tag ${violation.severity}`}>{violation.severity}</span>
         <span className="vlive-principle">{violation.principle}</span>
-        <span className="vlive-file">{violation.file?.split('/').pop() ?? violation.file}</span>
+        <span className="vlive-file">{(() => { const { filePath, line } = parseFileRef(violation.file, violation.line); const name = filePath?.split('/').pop() ?? filePath; return line != null ? `${name}:${line}` : name; })()}</span>
         <svg
           className={`vlive-chevron${open ? ' open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24"
@@ -25,29 +62,30 @@ function ViolationLiveRow({ violation, index }) {
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </div>
-      {open && (
-        <div className="vlive-detail">
-          <div className="vlive-detail-row">
-            <span className="vlive-detail-label">File</span>
-            <code className="vlive-detail-value">{violation.file}</code>
+      {open && (() => {
+        const { filePath, line } = parseFileRef(violation.file, violation.line);
+        const filename = filePath ? filePath.split('/').pop() : null;
+        const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
+        const ref = line != null ? `${filePath}:${line}` : filePath;
+        const display = line != null ? `${filename}:${line}` : filename;
+        return (
+          <div className="vlive-detail">
+            {violation.reason && (
+              <div className="vlive-detail-section">
+                <span className="vlive-detail-section-label">Reason</span>
+                <p className="vlive-detail-reason">{violation.reason}</p>
+              </div>
+            )}
+            {filename && (
+              <div className="vlive-detail-meta">
+                {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
+                <FileCopyBtn display={display} copyText={ref} />
+              </div>
+            )}
+            {violation.snippet && <pre className="vlive-snippet">{violation.snippet}</pre>}
           </div>
-          {violation.line != null && (
-            <div className="vlive-detail-row">
-              <span className="vlive-detail-label">Line</span>
-              <code className="vlive-detail-value">{violation.line}</code>
-            </div>
-          )}
-          {violation.reason && (
-            <div className="vlive-detail-row">
-              <span className="vlive-detail-label">Reason</span>
-              <span className="vlive-detail-value vlive-detail-value--prose">{violation.reason}</span>
-            </div>
-          )}
-          {violation.snippet && (
-            <pre className="vlive-snippet">{violation.snippet}</pre>
-          )}
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }

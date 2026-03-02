@@ -296,8 +296,8 @@ export default function App() {
   // Show the project header on all data pages; hide it on evaluate and settings.
   const showProjectHeader = activeTab === 'overview' && projects.length > 0 && !!selectedProject;
 
-  // Show the run navigator only on data pages with runs available.
-  const showRunNav = showProjectHeader && availableRuns.length > 0;
+  // Show the run navigator only on top-level data pages (not when drilled into a sub-page).
+  const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
 
   // "View run" button only on the top-level overview (not when already in run mode or inner pages).
   const onViewRun = activePage.page === 'overview' ? handleRunView : undefined;
