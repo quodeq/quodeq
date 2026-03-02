@@ -548,13 +548,13 @@
   transition: background 150ms ease, border-color 150ms ease;
 }
 
-.qd-card:hover {
-  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-surface));
-  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+.qd-card:not(.qd-card-stale) {
+  border-color: var(--color-text-muted);
 }
 
-.qd-card:not(.qd-card-stale) {
-  border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
+.qd-card:hover {
+  background: color-mix(in srgb, var(--color-accent) 5%, var(--color-surface));
+  border-color: var(--color-accent);
 }
 
 .qd-card-stale {
