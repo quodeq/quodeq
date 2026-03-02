@@ -133,6 +133,7 @@ class FilesystemActionProvider(ActionProvider):
             discipline = None
             path = None
             location = None
+            display_name = None
             info_path = reports_root / entry.name / "repository_info.json"
             if info_path.exists():
                 try:
@@ -141,6 +142,7 @@ class FilesystemActionProvider(ActionProvider):
                     discipline = info.get("discipline") or None
                     path = info.get("path") or None
                     location = info.get("location") or None
+                    display_name = info.get("displayName") or None
                 except (json.JSONDecodeError, OSError):
                     pass
             latest_grade = None
@@ -155,6 +157,7 @@ class FilesystemActionProvider(ActionProvider):
                 files_count = total if total > 0 else None
             except Exception:
                 pass
+            path_exists = Path(path).exists() if location == "local" and path else None
             projects.append(
                 {
                     "name": entry.name,
@@ -162,9 +165,11 @@ class FilesystemActionProvider(ActionProvider):
                     "latestRunId": runs[0].run_id,
                     "latestDate": runs[0].date_iso,
                     "parent": parent,
+                    "displayName": display_name,
                     "discipline": discipline,
                     "path": path,
                     "location": location,
+                    "pathExists": path_exists,
                     "filesCount": files_count,
                     "latestGrade": latest_grade,
                     "latestScore": latest_score,
@@ -191,6 +196,19 @@ class FilesystemActionProvider(ActionProvider):
             if best_parent:
                 p["parent"] = best_parent
         return {"projects": projects}
+
+    def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
+        info_path = Path(reports_dir) / project / "repository_info.json"
+        if not info_path.exists():
+            return False
+        try:
+            info = json.loads(info_path.read_text())
+            info["path"] = new_path
+            info["location"] = "local"
+            info_path.write_text(json.dumps(info, indent=2))
+            return True
+        except (json.JSONDecodeError, OSError):
+            return False
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         import shutil
