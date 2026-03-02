@@ -129,7 +129,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={RunHistoryTooltip} cursor={false} />
+          <Tooltip content={RunHistoryTooltip} cursor={false} isAnimationActive={false} />
           <ReferenceLine y={5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.5} />
           <Bar
             dataKey="numericAverage"
@@ -146,7 +146,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
               <Cell
                 key={entry.runId ?? i}
                 fill={gradeBarColor(entry.overallGrade)}
-                opacity={entry.runId === selectedRunId ? 1 : 0.45}
+                opacity={entry.runId === selectedRunId ? 1 : 0.55}
                 stroke={hoveredIndex === i ? 'rgba(255,255,255,0.25)' : 'none'}
                 strokeWidth={hoveredIndex === i ? 1.5 : 0}
               />
