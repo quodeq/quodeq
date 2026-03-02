@@ -158,7 +158,8 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             isAnimationActive={false}
             dataKey="numericAverage"
             type="monotone"
-            stroke={cssVar('--color-accent', '#e8795a')}
+            stroke={cssVar('--color-text', '#1a1a1a')}
+            strokeOpacity={0.55}
             strokeWidth={2.5}
             dot={false}
             activeDot={false}
