@@ -45,10 +45,36 @@ function CopyButton({ onClick, label }) {
   };
   return (
     <button className="detail-copy-btn" onClick={handleClick}>
-      <CopyIcon />
       {copied ? 'Copied!' : label}
+      <CopyIcon />
     </button>
   );
+}
+
+function FileCopyBtn({ display, copyText }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <button
+      type="button"
+      className="vlive-detail-file-btn"
+      onClick={() => {
+        navigator.clipboard.writeText(copyText);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+      }}
+    >
+      {copied ? 'Copied!' : display}
+      <CopyIcon />
+    </button>
+  );
+}
+
+function parseFileRef(rawFile, rawLine) {
+  if (!rawFile) return { filePath: null, line: rawLine ?? null };
+  const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
+  const filePath = m[1] || rawFile;
+  const line = rawLine ?? (m[2] ? parseInt(m[2], 10) : null);
+  return { filePath, line };
 }
 
 const PAGE_SIZE = 20;
@@ -197,35 +223,42 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
             <div className="vlive-violations-group">
               {vs.map((v, idx) => (
                 <div key={idx} className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}>
-                  <div className="vdetail-row-main">
-                    <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-                    {v.file && (
-                      <span className="vlive-file">
-                        {v.file.split('/').pop()}
-                      </span>
-                    )}
-                    <CopyButton
-                      label="Fix plan"
-                      onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v))}
-                    />
-                  </div>
-                  <div className="vlive-detail">
-                    {v.file && (
-                      <div className="vlive-detail-row">
-                        <span className="vlive-detail-label">File</span>
-                        <code className="vlive-detail-value">{v.file}{v.line ? `:${v.line}` : ''}</code>
-                      </div>
-                    )}
-                    {(v.reason || v.findings) && (
-                      <div className="vlive-detail-row">
-                        <span className="vlive-detail-label">Reason</span>
-                        <span className="vlive-detail-value vlive-detail-value--prose">{v.reason || v.findings}</span>
-                      </div>
-                    )}
-                    {(v.code || v.snippet) && (
-                      <pre className="vlive-snippet">{v.code || v.snippet}</pre>
-                    )}
-                  </div>
+                  {(() => {
+                    const { filePath, line } = parseFileRef(v.file, v.line);
+                    const filename = filePath ? filePath.split('/').pop() : null;
+                    const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
+                    const ref = line != null ? `${filePath}:${line}` : filePath;
+                    const display = line != null ? `${filename}:${line}` : filename;
+                    return (
+                      <>
+                        <div className="vdetail-row-main">
+                          <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+                          {filename && <span className="vlive-file">{display}</span>}
+                          <CopyButton
+                            label="Fix plan"
+                            onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v))}
+                          />
+                        </div>
+                        <div className="vlive-detail">
+                          {(v.reason || v.findings) && (
+                            <div className="vlive-detail-section">
+                              <span className="vlive-detail-section-label">Reason</span>
+                              <p className="vlive-detail-reason">{v.reason || v.findings}</p>
+                            </div>
+                          )}
+                          {filename && (
+                            <div className="vlive-detail-meta">
+                              {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
+                              <FileCopyBtn display={display} copyText={ref} />
+                            </div>
+                          )}
+                          {(v.code || v.snippet) && (
+                            <pre className="vlive-snippet">{v.code || v.snippet}</pre>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
                 </div>
               ))}
             </div>
@@ -242,26 +275,38 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
           <div className="vlive-violations-group">
             {displayedCompliance.map((c, idx) => (
               <div key={idx} className="vdetail-row vdetail-row--compliant" style={{ animationDelay: `${Math.min(idx * 30, 300)}ms` }}>
-                <div className="vdetail-row-main">
-                  {c.file && (
-                    <span className="vlive-file">{c.file.split('/').pop()}</span>
-                  )}
-                </div>
-                <div className="vlive-detail">
-                  {c.file && (
-                    <div className="vlive-detail-row">
-                      <span className="vlive-detail-label">File</span>
-                      <code className="vlive-detail-value">{c.file}{c.line ? `:${c.line}` : ''}</code>
-                    </div>
-                  )}
-                  {c.reason && (
-                    <div className="vlive-detail-row">
-                      <span className="vlive-detail-label">Reason</span>
-                      <span className="vlive-detail-value vlive-detail-value--prose">{c.reason}</span>
-                    </div>
-                  )}
-                  {c.snippet && <pre className="vlive-snippet">{c.snippet}</pre>}
-                </div>
+                {(() => {
+                  const { filePath, line } = parseFileRef(c.file, c.line);
+                  const filename = filePath ? filePath.split('/').pop() : null;
+                  const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
+                  const ref = line != null ? `${filePath}:${line}` : filePath;
+                  const display = line != null ? `${filename}:${line}` : filename;
+                  return (
+                    <>
+                      <div className="vdetail-row-main">
+                        {filename && <span className="vlive-file">{display}</span>}
+                      </div>
+                      <div className="vlive-detail">
+                        {c.reason && (
+                          <div className="vlive-detail-section">
+                            <span className="vlive-detail-section-label">Reason</span>
+                            <p className="vlive-detail-reason">{c.reason}</p>
+                          </div>
+                        )}
+                        {filename && (
+                          <div className="vlive-detail-section">
+                            <span className="vlive-detail-section-label">File</span>
+                            <div className="vlive-detail-meta">
+                              {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
+                              <FileCopyBtn display={display} copyText={ref} />
+                            </div>
+                          </div>
+                        )}
+                        {c.snippet && <pre className="vlive-snippet">{c.snippet}</pre>}
+                      </div>
+                    </>
+                  );
+                })()}
               </div>
             ))}
           </div>
