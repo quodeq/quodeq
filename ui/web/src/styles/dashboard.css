@@ -2272,3 +2272,16 @@
 .rht-date  { color: var(--color-text-muted, #94a3b8); }
 .rht-score { font-weight: 600; color: var(--color-text, #f1f5f9); }
 .rht-grade { color: var(--color-text-muted, #94a3b8); font-size: 0.75rem; }
+
+/* ── History panels row (Score History + Dimension Scores side-by-side) ── */
+
+.history-panels-row {
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+}
+
+.history-panels-row > .run-history-panel {
+  flex: 1 1 0;
+  min-width: 0;
+}

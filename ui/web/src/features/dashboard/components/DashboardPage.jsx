@@ -8,6 +8,7 @@ import CopyButton from '../../../components/CopyButton.jsx';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { formatRunId, gradeColorClass, mostFrequentGrade, splitScore } from '../../../utils/formatters.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
+import DimensionScorePanel from './DimensionScorePanel.jsx';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -201,12 +202,15 @@ function AccumulatedOverviewPanel({
         </div>
       </section>
 
-      <RunHistoryPanel
-        trend={trend}
-        selectedRunId={selectedRunId}
-        selectedRunScore={accumulated?.summary?.numericAverage}
-        onBarClick={onRunClick}
-      />
+      <div className="history-panels-row">
+        <RunHistoryPanel
+          trend={trend}
+          selectedRunId={selectedRunId}
+          selectedRunScore={accumulated?.summary?.numericAverage}
+          onBarClick={onRunClick}
+        />
+        <DimensionScorePanel dimensions={accumulatedDimensions} onBarClick={onDimensionClick} />
+      </div>
 
       {/* Quality dimension cards */}
       <div className="dimensions-header">
