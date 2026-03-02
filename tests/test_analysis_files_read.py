@@ -59,3 +59,24 @@ def test_extract_jsonl_evidence_returns_zero_on_empty():
         stream.write_text("")
         files_read = extract_jsonl_evidence(str(stream), str(jsonl), "dim")
         assert files_read == 0
+
+
+def test_extract_jsonl_evidence_item_completed_reads():
+    events = [
+        {
+            "type": "item.completed",
+            "item": {
+                "type": "agent_message",
+                "content": [
+                    {"type": "tool_use", "name": "Read", "input": {"file_path": "/repo/c.py"}},
+                    {"type": "tool_use", "name": "Read", "input": {"file_path": "/repo/d.py"}},
+                ],
+            },
+        }
+    ]
+    with tempfile.TemporaryDirectory() as tmp:
+        stream = Path(tmp) / "stream.json"
+        jsonl = Path(tmp) / "out.jsonl"
+        _write_stream(stream, events)
+        files_read = extract_jsonl_evidence(str(stream), str(jsonl), "dim")
+        assert files_read == 2
