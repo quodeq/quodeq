@@ -29,6 +29,13 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
     def list_projects():
         return jsonify(provider.list_projects(_reports_dir()))
 
+    @app.delete("/api/projects/<project>")
+    def delete_project(project: str):
+        ok = provider.delete_project(_reports_dir(), project)
+        if not ok:
+            return jsonify({"error": "Project not found"}), 404
+        return jsonify({"deleted": project})
+
     @app.get("/api/projects/<project>/info")
     def project_info(project: str):
         info = provider.get_project_info(_reports_dir(), project)
