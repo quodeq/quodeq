@@ -3,8 +3,11 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import shutil
+import subprocess
 import sys
+import urllib.request
 from typing import Any
 
 from codecompass.action_provider import ActionProvider
@@ -16,7 +19,6 @@ from codecompass.adapters.fs.report_parser import (
     _calculate_trend,
     _clean_cell,
     _extract_exec_summary,
-    _get_previous_run_for_dimension,
     _is_divider_row,
     _list_runs,
     _most_frequent_grade,
@@ -201,17 +203,17 @@ class FilesystemActionProvider(ActionProvider):
         stale_dim_map: dict[str, dict[str, Any]] = {}
         skip_grades = {"NA", "N/A", "INSUFFICIENT"}
 
-        run_data_cache: dict[int, list[dict[str, Any]]] = {}
-        def get_run_dimensions(idx: int) -> list[dict[str, Any]]:
-            if idx not in run_data_cache:
-                run_data_cache[idx] = _read_run_data(reports_root, project, runs[idx].run_id)
-            return run_data_cache[idx]
+        run_data_cache: dict[str, list[dict[str, Any]]] = {}
+        def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
+            if run_id not in run_data_cache:
+                run_data_cache[run_id] = _read_run_data(reports_root, project, run_id)
+            return run_data_cache[run_id]
 
         non_na_count: dict[str, int] = {}
         stale_previous_by_dimension: dict[str, dict[str, Any]] = {}
 
         for i in range(selected_index + 1, len(runs)):
-            run_dimensions = get_run_dimensions(i)
+            run_dimensions = get_run_dimensions(runs[i].run_id)
             for dim in run_dimensions:
                 dim_name = dim.get("dimension")
                 if not dim_name:
@@ -236,7 +238,7 @@ class FilesystemActionProvider(ActionProvider):
                             stale_previous_by_dimension[dim_name] = dim
 
         for i in range(0, selected_index):
-            run_dimensions = get_run_dimensions(i)
+            run_dimensions = get_run_dimensions(runs[i].run_id)
             for dim in run_dimensions:
                 dim_name = dim.get("dimension")
                 if dim_name and dim_name not in selected_dim_names and dim_name not in stale_dim_map:
@@ -268,7 +270,7 @@ class FilesystemActionProvider(ActionProvider):
         trend = []
         acc_by_dim: dict[str, dict[str, Any]] = {}
         for item in reversed(runs):  # oldest → newest
-            for dim in _read_run_data(reports_root, project, item.run_id):
+            for dim in get_run_dimensions(item.run_id):
                 dim_name = dim.get("dimension")
                 if dim_name:
                     acc_by_dim[dim_name] = dim  # latest run wins
@@ -317,10 +319,13 @@ class FilesystemActionProvider(ActionProvider):
         if not runs:
             return None
 
+        # Pre-read all run data once to avoid redundant disk reads across the loops below.
+        all_run_data: dict[str, list[dict[str, Any]]] = {}
         latest_by_dimension: dict[str, dict[str, Any]] = {}
         for run_id in runs:
-            dimensions = _read_run_data(reports_root, project, run_id)
-            for dim in dimensions:
+            dims = _read_run_data(reports_root, project, run_id)
+            all_run_data[run_id] = dims
+            for dim in dims:
                 dim_name = dim.get("dimension")
                 if dim_name and dim_name not in latest_by_dimension:
                     latest_by_dimension[dim_name] = {**dim, "fromRunId": run_id}
@@ -329,7 +334,15 @@ class FilesystemActionProvider(ActionProvider):
 
         dimensions_with_trend = []
         for dim in all_dimensions:
-            previous = _get_previous_run_for_dimension(reports_root, project, dim.get("fromRunId"), dim.get("dimension"))
+            from_run = dim.get("fromRunId")
+            dim_name = dim.get("dimension")
+            previous = None
+            if from_run:
+                for rid in sorted((r for r in runs if r < from_run), reverse=True):
+                    d = next((x for x in all_run_data.get(rid, []) if x.get("dimension") == dim_name), None)
+                    if d:
+                        previous = {"runId": rid, "dimension": d}
+                        break
             trend = _calculate_trend(dim.get("overallScore"), previous.get("dimension", {}).get("overallScore") if previous else None)
             dimensions_with_trend.append(
                 {
@@ -367,8 +380,7 @@ class FilesystemActionProvider(ActionProvider):
         if len(runs) >= 2:
             prev_latest_by_dimension: dict[str, dict[str, Any]] = {}
             for run_id in runs[1:]:
-                dimensions = _read_run_data(reports_root, project, run_id)
-                for dim in dimensions:
+                for dim in all_run_data[run_id]:
                     dim_name = dim.get("dimension")
                     if dim_name and dim_name not in prev_latest_by_dimension:
                         prev_latest_by_dimension[dim_name] = dim
@@ -496,7 +508,6 @@ class FilesystemActionProvider(ActionProvider):
     def get_client_models(self, client_id: str):
         if client_id == "claude":
             return self._get_claude_models()
-        import subprocess
         if not shutil.which(client_id):
             return {"models": []}
         try:
@@ -517,8 +528,6 @@ class FilesystemActionProvider(ActionProvider):
         return {"models": models}
 
     def _get_claude_models(self):
-        import json
-        import urllib.request
         # Try direct API call when ANTHROPIC_API_KEY is available
         api_key = os.environ.get("ANTHROPIC_API_KEY")
         if api_key:
