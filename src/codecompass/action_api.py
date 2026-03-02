@@ -29,6 +29,19 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
     def list_projects():
         return jsonify(provider.list_projects(_reports_dir()))
 
+    @app.patch("/api/projects/<project>/path")
+    def update_project_path(project: str):
+        data = request.get_json(silent=True) or {}
+        new_path = data.get("path", "").strip()
+        if not new_path:
+            body, status = _error("Path is required", 400, "INVALID_INPUT")
+            return jsonify(body), status
+        ok = provider.update_project_path(_reports_dir(), project, new_path)
+        if not ok:
+            body, status = _error("Project not found", 404, "NOT_FOUND")
+            return jsonify(body), status
+        return jsonify({"updated": project, "path": new_path})
+
     @app.delete("/api/projects/<project>")
     def delete_project(project: str):
         ok = provider.delete_project(_reports_dir(), project)

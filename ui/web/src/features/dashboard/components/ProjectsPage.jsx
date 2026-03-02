@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
+import CopyButton from '../../../components/CopyButton.jsx';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -59,7 +60,7 @@ function GradeChip({ grade, score }) {
   );
 }
 
-export default function ProjectsPage({ projects = [], selectedProject, onSelect, onDelete }) {
+export default function ProjectsPage({ projects = [], selectedProject, onSelect, onDelete, onRelocate }) {
   const { projectMap, children, roots } = useMemo(() => {
     const projectMap = Object.fromEntries(projects.map((p) => [p.name || p, p]));
     const children = {};
@@ -77,7 +78,19 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
     return { projectMap, children, roots };
   }, [projects]);
 
-  const [confirming, setConfirming] = useState(null); // holds project name being confirmed
+  const [confirming, setConfirming] = useState(null);
+  const [relocating, setRelocating] = useState(null);   // project name being relocated
+  const [relocatePath, setRelocatePath] = useState('');
+  function startRelocate(name, currentPath) {
+    setRelocating(name);
+    setRelocatePath(currentPath || '');
+  }
+
+  function submitRelocate(name) {
+    if (relocatePath.trim()) onRelocate?.(name, relocatePath.trim());
+    setRelocating(null);
+  }
+
 
   const [expanded, setExpanded] = useState(() => {
     const selectedData = projectMap[selectedProject];
@@ -124,6 +137,7 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
             const date = formatDate(p.latestDate);
             const discipline = disciplineLabel(p.discipline);
             const path = formatPath(p.path);
+            const pathMissing = p.location === 'local' && p.pathExists === false;
             const childSelected = hasChildren && children[name].some((c) => (c.name || c) === selectedProject);
 
             return (
@@ -133,7 +147,7 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
               >
                 <div className="project-card-main" onClick={() => onSelect?.(name)}>
                   <div className="project-card-top">
-                    <span className="project-card-name">{name}</span>
+                    <span className="project-card-name">{p.displayName || name}</span>
                     <GradeChip grade={grade} score={score} />
                   </div>
                   <div className="project-card-meta">
@@ -144,7 +158,37 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
                     <span className="project-meta-item">{p.runsCount} {p.runsCount === 1 ? 'run' : 'runs'}</span>
                     {date && <span className="project-meta-date">{date}</span>}
                   </div>
-                  {path && <div className="project-card-path">{path}</div>}
+                  {relocating === name ? (
+                    <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        className="project-relocate-input"
+                        value={relocatePath}
+                        onChange={(e) => setRelocatePath(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(name); if (e.key === 'Escape') setRelocating(null); }}
+                        placeholder="/new/path/to/repo"
+                        autoFocus
+                      />
+                      <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(name)}>Save</button>
+                      <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>Cancel</button>
+                    </div>
+                  ) : (
+                    <div className="project-path-row">
+                      {pathMissing && <span className="project-path-missing">Path not found</span>}
+                      {path && <div className="project-card-path">{path}</div>}
+                      {p.location === 'online' && p.path && (
+                        <span onClick={(e) => e.stopPropagation()}>
+                          <CopyButton label="" onClick={() => navigator.clipboard?.writeText(p.path)} />
+                        </span>
+                      )}
+                      {pathMissing && (
+                        <button
+                          type="button"
+                          className="project-path-action project-path-action--warn"
+                          onClick={(e) => { e.stopPropagation(); startRelocate(name, p.path); }}
+                        >Relocate</button>
+                      )}
+                    </div>
+                  )}
                 </div>
                 <div className="project-card-footer">
                   {confirming === name ? (
@@ -203,7 +247,7 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
                           onClick={() => onSelect?.(childName)}
                         >
                           <div className="project-child-top">
-                            <span className="project-child-name">{childName}</span>
+                            <span className="project-child-name">{child.displayName || childName}</span>
                             <GradeChip grade={cGrade} score={cScore} />
                           </div>
                           <div className="project-card-meta">

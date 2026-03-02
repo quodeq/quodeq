@@ -155,12 +155,24 @@ export default function App() {
     navReset();
   }
 
-  async function handleDeleteProject(name) {
+  function _apiQs() {
     const params = new URLSearchParams(window.location.search);
     const dir = params.get('evaluations') || '';
-    const qs = dir ? `?evaluations=${encodeURIComponent(dir)}` : '';
-    await fetch(`/api/projects/${encodeURIComponent(name)}${qs}`, { method: 'DELETE' });
+    return dir ? `?evaluations=${encodeURIComponent(dir)}` : '';
+  }
+
+  async function handleDeleteProject(name) {
+    await fetch(`/api/projects/${encodeURIComponent(name)}${_apiQs()}`, { method: 'DELETE' });
     if (selectedProject === name) handleProjectChange(projects.find((p) => (p.name || p) !== name)?.name ?? '');
+    loadProjects();
+  }
+
+  async function handleRelocateProject(name, newPath) {
+    await fetch(`/api/projects/${encodeURIComponent(name)}/path${_apiQs()}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: newPath }),
+    });
     loadProjects();
   }
 
@@ -230,10 +242,15 @@ export default function App() {
     return { discipline, repository, totalFiles: totalFiles || null };
   }, [accumulated]);
 
-  const selectedProjectParent = useMemo(() => {
-    if (!selectedProject || !projects.length) return null;
+  const { selectedDisplayName, selectedProjectParent } = useMemo(() => {
+    if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null };
     const data = projects.find((p) => (p.name || p) === selectedProject);
-    return data?.parent || null;
+    const parentName = data?.parent || null;
+    const parentData = parentName ? projects.find((p) => (p.name || p) === parentName) : null;
+    return {
+      selectedDisplayName: data?.displayName || selectedProject,
+      selectedProjectParent: parentData?.displayName || parentName,
+    };
   }, [selectedProject, projects]);
 
   // -------------------------------------------------------------------------
@@ -600,6 +617,7 @@ export default function App() {
             selectedProject={selectedProject}
             onSelect={handleProjectChange}
             onDelete={handleDeleteProject}
+            onRelocate={handleRelocateProject}
           />
         );
 
@@ -680,7 +698,7 @@ export default function App() {
                     <span className="content-project-sep">›</span>
                   </>
                 )}
-                {selectedProject}
+                {selectedDisplayName}
               </h1>
               {headerMeta && (
                 <div className="content-meta-row">
