@@ -108,7 +108,8 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
           </span>
           {overallGrade?.score && (
             <div className="acc-eval-score-row">
-              <span className="acc-eval-score">{overallGrade.score}</span>
+              <span className="acc-eval-score">{overallGrade.score.replace('/10', '')}</span>
+              <span className="acc-eval-score-denom">/10</span>
             </div>
           )}
         </div>
@@ -161,7 +162,11 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
                 onClick={() => onNavigate && onNavigate('evalprinciple', { evalPrincipal: buildEvalPrincipal(pg.principle) })}
               >
                 <span className="exec-summary-principle">{pg.principle}</span>
-                {pg.score && <span className="exec-summary-score">{pg.score}</span>}
+                {pg.score && (
+                  <span className="exec-summary-score">
+                    {pg.score.replace('/10', '')}<span className="exec-summary-score-denom">/10</span>
+                  </span>
+                )}
                 <span className={`chip small ${gradeColorClass(pg.grade)}`}>{pg.grade || '—'}</span>
                 <span className="exec-summary-chevron">›</span>
               </li>
