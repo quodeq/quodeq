@@ -23,9 +23,13 @@ def generate_practice_file(
     topic: str,
     language: str,
     output_dir: Path,
-    template_path: Path,
+    template: str | None = None,
+    template_path: Path | None = None,
 ) -> Path:
-    template = template_path.read_text()
+    if template is None:
+        if template_path is None:
+            raise ValueError("Either template or template_path must be provided")
+        template = template_path.read_text()
     today = date.today().isoformat()
     output_file = output_dir / f"{_slugify(topic)}.json"
     prompt = render_template(
@@ -54,6 +58,7 @@ def generate_practices_for_discipline(
     output_dir: Path,
     template_path: Path,
 ) -> list[Path]:
+    template = template_path.read_text()
     generated = []
     for topic in topics:
         generated.append(
@@ -62,7 +67,7 @@ def generate_practices_for_discipline(
                 topic=topic,
                 language=language,
                 output_dir=output_dir,
-                template_path=template_path,
+                template=template,
             )
         )
     return generated
