@@ -353,8 +353,8 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
             deductions = build_deductions(vt_counts, scale_multiplier=scale_mult)
 
             effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
-            adjusted = min(effective_cap, math.floor(base_pts - deductions["total_deduction"]))
-            final_pts = max(0, min(10, adjusted))
+            adjusted = min(effective_cap, round(base_pts - deductions["total_deduction"], 1))
+            final_pts = max(0.0, min(10.0, adjusted))
 
             per_principle[key] = {
                 "display_name": pdata.get("display_name", key),
