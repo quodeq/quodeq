@@ -51,6 +51,40 @@ _MAJOR_PENALTY = 0.25     # per distinct major violation type, cap 5 types
 
 
 # ---------------------------------------------------------------------------
+# Project-size scaling
+# ---------------------------------------------------------------------------
+
+# Each entry is (min_file_count_inclusive, multiplier).
+# Tiers: Micro/Small (<500) x1 | Medium (500-5k) x2 | Large (5k-20k) x3
+#        XLarge (20k-50k) x4 | XXLarge (50k-100k) x5 | Enterprise (100k+) x6
+_SCALE_TIERS: list[tuple[int, int]] = [
+    (100_000, 6),
+    ( 50_000, 5),
+    ( 20_000, 4),
+    (  5_000, 3),
+    (    500, 2),
+    (      0, 1),
+]
+
+_SCALE_TIER_NAMES: dict[int, str] = {
+    1: "Small",
+    2: "Medium",
+    3: "Large",
+    4: "XLarge",
+    5: "XXLarge",
+    6: "Enterprise",
+}
+
+
+def _scale_multiplier(source_file_count: int) -> int:
+    """Return the size-based scaling multiplier for a project."""
+    for threshold, multiplier in _SCALE_TIERS:
+        if source_file_count >= threshold:
+            return multiplier
+    return 1
+
+
+# ---------------------------------------------------------------------------
 # Band lookups
 # ---------------------------------------------------------------------------
 
@@ -121,23 +155,31 @@ def evidence_has_taxonomy(violations: list[dict]) -> bool:
 # Deduction / drop computation
 # ---------------------------------------------------------------------------
 
-def build_deductions(violation_type_counts: dict[str, int]) -> dict:
+def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: int = 1) -> dict:
     """Compute point deductions for numerical mode.
 
     Rules:
-    - Each distinct critical violation type removes 1.0 point (cap: 3 types max)
-    - Each distinct major violation type removes 0.25 points (cap: 5 types max)
-    - If criticals are present the score is capped at 3; if majors are present
-      the score is capped at 5; both caps may apply simultaneously (take min).
+    - Each distinct critical violation type removes 1.0 point; types are capped
+      at 3*scale before computing the deduction.
+    - Each distinct major violation type removes 0.25 points; capped at 5*scale.
+    - If the raw critical count reaches 3*scale, the score is hard-capped at 3.
+    - If the raw major count reaches 5*scale, the score is hard-capped at 5.
+    - Both caps may apply simultaneously (take min).
     """
     n_critical = violation_type_counts.get("critical", 0)
     n_major = violation_type_counts.get("major", 0)
 
-    critical_deduction = n_critical * _CRITICAL_PENALTY
-    major_deduction = n_major * _MAJOR_PENALTY
+    critical_type_cap = 3 * scale_multiplier
+    major_type_cap = 5 * scale_multiplier
 
-    cap_from_critical = 3 if n_critical > 0 else 10
-    cap_from_major = 5 if n_major > 0 else 10
+    effective_critical = min(n_critical, critical_type_cap)
+    effective_major = min(n_major, major_type_cap)
+
+    critical_deduction = effective_critical * _CRITICAL_PENALTY
+    major_deduction = effective_major * _MAJOR_PENALTY
+
+    cap_from_critical = 3 if n_critical >= critical_type_cap else 10
+    cap_from_major = 5 if n_major >= major_type_cap else 10
 
     return {
         "critical_type_count": n_critical,
@@ -150,24 +192,24 @@ def build_deductions(violation_type_counts: dict[str, int]) -> dict:
     }
 
 
-def count_grade_drops(violation_type_counts: dict[str, int]) -> int:
+def count_grade_drops(violation_type_counts: dict[str, int], scale_multiplier: int = 1) -> int:
     """Return the number of grade levels to drop in non-numerical mode.
 
-    Critical and major types are evaluated independently against their
-    progressive threshold tables; the larger of the two drop values wins.
+    Drop table thresholds are multiplied by scale_multiplier so that large
+    projects require proportionally more violation types before incurring drops.
     """
     n_critical = violation_type_counts.get("critical", 0)
     n_major = violation_type_counts.get("major", 0)
 
     critical_drops = 0
     for min_count, levels in _CRITICAL_DROP_TABLE:
-        if n_critical >= min_count:
+        if n_critical >= min_count * scale_multiplier:
             critical_drops = levels
             break
 
     major_drops = 0
     for min_count, levels in _MAJOR_DROP_TABLE:
-        if n_major >= min_count:
+        if n_major >= min_count * scale_multiplier:
             major_drops = levels
             break
 
@@ -189,14 +231,14 @@ def confidence_interval_for(
     confidence_level,
     is_balanced: bool,
     total_instances: int,
-    source_file_count: int,
+    files_read: int = 0,
 ) -> dict:
     """Estimate the uncertainty width for a principle score.
 
     Starting width is 1.0. Additional half-points are added when:
     - confidence_level is 'low' (+1.0) or 'medium' (+0.5)
     - the sample is unbalanced (+0.5)
-    - the instance count is sparse relative to source file count (+0.5)
+    - the instance count is sparse relative to files actually read (+0.5)
 
     grade_stability is 'stable' unless the interval exceeds 1.5.
     """
@@ -210,8 +252,8 @@ def confidence_interval_for(
     if not is_balanced:
         width += 0.5
 
-    sparsity_floor = 0.01 * source_file_count if source_file_count > 0 else 0
-    if total_instances < sparsity_floor:
+    sparsity_floor = 0.01 * files_read if files_read > 0 else 0
+    if sparsity_floor > 0 and total_instances < sparsity_floor:
         width += 0.5
 
     return {
@@ -270,6 +312,9 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
         A dict with keys: repository, discipline, date, mode, principles, overall.
     """
     per_principle: dict = {}
+    source_file_count = evidence.get("source_file_count", 0)
+    files_read = evidence.get("files_read", 0)
+    scale_mult = _scale_multiplier(source_file_count)
     raw_principles = evidence.get("principles", {})
 
     for key, pdata in raw_principles.items():
@@ -290,12 +335,12 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
             confidence_level=conf_level,
             is_balanced=metrics.get("is_balanced", True),
             total_instances=metrics.get("total_instances", 0),
-            source_file_count=evidence.get("source_file_count", 0),
+            files_read=files_read,
         )
 
         if mode == "numerical":
             base_pts = score_for_compliance(pct)
-            deductions = build_deductions(vt_counts)
+            deductions = build_deductions(vt_counts, scale_multiplier=scale_mult)
 
             effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
             adjusted = min(effective_cap, round(base_pts - deductions["total_deduction"]))
@@ -324,7 +369,7 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
 
         else:  # non-numerical
             base_label = grade_for_compliance(pct)
-            level_drops = count_grade_drops(vt_counts)
+            level_drops = count_grade_drops(vt_counts, scale_multiplier=scale_mult)
             final_label = drop_grade(base_label, level_drops)
 
             per_principle[key] = {
@@ -349,6 +394,11 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
         "mode": mode,
         "principles": per_principle,
         "overall": overall,
+        "scale": {
+            "tier": _SCALE_TIER_NAMES.get(scale_mult, "Small"),
+            "multiplier": scale_mult,
+            "files_read": files_read,
+        },
     }
 
 
