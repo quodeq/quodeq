@@ -92,9 +92,8 @@ function ViolationLiveRow({ violation, index }) {
 
 export default function LiveViolationsFeed({ liveViolations }) {
   const dims = Object.keys(liveViolations ?? {});
-  if (!dims.length) return null;
-
   const totalCount = dims.reduce((sum, d) => sum + (liveViolations[d]?.length ?? 0), 0);
+  if (!totalCount) return null;
 
   return (
     <div className="vlive-feed">
