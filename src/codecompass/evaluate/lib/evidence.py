@@ -90,17 +90,20 @@ def _remove_duplicates(principles: dict) -> int:
     return dropped
 
 
-def _compute_principle_metrics(principles: dict) -> None:
+def _compute_principle_metrics(principles: dict, scale_multiplier: int = 1) -> None:
     """Attach a metrics block to each principle bucket (mutates in-place)."""
+    high_threshold = 10 * scale_multiplier
+    medium_threshold = 5 * scale_multiplier
+
     for bucket in principles.values():
         n_violations = len(bucket["violations"])
         n_compliance = len(bucket["compliance"])
         total = n_violations + n_compliance
         pct = round(n_compliance / total * 100, 1) if total > 0 else 0.0
 
-        if total >= 10:
+        if total >= high_threshold:
             confidence = "high"
-        elif total >= 5:
+        elif total >= medium_threshold:
             confidence = "medium"
         else:
             confidence = "low"
@@ -141,6 +144,7 @@ def assemble_evidence_from_jsonl(
     discipline: str,
     date_str: str,
     source_file_count: int = 0,
+    files_read: int = 0,
     analysis_hash: str = "",
     scoring_hash: str = "",
     mapping_hash: str = "",
@@ -158,17 +162,26 @@ def assemble_evidence_from_jsonl(
 
     principles, accepted, rejected = _read_jsonl_findings(jsonl_file)
     dropped = _remove_duplicates(principles)
-    _compute_principle_metrics(principles)
+    from codecompass.evaluate.lib.scoring import _scale_multiplier  # local import avoids circular dep
+    scale_mult = _scale_multiplier(source_file_count)
+    _compute_principle_metrics(principles, scale_multiplier=scale_mult)
 
     if not principles:
         log_error("No valid findings parsed from JSONL")
         return False
 
+    coverage_pct = (
+        round(files_read / source_file_count * 100, 1)
+        if source_file_count > 0 and files_read > 0
+        else 0.0
+    )
     result = {
         "repository": repo_name,
         "discipline": discipline,
         "date": date_str,
         "source_file_count": source_file_count,
+        "files_read": files_read,
+        "coverage_pct": coverage_pct,
         "meta": {
             "analysis_prompt_version": analysis_hash,
             "scoring_prompt_version": scoring_hash,
@@ -249,11 +262,12 @@ def build_evidence_file(
     discipline: str,
     today: str,
     source_file_count: int,
-    analysis_hash: str,
-    scoring_hash: str,
-    mapping_hash: str,
-    codecompass_version: str,
-    dimension_tag: str,
+    files_read: int = 0,
+    analysis_hash: str = "",
+    scoring_hash: str = "",
+    mapping_hash: str = "",
+    codecompass_version: str = "",
+    dimension_tag: str = "",
 ) -> bool:
     """Assemble JSONL into evidence JSON, validate it, and write a fallback if needed.
 
@@ -261,7 +275,7 @@ def build_evidence_file(
     """
     has_evidence = assemble_evidence_from_jsonl(
         jsonl_file, evidence_file, project_name, discipline, today,
-        source_file_count, analysis_hash, scoring_hash, mapping_hash, codecompass_version,
+        source_file_count, files_read, analysis_hash, scoring_hash, mapping_hash, codecompass_version,
     )
     if not has_evidence:
         log_warning("No valid evidence found — scoring will note insufficient evidence")
@@ -278,6 +292,8 @@ def build_evidence_file(
             "discipline": discipline,
             "date": today,
             "source_file_count": source_file_count,
+            "files_read": files_read,
+            "coverage_pct": 0.0,
             "meta": {
                 "analysis_prompt_version": analysis_hash,
                 "scoring_prompt_version": scoring_hash,
