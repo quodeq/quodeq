@@ -42,6 +42,24 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
             return jsonify(body), status
         return jsonify({"updated": project, "path": new_path})
 
+    @app.get("/api/projects/<project>/export")
+    def export_project(project: str):
+        import io
+        import zipfile
+        from pathlib import Path as _Path
+        from flask import send_file
+        project_path = _Path(_reports_dir()) / project
+        if not project_path.exists() or not project_path.is_dir():
+            body, status = _error("Project not found", 404, "NOT_FOUND")
+            return jsonify(body), status
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            for f in project_path.rglob("*"):
+                if f.is_file():
+                    zf.write(f, f.relative_to(project_path.parent))
+        buf.seek(0)
+        return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")
+
     @app.delete("/api/projects/<project>")
     def delete_project(project: str):
         ok = provider.delete_project(_reports_dir(), project)

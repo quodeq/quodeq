@@ -167,6 +167,17 @@ export default function App() {
     loadProjects();
   }
 
+  function handleExportProject(name) {
+    const qs = _apiQs();
+    const url = `/api/projects/${encodeURIComponent(name)}/export${qs}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
   async function handleRelocateProject(name, newPath) {
     await fetch(`/api/projects/${encodeURIComponent(name)}/path${_apiQs()}`, {
       method: 'PATCH',
@@ -617,6 +628,7 @@ export default function App() {
             selectedProject={selectedProject}
             onSelect={handleProjectChange}
             onDelete={handleDeleteProject}
+            onExport={handleExportProject}
             onRelocate={handleRelocateProject}
           />
         );
