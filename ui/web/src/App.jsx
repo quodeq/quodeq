@@ -187,6 +187,12 @@ export default function App() {
     handleNavigate('run', { runId: currentOverviewRun });
   }
 
+  function handleRunSelect(runId) {
+    const idx = availableRuns.findIndex((r) => r.runId === runId);
+    if (idx >= 0) setOverviewRunIndex(idx);
+    handleRunChange(runId);
+  }
+
   // -------------------------------------------------------------------------
   // Header meta (discipline, repository, source files)
   // -------------------------------------------------------------------------
@@ -310,6 +316,7 @@ export default function App() {
             selectedRun={selectedRun}
             projects={projects}
             onNavigate={handleNavigate}
+            onRunSelect={handleRunSelect}
             dashboard={dashboard}
             accumulated={accumulated}
             loading={loading}
