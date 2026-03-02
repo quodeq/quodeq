@@ -34,10 +34,14 @@ export async function proxyToActionApi(req, res, actionApiBase) {
       fetchOptions.body = JSON.stringify(req.body ?? {});
     }
     const response = await fetch(url, fetchOptions);
-    const body = await response.text();
     const contentType = response.headers.get('content-type') || 'application/json';
+    const isBinary = !contentType.startsWith('text/') && !contentType.includes('json');
+    const body = isBinary ? Buffer.from(await response.arrayBuffer()) : await response.text();
     res.status(response.status);
     res.set('content-type', contentType);
+    if (response.headers.has('content-disposition')) {
+      res.set('content-disposition', response.headers.get('content-disposition'));
+    }
     res.send(body);
   } catch (error) {
     res.status(502).json({ error: error.message || 'Failed to reach action API' });
