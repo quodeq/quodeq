@@ -50,12 +50,15 @@ def test_generate_practices_for_discipline_runs_all(tmp_path, monkeypatch):
         fake_generate,
     )
 
+    template_path = tmp_path / "principles-generator.md"
+    template_path.write_text("template content")
+
     topics = ["SOLID", "Error Handling"]
     generate_practices_for_discipline(
         discipline="backend",
         language="Python",
         topics=topics,
         output_dir=discipline_dir,
-        template_path=tmp_path / "principles-generator.md",
+        template_path=template_path,
     )
     assert len(generated) == 2

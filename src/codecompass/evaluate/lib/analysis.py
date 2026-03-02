@@ -7,7 +7,7 @@ import subprocess
 from pathlib import Path
 
 from codecompass.evaluate.lib.ai_cli_provider import get_ai_cmd, get_ai_model
-from codecompass.evaluate.lib.common import log_beat, log_error, log_info, log_step, log_success, log_warning
+from codecompass.evaluate.lib.common import log_beat, log_debug, log_error, log_info, log_step, log_success, log_warning
 
 
 # ---------------------------------------------------------------------------
@@ -160,7 +160,7 @@ def dump_debug_sample(stream_file: str, debug_stream: str, dimension_tag: str) -
                     if block.get("type") == "text":
                         text = block["text"]
                         preview = text[:400].replace("\n", "\n    ")
-                        log_info(f"  debug sample ({len(text)} chars):\n    {preview}")
+                        log_debug(f"  debug sample ({len(text)} chars):\n    {preview}")
                         return
 
             if d.get("type") == "item.completed":
@@ -169,10 +169,10 @@ def dump_debug_sample(stream_file: str, debug_stream: str, dimension_tag: str) -
                     text = item.get("text", "")
                     if text:
                         preview = text[:400].replace("\n", "\n    ")
-                        log_info(f"  debug sample ({len(text)} chars):\n    {preview}")
+                        log_debug(f"  debug sample ({len(text)} chars):\n    {preview}")
                         return
 
-    log_info("  debug: no assistant text blocks found in stream")
+    log_debug("  debug: no assistant text blocks found in stream")
 
 
 # ---------------------------------------------------------------------------
@@ -254,15 +254,20 @@ def run_scoring_phase(
     env = os.environ.copy()
     env.pop("CLAUDECODE", None)  # allow claude to run even when invoked from a Claude Code session
 
-    with open(eval_file, "w") as out:
-        result = subprocess.run(
-            args,
-            cwd=work_dir,
-            env=env,
-            stdout=out,
-            stderr=out,
-            stdin=subprocess.DEVNULL,
-        )
+    try:
+        with open(eval_file, "w") as out:
+            result = subprocess.run(
+                args,
+                cwd=work_dir,
+                env=env,
+                stdout=out,
+                stderr=out,
+                stdin=subprocess.DEVNULL,
+                timeout=300,
+            )
+    except subprocess.TimeoutExpired:
+        log_error(f"{dimension_tag} Scoring timed out after 300s")
+        return False
 
     eval_path = Path(eval_file)
     if result.returncode != 0 or not eval_path.exists() or eval_path.stat().st_size == 0:
