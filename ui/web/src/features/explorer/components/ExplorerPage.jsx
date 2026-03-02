@@ -3,7 +3,7 @@ import { getDimensionEval } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
-import { gradeColorClass } from '../../../utils/formatters.js';
+import { gradeColorClass, formatRunId } from '../../../utils/formatters.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 
 export default function ExplorerPage({ project, dimension, runId, onNavigate }) {
@@ -86,9 +86,12 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
 
   return (
     <>
-      <section className="acc-eval-panel panel">
+      <section className="acc-eval-panel acc-eval-panel--compact panel">
         <div className="acc-eval-top">
-          <span className="acc-eval-label">{evalData.dimension}</span>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+            <span className="explorer-dimension-title">{evalData.dimension}</span>
+            {runId && <span className="acc-eval-date">{formatRunId(runId)}</span>}
+          </div>
           {allViolations.length > 0 && (
             <CopyButton
               label="Fix plan"
@@ -143,6 +146,12 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
 
       {/* Principles list */}
       {principleGrades.length > 0 && (
+        <>
+        <div className="section-header">
+          <h3 className="section-title">
+            {evalData.dimension.charAt(0).toUpperCase() + evalData.dimension.slice(1).toLowerCase()} Principles
+          </h3>
+        </div>
         <section className="panel eval-summary-panel">
           <ul className="exec-summary-list">
             {principleGrades.map((pg) => (
@@ -159,6 +168,7 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
             ))}
           </ul>
         </section>
+        </>
       )}
 
       {/* Violations by principle */}

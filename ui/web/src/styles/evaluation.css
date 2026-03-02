@@ -1531,52 +1531,95 @@
   transform: rotate(90deg);
 }
 
-/* Accordion detail panel */
+/* Accordion / expanded detail panel */
 .vlive-detail {
   margin: 0 0 4px;
-  padding: 12px;
+  padding: 12px 14px;
   background: var(--color-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   display: flex;
   flex-direction: column;
-  gap: 8px;
-}
-
-.vlive-detail-row {
-  display: flex;
   gap: 10px;
-  align-items: flex-start;
-  font-size: var(--text-sm);
 }
 
-.vlive-detail-label {
-  flex-shrink: 0;
-  width: 52px;
+/* Section label (Reason / File) */
+.vlive-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.vlive-detail-section-label {
   font-size: var(--text-xs);
   font-weight: var(--weight-semibold);
   color: var(--color-text-subtle);
   text-transform: uppercase;
-  letter-spacing: 0.05em;
-  padding-top: 2px;
+  letter-spacing: 0.06em;
 }
 
-.vlive-detail-value {
-  flex: 1;
+/* Reason: prose text */
+.vlive-detail-reason {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: var(--leading-normal);
+}
+
+
+/* File meta row: [dir/][filename.py:12 📋] */
+.vlive-detail-meta {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.vlive-detail-meta-dir {
   font-family: var(--font-mono);
   font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  word-break: break-all;
+  color: var(--color-text-subtle);
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
-.vlive-detail-value--prose {
-  font-family: var(--font-sans);
-  word-break: normal;
-  overflow-wrap: break-word;
+/* filename:line copy button — styled like detail-copy-btn but mono */
+.vlive-detail-file-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 5px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: color 120ms ease;
+}
+
+.vlive-detail-file-btn:hover {
+  color: var(--color-accent);
+}
+
+.vlive-detail-file-btn svg {
+  opacity: 0.6;
+  flex-shrink: 0;
+}
+
+.vlive-detail-file-btn:hover svg {
+  opacity: 1;
 }
 
 .vlive-snippet {
-  margin: 0;
+  margin: 10px 0 0;
   padding: 10px 12px;
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);

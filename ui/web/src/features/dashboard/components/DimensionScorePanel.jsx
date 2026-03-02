@@ -14,6 +14,29 @@ function cssVar(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
+const GRADE_VAR = {
+  exemplary:    '--color-grade-top-text',
+  good:         '--color-grade-high-text',
+  proficient:   '--color-grade-high-text',
+  adequate:     '--color-grade-mid-text',
+  developing:   '--color-grade-mid-text',
+  poor:         '--color-grade-low-text',
+  insufficient: '--color-grade-low-text',
+  critical:     '--color-grade-bottom-text',
+  a: '--color-grade-top-text',
+  b: '--color-grade-high-text',
+  c: '--color-grade-mid-text',
+  d: '--color-grade-low-text',
+  f: '--color-grade-bottom-text',
+};
+
+function gradeBarColor(grade) {
+  if (!grade) return cssVar('--color-accent', '#e8795a');
+  const key = grade.trim().toLowerCase();
+  const varName = GRADE_VAR[key] ?? GRADE_VAR[key.charAt(0)];
+  return varName ? cssVar(varName, '#e8795a') : cssVar('--color-accent', '#e8795a');
+}
+
 const TREND_ARROW = { up: '↑', 'soft-up': '↗', same: '→', 'soft-down': '↘', down: '↓' };
 const TREND_COLOR = {
   up:         '#5ee6a0',
@@ -136,7 +159,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick }) {
             {data.map((entry, i) => (
               <Cell
                 key={entry.dimension ?? i}
-                fill={cssVar('--color-accent', '#e8795a')}
+                fill={gradeBarColor(entry.overallGrade)}
                 opacity={0.85}
               />
             ))}
