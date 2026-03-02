@@ -13,6 +13,7 @@ import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
 import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
 import EvalPrincipleDetailPage from './features/explorer/components/EvalPrincipleDetailPage.jsx';
 import { formatRunId } from './utils/formatters.js';
+import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
 
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,17 @@ const ICON_EVALUATE = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="7" />
     <line x1="16.5" y1="16.5" x2="22" y2="22" />
+  </svg>
+);
+
+const ICON_PROJECTS = (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3"  width="4" height="4" rx="0.5" />
+    <rect x="3" y="10" width="4" height="4" rx="0.5" />
+    <rect x="3" y="17" width="4" height="4" rx="0.5" />
+    <line x1="9" y1="5"  x2="21" y2="5"  />
+    <line x1="9" y1="12" x2="21" y2="12" />
+    <line x1="9" y1="19" x2="21" y2="19" />
   </svg>
 );
 
@@ -119,7 +131,7 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedRun, setSelectedRun] = useState('latest');
 
-  useEffect(() => {
+  function loadProjects() {
     listProjects()
       .then((data) => {
         const list = data.projects || data || [];
@@ -131,12 +143,48 @@ export default function App() {
         }
       })
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadProjects();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleProjectChange(name) {
     setSelectedProject(name);
     setSelectedRun('latest');
     navReset();
+  }
+
+  function _apiQs() {
+    const params = new URLSearchParams(window.location.search);
+    const dir = params.get('evaluations') || '';
+    return dir ? `?evaluations=${encodeURIComponent(dir)}` : '';
+  }
+
+  async function handleDeleteProject(name) {
+    await fetch(`/api/projects/${encodeURIComponent(name)}${_apiQs()}`, { method: 'DELETE' });
+    if (selectedProject === name) handleProjectChange(projects.find((p) => (p.name || p) !== name)?.name ?? '');
+    loadProjects();
+  }
+
+  function handleExportProject(name) {
+    const qs = _apiQs();
+    const url = `/api/projects/${encodeURIComponent(name)}/export${qs}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${name}.zip`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  }
+
+  async function handleRelocateProject(name, newPath) {
+    await fetch(`/api/projects/${encodeURIComponent(name)}/path${_apiQs()}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: newPath }),
+    });
+    loadProjects();
   }
 
   function handleRunChange(runId) { setSelectedRun(runId); }
@@ -204,6 +252,17 @@ export default function App() {
     const totalFiles = dims.reduce((s, d) => s + (d.sourceFileCount || 0), 0);
     return { discipline, repository, totalFiles: totalFiles || null };
   }, [accumulated]);
+
+  const { selectedDisplayName, selectedProjectParent } = useMemo(() => {
+    if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null };
+    const data = projects.find((p) => (p.name || p) === selectedProject);
+    const parentName = data?.parent || null;
+    const parentData = parentName ? projects.find((p) => (p.name || p) === parentName) : null;
+    return {
+      selectedDisplayName: data?.displayName || selectedProject,
+      selectedProjectParent: parentData?.displayName || parentName,
+    };
+  }, [selectedProject, projects]);
 
   // -------------------------------------------------------------------------
   // Theme
@@ -289,12 +348,12 @@ export default function App() {
   // -------------------------------------------------------------------------
   // Active tab / header visibility
   // -------------------------------------------------------------------------
-  const activeTab = ['overview', 'evaluate', 'settings'].includes(activePage.page)
+  const activeTab = ['overview', 'projects', 'evaluate', 'settings'].includes(activePage.page)
     ? activePage.page
     : 'overview';
 
   // Show the project header on all data pages; hide it on evaluate and settings.
-  const showProjectHeader = activeTab === 'overview' && projects.length > 0 && !!selectedProject;
+  const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
 
   // Show the run navigator only on top-level data pages (not when drilled into a sub-page).
   const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
@@ -562,6 +621,18 @@ export default function App() {
           </div>
         );
 
+      case 'projects':
+        return (
+          <ProjectsPage
+            projects={projects}
+            selectedProject={selectedProject}
+            onSelect={handleProjectChange}
+            onDelete={handleDeleteProject}
+            onExport={handleExportProject}
+            onRelocate={handleRelocateProject}
+          />
+        );
+
       default:
         return <div className="empty-state"><p>Page not found: {page}</p></div>;
     }
@@ -599,6 +670,16 @@ export default function App() {
             {ICON_EVALUATE}
             <span className="sidebar-nav-label">Evaluate</span>
           </button>
+
+          <button
+            type="button"
+            className={`sidebar-nav-item${activeTab === 'projects' ? ' active' : ''}`}
+            onClick={() => navTab('projects')}
+            title="Projects"
+          >
+            {ICON_PROJECTS}
+            <span className="sidebar-nav-label">Projects</span>
+          </button>
         </nav>
 
         {/* Settings at bottom */}
@@ -614,23 +695,6 @@ export default function App() {
           </button>
         </div>
 
-        {/* Project selector */}
-        {projects.length > 0 && (
-          <div className="sidebar-project-section">
-            <p className="sidebar-project-label">Project</p>
-            <select
-              className="project-select-styled"
-              value={selectedProject}
-              disabled={projects.length === 0}
-              onChange={(e) => handleProjectChange(e.target.value)}
-            >
-              {projects.map((p) => {
-                const name = p.name || p;
-                return <option key={name} value={name}>{name}</option>;
-              })}
-            </select>
-          </div>
-        )}
       </aside>
 
       {/* Main content */}
@@ -639,7 +703,15 @@ export default function App() {
         {showProjectHeader && (
           <header className="content-header">
             <div className="content-header-left">
-              <h1 className="content-project-name">{selectedProject}</h1>
+              <h1 className="content-project-name">
+                {selectedProjectParent && (
+                  <>
+                    <span className="content-project-parent">{selectedProjectParent}</span>
+                    <span className="content-project-sep">›</span>
+                  </>
+                )}
+                {selectedDisplayName}
+              </h1>
               {headerMeta && (
                 <div className="content-meta-row">
                   {headerMeta.repository && (

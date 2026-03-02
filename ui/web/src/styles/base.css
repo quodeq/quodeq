@@ -606,6 +606,17 @@ textarea:focus {
   margin: 0;
 }
 
+.content-project-parent {
+  color: var(--color-text-muted);
+  font-weight: var(--weight-normal);
+}
+
+.content-project-sep {
+  color: var(--color-text-muted);
+  margin: 0 var(--space-2);
+  font-weight: var(--weight-normal);
+}
+
 .content-meta-row {
   display: flex;
   align-items: center;

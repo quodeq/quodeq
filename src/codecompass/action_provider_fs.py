@@ -129,16 +129,94 @@ class FilesystemActionProvider(ActionProvider):
             runs = _list_runs(reports_root, entry.name)
             if not runs:
                 continue
+            parent = None
+            discipline = None
+            path = None
+            location = None
+            display_name = None
+            info_path = reports_root / entry.name / "repository_info.json"
+            if info_path.exists():
+                try:
+                    info = json.loads(info_path.read_text())
+                    parent = info.get("parent") or None
+                    discipline = info.get("discipline") or None
+                    path = info.get("path") or None
+                    location = info.get("location") or None
+                    display_name = info.get("displayName") or None
+                except (json.JSONDecodeError, OSError):
+                    pass
+            latest_grade = None
+            latest_score = None
+            files_count = None
+            try:
+                dims = _read_run_data(reports_root, entry.name, runs[0].run_id)
+                summary = _summarize_dimensions(dims)
+                latest_grade = summary.get("overallGrade")
+                latest_score = summary.get("numericAverage")
+                total = sum(d.get("sourceFileCount") or 0 for d in dims)
+                files_count = total if total > 0 else None
+            except Exception:
+                pass
+            path_exists = Path(path).exists() if location == "local" and path else None
             projects.append(
                 {
                     "name": entry.name,
                     "runsCount": len(runs),
-                    "latestRunId": runs[0].run_id if runs else None,
-                    "latestDate": runs[0].date_iso if runs else None,
+                    "latestRunId": runs[0].run_id,
+                    "latestDate": runs[0].date_iso,
+                    "parent": parent,
+                    "displayName": display_name,
+                    "discipline": discipline,
+                    "path": path,
+                    "location": location,
+                    "pathExists": path_exists,
+                    "filesCount": files_count,
+                    "latestGrade": latest_grade,
+                    "latestScore": latest_score,
                 }
             )
         projects.sort(key=lambda item: item["name"])
+        # Auto-detect parent for local projects that have no explicit parent
+        local_with_path = [p for p in projects if p.get("location") == "local" and p.get("path")]
+        for p in projects:
+            if p.get("parent") is not None:
+                continue
+            if p.get("location") != "local" or not p.get("path"):
+                continue
+            p_path = p["path"].rstrip("/")
+            best_parent = None
+            best_len = 0
+            for candidate in local_with_path:
+                if candidate["name"] == p["name"]:
+                    continue
+                c_path = candidate["path"].rstrip("/")
+                if p_path.startswith(c_path + "/") and len(c_path) > best_len:
+                    best_parent = candidate["name"]
+                    best_len = len(c_path)
+            if best_parent:
+                p["parent"] = best_parent
         return {"projects": projects}
+
+    def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
+        info_path = Path(reports_dir) / project / "repository_info.json"
+        if not info_path.exists():
+            return False
+        try:
+            info = json.loads(info_path.read_text())
+            info["path"] = new_path
+            info["location"] = "local"
+            info_path.write_text(json.dumps(info, indent=2))
+            return True
+        except (json.JSONDecodeError, OSError):
+            return False
+
+    def delete_project(self, reports_dir: str, project: str) -> bool:
+        import shutil
+        project_path = Path(reports_dir) / project
+        if not project_path.exists() or not project_path.is_dir():
+            return False
+        shutil.rmtree(project_path)
+        return True
 
     def get_project_info(self, reports_dir: str, project: str):
         info_path = Path(reports_dir) / project / "repository_info.json"
