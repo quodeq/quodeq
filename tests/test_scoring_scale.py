@@ -88,14 +88,14 @@ def test_build_deductions_caps_contribution():
 def test_count_grade_drops_scale_1():
     # _CRITICAL_DROP_TABLE: [(12,3),(4,2),(1,1)] * scale=1
     assert count_grade_drops({"critical": 1, "major": 0}) == 1   # >= 1*1
-    assert count_grade_drops({"critical": 4, "major": 0}) == 2   # >= 4*1
+    assert count_grade_drops({"critical": 4, "major": 0}) == 2   # >= 1*4=4
     assert count_grade_drops({"critical": 12, "major": 0}) == 3  # >= 12*1
 
 
 def test_count_grade_drops_scale_4():
     # thresholds multiplied by 4
     assert count_grade_drops({"critical": 3, "major": 0}, scale_multiplier=4) == 0   # < 1*4=4
-    assert count_grade_drops({"critical": 4, "major": 0}, scale_multiplier=4) == 1   # >= 4*1
+    assert count_grade_drops({"critical": 4, "major": 0}, scale_multiplier=4) == 1   # >= 1*4=4
     assert count_grade_drops({"critical": 16, "major": 0}, scale_multiplier=4) == 2  # >= 4*4
     assert count_grade_drops({"critical": 48, "major": 0}, scale_multiplier=4) == 3  # >= 12*4
 
