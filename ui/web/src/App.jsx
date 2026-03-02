@@ -477,9 +477,11 @@ export default function App() {
                   </div>
                   <div className="theme-toggle">
                     {[
-                      { value: 'system', label: 'System' },
-                      { value: 'light', label: 'Light' },
-                      { value: 'dark', label: 'Dark' },
+                      { value: 'system',    label: 'System' },
+                      { value: 'light',     label: 'Light' },
+                      { value: 'dark',      label: 'Dark' },
+                      { value: 'media-light', label: 'Media Light' },
+                      { value: 'media-dark',  label: 'Media Dark' },
                     ].map(({ value, label }) => (
                       <button
                         key={value}
