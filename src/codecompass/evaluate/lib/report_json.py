@@ -59,7 +59,7 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
 
         # Build the score string only when a numeric value is present
         raw_final = matched.get("final_score")
-        formatted_score = f"{raw_final}/10" if raw_final is not None else None
+        formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
 
         # Prefer grade already computed by the scorer, fall back to our own mapping
         resolved_grade = matched.get("grade") or grade_from_score(formatted_score)
