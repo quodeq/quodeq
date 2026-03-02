@@ -368,9 +368,9 @@
 .dimension-violations-row .dimension-name {
   flex: 1;
   min-width: 0;
-  font-weight: 500;
+  font-weight: var(--weight-medium);
   text-transform: capitalize;
-  color: var(--color-text-muted);
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1324,9 +1324,9 @@
 
 .offending-file-path {
   min-width: 0;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
-  font-size: 0.8rem;
-  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1798,8 +1798,13 @@
   flex-shrink: 0;
   font-size: 0.8rem;
   font-weight: var(--weight-medium);
-  color: var(--color-text-muted);
+  color: var(--color-text);
   font-variant-numeric: tabular-nums;
+}
+
+.exec-summary-score-denom {
+  font-size: 0.7em;
+  color: var(--color-text-subtle);
 }
 
 .metrics-grid {

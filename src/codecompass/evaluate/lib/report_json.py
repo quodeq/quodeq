@@ -106,7 +106,7 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
     # Overall score only exists when the scorer produced a weighted value
     weighted = aggregate.get("weighted_score")
     if weighted is not None:
-        top_score = f"{round(weighted)}/10"
+        top_score = f"{round(weighted, 1)}/10"
         top_grade = aggregate.get("grade") or grade_from_score(top_score)
     else:
         top_score = None
@@ -123,6 +123,8 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
         "discipline": evidence.get("discipline", ""),
         "date": evidence.get("date", ""),
         "sourceFileCount": evidence.get("source_file_count"),
+        "filesRead": evidence.get("files_read", 0),
+        "coveragePct": evidence.get("coverage_pct", 0.0),
         "meta": {
             "analysis_prompt_version": raw_meta.get("analysis_prompt_version"),
             "scoring_prompt_version": raw_meta.get("scoring_prompt_version"),
