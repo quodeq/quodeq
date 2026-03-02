@@ -129,7 +129,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={RunHistoryTooltip} cursor={false} isAnimationActive={false} />
+          <Tooltip content={RunHistoryTooltip} cursor={false} isAnimationActive={false} offset={20} />
           <ReferenceLine y={2.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <ReferenceLine y={5}   stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.3} />
           <ReferenceLine y={7.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
