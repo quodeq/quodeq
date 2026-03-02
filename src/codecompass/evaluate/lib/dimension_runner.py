@@ -8,7 +8,6 @@ from codecompass.evaluate.lib.common import log_banner, log_divider, log_error, 
 from codecompass.evaluate.lib.evaluation import compute_prompt_hash, run_two_phase_dimension
 from codecompass.evaluate.lib.evaluator_renderer import (
     extract_analysis_context,
-    extract_scoring_context,
 )
 
 
@@ -61,7 +60,6 @@ def run_dimensions(dimensions: list[str], ctx: DimensionRunContext) -> tuple[int
             continue
 
         analysis_standards = json.dumps(extract_analysis_context(evaluator_data), indent=2)
-        scoring_standards = json.dumps(extract_scoring_context(evaluator_data), indent=2)
         evaluator_hash = compute_prompt_hash(evaluator_file.read_text())
 
         evidence_file = str(ctx.evidence_dir / f"{dimension}_evidence.json")
@@ -78,7 +76,6 @@ def run_dimensions(dimensions: list[str], ctx: DimensionRunContext) -> tuple[int
             analysis_template=ctx.analysis_template,
             scoring_template=ctx.scoring_template,
             analysis_standards=analysis_standards,
-            scoring_standards=scoring_standards,
             source_file_count=ctx.source_file_count,
             analysis_hash=ctx.analysis_hash,
             scoring_hash=ctx.scoring_hash,
