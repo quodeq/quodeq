@@ -1,3 +1,5 @@
 from __future__ import annotations
 
-from codecompass.evaluate.lib.ai_cli import run_ai_cli
+from codecompass.ai_cli import run_ai_cli
+
+__all__ = ["run_ai_cli"]

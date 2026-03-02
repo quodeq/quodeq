@@ -6,6 +6,8 @@ from typing import Any
 
 MANIFEST_FILENAME = ".codecompass.json"
 
+_manifest_cache: dict[str, dict[str, Any]] = {}
+
 
 def manifest_exists(work_dir: str) -> bool:
     return Path(work_dir, MANIFEST_FILENAME).is_file()
@@ -16,8 +18,10 @@ def manifest_path(work_dir: str) -> str:
 
 
 def _load_manifest(manifest: str | Path) -> dict[str, Any]:
-    path = Path(manifest)
-    return json.loads(path.read_text())
+    key = str(Path(manifest).resolve())
+    if key not in _manifest_cache:
+        _manifest_cache[key] = json.loads(Path(manifest).read_text())
+    return _manifest_cache[key]
 
 
 def parse_manifest_project_name(manifest: str | Path) -> str:

@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+import logging as _logging
 import sys
+
+_eval_logger = _logging.getLogger("codecompass.evaluate")
+_eval_handler = _logging.StreamHandler(sys.stderr)
+_eval_handler.setFormatter(_logging.Formatter("%(message)s"))
+_eval_logger.addHandler(_eval_handler)
+_eval_logger.propagate = False
+_eval_logger.setLevel(_logging.DEBUG)
 
 _OK   = "✓"
 _ERR  = "✗"
@@ -32,14 +40,18 @@ def log_success(message: str) -> str:
 
 def log_warning(message: str) -> str:
     formatted = f"  {_WARN} {message}"
-    print(formatted, file=sys.stderr, flush=True)
+    _eval_logger.warning(formatted)
     return formatted
 
 
 def log_error(message: str) -> str:
     formatted = f"  {_ERR} {message}"
-    print(formatted, file=sys.stderr, flush=True)
+    _eval_logger.error(formatted)
     return formatted
+
+
+def log_debug(message: str) -> None:
+    _eval_logger.debug(message)
 
 
 def log_beat(message: str) -> None:
