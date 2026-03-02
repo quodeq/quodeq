@@ -7,6 +7,7 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { formatRunId, gradeColorClass, mostFrequentGrade, splitScore } from '../../../utils/formatters.js';
+import RunHistoryPanel from './RunHistoryPanel.jsx';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -79,6 +80,9 @@ function AccumulatedOverviewPanel({
   accumulatedDimensions,
   availableRuns,
   overviewRunIndex,
+  trend,
+  selectedRunId,
+  onRunClick,
   onDimensionClick,
   onFileClick,
   onPrincipleClick,
@@ -196,6 +200,13 @@ function AccumulatedOverviewPanel({
           </div>
         </div>
       </section>
+
+      <RunHistoryPanel
+        trend={trend}
+        selectedRunId={selectedRunId}
+        selectedRunScore={accumulated?.summary?.numericAverage}
+        onBarClick={onRunClick}
+      />
 
       {/* Quality dimension cards */}
       <div className="dimensions-header">
@@ -539,6 +550,7 @@ export default function DashboardPage({
   selectedRun,
   projects = [],
   onNavigate,
+  onRunSelect,
   runMode = false,
   // Data from App-level useDashboard
   dashboard,
@@ -642,6 +654,9 @@ export default function DashboardPage({
                   accumulatedDimensions={accumulatedDimensions}
                   availableRuns={availableRuns}
                   overviewRunIndex={overviewRunIndex}
+                  trend={dashboard?.trend || []}
+                  selectedRunId={selectedRunId}
+                  onRunClick={onRunSelect}
                   onDimensionClick={handleAccumulatedDimensionClick}
                   onFileClick={handleFileClick}
                   onPrincipleClick={handlePrincipleClick}

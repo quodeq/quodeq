@@ -7,7 +7,7 @@ export default function RunNavigator({ currentRun, isLatest, isOldest, onPrev, o
     <div className="run-navigator">
       <button
         type="button"
-        className="run-nav-action"
+        className="run-nav-action run-nav-action--danger"
         onClick={onLatest}
         disabled={isLatest}
         title="Go to latest run"
