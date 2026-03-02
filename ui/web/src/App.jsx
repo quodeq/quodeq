@@ -131,7 +131,7 @@ export default function App() {
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedRun, setSelectedRun] = useState('latest');
 
-  useEffect(() => {
+  function loadProjects() {
     listProjects()
       .then((data) => {
         const list = data.projects || data || [];
@@ -143,12 +143,25 @@ export default function App() {
         }
       })
       .catch(() => {});
+  }
+
+  useEffect(() => {
+    loadProjects();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleProjectChange(name) {
     setSelectedProject(name);
     setSelectedRun('latest');
     navReset();
+  }
+
+  async function handleDeleteProject(name) {
+    const params = new URLSearchParams(window.location.search);
+    const dir = params.get('evaluations') || '';
+    const qs = dir ? `?evaluations=${encodeURIComponent(dir)}` : '';
+    await fetch(`/api/projects/${encodeURIComponent(name)}${qs}`, { method: 'DELETE' });
+    if (selectedProject === name) handleProjectChange(projects.find((p) => (p.name || p) !== name)?.name ?? '');
+    loadProjects();
   }
 
   function handleRunChange(runId) { setSelectedRun(runId); }
@@ -586,6 +599,7 @@ export default function App() {
             projects={projects}
             selectedProject={selectedProject}
             onSelect={handleProjectChange}
+            onDelete={handleDeleteProject}
           />
         );
 
