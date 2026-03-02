@@ -80,7 +80,7 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
       grade: pg?.grade || null,
       principleData,
       dimViolations: principleData?.violations || [],
-      dimCompliance: principleData?.compliance || [],
+      dimCompliance: (evalData.compliance || []).filter((c) => c.principle === principleId),
     };
   }
 

@@ -28,10 +28,9 @@ const ICON_OVERVIEW = (
 );
 
 const ICON_EVALUATE = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-    <path d="M2 17l10 5 10-5" />
-    <path d="M2 12l10 5 10-5" />
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="7" />
+    <line x1="16.5" y1="16.5" x2="22" y2="22" />
   </svg>
 );
 
@@ -246,7 +245,7 @@ export default function App() {
   // -------------------------------------------------------------------------
   // Evaluation
   // -------------------------------------------------------------------------
-  const { job, jobError, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
+  const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
 
   function handleStartEvaluation(payload) {
     startEvaluation({ ...payload, aiCmd: aiCmd || undefined });
@@ -352,12 +351,24 @@ export default function App() {
           <section className="evaluate-screen">
             <header className="evaluate-header">
               <div className="evaluate-header-content">
-                <div className="evaluate-icon">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                    <path d="M2 17l10 5 10-5" />
-                    <path d="M2 12l10 5 10-5" />
-                  </svg>
+                <div className={`evaluate-icon${job?.status === 'running' ? ' running' : ''}`}>
+                  {/* Static layer — visible when idle */}
+                  <div className="eval-icon-static">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="7" />
+                      <line x1="16.5" y1="16.5" x2="22" y2="22" />
+                    </svg>
+                  </div>
+                  {/* Animated layer — visible when running */}
+                  <div className="eval-icon-animated">
+                    <span className="eval-file-chip" style={{animationDelay: '0s'}} />
+                    <span className="eval-file-chip" style={{animationDelay: '0.55s'}} />
+                    <span className="eval-file-chip" style={{animationDelay: '1.1s'}} />
+                    <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="11" cy="11" r="7" />
+                      <line x1="16.5" y1="16.5" x2="22" y2="22" />
+                    </svg>
+                  </div>
                 </div>
                 <div>
                   <h1>Evaluate Repository</h1>
@@ -378,16 +389,16 @@ export default function App() {
               {!job && (
                 <div className="panel evaluate-panel">
                   <div className="panel-header">
-                    <h3>Evaluate a Repository</h3>
+                    <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
                   </div>
                   <EvaluationForm onStart={handleStartEvaluation} disabled={false} />
                 </div>
               )}
 
               {jobError && <div className="job-error-banner">{jobError}</div>}
-              <EvaluationStatus job={job} onDismiss={handleEvalDismiss} onCancel={cancelEvaluation} />
+              <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={handleEvalDismiss} onCancel={cancelEvaluation} />
 
-              <div className="panel evaluate-help-panel">
+              {!job && <div className="panel evaluate-help-panel">
                 <div className="panel-header">
                   <h3>How It Works</h3>
                 </div>
@@ -414,7 +425,7 @@ export default function App() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </div>}
             </div>
           </section>
         );

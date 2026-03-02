@@ -309,6 +309,101 @@ function parseFromMarkdown(mdPath, project, runId, dimension) {
 }
 
 // ---------------------------------------------------------------------------
+// Live stream reader — extracts violations from the growing stream-json file
+// written during Phase 1 analysis (deleted once Phase 1 finishes)
+// ---------------------------------------------------------------------------
+function parseFromLiveStream(streamPath, project, runId, dimension) {
+  let content;
+  try {
+    content = fs.readFileSync(streamPath, 'utf-8');
+  } catch {
+    return null;
+  }
+
+  const violations = [];
+  const seen = new Set();
+
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    let event;
+    try { event = JSON.parse(trimmed); } catch { continue; }
+
+    const texts = [];
+    const etype = event.type;
+    if (etype === 'assistant') {
+      for (const block of event.message?.content ?? []) {
+        if (block.type === 'text' && block.text) texts.push(block.text);
+      }
+    } else if (etype === 'result') {
+      if (event.result) texts.push(event.result);
+    } else if (etype === 'item.completed') {
+      const item = event.item ?? {};
+      if (item.type === 'agent_message') {
+        if (item.text) texts.push(item.text);
+        for (const block of item.content ?? []) {
+          if ((block.type === 'text' || block.type === 'output_text') && block.text) texts.push(block.text);
+        }
+      }
+    }
+
+    for (const text of texts) {
+      for (const tl of text.split('\n')) {
+        const t = tl.trim();
+        if (!t.startsWith('{')) continue;
+        let obj;
+        try { obj = JSON.parse(t); } catch { continue; }
+        if (!obj.p || obj.t !== 'violation') continue;
+
+        const key = `${obj.p}:${obj.file ?? ''}:${obj.line ?? ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        violations.push({
+          principle: obj.d || obj.p,
+          file:      obj.file ?? null,
+          line:      obj.line ?? null,
+          reason:    obj.reason ?? null,
+          snippet:   obj.snippet ? String(obj.snippet).split('\n')[0].trim() : null,
+          severity:  obj.severity ?? 'minor',
+        });
+      }
+    }
+  }
+
+  return { dimension, runId, project, violations, partial: true };
+}
+
+// ---------------------------------------------------------------------------
+// Evidence file fallback — returns partial violations before scoring completes
+// ---------------------------------------------------------------------------
+function parseFromEvidence(evidencePath, project, runId, dimension) {
+  let data;
+  try {
+    data = JSON.parse(fs.readFileSync(evidencePath, 'utf-8'));
+  } catch {
+    return null;
+  }
+
+  const violations = [];
+  for (const [rawKey, pdata] of Object.entries(data.principles ?? {})) {
+    const label = pdata.display_name || rawKey;
+    for (const v of pdata.violations ?? []) {
+      violations.push({
+        principle: label,
+        file:      v.file ? (v.line ? `${v.file}:${v.line}` : v.file) : null,
+        line:      v.line ?? null,
+        reason:    v.reason ?? null,
+        snippet:   v.snippet ?? null,
+        severity:  v.severity ?? 'minor',
+      });
+    }
+  }
+
+  return { dimension, runId, project, violations, partial: true };
+}
+
+// ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
 export function parseEvalFile(reportsRoot, project, runId, dimension) {
@@ -320,7 +415,19 @@ export function parseEvalFile(reportsRoot, project, runId, dimension) {
   }
 
   const mdPath = path.join(base, `${dimension}_eval.md`);
-  if (!fs.existsSync(mdPath)) return null;
+  if (fs.existsSync(mdPath)) {
+    return parseFromMarkdown(mdPath, project, runId, dimension);
+  }
 
-  return parseFromMarkdown(mdPath, project, runId, dimension);
+  const evidencePath = path.join(reportsRoot, project, runId, 'evidence', `${dimension}_evidence.json`);
+  if (fs.existsSync(evidencePath)) {
+    return parseFromEvidence(evidencePath, project, runId, dimension);
+  }
+
+  const streamPath = path.join(reportsRoot, project, runId, 'evidence', `${dimension}_live.stream`);
+  if (fs.existsSync(streamPath)) {
+    return parseFromLiveStream(streamPath, project, runId, dimension);
+  }
+
+  return null;
 }
