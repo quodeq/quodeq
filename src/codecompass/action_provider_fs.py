@@ -348,12 +348,29 @@ class FilesystemActionProvider(ActionProvider):
         numeric_scores = [score for score in (_parse_numeric_score(s) for s in scores) if score is not None]
         avg_score = round(sum(numeric_scores) / len(numeric_scores), 1) if numeric_scores else None
 
+        # Compute previous overall average by re-accumulating over runs[1:] (i.e., excluding
+        # the latest run). This gives the true prior snapshot rather than mixing each dimension's
+        # individual previousScore which may point to different runs.
+        prev_avg_score = None
+        if len(runs) >= 2:
+            prev_latest_by_dimension: dict[str, dict[str, Any]] = {}
+            for run_id in runs[1:]:
+                dimensions = _read_run_data(reports_root, project, run_id)
+                for dim in dimensions:
+                    dim_name = dim.get("dimension")
+                    if dim_name and dim_name not in prev_latest_by_dimension:
+                        prev_latest_by_dimension[dim_name] = dim
+            prev_scores_raw = [d.get("overallScore") for d in prev_latest_by_dimension.values() if d.get("overallScore")]
+            prev_numeric_scores = [s for s in (_parse_numeric_score(s) for s in prev_scores_raw) if s is not None]
+            prev_avg_score = round(sum(prev_numeric_scores) / len(prev_numeric_scores), 1) if prev_numeric_scores else None
+
         return {
             "project": project,
             "dimensions": dimensions_with_trend,
             "summary": {
                 "overallGrade": _most_frequent_grade(grades),
                 "numericAverage": avg_score,
+                "previousNumericAverage": prev_avg_score,
                 "totalViolations": total_violations,
                 "totalCompliance": total_compliance,
                 "dimensionCount": len(dimensions_with_trend),
