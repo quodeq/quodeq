@@ -81,6 +81,7 @@ def _scale_multiplier(source_file_count: int) -> int:
     for threshold, multiplier in _SCALE_TIERS:
         if source_file_count >= threshold:
             return multiplier
+    return 1
 
 
 # ---------------------------------------------------------------------------
