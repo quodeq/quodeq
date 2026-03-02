@@ -130,7 +130,9 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             tickLine={false}
           />
           <Tooltip content={RunHistoryTooltip} cursor={false} isAnimationActive={false} />
-          <ReferenceLine y={5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.5} />
+          <ReferenceLine y={2.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={5}   stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.3} />
+          <ReferenceLine y={7.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <Bar
             dataKey="numericAverage"
             radius={[3, 3, 0, 0]}
@@ -156,9 +158,9 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             isAnimationActive={false}
             dataKey="numericAverage"
             type="monotone"
-            stroke={cssVar('--color-text-muted', '#9a9490')}
+            stroke={cssVar('--color-accent', '#e8795a')}
             strokeWidth={2.5}
-            dot={{ r: 3, fill: cssVar('--color-text-muted', '#9a9490'), strokeWidth: 0 }}
+            dot={false}
             activeDot={false}
           />
         </ComposedChart>

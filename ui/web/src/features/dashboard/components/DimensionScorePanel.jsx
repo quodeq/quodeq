@@ -146,7 +146,9 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick }) {
             tickLine={false}
           />
           <Tooltip content={DimensionTooltip} cursor={false} isAnimationActive={false} />
-          <ReferenceLine y={5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.5} />
+          <ReferenceLine y={2.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={5}   stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.3} />
+          <ReferenceLine y={7.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <Bar
             dataKey="numericScore"
             radius={[3, 3, 0, 0]}
