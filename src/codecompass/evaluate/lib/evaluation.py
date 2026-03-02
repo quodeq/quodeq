@@ -87,7 +87,7 @@ def run_two_phase_dimension(
 
     try:
         run_analysis_phase(work_dir, dimension, analysis_prompt, stream_file, dimension_tag)
-        extract_jsonl_evidence(stream_file, jsonl_file, dimension)
+        files_read = extract_jsonl_evidence(stream_file, jsonl_file, dimension)
 
         # Debug sample when stream had content but no evidence was extracted
         stream_path = Path(stream_file)
@@ -120,6 +120,7 @@ def run_two_phase_dimension(
             discipline=discipline,
             today=today,
             source_file_count=source_file_count,
+            files_read=files_read,
             analysis_hash=analysis_hash,
             scoring_hash=scoring_hash,
             mapping_hash=mapping_hash,
