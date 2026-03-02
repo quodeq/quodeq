@@ -40,17 +40,22 @@ def extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
     return count, lines
 
 
-def process_assistant_event(data: dict, out, stats: dict) -> None:
+def process_assistant_event(data: dict, out, stats: dict, files_read: set) -> None:
     """Process legacy assistant message events."""
     msg = data.get("message", {})
     for block in msg.get("content", []):
-        if block.get("type") == "text":
+        btype = block.get("type")
+        if btype == "text":
             text = block["text"].strip()
             if text:
                 stats["text_blocks"] += 1
                 c, l = extract_jsonl_from_text(text, out)
                 stats["jsonl_lines"] += c
                 stats["total_text_lines"] += l
+        elif btype == "tool_use" and block.get("name") == "Read":
+            fp = block.get("input", {}).get("file_path")
+            if fp:
+                files_read.add(fp)
 
 
 def process_result_event(data: dict, out, stats: dict) -> None:
@@ -63,7 +68,7 @@ def process_result_event(data: dict, out, stats: dict) -> None:
         stats["total_text_lines"] += l
 
 
-def process_item_completed_event(data: dict, out, stats: dict) -> None:
+def process_item_completed_event(data: dict, out, stats: dict, files_read: set) -> None:
     """Process Codex-style item.completed events."""
     item = data.get("item", {})
     if item.get("type") == "agent_message":
@@ -74,19 +79,30 @@ def process_item_completed_event(data: dict, out, stats: dict) -> None:
             stats["jsonl_lines"] += c
             stats["total_text_lines"] += l
         for block in item.get("content", []):
-            if isinstance(block, dict) and block.get("type") in ("text", "output_text"):
-                block_text = (block.get("text") or "").strip()
-                if block_text:
-                    stats["text_blocks"] += 1
-                    c, l = extract_jsonl_from_text(block_text, out)
-                    stats["jsonl_lines"] += c
-                    stats["total_text_lines"] += l
+            if isinstance(block, dict):
+                btype = block.get("type")
+                if btype in ("text", "output_text"):
+                    block_text = (block.get("text") or "").strip()
+                    if block_text:
+                        stats["text_blocks"] += 1
+                        c, l = extract_jsonl_from_text(block_text, out)
+                        stats["jsonl_lines"] += c
+                        stats["total_text_lines"] += l
+                elif btype == "tool_use" and block.get("name") == "Read":
+                    fp = block.get("input", {}).get("file_path")
+                    if fp:
+                        files_read.add(fp)
 
 
-def extract_jsonl_evidence(stream_file: str, jsonl_file: str, dimension: str) -> None:
-    """Extract JSONL evidence lines from a stream-json file."""
+def extract_jsonl_evidence(stream_file: str, jsonl_file: str, dimension: str) -> int:
+    """Extract JSONL evidence lines from a stream-json file.
+
+    Returns:
+        Number of unique file paths read by the AI during analysis.
+    """
     stats: dict = {"text_blocks": 0, "jsonl_lines": 0, "total_text_lines": 0}
     event_types: dict = {}
+    files_read: set = set()
 
     with open(stream_file) as f, open(jsonl_file, "w") as out:
         for line in f:
@@ -102,13 +118,13 @@ def extract_jsonl_evidence(stream_file: str, jsonl_file: str, dimension: str) ->
             event_types[etype] = event_types.get(etype, 0) + 1
 
             if etype == "assistant":
-                process_assistant_event(data, out, stats)
+                process_assistant_event(data, out, stats, files_read)
             elif etype == "result":
                 process_result_event(data, out, stats)
             elif etype == "item.completed":
-                process_item_completed_event(data, out, stats)
+                process_item_completed_event(data, out, stats, files_read)
 
-    pass  # evidence count is reported after assembly
+    return len(files_read)
 
 
 def is_stream_valid(stream_file: str) -> bool:
