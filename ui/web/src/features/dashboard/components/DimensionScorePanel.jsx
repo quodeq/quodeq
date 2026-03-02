@@ -1,0 +1,148 @@
+import {
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  Cell,
+  ReferenceLine,
+} from 'recharts';
+
+function cssVar(name, fallback) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+}
+
+const TREND_ARROW = { up: '↑', 'soft-up': '↗', same: '→', 'soft-down': '↘', down: '↓' };
+const TREND_COLOR = {
+  up:         '#5ee6a0',
+  'soft-up':  '#92c9a8',
+  same:       '#94a3b8',
+  'soft-down':'#c8956c',
+  down:       '#f09070',
+};
+
+// Shortcodes mirror src/codecompass/config/dimensions.py
+const DIM_CODE = {
+  affordability:  'aff',
+  availability:   'avl',
+  configurability:'cfg',
+  efficiency:     'eff',
+  evolvability:   'evo',
+  extensibility:  'ext',
+  flexibility:    'flx',
+  maintainability:'mnt',
+  performance:    'perf',
+  recoverability: 'rcv',
+  resilience:     'res',
+  robustness:     'rob',
+  scalability:    'scl',
+  simplicity:     'sim',
+  usability:      'usx',
+};
+
+function dimCode(name) {
+  if (!name) return '';
+  return (DIM_CODE[name.toLowerCase()] ?? name.slice(0, 4)).toUpperCase();
+}
+
+function trendDir(delta) {
+  if (delta === null || delta === undefined) return null;
+  if (delta > 1)    return 'up';
+  if (delta > 0.5)  return 'soft-up';
+  if (delta < -1)   return 'down';
+  if (delta < -0.5) return 'soft-down';
+  return 'same';
+}
+
+function DimensionTooltip({ active, payload }) {
+  if (!active || !payload?.length) return null;
+  const d = payload[0].payload;
+  return (
+    <div className="run-history-tooltip">
+      <span className="rht-date">{d.dimension}</span>
+      <span className="rht-score">{parseFloat(d.overallScore).toFixed(1)} / 10</span>
+      <span className="rht-grade">{d.overallGrade}</span>
+    </div>
+  );
+}
+
+
+export default function DimensionScorePanel({ dimensions = [], onBarClick }) {
+  if (!dimensions || dimensions.length === 0) return null;
+
+  const data = [...dimensions]
+    .sort((a, b) => a.dimension.localeCompare(b.dimension))
+    .map((d) => {
+      const curr = parseFloat(d.overallScore);
+      const prev = parseFloat(d.previousScore);
+      const delta = !isNaN(curr) && !isNaN(prev) ? curr - prev : null;
+      return { ...d, numericScore: isNaN(curr) ? 0 : curr, delta };
+    });
+
+  const renderTrendLabel = ({ x, y, width, index }) => {
+    const entry = data[index];
+    const dir = trendDir(entry?.delta);
+    if (!dir) return null;
+    const cx = x + width / 2;
+    const deltaStr = entry.delta > 0 ? `+${entry.delta.toFixed(1)}` : entry.delta.toFixed(1);
+    return (
+      <g>
+        <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={TREND_COLOR[dir]}>
+          {deltaStr}
+        </text>
+        <text x={cx} y={y - 14} textAnchor="middle" fontSize={11} fill={TREND_COLOR[dir]}>
+          {TREND_ARROW[dir]}
+        </text>
+      </g>
+    );
+  };
+
+  return (
+    <section className="run-history-panel panel">
+      <div className="run-history-header">
+        <span className="run-history-title">Dimension Scores</span>
+      </div>
+      <ResponsiveContainer width="100%" height={160}>
+        <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
+          <CartesianGrid vertical={false} stroke={cssVar('--color-border', '#383532')} />
+          <XAxis
+            dataKey="dimension"
+            tickFormatter={dimCode}
+            tick={{ fontSize: 11, fill: cssVar('--color-text-muted', '#9a9490') }}
+            interval={0}
+            axisLine={false}
+            tickLine={false}
+          />
+          <YAxis
+            domain={[0, 10]}
+            ticks={[0, 2.5, 5, 7.5, 10]}
+            tick={{ fontSize: 11, fill: cssVar('--color-text-muted', '#9a9490') }}
+            axisLine={false}
+            tickLine={false}
+          />
+          <Tooltip content={DimensionTooltip} cursor={false} />
+          <ReferenceLine y={5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.5} />
+          <Bar
+            dataKey="numericScore"
+            radius={[3, 3, 0, 0]}
+            maxBarSize={40}
+            label={renderTrendLabel}
+            isAnimationActive={false}
+            cursor={onBarClick ? 'pointer' : 'default'}
+            onClick={(entry) => onBarClick?.(entry)}
+          >
+            {data.map((entry, i) => (
+              <Cell
+                key={entry.dimension ?? i}
+                fill={cssVar('--color-accent', '#e8795a')}
+                opacity={0.85}
+              />
+            ))}
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </section>
+  );
+}
