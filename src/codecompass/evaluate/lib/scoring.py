@@ -55,7 +55,7 @@ _MAJOR_PENALTY = 0.25     # per distinct major violation type, cap 5 types
 # ---------------------------------------------------------------------------
 
 # Each entry is (min_file_count_inclusive, multiplier).
-# Tiers: Micro/Small (<500) x1 | Medium (500-5k) x2 | Large (5k-20k) x3
+# Tiers: Small (<500) x1 | Medium (500-5k) x2 | Large (5k-20k) x3
 #        XLarge (20k-50k) x4 | XXLarge (50k-100k) x5 | Enterprise (100k+) x6
 _SCALE_TIERS: list[tuple[int, int]] = [
     (100_000, 6),
@@ -81,7 +81,6 @@ def _scale_multiplier(source_file_count: int) -> int:
     for threshold, multiplier in _SCALE_TIERS:
         if source_file_count >= threshold:
             return multiplier
-    return 1
 
 
 # ---------------------------------------------------------------------------

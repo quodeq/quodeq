@@ -52,6 +52,12 @@ def test_build_deductions_default_scale_unchanged():
     d = build_deductions({"critical": 3, "major": 0})
     assert d["critical_cap"] == 3           # 3 >= 3, hard cap
 
+    # scale=1: hard cap does NOT fire at 1 or 2 criticals (requires >= 3)
+    d = build_deductions({"critical": 1, "major": 0})
+    assert d["critical_cap"] == 10   # 1 < 3, no hard cap
+    d = build_deductions({"critical": 2, "major": 0})
+    assert d["critical_cap"] == 10   # 2 < 3, no hard cap
+
 
 def test_build_deductions_xlarge_scale():
     # scale=4: hard cap triggers at >= 12 critical types
