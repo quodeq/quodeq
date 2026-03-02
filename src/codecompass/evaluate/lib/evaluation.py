@@ -85,6 +85,7 @@ def run_two_phase_dimension(
     with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as jf:
         jsonl_file = jf.name
 
+    files_read: int = 0
     try:
         run_analysis_phase(work_dir, dimension, analysis_prompt, stream_file, dimension_tag)
         files_read = extract_jsonl_evidence(stream_file, jsonl_file, dimension)
