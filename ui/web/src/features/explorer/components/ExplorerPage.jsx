@@ -67,6 +67,15 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
     [evalData]
   );
 
+  const complianceByPrinciple = useMemo(() => {
+    const map = new Map();
+    for (const c of (evalData?.compliance || [])) {
+      if (!map.has(c.principle)) map.set(c.principle, []);
+      map.get(c.principle).push(c);
+    }
+    return map;
+  }, [evalData]);
+
   if (loading) return <div className="loading">Loading…</div>;
   if (error) return <div className="inline-error">{error}</div>;
   if (!evalData) return <div className="empty-state"><h2>No data found</h2></div>;
@@ -80,7 +89,7 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
       grade: pg?.grade || null,
       principleData,
       dimViolations: principleData?.violations || [],
-      dimCompliance: (evalData.compliance || []).filter((c) => c.principle === principleId),
+      dimCompliance: complianceByPrinciple.get(principleId) || [],
     };
   }
 
