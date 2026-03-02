@@ -137,6 +137,15 @@ class FilesystemActionProvider(ActionProvider):
                     parent = info.get("parent") or None
                 except (json.JSONDecodeError, OSError):
                     pass
+            latest_grade = None
+            latest_score = None
+            try:
+                dims = _read_run_data(reports_root, entry.name, runs[0].run_id)
+                summary = _summarize_dimensions(dims)
+                latest_grade = summary.get("overallGrade")
+                latest_score = summary.get("numericAverage")
+            except Exception:
+                pass
             projects.append(
                 {
                     "name": entry.name,
@@ -144,6 +153,8 @@ class FilesystemActionProvider(ActionProvider):
                     "latestRunId": runs[0].run_id,
                     "latestDate": runs[0].date_iso,
                     "parent": parent,
+                    "latestGrade": latest_grade,
+                    "latestScore": latest_score,
                 }
             )
         projects.sort(key=lambda item: item["name"])
