@@ -100,15 +100,11 @@ function AccumulatedOverviewPanel({
   );
 
   const accumulatedScoreDelta = useMemo(() => {
-    const prevScores = accumulatedDimensions
-      .map((d) => parseFloat(d.previousScore))
-      .filter((v) => !isNaN(v));
-    if (prevScores.length === 0) return null;
-    const prevAvg = prevScores.reduce((a, b) => a + b, 0) / prevScores.length;
-    const currAvg = parseFloat(accumulated?.summary?.numericAverage);
-    if (isNaN(currAvg)) return null;
-    return (currAvg - prevAvg).toFixed(1);
-  }, [accumulatedDimensions, accumulated]);
+    const curr = parseFloat(accumulated?.summary?.numericAverage);
+    const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
+    if (isNaN(curr) || isNaN(prev)) return null;
+    return (curr - prev).toFixed(1);
+  }, [accumulated]);
 
   const accumulatedLastDate = useMemo(() => {
     const ids = accumulatedDimensions.map((d) => d.fromRunId).filter(Boolean);
@@ -149,7 +145,7 @@ function AccumulatedOverviewPanel({
           </div>
           {accumulatedScoreDelta !== null && (
             <div className="acc-eval-trend">
-              <TrendBadge delta={accumulatedScoreDelta} showLabel={true} />
+              <TrendBadge delta={accumulatedScoreDelta} showLabel={false} />
             </div>
           )}
         </div>
@@ -236,7 +232,7 @@ function AccumulatedOverviewPanel({
                         </span>
                       )}
                     </span>
-                    <TrendBadge delta={delta} trend={item.trend} />
+                    <TrendBadge delta={delta} />
                   </div>
                   <div className="qd-card-stats">
                     {(item.totals?.violationCount ?? 0) > 0 && (
@@ -350,15 +346,15 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
   );
 
   const runScoreDelta = useMemo(() => {
-    const prevScores = (dashboard?.dimensions || [])
-      .map((d) => parseFloat(d.previousScore))
-      .filter((v) => !isNaN(v));
-    if (prevScores.length === 0) return null;
-    const prevAvg = prevScores.reduce((a, b) => a + b, 0) / prevScores.length;
-    const currAvg = parseFloat(runSummary.numericAverage);
-    if (isNaN(currAvg)) return null;
-    return (currAvg - prevAvg).toFixed(1);
-  }, [dashboard, runSummary]);
+    const trendSeries = dashboard?.trend || [];
+    const selectedRunId = dashboard?.selectedRun?.runId;
+    const idx = trendSeries.findIndex((t) => t.runId === selectedRunId);
+    if (idx < 0 || idx + 1 >= trendSeries.length) return null;
+    const curr = parseFloat(trendSeries[idx].numericAverage);
+    const prev = parseFloat(trendSeries[idx + 1].numericAverage);
+    if (isNaN(curr) || isNaN(prev)) return null;
+    return (curr - prev).toFixed(1);
+  }, [dashboard]);
 
   const runUniquePrinciples = useMemo(() => {
     const violations = (dashboard?.dimensions || []).flatMap((d) => d.violations || []);
@@ -399,7 +395,7 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
           </div>
           {runScoreDelta !== null && (
             <div className="acc-eval-trend">
-              <TrendBadge delta={runScoreDelta} showLabel={true} />
+              <TrendBadge delta={runScoreDelta} showLabel={false} />
             </div>
           )}
         </div>
@@ -472,7 +468,7 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
                         </span>
                       )}
                     </span>
-                    <TrendBadge delta={delta} trend={item.trend} />
+                    <TrendBadge delta={delta} />
                   </div>
                   <div className="qd-card-stats">
                     {(item.totals?.violationCount ?? 0) > 0 && (
