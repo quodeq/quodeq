@@ -129,12 +129,21 @@ class FilesystemActionProvider(ActionProvider):
             runs = _list_runs(reports_root, entry.name)
             if not runs:
                 continue
+            parent = None
+            info_path = reports_root / entry.name / "repository_info.json"
+            if info_path.exists():
+                try:
+                    info = json.loads(info_path.read_text())
+                    parent = info.get("parent") or None
+                except (json.JSONDecodeError, OSError):
+                    pass
             projects.append(
                 {
                     "name": entry.name,
                     "runsCount": len(runs),
-                    "latestRunId": runs[0].run_id if runs else None,
-                    "latestDate": runs[0].date_iso if runs else None,
+                    "latestRunId": runs[0].run_id,
+                    "latestDate": runs[0].date_iso,
+                    "parent": parent,
                 }
             )
         projects.sort(key=lambda item: item["name"])
