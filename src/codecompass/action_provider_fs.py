@@ -262,20 +262,32 @@ class FilesystemActionProvider(ActionProvider):
                 }
             )
 
+        # Build trend using accumulated scores (same logic as get_accumulated):
+        # for each run, compute the score using the best/latest dimension data
+        # available up to and including that run, not just that run's data alone.
         trend = []
-        for item in runs:
-            dimensions = _read_run_data(reports_root, project, item.run_id)
-            summary = _summarize_dimensions(dimensions)
+        acc_by_dim: dict[str, dict[str, Any]] = {}
+        for item in reversed(runs):  # oldest → newest
+            for dim in _read_run_data(reports_root, project, item.run_id):
+                dim_name = dim.get("dimension")
+                if dim_name:
+                    acc_by_dim[dim_name] = dim  # latest run wins
+            acc_scores = [
+                s for s in (_parse_numeric_score(d.get("overallScore")) for d in acc_by_dim.values())
+                if s is not None
+            ]
+            acc_grades = [d.get("overallGrade") for d in acc_by_dim.values() if d.get("overallGrade")]
             trend.append(
                 {
                     "runId": item.run_id,
                     "dateISO": item.date_iso,
                     "dateLabel": item.date_label,
-                    "dimensionsCount": summary.get("dimensionsCount"),
-                    "overallGrade": summary.get("overallGrade"),
-                    "numericAverage": summary.get("numericAverage"),
+                    "dimensionsCount": len(acc_by_dim),
+                    "overallGrade": _most_frequent_grade(acc_grades) if acc_grades else None,
+                    "numericAverage": round(sum(acc_scores) / len(acc_scores), 1) if acc_scores else None,
                 }
             )
+        trend.reverse()  # back to newest-first
 
         return {
             "project": project,

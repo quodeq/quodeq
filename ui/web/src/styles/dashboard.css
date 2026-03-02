@@ -677,6 +677,17 @@
   pointer-events: none;
 }
 
+.run-navigator .run-nav-action--danger {
+  color: var(--color-danger);
+  border-color: color-mix(in srgb, var(--color-danger) 35%, transparent);
+}
+
+.run-navigator .run-nav-action--danger:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--color-danger) 55%, transparent);
+  color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 10%, transparent);
+}
+
 /* Segmented pager: [‹][date][›] as one bordered unit */
 .run-nav-pager {
   display: inline-flex;
@@ -2217,3 +2228,47 @@
   border-color: var(--color-sev-minor-text);
   color: var(--color-sev-minor-text);
 }
+
+/* ── Run History Panel ────────────────────────────────── */
+
+.run-history-panel .recharts-wrapper,
+.run-history-panel .recharts-surface,
+.run-history-panel .recharts-tooltip-wrapper,
+.run-history-panel svg,
+.run-history-panel svg *,
+.run-history-panel *:focus {
+  outline: none !important;
+  user-select: none;
+}
+
+.run-history-panel {
+}
+
+.run-history-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.run-history-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.run-history-tooltip {
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border, rgba(255,255,255,0.1));
+  border-radius: 6px;
+  padding: 6px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.8rem;
+}
+
+.rht-date  { color: var(--color-text-muted, #94a3b8); }
+.rht-score { font-weight: 600; color: var(--color-text, #f1f5f9); }
+.rht-grade { color: var(--color-text-muted, #94a3b8); font-size: 0.75rem; }
