@@ -80,11 +80,9 @@ def run_two_phase_dimension(
     log_step("Gathering evidence")
 
     # --- Phase 1: Analysis ---
-    with (
-        tempfile.NamedTemporaryFile(mode="w", suffix=".stream", delete=False) as sf,
-        tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as jf,
-    ):
-        stream_file = sf.name
+    # Use a predictable path so the server can read violations live while the stream grows.
+    stream_file = str(Path(evidence_file).parent / f"{dimension}_live.stream")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as jf:
         jsonl_file = jf.name
 
     try:

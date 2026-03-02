@@ -1,6 +1,6 @@
 /* --- Evaluate Screen --- */
 .evaluate-screen {
-  padding: 32px;
+  width: 100%;
   max-width: 1200px;
   margin: 0 auto;
 }
@@ -101,6 +101,7 @@
 /* Job Panel */
 .evaluate-job-panel {
   padding: 24px;
+  min-height: 480px;
 }
 
 .job-header {
@@ -123,20 +124,32 @@
   color: var(--color-text);
 }
 
-/* Spinner shown while running */
-.job-spinner {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
-  border-top-color: var(--color-accent);
-  border-radius: 50%;
-  animation: spin 0.75s linear infinite;
-  flex-shrink: 0;
+/* Header right cluster */
+.job-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
+/* Inline cancel — identical pill to the running badge, accent colour, no animation */
+.job-cancel-inline {
+  display: inline-block;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  line-height: inherit;
+  background: color-mix(in srgb, var(--color-danger) 12%, transparent);
+  border: none;
+  color: var(--color-danger);
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.job-cancel-inline:hover {
+  background: color-mix(in srgb, var(--color-danger) 22%, transparent);
 }
 
 /* Status badge */
@@ -235,6 +248,18 @@
   font-size: var(--text-xs);
 }
 
+.job-meta-id-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.job-meta-id-row .job-meta-code {
+  flex: 1;
+  min-width: 0;
+}
+
 /* Console */
 .console-output {
   background: #0d1117;
@@ -266,6 +291,46 @@
   color: #8bc34a;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Slim status row */
+.eval-status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.eval-status-line {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.eval-console-toggle {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+  line-height: 1;
+}
+
+.eval-console-toggle:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
 }
 
 /* Action row */
@@ -457,6 +522,10 @@
   .dimension-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
+
+  .vlive-file {
+    max-width: 120px;
+  }
 }
 
 /* --- Evaluate Screen Enhancements --- */
@@ -467,6 +536,7 @@
 }
 
 .evaluate-icon {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -475,6 +545,70 @@
   background: linear-gradient(135deg, var(--color-accent-soft), color-mix(in srgb, var(--color-accent) 5%, transparent));
   border-radius: 20px;
   color: var(--color-accent);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+/* --- idle layer --- */
+.eval-icon-static {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 1;
+  transition: opacity 400ms ease;
+}
+
+/* --- animated layer --- */
+.eval-icon-animated {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 400ms ease;
+}
+
+/* swap on running */
+.evaluate-icon.running .eval-icon-static  { opacity: 0; }
+.evaluate-icon.running .eval-icon-animated { opacity: 1; }
+
+/* floating file chips behind the glass */
+.eval-file-chip {
+  position: absolute;
+  width: 18px;
+  height: 10px;
+  background: color-mix(in srgb, var(--color-accent) 35%, transparent);
+  border-radius: 3px;
+  animation: file-drift 1.65s ease-in-out infinite;
+  opacity: 0;
+}
+
+/* stagger vertical positions */
+.eval-file-chip:nth-child(1) { top: 18px; }
+.eval-file-chip:nth-child(2) { top: 32px; }
+.eval-file-chip:nth-child(3) { top: 46px; }
+
+@keyframes file-drift {
+  0%   { transform: translateX(34px); opacity: 0; }
+  15%  { opacity: 0.7; }
+  85%  { opacity: 0.7; }
+  100% { transform: translateX(-34px); opacity: 0; }
+}
+
+/* glass gently sweeps left→right while running */
+.eval-glass-sweep {
+  position: relative;
+  z-index: 1;
+  animation: glass-sweep 2.5s ease-in-out infinite;
+}
+
+@keyframes glass-sweep {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  40%       { transform: translateX(4px) rotate(3deg); }
+  60%       { transform: translateX(-4px) rotate(-3deg); }
 }
 
 .evaluate-header h1 {
@@ -757,7 +891,7 @@
 
 /* --- Evaluate Page (Full Page) --- */
 .evaluate-page {
-  max-width: 800px;
+  max-width: 1000px;
   margin: 0 auto;
   padding: 40px 20px;
 }
@@ -1087,11 +1221,6 @@
   opacity: 0.5;
 }
 
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
-}
-
 .folder-browser-hint {
   padding: 8px 14px;
   margin-bottom: 8px;
@@ -1317,3 +1446,201 @@
     text-align: center;
   }
 }
+
+/* ---- Live Violations Feed ---- */
+.vlive-feed {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.vlive-counter {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  padding: 0 4px 12px;
+}
+
+.vlive-dimension-group {
+  margin-bottom: 16px;
+}
+
+.vlive-dimension-label {
+  padding: 4px 0 8px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: 4px;
+}
+
+/* Entrance animation */
+.vlive-row {
+  animation: vlive-enter 200ms ease-out both;
+}
+
+@keyframes vlive-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.vlive-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+
+.vlive-row-main:hover {
+  background: var(--color-surface-alt);
+}
+
+.vlive-principle {
+  flex: 1;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.vlive-file {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 280px;
+}
+
+.vlive-chevron {
+  color: var(--color-text-muted);
+  transition: transform 180ms ease;
+  flex-shrink: 0;
+}
+
+.vlive-chevron.open {
+  transform: rotate(90deg);
+}
+
+/* Accordion detail panel */
+.vlive-detail {
+  margin: 0 0 4px;
+  padding: 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.vlive-detail-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  font-size: var(--text-sm);
+}
+
+.vlive-detail-label {
+  flex-shrink: 0;
+  width: 52px;
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-top: 2px;
+}
+
+.vlive-detail-value {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+
+.vlive-detail-value--prose {
+  font-family: var(--font-sans);
+  word-break: normal;
+  overflow-wrap: break-word;
+}
+
+.vlive-snippet {
+  margin: 0;
+  padding: 10px 12px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+/* Detail rows (explorer detail pages) */
+.vdetail-row {
+  animation: vlive-enter 200ms ease-out both;
+  margin-bottom: var(--space-3);
+}
+
+.vdetail-row-main {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-radius: var(--radius-md);
+  cursor: default;
+}
+
+.vdetail-row-main .detail-copy-btn {
+  margin-left: auto;
+}
+
+/* Dimension label inline in the row (file detail page) */
+.vlive-dimension-inline {
+  font-family: var(--font-mono);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  opacity: 0.7;
+  flex-shrink: 0;
+}
+
+/* Violations group wrapper in detail pages */
+.vlive-violations-group {
+  margin-bottom: var(--space-4);
+}
+
+/* Title label in violation group headers */
+.violation-group-title {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-primary);
+}
+
+/* Severity + compliant left border accents */
+.vdetail-row--critical,
+.vdetail-row--major,
+.vdetail-row--minor,
+.vdetail-row--unknown,
+.vdetail-row--compliant {
+  border-left: 2px solid;
+  padding-left: var(--space-3);
+}
+
+.vdetail-row--critical  { border-color: var(--color-sev-critical-border); }
+.vdetail-row--major     { border-color: var(--color-sev-major-border); }
+.vdetail-row--minor     { border-color: var(--color-sev-minor-border); }
+.vdetail-row--unknown   { border-color: var(--color-border); }
+.vdetail-row--compliant { border-color: var(--color-success); }
