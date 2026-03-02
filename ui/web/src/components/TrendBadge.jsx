@@ -4,8 +4,8 @@ export default function TrendBadge({ delta, trend, showLabel = false }) {
   if (delta === null || delta === undefined) return null;
 
   const d = parseFloat(delta);
-  const dir = trend || (d > 0 ? 'up' : d < 0 ? 'down' : 'same');
-  const label = d > 0.3 ? 'Improving' : d < -0.3 ? 'Declining' : 'Stable';
+  const label = d > 1 ? 'Improving' : d < -1 ? 'Declining' : 'Stable';
+  const dir = trend || (d > 1 ? 'up' : d > 0.5 ? 'soft-up' : d < -1 ? 'down' : d < -0.5 ? 'soft-down' : 'same');
 
   return (
     <span className={`trend-badge trend-badge-${dir}`}>

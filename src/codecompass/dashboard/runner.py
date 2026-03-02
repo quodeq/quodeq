@@ -93,6 +93,17 @@ def _choose_action_api_port(start: int = 8001, taken: set[int] | None = None) ->
     return port
 
 
+def _kill_stale_action_api(host: str, port: int) -> None:
+    """Kill any lingering action API processes so the dashboard always loads fresh code."""
+    try:
+        subprocess.run(["pkill", "-f", "codecompass.action_api"], capture_output=True)
+    except OSError:
+        pass
+    deadline = time.monotonic() + 3
+    while _is_port_open(host, port) and time.monotonic() < deadline:
+        time.sleep(0.1)
+
+
 def _spawn_action_api(port: int) -> subprocess.Popen:
     env = os.environ.copy()
     env["CODECOMPASS_ACTION_API_PORT"] = str(port)
@@ -240,6 +251,7 @@ def run_dashboard(config: DashboardConfig) -> int:
     if config.api_forced:
         action_api_url, action_api_process = _ensure_action_api_forced(action_api_host, action_api_port)
     else:
+        _kill_stale_action_api(action_api_host, action_api_port)
         action_api_url, action_api_process = _ensure_action_api(action_api_host, action_api_port)
 
     process = _start_ui_server(config, action_api_url)
@@ -249,8 +261,10 @@ def run_dashboard(config: DashboardConfig) -> int:
     if config.open_browser:
         webbrowser.open(f"http://localhost:{config.port}")
 
+    current_action_api_process = action_api_process
+
     def _stop_children() -> None:
-        for proc in (process, action_api_process):
+        for proc in (process, current_action_api_process):
             if proc and proc.poll() is None:
                 proc.terminate()
                 try:
@@ -266,7 +280,22 @@ def run_dashboard(config: DashboardConfig) -> int:
     signal.signal(signal.SIGTSTP, _handle_tstp)
 
     try:
-        return process.wait()
+        while process.poll() is None:
+            try:
+                process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+            # Restart action API if it crashed
+            if current_action_api_process and current_action_api_process.poll() is not None:
+                if not _action_api_healthy(action_api_url):
+                    log_warning("Action API stopped — restarting…")
+                    try:
+                        _, current_action_api_process = _ensure_action_api(
+                            action_api_host, action_api_port
+                        )
+                        log_success("Action API restarted.")
+                    except Exception as exc:
+                        log_warning(f"Could not restart Action API: {exc}")
     except KeyboardInterrupt:
         pass
     finally:

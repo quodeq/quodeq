@@ -34,6 +34,87 @@ from codecompass.adapters.fs.report_parser import (
 from codecompass.evaluate.lib.repo_handler import is_repo_url
 
 
+def _parse_violations_from_evidence(evidence_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+    try:
+        data = json.loads(evidence_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    violations = []
+    for raw_key, pdata in (data.get("principles") or {}).items():
+        label = pdata.get("display_name") or raw_key
+        for v in pdata.get("violations") or []:
+            f = v.get("file")
+            line = v.get("line")
+            violations.append({
+                "principle": label,
+                "file": f"{f}:{line}" if f and line else f,
+                "line": line,
+                "reason": v.get("reason"),
+                "snippet": v.get("snippet"),
+                "severity": v.get("severity") or "minor",
+            })
+    return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}
+
+
+def _parse_violations_from_stream(stream_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+    try:
+        content = stream_path.read_text()
+    except OSError:
+        return None
+    violations: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw_line in content.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        try:
+            event = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        texts: list[str] = []
+        etype = event.get("type")
+        if etype == "assistant":
+            for block in (event.get("message") or {}).get("content") or []:
+                if block.get("type") == "text" and block.get("text"):
+                    texts.append(block["text"])
+        elif etype == "result":
+            if event.get("result"):
+                texts.append(event["result"])
+        elif etype == "item.completed":
+            item = event.get("item") or {}
+            if item.get("type") == "agent_message":
+                if item.get("text"):
+                    texts.append(item["text"])
+                for block in item.get("content") or []:
+                    if block.get("type") in ("text", "output_text") and block.get("text"):
+                        texts.append(block["text"])
+        for text in texts:
+            for tl in text.splitlines():
+                t = tl.strip()
+                if not t.startswith("{"):
+                    continue
+                try:
+                    obj = json.loads(t)
+                except json.JSONDecodeError:
+                    continue
+                if not obj.get("p") or obj.get("t") != "violation":
+                    continue
+                key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                snippet = obj.get("snippet")
+                violations.append({
+                    "principle": obj.get("d") or obj["p"],
+                    "file": obj.get("file"),
+                    "line": obj.get("line"),
+                    "reason": obj.get("reason"),
+                    "snippet": str(snippet).splitlines()[0].strip() if snippet else None,
+                    "severity": obj.get("severity") or "minor",
+                })
+    return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}
+
+
 class FilesystemActionProvider(ActionProvider):
     def __init__(self, job_manager: JobManager | None = None) -> None:
         self._jobs = job_manager or JobManager()
@@ -267,12 +348,29 @@ class FilesystemActionProvider(ActionProvider):
         numeric_scores = [score for score in (_parse_numeric_score(s) for s in scores) if score is not None]
         avg_score = round(sum(numeric_scores) / len(numeric_scores), 1) if numeric_scores else None
 
+        # Compute previous overall average by re-accumulating over runs[1:] (i.e., excluding
+        # the latest run). This gives the true prior snapshot rather than mixing each dimension's
+        # individual previousScore which may point to different runs.
+        prev_avg_score = None
+        if len(runs) >= 2:
+            prev_latest_by_dimension: dict[str, dict[str, Any]] = {}
+            for run_id in runs[1:]:
+                dimensions = _read_run_data(reports_root, project, run_id)
+                for dim in dimensions:
+                    dim_name = dim.get("dimension")
+                    if dim_name and dim_name not in prev_latest_by_dimension:
+                        prev_latest_by_dimension[dim_name] = dim
+            prev_scores_raw = [d.get("overallScore") for d in prev_latest_by_dimension.values() if d.get("overallScore")]
+            prev_numeric_scores = [s for s in (_parse_numeric_score(s) for s in prev_scores_raw) if s is not None]
+            prev_avg_score = round(sum(prev_numeric_scores) / len(prev_numeric_scores), 1) if prev_numeric_scores else None
+
         return {
             "project": project,
             "dimensions": dimensions_with_trend,
             "summary": {
                 "overallGrade": _most_frequent_grade(grades),
                 "numericAverage": avg_score,
+                "previousNumericAverage": prev_avg_score,
                 "totalViolations": total_violations,
                 "totalCompliance": total_compliance,
                 "dimensionCount": len(dimensions_with_trend),
@@ -281,16 +379,23 @@ class FilesystemActionProvider(ActionProvider):
         }
 
     def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str):
-        eval_path = Path(reports_dir) / project / run_id / "evaluation" / f"{dimension}.json"
+        base = Path(reports_dir) / project / run_id
+        eval_path = base / "evaluation" / f"{dimension}.json"
         if eval_path.exists():
             return _parse_eval_from_json(eval_path, project, run_id, dimension)
-        markdown_path = Path(reports_dir) / project / run_id / "evaluation" / f"{dimension}_eval.md"
+        markdown_path = base / "evaluation" / f"{dimension}_eval.md"
         if markdown_path.exists():
             try:
                 content = markdown_path.read_text()
             except OSError:
                 return None
             return _parse_eval_markdown(content, project, run_id, dimension)
+        evidence_path = base / "evidence" / f"{dimension}_evidence.json"
+        if evidence_path.exists():
+            return _parse_violations_from_evidence(evidence_path, project, run_id, dimension)
+        stream_path = base / "evidence" / f"{dimension}_live.stream"
+        if stream_path.exists():
+            return _parse_violations_from_stream(stream_path, project, run_id, dimension)
         return None
 
     def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None):
