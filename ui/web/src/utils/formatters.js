@@ -66,7 +66,7 @@ export function formatRunId(runId) {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const monthName = months[month - 1];
   if (!monthName) return s;
-  return `${monthName} ${day} ${year}`;
+  return `${monthName} ${day}`;
 }
 
 /**

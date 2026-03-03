@@ -104,7 +104,6 @@ function runIdToDate(runId) {
   return {
     iso,
     label: dt.toLocaleDateString('en-US', {
-      year: 'numeric',
       month: 'short',
       day: '2-digit',
       timeZone: 'UTC'

@@ -20,7 +20,7 @@ test('listRuns sorts runs newest first and parses display date', () => {
   assert.equal(runs.length, 4);
   assert.equal(runs[0].runId, '20260223');
   assert.equal(runs[1].runId, '20260221');
-  assert.match(runs[0].dateLabel, /2026/);
+  assert.match(runs[0].dateLabel, /Feb/);
 });
 
 
