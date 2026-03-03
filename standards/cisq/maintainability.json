@@ -1,0 +1,12 @@
+{
+  "characteristic": "Maintainability",
+  "source": "ISO 5055 / CISQ 2021",
+  "cwes": [
+    { "id": 1057, "name": "Data Access Outside Expected Component" },
+    { "id": 1061, "name": "Insufficient Encapsulation" },
+    { "id": 1080, "name": "Source File With Excessive Lines of Code" },
+    { "id": 1121, "name": "Excessive McCabe Cyclomatic Complexity" },
+    { "id": 1047, "name": "Modules with Circular Dependencies" },
+    { "id": 1059, "name": "Insufficient Technical Documentation" }
+  ]
+}

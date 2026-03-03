@@ -1,0 +1,11 @@
+{
+  "characteristic": "Reliability",
+  "source": "ISO 5055 / CISQ 2021",
+  "cwes": [
+    { "id": 390, "name": "Detection of Error Condition Without Action" },
+    { "id": 476, "name": "NULL Pointer Dereference" },
+    { "id": 755, "name": "Improper Handling of Exceptional Conditions" },
+    { "id": 772, "name": "Missing Release of Resource after Effective Lifetime" },
+    { "id": 1059, "name": "Insufficient Technical Documentation" }
+  ]
+}
