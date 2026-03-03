@@ -1,0 +1,12 @@
+{
+  "characteristic": "Security",
+  "source": "ISO 5055 / CISQ 2021",
+  "cwes": [
+    { "id": 20,  "name": "Improper Input Validation" },
+    { "id": 78,  "name": "OS Command Injection" },
+    { "id": 89,  "name": "SQL Injection" },
+    { "id": 95,  "name": "Improper Neutralization of Directives in Dynamically Evaluated Code" },
+    { "id": 798, "name": "Use of Hard-coded Credentials" },
+    { "id": 306, "name": "Missing Authentication for Critical Function" }
+  ]
+}
