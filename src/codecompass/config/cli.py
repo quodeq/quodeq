@@ -9,6 +9,7 @@ from codecompass.config.actions import run_generate_evaluators
 from codecompass.config.actions import run_refresh_analysis
 from codecompass.config.actions import run_refresh_practices
 from codecompass.config.actions import run_refresh_standards
+from codecompass.config.actions import run_scaffold_plugin
 from codecompass.config.dimensions import render_dimension_table
 from codecompass.config.paths import default_paths
 
@@ -40,6 +41,9 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Minimum stars for cursor-rules repos (default: 500)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would change without writing files")
+    # Plugin scaffolding
+    parser.add_argument("--scaffold-plugin", metavar="RUNTIME",
+                        help="Generate a new v2 plugin skeleton for the given runtime")
     return parser
 
 
@@ -67,4 +71,6 @@ def main(argv: list[str] | None = None) -> int:
         return run_refresh_analysis(args.refresh_analysis, paths, dry_run=args.dry_run)
     if args.refresh_standards:
         return run_refresh_standards(paths, dry_run=args.dry_run)
+    if args.scaffold_plugin is not None:
+        return run_scaffold_plugin(args.scaffold_plugin, paths)
     return 0

@@ -1,0 +1,47 @@
+{
+  "runtime": "kotlin",
+  "version": "1.0.0",
+  "source": "manually curated",
+  "practices": [
+    {
+      "id": "kt-001",
+      "title": "Never hardcode secrets in source code",
+      "cwe": 798,
+      "dimension": "security",
+      "severity": "critical",
+      "bad": "val apiKey = \"sk-prod-abc123xyz456\"",
+      "good": "val apiKey = System.getenv(\"API_KEY\")",
+      "explanation": "Hardcoded secrets are committed to version control and exposed in logs. Always read from environment variables or a secrets manager."
+    },
+    {
+      "id": "kt-002",
+      "title": "Use parameterized queries — never string-template SQL",
+      "cwe": 89,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "db.query(\"SELECT * FROM users WHERE id = ${userId}\")",
+      "good": "db.query(\"SELECT * FROM users WHERE id = ?\", listOf(userId))",
+      "explanation": "String-templated SQL enables injection attacks. Use parameterized queries or an ORM's safe query builder."
+    },
+    {
+      "id": "kt-003",
+      "title": "Never swallow exceptions with empty catch blocks",
+      "cwe": 755,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "try { riskyOp() } catch (e: Exception) { }",
+      "good": "try { riskyOp() } catch (e: Exception) { logger.error(\"Failed\", e) }",
+      "explanation": "Empty catch blocks hide errors and make debugging impossible. At minimum log the exception."
+    },
+    {
+      "id": "kt-004",
+      "title": "Keep files under 300 lines",
+      "cwe": 1080,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "// 500-line file mixing data classes, business logic, and API calls",
+      "good": "// Separate into UserModel.kt, UserService.kt, UserController.kt",
+      "explanation": "Large files violate Single Responsibility Principle and are hard to navigate and test."
+    }
+  ]
+}
