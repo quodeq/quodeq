@@ -1,0 +1,9 @@
+{
+  "applies": [
+    { "id": "maintainability", "weight": 1.0 },
+    { "id": "reliability",     "weight": 1.0 },
+    { "id": "security",        "weight": 1.2 },
+    { "id": "performance",     "weight": 0.8 }
+  ],
+  "excludes": ["usability", "flexibility"]
+}
