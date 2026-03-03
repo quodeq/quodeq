@@ -93,9 +93,15 @@ def _format_dimensions(dimensions_config: dict, standards_dir: Path | None) -> s
             if std_file.exists():
                 import json
                 std = json.loads(std_file.read_text())
-                reqs = std.get("requirements", [])[:5]
-                for req in reqs:
-                    lines.append(f"  - {req.get('id', '')}: {req.get('text', '')}")
+                sub_chars = std.get("sub_characteristics", [])
+                if sub_chars and isinstance(sub_chars[0], dict):
+                    for sc in sub_chars:
+                        lines.append(f"  **{sc['name']}**:")
+                        for req in sc.get("requirements", []):
+                            lines.append(f"    - {req['id']}: {req['text']}")
+                else:
+                    for req in std.get("requirements", []):
+                        lines.append(f"  - {req.get('id', '')}: {req.get('text', '')}")
 
     return "\n".join(lines)
 

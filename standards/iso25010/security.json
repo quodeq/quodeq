@@ -5,13 +5,54 @@
   "version": "2023",
   "note": "Security requirements are sourced from OWASP ASVS L1 (standards/asvs/level1.json). This file contains structural metadata only.",
   "sub_characteristics": [
-    "Confidentiality", "Integrity", "Non-repudiation", "Accountability", "Authenticity"
-  ],
-  "requirements": [
-    { "id": "S-1", "text": "Dynamic code evaluation (eval) MUST NOT be used with user-controlled input", "cwe": [95] },
-    { "id": "S-2", "text": "Credentials and secrets MUST NOT be hardcoded in source files", "cwe": [798] },
-    { "id": "S-3", "text": "All user input MUST be validated and sanitised before use", "cwe": [20] },
-    { "id": "S-4", "text": "SQL queries MUST use parameterised statements; string concatenation is forbidden", "cwe": [89] },
-    { "id": "S-5", "text": "Shell commands MUST NOT be constructed from user-controlled data", "cwe": [78] }
+    {
+      "name": "Confidentiality",
+      "requirements": [
+        { "id": "S-CON-1", "text": "Credentials and secrets MUST NOT be hardcoded in source files", "cwe": [798] },
+        { "id": "S-CON-2", "text": "Sensitive data MUST NOT be logged (passwords, tokens, PII)", "cwe": [532] },
+        { "id": "S-CON-3", "text": "Sensitive data MUST be stored using platform-specific secure storage (Keychain, Vault)", "cwe": [311] },
+        { "id": "S-CON-4", "text": "Debug endpoints and verbose error details MUST be disabled in production builds", "cwe": [215] },
+        { "id": "S-CON-5", "text": "File permissions MUST follow least-privilege; world-readable config files are forbidden", "cwe": [732] }
+      ]
+    },
+    {
+      "name": "Integrity",
+      "requirements": [
+        { "id": "S-INT-1", "text": "All user input MUST be validated and sanitised before use", "cwe": [20] },
+        { "id": "S-INT-2", "text": "SQL queries MUST use parameterised statements; string concatenation is forbidden", "cwe": [89] },
+        { "id": "S-INT-3", "text": "HTML output MUST be escaped or rendered through a templating engine with auto-escaping", "cwe": [79] },
+        { "id": "S-INT-4", "text": "Deserialization of untrusted data MUST use safe parsers (JSON, not pickle/yaml.load)", "cwe": [502] },
+        { "id": "S-INT-5", "text": "Cryptographic algorithms MUST use current standards (AES-256, SHA-256+); MD5/SHA-1 are forbidden", "cwe": [327] }
+      ]
+    },
+    {
+      "name": "Non-repudiation",
+      "requirements": [
+        { "id": "S-NRP-1", "text": "Authentication events (login, logout, failure) MUST be logged with timestamps", "cwe": [778] },
+        { "id": "S-NRP-2", "text": "State-changing operations MUST be logged with actor identity", "cwe": [778] },
+        { "id": "S-NRP-3", "text": "Log entries MUST NOT be modifiable by application-level code", "cwe": [117] },
+        { "id": "S-NRP-4", "text": "Audit logs MUST include operation type, target resource, and outcome", "cwe": [778] }
+      ]
+    },
+    {
+      "name": "Accountability",
+      "requirements": [
+        { "id": "S-ACC-1", "text": "Authentication MUST be required for all non-public endpoints", "cwe": [306] },
+        { "id": "S-ACC-2", "text": "Authorization checks MUST be enforced server-side, not client-side only", "cwe": [863] },
+        { "id": "S-ACC-3", "text": "Session tokens MUST be invalidated on logout and password change", "cwe": [613] },
+        { "id": "S-ACC-4", "text": "Rate limiting MUST be applied to authentication endpoints", "cwe": [307] },
+        { "id": "S-ACC-5", "text": "Default credentials MUST NOT exist in any deployed configuration", "cwe": [1188] }
+      ]
+    },
+    {
+      "name": "Authenticity",
+      "requirements": [
+        { "id": "S-AUT-1", "text": "Dynamic code evaluation (eval) MUST NOT be used with user-controlled input", "cwe": [95] },
+        { "id": "S-AUT-2", "text": "Shell commands MUST NOT be constructed from user-controlled data", "cwe": [78] },
+        { "id": "S-AUT-3", "text": "File paths MUST be validated against traversal attacks (../) before use", "cwe": [22] },
+        { "id": "S-AUT-4", "text": "CORS policies MUST not use wildcard origins for authenticated endpoints", "cwe": [346] },
+        { "id": "S-AUT-5", "text": "Dependencies MUST be pinned to exact versions and audited for known vulnerabilities", "cwe": [1104] }
+      ]
+    }
   ]
 }

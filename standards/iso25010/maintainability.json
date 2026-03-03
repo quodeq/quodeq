@@ -4,13 +4,52 @@
   "iso_25010": "Maintainability",
   "version": "2023",
   "sub_characteristics": [
-    "Modularity", "Reusability", "Analyzability", "Modifiability", "Testability"
-  ],
-  "requirements": [
-    { "id": "M-1", "text": "Cyclomatic complexity MUST be \u226410 per function", "cwe": [1121] },
-    { "id": "M-2", "text": "Source files MUST NOT exceed 300 lines", "cwe": [1080] },
-    { "id": "M-3", "text": "Package dependency cycles MUST be 0", "cwe": [1047] },
-    { "id": "M-4", "text": "Test coverage MUST be \u226580%", "cwe": [1059] },
-    { "id": "M-5", "text": "Public APIs MUST be documented", "cwe": [1053] }
+    {
+      "name": "Modularity",
+      "requirements": [
+        { "id": "M-MOD-1", "text": "Cyclomatic complexity MUST be ≤10 per function", "cwe": [1121] },
+        { "id": "M-MOD-2", "text": "Each module MUST have a single clearly defined responsibility", "cwe": [1080] },
+        { "id": "M-MOD-3", "text": "Package dependency cycles MUST be 0", "cwe": [1047] },
+        { "id": "M-MOD-4", "text": "Functions MUST have ≤5 parameters; use an options object for more", "cwe": [1121] }
+      ]
+    },
+    {
+      "name": "Reusability",
+      "requirements": [
+        { "id": "M-REU-1", "text": "Shared logic MUST be extracted into utility modules rather than duplicated", "cwe": [1041] },
+        { "id": "M-REU-2", "text": "Public functions MUST NOT depend on global mutable state", "cwe": [1057] },
+        { "id": "M-REU-3", "text": "Interfaces MUST be preferred over concrete types in function signatures", "cwe": [1061] },
+        { "id": "M-REU-4", "text": "Configuration MUST be injectable; modules MUST NOT read env vars directly", "cwe": [1188] }
+      ]
+    },
+    {
+      "name": "Analyzability",
+      "requirements": [
+        { "id": "M-ANA-1", "text": "Source files MUST NOT exceed 300 lines", "cwe": [1080] },
+        { "id": "M-ANA-2", "text": "Functions MUST NOT exceed 50 lines", "cwe": [1080] },
+        { "id": "M-ANA-3", "text": "Nesting depth MUST NOT exceed 4 levels", "cwe": [1121] },
+        { "id": "M-ANA-4", "text": "Boolean expressions MUST NOT combine more than 3 conditions without extraction", "cwe": [1121] },
+        { "id": "M-ANA-5", "text": "Public APIs MUST be documented with parameter and return descriptions", "cwe": [1053] }
+      ]
+    },
+    {
+      "name": "Modifiability",
+      "requirements": [
+        { "id": "M-MDF-1", "text": "Magic numbers and strings MUST be replaced with named constants", "cwe": [1059] },
+        { "id": "M-MDF-2", "text": "Feature flags MUST be used for in-progress features rather than commented-out code", "cwe": [1059] },
+        { "id": "M-MDF-3", "text": "Wildcard imports (import *) MUST NOT be used", "cwe": [1061] },
+        { "id": "M-MDF-4", "text": "Dead code MUST be removed, not commented out", "cwe": [561] }
+      ]
+    },
+    {
+      "name": "Testability",
+      "requirements": [
+        { "id": "M-TST-1", "text": "Test coverage MUST be ≥80% for business-critical modules", "cwe": [1059] },
+        { "id": "M-TST-2", "text": "Functions with side effects MUST accept dependencies as parameters for test injection", "cwe": [1061] },
+        { "id": "M-TST-3", "text": "All public functions MUST have corresponding test files", "cwe": [1059] },
+        { "id": "M-TST-4", "text": "Test files MUST be co-located or mirror the source directory structure", "cwe": [1059] },
+        { "id": "M-TST-5", "text": "Each test MUST verify a single behaviour with a descriptive name", "cwe": [1059] }
+      ]
+    }
   ]
 }
