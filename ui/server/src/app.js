@@ -7,6 +7,7 @@ import { createJobManager } from './jobs/evaluationJobs.js';
 import { createProjectsRouter } from './routes/projects.js';
 import { createEvaluationsRouter } from './routes/evaluations.js';
 import { createBrowseRouter } from './routes/browse.js';
+import { getRegistry } from './registry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(__dirname, '../../..');
@@ -67,6 +68,16 @@ export function createApp(options = {}) {
 
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
+
+  app.get('/api', (_req, res) => {
+    const endpoints = getRegistry();
+    res.json({
+      name: 'CodeCompass API',
+      version: '0.1.0',
+      endpointCount: endpoints.length,
+      endpoints
+    });
+  });
 
   if (actionApiBase) {
     app.use('/api', (req, res) => proxyToActionApi(req, res, actionApiBase));
