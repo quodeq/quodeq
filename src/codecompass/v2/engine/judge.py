@@ -140,7 +140,7 @@ def _assemble_evidence(
         elif j.verdict == "compliance":
             pe.compliance.append(record)
 
-    from codecompass.evaluate.lib.scoring import _scale_multiplier
+    from codecompass.v2.engine.scoring import _scale_multiplier
     scale_mult = _scale_multiplier(source_file_count)
 
     for pe in principles.values():
