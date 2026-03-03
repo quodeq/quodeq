@@ -113,6 +113,38 @@ def add_discipline(name: str, language: str, category: str, paths: ConfigPaths) 
     registry.write_text(content + entry)
 
 
+def run_refresh_practices(
+    runtime: str,
+    paths: ConfigPaths,
+    *,
+    min_stars: int = 500,
+    dry_run: bool = False,
+) -> int:
+    from codecompass.config.knowledge_refresh import refresh_practices
+    evaluators_dir = paths.root / "evaluators"
+    return refresh_practices(runtime, evaluators_dir, min_stars=min_stars, dry_run=dry_run)
+
+
+def run_refresh_analysis(
+    runtime: str,
+    paths: ConfigPaths,
+    *,
+    dry_run: bool = False,
+) -> int:
+    from codecompass.config.knowledge_refresh import refresh_analysis
+    evaluators_dir = paths.root / "evaluators"
+    return refresh_analysis(runtime, evaluators_dir, dry_run=dry_run)
+
+
+def run_refresh_standards(paths: ConfigPaths, *, dry_run: bool = False) -> int:
+    from codecompass.config.standards_fetcher import fetch_asvs_l1
+    standards_dir = paths.root / "standards"
+    count = fetch_asvs_l1(standards_dir, dry_run=dry_run)
+    if not dry_run:
+        print(f"Saved {count} ASVS L1 requirements to {standards_dir / 'asvs' / 'level1.json'}")
+    return 0
+
+
 def check_sources(discipline: str, paths: ConfigPaths) -> int:
     practices_dir = paths.practices_dir / discipline
     if not practices_dir.exists():

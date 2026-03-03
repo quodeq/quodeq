@@ -6,6 +6,9 @@ from codecompass.config.actions import check_sources
 from codecompass.config.actions import resolve_parallel
 from codecompass.config.actions import run_generate_dimensions
 from codecompass.config.actions import run_generate_evaluators
+from codecompass.config.actions import run_refresh_analysis
+from codecompass.config.actions import run_refresh_practices
+from codecompass.config.actions import run_refresh_standards
 from codecompass.config.dimensions import render_dimension_table
 from codecompass.config.paths import default_paths
 
@@ -26,6 +29,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--parallel")
     parser.add_argument("--sequential", action="store_true")
     parser.add_argument("--data-version", default=None)
+    # Knowledge refresh
+    parser.add_argument("--refresh-practices", metavar="RUNTIME",
+                        help="Refresh practices.json for a plugin runtime from GitHub cursor-rules")
+    parser.add_argument("--refresh-analysis", metavar="RUNTIME",
+                        help="Refresh analysis.md for a plugin runtime from linter docs")
+    parser.add_argument("--refresh-standards", action="store_true",
+                        help="Re-fetch OWASP ASVS L1 into standards/asvs/level1.json")
+    parser.add_argument("--min-stars", type=int, default=500,
+                        help="Minimum stars for cursor-rules repos (default: 500)")
+    parser.add_argument("--dry-run", action="store_true",
+                        help="Show what would change without writing files")
     return parser
 
 
@@ -46,4 +60,11 @@ def main(argv: list[str] | None = None) -> int:
     if args.list_dimensions:
         print(render_dimension_table())
         return 0
+    if args.refresh_practices is not None:
+        return run_refresh_practices(args.refresh_practices, paths,
+                                     min_stars=args.min_stars, dry_run=args.dry_run)
+    if args.refresh_analysis is not None:
+        return run_refresh_analysis(args.refresh_analysis, paths, dry_run=args.dry_run)
+    if args.refresh_standards:
+        return run_refresh_standards(paths, dry_run=args.dry_run)
     return 0
