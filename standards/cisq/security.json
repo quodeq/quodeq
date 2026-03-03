@@ -2,11 +2,25 @@
   "characteristic": "Security",
   "source": "ISO 5055 / CISQ 2021",
   "cwes": [
-    { "id": 20,  "name": "Improper Input Validation" },
-    { "id": 78,  "name": "OS Command Injection" },
-    { "id": 89,  "name": "SQL Injection" },
-    { "id": 95,  "name": "Improper Neutralization of Directives in Dynamically Evaluated Code" },
-    { "id": 798, "name": "Use of Hard-coded Credentials" },
-    { "id": 306, "name": "Missing Authentication for Critical Function" }
+    { "id": 20, "name": "Improper Input Validation", "requirement": "All external input MUST be validated against expected format and range" },
+    { "id": 78, "name": "OS Command Injection", "requirement": "OS commands MUST NOT be constructed from user-controlled data" },
+    { "id": 89, "name": "SQL Injection", "requirement": "SQL queries MUST use parameterised statements" },
+    { "id": 95, "name": "Improper Neutralization of Directives in Dynamically Evaluated Code", "requirement": "Dynamic code evaluation MUST NOT process user-controlled input" },
+    { "id": 798, "name": "Use of Hard-coded Credentials", "requirement": "Credentials MUST be loaded from secure external sources, never hardcoded" },
+    { "id": 306, "name": "Missing Authentication for Critical Function", "requirement": "All state-changing endpoints MUST require authentication" },
+    { "id": 22, "name": "Improper Limitation of a Pathname to a Restricted Directory", "requirement": "File paths MUST be canonicalised and validated against allowed directories" },
+    { "id": 79, "name": "Cross-site Scripting (XSS)", "requirement": "Output rendered in HTML MUST be escaped or use auto-escaping templates" },
+    { "id": 259, "name": "Use of Hard-coded Password", "requirement": "Passwords MUST NOT appear as literals in source code" },
+    { "id": 311, "name": "Missing Encryption of Sensitive Data", "requirement": "Sensitive data at rest MUST be encrypted using platform-appropriate mechanisms" },
+    { "id": 327, "name": "Use of a Broken or Risky Cryptographic Algorithm", "requirement": "Only current cryptographic standards (AES-256, SHA-256+) MUST be used" },
+    { "id": 346, "name": "Origin Validation Error", "requirement": "Cross-origin requests MUST be validated against an allowlist" },
+    { "id": 502, "name": "Deserialization of Untrusted Data", "requirement": "Untrusted data MUST NOT be deserialized using unsafe parsers" },
+    { "id": 532, "name": "Insertion of Sensitive Information into Log File", "requirement": "Logs MUST NOT contain passwords, tokens, or PII" },
+    { "id": 611, "name": "Improper Restriction of XML External Entity Reference", "requirement": "XML parsers MUST disable external entity resolution" },
+    { "id": 613, "name": "Insufficient Session Expiration", "requirement": "Sessions MUST expire after a configurable idle timeout" },
+    { "id": 732, "name": "Incorrect Permission Assignment for Critical Resource", "requirement": "Files and resources MUST use least-privilege permissions" },
+    { "id": 863, "name": "Incorrect Authorization", "requirement": "Authorization MUST be enforced server-side for every protected operation" },
+    { "id": 918, "name": "Server-Side Request Forgery (SSRF)", "requirement": "Server-side HTTP requests MUST validate target URLs against an allowlist" },
+    { "id": 1104, "name": "Use of Unmaintained Third Party Components", "requirement": "Dependencies MUST be kept up-to-date and free of known vulnerabilities" }
   ]
 }

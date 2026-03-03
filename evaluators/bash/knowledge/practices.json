@@ -25,16 +25,76 @@
     },
     {
       "id": "sh-003",
-      "title": "Keep scripts under 200 lines — extract functions",
+      "title": "Use arrays for commands — avoid eval and word splitting",
+      "cwe": 78,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "eval \"$user_command\"",
+      "good": "cmd=(\"ls\" \"-la\" \"${target_dir}\")\n\"${cmd[@]}\"",
+      "explanation": "eval and unquoted expansion enable arbitrary code execution. Use bash arrays to safely construct commands."
+    },
+    {
+      "id": "sh-004",
+      "title": "Validate input before using in file paths or commands",
+      "cwe": 22,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "cat \"/data/${user_input}/config\"",
+      "good": "if [[ \"${user_input}\" =~ ^[a-zA-Z0-9_-]+$ ]]; then\n    cat \"/data/${user_input}/config\"\nfi",
+      "explanation": "Unsanitized input in paths enables directory traversal (../) attacks. Validate against an allowlist pattern."
+    },
+    {
+      "id": "sh-005",
+      "title": "Use functions to organise scripts",
+      "cwe": 1080,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "# 200 lines of linear script with no structure",
+      "good": "validate_args() { ... }\nprocess_data() { ... }\ncleanup() { ... }\nmain() {\n    validate_args \"$@\"\n    process_data\n    cleanup\n}\nmain \"$@\"",
+      "explanation": "Linear scripts are hard to debug and test. Functions provide named scopes and enable selective testing."
+    },
+    {
+      "id": "sh-006",
+      "title": "Use meaningful variable names — avoid single letters",
+      "cwe": 1059,
+      "dimension": "maintainability",
+      "severity": "low",
+      "bad": "for f in $(ls *.txt); do\n    x=$(wc -l < \"$f\")\ndone",
+      "good": "for filename in ./*.txt; do\n    line_count=$(wc -l < \"${filename}\")\ndone",
+      "explanation": "Single-letter variables make scripts unreadable. Use descriptive names that convey purpose."
+    },
+    {
+      "id": "sh-007",
+      "title": "Keep scripts under 200 lines — extract functions or split files",
       "cwe": 1080,
       "dimension": "maintainability",
       "severity": "medium",
       "bad": "# 300-line monolithic script",
       "good": "main() { validate_args; process_data; cleanup; }\nmain \"$@\"",
-      "explanation": "Long scripts are hard to debug and test. Extract reusable logic into functions."
+      "explanation": "Long scripts are hard to debug and test. Extract reusable logic into functions or sourced helper scripts."
     },
     {
-      "id": "sh-004",
+      "id": "sh-008",
+      "title": "Run ShellCheck on all scripts",
+      "cwe": 1121,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "# No linting — bugs caught in production",
+      "good": "# In CI: shellcheck -x *.sh",
+      "explanation": "ShellCheck catches quoting bugs, POSIX issues, and common mistakes automatically. Run it in CI."
+    },
+    {
+      "id": "sh-009",
+      "title": "Use trap for cleanup on exit",
+      "cwe": 459,
+      "dimension": "reliability",
+      "severity": "high",
+      "bad": "TMPDIR=$(mktemp -d)\n# ... script runs ...\nrm -rf \"$TMPDIR\"",
+      "good": "TMPDIR=$(mktemp -d)\ntrap 'rm -rf \"${TMPDIR}\"' EXIT\n# ... script runs ...",
+      "explanation": "Without trap, early exits and errors leave temp files behind. trap EXIT ensures cleanup on all exit paths."
+    },
+    {
+      "id": "sh-010",
       "title": "Check return codes — use set -euo pipefail",
       "cwe": 252,
       "dimension": "reliability",
@@ -42,6 +102,66 @@
       "bad": "cd /some/dir\nrm -rf *",
       "good": "set -euo pipefail\ncd /some/dir || exit 1\nrm -rf *",
       "explanation": "Without error checking, commands silently fail and subsequent commands run in wrong state."
+    },
+    {
+      "id": "sh-011",
+      "title": "Validate required arguments at script start",
+      "cwe": 20,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "INPUT_FILE=\"$1\"\nprocess \"${INPUT_FILE}\"",
+      "good": "if [[ $# -lt 1 ]]; then\n    echo \"Usage: $0 <input-file>\" >&2\n    exit 1\nfi\nINPUT_FILE=\"$1\"",
+      "explanation": "Missing argument validation causes cryptic errors downstream. Check required args early with clear usage messages."
+    },
+    {
+      "id": "sh-012",
+      "title": "Use mktemp for temporary files — never hardcode paths",
+      "cwe": 377,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "echo \"data\" > /tmp/myapp_temp.txt",
+      "good": "tmpfile=$(mktemp /tmp/myapp.XXXXXX)\necho \"data\" > \"${tmpfile}\"",
+      "explanation": "Hardcoded temp paths create race conditions and symlink attacks. mktemp generates unique, safe filenames."
+    },
+    {
+      "id": "sh-013",
+      "title": "Avoid useless cat — pipe directly or use redirection",
+      "cwe": 1084,
+      "dimension": "performance",
+      "severity": "low",
+      "bad": "cat file.txt | grep 'pattern'",
+      "good": "grep 'pattern' file.txt",
+      "explanation": "Piping cat into another command adds an unnecessary process. Most commands accept file arguments directly."
+    },
+    {
+      "id": "sh-014",
+      "title": "Use built-in string operations instead of external commands",
+      "cwe": 1084,
+      "dimension": "performance",
+      "severity": "low",
+      "bad": "ext=$(echo \"$file\" | sed 's/.*\\.//')",
+      "good": "ext=\"${file##*.}\"",
+      "explanation": "Bash built-in parameter expansion is faster than spawning sed/awk. Use ${var#}, ${var%}, ${var//} for simple string ops."
+    },
+    {
+      "id": "sh-015",
+      "title": "Avoid subshells in loops — use while-read or built-ins",
+      "cwe": 1050,
+      "dimension": "performance",
+      "severity": "medium",
+      "bad": "for f in $(find . -name '*.log'); do\n    count=$(wc -l < \"$f\")\ndone",
+      "good": "find . -name '*.log' -print0 | while IFS= read -r -d '' f; do\n    count=$(wc -l < \"$f\")\ndone",
+      "explanation": "$(find ...) in for loops breaks on spaces and forks a subshell. Use find -print0 | while read for safe iteration."
+    },
+    {
+      "id": "sh-016",
+      "title": "Pre-compute values outside loops",
+      "cwe": 1084,
+      "dimension": "performance",
+      "severity": "low",
+      "bad": "for i in $(seq 1 100); do\n    today=$(date +%Y-%m-%d)\n    echo \"${today}: item ${i}\"\ndone",
+      "good": "today=$(date +%Y-%m-%d)\nfor i in $(seq 1 100); do\n    echo \"${today}: item ${i}\"\ndone",
+      "explanation": "Calling external commands inside loops spawns a process per iteration. Move invariant computations outside the loop."
     }
   ]
 }

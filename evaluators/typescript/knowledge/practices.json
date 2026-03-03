@@ -82,6 +82,86 @@
       "bad": "type User = { id: string; name: string; };",
       "good": "interface User { id: string; name: string; }",
       "explanation": "Interfaces produce better error messages, support declaration merging, and communicate intent more clearly for object shapes. Use type aliases for unions, intersections, and primitives."
+    },
+    {
+      "id": "ts-009",
+      "title": "Never use innerHTML — use textContent or DOM APIs",
+      "cwe": 79,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "element.innerHTML = `<span>${userInput}</span>`;",
+      "good": "element.textContent = userInput;",
+      "explanation": "innerHTML interprets HTML and enables XSS attacks. Use textContent for text or a sanitization library for HTML."
+    },
+    {
+      "id": "ts-010",
+      "title": "Always validate and sanitize external input",
+      "cwe": 20,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "app.post('/api/user', (req, res) => {\n  db.insert(req.body);\n});",
+      "good": "app.post('/api/user', (req, res) => {\n  const parsed = userSchema.parse(req.body);\n  db.insert(parsed);\n});",
+      "explanation": "Unsanitized input leads to injection, XSS, and data corruption. Use a validation library (zod, joi) at API boundaries."
+    },
+    {
+      "id": "ts-011",
+      "title": "Use nullish coalescing (??) instead of logical OR for defaults",
+      "cwe": 476,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "const port = config.port || 3000;",
+      "good": "const port = config.port ?? 3000;",
+      "explanation": "Logical OR treats 0, '', and false as falsy. Nullish coalescing only falls through on null/undefined, preserving valid falsy values."
+    },
+    {
+      "id": "ts-012",
+      "title": "Always declare return types on exported functions",
+      "cwe": 1059,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "export function getUser(id: string) {\n  return db.findUser(id);\n}",
+      "good": "export function getUser(id: string): Promise<User | null> {\n  return db.findUser(id);\n}",
+      "explanation": "Explicit return types catch accidental changes, improve IntelliSense, and serve as documentation for consumers."
+    },
+    {
+      "id": "ts-013",
+      "title": "Clean up resources in try/finally or AbortController",
+      "cwe": 772,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "const conn = await pool.connect();\nconst result = await conn.query(sql);\nconn.release();",
+      "good": "const conn = await pool.connect();\ntry {\n  return await conn.query(sql);\n} finally {\n  conn.release();\n}",
+      "explanation": "Without finally, exceptions leak resources. Always clean up in finally blocks or use AbortController/Symbol.dispose."
+    },
+    {
+      "id": "ts-014",
+      "title": "Use lazy imports for heavy modules",
+      "cwe": 1084,
+      "dimension": "performance",
+      "severity": "medium",
+      "bad": "import { heavyLib } from 'heavy-lib';\n// heavyLib only used in rare code path",
+      "good": "async function rarePath() {\n  const { heavyLib } = await import('heavy-lib');\n  heavyLib.process();\n}",
+      "explanation": "Top-level imports of large libraries increase cold-start time. Use dynamic import() for code only needed in specific paths."
+    },
+    {
+      "id": "ts-015",
+      "title": "Avoid synchronous fs operations in server code",
+      "cwe": 1088,
+      "dimension": "performance",
+      "severity": "high",
+      "bad": "const data = fs.readFileSync('config.json', 'utf-8');",
+      "good": "const data = await fs.promises.readFile('config.json', 'utf-8');",
+      "explanation": "Synchronous fs calls block the event loop and stall all concurrent requests. Use fs.promises or fs callbacks."
+    },
+    {
+      "id": "ts-016",
+      "title": "Memoize expensive computations in React components",
+      "cwe": 1084,
+      "dimension": "performance",
+      "severity": "medium",
+      "bad": "function Table({ rows }: Props) {\n  const sorted = rows.sort((a, b) => a.name.localeCompare(b.name));\n  return <List items={sorted} />;\n}",
+      "good": "function Table({ rows }: Props) {\n  const sorted = useMemo(() =>\n    [...rows].sort((a, b) => a.name.localeCompare(b.name)),\n    [rows]\n  );\n  return <List items={sorted} />;\n}",
+      "explanation": "Sorting or filtering on every render wastes CPU. Use useMemo to cache derived data until dependencies change."
     }
   ]
 }

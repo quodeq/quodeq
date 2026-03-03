@@ -4,11 +4,41 @@
   "iso_25010": "Flexibility",
   "version": "2023",
   "sub_characteristics": [
-    "Adaptability", "Scalability", "Installability", "Replaceability"
-  ],
-  "requirements": [
-    { "id": "F-1", "text": "Configuration MUST be externalised (env vars or config files); no hardcoded env-specific values", "cwe": [1188] },
-    { "id": "F-2", "text": "Public interfaces MUST be versioned; breaking changes require a major version bump", "cwe": [1059] },
-    { "id": "F-3", "text": "Components MUST be replaceable without modifying callers (dependency inversion)", "cwe": [1061] }
+    {
+      "name": "Adaptability",
+      "requirements": [
+        { "id": "F-ADP-1", "text": "Configuration MUST be externalised (env vars or config files); no hardcoded env-specific values", "cwe": [1188] },
+        { "id": "F-ADP-2", "text": "Feature toggles MUST be used for environment-specific behaviour", "cwe": [1188] },
+        { "id": "F-ADP-3", "text": "Platform-specific code MUST be isolated behind abstraction layers", "cwe": [1061] },
+        { "id": "F-ADP-4", "text": "Locale and timezone MUST NOT be hardcoded; use runtime configuration", "cwe": [1188] }
+      ]
+    },
+    {
+      "name": "Scalability",
+      "requirements": [
+        { "id": "F-SCL-1", "text": "Stateless request handling MUST be preferred; session state MUST be externalised", "cwe": [1057] },
+        { "id": "F-SCL-2", "text": "File-based storage MUST be replaceable with distributed alternatives", "cwe": [1061] },
+        { "id": "F-SCL-3", "text": "Database schemas MUST support migration tooling for non-destructive evolution", "cwe": [1059] },
+        { "id": "F-SCL-4", "text": "Work dispatching MUST support horizontal scaling (queue-based or partitioned)", "cwe": [1061] }
+      ]
+    },
+    {
+      "name": "Installability",
+      "requirements": [
+        { "id": "F-INS-1", "text": "Dependencies MUST be declared in a lockfile with exact versions", "cwe": [1104] },
+        { "id": "F-INS-2", "text": "Build and run instructions MUST be documented and reproducible", "cwe": [1059] },
+        { "id": "F-INS-3", "text": "System-level dependencies MUST be declared explicitly (not assumed)", "cwe": [1059] },
+        { "id": "F-INS-4", "text": "Container images MUST use specific base image tags, not :latest", "cwe": [1104] }
+      ]
+    },
+    {
+      "name": "Replaceability",
+      "requirements": [
+        { "id": "F-RPL-1", "text": "Components MUST be replaceable without modifying callers (dependency inversion)", "cwe": [1061] },
+        { "id": "F-RPL-2", "text": "Public interfaces MUST be versioned; breaking changes require a major version bump", "cwe": [1059] },
+        { "id": "F-RPL-3", "text": "External service integrations MUST use adapter/wrapper patterns", "cwe": [1061] },
+        { "id": "F-RPL-4", "text": "Data formats MUST be versioned for backward-compatible deserialization", "cwe": [1059] }
+      ]
+    }
   ]
 }
