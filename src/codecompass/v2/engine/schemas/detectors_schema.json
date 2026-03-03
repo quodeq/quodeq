@@ -4,11 +4,26 @@
   "type": "array",
   "items": {
     "type": "object",
-    "required": ["type", "rules"],
-    "properties": {
-      "type": { "type": "string", "enum": ["grep"] },
-      "rules": { "type": "string", "minLength": 1 }
-    },
-    "additionalProperties": false
+    "oneOf": [
+      {
+        "required": ["type", "rules"],
+        "properties": {
+          "type": { "type": "string", "const": "grep" },
+          "rules": { "type": "string", "minLength": 1 }
+        },
+        "additionalProperties": false
+      },
+      {
+        "required": ["type", "tool", "command"],
+        "properties": {
+          "type": { "type": "string", "const": "tool" },
+          "tool": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1 },
+          "optional": { "type": "boolean" },
+          "timeout": { "type": "integer", "minimum": 1 }
+        },
+        "additionalProperties": false
+      }
+    ]
   }
 }
