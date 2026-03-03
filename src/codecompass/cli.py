@@ -152,7 +152,7 @@ def _run_dashboard(argv: list[str] | None) -> int:
     return dashboard_main(sub_argv)
 
 
-def _run_evaluate(argv: list[str] | None) -> int:
+def _run_evaluate_v1(argv: list[str] | None) -> int:
     sub_argv = argv[1:] if argv is not None else sys.argv[2:]
     parsed = parse_cli_args(sub_argv)
     if parsed.errors:
@@ -184,7 +184,7 @@ def _run_configure(argv: list[str] | None) -> int:
 
 _COMMAND_HANDLERS: dict[str, Callable] = {
     "dashboard": _run_dashboard,
-    "evaluate": _run_evaluate,
+    "evaluate-v1": _run_evaluate_v1,
     "configure": _run_configure,
 }
 
