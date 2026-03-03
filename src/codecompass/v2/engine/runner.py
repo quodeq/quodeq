@@ -86,3 +86,14 @@ def _run_detectors(detectors_config: list, src: Path, plugin_dir: Path) -> list[
         all_findings.extend(findings)
 
     return all_findings
+
+
+def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> dict:
+    """Full pipeline: run → score → write reports. Returns scores dict."""
+    from codecompass.v2.engine.scoring import score_evidence
+    from codecompass.v2.engine.report import write_reports
+
+    evidence = run(config)
+    scores = score_evidence(evidence, mode=mode)
+    write_reports(evidence, scores, output_dir)
+    return scores
