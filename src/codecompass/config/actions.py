@@ -145,6 +145,18 @@ def run_refresh_standards(paths: ConfigPaths, *, dry_run: bool = False) -> int:
     return 0
 
 
+def run_scaffold_plugin(runtime: str, paths: ConfigPaths) -> int:
+    from codecompass.config.scaffold import scaffold_plugin
+    evaluators_dir = paths.root / "evaluators"
+    try:
+        plugin_dir = scaffold_plugin(runtime, evaluators_dir)
+        print(f"Created plugin skeleton at {plugin_dir}")
+        return 0
+    except ValueError as e:
+        log_error(str(e))
+        return 1
+
+
 def check_sources(discipline: str, paths: ConfigPaths) -> int:
     practices_dir = paths.practices_dir / discipline
     if not practices_dir.exists():
