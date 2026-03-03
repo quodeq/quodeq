@@ -1,0 +1,47 @@
+{
+  "runtime": "bash",
+  "version": "1.0.0",
+  "source": "manually curated",
+  "practices": [
+    {
+      "id": "sh-001",
+      "title": "Always quote variable expansions",
+      "cwe": 78,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "rm -rf $DIRECTORY",
+      "good": "rm -rf \"${DIRECTORY}\"",
+      "explanation": "Unquoted variables undergo word splitting and glob expansion, enabling injection when variables contain spaces or special characters."
+    },
+    {
+      "id": "sh-002",
+      "title": "Never hardcode secrets in shell scripts",
+      "cwe": 798,
+      "dimension": "security",
+      "severity": "critical",
+      "bad": "API_KEY='sk-prod-abc123xyz456'",
+      "good": "API_KEY=\"${API_KEY:?API_KEY not set}\"",
+      "explanation": "Hardcoded secrets in shell scripts are visible in process listings and version control."
+    },
+    {
+      "id": "sh-003",
+      "title": "Keep scripts under 200 lines — extract functions",
+      "cwe": 1080,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "# 300-line monolithic script",
+      "good": "main() { validate_args; process_data; cleanup; }\nmain \"$@\"",
+      "explanation": "Long scripts are hard to debug and test. Extract reusable logic into functions."
+    },
+    {
+      "id": "sh-004",
+      "title": "Check return codes — use set -euo pipefail",
+      "cwe": 252,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "cd /some/dir\nrm -rf *",
+      "good": "set -euo pipefail\ncd /some/dir || exit 1\nrm -rf *",
+      "explanation": "Without error checking, commands silently fail and subsequent commands run in wrong state."
+    }
+  ]
+}

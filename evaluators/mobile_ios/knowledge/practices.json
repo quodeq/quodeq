@@ -1,0 +1,47 @@
+{
+  "runtime": "mobile_ios",
+  "version": "1.0.0",
+  "source": "manually curated",
+  "practices": [
+    {
+      "id": "ios-001",
+      "title": "Never hardcode API keys or secrets",
+      "cwe": 798,
+      "dimension": "security",
+      "severity": "critical",
+      "bad": "let apiKey = \"sk-prod-abc123xyz456\"",
+      "good": "let apiKey = Bundle.main.infoDictionary?[\"API_KEY\"] as? String ?? \"\"",
+      "explanation": "Hardcoded secrets in Swift files are visible in the IPA binary. Use Info.plist with build-time substitution or a keychain."
+    },
+    {
+      "id": "ios-002",
+      "title": "Avoid force unwrap (!) — use guard let or if let",
+      "cwe": 476,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "let name = user.name!",
+      "good": "guard let name = user.name else { return }",
+      "explanation": "Force unwrap crashes at runtime if the value is nil. Use optional binding for safe access."
+    },
+    {
+      "id": "ios-003",
+      "title": "Never store sensitive data in UserDefaults",
+      "cwe": 311,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "UserDefaults.standard.set(token, forKey: \"authToken\")",
+      "good": "try Keychain.save(token, forKey: \"authToken\")",
+      "explanation": "UserDefaults is stored unencrypted in a plist file. Use Keychain Services for tokens, passwords, and keys."
+    },
+    {
+      "id": "ios-004",
+      "title": "Keep view controllers under 300 lines",
+      "cwe": 1080,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "// 500-line ViewController with networking, UI, and data logic",
+      "good": "// Split into ViewModel, Coordinator, and lean ViewController",
+      "explanation": "Massive view controllers are the most common iOS anti-pattern. Use MVVM or similar to separate concerns."
+    }
+  ]
+}
