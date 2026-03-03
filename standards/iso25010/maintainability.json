@@ -1,0 +1,16 @@
+{
+  "id": "maintainability",
+  "name": "Maintainability",
+  "iso_25010": "Maintainability",
+  "version": "2023",
+  "sub_characteristics": [
+    "Modularity", "Reusability", "Analyzability", "Modifiability", "Testability"
+  ],
+  "requirements": [
+    { "id": "M-1", "text": "Cyclomatic complexity MUST be \u226410 per function", "cwe": [1121] },
+    { "id": "M-2", "text": "Source files MUST NOT exceed 300 lines", "cwe": [1080] },
+    { "id": "M-3", "text": "Package dependency cycles MUST be 0", "cwe": [1047] },
+    { "id": "M-4", "text": "Test coverage MUST be \u226580%", "cwe": [1059] },
+    { "id": "M-5", "text": "Public APIs MUST be documented", "cwe": [1053] }
+  ]
+}
