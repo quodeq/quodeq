@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from codecompass.evaluate.lib.evidence import DEFAULT_WEIGHT
+DEFAULT_WEIGHT = "Medium (x2)"
 
 
 @dataclass
