@@ -4,13 +4,45 @@
   "iso_25010": "Reliability",
   "version": "2023",
   "sub_characteristics": [
-    "Maturity", "Availability", "Fault Tolerance", "Recoverability"
-  ],
-  "requirements": [
-    { "id": "R-1", "text": "Exceptions MUST be caught and handled; empty catch blocks are forbidden", "cwe": [390] },
-    { "id": "R-2", "text": "All public functions MUST have corresponding test files", "cwe": [1059] },
-    { "id": "R-3", "text": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII", "cwe": [772] },
-    { "id": "R-4", "text": "Null/undefined dereferences MUST be guarded before use", "cwe": [476] },
-    { "id": "R-5", "text": "Async operations MUST handle rejection/error paths explicitly", "cwe": [755] }
+    {
+      "name": "Maturity",
+      "requirements": [
+        { "id": "R-MAT-1", "text": "All public functions MUST have corresponding test files", "cwe": [1059] },
+        { "id": "R-MAT-2", "text": "Edge cases (empty input, boundary values) MUST be tested explicitly", "cwe": [1059] },
+        { "id": "R-MAT-3", "text": "Error paths MUST be tested, not only happy paths", "cwe": [1059] },
+        { "id": "R-MAT-4", "text": "Deprecated APIs MUST NOT be used; use supported alternatives", "cwe": [477] },
+        { "id": "R-MAT-5", "text": "Type annotations MUST be used on public function signatures", "cwe": [1059] }
+      ]
+    },
+    {
+      "name": "Availability",
+      "requirements": [
+        { "id": "R-AVL-1", "text": "Health-check endpoints MUST be implemented for long-running services", "cwe": [1059] },
+        { "id": "R-AVL-2", "text": "Circuit breakers MUST be used for external service calls", "cwe": [400] },
+        { "id": "R-AVL-3", "text": "Retry logic MUST use exponential backoff with jitter", "cwe": [400] },
+        { "id": "R-AVL-4", "text": "Timeouts MUST be set on all external HTTP and database calls", "cwe": [1088] },
+        { "id": "R-AVL-5", "text": "Graceful shutdown handlers MUST be implemented for server processes", "cwe": [404] }
+      ]
+    },
+    {
+      "name": "Fault Tolerance",
+      "requirements": [
+        { "id": "R-FT-1", "text": "Exceptions MUST be caught and handled; empty catch blocks are forbidden", "cwe": [390] },
+        { "id": "R-FT-2", "text": "Null/undefined dereferences MUST be guarded before use", "cwe": [476] },
+        { "id": "R-FT-3", "text": "Async operations MUST handle rejection/error paths explicitly", "cwe": [755] },
+        { "id": "R-FT-4", "text": "Input from external sources MUST be validated before processing", "cwe": [20] },
+        { "id": "R-FT-5", "text": "Fallback values MUST be provided for optional configuration", "cwe": [1188] }
+      ]
+    },
+    {
+      "name": "Recoverability",
+      "requirements": [
+        { "id": "R-REC-1", "text": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns", "cwe": [772] },
+        { "id": "R-REC-2", "text": "Database transactions MUST be rolled back on error", "cwe": [772] },
+        { "id": "R-REC-3", "text": "Temporary files MUST be cleaned up in finally/defer blocks", "cwe": [459] },
+        { "id": "R-REC-4", "text": "Persistent operations MUST be idempotent or use transaction guards", "cwe": [772] },
+        { "id": "R-REC-5", "text": "Error messages MUST include enough context for diagnosis (operation, input, state)", "cwe": [755] }
+      ]
+    }
   ]
 }

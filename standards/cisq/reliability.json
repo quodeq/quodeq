@@ -2,10 +2,20 @@
   "characteristic": "Reliability",
   "source": "ISO 5055 / CISQ 2021",
   "cwes": [
-    { "id": 390, "name": "Detection of Error Condition Without Action" },
-    { "id": 476, "name": "NULL Pointer Dereference" },
-    { "id": 755, "name": "Improper Handling of Exceptional Conditions" },
-    { "id": 772, "name": "Missing Release of Resource after Effective Lifetime" },
-    { "id": 1059, "name": "Insufficient Technical Documentation" }
+    { "id": 390, "name": "Detection of Error Condition Without Action", "requirement": "All detected error conditions MUST trigger handling logic" },
+    { "id": 476, "name": "NULL Pointer Dereference", "requirement": "Nullable references MUST be checked before dereferencing" },
+    { "id": 755, "name": "Improper Handling of Exceptional Conditions", "requirement": "Exceptional conditions MUST be caught and handled appropriately" },
+    { "id": 772, "name": "Missing Release of Resource after Effective Lifetime", "requirement": "Resources MUST be released in finally/defer blocks" },
+    { "id": 1059, "name": "Insufficient Technical Documentation", "requirement": "Error handling behaviour MUST be documented for public APIs" },
+    { "id": 252, "name": "Unchecked Return Value", "requirement": "Return values from fallible operations MUST be checked" },
+    { "id": 404, "name": "Improper Resource Shutdown or Release", "requirement": "Resources MUST be shut down in the correct order during cleanup" },
+    { "id": 459, "name": "Incomplete Cleanup", "requirement": "Temporary resources MUST be cleaned up on all exit paths" },
+    { "id": 477, "name": "Use of Obsolete Function", "requirement": "Deprecated functions MUST be replaced with supported alternatives" },
+    { "id": 674, "name": "Uncontrolled Recursion", "requirement": "Recursive functions MUST have verifiable termination conditions" },
+    { "id": 396, "name": "Declaration of Catch for Generic Exception", "requirement": "Catch blocks MUST target specific exception types, not generic Exception" },
+    { "id": 397, "name": "Declaration of Throws for Generic Exception", "requirement": "Throw declarations MUST specify concrete exception types" },
+    { "id": 691, "name": "Insufficient Control Flow Management", "requirement": "Control flow MUST be structured and predictable; no unreachable statements" },
+    { "id": 754, "name": "Improper Check for Unusual or Exceptional Conditions", "requirement": "Boundary and edge-case conditions MUST be checked explicitly" },
+    { "id": 835, "name": "Loop with Unreachable Exit Condition", "requirement": "All loops MUST have reachable termination conditions" }
   ]
 }

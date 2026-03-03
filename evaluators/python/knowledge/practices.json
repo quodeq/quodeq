@@ -42,6 +42,126 @@
       "bad": "cursor.execute(f\"SELECT * FROM users WHERE id = {user_id}\")",
       "good": "cursor.execute(\"SELECT * FROM users WHERE id = %s\", (user_id,))",
       "explanation": "F-string SQL enables injection. Use parameterized queries with the DB-API 2.0 placeholder style."
+    },
+    {
+      "id": "py-005",
+      "title": "Keep source files under 300 lines",
+      "cwe": 1080,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "# 500-line module mixing models, views, and utilities",
+      "good": "# Split into models.py, views.py, utils.py — each under 300 lines",
+      "explanation": "Large files are hard to navigate, review, and test. Extract cohesive groups of functions into separate modules."
+    },
+    {
+      "id": "py-006",
+      "title": "Keep cyclomatic complexity ≤10 per function",
+      "cwe": 1121,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "def process(x):\n    if x > 0:\n        if x < 10:\n            if x % 2:\n                ...\n            elif x % 3:\n                ...",
+      "good": "def process(x):\n    if not _is_valid_range(x):\n        return None\n    return _apply_rule(x)",
+      "explanation": "High cyclomatic complexity makes functions hard to test and understand. Extract conditions into named helper functions."
+    },
+    {
+      "id": "py-007",
+      "title": "Never use wildcard imports (from x import *)",
+      "cwe": 1061,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "from os.path import *",
+      "good": "from os.path import join, exists",
+      "explanation": "Star imports pollute the namespace, create hidden coupling, and make it impossible to trace where names come from."
+    },
+    {
+      "id": "py-008",
+      "title": "Use type hints on public function signatures",
+      "cwe": 1059,
+      "dimension": "maintainability",
+      "severity": "low",
+      "bad": "def calculate_total(items, tax_rate):\n    return sum(i.price for i in items) * (1 + tax_rate)",
+      "good": "def calculate_total(items: list[Item], tax_rate: float) -> float:\n    return sum(i.price for i in items) * (1 + tax_rate)",
+      "explanation": "Type hints enable static analysis, improve IDE support, and serve as documentation for function contracts."
+    },
+    {
+      "id": "py-009",
+      "title": "Use context managers for resource handling",
+      "cwe": 772,
+      "dimension": "reliability",
+      "severity": "high",
+      "bad": "f = open('data.txt')\ndata = f.read()\nf.close()",
+      "good": "with open('data.txt') as f:\n    data = f.read()",
+      "explanation": "Manual open/close leaks resources on exceptions. Context managers (with statement) guarantee cleanup."
+    },
+    {
+      "id": "py-010",
+      "title": "Never use bare except — catch specific exceptions",
+      "cwe": 390,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "try:\n    process(data)\nexcept:\n    pass",
+      "good": "try:\n    process(data)\nexcept ValueError as e:\n    logger.warning(f\"Invalid data: {e}\")",
+      "explanation": "Bare except catches KeyboardInterrupt and SystemExit, hiding real errors. Always catch specific exception types."
+    },
+    {
+      "id": "py-011",
+      "title": "Guard against None before attribute access",
+      "cwe": 476,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "user = get_user(id)\nprint(user.name)",
+      "good": "user = get_user(id)\nif user is not None:\n    print(user.name)",
+      "explanation": "Accessing attributes on None raises AttributeError. Guard optional values before use."
+    },
+    {
+      "id": "py-012",
+      "title": "Handle async errors explicitly — never fire-and-forget",
+      "cwe": 755,
+      "dimension": "reliability",
+      "severity": "high",
+      "bad": "asyncio.create_task(send_email(to, body))",
+      "good": "task = asyncio.create_task(send_email(to, body))\ntask.add_done_callback(_handle_task_exception)",
+      "explanation": "Fire-and-forget tasks swallow exceptions silently. Always attach error handlers or await tasks."
+    },
+    {
+      "id": "py-013",
+      "title": "Use generators for large data iteration",
+      "cwe": 400,
+      "dimension": "performance",
+      "severity": "medium",
+      "bad": "def get_all_rows():\n    return [transform(r) for r in db.fetch_all()]",
+      "good": "def get_all_rows():\n    for r in db.fetch_cursor():\n        yield transform(r)",
+      "explanation": "List comprehensions materialise the entire result in memory. Generators stream one item at a time."
+    },
+    {
+      "id": "py-014",
+      "title": "Avoid N+1 queries — batch database access",
+      "cwe": 1084,
+      "dimension": "performance",
+      "severity": "high",
+      "bad": "for user in users:\n    orders = db.query(f\"SELECT * FROM orders WHERE user_id = {user.id}\")",
+      "good": "user_ids = [u.id for u in users]\norders = db.query(\"SELECT * FROM orders WHERE user_id = ANY(%s)\", [user_ids])",
+      "explanation": "Querying inside a loop creates N+1 round-trips. Batch into a single query with IN or ANY clause."
+    },
+    {
+      "id": "py-015",
+      "title": "Avoid mutable default arguments and global mutable state",
+      "cwe": 1057,
+      "dimension": "performance",
+      "severity": "medium",
+      "bad": "def add_item(item, items=[]):\n    items.append(item)\n    return items",
+      "good": "def add_item(item, items=None):\n    if items is None:\n        items = []\n    items.append(item)\n    return items",
+      "explanation": "Mutable default arguments are shared across calls, causing subtle bugs. Use None and create fresh instances."
+    },
+    {
+      "id": "py-016",
+      "title": "Prefer comprehensions over manual loop-and-append",
+      "cwe": 1084,
+      "dimension": "performance",
+      "severity": "low",
+      "bad": "result = []\nfor x in items:\n    if x.active:\n        result.append(x.name)",
+      "good": "result = [x.name for x in items if x.active]",
+      "explanation": "List comprehensions are faster than manual loop-and-append and communicate intent more clearly."
     }
   ]
 }

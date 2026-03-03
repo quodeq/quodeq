@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from codecompass.v2.engine.context_builder import build_judge_context
@@ -92,3 +93,69 @@ def test_code_snippet_extraction(tmp_path):
     ctx = build_judge_context([finding], {}, "", {"applies": []}, src_dir=tmp_path)
     assert "Code Context" in ctx
     assert "eval(x)" in ctx
+
+
+def test_grouped_sub_characteristics_in_output(tmp_path):
+    """Test that the new grouped sub_characteristics structure renders correctly."""
+    std_dir = tmp_path / "standards"
+    iso_dir = std_dir / "iso25010"
+    iso_dir.mkdir(parents=True)
+
+    # Write a standards file with the new grouped structure
+    std_data = {
+        "id": "security",
+        "name": "Security",
+        "iso_25010": "Security",
+        "version": "2023",
+        "sub_characteristics": [
+            {
+                "name": "Confidentiality",
+                "requirements": [
+                    {"id": "S-CON-1", "text": "Secrets MUST NOT be hardcoded", "cwe": [798]},
+                    {"id": "S-CON-2", "text": "Sensitive data MUST NOT be logged", "cwe": [532]},
+                ],
+            },
+            {
+                "name": "Integrity",
+                "requirements": [
+                    {"id": "S-INT-1", "text": "All input MUST be validated", "cwe": [20]},
+                ],
+            },
+        ],
+    }
+    (iso_dir / "security.json").write_text(json.dumps(std_data))
+
+    dims = {"applies": [{"id": "security", "weight": 1.2, "iso_25010": "Security"}]}
+    ctx = build_judge_context([], {}, "", dims, standards_dir=std_dir)
+
+    # Sub-characteristic names should appear
+    assert "Confidentiality" in ctx
+    assert "Integrity" in ctx
+    # Requirement IDs and text should appear
+    assert "S-CON-1" in ctx
+    assert "Secrets MUST NOT be hardcoded" in ctx
+    assert "S-INT-1" in ctx
+
+
+def test_legacy_flat_requirements_backward_compat(tmp_path):
+    """Test backward compatibility with legacy flat requirements array."""
+    std_dir = tmp_path / "standards"
+    iso_dir = std_dir / "iso25010"
+    iso_dir.mkdir(parents=True)
+
+    # Write a legacy-format standards file
+    std_data = {
+        "id": "security",
+        "name": "Security",
+        "sub_characteristics": ["Confidentiality", "Integrity"],
+        "requirements": [
+            {"id": "S-1", "text": "No eval with user input", "cwe": [95]},
+        ],
+    }
+    (iso_dir / "security.json").write_text(json.dumps(std_data))
+
+    dims = {"applies": [{"id": "security", "weight": 1.0}]}
+    ctx = build_judge_context([], {}, "", dims, standards_dir=std_dir)
+
+    assert "S-1" in ctx
+    assert "No eval with user input" in ctx

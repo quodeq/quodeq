@@ -25,6 +25,76 @@
     },
     {
       "id": "jv-003",
+      "title": "Validate and sanitize all external input",
+      "cwe": 20,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "String name = request.getParameter(\"name\");\ndb.save(name);",
+      "good": "String name = request.getParameter(\"name\");\nif (name == null || !NAME_PATTERN.matcher(name).matches()) {\n    throw new ValidationException(\"Invalid name\");\n}\ndb.save(name);",
+      "explanation": "Unvalidated input can lead to injection attacks and data corruption. Validate format and range at entry points."
+    },
+    {
+      "id": "jv-004",
+      "title": "Never use Runtime.exec with unsanitized input",
+      "cwe": 78,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "Runtime.getRuntime().exec(\"cmd /c \" + userInput);",
+      "good": "ProcessBuilder pb = new ProcessBuilder(\"cmd\", \"/c\", sanitizedCmd);\npb.start();",
+      "explanation": "Constructing shell commands from user input enables command injection. Use ProcessBuilder with argument arrays."
+    },
+    {
+      "id": "jv-005",
+      "title": "Keep methods under 50 lines",
+      "cwe": 1080,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "public void processOrder(Order order) {\n    // 80 lines of mixed validation, business logic, and persistence\n}",
+      "good": "public void processOrder(Order order) {\n    validate(order);\n    Order result = applyRules(order);\n    persist(result);\n}",
+      "explanation": "Long methods are hard to understand, test, and modify. Extract logical steps into named methods."
+    },
+    {
+      "id": "jv-006",
+      "title": "Avoid God classes — keep classes under 300 lines",
+      "cwe": 1080,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "// 500-line class mixing data access, business logic, and validation",
+      "good": "// Separate into UserRepository.java, UserService.java, UserValidator.java",
+      "explanation": "Large classes violate Single Responsibility Principle and are hard to test. Split by concern."
+    },
+    {
+      "id": "jv-007",
+      "title": "Use enums instead of string/int constants",
+      "cwe": 1061,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "public static final int STATUS_ACTIVE = 1;\npublic static final int STATUS_INACTIVE = 2;",
+      "good": "public enum Status { ACTIVE, INACTIVE }",
+      "explanation": "Magic constants lack type safety and allow invalid values. Enums provide compile-time checking and self-documentation."
+    },
+    {
+      "id": "jv-008",
+      "title": "Prefer composition and interfaces over deep inheritance",
+      "cwe": 1074,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "class PremiumGoldInternationalUser extends PremiumGoldUser extends PremiumUser extends User { }",
+      "good": "class User implements Billable, International {\n    private final BillingPlan plan;\n}",
+      "explanation": "Deep inheritance hierarchies are rigid and hard to modify. Prefer composition with interfaces for flexible behaviour."
+    },
+    {
+      "id": "jv-009",
+      "title": "Use try-with-resources for AutoCloseable objects",
+      "cwe": 772,
+      "dimension": "reliability",
+      "severity": "high",
+      "bad": "Connection conn = pool.getConnection();\nResultSet rs = conn.query(sql);\nconn.close();",
+      "good": "try (Connection conn = pool.getConnection();\n     ResultSet rs = conn.query(sql)) {\n    // process results\n}",
+      "explanation": "Manual close() is skipped on exceptions, leaking resources. try-with-resources guarantees cleanup."
+    },
+    {
+      "id": "jv-010",
       "title": "Catch specific exceptions — never catch generic Exception",
       "cwe": 396,
       "dimension": "reliability",
@@ -34,14 +104,64 @@
       "explanation": "Catching Exception hides programming errors (NPE, IllegalArgument) that should propagate. Catch only expected checked exceptions."
     },
     {
-      "id": "jv-004",
-      "title": "Keep classes under 300 lines",
-      "cwe": 1080,
-      "dimension": "maintainability",
+      "id": "jv-011",
+      "title": "Check for null before dereferencing",
+      "cwe": 476,
+      "dimension": "reliability",
       "severity": "medium",
-      "bad": "// 500-line class mixing data access, business logic, and validation",
-      "good": "// Separate into UserRepository.java, UserService.java, UserValidator.java",
-      "explanation": "Large classes violate Single Responsibility Principle and are hard to test."
+      "bad": "User user = repository.findById(id);\nString name = user.getName();",
+      "good": "User user = repository.findById(id);\nif (user == null) {\n    throw new NotFoundException(\"User not found: \" + id);\n}\nString name = user.getName();",
+      "explanation": "Null pointer dereference is the most common runtime exception. Guard nullable returns with explicit checks or Optional."
+    },
+    {
+      "id": "jv-012",
+      "title": "Handle InterruptedException correctly — don't swallow it",
+      "cwe": 755,
+      "dimension": "reliability",
+      "severity": "high",
+      "bad": "try { Thread.sleep(1000); } catch (InterruptedException e) { }",
+      "good": "try { Thread.sleep(1000); } catch (InterruptedException e) {\n    Thread.currentThread().interrupt();\n    throw new RuntimeException(\"Interrupted\", e);\n}",
+      "explanation": "Swallowing InterruptedException breaks thread cancellation. Re-set the interrupt flag and propagate."
+    },
+    {
+      "id": "jv-013",
+      "title": "Use StringBuilder in loops — not string concatenation",
+      "cwe": 1046,
+      "dimension": "performance",
+      "severity": "medium",
+      "bad": "String result = \"\";\nfor (String s : items) {\n    result += s + \",\";\n}",
+      "good": "StringBuilder sb = new StringBuilder();\nfor (String s : items) {\n    sb.append(s).append(\",\");\n}\nString result = sb.toString();",
+      "explanation": "String concatenation in loops creates O(n²) intermediate objects. StringBuilder appends in-place."
+    },
+    {
+      "id": "jv-014",
+      "title": "Avoid unnecessary autoboxing — use primitives where possible",
+      "cwe": 1050,
+      "dimension": "performance",
+      "severity": "low",
+      "bad": "Integer count = 0;\nfor (Item item : items) {\n    count += item.getQuantity();\n}",
+      "good": "int count = 0;\nfor (Item item : items) {\n    count += item.getQuantity();\n}",
+      "explanation": "Autoboxing creates unnecessary Integer objects on every operation. Use primitive types in hot paths."
+    },
+    {
+      "id": "jv-015",
+      "title": "Use connection pooling — never create connections per request",
+      "cwe": 400,
+      "dimension": "performance",
+      "severity": "high",
+      "bad": "Connection conn = DriverManager.getConnection(url, user, pass);",
+      "good": "// At startup:\nHikariDataSource ds = new HikariDataSource(config);\n// Per request:\nConnection conn = ds.getConnection();",
+      "explanation": "Creating database connections is expensive. Use a pool (HikariCP, c3p0) to reuse connections."
+    },
+    {
+      "id": "jv-016",
+      "title": "Avoid N+1 queries — batch database access",
+      "cwe": 1084,
+      "dimension": "performance",
+      "severity": "high",
+      "bad": "for (User u : users) {\n    List<Order> orders = orderRepo.findByUserId(u.getId());\n}",
+      "good": "List<Long> ids = users.stream().map(User::getId).toList();\nMap<Long, List<Order>> orders = orderRepo.findByUserIds(ids);",
+      "explanation": "Querying inside a loop creates N+1 round-trips. Batch into a single query with IN clause."
     }
   ]
 }
