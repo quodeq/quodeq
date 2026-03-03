@@ -8,10 +8,18 @@ from codecompass.v2.engine.context_builder import build_judge_context
 from codecompass.v2.engine.detectors.grep import GrepDetector
 from codecompass.v2.engine.detectors.tool import ToolDetector, register_parser
 from codecompass.v2.engine.detectors.parsers.eslint import parse_eslint_output
-from codecompass.v2.engine.evidence import Evidence
+from codecompass.v2.engine.evidence import Evidence, Judgment
+from codecompass.v2.engine.file_sampler import sample_files
 from codecompass.v2.engine.finding import Finding
-from codecompass.v2.engine.judge import run_judge
+from codecompass.v2.engine.judge import run_judge, _parse_judge_output, _assemble_evidence
 from codecompass.v2.engine.plugin_loader import load_plugin_full
+from codecompass.v2.engine.reviewer import run_code_review
+
+
+def _now_iso() -> str:
+    from datetime import datetime, timezone
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
 
 _DETECTOR_REGISTRY = {
     "grep": GrepDetector(),
@@ -30,17 +38,36 @@ class RunConfig:
     standards_dir: Path | None = None
     source_file_count: int = 0
     ai_caller: object = None
+    dimensions: list[str] | None = None
 
 
 def run(config: RunConfig) -> Evidence:
-    """Orchestrator: load plugin → detect → build context → judge → Evidence."""
+    """Orchestrator: load plugin → detect → judge (Pass 1) → review (Pass 2) → Evidence."""
     plugin_dir = config.evaluators_dir / config.plugin_id
     if not plugin_dir.exists():
         raise ValueError(f"Plugin directory not found: {plugin_dir}")
 
     full = load_plugin_full(plugin_dir)
 
+    # Filter dimensions and practices if -d was specified
+    if config.dimensions:
+        dim_set = set(config.dimensions)
+        full["dimensions"]["applies"] = [
+            d for d in full["dimensions"]["applies"]
+            if d["id"] in dim_set
+        ]
+        if "practices" in full["practices"]:
+            full["practices"]["practices"] = [
+                p for p in full["practices"]["practices"]
+                if p.get("dimension") in dim_set
+            ]
+
     findings = _run_detectors(full["detectors"], config.src, plugin_dir)
+
+    # Filter findings to requested dimensions so the judge only sees relevant ones
+    if config.dimensions:
+        dim_set_lower = {d.lower() for d in config.dimensions}
+        findings = [f for f in findings if f.dimension.lower() in dim_set_lower]
 
     # Count files read (files that had at least one finding)
     files_with_findings = {f.file for f in findings if f.file}
@@ -49,6 +76,9 @@ def run(config: RunConfig) -> Evidence:
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
     analysis_md = analysis_file.read_text() if analysis_file.exists() else ""
 
+    ai_caller = config.ai_caller or run_ai_cli
+
+    # ── Pass 1: Judge triages detector findings ──────────────────────
     context = build_judge_context(
         findings=findings,
         practices=full["practices"],
@@ -58,19 +88,74 @@ def run(config: RunConfig) -> Evidence:
         src_dir=config.src,
     )
 
-    ai_caller = config.ai_caller or run_ai_cli
-    files_read = len(files_with_findings) or config.source_file_count
+    judge_judgments, judge_dismissed = _run_judge_pass(context, ai_caller)
 
-    return run_judge(
-        context=context,
+    # ── Pass 2: LLM reads actual source files ────────────────────────
+    extensions = set(full["plugin"].get("detects", {}).get("extensions", []))
+    sampled = sample_files(config.src, findings, extensions)
+
+    review_judgments, review_dismissed = run_code_review(
+        sampled_files=sampled,
+        practices=full["practices"],
+        analysis_md=analysis_md,
+        dimensions_config=full["dimensions"],
+        ai_caller=ai_caller,
+    )
+
+    # ── Merge and deduplicate ────────────────────────────────────────
+    all_judgments = _deduplicate(judge_judgments + review_judgments)
+    total_dismissed = judge_dismissed + review_dismissed
+
+    # Count files read: union of detector-hit files and sampled files
+    sampled_files_set = {sf.path for sf in sampled}
+    all_files_read = files_with_findings | sampled_files_set
+    files_read = len(all_files_read) or config.source_file_count
+
+    coverage_pct = (
+        round(files_read / config.source_file_count * 100, 1)
+        if config.source_file_count > 0 and files_read > 0
+        else 0.0
+    )
+
+    return _assemble_evidence(
+        judgments=all_judgments,
+        dismissed_count=total_dismissed,
         repository=str(config.src),
         plugin_id=config.plugin_id,
-        date_str=full["plugin"].get("version", ""),
+        date_str=_now_iso(),
         practices=full["practices"],
         source_file_count=config.source_file_count,
         files_read=files_read,
-        ai_caller=ai_caller,
+        coverage_pct=coverage_pct,
     )
+
+
+def _run_judge_pass(context: str, ai_caller) -> tuple[list[Judgment], int]:
+    """Run Pass 1: send context to judge LLM and parse JSONL."""
+    from codecompass.v2.engine.judge import _PROMPT_PATH
+
+    prompt_template = _PROMPT_PATH.read_text()
+    prompt = prompt_template.replace("{{CONTEXT}}", context)
+
+    stdout, error = ai_caller(prompt)
+    if error:
+        raise RuntimeError(f"Judge AI call failed: {error}")
+
+    return _parse_judge_output(stdout)
+
+
+def _deduplicate(judgments: list[Judgment]) -> list[Judgment]:
+    """Deduplicate judgments by (file, line, practice_id). Keep longer reason."""
+    seen: dict[tuple[str, int, str], Judgment] = {}
+    for j in judgments:
+        key = (j.file, j.line, j.practice_id)
+        if key in seen:
+            existing = seen[key]
+            if len(j.reason) > len(existing.reason):
+                seen[key] = j
+        else:
+            seen[key] = j
+    return list(seen.values())
 
 
 def _run_detectors(detectors_config: list, src: Path, plugin_dir: Path) -> list[Finding]:
@@ -152,5 +237,5 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> di
 
     evidence = run(config)
     scores = score_evidence(evidence, mode=mode)
-    write_reports(evidence, scores, output_dir)
+    write_reports(evidence, scores, output_dir, dimensions=config.dimensions)
     return scores

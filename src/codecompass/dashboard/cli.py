@@ -16,6 +16,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--no-build", action="store_true")
     parser.add_argument("--reinstall", action="store_true")
     parser.add_argument("--open", default="true")
+    parser.add_argument("--version", default="v1", choices=["v1", "v2"])
     return parser
 
 
@@ -37,6 +38,7 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
         api_host=args.api_host,
         api_port=args.api_port,
         api_forced=api_forced,
+        version=args.version,
     )
 
 

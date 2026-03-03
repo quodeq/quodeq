@@ -12,12 +12,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const defaultRepoRoot = path.resolve(__dirname, '../../..');
 const defaultReportsRoot = path.resolve(defaultRepoRoot, 'evaluations');
 
-function resolveEvaluateCommand(repoRoot) {
+function resolveEvaluateCommand(repoRoot, version = 'v1') {
+  const subcommand = version === 'v2' ? 'evaluate' : 'evaluate-v1';
   const venvCommand = path.resolve(repoRoot, '.venv', 'bin', 'codecompass');
   if (fs.existsSync(venvCommand)) {
-    return [venvCommand, 'evaluate'];
+    return [venvCommand, subcommand];
   }
-  return ['uv', 'run', 'codecompass', 'evaluate'];
+  return ['uv', 'run', 'codecompass', subcommand];
 }
 
 function parseCommand(value) {
@@ -48,6 +49,31 @@ export async function proxyToActionApi(req, res, actionApiBase) {
   }
 }
 
+const V1_DIMENSIONS = [
+  { name: 'Affordability',   code: 'affordability' },
+  { name: 'Availability',    code: 'availability' },
+  { name: 'Configurability', code: 'configurability' },
+  { name: 'Efficiency',      code: 'efficiency' },
+  { name: 'Evolvability',    code: 'evolvability' },
+  { name: 'Extensibility',   code: 'extensibility' },
+  { name: 'Flexibility',     code: 'flexibility' },
+  { name: 'Maintainability', code: 'maintainability' },
+  { name: 'Performance',     code: 'performance' },
+  { name: 'Recoverability',  code: 'recoverability' },
+  { name: 'Resilience',      code: 'resilience' },
+  { name: 'Robustness',      code: 'robustness' },
+  { name: 'Scalability',     code: 'scalability' },
+  { name: 'Simplicity',      code: 'simplicity' },
+  { name: 'Usability',       code: 'usability' },
+];
+
+const V2_DIMENSIONS = [
+  { name: 'Maintainability', code: 'maintainability' },
+  { name: 'Reliability',     code: 'reliability' },
+  { name: 'Security',        code: 'security' },
+  { name: 'Performance',     code: 'performance' },
+];
+
 export function createApp(options = {}) {
   const app = express();
 
@@ -55,39 +81,50 @@ export function createApp(options = {}) {
   const repoRoot = options.repoRoot ?? defaultRepoRoot;
   const staticDistPath = options.staticDistPath ?? options.staticDist ?? null;
   const actionApiBase = options.actionApiBase ?? process.env.CODECOMPASS_ACTION_API ?? null;
+  const version = options.version ?? process.env.CODECOMPASS_VERSION ?? 'v1';
 
   const evaluateCommand =
     options.evaluateCommand ??
     parseCommand(process.env.CODECOMPASS_EVALUATE_CMD) ??
-    resolveEvaluateCommand(repoRoot);
+    resolveEvaluateCommand(repoRoot, version);
 
   const jobManager =
     options.jobManager ??
-    createJobManager({ repoRoot, reportsRoot, evaluateCommand });
+    createJobManager({ repoRoot, reportsRoot, evaluateCommand, version });
 
   app.use(cors());
   app.use(express.json({ limit: '1mb' }));
 
+  // Config endpoint — always served locally
+  app.get('/api/config', (_req, res) => {
+    res.json({
+      version,
+      dimensions: version === 'v2' ? V2_DIMENSIONS : V1_DIMENSIONS,
+    });
+  });
+
+  // Node-handled routes — always registered (data lives on local filesystem)
+  app.get('/api/projects/:project/info', (req, res) => {
+    try {
+      const infoPath = path.join(reportsRoot, req.params.project, 'repository_info.json');
+      const info = JSON.parse(fs.readFileSync(infoPath, 'utf-8'));
+      res.json(info);
+    } catch {
+      res.status(404).json({ error: 'Repository info not found' });
+    }
+  });
+
+  app.get('/api/health', (_req, res) => {
+    res.json({ ok: true });
+  });
+
+  app.use('/api', createProjectsRouter({ reportsRoot }));
+  app.use('/api', createEvaluationsRouter({ jobManager }));
+  app.use('/api', createBrowseRouter());
+
+  // Proxy remaining /api/* to Python action API when available
   if (actionApiBase) {
     app.use('/api', (req, res) => proxyToActionApi(req, res, actionApiBase));
-  } else {
-    app.get('/api/projects/:project/info', (req, res) => {
-      try {
-        const infoPath = path.join(reportsRoot, req.params.project, 'repository_info.json');
-        const info = JSON.parse(fs.readFileSync(infoPath, 'utf-8'));
-        res.json(info);
-      } catch {
-        res.status(404).json({ error: 'Repository info not found' });
-      }
-    });
-
-    app.get('/api/health', (_req, res) => {
-      res.json({ ok: true });
-    });
-
-    app.use('/api', createProjectsRouter({ reportsRoot }));
-    app.use('/api', createEvaluationsRouter({ jobManager }));
-    app.use('/api', createBrowseRouter());
   }
 
   if (staticDistPath) {

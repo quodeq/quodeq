@@ -18,6 +18,10 @@ async function request(path, options = {}) {
   return payload;
 }
 
+export function getConfig() {
+  return request('/config');
+}
+
 export function listProjects() {
   return request('/projects');
 }

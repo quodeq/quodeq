@@ -2,7 +2,8 @@ import { useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
 import { DIMENSION_OPTIONS } from '../constants.js';
 
-export default function EvaluationForm({ onStart, disabled }) {
+export default function EvaluationForm({ onStart, disabled, dimensionOptions }) {
+  const dims = dimensionOptions || DIMENSION_OPTIONS;
   const [repo, setRepo] = useState('');
   const [selectedDimensions, setSelectedDimensions] = useState([]);
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
@@ -77,7 +78,7 @@ export default function EvaluationForm({ onStart, disabled }) {
                 <button
                   type="button"
                   className="dim-action-btn"
-                  onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.map((d) => d.code))}
+                  onClick={() => setSelectedDimensions(dims.map((d) => d.code))}
                 >
                   Select all
                 </button>
@@ -91,7 +92,7 @@ export default function EvaluationForm({ onStart, disabled }) {
               </div>
             </div>
             <div className="dimension-grid">
-              {DIMENSION_OPTIONS.map((dim) => (
+              {dims.map((dim) => (
                 <button
                   key={dim.code}
                   type="button"

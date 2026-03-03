@@ -14,7 +14,7 @@ function parseDimensions(raw) {
   return String(raw).split(',').map((d) => d.trim()).filter(Boolean);
 }
 
-function buildArgs(payload, reportsRoot) {
+function buildArgsV1(payload, reportsRoot) {
   const result = [];
   const dims = parseDimensions(payload.dimensions);
 
@@ -29,6 +29,22 @@ function buildArgs(payload, reportsRoot) {
   }
   if (payload.discipline && String(payload.discipline).trim()) {
     result.push(String(payload.discipline).trim());
+  }
+  result.push(String(payload.repo).trim());
+  return result;
+}
+
+function buildArgsV2(payload, reportsRoot) {
+  const result = [];
+  if (payload.discipline && String(payload.discipline).trim()) {
+    result.push('-p', String(payload.discipline).trim());
+  }
+  const dims = parseDimensions(payload.dimensions);
+  if (dims.length > 0) {
+    result.push('-d', dims.join(','));
+  }
+  if (reportsRoot) {
+    result.push('-o', String(reportsRoot));
   }
   result.push(String(payload.repo).trim());
   return result;
@@ -53,10 +69,11 @@ function tryExtractReportPath(record, raw) {
 }
 
 function snapshot(record) {
-  return { ...record, logs: record.logs.slice() };
+  const { _proc, ...rest } = record;
+  return { ...rest, logs: record.logs.slice() };
 }
 
-export function createJobManager({ repoRoot, reportsRoot, evaluateCommand, spawnImpl = spawn } = {}) {
+export function createJobManager({ repoRoot, reportsRoot, evaluateCommand, version = 'v1', spawnImpl = spawn } = {}) {
   const registry = new Map();
   let activeId = null;
 
@@ -86,6 +103,7 @@ export function createJobManager({ repoRoot, reportsRoot, evaluateCommand, spawn
     }
 
     const jobId = randomUUID();
+    const buildArgs = version === 'v2' ? buildArgsV2 : buildArgsV1;
     const extraArgs = buildArgs(payload, reportsRoot);
     const fullCmd = [...cmdBase, ...extraArgs];
 
@@ -99,16 +117,24 @@ export function createJobManager({ repoRoot, reportsRoot, evaluateCommand, spawn
       exitCode: null,
       outputProject: null,
       outputRunId: null,
-      logs: []
+      logs: [],
+      _proc: null
     };
 
     registry.set(jobId, record);
     activeId = jobId;
 
+    // Remove CLAUDECODE to allow nested claude --print calls in the AI judge
+    const childEnv = { ...process.env };
+    delete childEnv.CLAUDECODE;
+    childEnv.PYTHONUNBUFFERED = '1';
+
     const proc = spawnImpl(fullCmd[0], fullCmd.slice(1), {
       cwd: repoRoot,
-      env: process.env
+      env: childEnv
     });
+
+    record._proc = proc;
 
     proc.stdout?.on('data', (chunk) => {
       ingestChunk(record, chunk);
@@ -125,6 +151,7 @@ export function createJobManager({ repoRoot, reportsRoot, evaluateCommand, spawn
       record.status = 'failed';
       record.exitCode = -1;
       record.endedAt = new Date().toISOString();
+      record._proc = null;
       if (activeId === jobId) activeId = null;
     });
 
@@ -132,11 +159,25 @@ export function createJobManager({ repoRoot, reportsRoot, evaluateCommand, spawn
       record.exitCode = code;
       record.status = code === 0 ? 'completed' : 'failed';
       record.endedAt = new Date().toISOString();
+      record._proc = null;
       if (activeId === jobId) activeId = null;
     });
 
     return getJob(jobId);
   }
 
-  return { startJob, getJob };
+  function cancelJob(jobId) {
+    const rec = registry.get(jobId);
+    if (!rec || rec.status !== 'running') return false;
+    if (rec._proc) {
+      rec._proc.kill('SIGTERM');
+    }
+    rec.status = 'cancelled';
+    rec.endedAt = new Date().toISOString();
+    rec._proc = null;
+    if (activeId === jobId) activeId = null;
+    return true;
+  }
+
+  return { startJob, getJob, cancelJob };
 }

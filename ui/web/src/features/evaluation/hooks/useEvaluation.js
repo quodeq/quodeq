@@ -92,6 +92,7 @@ export function useEvaluation() {
         }
       } catch (err) {
         setJobError(err.message);
+        setJob((prev) => prev ? { ...prev, status: 'failed' } : prev);
         stopPolling();
         stopDimensionPolling();
       }

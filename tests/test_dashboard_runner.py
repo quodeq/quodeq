@@ -54,6 +54,10 @@ def test_run_dashboard_invokes_node(tmp_path: Path, monkeypatch):
         "codecompass.dashboard.runner._ensure_action_api",
         lambda *_args, **_kwargs: ("http://127.0.0.1:8001", None),
     )
+    monkeypatch.setattr(
+        "codecompass.dashboard.runner._kill_stale_action_api",
+        lambda *_args, **_kwargs: None,
+    )
 
     config = DashboardConfig(
         port=4173,
@@ -87,6 +91,10 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
         "codecompass.dashboard.runner._ensure_action_api",
         lambda *_args, **_kwargs: ("http://127.0.0.1:8001", None),
     )
+    monkeypatch.setattr(
+        "codecompass.dashboard.runner._kill_stale_action_api",
+        lambda *_args, **_kwargs: None,
+    )
 
     reports_dir = tmp_path / "reports"
     config = DashboardConfig(
@@ -119,6 +127,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     (tmp_path / "ui/server/node_modules").mkdir(parents=True)
 
     monkeypatch.setattr(runner, "_ensure_action_api", lambda *_args, **_kwargs: ("http://127.0.0.1:8001", None))
+    monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == 4173)
     monkeypatch.setattr(
         runner,

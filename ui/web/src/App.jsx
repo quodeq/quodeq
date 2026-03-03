@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { listProjects, getAiClients } from './api/index.js';
+import { listProjects, getAiClients, getConfig } from './api/index.js';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import RunNavigator from './features/dashboard/components/RunNavigator.jsx';
@@ -130,6 +130,13 @@ export default function App() {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState('');
   const [selectedRun, setSelectedRun] = useState('latest');
+  const [appConfig, setAppConfig] = useState(null);
+
+  useEffect(() => {
+    getConfig()
+      .then(setAppConfig)
+      .catch(() => {});
+  }, []);
 
   function loadProjects() {
     listProjects()
@@ -449,6 +456,7 @@ export default function App() {
                   project={selectedProject}
                   onStart={handleStartEvaluation}
                   disabled={false}
+                  dimensionOptions={appConfig?.dimensions}
                 />
               )}
 
@@ -457,7 +465,7 @@ export default function App() {
                   <div className="panel-header">
                     <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
                   </div>
-                  <EvaluationForm onStart={handleStartEvaluation} disabled={false} />
+                  <EvaluationForm onStart={handleStartEvaluation} disabled={false} dimensionOptions={appConfig?.dimensions} />
                 </div>
               )}
 
@@ -648,6 +656,9 @@ export default function App() {
         <div className="sidebar-header">
           <div className="sidebar-brand-icon">CC</div>
           <span className="sidebar-brand-text">CodeCompass</span>
+          {appConfig?.version && (
+            <span className="sidebar-version-badge">{appConfig.version}</span>
+          )}
         </div>
 
         <nav className="sidebar-nav">

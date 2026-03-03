@@ -103,7 +103,7 @@ def test_start_evaluation_uses_cli_module(tmp_path: Path) -> None:
         sys.executable,
         "-m",
         "codecompass.cli",
-        "evaluate",
+        "evaluate-v1",
         "--evaluations",
     ]
     assert captured["cmd"][5] == str(reports_dir)

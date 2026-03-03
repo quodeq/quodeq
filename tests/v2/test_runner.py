@@ -123,7 +123,11 @@ def test_empty_project(tmp_path):
         ai_caller=mock_ai,
     )
     evidence = run(config)
-    assert evidence.principles == {}
+    # Practices are seeded even when the judge returns nothing
+    for pe in evidence.principles.values():
+        assert pe.violations == []
+        assert pe.compliance == []
+        assert pe.metrics.get("no_evidence") is True
 
 
 def test_unknown_plugin_error(tmp_path):

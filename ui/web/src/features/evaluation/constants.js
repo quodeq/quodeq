@@ -15,3 +15,10 @@ export const DIMENSION_OPTIONS = [
   { name: 'Simplicity',      code: 'simplicity' },
   { name: 'Usability',       code: 'usability' },
 ];
+
+export const V2_DIMENSION_OPTIONS = [
+  { name: 'Maintainability', code: 'maintainability' },
+  { name: 'Reliability',     code: 'reliability' },
+  { name: 'Security',        code: 'security' },
+  { name: 'Performance',     code: 'performance' },
+];

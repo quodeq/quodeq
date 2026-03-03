@@ -10,6 +10,13 @@ import nodePath from 'node:path';
 const NUMERIC_SCALE = ['Critical', 'Poor', 'Adequate', 'Good', 'Exemplary'];
 const TEXT_SCALE = ['Insufficient', 'Developing', 'Proficient', 'Exemplary'];
 const KNOWN_SEVERITIES = ['critical', 'major', 'minor'];
+const SEVERITY_ALIASES = { high: 'critical', medium: 'major', low: 'minor' };
+
+function normalizeSeverity(raw) {
+  const s = (raw || '').toLowerCase();
+  if (KNOWN_SEVERITIES.includes(s)) return s;
+  return SEVERITY_ALIASES[s] || 'unknown';
+}
 
 // ---------------------------------------------------------------------------
 // Low-level filesystem helpers
@@ -368,7 +375,7 @@ function dimensionNameFromEvidencePath(evidencePath) {
 function buildTotals(vios, compls) {
   const sev = { critical: 0, major: 0, minor: 0, unknown: 0 };
   for (const v of vios) {
-    const k = KNOWN_SEVERITIES.includes(v.severity) ? v.severity : 'unknown';
+    const k = normalizeSeverity(v.severity);
     sev[k] += 1;
   }
   return {
@@ -407,6 +414,7 @@ function readReportJson(jsonPath) {
 
   return {
     dimension: data.dimension ?? null,
+    date: data.date ?? null,
     overallScore: data.overallScore ?? null,
     overallGrade: data.overallGrade ?? null,
     principles: (data.principles ?? []).map((p) => ({
@@ -420,7 +428,7 @@ function readReportJson(jsonPath) {
       file: v.file ?? null,
       line: v.line ?? null,
       reason: v.reason ?? null,
-      severity: v.severity ?? 'minor',
+      severity: normalizeSeverity(v.severity),
       snippet: v.snippet ?? null
     })),
     compliance: (data.compliance ?? []).map((c) => ({
@@ -472,12 +480,17 @@ function loadRunDimensions(reportsRoot, project, runId) {
   const evalDir = nodePath.join(runDir, 'evaluation');
   const evidenceDir = nodePath.join(runDir, 'evidence');
 
-  const evalEntries = readdirSafe(evalDir, { withFileTypes: true })
-    .filter((e) => e.isFile() && e.name.endsWith('_eval.md'));
+  const allFiles = readdirSafe(evalDir, { withFileTypes: true })
+    .filter((e) => e.isFile());
 
-  const dimData = evalEntries
+  const mdEntries = allFiles.filter((e) => e.name.endsWith('_eval.md'));
+  const seenDims = new Set();
+
+  // v1: discover from _eval.md files, preferring .json when both exist
+  const dimData = mdEntries
     .map((entry) => {
       const dimName = entry.name.slice(0, -8); // strip _eval.md
+      seenDims.add(dimName);
       const jsonFile = nodePath.join(evalDir, `${dimName}.json`);
       if (fsSync.existsSync(jsonFile)) {
         return readReportJson(jsonFile);
@@ -485,6 +498,15 @@ function loadRunDimensions(reportsRoot, project, runId) {
       return readEvalFile(nodePath.join(evalDir, entry.name));
     })
     .filter(Boolean);
+
+  // v2: discover standalone .json files not already covered by _eval.md
+  for (const entry of allFiles) {
+    if (!entry.name.endsWith('.json') || entry.name.endsWith('_v2.json')) continue;
+    const dimName = entry.name.slice(0, -5); // strip .json
+    if (seenDims.has(dimName)) continue;
+    const parsed = readReportJson(nodePath.join(evalDir, entry.name));
+    if (parsed) dimData.push(parsed);
+  }
 
   // Build evidence map keyed by dimension name
   const evidenceMap = new Map(
@@ -564,9 +586,9 @@ function precedingDimension(reportsRoot, project, beforeRunId, dimensionName) {
   const projectDir = nodePath.join(reportsRoot, project);
   if (!fsSync.existsSync(projectDir)) return null;
 
-  const olderRuns = fsSync.readdirSync(projectDir)
-    .filter((name) => /^\d{8}$/.test(name) && name < beforeRunId)
-    .sort((a, b) => b.localeCompare(a));
+  const allRuns = listRuns(reportsRoot, project);
+  const idx = allRuns.findIndex((r) => r.runId === beforeRunId);
+  const olderRuns = idx >= 0 ? allRuns.slice(idx + 1).map((r) => r.runId) : [];
 
   for (const runId of olderRuns) {
     const dims = loadRunDimensions(reportsRoot, project, runId);
@@ -589,11 +611,17 @@ export function listRuns(reportsRoot, project) {
   const entries = readdirSafe(projectDir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
     .map((e) => {
+      // Try YYYYMMDD directory name first (v1 convention)
       const parsed = runIdToDate(e.name);
+      if (parsed) {
+        return { runId: e.name, dateISO: parsed.iso, dateLabel: parsed.label };
+      }
+      // Fall back to reading date from the first evaluation JSON (v2 convention)
+      const dateFromFile = readRunDate(projectDir, e.name);
       return {
         runId: e.name,
-        dateISO: parsed?.iso ?? null,
-        dateLabel: parsed?.label ?? e.name
+        dateISO: dateFromFile?.iso ?? null,
+        dateLabel: dateFromFile?.label ?? e.name
       };
     });
 
@@ -607,6 +635,32 @@ export function listRuns(reportsRoot, project) {
   });
 
   return entries;
+}
+
+/**
+ * Read the date from the first evaluation JSON in a run directory.
+ * Returns { iso, label } or null.
+ */
+function readRunDate(projectDir, runId) {
+  const evalDir = nodePath.join(projectDir, runId, 'evaluation');
+  const files = readdirSafe(evalDir, { withFileTypes: true })
+    .filter((e) => e.isFile() && e.name.endsWith('.json'));
+  for (const f of files) {
+    try {
+      const data = JSON.parse(fsSync.readFileSync(nodePath.join(evalDir, f.name), 'utf-8'));
+      if (data.date) {
+        const dt = new Date(data.date);
+        if (!Number.isNaN(dt.getTime())) {
+          const iso = dt.toISOString().slice(0, 10);
+          const label = dt.toLocaleDateString('en-US', {
+            year: 'numeric', month: 'short', day: '2-digit', timeZone: 'UTC'
+          });
+          return { iso, label };
+        }
+      }
+    } catch { /* skip unreadable files */ }
+  }
+  return null;
 }
 
 /**
@@ -768,7 +822,7 @@ export function buildAccumulatedData(reportsRoot, project, asOfRun = null) {
   if (!fsSync.existsSync(projectDir)) return null;
 
   let runIds = fsSync.readdirSync(projectDir)
-    .filter((name) => /^\d{8}$/.test(name))
+    .filter((name) => !name.startsWith('.') && fsSync.statSync(nodePath.join(projectDir, name)).isDirectory())
     .sort((a, b) => b.localeCompare(a)); // newest first
 
   if (asOfRun) {

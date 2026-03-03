@@ -114,6 +114,16 @@ def _assemble_evidence(
 
     principles: dict[str, PrincipleEvidence] = {}
 
+    # Seed all known practices so they appear even with 0 findings
+    for p_info in practices.get("practices", []):
+        pid = p_info["id"]
+        principles[pid] = PrincipleEvidence(
+            practice_id=pid,
+            display_name=p_info.get("title", pid),
+            dimension=p_info.get("dimension", ""),
+            severity=p_info.get("severity", "medium"),
+        )
+
     for j in judgments:
         if j.practice_id not in principles:
             p_info = practice_lookup.get(j.practice_id, {})

@@ -505,20 +505,29 @@ class FilesystemActionProvider(ActionProvider):
             raise FileNotFoundError(f"Repository not found: {repo}")
 
         reports_abs = str(Path(reports_dir).resolve())
-        cmd = [sys.executable, "-m", "codecompass.cli", "evaluate"]
-        cmd += ["--evaluations", reports_abs]
-        if dimensions:
-            cmd += ["-d", dimensions]
-        if numerical:
-            cmd.append("-n")
-        if discipline:
-            cmd.append(discipline)
-        if is_repo_url(repo):
-            cmd.append(repo)
-        else:
-            cmd.append(str(repo_path.resolve()))
-
+        version = os.environ.get("CODECOMPASS_VERSION", "v1")
         info = _build_repository_info(repo, discipline)
+
+        if version == "v2":
+            cmd = [sys.executable, "-m", "codecompass.cli", "evaluate"]
+            if dimensions:
+                cmd += ["-d", dimensions]
+            cmd += ["-o", reports_abs]
+            repo_arg = repo if is_repo_url(repo) else str(repo_path.resolve())
+            cmd.append(repo_arg)
+        else:
+            cmd = [sys.executable, "-m", "codecompass.cli", "evaluate-v1"]
+            cmd += ["--evaluations", reports_abs]
+            if dimensions:
+                cmd += ["-d", dimensions]
+            if numerical:
+                cmd.append("-n")
+            if discipline:
+                cmd.append(discipline)
+            if is_repo_url(repo):
+                cmd.append(repo)
+            else:
+                cmd.append(str(repo_path.resolve()))
         info_dir = Path(reports_dir) / str(info["name"])
         info_dir.mkdir(parents=True, exist_ok=True)
         (info_dir / "repository_info.json").write_text(json.dumps(info))

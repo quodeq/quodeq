@@ -4,7 +4,7 @@ import json
 from pathlib import Path
 
 from codecompass.v2.engine.evidence import Evidence, PrincipleEvidence
-from codecompass.v2.engine.report import build_v2_report, build_v1_compatible_report, write_reports
+from codecompass.v2.engine.report import build_report, write_reports
 from codecompass.v2.engine.scoring import score_evidence
 
 
@@ -41,22 +41,10 @@ def _make_evidence() -> Evidence:
     )
 
 
-def test_v2_report_extra_fields():
+def test_report_shape():
     ev = _make_evidence()
     scores = score_evidence(ev)
-    report = build_v2_report(ev, scores)
-    assert report["engine_version"] == "2.0.0"
-    assert report["dismissed_count"] == 2
-    assert "evidence_summary" in report
-    assert report["evidence_summary"]["dismissed_count"] == 2
-
-
-def test_v1_shape_match():
-    ev = _make_evidence()
-    scores = score_evidence(ev)
-    report = build_v1_compatible_report(ev, scores)
-    assert "engine_version" not in report
-    assert "dismissed_count" not in report
+    report = build_report(ev, scores)
     assert "dimension" in report
     assert "principles" in report
     assert "violations" in report
@@ -67,22 +55,24 @@ def test_file_writing(tmp_path):
     scores = score_evidence(ev)
     write_reports(ev, scores, tmp_path)
 
-    v2_file = tmp_path / "typescript_v2.json"
-    v1_file = tmp_path / "typescript.json"
-    assert v2_file.exists()
-    assert v1_file.exists()
+    eval_file = tmp_path / "evaluation" / "security.json"
+    evidence_file = tmp_path / "evidence" / "security_evidence.json"
+    assert eval_file.exists()
+    assert evidence_file.exists()
 
-    v2_data = json.loads(v2_file.read_text())
-    v1_data = json.loads(v1_file.read_text())
+    eval_data = json.loads(eval_file.read_text())
+    assert eval_data["dimension"] == "security"
+    assert len(eval_data["principles"]) == 1
 
-    assert v2_data["engine_version"] == "2.0.0"
-    assert "engine_version" not in v1_data
+    ev_data = json.loads(evidence_file.read_text())
+    assert "principles" in ev_data
+    assert "ts-001" in ev_data["principles"]
 
 
 def test_violations_structure():
     ev = _make_evidence()
     scores = score_evidence(ev)
-    report = build_v2_report(ev, scores)
+    report = build_report(ev, scores)
     assert len(report["violations"]) == 1
     assert report["violations"][0]["principle"] == "Avoid eval()"
     assert report["violations"][0]["file"] == "a.ts"

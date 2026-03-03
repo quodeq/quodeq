@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react';
 import { getProjectInfo } from '../../../api/index.js';
 import { DIMENSION_OPTIONS } from '../constants.js';
 
-export default function ReEvaluateCard({ project, onStart, disabled }) {
+export default function ReEvaluateCard({ project, onStart, disabled, dimensionOptions }) {
+  const dims = dimensionOptions || DIMENSION_OPTIONS;
   const [info, setInfo] = useState(null);
   const [selectedDimensions, setSelectedDimensions] = useState([]);
 
@@ -28,6 +29,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
   function handleStart() {
     onStart({
       repo: info.path,
+      discipline: info.discipline || '',
       dimensions: selectedDimensions.join(','),
       numerical: true,
     });
@@ -54,7 +56,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
               <button
                 type="button"
                 className="dim-action-btn"
-                onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.filter((d) => !hasFilter || available.has(d.code)).map((d) => d.code))}
+                onClick={() => setSelectedDimensions(dims.filter((d) => !hasFilter || available.has(d.code)).map((d) => d.code))}
               >
                 Select all
               </button>
@@ -68,7 +70,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
             </div>
           </div>
           <div className="dimension-grid">
-            {DIMENSION_OPTIONS.map((dim) => {
+            {dims.map((dim) => {
               const enabled = !hasFilter || available.has(dim.code);
               return (
                 <button

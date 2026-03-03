@@ -7,6 +7,21 @@ from pathlib import Path
 from codecompass.v2.engine.evidence import Evidence
 
 
+_SEVERITY_MAP = {
+    "critical": "critical",
+    "high": "critical",
+    "major": "major",
+    "medium": "major",
+    "minor": "minor",
+    "low": "minor",
+}
+
+
+def _normalize_severity(raw: str | None) -> str:
+    """Map AI judge severities (high/medium/low) to dashboard severities (critical/major/minor)."""
+    return _SEVERITY_MAP.get((raw or "").lower(), "minor")
+
+
 def grade_from_score(score: str | None) -> str | None:
     # Nothing to map if the input is falsy
     if not score:
@@ -85,15 +100,16 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
 
         # Flatten violations, stamping each with the principle name
         for viol in pdata.get("violations", []):
+            normalized_sev = _normalize_severity(viol.get("severity"))
             flat_entry: dict = {"principle": label}
             flat_entry.update(
-                {field: viol.get(field) for field in ("file", "line", "reason", "snippet", "severity")}
+                {field: viol.get(field) for field in ("file", "line", "reason", "snippet")}
             )
+            flat_entry["severity"] = normalized_sev
             flat_violations.append(flat_entry)
 
-            bucket = viol.get("severity", "minor")
-            if bucket in sev_tally:
-                sev_tally[bucket] += 1
+            if normalized_sev in sev_tally:
+                sev_tally[normalized_sev] += 1
 
         # Flatten compliance examples the same way
         for comp in pdata.get("compliance", []):
@@ -144,29 +160,76 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
     }
 
 
-def build_v2_report(evidence: Evidence, scores: dict) -> dict:
-    """Build v2 report: v1 report + v2-specific fields."""
+def build_report(evidence: Evidence, scores: dict, dimension: str | None = None) -> dict:
+    """Build the scored evaluation report for the dashboard."""
     v1_evidence = evidence.to_v1_evidence_dict()
-    base = build_report_json(evidence.plugin_id, v1_evidence, scores)
-    base["engine_version"] = "2.0.0"
-    base["dismissed_count"] = evidence.dismissed_count
-    base["evidence_summary"] = evidence.summary()
-    return base
+    dim_label = dimension or evidence.plugin_id
+    return build_report_json(dim_label, v1_evidence, scores)
 
 
-def build_v1_compatible_report(evidence: Evidence, scores: dict) -> dict:
-    """Build exact v1 web dashboard format, no v2 fields."""
-    v1_evidence = evidence.to_v1_evidence_dict()
-    return build_report_json(evidence.plugin_id, v1_evidence, scores)
+def _split_evidence_by_dimension(evidence: Evidence) -> dict[str, Evidence]:
+    """Split a single Evidence into per-dimension Evidence objects."""
+    from codecompass.v2.engine.evidence import Evidence as Ev, PrincipleEvidence
+
+    dim_principles: dict[str, dict[str, PrincipleEvidence]] = {}
+    for key, pe in evidence.principles.items():
+        dim = pe.dimension or evidence.plugin_id
+        dim_principles.setdefault(dim, {})[key] = pe
+
+    result: dict[str, Ev] = {}
+    for dim, principles in dim_principles.items():
+        result[dim] = Ev(
+            repository=evidence.repository,
+            plugin_id=evidence.plugin_id,
+            date=evidence.date,
+            source_file_count=evidence.source_file_count,
+            files_read=evidence.files_read,
+            coverage_pct=evidence.coverage_pct,
+            principles=principles,
+            dismissed_count=evidence.dismissed_count,
+            meta=evidence.meta,
+        )
+    return result
 
 
-def write_reports(evidence: Evidence, scores: dict, output_dir: Path) -> None:
-    """Write both v2 and v1-compatible report files."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+def write_reports(
+    evidence: Evidence,
+    scores: dict,
+    run_dir: Path,
+    dimensions: list[str] | None = None,
+) -> None:
+    """Write per-dimension evaluation and evidence files.
 
-    v2_report = build_v2_report(evidence, scores)
-    v1_report = build_v1_compatible_report(evidence, scores)
+    Output structure under *run_dir*::
 
-    dim = evidence.plugin_id
-    (output_dir / f"{dim}_v2.json").write_text(json.dumps(v2_report, indent=2))
-    (output_dir / f"{dim}.json").write_text(json.dumps(v1_report, indent=2))
+        evaluation/<dimension>.json        — scored report
+        evidence/<dimension>_evidence.json  — raw findings
+
+    *dimensions* is the list requested via ``-d``; when the judge produces
+    no principles we still write one file per requested dimension.
+    """
+    from codecompass.v2.engine.scoring import score_evidence
+
+    eval_dir = run_dir / "evaluation"
+    evidence_dir = run_dir / "evidence"
+    eval_dir.mkdir(parents=True, exist_ok=True)
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+
+    per_dim = _split_evidence_by_dimension(evidence)
+
+    if not per_dim:
+        # No principles — write one file per requested dimension (or plugin_id)
+        dim_names = dimensions if dimensions else [evidence.plugin_id]
+        for dim in dim_names:
+            report = build_report(evidence, scores, dimension=dim)
+            (eval_dir / f"{dim}.json").write_text(json.dumps(report, indent=2))
+            ev_dict = evidence.to_v1_evidence_dict()
+            (evidence_dir / f"{dim}_evidence.json").write_text(json.dumps(ev_dict, indent=2))
+        return
+
+    for dim, dim_evidence in per_dim.items():
+        dim_scores = score_evidence(dim_evidence, mode=scores.get("mode", "numerical"))
+        report = build_report(dim_evidence, dim_scores, dimension=dim)
+        (eval_dir / f"{dim}.json").write_text(json.dumps(report, indent=2))
+        ev_dict = dim_evidence.to_v1_evidence_dict()
+        (evidence_dir / f"{dim}_evidence.json").write_text(json.dumps(ev_dict, indent=2))

@@ -40,7 +40,21 @@ class PrincipleEvidence:
         n_violations = len(self.violations)
         n_compliance = len(self.compliance)
         total = n_violations + n_compliance
-        pct = round(n_compliance / total * 100, 1) if total > 0 else 0.0
+
+        # No findings at all → treat as "no evidence" (100 % compliance, low confidence)
+        if total == 0:
+            self.metrics = {
+                "total_instances": 0,
+                "compliant": 0,
+                "violating": 0,
+                "compliance_percentage": 100.0,
+                "confidence_level": "low",
+                "is_balanced": False,
+                "no_evidence": True,
+            }
+            return
+
+        pct = round(n_compliance / total * 100, 1)
 
         if total >= high_threshold:
             confidence = "high"

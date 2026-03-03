@@ -30,6 +30,7 @@ class DashboardConfig:
     api_host: str | None = None
     api_port: int | None = None
     api_forced: bool = False
+    version: str = "v1"
 
 
 def validate_paths(config: DashboardConfig) -> None:
@@ -184,6 +185,7 @@ def _ensure_action_api_forced(host: str, port: int) -> tuple[str, subprocess.Pop
 def _start_ui_server(config: DashboardConfig, action_api_url: str) -> subprocess.Popen:
     env = os.environ.copy()
     env["CODECOMPASS_ACTION_API"] = action_api_url
+    env["CODECOMPASS_VERSION"] = config.version
     return subprocess.Popen(
         [
             "node",
@@ -237,9 +239,13 @@ def run_dashboard(config: DashboardConfig) -> int:
         api_host=config.api_host,
         api_port=config.api_port,
         api_forced=config.api_forced,
+        version=config.version,
     )
 
     validate_paths(config)
+
+    # Propagate version to child processes (action API + Node server)
+    os.environ["CODECOMPASS_VERSION"] = config.version
 
     log_info("Starting dashboard...")
     log_info(f"Reports: {config.reports_dir}")
@@ -300,3 +306,5 @@ def run_dashboard(config: DashboardConfig) -> int:
         pass
     finally:
         _stop_children()
+
+    return process.poll() or 0

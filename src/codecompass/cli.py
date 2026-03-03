@@ -19,8 +19,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="codecompass")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    dashboard_parser = subparsers.add_parser("dashboard", help="Run the dashboard")
+    dashboard_parser = subparsers.add_parser("dashboard", help="Run the v2 dashboard")
     dashboard_parser.set_defaults(_command="dashboard")
+
+    dashboard_v1_parser = subparsers.add_parser("dashboard-v1", help="Run the legacy v1 dashboard")
+    dashboard_v1_parser.set_defaults(_command="dashboard-v1")
 
     # v2 evaluate (default)
     evaluate_parser = subparsers.add_parser(
@@ -48,6 +51,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Produce evidence JSON only (skip scoring)",
     )
+    evaluate_parser.add_argument(
+        "-d",
+        "--dimensions",
+        default=None,
+        help="Comma-separated list of dimension IDs to evaluate (e.g. maintainability,security)",
+    )
     evaluate_parser.set_defaults(_command="evaluate")
 
     # v1 evaluate (legacy, explicit discipline)
@@ -74,6 +83,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_evaluate_v2(args: argparse.Namespace) -> int:
     """Run the v2 evaluation pipeline."""
+    import uuid
+
     from codecompass.v2.engine.runner import (
         RunConfig,
         count_source_files,
@@ -122,27 +133,54 @@ def run_evaluate_v2(args: argparse.Namespace) -> int:
             source_file_count = count_source_files(src, extensions)
             print(f"Source files: {source_file_count}")
 
-    # 5. Build config and run
+    # 5. Parse dimension filter
+    dimensions = None
+    if args.dimensions:
+        dimensions = [d.strip() for d in args.dimensions.split(",") if d.strip()]
+
+    # 6. Build config and run
     config = RunConfig(
         src=src,
         plugin_id=plugin_id,
         evaluators_dir=evaluators_dir,
         source_file_count=source_file_count,
+        dimensions=dimensions,
     )
 
-    output_dir = Path(args.output)
+    # 7. Build output directory: <reports>/<project>/<run_id>/
+    import json as _json
+
+    reports_root = Path(args.output)
+    project_name = src.name
+    run_id = uuid.uuid4().hex[:12]
+    run_dir = reports_root / project_name / run_id
+
+    # Write repository_info.json so the dashboard can discover this project
+    project_dir = reports_root / project_name
+    project_dir.mkdir(parents=True, exist_ok=True)
+    info_file = project_dir / "repository_info.json"
+    if not info_file.exists():
+        info = {
+            "name": project_name,
+            "discipline": plugin_id,
+            "location": "online" if is_repo_url(args.repo) else "local",
+            "path": str(src),
+        }
+        info_file.write_text(_json.dumps(info))
 
     if args.evidence_only:
         import json
 
         evidence = run(config)
-        out_file = output_dir / f"{plugin_id}_evidence.json"
-        out_file.parent.mkdir(parents=True, exist_ok=True)
-        out_file.write_text(json.dumps(evidence.to_v1_evidence_dict(), indent=2))
-        print(f"Evidence written to {out_file}")
+        evidence_dir = run_dir / "evidence"
+        evidence_dir.mkdir(parents=True, exist_ok=True)
+        for dim_name in (dimensions or [plugin_id]):
+            out_file = evidence_dir / f"{dim_name}_evidence.json"
+            out_file.write_text(json.dumps(evidence.to_v1_evidence_dict(), indent=2))
+        print(f"Report path: {run_dir / 'evaluation'}")
     else:
-        scores = run_full(config, output_dir, mode=args.mode)
-        print(f"Reports written to {output_dir}/")
+        scores = run_full(config, run_dir, mode=args.mode)
+        print(f"Report path: {run_dir / 'evaluation'}")
         for dim, score in scores.items():
             print(f"  {dim}: {score}")
 
@@ -154,6 +192,9 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     if args._command == "dashboard":
+        sub_argv = argv[1:] if argv is not None else sys.argv[2:]
+        return dashboard_main(["--version", "v2"] + sub_argv)
+    if args._command == "dashboard-v1":
         sub_argv = argv[1:] if argv is not None else sys.argv[2:]
         return dashboard_main(sub_argv)
     if args._command == "evaluate":

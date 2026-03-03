@@ -35,7 +35,7 @@ def test_cli_dashboard_passes_subcommand_args(monkeypatch):
     result = __import__("codecompass.cli", fromlist=["main"]).main(["dashboard"])
 
     assert result == 0
-    assert captured["argv"] == []
+    assert captured["argv"] == ["--version", "v2"]
 
 
 def test_cli_evaluate_v1_single_repo_defaults_discipline(monkeypatch):

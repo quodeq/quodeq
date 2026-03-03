@@ -31,5 +31,14 @@ export function createEvaluationsRouter({ jobManager }) {
     res.json(job);
   });
 
+  router.delete('/evaluations/:jobId', (req, res) => {
+    const cancelled = jobManager.cancelJob(req.params.jobId);
+    if (!cancelled) {
+      res.status(404).json({ error: 'Job not found or not running' });
+      return;
+    }
+    res.json({ ok: true });
+  });
+
   return router;
 }
