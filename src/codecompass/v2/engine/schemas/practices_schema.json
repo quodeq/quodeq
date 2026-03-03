@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plugin practices knowledge",
+  "type": "object",
+  "required": ["runtime", "version", "practices"],
+  "properties": {
+    "runtime": { "type": "string", "minLength": 1 },
+    "version": { "type": "string" },
+    "source": { "type": "string" },
+    "source_stars": { "type": "integer" },
+    "extracted": { "type": "string" },
+    "practices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "cwe", "dimension", "severity", "bad", "good", "explanation"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "cwe": { "type": "integer" },
+          "dimension": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "bad": { "type": "string" },
+          "good": { "type": "string" },
+          "explanation": { "type": "string" },
+          "source": { "type": "string" },
+          "source_stars": { "type": "integer" },
+          "extracted": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
