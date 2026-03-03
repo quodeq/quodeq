@@ -1,0 +1,4 @@
+[
+  { "type": "grep", "rules": "scan_rules.ini" },
+  { "type": "tool", "tool": "eslint", "command": "npx eslint {src} --format=json", "optional": true }
+]

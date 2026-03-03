@@ -1,0 +1,14 @@
+{
+  "id": "flexibility",
+  "name": "Flexibility",
+  "iso_25010": "Flexibility",
+  "version": "2023",
+  "sub_characteristics": [
+    "Adaptability", "Scalability", "Installability", "Replaceability"
+  ],
+  "requirements": [
+    { "id": "F-1", "text": "Configuration MUST be externalised (env vars or config files); no hardcoded env-specific values", "cwe": [1188] },
+    { "id": "F-2", "text": "Public interfaces MUST be versioned; breaking changes require a major version bump", "cwe": [1059] },
+    { "id": "F-3", "text": "Components MUST be replaceable without modifying callers (dependency inversion)", "cwe": [1061] }
+  ]
+}

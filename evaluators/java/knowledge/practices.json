@@ -1,0 +1,47 @@
+{
+  "runtime": "java",
+  "version": "1.0.0",
+  "source": "manually curated",
+  "practices": [
+    {
+      "id": "jv-001",
+      "title": "Never hardcode secrets in source code",
+      "cwe": 798,
+      "dimension": "security",
+      "severity": "critical",
+      "bad": "String apiKey = \"sk-prod-abc123xyz456\";",
+      "good": "String apiKey = System.getenv(\"API_KEY\");",
+      "explanation": "Hardcoded secrets are committed to version control and exposed in class files. Use environment variables or a vault."
+    },
+    {
+      "id": "jv-002",
+      "title": "Use PreparedStatement — never concatenate SQL strings",
+      "cwe": 89,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "stmt.execute(\"SELECT * FROM users WHERE id = \" + userId);",
+      "good": "PreparedStatement ps = conn.prepareStatement(\"SELECT * FROM users WHERE id = ?\");\nps.setString(1, userId);",
+      "explanation": "String concatenation in SQL enables injection attacks. PreparedStatement escapes inputs automatically."
+    },
+    {
+      "id": "jv-003",
+      "title": "Catch specific exceptions — never catch generic Exception",
+      "cwe": 396,
+      "dimension": "reliability",
+      "severity": "medium",
+      "bad": "try { op(); } catch (Exception e) { log(e); }",
+      "good": "try { op(); } catch (IOException e) { handleIO(e); } catch (ParseException e) { handleParse(e); }",
+      "explanation": "Catching Exception hides programming errors (NPE, IllegalArgument) that should propagate. Catch only expected checked exceptions."
+    },
+    {
+      "id": "jv-004",
+      "title": "Keep classes under 300 lines",
+      "cwe": 1080,
+      "dimension": "maintainability",
+      "severity": "medium",
+      "bad": "// 500-line class mixing data access, business logic, and validation",
+      "good": "// Separate into UserRepository.java, UserService.java, UserValidator.java",
+      "explanation": "Large classes violate Single Responsibility Principle and are hard to test."
+    }
+  ]
+}

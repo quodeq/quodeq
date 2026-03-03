@@ -1,0 +1,10 @@
+{
+  "id": "python",
+  "name": "Python",
+  "version": "1.0.0",
+  "engine_version": ">=2.0.0",
+  "detects": {
+    "extensions": [".py"],
+    "config_files": ["pyproject.toml", "setup.py", "requirements.txt"]
+  }
+}
