@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plugin detector configuration",
+  "type": "array",
+  "items": {
+    "type": "object",
+    "required": ["type", "rules"],
+    "properties": {
+      "type": { "type": "string", "enum": ["grep"] },
+      "rules": { "type": "string", "minLength": 1 }
+    },
+    "additionalProperties": false
+  }
+}
