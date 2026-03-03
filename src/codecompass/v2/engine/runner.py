@@ -99,6 +99,52 @@ def _run_detectors(detectors_config: list, src: Path, plugin_dir: Path) -> list[
     return all_findings
 
 
+def detect_plugin(src: Path, evaluators_dir: Path) -> str:
+    """Auto-detect the best plugin for a repository by counting extension matches.
+
+    Reads each plugin.json under evaluators_dir, walks the repo counting files
+    that match ``detects.extensions``, and returns the plugin_id with the most hits.
+    Raises ValueError if no plugin matches any file.
+    """
+    import json
+
+    best_id: str | None = None
+    best_count = 0
+
+    for child in sorted(evaluators_dir.iterdir()):
+        if not child.is_dir() or child.name.startswith("_"):
+            continue
+        pf = child / "plugin.json"
+        if not pf.exists():
+            continue
+        try:
+            data = json.loads(pf.read_text())
+        except (json.JSONDecodeError, KeyError):
+            continue
+        exts = set(data.get("detects", {}).get("extensions", []))
+        if not exts:
+            continue
+        count = count_source_files(src, exts)
+        if count > best_count:
+            best_count = count
+            best_id = data.get("id", child.name)
+
+    if best_id is None:
+        raise ValueError(
+            f"No plugin in {evaluators_dir} matched any file in {src}"
+        )
+    return best_id
+
+
+def count_source_files(src: Path, extensions: set[str]) -> int:
+    """Count files under *src* whose suffix is in *extensions*."""
+    total = 0
+    for p in src.rglob("*"):
+        if p.is_file() and p.suffix in extensions:
+            total += 1
+    return total
+
+
 def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> dict:
     """Full pipeline: run → score → write reports. Returns scores dict."""
     from codecompass.v2.engine.scoring import score_evidence
