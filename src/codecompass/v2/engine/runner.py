@@ -6,6 +6,8 @@ from pathlib import Path
 from codecompass.config.generators import run_ai_cli
 from codecompass.v2.engine.context_builder import build_judge_context
 from codecompass.v2.engine.detectors.grep import GrepDetector
+from codecompass.v2.engine.detectors.tool import ToolDetector, register_parser
+from codecompass.v2.engine.detectors.parsers.eslint import parse_eslint_output
 from codecompass.v2.engine.evidence import Evidence
 from codecompass.v2.engine.finding import Finding
 from codecompass.v2.engine.judge import run_judge
@@ -13,7 +15,11 @@ from codecompass.v2.engine.plugin_loader import load_plugin_full
 
 _DETECTOR_REGISTRY = {
     "grep": GrepDetector(),
+    "tool": ToolDetector(),
 }
+
+# Register built-in parsers
+register_parser("eslint", parse_eslint_output)
 
 
 @dataclass
@@ -81,8 +87,24 @@ def _run_detectors(detectors_config: list, src: Path, plugin_dir: Path) -> list[
         if det_type == "grep":
             rules_file = det_config.get("rules", "scan_rules.ini")
             config["rules_file"] = str(plugin_dir / rules_file)
+        elif det_type == "tool":
+            config["tool"] = det_config.get("tool", "")
+            config["command"] = det_config.get("command", "")
+            config["optional"] = det_config.get("optional", False)
+            config["timeout"] = det_config.get("timeout", 60)
 
         findings = detector.run(src, config)
         all_findings.extend(findings)
 
     return all_findings
+
+
+def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> dict:
+    """Full pipeline: run → score → write reports. Returns scores dict."""
+    from codecompass.v2.engine.scoring import score_evidence
+    from codecompass.v2.engine.report import write_reports
+
+    evidence = run(config)
+    scores = score_evidence(evidence, mode=mode)
+    write_reports(evidence, scores, output_dir)
+    return scores
