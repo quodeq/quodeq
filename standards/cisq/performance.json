@@ -1,0 +1,9 @@
+{
+  "characteristic": "Performance Efficiency",
+  "source": "ISO 5055 / CISQ 2021",
+  "cwes": [
+    { "id": 400,  "name": "Uncontrolled Resource Consumption" },
+    { "id": 1084, "name": "Invokable Control Element with Excessive File or Data Access Operations" },
+    { "id": 1088, "name": "Synchronous Access of Remote Resource without Timeout" }
+  ]
+}

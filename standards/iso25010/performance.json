@@ -1,0 +1,15 @@
+{
+  "id": "performance",
+  "name": "Performance Efficiency",
+  "iso_25010": "Performance Efficiency",
+  "version": "2023",
+  "sub_characteristics": [
+    "Time Behaviour", "Resource Utilisation", "Capacity"
+  ],
+  "requirements": [
+    { "id": "P-1", "text": "Database queries inside loops are forbidden (N+1 problem)", "cwe": [1084] },
+    { "id": "P-2", "text": "Synchronous blocking I/O MUST NOT be used in async contexts", "cwe": [1088] },
+    { "id": "P-3", "text": "Unbounded result sets MUST be paginated or limited", "cwe": [400] },
+    { "id": "P-4", "text": "Sequential awaits on independent async calls MUST be parallelised", "cwe": [1088] }
+  ]
+}

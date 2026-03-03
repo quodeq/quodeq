@@ -1,0 +1,17 @@
+{
+  "id": "security",
+  "name": "Security",
+  "iso_25010": "Security",
+  "version": "2023",
+  "note": "Security requirements are sourced from OWASP ASVS L1 (standards/asvs/level1.json). This file contains structural metadata only.",
+  "sub_characteristics": [
+    "Confidentiality", "Integrity", "Non-repudiation", "Accountability", "Authenticity"
+  ],
+  "requirements": [
+    { "id": "S-1", "text": "Dynamic code evaluation (eval) MUST NOT be used with user-controlled input", "cwe": [95] },
+    { "id": "S-2", "text": "Credentials and secrets MUST NOT be hardcoded in source files", "cwe": [798] },
+    { "id": "S-3", "text": "All user input MUST be validated and sanitised before use", "cwe": [20] },
+    { "id": "S-4", "text": "SQL queries MUST use parameterised statements; string concatenation is forbidden", "cwe": [89] },
+    { "id": "S-5", "text": "Shell commands MUST NOT be constructed from user-controlled data", "cwe": [78] }
+  ]
+}

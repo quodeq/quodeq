@@ -1,0 +1,15 @@
+{
+  "id": "usability",
+  "name": "Usability",
+  "iso_25010": "Usability",
+  "version": "2023",
+  "sub_characteristics": [
+    "Appropriateness Recognisability", "Learnability", "Operability",
+    "User Error Protection", "User Interface Aesthetics", "Accessibility"
+  ],
+  "requirements": [
+    { "id": "U-1", "text": "All user-facing error messages MUST be human-readable (no stack traces exposed)", "cwe": [209] },
+    { "id": "U-2", "text": "API responses MUST include machine-readable error codes alongside messages", "cwe": [1059] },
+    { "id": "U-3", "text": "CLI commands MUST provide --help output describing all flags", "cwe": [1053] }
+  ]
+}
