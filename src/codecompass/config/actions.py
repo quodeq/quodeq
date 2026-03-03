@@ -157,6 +157,7 @@ def run_scaffold_plugin(runtime: str, paths: ConfigPaths) -> int:
         return 1
 
 
+
 def check_sources(discipline: str, paths: ConfigPaths) -> int:
     practices_dir = paths.practices_dir / discipline
     if not practices_dir.exists():
