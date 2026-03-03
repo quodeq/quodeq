@@ -1,0 +1,47 @@
+{
+  "runtime": "python",
+  "version": "1.0.0",
+  "source": "manually curated",
+  "practices": [
+    {
+      "id": "py-001",
+      "title": "Never use eval() or exec() with untrusted input",
+      "cwe": 95,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "result = eval(user_input)",
+      "good": "result = json.loads(user_input)",
+      "explanation": "eval() and exec() execute arbitrary code. Use json.loads(), ast.literal_eval(), or structured parsers instead."
+    },
+    {
+      "id": "py-002",
+      "title": "Never hardcode secrets in source code",
+      "cwe": 798,
+      "dimension": "security",
+      "severity": "critical",
+      "bad": "API_KEY = 'sk-prod-abc123xyz456'",
+      "good": "API_KEY = os.environ['API_KEY']",
+      "explanation": "Hardcoded secrets leak through version control. Use environment variables or a secrets manager."
+    },
+    {
+      "id": "py-003",
+      "title": "Avoid os.system and shell=True — use subprocess with lists",
+      "cwe": 78,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "os.system(f'rm -rf {path}')",
+      "good": "subprocess.run(['rm', '-rf', path], check=True)",
+      "explanation": "os.system and shell=True enable command injection. Use subprocess with argument lists."
+    },
+    {
+      "id": "py-004",
+      "title": "Use parameterized queries — never f-string SQL",
+      "cwe": 89,
+      "dimension": "security",
+      "severity": "high",
+      "bad": "cursor.execute(f\"SELECT * FROM users WHERE id = {user_id}\")",
+      "good": "cursor.execute(\"SELECT * FROM users WHERE id = %s\", (user_id,))",
+      "explanation": "F-string SQL enables injection. Use parameterized queries with the DB-API 2.0 placeholder style."
+    }
+  ]
+}
