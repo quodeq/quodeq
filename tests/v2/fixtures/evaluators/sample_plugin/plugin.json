@@ -1,0 +1,11 @@
+{
+  "id": "sample_plugin",
+  "name": "Sample Plugin",
+  "version": "1.0.0",
+  "engine_version": ">=2.0.0",
+  "detects": {
+    "extensions": [".sample"],
+    "config_files": []
+  },
+  "cross_cutting": []
+}
