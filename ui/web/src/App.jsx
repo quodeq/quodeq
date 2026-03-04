@@ -128,7 +128,9 @@ export default function App() {
   // Project / run selection
   // -------------------------------------------------------------------------
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState('');
+  const [selectedProject, setSelectedProject] = useState(() => {
+    try { return localStorage.getItem('codecompass_selected_project') || ''; } catch { return ''; }
+  });
   const [selectedRun, setSelectedRun] = useState('latest');
 
   function loadProjects() {
@@ -137,7 +139,10 @@ export default function App() {
         const list = data.projects || data || [];
         setProjects(list);
         if (list.length > 0 && !selectedProject) {
-          setSelectedProject(list[0].id || list[0].name || list[0]);
+          const saved = localStorage.getItem('codecompass_selected_project');
+          const match = saved && list.find((p) => (p.id || p.name) === saved);
+          const pick = match ? saved : (list[0].id || list[0].name || list[0]);
+          setSelectedProject(pick);
         } else if (list.length === 0) {
           navTab('evaluate');
         }
@@ -151,6 +156,7 @@ export default function App() {
 
   function handleProjectChange(name) {
     setSelectedProject(name);
+    try { localStorage.setItem('codecompass_selected_project', name); } catch {}
     setSelectedRun('latest');
     navReset();
   }
@@ -659,7 +665,9 @@ export default function App() {
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
-          <div className="sidebar-brand-icon">CC</div>
+          <div className="sidebar-brand-icon">
+            <img src="/logo.png" alt="CodeCompass" width="36" height="36" />
+          </div>
           <span className="sidebar-brand-text">CodeCompass</span>
         </div>
 

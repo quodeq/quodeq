@@ -529,6 +529,9 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         stream_path = base / "evidence" / f"{dimension}_live.stream"
         if stream_path.exists():
             return _parse_violations_from_stream(stream_path, project, run_id, dimension)
+        # Run exists but dimension hasn't started yet
+        if base.is_dir():
+            return {"waiting": True, "project": project, "runId": run_id, "dimension": dimension}
         return None
 
     def get_violations(self, reports_dir: str, project: str, run_id: str):
