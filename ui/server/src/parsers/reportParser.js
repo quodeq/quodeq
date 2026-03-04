@@ -735,7 +735,8 @@ export function buildDashboard(reportsRoot, project, run = 'latest') {
             ...dim,
             stale: true,
             fromRunId: runs[i].runId,
-            fromDateISO: runs[i].dateISO
+            fromDateISO: runs[i].dateISO,
+            fromDateLabel: runs[i].dateLabel
           });
         }
         if (!gradeNA) {
@@ -757,7 +758,8 @@ export function buildDashboard(reportsRoot, project, run = 'latest') {
           ...dim,
           stale: true,
           fromRunId: runs[i].runId,
-          fromDateISO: runs[i].dateISO
+          fromDateISO: runs[i].dateISO,
+          fromDateLabel: runs[i].dateLabel
         });
       }
     }
@@ -777,7 +779,7 @@ export function buildDashboard(reportsRoot, project, run = 'latest') {
     };
   });
 
-  // Build trend series (one entry per run)
+  // Build trend series (one entry per run, skip runs with no scored dimensions)
   const trend = runs.map((r) => {
     const dims = loadRunDimensions(reportsRoot, project, r.runId);
     const summary = aggregateDimensions(dims);
@@ -789,7 +791,7 @@ export function buildDashboard(reportsRoot, project, run = 'latest') {
       overallGrade: summary.overallGrade,
       numericAverage: summary.numericAverage
     };
-  });
+  }).filter((t) => t.dimensionsCount > 0);
 
   return {
     project,
@@ -831,12 +833,19 @@ export function buildAccumulatedData(reportsRoot, project, asOfRun = null) {
   if (runIds.length === 0) return null;
 
   // Collect the latest evaluation per dimension (newest run wins)
+  const runLookup = new Map(allRuns.map((r) => [r.runId, r]));
   const latestPerDim = new Map();
   for (const runId of runIds) {
     const dims = loadRunDimensions(reportsRoot, project, runId);
+    const run = runLookup.get(runId);
     for (const dim of dims) {
       if (!latestPerDim.has(dim.dimension)) {
-        latestPerDim.set(dim.dimension, { ...dim, fromRunId: runId });
+        latestPerDim.set(dim.dimension, {
+          ...dim,
+          fromRunId: runId,
+          fromDateISO: run?.dateISO ?? null,
+          fromDateLabel: run?.dateLabel ?? null
+        });
       }
     }
   }
