@@ -20,7 +20,8 @@ from codecompass.evaluate.lib.discipline_detector import (
 from codecompass.evaluate.lib.evaluation import compute_prompt_hash
 from codecompass.evaluate.lib.practices_runner import build_practices_evaluation
 from codecompass.evaluate.lib.prescan import run_prescan_metrics
-from codecompass.evaluate.lib.repo_handler import is_repo_url, prepare_repository
+from codecompass.evaluate.lib.repo_handler import prepare_repository
+from codecompass.utils import is_repo_url
 from codecompass.bootstrap import DataProvider
 from codecompass.ports.data_errors import NotFoundError
 
@@ -77,36 +78,7 @@ def _parse_source_file_count(prescan_summary: str) -> int:
     return 0
 
 
-def resolve_project_uuid(reports_dir: Path, project_name: str, repo_path: str, discipline: str | None, location: str = "local") -> str:
-    """Find or create a UUID project directory matching project_name + repo_path."""
-    resolved = repo_path if location == "online" else str(Path(repo_path).resolve())
-    if not reports_dir.exists():
-        reports_dir.mkdir(parents=True, exist_ok=True)
-    for entry in reports_dir.iterdir():
-        if not entry.is_dir() or entry.name.startswith("."):
-            continue
-        info_file = entry / "repository_info.json"
-        if not info_file.exists():
-            continue
-        try:
-            info = json.loads(info_file.read_text())
-        except (json.JSONDecodeError, OSError):
-            continue
-        if info.get("name") == project_name and info.get("path") == resolved:
-            return entry.name
-    # No match — create new project directory
-    project_uuid = str(uuid.uuid4())
-    project_dir = reports_dir / project_uuid
-    project_dir.mkdir(parents=True, exist_ok=True)
-    info = {
-        "uuid": project_uuid,
-        "name": project_name,
-        "discipline": discipline,
-        "location": location,
-        "path": resolved,
-    }
-    (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
-    return project_uuid
+from codecompass.evaluate.project_resolver import resolve_project_uuid as resolve_project_uuid  # re-export
 
 
 def run(config: EvaluateConfig) -> int:
@@ -146,12 +118,8 @@ def run(config: EvaluateConfig) -> int:
     if config.provider is not None:
         provider = config.provider
     else:
-        from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
-        from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
-        provider = DataProvider(
-            practices=FilesystemPracticesRepository(root=paths.vroot),
-            evaluators=FilesystemEvaluatorsRepository(root=paths.vroot),
-        )
+        from codecompass.bootstrap import default_provider
+        provider = default_provider(paths.vroot)
     try:
         available = list_available_dimensions(provider.evaluators, config.discipline)
     except NotFoundError:
