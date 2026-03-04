@@ -60,31 +60,8 @@ _MINOR_PENALTY = 0.1      # per distinct minor violation type
 # Each entry is (min_file_count_inclusive, multiplier).
 # Tiers: Small (<500) x1 | Medium (500-5k) x2 | Large (5k-20k) x3
 #        XLarge (20k-50k) x4 | XXLarge (50k-100k) x5 | Enterprise (100k+) x6
-_SCALE_TIERS: list[tuple[int, int]] = [
-    (100_000, 6),
-    ( 50_000, 5),
-    ( 20_000, 4),
-    (  5_000, 3),
-    (    500, 2),
-    (      0, 1),
-]
-
-_SCALE_TIER_NAMES: dict[int, str] = {
-    1: "Small",
-    2: "Medium",
-    3: "Large",
-    4: "XLarge",
-    5: "XXLarge",
-    6: "Enterprise",
-}
-
-
-def scale_multiplier(source_file_count: int) -> int:
-    """Return the size-based scaling multiplier for a project."""
-    for threshold, multiplier in _SCALE_TIERS:
-        if source_file_count >= threshold:
-            return multiplier
-    return 1
+from codecompass.evaluate.lib.scale import SCALE_TIER_NAMES as _SCALE_TIER_NAMES
+from codecompass.evaluate.lib.scale import scale_multiplier as scale_multiplier  # re-export
 
 
 # ---------------------------------------------------------------------------
@@ -276,16 +253,19 @@ def confidence_interval_for(
 # Numerical score → grade label
 # ---------------------------------------------------------------------------
 
+_GRADE_BANDS: list[tuple[float, str]] = [
+    (9, "Exemplary"),
+    (7, "Good"),
+    (5, "Adequate"),
+    (3, "Poor"),
+]
+
+
 def score_to_grade_label(score: float) -> str:
     """Convert a 0–10 numerical score to a descriptive grade label."""
-    if score >= 9:
-        return "Exemplary"
-    if score >= 7:
-        return "Good"
-    if score >= 5:
-        return "Adequate"
-    if score >= 3:
-        return "Poor"
+    for threshold, label in _GRADE_BANDS:
+        if score >= threshold:
+            return label
     return "Critical"
 
 
@@ -308,6 +288,45 @@ def weight_as_multiplier(weight_str: str) -> int:
 # ---------------------------------------------------------------------------
 # Main scoring entry points
 # ---------------------------------------------------------------------------
+
+def _score_numerical(pdata, key, pct, weight_label, vt_counts, scale_mult, using_taxonomy, conf_level, ci) -> dict:
+    base_pts = score_for_compliance(pct)
+    deductions = build_deductions(vt_counts, scale_multiplier=scale_mult)
+    effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
+    adjusted = min(effective_cap, round(base_pts - deductions["total_deduction"], 1))
+    final_pts = max(0.0, min(10.0, adjusted))
+    return {
+        "display_name": pdata.get("display_name", key),
+        "weight": weight_label,
+        "compliance_percentage": pct,
+        "base_score": base_pts,
+        "deductions": deductions,
+        "final_score": final_pts,
+        "grade": score_to_grade_label(final_pts),
+        "taxonomy_used": using_taxonomy,
+        "confidence_level": conf_level,
+        "confidence_interval": ci["confidence_interval"],
+        "grade_stability": ci["grade_stability"],
+    }
+
+
+def _score_non_numerical(pdata, key, pct, weight_label, vt_counts, scale_mult, using_taxonomy, conf_level, ci) -> dict:
+    base_label = grade_for_compliance(pct)
+    level_drops = count_grade_drops(vt_counts, scale_multiplier=scale_mult)
+    final_label = drop_grade(base_label, level_drops)
+    return {
+        "display_name": pdata.get("display_name", key),
+        "weight": weight_label,
+        "compliance_percentage": pct,
+        "base_grade": base_label,
+        "severity_drops": level_drops,
+        "grade": final_label,
+        "taxonomy_used": using_taxonomy,
+        "confidence_level": conf_level,
+        "confidence_interval": ci["confidence_interval"],
+        "grade_stability": ci["grade_stability"],
+    }
+
 
 def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     """Compute per-principle scores and return the full result dictionary.
@@ -348,45 +367,8 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
             files_read=files_read,
         )
 
-        if mode == "numerical":
-            base_pts = score_for_compliance(pct)
-            deductions = build_deductions(vt_counts, scale_multiplier=scale_mult)
-
-            effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
-            adjusted = min(effective_cap, round(base_pts - deductions["total_deduction"], 1))
-            final_pts = max(0.0, min(10.0, adjusted))
-
-            per_principle[key] = {
-                "display_name": pdata.get("display_name", key),
-                "weight": weight_label,
-                "compliance_percentage": pct,
-                "base_score": base_pts,
-                "deductions": deductions,
-                "final_score": final_pts,
-                "grade": score_to_grade_label(final_pts),
-                "taxonomy_used": using_taxonomy,
-                "confidence_level": conf_level,
-                "confidence_interval": ci["confidence_interval"],
-                "grade_stability": ci["grade_stability"],
-            }
-
-        else:  # non-numerical
-            base_label = grade_for_compliance(pct)
-            level_drops = count_grade_drops(vt_counts, scale_multiplier=scale_mult)
-            final_label = drop_grade(base_label, level_drops)
-
-            per_principle[key] = {
-                "display_name": pdata.get("display_name", key),
-                "weight": weight_label,
-                "compliance_percentage": pct,
-                "base_grade": base_label,
-                "severity_drops": level_drops,
-                "grade": final_label,
-                "taxonomy_used": using_taxonomy,
-                "confidence_level": conf_level,
-                "confidence_interval": ci["confidence_interval"],
-                "grade_stability": ci["grade_stability"],
-            }
+        scorer = _score_numerical if mode == "numerical" else _score_non_numerical
+        per_principle[key] = scorer(pdata, key, pct, weight_label, vt_counts, scale_mult, using_taxonomy, conf_level, ci)
 
     overall = _weighted_overall(per_principle, mode)
 

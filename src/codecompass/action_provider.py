@@ -3,9 +3,8 @@ from __future__ import annotations
 from typing import Protocol, runtime_checkable
 
 
-@runtime_checkable
-class ActionProvider(Protocol):
-    """Interface for all action providers (filesystem, API, etc.)."""
+class ProjectActions(Protocol):
+    """Methods for project listing and metadata."""
 
     def list_projects(self, reports_dir: str) -> dict:
         """Return a dict with a 'projects' list for the given reports directory."""
@@ -14,6 +13,10 @@ class ActionProvider(Protocol):
     def get_project_info(self, reports_dir: str, project: str) -> dict:
         """Return project metadata including discipline and available dimensions."""
         ...
+
+
+class ReportActions(Protocol):
+    """Methods for reading evaluation reports and dashboards."""
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict:
         """Return the dashboard payload for a specific project run."""
@@ -35,6 +38,10 @@ class ActionProvider(Protocol):
         """Return aggregated violation summary for a run."""
         ...
 
+
+class EvaluationActions(Protocol):
+    """Methods for running and managing evaluations."""
+
     def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None) -> dict:
         """Start an asynchronous evaluation job and return job metadata."""
         ...
@@ -47,6 +54,10 @@ class ActionProvider(Protocol):
         """Cancel a running evaluation job. Return True on success."""
         ...
 
+
+class ToolingActions(Protocol):
+    """Methods for browsing repos and discovering AI clients."""
+
     def browse_repo(self, path: str | None) -> dict:
         """List directories at the given path for repository browsing."""
         ...
@@ -58,3 +69,9 @@ class ActionProvider(Protocol):
     def get_client_models(self, client_id: str) -> dict:
         """Return available models for an AI client."""
         ...
+
+
+@runtime_checkable
+class ActionProvider(ProjectActions, ReportActions, EvaluationActions, ToolingActions, Protocol):
+    """Composite interface for all action providers (filesystem, API, etc.)."""
+    ...
