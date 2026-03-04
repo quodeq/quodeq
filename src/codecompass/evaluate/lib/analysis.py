@@ -58,7 +58,7 @@ def process_assistant_event(data: dict, out, stats: dict, files_read: set) -> No
                 files_read.add(fp)
 
 
-def process_result_event(data: dict, out, stats: dict) -> None:
+def process_result_event(data: dict, out, stats: dict, _files_read: set | None = None) -> None:
     """Process result events."""
     result = data.get("result", "").strip()
     if result:
@@ -94,6 +94,13 @@ def process_item_completed_event(data: dict, out, stats: dict, files_read: set) 
                         files_read.add(fp)
 
 
+_EVENT_HANDLERS: dict[str, callable] = {
+    "assistant": process_assistant_event,
+    "result": process_result_event,
+    "item.completed": process_item_completed_event,
+}
+
+
 def extract_jsonl_evidence(stream_file: str, jsonl_file: str, dimension: str) -> int:
     """Extract JSONL evidence lines from a stream-json file.
 
@@ -117,12 +124,9 @@ def extract_jsonl_evidence(stream_file: str, jsonl_file: str, dimension: str) ->
             etype = data.get("type", "unknown")
             event_types[etype] = event_types.get(etype, 0) + 1
 
-            if etype == "assistant":
-                process_assistant_event(data, out, stats, files_read)
-            elif etype == "result":
-                process_result_event(data, out, stats)
-            elif etype == "item.completed":
-                process_item_completed_event(data, out, stats, files_read)
+            handler = _EVENT_HANDLERS.get(etype)
+            if handler:
+                handler(data, out, stats, files_read)
 
     return len(files_read)
 
