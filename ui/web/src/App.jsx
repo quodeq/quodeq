@@ -137,7 +137,7 @@ export default function App() {
         const list = data.projects || data || [];
         setProjects(list);
         if (list.length > 0 && !selectedProject) {
-          setSelectedProject(list[0].name || list[0]);
+          setSelectedProject(list[0].id || list[0].name || list[0]);
         } else if (list.length === 0) {
           navTab('evaluate');
         }
@@ -161,25 +161,26 @@ export default function App() {
     return dir ? `?evaluations=${encodeURIComponent(dir)}` : '';
   }
 
-  async function handleDeleteProject(name) {
-    await fetch(`/api/projects/${encodeURIComponent(name)}${_apiQs()}`, { method: 'DELETE' });
-    if (selectedProject === name) handleProjectChange(projects.find((p) => (p.name || p) !== name)?.name ?? '');
+  async function handleDeleteProject(projectId) {
+    await fetch(`/api/projects/${encodeURIComponent(projectId)}${_apiQs()}`, { method: 'DELETE' });
+    if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
     loadProjects();
   }
 
-  function handleExportProject(name) {
+  function handleExportProject(projectId) {
     const qs = _apiQs();
-    const url = `/api/projects/${encodeURIComponent(name)}/export${qs}`;
+    const url = `/api/projects/${encodeURIComponent(projectId)}/export${qs}`;
+    const proj = projects.find((p) => (p.id || p.name) === projectId);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${name}.zip`;
+    a.download = `${proj?.name || projectId}.zip`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
   }
 
-  async function handleRelocateProject(name, newPath) {
-    await fetch(`/api/projects/${encodeURIComponent(name)}/path${_apiQs()}`, {
+  async function handleRelocateProject(projectId, newPath) {
+    await fetch(`/api/projects/${encodeURIComponent(projectId)}/path${_apiQs()}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: newPath }),
@@ -255,12 +256,12 @@ export default function App() {
 
   const { selectedDisplayName, selectedProjectParent } = useMemo(() => {
     if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null };
-    const data = projects.find((p) => (p.name || p) === selectedProject);
-    const parentName = data?.parent || null;
-    const parentData = parentName ? projects.find((p) => (p.name || p) === parentName) : null;
+    const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
+    const parentId = data?.parent || null;
+    const parentData = parentId ? projects.find((p) => (p.id || p.name || p) === parentId) : null;
     return {
-      selectedDisplayName: data?.displayName || selectedProject,
-      selectedProjectParent: parentData?.displayName || parentName,
+      selectedDisplayName: data?.displayName || data?.name || selectedProject,
+      selectedProjectParent: parentData?.displayName || parentData?.name || parentId,
     };
   }, [selectedProject, projects]);
 
@@ -408,6 +409,7 @@ export default function App() {
             project={selectedProject}
             dimension={params.dimension}
             runId={params.runId}
+            dateLabel={params.dateLabel}
             onNavigate={handleNavigate}
           />
         );
@@ -737,7 +739,7 @@ export default function App() {
             </div>
             {showRunNav && (
               <RunNavigator
-                currentRun={formatRunId(currentOverviewRun)}
+                currentRun={formatRunId(currentOverviewRun, availableRuns[overviewRunIndex]?.dateLabel)}
                 isLatest={overviewRunIndex === 0}
                 isOldest={overviewRunIndex >= availableRuns.length - 1}
                 onPrev={handleRunPrev}

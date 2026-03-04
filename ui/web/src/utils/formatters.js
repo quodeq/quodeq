@@ -49,24 +49,20 @@ export function gradeColorClass(grade) {
 
 /**
  * Format a run identifier for display.
- * - 8-digit strings are treated as YYYYMMDD and converted to "Mon DD YYYY".
+ * - If a dateLabel is provided, use it directly.
  * - "latest" (or falsy) becomes "Latest".
- * - Everything else is returned unchanged.
+ * - Otherwise return a truncated UUID as fallback.
  *
  * @param {string|null|undefined} runId
+ * @param {string|null|undefined} dateLabel
  * @returns {string}
  */
-export function formatRunId(runId) {
+export function formatRunId(runId, dateLabel) {
+  if (dateLabel) return dateLabel;
   if (!runId || runId === 'latest') return 'Latest';
+  // Truncate UUID for compact display
   const s = String(runId);
-  if (s.length !== 8) return s;
-  const year = s.slice(0, 4);
-  const month = parseInt(s.slice(4, 6), 10);
-  const day = parseInt(s.slice(6, 8), 10);
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const monthName = months[month - 1];
-  if (!monthName) return s;
-  return `${monthName} ${day} ${year}`;
+  return s.length > 8 ? s.slice(0, 8) + '…' : s;
 }
 
 /**

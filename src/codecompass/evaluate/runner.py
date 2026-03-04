@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import json
 import subprocess
+import uuid
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -75,6 +77,36 @@ def _parse_source_file_count(prescan_summary: str) -> int:
     return 0
 
 
+def _resolve_project_uuid(reports_dir: Path, project_name: str, repo_path: str, discipline: str | None) -> str:
+    """Find or create a UUID project directory matching project_name + repo_path."""
+    resolved = str(Path(repo_path).resolve())
+    for entry in reports_dir.iterdir():
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        info_file = entry / "repository_info.json"
+        if not info_file.exists():
+            continue
+        try:
+            info = json.loads(info_file.read_text())
+        except (json.JSONDecodeError, OSError):
+            continue
+        if info.get("name") == project_name and info.get("path") == resolved:
+            return entry.name
+    # No match — create new project directory
+    project_uuid = str(uuid.uuid4())
+    project_dir = reports_dir / project_uuid
+    project_dir.mkdir(parents=True, exist_ok=True)
+    info = {
+        "uuid": project_uuid,
+        "name": project_name,
+        "discipline": discipline,
+        "location": "local",
+        "path": resolved,
+    }
+    (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
+    return project_uuid
+
+
 def run(config: EvaluateConfig) -> int:
     if not config.repo:
         return fail_with_error("repository path required")
@@ -128,8 +160,10 @@ def run(config: EvaluateConfig) -> int:
         return fail_with_error(str(exc))
     if skipped:
         log_warning(f"Skipped (not available for {config.discipline}): {', '.join(skipped)}")
-    today = date.today().strftime("%Y%m%d")
+    today = date.today().isoformat()
+    run_id = str(uuid.uuid4())
     project_name = Path(config.repo).name
+    project_uuid = _resolve_project_uuid(config.reports_dir, project_name, repo_path, config.discipline)
 
     dim_label = ", ".join(selected) if len(selected) <= 4 else f"{len(selected)} dimensions"
     log_banner([
@@ -137,8 +171,8 @@ def run(config: EvaluateConfig) -> int:
         f"Repo: {project_name}  ·  Discipline: {config.discipline}  ·  {dim_label}",
     ])
 
-    evidence_dir = config.reports_dir / project_name / today / "evidence"
-    evaluation_dir = config.reports_dir / project_name / today / "evaluation"
+    evidence_dir = config.reports_dir / project_uuid / run_id / "evidence"
+    evaluation_dir = config.reports_dir / project_uuid / run_id / "evaluation"
     evidence_dir.mkdir(parents=True, exist_ok=True)
     evaluation_dir.mkdir(parents=True, exist_ok=True)
     log_info(f"Report path: {evaluation_dir}")
