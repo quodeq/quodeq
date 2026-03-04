@@ -318,6 +318,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                             "stale": True,
                             "fromRunId": runs[i].run_id,
                             "fromDateISO": runs[i].date_iso,
+                            "fromDateLabel": runs[i].date_label,
                         }
                     if not grade_is_na:
                         non_na_count[dim_name] = non_na_count.get(dim_name, 0) + 1
@@ -334,6 +335,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                         "stale": True,
                         "fromRunId": runs[i].run_id,
                         "fromDateISO": runs[i].date_iso,
+                        "fromDateLabel": runs[i].date_label,
                     }
 
         stale_dimensions = sorted(stale_dim_map.values(), key=lambda d: d.get("dimension") or "")
@@ -357,10 +359,14 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         trend = []
         acc_by_dim: dict[str, dict[str, Any]] = {}
         for item in reversed(runs):  # oldest → newest
-            for dim in get_run_dimensions(item.run_id):
+            run_dims = get_run_dimensions(item.run_id)
+            for dim in run_dims:
                 dim_name = dim.get("dimension")
                 if dim_name:
                     acc_by_dim[dim_name] = dim  # latest run wins
+            # Skip runs with no scored dimensions (e.g. in-progress evaluations)
+            if not run_dims:
+                continue
             acc_scores = [
                 s for s in (parse_numeric_score(d.get("overallScore")) for d in acc_by_dim.values())
                 if s is not None
@@ -412,15 +418,22 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return None
 
         # Pre-read all run data once to avoid redundant disk reads across the loops below.
+        run_lookup = {r.run_id: r for r in all_run_infos}
         all_run_data: dict[str, list[dict[str, Any]]] = {}
         latest_by_dimension: dict[str, dict[str, Any]] = {}
         for run_id in runs:
             dims = read_run_data(reports_root, project, run_id)
             all_run_data[run_id] = dims
+            run_info = run_lookup.get(run_id)
             for dim in dims:
                 dim_name = dim.get("dimension")
                 if dim_name and dim_name not in latest_by_dimension:
-                    latest_by_dimension[dim_name] = {**dim, "fromRunId": run_id}
+                    latest_by_dimension[dim_name] = {
+                        **dim,
+                        "fromRunId": run_id,
+                        "fromDateISO": run_info.date_iso if run_info else None,
+                        "fromDateLabel": run_info.date_label if run_info else None,
+                    }
 
         all_dimensions = list(latest_by_dimension.values())
 
