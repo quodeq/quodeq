@@ -82,21 +82,21 @@ function TrashIcon() {
 }
 
 export default function ProjectsPage({ projects = [], selectedProject, onSelect, onDelete, onExport, onRelocate }) {
-  const { projectMap, children, roots } = useMemo(() => {
-    const projectMap = Object.fromEntries(projects.map((p) => [p.name || p, p]));
+  const { children, roots } = useMemo(() => {
+    const nameToProject = Object.fromEntries(projects.map((p) => [p.name || p, p]));
     const children = {};
     const roots = [];
     for (const p of projects) {
-      const name = p.name || p;
       const parent = p.parent;
-      if (parent && projectMap[parent]) {
-        if (!children[parent]) children[parent] = [];
-        children[parent].push(p);
+      if (parent && nameToProject[parent]) {
+        const parentId = nameToProject[parent].id || nameToProject[parent].name || parent;
+        if (!children[parentId]) children[parentId] = [];
+        children[parentId].push(p);
       } else {
         roots.push(p);
       }
     }
-    return { projectMap, children, roots };
+    return { children, roots };
   }, [projects]);
 
   const [confirming, setConfirming] = useState(null);
@@ -161,23 +161,24 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
       ) : (
         <div className="projects-cards">
           {roots.map((p) => {
+            const id = p.id || p.name || p;
             const name = p.name || p;
-            const isSelected = name === selectedProject;
-            const hasChildren = !!(children[name]?.length);
+            const isSelected = id === selectedProject;
+            const hasChildren = !!(children[id]?.length);
             const grade = gradeLabel(p.overallGrade ?? p.latestGrade);
             const score = p.latestScore != null ? parseFloat(p.latestScore).toFixed(1) : null;
             const date = formatDate(p.latestDate);
             const discipline = disciplineLabel(p.discipline);
             const path = formatPath(p.path);
             const pathMissing = p.location === 'local' && p.pathExists === false;
-            const childSelected = hasChildren && children[name].some((c) => (c.name || c) === selectedProject);
+            const childSelected = hasChildren && children[id].some((c) => (c.id || c.name || c) === selectedProject);
 
             return (
-              <div key={name} className="project-card-group">
+              <div key={id} className="project-card-group">
                 <div
                   className={`project-card panel${isSelected ? ' project-card--selected' : ''}${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}
                 >
-                  <div className="project-card-main" onClick={() => onSelect?.(name)}>
+                  <div className="project-card-main" onClick={() => onSelect?.(id)}>
                     <div className="project-card-top">
                       <span className="project-card-name">{p.displayName || name}</span>
                       <GradeChip grade={grade} score={score} />
@@ -190,17 +191,17 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
                       <span className="project-meta-item">{p.runsCount} {p.runsCount === 1 ? 'run' : 'runs'}</span>
                       {date && <span className="project-meta-date">{date}</span>}
                     </div>
-                    {relocating === name ? (
+                    {relocating === id ? (
                       <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
                         <input
                           className="project-relocate-input"
                           value={relocatePath}
                           onChange={(e) => setRelocatePath(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(name); if (e.key === 'Escape') setRelocating(null); }}
+                          onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }}
                           placeholder="/new/path/to/repo"
                           autoFocus
                         />
-                        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(name)}>Save</button>
+                        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>Save</button>
                         <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>Cancel</button>
                       </div>
                     ) : (
@@ -217,33 +218,34 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
                           <button
                             type="button"
                             className="project-path-action project-path-action--warn"
-                            onClick={(e) => { e.stopPropagation(); startRelocate(name, p.path); }}
+                            onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}
                           >Relocate</button>
                         )}
                       </div>
                     )}
                   </div>
                   <div className="project-card-footer">
-                    {renderCardFooter(name)}
+                    {renderCardFooter(id)}
                   </div>
                 </div>
 
                 {hasChildren && (
                   <div className="project-children-outer">
-                    {children[name].map((child) => {
+                    {children[id].map((child) => {
+                      const childId = child.id || child.name || child;
                       const childName = child.name || child;
-                      const isChildSelected = childName === selectedProject;
+                      const isChildSelected = childId === selectedProject;
                       const cGrade = gradeLabel(child.overallGrade ?? child.latestGrade);
                       const cScore = child.latestScore != null ? parseFloat(child.latestScore).toFixed(1) : null;
                       const cDate = formatDate(child.latestDate);
                       const cDiscipline = disciplineLabel(child.discipline);
 
                       return (
-                        <div key={childName} className="project-child-entry">
+                        <div key={childId} className="project-child-entry">
                           <div
                             className={`project-card project-card--child panel${isChildSelected ? ' project-card--selected' : ''}`}
                           >
-                            <div className="project-card-main" onClick={() => onSelect?.(childName)}>
+                            <div className="project-card-main" onClick={() => onSelect?.(childId)}>
                               <div className="project-card-top">
                                 <span className="project-card-name">{child.displayName || childName}</span>
                                 <GradeChip grade={cGrade} score={cScore} />
@@ -258,7 +260,7 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
                               </div>
                             </div>
                             <div className="project-card-footer" onClick={(e) => e.stopPropagation()}>
-                              {renderCardFooter(childName)}
+                              {renderCardFooter(childId)}
                             </div>
                           </div>
                         </div>

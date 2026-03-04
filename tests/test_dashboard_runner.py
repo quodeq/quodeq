@@ -34,26 +34,20 @@ class DummyProcess:
         pass
 
 
-def test_run_dashboard_invokes_node(tmp_path: Path, monkeypatch):
+def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkeypatch):
     (tmp_path / "reports").mkdir()
     static_dist = tmp_path / "ui/web/dist"
     static_dist.mkdir(parents=True)
     (static_dist / "index.html").write_text("ok")
 
-    server_modules = tmp_path / "ui/server/node_modules"
-    server_modules.mkdir(parents=True)
+    captured = {}
 
-    popen_calls = []
+    def fake_ensure(*args, **kwargs):
+        captured["static_dist"] = kwargs.get("static_dist")
+        return "http://127.0.0.1:4173", DummyProcess()
 
-    def fake_popen(args, **kwargs):
-        popen_calls.append(args)
-        return DummyProcess()
-
-    monkeypatch.setattr("codecompass.dashboard.runner.subprocess.Popen", fake_popen)
-    monkeypatch.setattr(
-        "codecompass.dashboard.runner._ensure_action_api",
-        lambda *_args, **_kwargs: ("http://127.0.0.1:8001", None),
-    )
+    monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
+    monkeypatch.setattr(runner, "_ensure_action_api", fake_ensure)
 
     config = DashboardConfig(
         port=4173,
@@ -65,10 +59,8 @@ def test_run_dashboard_invokes_node(tmp_path: Path, monkeypatch):
         reinstall=False,
     )
 
-    exit_code = run_dashboard(config)
-    assert exit_code == 0
-    assert popen_calls
-    assert popen_calls[0][0] == "node"
+    run_dashboard(config)
+    assert captured["static_dist"] is not None
 
 
 def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
@@ -76,16 +68,10 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
     static_dist.mkdir(parents=True)
     (static_dist / "index.html").write_text("ok")
 
-    server_modules = tmp_path / "ui/server/node_modules"
-    server_modules.mkdir(parents=True)
-
-    def fake_popen(args, **kwargs):
-        return DummyProcess()
-
-    monkeypatch.setattr("codecompass.dashboard.runner.subprocess.Popen", fake_popen)
+    monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
     monkeypatch.setattr(
-        "codecompass.dashboard.runner._ensure_action_api",
-        lambda *_args, **_kwargs: ("http://127.0.0.1:8001", None),
+        runner, "_ensure_action_api",
+        lambda *_args, **_kwargs: ("http://127.0.0.1:4173", DummyProcess()),
     )
 
     reports_dir = tmp_path / "reports"
@@ -100,8 +86,7 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
         reports_defaulted=True,
     )
 
-    exit_code = run_dashboard(config)
-    assert exit_code == 0
+    run_dashboard(config)
     assert reports_dir.exists()
 
 
@@ -116,15 +101,13 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     static_dist = tmp_path / "ui/web/dist"
     static_dist.mkdir(parents=True)
     (static_dist / "index.html").write_text("ok")
-    (tmp_path / "ui/server/node_modules").mkdir(parents=True)
 
-    monkeypatch.setattr(runner, "_ensure_action_api", lambda *_args, **_kwargs: ("http://127.0.0.1:8001", None))
-    monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == 4173)
+    monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
     monkeypatch.setattr(
-        runner,
-        "_start_ui_server",
-        lambda *_args, **_kwargs: type("Dummy", (), {"wait": lambda self: 0, "poll": lambda self: 0, "terminate": lambda self: None})(),
+        runner, "_ensure_action_api",
+        lambda *_args, **_kwargs: ("http://127.0.0.1:4174", DummyProcess()),
     )
+    monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == 4173)
 
     config = DashboardConfig(
         port=4173,
@@ -137,8 +120,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
         reports_defaulted=True,
     )
 
-    exit_code = run_dashboard(config)
-    assert exit_code == 0
+    run_dashboard(config)
     assert config.port == 4174
 
 

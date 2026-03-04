@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { listProjects, getAiClients } from './api/index.js';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
@@ -254,14 +254,16 @@ export default function App() {
     return { discipline, repository, totalFiles };
   }, [accumulated]);
 
-  const { selectedDisplayName, selectedProjectParent } = useMemo(() => {
-    if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null };
+  const { selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
+    if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
     const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
-    const parentId = data?.parent || null;
-    const parentData = parentId ? projects.find((p) => (p.id || p.name || p) === parentId) : null;
+    const parentName = data?.parent || null;
+    const parentData = parentName ? projects.find((p) => (p.name || p) === parentName) : null;
+    const parentId = parentData ? (parentData.id || parentData.name || parentName) : null;
     return {
       selectedDisplayName: data?.displayName || data?.name || selectedProject,
-      selectedProjectParent: parentData?.displayName || parentData?.name || parentId,
+      selectedProjectParent: parentData?.displayName || parentData?.name || parentName,
+      selectedProjectParentId: parentId,
     };
   }, [selectedProject, projects]);
 
@@ -312,6 +314,15 @@ export default function App() {
   // Evaluation
   // -------------------------------------------------------------------------
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
+
+  // Auto-navigate to evaluate screen when a running job is discovered (e.g. from another tab)
+  const prevJobRef = useRef(null);
+  useEffect(() => {
+    if (job?.status === 'running' && !prevJobRef.current) {
+      navTab('evaluate');
+    }
+    prevJobRef.current = job;
+  }, [job]);
 
   function handleStartEvaluation(payload) {
     startEvaluation({ ...payload, aiCmd: aiCmd || undefined });
@@ -708,7 +719,13 @@ export default function App() {
               <h1 className="content-project-name">
                 {selectedProjectParent && (
                   <>
-                    <span className="content-project-parent">{selectedProjectParent}</span>
+                    <span
+                      className="content-project-parent content-project-parent--link"
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => selectedProjectParentId && handleProjectChange(selectedProjectParentId)}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && selectedProjectParentId) handleProjectChange(selectedProjectParentId); }}
+                    >{selectedProjectParent}</span>
                     <span className="content-project-sep">›</span>
                   </>
                 )}

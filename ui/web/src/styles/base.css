@@ -610,6 +610,13 @@ textarea:focus {
   color: var(--color-text-muted);
   font-weight: var(--weight-normal);
 }
+.content-project-parent--link {
+  cursor: pointer;
+}
+.content-project-parent--link:hover {
+  color: var(--color-text);
+  text-decoration: underline;
+}
 
 .content-project-sep {
   color: var(--color-text-muted);

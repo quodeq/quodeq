@@ -3,7 +3,9 @@ from __future__ import annotations
 import os
 from typing import Any
 
-from flask import Flask, jsonify, request
+from pathlib import Path
+
+from flask import Flask, jsonify, request, send_from_directory
 
 from codecompass.action_provider import ActionProvider
 
@@ -22,7 +24,7 @@ def _reports_dir() -> str:
     return request.args.get("evaluations") or os.environ.get("CODECOMPASS_EVALUATIONS_DIR", "evaluations")
 
 
-def create_app(provider: ActionProvider | None = None) -> Flask:
+def create_app(provider: ActionProvider | None = None, static_dist: str | None = None) -> Flask:
     app = Flask(__name__)
     provider = provider or _default_provider()
 
@@ -116,6 +118,10 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
             return jsonify(body), status
         return jsonify(payload)
 
+    @app.get("/api/evaluations")
+    def list_evaluations():
+        return jsonify(provider.list_evaluations())
+
     @app.post("/api/evaluations")
     def start_evaluation():
         payload = request.get_json(silent=True) or {}
@@ -171,13 +177,29 @@ def create_app(provider: ActionProvider | None = None) -> Flask:
             return jsonify(body), status
         return jsonify(payload)
 
+    if static_dist:
+        dist = Path(static_dist).resolve()
+        if dist.is_dir():
+            @app.route('/')
+            def serve_root():
+                return send_from_directory(str(dist), 'index.html')
+
+            @app.route('/<path:path>')
+            def serve_static_or_spa(path):
+                if (dist / path).is_file():
+                    return send_from_directory(str(dist), path)
+                if path.startswith('api/'):
+                    return jsonify({"error": "Not found"}), 404
+                return send_from_directory(str(dist), 'index.html')
+
     return app
 
 
 def main() -> None:
     port = int(os.environ.get("CODECOMPASS_ACTION_API_PORT", "8001"))
     host = os.environ.get("CODECOMPASS_ACTION_API_HOST", "127.0.0.1")
-    app = create_app()
+    static_dist = os.environ.get("CODECOMPASS_STATIC_DIST")
+    app = create_app(static_dist=static_dist)
     app.run(host=host, port=port)
 
 

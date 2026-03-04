@@ -54,6 +54,10 @@ class EvaluationActions(Protocol):
         """Cancel a running evaluation job. Return True on success."""
         ...
 
+    def list_evaluations(self) -> list[dict]:
+        """Return all evaluation jobs (running, done, failed, cancelled)."""
+        ...
+
 
 class ToolingActions(Protocol):
     """Methods for browsing repos and discovering AI clients."""

@@ -5,6 +5,16 @@ from pathlib import Path
 
 _MAX_FILE_BYTES = 1 * 1024 * 1024  # 1 MB
 
+_IGNORE_DIRS = frozenset({
+    "node_modules", ".gradle", "build", "dist", ".next",
+    "__pycache__", ".mypy_cache", ".pytest_cache",
+    ".git", ".svn", ".hg",
+    ".idea", ".vscode", ".eclipse",
+    "target", "out", "bin", "obj",
+    ".venv", "venv", "env",
+    ".terraform",
+})
+
 
 @lru_cache(maxsize=128)
 def run_prescan_metrics(work_dir: str, discipline: str) -> str:
@@ -13,6 +23,8 @@ def run_prescan_metrics(work_dir: str, discipline: str) -> str:
     line_count = 0
     for path in root.rglob("*"):
         if not path.is_file():
+            continue
+        if any(part in _IGNORE_DIRS for part in path.relative_to(root).parts):
             continue
         try:
             if path.stat().st_size > _MAX_FILE_BYTES:

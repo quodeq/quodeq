@@ -38,7 +38,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
   return (
     <div className="panel evaluate-panel">
       <div className="panel-header">
-        <h3>Re-evaluate <span className="re-eval-project-name">{project}</span></h3>
+        <h3>Re-evaluate <span className="re-eval-project-name">{info.name || project}</span></h3>
       </div>
 
       <div className="evaluate-form-large">
@@ -92,7 +92,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
           disabled={!canStart}
           onClick={handleStart}
         >
-          {disabled ? 'Running Evaluation...' : `Re-evaluate ${project}`}
+          {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
         </button>
       </div>
     </div>
