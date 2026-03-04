@@ -70,8 +70,8 @@ def run_generate_practices(
     provider: DataProvider | None = None,
 ) -> int:
     if provider is None:
-        from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
-        provider = DataProvider(practices=FilesystemPracticesRepository(root=paths.root))
+        from codecompass.bootstrap import default_provider
+        provider = default_provider(paths.root)
     practices_repo = provider.practices
     try:
         topic_ids = practices_repo.list_topics(discipline)

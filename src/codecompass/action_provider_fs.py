@@ -3,36 +3,24 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
-import re
-import shutil
-import subprocess
-import sys
-import urllib.request
 from typing import Any
 
 from codecompass.action_provider import ActionProvider
 from codecompass.action_provider_jobs import JobManager
+from codecompass._fs_evaluation_mixin import FsEvaluationMixin
+from codecompass._fs_tooling_mixin import FsToolingMixin
 from codecompass.adapters.fs.report_parser import (
-    RunInfo,
-    build_repository_info,
-    build_totals,
     calculate_trend,
-    clean_cell,
-    extract_exec_summary,
-    is_divider_row,
     list_runs,
     most_frequent_grade,
     parse_eval_from_json,
     parse_eval_markdown,
     parse_evidence_file,
     parse_numeric_score,
-    parse_report_json,
     read_run_data,
     safe_read_dir,
-    split_table_row,
     summarize_dimensions,
 )
-from codecompass.evaluate.lib.repo_handler import is_repo_url
 
 
 def _parse_violations_from_evidence(evidence_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
@@ -57,6 +45,38 @@ def _parse_violations_from_evidence(evidence_path: Path, project: str, run_id: s
     return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}
 
 
+def _texts_from_assistant(event: dict) -> list[str]:
+    texts: list[str] = []
+    for block in (event.get("message") or {}).get("content") or []:
+        if block.get("type") == "text" and block.get("text"):
+            texts.append(block["text"])
+    return texts
+
+
+def _texts_from_result(event: dict) -> list[str]:
+    r = event.get("result")
+    return [r] if r else []
+
+
+def _texts_from_item_completed(event: dict) -> list[str]:
+    texts: list[str] = []
+    item = event.get("item") or {}
+    if item.get("type") == "agent_message":
+        if item.get("text"):
+            texts.append(item["text"])
+        for block in item.get("content") or []:
+            if block.get("type") in ("text", "output_text") and block.get("text"):
+                texts.append(block["text"])
+    return texts
+
+
+_TEXT_EXTRACTORS: dict[str, callable] = {
+    "assistant": _texts_from_assistant,
+    "result": _texts_from_result,
+    "item.completed": _texts_from_item_completed,
+}
+
+
 def _parse_violations_from_stream(stream_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
     try:
         content = stream_path.read_text()
@@ -72,23 +92,8 @@ def _parse_violations_from_stream(stream_path: Path, project: str, run_id: str, 
             event = json.loads(stripped)
         except json.JSONDecodeError:
             continue
-        texts: list[str] = []
-        etype = event.get("type")
-        if etype == "assistant":
-            for block in (event.get("message") or {}).get("content") or []:
-                if block.get("type") == "text" and block.get("text"):
-                    texts.append(block["text"])
-        elif etype == "result":
-            if event.get("result"):
-                texts.append(event["result"])
-        elif etype == "item.completed":
-            item = event.get("item") or {}
-            if item.get("type") == "agent_message":
-                if item.get("text"):
-                    texts.append(item["text"])
-                for block in item.get("content") or []:
-                    if block.get("type") in ("text", "output_text") and block.get("text"):
-                        texts.append(block["text"])
+        extractor = _TEXT_EXTRACTORS.get(event.get("type"))
+        texts = extractor(event) if extractor else []
         for text in texts:
             for tl in text.splitlines():
                 t = tl.strip()
@@ -116,9 +121,12 @@ def _parse_violations_from_stream(stream_path: Path, project: str, run_id: str, 
     return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}
 
 
-class FilesystemActionProvider(ActionProvider):
+class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider):
     def __init__(self, job_manager: JobManager | None = None) -> None:
         self._jobs = job_manager or JobManager()
+        self._model_fetchers: dict[str, callable] = {
+            "claude": self._get_claude_models,
+        }
     def list_projects(self, reports_dir: str):
         reports_root = Path(reports_dir)
         projects = []
@@ -510,46 +518,6 @@ class FilesystemActionProvider(ActionProvider):
             return _parse_violations_from_stream(stream_path, project, run_id, dimension)
         return None
 
-    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None):
-        repo_path = Path(repo)
-        if not is_repo_url(repo) and not repo_path.exists():
-            raise FileNotFoundError(f"Repository not found: {repo}")
-
-        reports_abs = str(Path(reports_dir).resolve())
-        cmd = [sys.executable, "-m", "codecompass.cli", "evaluate"]
-        cmd += ["--evaluations", reports_abs]
-        if dimensions:
-            cmd += ["-d", dimensions]
-        if numerical:
-            cmd.append("-n")
-        if discipline:
-            cmd.append(discipline)
-        if is_repo_url(repo):
-            cmd.append(repo)
-        else:
-            cmd.append(str(repo_path.resolve()))
-
-        from codecompass.evaluate.runner import resolve_project_uuid
-        repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
-        project_name = repo.split("/")[-1].replace(".git", "") if is_repo_url(repo) else Path(repo).name
-        location = "online" if is_repo_url(repo) else "local"
-        project_uuid = resolve_project_uuid(Path(reports_dir), project_name, repo_resolved, discipline, location=location)
-
-        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
-        if ai_cmd:
-            env["AI_CMD"] = ai_cmd
-        if ai_model:
-            env["AI_MODEL"] = ai_model
-
-        cwd = str(Path.cwd()) if is_repo_url(repo) else str(repo_path.resolve())
-        return self._jobs.start_job(cmd, cwd=cwd, env=env)
-
-    def get_evaluation_status(self, job_id: str):
-        return self._jobs.get_job(job_id)
-
-    def cancel_evaluation(self, job_id: str) -> bool:
-        return self._jobs.cancel_job(job_id)
-
     def get_violations(self, reports_dir: str, project: str, run_id: str):
         dashboard = self.get_dashboard(reports_dir, project, run_id)
         summary = {
@@ -574,108 +542,14 @@ class FilesystemActionProvider(ActionProvider):
                     file_path, {"path": file_path, "count": 0, "critical": 0, "major": 0, "minor": 0}
                 )
                 entry["count"] += 1
-                if violation.get("severity") == "critical":
-                    entry["critical"] += 1
-                elif violation.get("severity") == "major":
-                    entry["major"] += 1
-                elif violation.get("severity") == "minor":
-                    entry["minor"] += 1
+                sev = violation.get("severity", "minor")
+                if sev in entry:
+                    entry[sev] += 1
 
         files = sorted(summary["byFile"].values(), key=lambda item: item["count"], reverse=True)[:20]
         summary["files"] = files
         summary.pop("byFile", None)
         return summary
 
-    def get_ai_clients(self):
-        candidates = [
-            {"id": "claude", "label": "Claude"},
-            {"id": "codex", "label": "Codex"},
-            {"id": "copilot", "label": "Copilot"},
-        ]
-        return {"clients": [c for c in candidates if shutil.which(c["id"])]}
-
-    def get_client_models(self, client_id: str):
-        if client_id == "claude":
-            return self._get_claude_models()
-        if not shutil.which(client_id):
-            return {"models": []}
-        try:
-            result = subprocess.run(
-                [client_id, "/models"],
-                capture_output=True,
-                text=True,
-                timeout=8,
-            )
-            output = result.stdout if result.returncode == 0 else ""
-        except (subprocess.TimeoutExpired, OSError):
-            return {"models": []}
-        models = []
-        for line in output.splitlines():
-            token = line.strip().split()[0] if line.strip() else ""
-            if token and token[0] not in ("#", "=", "-", "[", "("):
-                models.append(token)
-        return {"models": models}
-
-    def _get_claude_models(self):
-        # Try direct API call when ANTHROPIC_API_KEY is available
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if api_key:
-            try:
-                req = urllib.request.Request(
-                    "https://api.anthropic.com/v1/models",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                    },
-                )
-                with urllib.request.urlopen(req, timeout=8) as resp:
-                    data = json.loads(resp.read())
-                models = [m["id"] for m in data.get("data", []) if m.get("id")]
-                if models:
-                    return {"models": models}
-            except Exception:
-                pass
-        # Fall back to a curated list of current models.
-        # Claude Code uses OAuth (web login) — there's no way to call /v1/models
-        # without an API key, so we maintain this list manually.
-        return {"models": [
-            "claude-opus-4-5",
-            "claude-sonnet-4-5",
-            "claude-haiku-4-5",
-        ]}
-
-    def browse_repo(self, path: str | None):
-        target = Path(path) if path else Path.home()
-        target = target.resolve()
-        if not target.exists():
-            return {"error": "Path not found", "path": str(target)}
-        if not target.is_dir():
-            return {"error": "Path is not a directory", "path": str(target)}
-
-        directories = []
-        for entry in safe_read_dir(target):
-            if entry.name.startswith("."):
-                continue
-            if not entry.is_dir():
-                continue
-            entry_path = target / entry.name
-            try:
-                os.access(entry_path, os.R_OK)
-            except OSError:
-                continue
-            directories.append(
-                {
-                    "name": entry.name,
-                    "path": str(entry_path),
-                    "isGitRepo": (entry_path / ".git").exists(),
-                }
-            )
-
-        directories.sort(key=lambda item: item["name"])
-        parent = target.parent if target.parent != target else None
-        return {
-            "current": str(target),
-            "parent": str(parent) if parent else None,
-            "directories": directories,
-            "isGitRepo": (target / ".git").exists(),
-        }
+    # browse_repo, get_ai_clients, get_client_models → FsToolingMixin
+    # start_evaluation, get_evaluation_status, cancel_evaluation → FsEvaluationMixin

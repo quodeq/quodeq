@@ -33,6 +33,36 @@ class DisciplineRule:
     suggested_topics: list[str] | None = None
 
 
+_SIMPLE_FIELDS = {
+    "language", "category", "detect_file", "detect_file_alt",
+    "detect_file_alt2", "detect_glob", "detect_dir", "detect_requires_file",
+}
+_QUOTED_FIELDS = {
+    "detect_contains", "detect_contains_alt", "detect_contains_alt2",
+}
+_CSV_FIELDS = {"detect_excludes", "suggested_topics"}
+
+
+def _parse_csv(value: str) -> list[str]:
+    return [part.strip() for part in value.split(",") if part.strip()]
+
+
+def _parse_field(rule: DisciplineRule, key: str, value: str) -> None:
+    if key in _SIMPLE_FIELDS:
+        setattr(rule, key, value)
+    elif key in _QUOTED_FIELDS:
+        setattr(rule, key, _strip_quotes(value))
+    elif key in _CSV_FIELDS:
+        setattr(rule, key, _parse_csv(value))
+    elif key == "detect_priority":
+        try:
+            rule.detect_priority = int(value)
+        except ValueError:
+            rule.detect_priority = 99
+    elif key == "detect_fallback":
+        rule.detect_fallback = value.lower() == "true"
+
+
 @dataclass
 class DisciplineRegistry:
     disciplines: dict[str, DisciplineRule]
@@ -55,34 +85,7 @@ class DisciplineRegistry:
             key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip()
-            # Simple string fields — direct assignment
-            _SIMPLE_FIELDS = {
-                "language", "category", "detect_file", "detect_file_alt",
-                "detect_file_alt2", "detect_glob", "detect_dir", "detect_requires_file",
-            }
-            # String fields that need quote stripping
-            _QUOTED_FIELDS = {
-                "detect_contains", "detect_contains_alt", "detect_contains_alt2",
-            }
-            if key in _SIMPLE_FIELDS:
-                setattr(current, key, value)
-            elif key in _QUOTED_FIELDS:
-                setattr(current, key, _strip_quotes(value))
-            elif key == "detect_priority":
-                try:
-                    current.detect_priority = int(value)
-                except ValueError:
-                    current.detect_priority = 99
-            elif key == "detect_excludes":
-                current.detect_excludes = [
-                    part.strip() for part in value.split(",") if part.strip()
-                ]
-            elif key == "detect_fallback":
-                current.detect_fallback = value.lower() == "true"
-            elif key == "suggested_topics":
-                current.suggested_topics = [
-                    part.strip() for part in value.split(",") if part.strip()
-                ]
+            _parse_field(current, key, value)
 
         return cls(rules)
 
