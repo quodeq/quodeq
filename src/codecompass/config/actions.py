@@ -3,7 +3,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
 from codecompass.bootstrap import DataProvider
 from codecompass.config import generators
 from codecompass.config import practices_manager
@@ -71,6 +70,7 @@ def run_generate_practices(
     provider: DataProvider | None = None,
 ) -> int:
     if provider is None:
+        from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
         provider = DataProvider(practices=FilesystemPracticesRepository(root=paths.root))
     practices_repo = provider.practices
     try:

@@ -6,7 +6,12 @@ from typing import Any
 from flask import Flask, jsonify, request
 
 from codecompass.action_provider import ActionProvider
-from codecompass.action_provider_fs import FilesystemActionProvider
+
+
+def _default_provider() -> ActionProvider:
+    """Create the default filesystem-based provider (lazy import)."""
+    from codecompass.action_provider_fs import FilesystemActionProvider
+    return FilesystemActionProvider()
 
 
 def _error(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
@@ -19,7 +24,7 @@ def _reports_dir() -> str:
 
 def create_app(provider: ActionProvider | None = None) -> Flask:
     app = Flask(__name__)
-    provider = provider or FilesystemActionProvider()
+    provider = provider or _default_provider()
 
     @app.get("/api/health")
     def health():

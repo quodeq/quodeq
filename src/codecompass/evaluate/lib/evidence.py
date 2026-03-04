@@ -162,8 +162,8 @@ def assemble_evidence_from_jsonl(
 
     principles, accepted, rejected = _read_jsonl_findings(jsonl_file)
     dropped = _remove_duplicates(principles)
-    from codecompass.evaluate.lib.scoring import _scale_multiplier  # local import avoids circular dep
-    scale_mult = _scale_multiplier(source_file_count)
+    from codecompass.evaluate.lib.scoring import scale_multiplier  # local import avoids circular dep
+    scale_mult = scale_multiplier(source_file_count)
     _compute_principle_metrics(principles, scale_multiplier=scale_mult)
 
     if not principles:
