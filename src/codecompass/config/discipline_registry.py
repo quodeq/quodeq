@@ -55,28 +55,19 @@ class DisciplineRegistry:
             key, value = line.split("=", 1)
             key = key.strip()
             value = value.strip()
-            if key == "language":
-                current.language = value
-            elif key == "category":
-                current.category = value
-            elif key == "detect_file":
-                current.detect_file = value
-            elif key == "detect_contains":
-                current.detect_contains = _strip_quotes(value)
-            elif key == "detect_file_alt":
-                current.detect_file_alt = value
-            elif key == "detect_contains_alt":
-                current.detect_contains_alt = _strip_quotes(value)
-            elif key == "detect_file_alt2":
-                current.detect_file_alt2 = value
-            elif key == "detect_contains_alt2":
-                current.detect_contains_alt2 = _strip_quotes(value)
-            elif key == "detect_glob":
-                current.detect_glob = value
-            elif key == "detect_dir":
-                current.detect_dir = value
-            elif key == "detect_requires_file":
-                current.detect_requires_file = value
+            # Simple string fields — direct assignment
+            _SIMPLE_FIELDS = {
+                "language", "category", "detect_file", "detect_file_alt",
+                "detect_file_alt2", "detect_glob", "detect_dir", "detect_requires_file",
+            }
+            # String fields that need quote stripping
+            _QUOTED_FIELDS = {
+                "detect_contains", "detect_contains_alt", "detect_contains_alt2",
+            }
+            if key in _SIMPLE_FIELDS:
+                setattr(current, key, value)
+            elif key in _QUOTED_FIELDS:
+                setattr(current, key, _strip_quotes(value))
             elif key == "detect_priority":
                 try:
                     current.detect_priority = int(value)

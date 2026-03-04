@@ -3,7 +3,11 @@
     "allow": [
       "Bash(node:*)",
       "Bash(cp:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(python3:*)",
+      "Bash(.venv/bin/python:*)"
     ]
   }
 }
