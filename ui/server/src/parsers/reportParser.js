@@ -100,14 +100,17 @@ const _runDateCache = new Map();
  * Returns { iso, label } or null if no date found.
  */
 /**
- * Normalize a date string from evidence files.
- * Accepts ISO "2026-03-01" or compact "20260301" format.
- * Returns "YYYY-MM-DD" or null.
+ * Normalize a date or datetime string into a sortable ISO string.
+ * Accepts ISO datetime (2026-03-01T14:30:25), ISO date (2026-03-01),
+ * or compact date (20260301).  Returns the full string (including time
+ * when present) so that same-day runs sort correctly, or null.
  */
 function normalizeDate(raw) {
   if (!raw) return null;
   const s = String(raw);
-  // Already ISO
+  // ISO datetime  YYYY-MM-DDTHH:MM:SS (with optional fractional seconds)
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(s)) return s;
+  // ISO date only
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   // Compact YYYYMMDD → YYYY-MM-DD
   const m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
@@ -127,7 +130,9 @@ function runDateFromDir(reportsRoot, project, runId) {
       const data = JSON.parse(fsSync.readFileSync(nodePath.join(evidenceDir, e.name), 'utf8'));
       const iso = normalizeDate(data.date);
       if (iso) {
-        const dt = new Date(`${iso}T00:00:00Z`);
+        // If iso already contains time (YYYY-MM-DDTHH:MM:SS), use as-is; otherwise append T00:00:00Z
+        const dtStr = iso.includes('T') ? `${iso}Z` : `${iso}T00:00:00Z`;
+        const dt = new Date(dtStr);
         if (!Number.isNaN(dt.getTime())) {
           const result = {
             iso,

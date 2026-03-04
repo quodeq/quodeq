@@ -32,11 +32,18 @@ def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
 
 
 def _normalize_date(raw: str) -> tuple[str, str] | None:
-    """Parse a date string in ISO (2026-03-01) or compact (20260301) format."""
-    for fmt in ("%Y-%m-%d", "%Y%m%d"):
+    """Parse a date/datetime string and return (sortable_iso, human_label).
+
+    Accepts ISO datetime (2026-03-01T14:30:25), ISO date (2026-03-01),
+    or compact date (20260301).  The first element is the full string
+    (including time when available) so that same-day runs sort correctly.
+    """
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
         try:
             parsed = datetime.strptime(raw, fmt)
-            return parsed.date().isoformat(), parsed.strftime("%b %d, %Y")
+            sortable = parsed.isoformat(timespec='seconds') if "T" in fmt else parsed.date().isoformat()
+            label = parsed.strftime("%b %d, %Y")
+            return sortable, label
         except ValueError:
             continue
     return None
