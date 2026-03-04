@@ -24,7 +24,7 @@ export default function ProjectSelector({ projects, selectedProject, selectedRun
             <option value="">No analyzed project</option>
           ) : null}
           {projectList.map((project) => (
-            <option key={project.name} value={project.name}>
+            <option key={project.id || project.name} value={project.id || project.name}>
               {project.name}
             </option>
           ))}

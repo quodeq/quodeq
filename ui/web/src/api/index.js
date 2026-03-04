@@ -31,6 +31,10 @@ export function getDashboard(projectId, run = 'latest') {
   return request(`/projects/${encodeURIComponent(projectId)}/dashboard${q}`);
 }
 
+export function listEvaluations() {
+  return request('/evaluations');
+}
+
 export function startEvaluation(input) {
   return request('/evaluations', {
     method: 'POST',

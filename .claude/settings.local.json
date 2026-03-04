@@ -18,7 +18,9 @@
       "Bash(lsof:*)",
       "Bash(ps:*)",
       "Bash(xargs kill -9)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(kill %1:*)",
+      "Bash(/Users/marche000/Projects/codecompass/.venv/bin/python:*)"
     ]
   }
 }
