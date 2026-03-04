@@ -14,7 +14,11 @@
       "Bash(python3.13:*)",
       "Bash(grep:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(lsof:*)",
+      "Bash(ps:*)",
+      "Bash(xargs kill -9)",
+      "Bash(npm run:*)"
     ]
   }
 }
