@@ -75,16 +75,11 @@ body {
 
 .sidebar-brand-icon {
   flex-shrink: 0;
-  width: 32px;
+  width: 38px;
   height: 32px;
-  background: var(--color-accent);
-  color: #fff;
-  border-radius: var(--radius-md);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
   font-family: var(--font-sans);
 }
 
