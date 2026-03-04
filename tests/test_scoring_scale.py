@@ -1,5 +1,5 @@
 from codecompass.evaluate.lib.scoring import (
-    _scale_multiplier,
+    scale_multiplier,
     build_deductions,
     count_grade_drops,
     confidence_interval_for,
@@ -7,38 +7,38 @@ from codecompass.evaluate.lib.scoring import (
 )
 
 
-# --- _scale_multiplier ---
+# --- scale_multiplier ---
 
 def test_scale_micro_and_small():
-    assert _scale_multiplier(0) == 1
-    assert _scale_multiplier(49) == 1
-    assert _scale_multiplier(50) == 1
-    assert _scale_multiplier(499) == 1
+    assert scale_multiplier(0) == 1
+    assert scale_multiplier(49) == 1
+    assert scale_multiplier(50) == 1
+    assert scale_multiplier(499) == 1
 
 
 def test_scale_medium():
-    assert _scale_multiplier(500) == 2
-    assert _scale_multiplier(4_999) == 2
+    assert scale_multiplier(500) == 2
+    assert scale_multiplier(4_999) == 2
 
 
 def test_scale_large():
-    assert _scale_multiplier(5_000) == 3
-    assert _scale_multiplier(19_999) == 3
+    assert scale_multiplier(5_000) == 3
+    assert scale_multiplier(19_999) == 3
 
 
 def test_scale_xlarge():
-    assert _scale_multiplier(20_000) == 4
-    assert _scale_multiplier(49_999) == 4
+    assert scale_multiplier(20_000) == 4
+    assert scale_multiplier(49_999) == 4
 
 
 def test_scale_xxlarge():
-    assert _scale_multiplier(50_000) == 5
-    assert _scale_multiplier(99_999) == 5
+    assert scale_multiplier(50_000) == 5
+    assert scale_multiplier(99_999) == 5
 
 
 def test_scale_enterprise():
-    assert _scale_multiplier(100_000) == 6
-    assert _scale_multiplier(999_999) == 6
+    assert scale_multiplier(100_000) == 6
+    assert scale_multiplier(999_999) == 6
 
 
 # --- build_deductions ---

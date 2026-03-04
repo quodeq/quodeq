@@ -23,7 +23,7 @@ class RunInfo:
     date_label: str
 
 
-def _safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
+def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
     try:
         with os.scandir(path) as it:
             return list(it)
@@ -45,7 +45,7 @@ def _normalize_date(raw: str) -> tuple[str, str] | None:
 def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
     """Read the date from the first evidence file in a run directory."""
     evidence_dir = reports_root / project / run_id / "evidence"
-    for entry in _safe_read_dir(evidence_dir):
+    for entry in safe_read_dir(evidence_dir):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
             try:
                 data = json.loads(Path(entry.path).read_text())
@@ -56,10 +56,14 @@ def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str 
                         return result
             except (json.JSONDecodeError, OSError):
                 pass
+    # Fallback: try parsing the run_id itself as a date (backward compat with YYYYMMDD dirs)
+    fallback = _normalize_date(run_id)
+    if fallback:
+        return fallback
     return None, run_id
 
 
-def _parse_numeric_score(score_text: str | None) -> float | None:
+def parse_numeric_score(score_text: str | None) -> float | None:
     if not score_text:
         return None
     match = re.search(r"(\d+(?:\.\d+)?)", str(score_text))
@@ -68,11 +72,11 @@ def _parse_numeric_score(score_text: str | None) -> float | None:
     return float(match.group(1))
 
 
-def _clean_cell(value: str) -> str:
+def clean_cell(value: str) -> str:
     return value.replace("**", "").replace("`", "").strip()
 
 
-def _build_repository_info(repo: str, discipline: str | None) -> dict[str, str | None]:
+def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | None]:
     if is_repo_url(repo):
         name = repo.split("/")[-1].replace(".git", "")
         return {
@@ -90,17 +94,17 @@ def _build_repository_info(repo: str, discipline: str | None) -> dict[str, str |
     }
 
 
-def _split_table_row(line: str) -> list[str]:
+def split_table_row(line: str) -> list[str]:
     raw = line.strip()
     no_outer = raw.lstrip("|").rstrip("|")
-    return [_clean_cell(cell) for cell in no_outer.split("|")]
+    return [clean_cell(cell) for cell in no_outer.split("|")]
 
 
-def _is_divider_row(line: str) -> bool:
+def is_divider_row(line: str) -> bool:
     return re.match(r"^\s*\|?\s*[-:]+(\s*\|\s*[-:]+)+\s*\|?\s*$", line) is not None
 
 
-def _extract_exec_summary(markdown: str) -> list[str]:
+def extract_exec_summary(markdown: str) -> list[str]:
     lines = markdown.splitlines()
     start = -1
     for idx, line in enumerate(lines):
@@ -118,14 +122,14 @@ def _extract_exec_summary(markdown: str) -> list[str]:
     return result
 
 
-def _parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: str) -> dict[str, Any]:
-    table_lines = [line for line in _extract_exec_summary(markdown) if not _is_divider_row(line)]
+def parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: str) -> dict[str, Any]:
+    table_lines = [line for line in extract_exec_summary(markdown) if not is_divider_row(line)]
     principle_grades: list[dict[str, Any]] = []
     if len(table_lines) >= 2:
-        header_cells = [c for c in _split_table_row(table_lines[0]) if c]
+        header_cells = [c for c in split_table_row(table_lines[0]) if c]
         is_four_col = len(header_cells) >= 4
         for line in table_lines[1:]:
-            cells = [c for c in _split_table_row(line) if c]
+            cells = [c for c in split_table_row(line) if c]
             if len(cells) < 2:
                 continue
             principle = cells[0]
@@ -145,7 +149,7 @@ def _parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: st
             else:
                 grade = cells[1]
             if not grade and score:
-                grade_score = _parse_numeric_score(score)
+                grade_score = parse_numeric_score(score)
                 if grade_score is not None:
                     if grade_score >= 9:
                         grade = "Exemplary"
@@ -178,7 +182,7 @@ def _parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: st
     }
 
 
-def _most_frequent_grade(grades: list[str]) -> str | None:
+def most_frequent_grade(grades: list[str]) -> str | None:
     if not grades:
         return None
     counts: dict[str, int] = {}
@@ -202,7 +206,7 @@ def _most_frequent_grade(grades: list[str]) -> str | None:
     return winner
 
 
-def _build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, Any]]) -> dict[str, Any]:
+def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, Any]]) -> dict[str, Any]:
     severity = {"critical": 0, "major": 0, "minor": 0, "unknown": 0}
     for entry in violations:
         key = entry.get("severity", "unknown")
@@ -216,7 +220,7 @@ def _build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, A
     }
 
 
-def _parse_report_json(json_path: Path) -> dict[str, Any] | None:
+def parse_report_json(json_path: Path) -> dict[str, Any] | None:
     try:
         data = json.loads(json_path.read_text())
     except OSError:
@@ -257,11 +261,11 @@ def _parse_report_json(json_path: Path) -> dict[str, Any] | None:
         "detailPrinciples": [],
         "violations": violations,
         "compliance": compliance,
-        "totals": _build_totals(violations, compliance),
+        "totals": build_totals(violations, compliance),
     }
 
 
-def _parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
+def parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
     dimension = evidence_path.name.replace("_evidence.json", "")
     try:
         data = json.loads(evidence_path.read_text())
@@ -277,10 +281,10 @@ def _parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
     }
 
 
-def _summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
     overall_grades = [d.get("overallGrade") for d in dimensions if d.get("overallGrade")]
     numeric_scores = [
-        score for score in (_parse_numeric_score(d.get("overallScore")) for d in dimensions) if score is not None
+        score for score in (parse_numeric_score(d.get("overallScore")) for d in dimensions) if score is not None
     ]
     numeric_average = None
     if numeric_scores:
@@ -292,7 +296,7 @@ def _summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
 
     return {
         "dimensionsCount": len(dimensions),
-        "overallGrade": _most_frequent_grade(overall_grades),
+        "overallGrade": most_frequent_grade(overall_grades),
         "numericAverage": numeric_average,
         "gradeBreakdown": [
             {"grade": grade, "count": count}
@@ -301,20 +305,20 @@ def _summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
-def _read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
+def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
     run_dir = reports_root / project / run_id
     evaluation_dir = run_dir / "evaluation"
     evidence_dir = run_dir / "evidence"
 
     evaluations: list[dict[str, Any]] = []
     seen_dimensions: set[str] = set()
-    entries = _safe_read_dir(evaluation_dir)
+    entries = safe_read_dir(evaluation_dir)
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith("_eval.md"):
             continue
         dimension = entry.name[:-8]
         json_path = evaluation_dir / f"{dimension}.json"
-        parsed = _parse_report_json(json_path) if json_path.exists() else None
+        parsed = parse_report_json(json_path) if json_path.exists() else None
         if parsed:
             evaluations.append(parsed)
             seen_dimensions.add(dimension)
@@ -325,15 +329,15 @@ def _read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[s
         dimension = entry.name[:-5]
         if dimension in seen_dimensions:
             continue
-        parsed = _parse_report_json(Path(entry.path))
+        parsed = parse_report_json(Path(entry.path))
         if parsed:
             evaluations.append(parsed)
             seen_dimensions.add(dimension)
 
     evidence_map: dict[str, dict[str, Any]] = {}
-    for entry in _safe_read_dir(evidence_dir):
+    for entry in safe_read_dir(evidence_dir):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
-            parsed = _parse_evidence_file(Path(entry.path))
+            parsed = parse_evidence_file(Path(entry.path))
             evidence_map[parsed["dimension"]] = parsed
 
     dimensions = []
@@ -353,10 +357,10 @@ def _read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[s
     return dimensions
 
 
-def _list_runs(reports_root: Path, project: str) -> list[RunInfo]:
+def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
     project_dir = reports_root / project
     run_infos: list[RunInfo] = []
-    for entry in _safe_read_dir(project_dir):
+    for entry in safe_read_dir(project_dir):
         if not entry.is_dir() or entry.name.startswith("."):
             continue
         # Skip repository_info.json-only dirs (the project root itself won't have sub-runs)
@@ -366,9 +370,9 @@ def _list_runs(reports_root: Path, project: str) -> list[RunInfo]:
     return run_infos
 
 
-def _calculate_trend(current_score: Any, previous_score: Any) -> str:
-    current = _parse_numeric_score(str(current_score)) if current_score is not None else None
-    previous = _parse_numeric_score(str(previous_score)) if previous_score is not None else None
+def calculate_trend(current_score: Any, previous_score: Any) -> str:
+    current = parse_numeric_score(str(current_score)) if current_score is not None else None
+    previous = parse_numeric_score(str(previous_score)) if previous_score is not None else None
     if current is None or previous is None:
         return "none"
     if current > previous:
@@ -382,20 +386,20 @@ def _get_previous_run_for_dimension(reports_root: Path, project: str, current_ru
     project_path = reports_root / project
     if not project_path.exists():
         return None
-    all_runs = _list_runs(reports_root, project)
+    all_runs = list_runs(reports_root, project)
     # Find the index of the current run, then iterate older runs (after it in the sorted list)
     current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
     if current_idx < 0:
         return None
     for run_info in all_runs[current_idx + 1:]:
-        dimensions = _read_run_data(reports_root, project, run_info.run_id)
+        dimensions = read_run_data(reports_root, project, run_info.run_id)
         dim = next((d for d in dimensions if d.get("dimension") == dimension), None)
         if dim:
             return {"runId": run_info.run_id, "dimension": dim}
     return None
 
 
-def _parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
     try:
         data = json.loads(json_path.read_text())
     except OSError:

@@ -14,23 +14,23 @@ from codecompass.action_provider import ActionProvider
 from codecompass.action_provider_jobs import JobManager
 from codecompass.adapters.fs.report_parser import (
     RunInfo,
-    _build_repository_info,
-    _build_totals,
-    _calculate_trend,
-    _clean_cell,
-    _extract_exec_summary,
-    _is_divider_row,
-    _list_runs,
-    _most_frequent_grade,
-    _parse_eval_from_json,
-    _parse_eval_markdown,
-    _parse_evidence_file,
-    _parse_numeric_score,
-    _parse_report_json,
-    _read_run_data,
-    _safe_read_dir,
-    _split_table_row,
-    _summarize_dimensions,
+    build_repository_info,
+    build_totals,
+    calculate_trend,
+    clean_cell,
+    extract_exec_summary,
+    is_divider_row,
+    list_runs,
+    most_frequent_grade,
+    parse_eval_from_json,
+    parse_eval_markdown,
+    parse_evidence_file,
+    parse_numeric_score,
+    parse_report_json,
+    read_run_data,
+    safe_read_dir,
+    split_table_row,
+    summarize_dimensions,
 )
 from codecompass.evaluate.lib.repo_handler import is_repo_url
 
@@ -122,10 +122,10 @@ class FilesystemActionProvider(ActionProvider):
     def list_projects(self, reports_dir: str):
         reports_root = Path(reports_dir)
         projects = []
-        for entry in _safe_read_dir(reports_root):
+        for entry in safe_read_dir(reports_root):
             if not entry.is_dir() or entry.name.startswith("."):
                 continue
-            runs = _list_runs(reports_root, entry.name)
+            runs = list_runs(reports_root, entry.name)
             if not runs:
                 continue
             parent = None
@@ -150,8 +150,8 @@ class FilesystemActionProvider(ActionProvider):
             latest_score = None
             files_count = None
             try:
-                dims = _read_run_data(reports_root, entry.name, runs[0].run_id)
-                summary = _summarize_dimensions(dims)
+                dims = read_run_data(reports_root, entry.name, runs[0].run_id)
+                summary = summarize_dimensions(dims)
                 latest_grade = summary.get("overallGrade")
                 latest_score = summary.get("numericAverage")
                 files_count = next((d.get("sourceFileCount") for d in dims if d.get("sourceFileCount")), None)
@@ -234,10 +234,10 @@ class FilesystemActionProvider(ActionProvider):
         # the most recent evidence file, which always records the discipline.
         if not discipline:
             reports_root = Path(reports_dir)
-            for run in sorted(_safe_read_dir(reports_root / project), key=lambda e: e.name, reverse=True):
+            for run in sorted(safe_read_dir(reports_root / project), key=lambda e: e.name, reverse=True):
                 if not run.is_dir():
                     continue
-                for ev in _safe_read_dir(reports_root / project / run.name / "evidence"):
+                for ev in safe_read_dir(reports_root / project / run.name / "evidence"):
                     if ev.name.endswith("_evidence.json"):
                         try:
                             d = json.loads(Path(ev.path).read_text()).get("discipline")
@@ -264,7 +264,7 @@ class FilesystemActionProvider(ActionProvider):
 
     def get_dashboard(self, reports_dir: str, project: str, run: str):
         reports_root = Path(reports_dir)
-        runs = _list_runs(reports_root, project)
+        runs = list_runs(reports_root, project)
         if not runs:
             raise FileNotFoundError(f"No runs found for project: {project}")
 
@@ -272,8 +272,8 @@ class FilesystemActionProvider(ActionProvider):
         if not selected_run:
             raise FileNotFoundError(f"Run not found: {run}")
 
-        selected_dimensions = _read_run_data(reports_root, project, selected_run.run_id)
-        selected_summary = _summarize_dimensions(selected_dimensions)
+        selected_dimensions = read_run_data(reports_root, project, selected_run.run_id)
+        selected_summary = summarize_dimensions(selected_dimensions)
         selected_dim_names = {d.get("dimension") for d in selected_dimensions}
 
         selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), 0)
@@ -285,7 +285,7 @@ class FilesystemActionProvider(ActionProvider):
         run_data_cache: dict[str, list[dict[str, Any]]] = {}
         def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
             if run_id not in run_data_cache:
-                run_data_cache[run_id] = _read_run_data(reports_root, project, run_id)
+                run_data_cache[run_id] = read_run_data(reports_root, project, run_id)
             return run_data_cache[run_id]
 
         non_na_count: dict[str, int] = {}
@@ -333,7 +333,7 @@ class FilesystemActionProvider(ActionProvider):
         dimensions_with_trend = []
         for dim in selected_dimensions:
             previous = previous_by_dimension.get(dim.get("dimension"))
-            trend = _calculate_trend(dim.get("overallScore"), previous.get("overallScore") if previous else None)
+            trend = calculate_trend(dim.get("overallScore"), previous.get("overallScore") if previous else None)
             dimensions_with_trend.append(
                 {
                     **dim,
@@ -354,7 +354,7 @@ class FilesystemActionProvider(ActionProvider):
                 if dim_name:
                     acc_by_dim[dim_name] = dim  # latest run wins
             acc_scores = [
-                s for s in (_parse_numeric_score(d.get("overallScore")) for d in acc_by_dim.values())
+                s for s in (parse_numeric_score(d.get("overallScore")) for d in acc_by_dim.values())
                 if s is not None
             ]
             acc_grades = [d.get("overallGrade") for d in acc_by_dim.values() if d.get("overallGrade")]
@@ -364,7 +364,7 @@ class FilesystemActionProvider(ActionProvider):
                     "dateISO": item.date_iso,
                     "dateLabel": item.date_label,
                     "dimensionsCount": len(acc_by_dim),
-                    "overallGrade": _most_frequent_grade(acc_grades) if acc_grades else None,
+                    "overallGrade": most_frequent_grade(acc_grades) if acc_grades else None,
                     "numericAverage": round(sum(acc_scores) / len(acc_scores), 1) if acc_scores else None,
                 }
             )
@@ -391,7 +391,7 @@ class FilesystemActionProvider(ActionProvider):
         if not project_path.exists():
             return None
 
-        all_run_infos = _list_runs(reports_root, project)  # newest first
+        all_run_infos = list_runs(reports_root, project)  # newest first
         if as_of:
             # Find the as_of run index and keep only that run and older
             as_of_idx = next((i for i, r in enumerate(all_run_infos) if r.run_id == as_of), None)
@@ -407,7 +407,7 @@ class FilesystemActionProvider(ActionProvider):
         all_run_data: dict[str, list[dict[str, Any]]] = {}
         latest_by_dimension: dict[str, dict[str, Any]] = {}
         for run_id in runs:
-            dims = _read_run_data(reports_root, project, run_id)
+            dims = read_run_data(reports_root, project, run_id)
             all_run_data[run_id] = dims
             for dim in dims:
                 dim_name = dim.get("dimension")
@@ -431,7 +431,7 @@ class FilesystemActionProvider(ActionProvider):
                         if d:
                             previous = {"runId": rid, "dimension": d}
                             break
-            trend = _calculate_trend(dim.get("overallScore"), previous.get("dimension", {}).get("overallScore") if previous else None)
+            trend = calculate_trend(dim.get("overallScore"), previous.get("dimension", {}).get("overallScore") if previous else None)
             dimensions_with_trend.append(
                 {
                     **dim,
@@ -458,7 +458,7 @@ class FilesystemActionProvider(ActionProvider):
             major += severity.get("major", 0)
             minor += severity.get("minor", 0)
 
-        numeric_scores = [score for score in (_parse_numeric_score(s) for s in scores) if score is not None]
+        numeric_scores = [score for score in (parse_numeric_score(s) for s in scores) if score is not None]
         avg_score = round(sum(numeric_scores) / len(numeric_scores), 1) if numeric_scores else None
 
         # Compute previous overall average by re-accumulating over runs[1:] (i.e., excluding
@@ -473,14 +473,14 @@ class FilesystemActionProvider(ActionProvider):
                     if dim_name and dim_name not in prev_latest_by_dimension:
                         prev_latest_by_dimension[dim_name] = dim
             prev_scores_raw = [d.get("overallScore") for d in prev_latest_by_dimension.values() if d.get("overallScore")]
-            prev_numeric_scores = [s for s in (_parse_numeric_score(s) for s in prev_scores_raw) if s is not None]
+            prev_numeric_scores = [s for s in (parse_numeric_score(s) for s in prev_scores_raw) if s is not None]
             prev_avg_score = round(sum(prev_numeric_scores) / len(prev_numeric_scores), 1) if prev_numeric_scores else None
 
         return {
             "project": project,
             "dimensions": dimensions_with_trend,
             "summary": {
-                "overallGrade": _most_frequent_grade(grades),
+                "overallGrade": most_frequent_grade(grades),
                 "numericAverage": avg_score,
                 "previousNumericAverage": prev_avg_score,
                 "totalViolations": total_violations,
@@ -494,14 +494,14 @@ class FilesystemActionProvider(ActionProvider):
         base = Path(reports_dir) / project / run_id
         eval_path = base / "evaluation" / f"{dimension}.json"
         if eval_path.exists():
-            return _parse_eval_from_json(eval_path, project, run_id, dimension)
+            return parse_eval_from_json(eval_path, project, run_id, dimension)
         markdown_path = base / "evaluation" / f"{dimension}_eval.md"
         if markdown_path.exists():
             try:
                 content = markdown_path.read_text()
             except OSError:
                 return None
-            return _parse_eval_markdown(content, project, run_id, dimension)
+            return parse_eval_markdown(content, project, run_id, dimension)
         evidence_path = base / "evidence" / f"{dimension}_evidence.json"
         if evidence_path.exists():
             return _parse_violations_from_evidence(evidence_path, project, run_id, dimension)
@@ -529,9 +529,11 @@ class FilesystemActionProvider(ActionProvider):
         else:
             cmd.append(str(repo_path.resolve()))
 
-        from codecompass.evaluate.runner import _resolve_project_uuid
+        from codecompass.evaluate.runner import resolve_project_uuid
         repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
-        project_uuid = _resolve_project_uuid(Path(reports_dir), Path(repo).name, repo_resolved, discipline)
+        project_name = repo.split("/")[-1].replace(".git", "") if is_repo_url(repo) else Path(repo).name
+        location = "online" if is_repo_url(repo) else "local"
+        project_uuid = resolve_project_uuid(Path(reports_dir), project_name, repo_resolved, discipline, location=location)
 
         env = {**os.environ, "PYTHONUNBUFFERED": "1"}
         if ai_cmd:
@@ -651,7 +653,7 @@ class FilesystemActionProvider(ActionProvider):
             return {"error": "Path is not a directory", "path": str(target)}
 
         directories = []
-        for entry in _safe_read_dir(target):
+        for entry in safe_read_dir(target):
             if entry.name.startswith("."):
                 continue
             if not entry.is_dir():
