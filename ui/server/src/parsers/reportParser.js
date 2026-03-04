@@ -92,24 +92,60 @@ function mostCommonGrade(grades) {
 // Run-ID / date helpers
 // ---------------------------------------------------------------------------
 
+// In-memory cache for run dates — run dates are immutable so cache never invalidates.
+const _runDateCache = new Map();
+
 /**
- * Parse the YYYYMMDD prefix of a run directory name into ISO + human label.
+ * Read the date from the first *_evidence.json file in a run's evidence/ directory.
+ * Returns { iso, label } or null if no date found.
  */
-function runIdToDate(runId) {
-  const m = runId.match(/^(\d{4})(\d{2})(\d{2})/);
-  if (!m) return null;
-  const iso = `${m[1]}-${m[2]}-${m[3]}`;
-  const dt = new Date(`${iso}T00:00:00Z`);
-  if (Number.isNaN(dt.getTime())) return null;
-  return {
-    iso,
-    label: dt.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: '2-digit',
-      timeZone: 'UTC'
-    })
-  };
+/**
+ * Normalize a date string from evidence files.
+ * Accepts ISO "2026-03-01" or compact "20260301" format.
+ * Returns "YYYY-MM-DD" or null.
+ */
+function normalizeDate(raw) {
+  if (!raw) return null;
+  const s = String(raw);
+  // Already ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+  // Compact YYYYMMDD → YYYY-MM-DD
+  const m = s.match(/^(\d{4})(\d{2})(\d{2})$/);
+  if (m) return `${m[1]}-${m[2]}-${m[3]}`;
+  return null;
+}
+
+function runDateFromDir(reportsRoot, project, runId) {
+  const cacheKey = `${project}/${runId}`;
+  if (_runDateCache.has(cacheKey)) return _runDateCache.get(cacheKey);
+
+  const evidenceDir = nodePath.join(reportsRoot, project, runId, 'evidence');
+  const entries = readdirSafe(evidenceDir, { withFileTypes: true });
+  for (const e of entries) {
+    if (!e.isFile() || !e.name.endsWith('_evidence.json')) continue;
+    try {
+      const data = JSON.parse(fsSync.readFileSync(nodePath.join(evidenceDir, e.name), 'utf8'));
+      const iso = normalizeDate(data.date);
+      if (iso) {
+        const dt = new Date(`${iso}T00:00:00Z`);
+        if (!Number.isNaN(dt.getTime())) {
+          const result = {
+            iso,
+            label: dt.toLocaleDateString('en-US', {
+              year: 'numeric',
+              month: 'short',
+              day: '2-digit',
+              timeZone: 'UTC'
+            })
+          };
+          _runDateCache.set(cacheKey, result);
+          return result;
+        }
+      }
+    } catch { /* skip unreadable files */ }
+  }
+  _runDateCache.set(cacheKey, null);
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -564,14 +600,15 @@ function precedingDimension(reportsRoot, project, beforeRunId, dimensionName) {
   const projectDir = nodePath.join(reportsRoot, project);
   if (!fsSync.existsSync(projectDir)) return null;
 
-  const olderRuns = fsSync.readdirSync(projectDir)
-    .filter((name) => /^\d{8}$/.test(name) && name < beforeRunId)
-    .sort((a, b) => b.localeCompare(a));
+  const allRuns = listRuns(reportsRoot, project); // newest-first
+  const idx = allRuns.findIndex((r) => r.runId === beforeRunId);
+  if (idx < 0) return null;
 
-  for (const runId of olderRuns) {
-    const dims = loadRunDimensions(reportsRoot, project, runId);
+  // Iterate older runs (higher index = older)
+  for (let i = idx + 1; i < allRuns.length; i++) {
+    const dims = loadRunDimensions(reportsRoot, project, allRuns[i].runId);
     const match = dims.find((d) => d.dimension === dimensionName);
-    if (match) return { runId, dimension: match };
+    if (match) return { runId: allRuns[i].runId, dimension: match };
   }
   return null;
 }
@@ -589,7 +626,7 @@ export function listRuns(reportsRoot, project) {
   const entries = readdirSafe(projectDir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
     .map((e) => {
-      const parsed = runIdToDate(e.name);
+      const parsed = runDateFromDir(reportsRoot, project, e.name);
       return {
         runId: e.name,
         dateISO: parsed?.iso ?? null,
@@ -618,8 +655,15 @@ export function listProjects(reportsRoot) {
     .filter((e) => e.isDirectory() && !e.name.startsWith('.'))
     .map((e) => {
       const runs = listRuns(reportsRoot, e.name);
+      let displayName = e.name;
+      const infoPath = nodePath.join(reportsRoot, e.name, 'repository_info.json');
+      try {
+        const info = JSON.parse(fsSync.readFileSync(infoPath, 'utf8'));
+        displayName = info.name || e.name;
+      } catch { /* use dir name as fallback */ }
       return {
-        name: e.name,
+        id: e.name,
+        name: displayName,
         runsCount: runs.length,
         latestRunId: runs[0]?.runId ?? null,
         latestDate: runs[0]?.dateISO ?? null
@@ -767,14 +811,18 @@ export function buildAccumulatedData(reportsRoot, project, asOfRun = null) {
   const projectDir = nodePath.join(reportsRoot, project);
   if (!fsSync.existsSync(projectDir)) return null;
 
-  let runIds = fsSync.readdirSync(projectDir)
-    .filter((name) => /^\d{8}$/.test(name))
-    .sort((a, b) => b.localeCompare(a)); // newest first
+  let allRuns = listRuns(reportsRoot, project); // newest first, uses evidence dates
 
   if (asOfRun) {
-    runIds = runIds.filter((id) => id <= asOfRun);
+    const asOfIdx = allRuns.findIndex((r) => r.runId === asOfRun);
+    if (asOfIdx >= 0) {
+      allRuns = allRuns.slice(asOfIdx);
+    } else {
+      allRuns = [];
+    }
   }
 
+  const runIds = allRuns.map((r) => r.runId);
   if (runIds.length === 0) return null;
 
   // Collect the latest evaluation per dimension (newest run wins)
@@ -839,4 +887,4 @@ export function buildAccumulatedData(reportsRoot, project, asOfRun = null) {
 }
 
 // Re-export helpers consumed by other modules (evalParser, routes, etc.)
-export { runIdToDate as parseRunIdDate, precedingDimension as getPreviousRunForDimension, scoreDirection as calculateTrend };
+export { runDateFromDir as parseRunDate, precedingDimension as getPreviousRunForDimension, scoreDirection as calculateTrend };

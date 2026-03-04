@@ -3,10 +3,10 @@ import { getDimensionEval } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
-import { gradeColorClass, formatRunId } from '../../../utils/formatters.js';
+import { gradeColorClass } from '../../../utils/formatters.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 
-export default function ExplorerPage({ project, dimension, runId, onNavigate }) {
+export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate }) {
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -90,7 +90,7 @@ export default function ExplorerPage({ project, dimension, runId, onNavigate }) 
         <div className="acc-eval-top">
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
             <span className="explorer-dimension-title">{evalData.dimension}</span>
-            {runId && <span className="acc-eval-date">{formatRunId(runId)}</span>}
+            {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
           </div>
           {allViolations.length > 0 && (
             <CopyButton

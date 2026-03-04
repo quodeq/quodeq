@@ -27,7 +27,6 @@ from codecompass.adapters.fs.report_parser import (
     _parse_evidence_file,
     _parse_numeric_score,
     _parse_report_json,
-    _parse_run_id_date,
     _read_run_data,
     _safe_read_dir,
     _split_table_row,
@@ -134,6 +133,7 @@ class FilesystemActionProvider(ActionProvider):
             path = None
             location = None
             display_name = None
+            project_name = entry.name  # fallback: use dir name
             info_path = reports_root / entry.name / "repository_info.json"
             if info_path.exists():
                 try:
@@ -143,6 +143,7 @@ class FilesystemActionProvider(ActionProvider):
                     path = info.get("path") or None
                     location = info.get("location") or None
                     display_name = info.get("displayName") or None
+                    project_name = info.get("name") or entry.name
                 except (json.JSONDecodeError, OSError):
                     pass
             latest_grade = None
@@ -159,7 +160,8 @@ class FilesystemActionProvider(ActionProvider):
             path_exists = Path(path).exists() if location == "local" and path else None
             projects.append(
                 {
-                    "name": entry.name,
+                    "id": entry.name,
+                    "name": project_name,
                     "runsCount": len(runs),
                     "latestRunId": runs[0].run_id,
                     "latestDate": runs[0].date_iso,
@@ -186,11 +188,11 @@ class FilesystemActionProvider(ActionProvider):
             best_parent = None
             best_len = 0
             for candidate in local_with_path:
-                if candidate["name"] == p["name"]:
+                if candidate["id"] == p["id"]:
                     continue
                 c_path = candidate["path"].rstrip("/")
                 if p_path.startswith(c_path + "/") and len(c_path) > best_len:
-                    best_parent = candidate["name"]
+                    best_parent = candidate["id"]
                     best_len = len(c_path)
             if best_parent:
                 p["parent"] = best_parent
@@ -389,10 +391,15 @@ class FilesystemActionProvider(ActionProvider):
         if not project_path.exists():
             return None
 
-        runs = [entry.name for entry in _safe_read_dir(project_path) if entry.is_dir() and entry.name.isdigit()]
-        runs.sort(reverse=True)
+        all_run_infos = _list_runs(reports_root, project)  # newest first
         if as_of:
-            runs = [run_id for run_id in runs if run_id <= as_of]
+            # Find the as_of run index and keep only that run and older
+            as_of_idx = next((i for i, r in enumerate(all_run_infos) if r.run_id == as_of), None)
+            if as_of_idx is not None:
+                all_run_infos = all_run_infos[as_of_idx:]
+            else:
+                all_run_infos = []
+        runs = [r.run_id for r in all_run_infos]
         if not runs:
             return None
 
@@ -409,17 +416,21 @@ class FilesystemActionProvider(ActionProvider):
 
         all_dimensions = list(latest_by_dimension.values())
 
+        # Build ordered list of run IDs for index-based comparison
+        run_order = runs  # already newest-first
         dimensions_with_trend = []
         for dim in all_dimensions:
             from_run = dim.get("fromRunId")
             dim_name = dim.get("dimension")
             previous = None
             if from_run:
-                for rid in sorted((r for r in runs if r < from_run), reverse=True):
-                    d = next((x for x in all_run_data.get(rid, []) if x.get("dimension") == dim_name), None)
-                    if d:
-                        previous = {"runId": rid, "dimension": d}
-                        break
+                from_idx = run_order.index(from_run) if from_run in run_order else -1
+                if from_idx >= 0:
+                    for rid in run_order[from_idx + 1:]:
+                        d = next((x for x in all_run_data.get(rid, []) if x.get("dimension") == dim_name), None)
+                        if d:
+                            previous = {"runId": rid, "dimension": d}
+                            break
             trend = _calculate_trend(dim.get("overallScore"), previous.get("dimension", {}).get("overallScore") if previous else None)
             dimensions_with_trend.append(
                 {
@@ -518,10 +529,9 @@ class FilesystemActionProvider(ActionProvider):
         else:
             cmd.append(str(repo_path.resolve()))
 
-        info = _build_repository_info(repo, discipline)
-        info_dir = Path(reports_dir) / str(info["name"])
-        info_dir.mkdir(parents=True, exist_ok=True)
-        (info_dir / "repository_info.json").write_text(json.dumps(info))
+        from codecompass.evaluate.runner import _resolve_project_uuid
+        repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
+        project_uuid = _resolve_project_uuid(Path(reports_dir), Path(repo).name, repo_resolved, discipline)
 
         env = {**os.environ, "PYTHONUNBUFFERED": "1"}
         if ai_cmd:

@@ -7,25 +7,31 @@ import { listProjects, listRuns, buildDashboard } from '../src/parsers/reportPar
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fixturesRoot = path.join(__dirname, 'fixtures/evaluations');
 
-test('listProjects returns projects with run metadata', () => {
+const PROJECT_UUID = 'a1b2c3d4-e5f6-7890-abcd-ef1234567890';
+
+test('listProjects returns projects with id, name from repository_info.json, and run metadata', () => {
   const projects = listProjects(fixturesRoot);
   assert.equal(projects.length, 1);
+  assert.equal(projects[0].id, PROJECT_UUID);
   assert.equal(projects[0].name, 'demo-app');
   assert.equal(projects[0].runsCount, 4);
-  assert.equal(projects[0].latestRunId, '20260223');
+  // latestRunId is a UUID, not a date
+  assert.equal(projects[0].latestRunId, 'run-uuid-01');
 });
 
-test('listRuns sorts runs newest first and parses display date', () => {
-  const runs = listRuns(fixturesRoot, 'demo-app');
+test('listRuns sorts runs newest first by evidence date', () => {
+  const runs = listRuns(fixturesRoot, PROJECT_UUID);
   assert.equal(runs.length, 4);
-  assert.equal(runs[0].runId, '20260223');
-  assert.equal(runs[1].runId, '20260221');
+  // Sorted by date from evidence files: 2026-02-23, 2026-02-21, 2026-02-20, 2026-02-19
+  assert.equal(runs[0].runId, 'run-uuid-01');
+  assert.equal(runs[0].dateISO, '2026-02-23');
+  assert.equal(runs[1].runId, 'run-uuid-02');
+  assert.equal(runs[1].dateISO, '2026-02-21');
   assert.match(runs[0].dateLabel, /2026/);
 });
 
-
 test('parseSummaryRows handles decimal score "7.5/10 Good" and N/A grade gracefully', () => {
-  const dashboard = buildDashboard(fixturesRoot, 'demo-app', '20260223');
+  const dashboard = buildDashboard(fixturesRoot, PROJECT_UUID, 'run-uuid-01');
   const dim = dashboard.dimensions[0];
 
   // Decimal score: "7.5/10 Good" → score="7.5/10", grade="Good"
@@ -45,7 +51,7 @@ test('parseSummaryRows handles decimal score "7.5/10 Good" and N/A grade gracefu
 });
 
 test('parseSummaryRows extracts score and grade separately from combined "5/10 Adequate" cell', () => {
-  const dashboard = buildDashboard(fixturesRoot, 'demo-app', '20260221');
+  const dashboard = buildDashboard(fixturesRoot, PROJECT_UUID, 'run-uuid-02');
 
   const dim = dashboard.dimensions[0];
   // Overall: "5.8/10 Adequate" → score must be "5.8/10", grade must be "Adequate"
@@ -65,7 +71,7 @@ test('parseSummaryRows extracts score and grade separately from combined "5/10 A
 });
 
 test('parseDetailedFindings handles em dash separator (sonnet 4.6 format)', () => {
-  const dashboard = buildDashboard(fixturesRoot, 'demo-app', '20260221');
+  const dashboard = buildDashboard(fixturesRoot, PROJECT_UUID, 'run-uuid-02');
 
   const dim = dashboard.dimensions[0];
   assert.equal(dim.dimension, 'maintainability');
@@ -81,10 +87,10 @@ test('parseDetailedFindings handles em dash separator (sonnet 4.6 format)', () =
 });
 
 test('buildDashboard returns summary, dimensions and trend for specific run', () => {
-  const dashboard = buildDashboard(fixturesRoot, 'demo-app', '20260220');
+  const dashboard = buildDashboard(fixturesRoot, PROJECT_UUID, 'run-uuid-03');
 
-  assert.equal(dashboard.project, 'demo-app');
-  assert.equal(dashboard.selectedRun.runId, '20260220');
+  assert.equal(dashboard.project, PROJECT_UUID);
+  assert.equal(dashboard.selectedRun.runId, 'run-uuid-03');
   assert.equal(dashboard.summary.dimensionsCount, 1);
   assert.equal(dashboard.summary.overallGrade, 'Proficient');
   assert.equal(dashboard.dimensions[0].dimension, 'maintainability');
@@ -98,5 +104,5 @@ test('buildDashboard returns summary, dimensions and trend for specific run', ()
   assert.equal(dashboard.dimensions[0].violations[0].line, 28);
   assert.equal(dashboard.dimensions[0].compliance[0].file, 'src/utils/logger.js');
   assert.equal(dashboard.trend.length, 4);
-  assert.equal(dashboard.trend[0].runId, '20260223');
+  assert.equal(dashboard.trend[0].runId, 'run-uuid-01');
 });
