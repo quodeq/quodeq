@@ -7,8 +7,7 @@ from pathlib import Path
 import subprocess
 
 
-def is_repo_url(repo_input: str) -> bool:
-    return repo_input.startswith(("http://", "https://", "git@"))
+from codecompass.utils import is_repo_url as is_repo_url  # re-export from shared location
 
 
 def prepare_repository(repo_input: str) -> str:

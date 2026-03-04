@@ -12,7 +12,9 @@
       "Bash(ls:*)",
       "Bash(uv run:*)",
       "Bash(python3.13:*)",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
     ]
   }
 }
