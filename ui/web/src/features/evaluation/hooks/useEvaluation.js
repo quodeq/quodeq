@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval } from '../../../api/index.js';
+import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } from '../../../api/index.js';
 
 export function useEvaluation() {
   const [job, setJob] = useState(null);
@@ -13,6 +13,16 @@ export function useEvaluation() {
   const partialDimensionsRef = useRef(new Set());
 
   useEffect(() => {
+    // Discover any running evaluation (e.g. started in another tab)
+    listEvaluations()
+      .then((jobs) => {
+        const running = jobs.find((j) => j.status === 'running');
+        if (running) {
+          setJob(running);
+          startPolling(running.jobId);
+        }
+      })
+      .catch(() => {});
     return () => {
       stopPolling();
       stopDimensionPolling();

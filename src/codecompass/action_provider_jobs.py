@@ -99,6 +99,10 @@ class JobManager:
                 return None
             return job.to_dict()
 
+    def list_jobs(self) -> list[dict[str, Any]]:
+        with self._lock:
+            return [job.to_dict() for job in self._jobs.values()]
+
     def _append_log(self, job: Job, line: str) -> None:
         if not line:
             return

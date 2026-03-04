@@ -45,10 +45,6 @@ def validate_paths(config: DashboardConfig) -> None:
         raise FileNotFoundError("Static dist missing index.html. Run without --no-build to build.")
 
 
-def _npm_install(path: Path) -> None:
-    subprocess.run(["npm", "install"], cwd=str(path), check=True)
-
-
 def _npm_build(path: Path) -> None:
     subprocess.run(["npm", "install"], cwd=str(path), check=True)
     subprocess.run(["npm", "run", "build"], cwd=str(path), check=True)
@@ -85,14 +81,6 @@ def _choose_ui_port(start: int, host: str = "127.0.0.1") -> int:
     return port
 
 
-def _choose_action_api_port(start: int = 8001, taken: set[int] | None = None) -> int:
-    taken = taken or set()
-    port = start
-    while port in taken or _is_port_open("127.0.0.1", port):
-        port += 1
-    return port
-
-
 def _kill_stale_action_api(host: str, port: int) -> None:
     """Kill any lingering action API processes so the dashboard always loads fresh code."""
     try:
@@ -104,10 +92,12 @@ def _kill_stale_action_api(host: str, port: int) -> None:
         time.sleep(0.1)
 
 
-def _spawn_action_api(port: int) -> subprocess.Popen:
+def _spawn_action_api(port: int, static_dist: Path | None = None) -> subprocess.Popen:
     env = os.environ.copy()
     env["CODECOMPASS_ACTION_API_PORT"] = str(port)
     env.setdefault("CODECOMPASS_ACTION_API_HOST", "127.0.0.1")
+    if static_dist:
+        env["CODECOMPASS_STATIC_DIST"] = str(static_dist)
     return subprocess.Popen(
         [sys.executable, "-m", "codecompass.action_api"],
         env=env,
@@ -143,7 +133,7 @@ def _action_api_healthy(base_url: str) -> bool:
         return False
 
 
-def _ensure_action_api(host: str, start_port: int, max_tries: int = 20) -> tuple[str, subprocess.Popen | None]:
+def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None) -> tuple[str, subprocess.Popen | None]:
     port = start_port
     for _ in range(max_tries):
         base_url = f"http://{host}:{port}"
@@ -152,7 +142,7 @@ def _ensure_action_api(host: str, start_port: int, max_tries: int = 20) -> tuple
                 return base_url, None
             port += 1
             continue
-        process = _spawn_action_api(port)
+        process = _spawn_action_api(port, static_dist=static_dist)
         try:
             _wait_for_action_api(base_url)
         except Exception:
@@ -164,13 +154,13 @@ def _ensure_action_api(host: str, start_port: int, max_tries: int = 20) -> tuple
     raise RuntimeError("Unable to find a free port for Action API.")
 
 
-def _ensure_action_api_forced(host: str, port: int) -> tuple[str, subprocess.Popen | None]:
+def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = None) -> tuple[str, subprocess.Popen | None]:
     base_url = f"http://{host}:{port}"
     if _is_port_open(host, port):
         if _action_api_healthy(base_url):
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    process = _spawn_action_api(port)
+    process = _spawn_action_api(port, static_dist=static_dist)
     try:
         _wait_for_action_api(base_url)
     except Exception:
@@ -179,27 +169,6 @@ def _ensure_action_api_forced(host: str, port: int) -> tuple[str, subprocess.Pop
             process.wait()
         raise
     return base_url, process
-
-
-def _start_ui_server(config: DashboardConfig, action_api_url: str) -> subprocess.Popen:
-    env = os.environ.copy()
-    env["CODECOMPASS_ACTION_API"] = action_api_url
-    return subprocess.Popen(
-        [
-            "node",
-            str(config.repo_root / "ui/server/src/index.js"),
-            "--evaluations",
-            str(config.reports_dir),
-            "--repo-root",
-            str(config.repo_root),
-            "--static-dist",
-            str(config.static_dist),
-            "--port",
-            str(config.port),
-        ],
-        env=env,
-        start_new_session=True,
-    )
 
 
 def run_dashboard(config: DashboardConfig) -> int:
@@ -212,10 +181,6 @@ def run_dashboard(config: DashboardConfig) -> int:
     if chosen_port != requested_port:
         log_warning(f"Port {requested_port} is in use. Using {chosen_port} instead.")
         config.port = chosen_port
-
-    if config.reinstall or not (repo_root / "ui/server/node_modules").exists():
-        log_info("Installing server dependencies (ui/server)...")
-        _npm_install(repo_root / "ui/server")
 
     if not config.no_build:
         dist_index = static_dist / "index.html"
@@ -247,30 +212,29 @@ def run_dashboard(config: DashboardConfig) -> int:
     log_info(f"Port:    {config.port}")
 
     action_api_host = config.api_host or "127.0.0.1"
-    action_api_port = config.api_port or 8001
+    action_api_port = config.api_port or config.port
     if config.api_forced:
-        action_api_url, action_api_process = _ensure_action_api_forced(action_api_host, action_api_port)
+        action_api_url, action_api_process = _ensure_action_api_forced(
+            action_api_host, action_api_port, static_dist=static_dist,
+        )
     else:
         _kill_stale_action_api(action_api_host, action_api_port)
-        action_api_url, action_api_process = _ensure_action_api(action_api_host, action_api_port)
+        action_api_url, action_api_process = _ensure_action_api(
+            action_api_host, action_api_port, static_dist=static_dist,
+        )
 
-    process = _start_ui_server(config, action_api_url)
-
-    log_success(f"Dashboard running at http://localhost:{config.port}")
+    log_success(f"Dashboard running at {action_api_url}")
 
     if config.open_browser:
-        webbrowser.open(f"http://localhost:{config.port}")
-
-    current_action_api_process = action_api_process
+        webbrowser.open(action_api_url)
 
     def _stop_children() -> None:
-        for proc in (process, current_action_api_process):
-            if proc and proc.poll() is None:
-                proc.terminate()
-                try:
-                    proc.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    proc.kill()
+        if action_api_process and action_api_process.poll() is None:
+            action_api_process.terminate()
+            try:
+                action_api_process.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                action_api_process.kill()
 
     def _handle_tstp(signum, frame) -> None:
         """Ctrl+Z: shut down cleanly instead of suspending."""
@@ -280,22 +244,15 @@ def run_dashboard(config: DashboardConfig) -> int:
     signal.signal(signal.SIGTSTP, _handle_tstp)
 
     try:
-        while process.poll() is None:
-            try:
-                process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                pass
-            # Restart action API if it crashed
-            if current_action_api_process and current_action_api_process.poll() is not None:
-                if not _action_api_healthy(action_api_url):
-                    log_warning("Action API stopped — restarting…")
-                    try:
-                        _, current_action_api_process = _ensure_action_api(
-                            action_api_host, action_api_port
-                        )
-                        log_success("Action API restarted.")
-                    except Exception as exc:
-                        log_warning(f"Could not restart Action API: {exc}")
+        if action_api_process:
+            while action_api_process.poll() is None:
+                try:
+                    action_api_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    pass
+        else:
+            # External API — just wait for interrupt
+            signal.pause()
     except KeyboardInterrupt:
         pass
     finally:

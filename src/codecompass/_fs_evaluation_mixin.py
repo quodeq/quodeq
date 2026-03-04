@@ -49,3 +49,6 @@ class FsEvaluationMixin:
 
     def cancel_evaluation(self, job_id: str) -> bool:
         return self._jobs.cancel_job(job_id)
+
+    def list_evaluations(self) -> list[dict]:
+        return self._jobs.list_jobs()
