@@ -7,7 +7,12 @@
       "Bash(git stash:*)",
       "Bash(git checkout:*)",
       "Bash(python3:*)",
-      "Bash(.venv/bin/python:*)"
+      "Bash(.venv/bin/python:*)",
+      "Bash(python:*)",
+      "Bash(ls:*)",
+      "Bash(uv run:*)",
+      "Bash(python3.13:*)",
+      "Bash(grep:*)"
     ]
   }
 }

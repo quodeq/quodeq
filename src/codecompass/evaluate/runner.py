@@ -4,7 +4,7 @@ import json
 import subprocess
 import uuid
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 from codecompass.config.paths import default_paths
@@ -162,7 +162,7 @@ def run(config: EvaluateConfig) -> int:
         return fail_with_error(str(exc))
     if skipped:
         log_warning(f"Skipped (not available for {config.discipline}): {', '.join(skipped)}")
-    today = date.today().isoformat()
+    today = datetime.now().isoformat(timespec='seconds')
     run_id = str(uuid.uuid4())
     project_name = config.repo.split("/")[-1].replace(".git", "") if is_repo_url(config.repo) else Path(config.repo).name
     location = "online" if is_repo_url(config.repo) else "local"
@@ -240,7 +240,7 @@ def run_practices_mode(
 ) -> int:
     repo_root = Path(repo_path)
     project_name = repo_root.name
-    date_value = today or date.today().isoformat()
+    date_value = today or datetime.now().isoformat(timespec='seconds')
 
     template = template_path.read_text()
 
