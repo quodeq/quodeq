@@ -77,9 +77,11 @@ def _parse_source_file_count(prescan_summary: str) -> int:
     return 0
 
 
-def _resolve_project_uuid(reports_dir: Path, project_name: str, repo_path: str, discipline: str | None) -> str:
+def resolve_project_uuid(reports_dir: Path, project_name: str, repo_path: str, discipline: str | None, location: str = "local") -> str:
     """Find or create a UUID project directory matching project_name + repo_path."""
-    resolved = str(Path(repo_path).resolve())
+    resolved = repo_path if location == "online" else str(Path(repo_path).resolve())
+    if not reports_dir.exists():
+        reports_dir.mkdir(parents=True, exist_ok=True)
     for entry in reports_dir.iterdir():
         if not entry.is_dir() or entry.name.startswith("."):
             continue
@@ -100,7 +102,7 @@ def _resolve_project_uuid(reports_dir: Path, project_name: str, repo_path: str, 
         "uuid": project_uuid,
         "name": project_name,
         "discipline": discipline,
-        "location": "local",
+        "location": location,
         "path": resolved,
     }
     (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
@@ -162,8 +164,9 @@ def run(config: EvaluateConfig) -> int:
         log_warning(f"Skipped (not available for {config.discipline}): {', '.join(skipped)}")
     today = date.today().isoformat()
     run_id = str(uuid.uuid4())
-    project_name = Path(config.repo).name
-    project_uuid = _resolve_project_uuid(config.reports_dir, project_name, repo_path, config.discipline)
+    project_name = config.repo.split("/")[-1].replace(".git", "") if is_repo_url(config.repo) else Path(config.repo).name
+    location = "online" if is_repo_url(config.repo) else "local"
+    project_uuid = resolve_project_uuid(config.reports_dir, project_name, repo_path, config.discipline, location=location)
 
     dim_label = ", ".join(selected) if len(selected) <= 4 else f"{len(selected)} dimensions"
     log_banner([

@@ -79,7 +79,7 @@ _SCALE_TIER_NAMES: dict[int, str] = {
 }
 
 
-def _scale_multiplier(source_file_count: int) -> int:
+def scale_multiplier(source_file_count: int) -> int:
     """Return the size-based scaling multiplier for a project."""
     for threshold, multiplier in _SCALE_TIERS:
         if source_file_count >= threshold:
@@ -324,7 +324,7 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     per_principle: dict = {}
     source_file_count = evidence.get("source_file_count", 0)
     files_read = evidence.get("files_read", 0)
-    scale_mult = _scale_multiplier(source_file_count)
+    scale_mult = scale_multiplier(source_file_count)
     raw_principles = evidence.get("principles", {})
 
     for key, pdata in raw_principles.items():

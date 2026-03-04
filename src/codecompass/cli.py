@@ -2,9 +2,6 @@ import argparse
 import sys
 from pathlib import Path
 
-from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
-from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
-from codecompass.bootstrap import DataProvider
 from codecompass.config.cli import build_parser as build_config_parser
 from codecompass.config.cli import main as configure_main
 from codecompass.config.paths import default_paths
@@ -40,41 +37,60 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _run_dashboard(argv: list[str] | None) -> int:
+    sub_argv = argv[1:] if argv is not None else sys.argv[2:]
+    return dashboard_main(sub_argv)
+
+
+def _run_evaluate(argv: list[str] | None) -> int:
+    sub_argv = argv[1:] if argv is not None else sys.argv[2:]
+    parsed = parse_cli_args(sub_argv)
+    if parsed.errors:
+        for err in parsed.errors:
+            print(err, file=sys.stderr)
+        return 1
+    paths = default_paths(version=parsed.data_version)
+    # Lazy imports to decouple concrete adapters from CLI entry point
+    from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
+    from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
+    from codecompass.bootstrap import DataProvider
+    provider = DataProvider(
+        practices=FilesystemPracticesRepository(root=paths.vroot),
+        evaluators=FilesystemEvaluatorsRepository(root=paths.vroot),
+    )
+    config = EvaluateConfig(
+        discipline=parsed.discipline,
+        repo=parsed.repo,
+        reports_dir=Path(parsed.reports_dir),
+        reports_defaulted=parsed.reports_defaulted,
+        dimensions=parsed.dimensions,
+        evidence_only=parsed.evidence_only,
+        no_prescan=parsed.no_prescan,
+        numerical=parsed.numerical,
+        version=parsed.data_version,
+        provider=provider,
+    )
+    return run_evaluate(config)
+
+
+def _run_configure(argv: list[str] | None) -> int:
+    sub_argv = argv[1:] if argv is not None else sys.argv[2:]
+    return configure_main(sub_argv)
+
+
+_COMMAND_HANDLERS: dict[str, callable] = {
+    "dashboard": _run_dashboard,
+    "evaluate": _run_evaluate,
+    "configure": _run_configure,
+}
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-
-    if args._command == "dashboard":
-        sub_argv = argv[1:] if argv is not None else sys.argv[2:]
-        return dashboard_main(sub_argv)
-    if args._command == "evaluate":
-        sub_argv = argv[1:] if argv is not None else sys.argv[2:]
-        parsed = parse_cli_args(sub_argv)
-        if parsed.errors:
-            for err in parsed.errors:
-                print(err, file=sys.stderr)
-            return 1
-        paths = default_paths(version=parsed.data_version)
-        provider = DataProvider(
-            practices=FilesystemPracticesRepository(root=paths.vroot),
-            evaluators=FilesystemEvaluatorsRepository(root=paths.vroot),
-        )
-        config = EvaluateConfig(
-            discipline=parsed.discipline,
-            repo=parsed.repo,
-            reports_dir=Path(parsed.reports_dir),
-            reports_defaulted=parsed.reports_defaulted,
-            dimensions=parsed.dimensions,
-            evidence_only=parsed.evidence_only,
-            no_prescan=parsed.no_prescan,
-            numerical=parsed.numerical,
-            version=parsed.data_version,
-            provider=provider,
-        )
-        return run_evaluate(config)
-    if args._command == "configure":
-        sub_argv = argv[1:] if argv is not None else sys.argv[2:]
-        return configure_main(sub_argv)
+    handler = _COMMAND_HANDLERS.get(args._command)
+    if handler:
+        return handler(argv)
     return 1
 
 
