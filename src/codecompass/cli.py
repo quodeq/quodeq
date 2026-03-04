@@ -50,14 +50,8 @@ def _run_evaluate(argv: list[str] | None) -> int:
             print(err, file=sys.stderr)
         return 1
     paths = default_paths(version=parsed.data_version)
-    # Lazy imports to decouple concrete adapters from CLI entry point
-    from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
-    from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
-    from codecompass.bootstrap import DataProvider
-    provider = DataProvider(
-        practices=FilesystemPracticesRepository(root=paths.vroot),
-        evaluators=FilesystemEvaluatorsRepository(root=paths.vroot),
-    )
+    from codecompass.bootstrap import default_provider
+    provider = default_provider(paths.vroot)
     config = EvaluateConfig(
         discipline=parsed.discipline,
         repo=parsed.repo,

@@ -56,12 +56,12 @@ def parse_manifest_target_dimensions(manifest: str | Path, index: int) -> list[s
     data = _load_manifest(manifest)
     targets = data.get("targets", [])
     target = targets[index] if index < len(targets) else {}
-    dimensions = target.get("dimensions")
-    if isinstance(dimensions, str):
-        return [dimensions]
-    if isinstance(dimensions, list):
-        return [str(item) for item in dimensions]
-    return ["all"]
+    raw = target.get("dimensions")
+    if not raw:
+        return ["all"]
+    if not isinstance(raw, list):
+        raw = [raw]
+    return [str(item) for item in raw]
 
 
 def validate_manifest(manifest: str | Path) -> list[str]:
