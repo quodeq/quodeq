@@ -112,9 +112,13 @@ function AccumulatedOverviewPanel({
   }, [accumulated]);
 
   const accumulatedLastDate = useMemo(() => {
-    const ids = accumulatedDimensions.map((d) => d.fromRunId).filter(Boolean);
-    if (ids.length === 0) return null;
-    return formatRunId(ids.sort().reverse()[0]);
+    // Find the most recent date using fromDateISO (already in API response)
+    const withDates = accumulatedDimensions
+      .filter((d) => d.fromRunId)
+      .map((d) => ({ runId: d.fromRunId, dateISO: d.fromDateISO, dateLabel: d.fromDateLabel }));
+    if (withDates.length === 0) return null;
+    withDates.sort((a, b) => (b.dateISO || '').localeCompare(a.dateISO || ''));
+    return withDates[0].dateLabel || formatRunId(withDates[0].runId);
   }, [accumulatedDimensions]);
 
   const accumulatedUniquePrinciples = useMemo(
@@ -262,7 +266,7 @@ function AccumulatedOverviewPanel({
                     )}
                   </div>
                   <div className="qd-card-footer">
-                    <span className="qd-card-date">{formatRunId(item.fromRunId)}</span>
+                    <span className="qd-card-date">{item.fromDateLabel || formatRunId(item.fromRunId)}</span>
                     {isStale && <span className="qd-card-stale-label">Older run</span>}
                   </div>
                 </article>
@@ -384,7 +388,7 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
     <>
       <section className="acc-eval-panel panel">
         <div className="acc-eval-top">
-          <span className="acc-eval-date">{formatRunId(selectedRunId)}</span>
+          <span className="acc-eval-date">{dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId)}</span>
           {(dashboard?.dimensions || []).some((d) => (d.violations?.length || 0) > 0) && (
             <CopyButton
               label="Fix plan"
@@ -393,7 +397,7 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
                   (d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
                 );
                 navigator.clipboard.writeText(
-                  buildDimensionPlanFromViolations(formatRunId(selectedRunId), allViolations)
+                  buildDimensionPlanFromViolations(dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId), allViolations)
                 );
               }}
             />
@@ -498,7 +502,7 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
                     )}
                   </div>
                   <div className="qd-card-footer">
-                    <span className="qd-card-date">{formatRunId(item.fromRunId || selectedRunId)}</span>
+                    <span className="qd-card-date">{item.fromDateLabel || dashboard?.selectedRun?.dateLabel || formatRunId(item.fromRunId || selectedRunId)}</span>
                   </div>
                 </article>
               );
@@ -576,13 +580,14 @@ export default function DashboardPage({
 
   const handleDimensionCardClick = (item, runId) => {
     if (onNavigate) {
-      onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId });
+      const dateLabel = dashboard?.selectedRun?.dateLabel || item.fromDateLabel;
+      onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel });
     }
   };
 
   const handleAccumulatedDimensionClick = (item) => {
     if (onNavigate) {
-      onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId });
+      onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel });
     }
   };
 

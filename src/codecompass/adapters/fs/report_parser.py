@@ -31,17 +31,32 @@ def _safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
         return []
 
 
-def _parse_run_id_date(run_id: str) -> tuple[str | None, str]:
-    match = None
-    if len(run_id) >= 8 and run_id[:8].isdigit():
-        match = run_id[:8]
-    if not match:
-        return None, run_id
-    try:
-        parsed = datetime.strptime(match, "%Y%m%d")
-    except ValueError:
-        return None, run_id
-    return parsed.date().isoformat(), parsed.strftime("%b %d, %Y")
+def _normalize_date(raw: str) -> tuple[str, str] | None:
+    """Parse a date string in ISO (2026-03-01) or compact (20260301) format."""
+    for fmt in ("%Y-%m-%d", "%Y%m%d"):
+        try:
+            parsed = datetime.strptime(raw, fmt)
+            return parsed.date().isoformat(), parsed.strftime("%b %d, %Y")
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
+    """Read the date from the first evidence file in a run directory."""
+    evidence_dir = reports_root / project / run_id / "evidence"
+    for entry in _safe_read_dir(evidence_dir):
+        if entry.is_file() and entry.name.endswith("_evidence.json"):
+            try:
+                data = json.loads(Path(entry.path).read_text())
+                raw = data.get("date")
+                if raw:
+                    result = _normalize_date(str(raw))
+                    if result:
+                        return result
+            except (json.JSONDecodeError, OSError):
+                pass
+    return None, run_id
 
 
 def _parse_numeric_score(score_text: str | None) -> float | None:
@@ -344,7 +359,8 @@ def _list_runs(reports_root: Path, project: str) -> list[RunInfo]:
     for entry in _safe_read_dir(project_dir):
         if not entry.is_dir() or entry.name.startswith("."):
             continue
-        date_iso, date_label = _parse_run_id_date(entry.name)
+        # Skip repository_info.json-only dirs (the project root itself won't have sub-runs)
+        date_iso, date_label = _parse_run_date(reports_root, project, entry.name)
         run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label))
     run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)
     return run_infos
@@ -366,13 +382,16 @@ def _get_previous_run_for_dimension(reports_root: Path, project: str, current_ru
     project_path = reports_root / project
     if not project_path.exists():
         return None
-    runs = [entry.name for entry in _safe_read_dir(project_path) if entry.is_dir() and entry.name < current_run_id]
-    runs.sort(reverse=True)
-    for run_id in runs:
-        dimensions = _read_run_data(reports_root, project, run_id)
+    all_runs = _list_runs(reports_root, project)
+    # Find the index of the current run, then iterate older runs (after it in the sorted list)
+    current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
+    if current_idx < 0:
+        return None
+    for run_info in all_runs[current_idx + 1:]:
+        dimensions = _read_run_data(reports_root, project, run_info.run_id)
         dim = next((d for d in dimensions if d.get("dimension") == dimension), None)
         if dim:
-            return {"runId": run_id, "dimension": dim}
+            return {"runId": run_info.run_id, "dimension": dim}
     return None
 
 

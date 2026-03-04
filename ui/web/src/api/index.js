@@ -22,13 +22,13 @@ export function listProjects() {
   return request('/projects');
 }
 
-export function getProjectInfo(project) {
-  return request(`/projects/${encodeURIComponent(project)}/info`);
+export function getProjectInfo(projectId) {
+  return request(`/projects/${encodeURIComponent(projectId)}/info`);
 }
 
-export function getDashboard(project, run = 'latest') {
+export function getDashboard(projectId, run = 'latest') {
   const q = run ? `?run=${encodeURIComponent(run)}` : '';
-  return request(`/projects/${encodeURIComponent(project)}/dashboard${q}`);
+  return request(`/projects/${encodeURIComponent(projectId)}/dashboard${q}`);
 }
 
 export function startEvaluation(input) {
@@ -46,14 +46,14 @@ export function cancelEvaluation(jobId) {
   return request(`/evaluations/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
 }
 
-export function getAccumulated(project, asOfRun = null) {
+export function getAccumulated(projectId, asOfRun = null) {
   const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  return request(`/projects/${encodeURIComponent(project)}/accumulated${q}`);
+  return request(`/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
 }
 
-export function getDimensionEval(project, runId, dimension) {
+export function getDimensionEval(projectId, runId, dimension) {
   return request(
-    `/projects/${encodeURIComponent(project)}/runs/${encodeURIComponent(runId)}/dimensions/${encodeURIComponent(dimension)}/eval`
+    `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/dimensions/${encodeURIComponent(dimension)}/eval`
   );
 }
 

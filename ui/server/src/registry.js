@@ -47,7 +47,7 @@ export function getRegistry() {
       description: 'Builds the full dashboard for a project run, including summary, dimensions, violations, compliance, and trend.',
       params: {
         path: { project: 'Project name (directory under evaluations/)' },
-        query: { run: 'Run ID (YYYYMMDD). Defaults to "latest"' },
+        query: { run: 'Run ID (UUID). Defaults to "latest"' },
         body: null
       },
       dataSource: 'filesystem: evaluations/<project>/<runId>/evaluation/*.md|.json + evidence/*.json',
@@ -72,7 +72,7 @@ export function getRegistry() {
       params: {
         path: {
           project: 'Project name',
-          runId: 'Run ID (YYYYMMDD)',
+          runId: 'Run ID (UUID)',
           dimension: 'Dimension slug (e.g. maintainability)'
         },
         query: null,
@@ -88,7 +88,7 @@ export function getRegistry() {
       params: {
         path: {
           project: 'Project name',
-          runId: 'Run ID (YYYYMMDD)'
+          runId: 'Run ID (UUID)'
         },
         query: null,
         body: null
