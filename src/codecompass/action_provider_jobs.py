@@ -12,6 +12,7 @@ import subprocess
 
 MAX_LOG_LINES = 600
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
+_DIMENSION_DIVIDER_RE = re.compile(r"\[\d+/\d+\]\s+(\S+)")
 
 
 @dataclass
@@ -25,6 +26,8 @@ class Job:
     logs: list[str]
     output_project: str | None
     output_run_id: str | None
+    phase: str | None = None
+    current_dimension: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -37,6 +40,8 @@ class Job:
             "logs": list(self.logs),
             "outputProject": self.output_project,
             "outputRunId": self.output_run_id,
+            "phase": self.phase,
+            "currentDimension": self.current_dimension,
         }
 
 
@@ -113,6 +118,17 @@ class JobManager:
         if match:
             job.output_project = match.group(1)
             job.output_run_id = match.group(2)
+        # Track evaluation phase from log markers
+        dim_match = _DIMENSION_DIVIDER_RE.search(line)
+        if dim_match:
+            job.current_dimension = dim_match.group(1)
+            job.phase = "evidence"
+        elif "Gathering evidence" in line:
+            job.phase = "evidence"
+        elif "Scoring" in line and job.phase == "evidence":
+            job.phase = "scoring"
+        elif "Scanning repository" in line:
+            job.phase = "scanning"
 
     def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
         if stream is None:

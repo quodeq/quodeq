@@ -11,6 +11,7 @@ export function useEvaluation() {
   const requestedDimensionsRef = useRef([]);
   const liveViolationsRef = useRef({});
   const partialDimensionsRef = useRef(new Set());
+  const dimFailCountRef = useRef({});
 
   useEffect(() => {
     // Discover any running evaluation (e.g. started in another tab)
@@ -49,7 +50,10 @@ export function useEvaluation() {
 
   function startDimensionPolling(project, runId) {
     stopDimensionPolling();
+    dimFailCountRef.current = {};
+    let tick = 0;
     dimPollRef.current = setInterval(async () => {
+      tick++;
       const dims = requestedDimensionsRef.current;
       if (!dims.length) {
         stopDimensionPolling();
@@ -64,8 +68,12 @@ export function useEvaluation() {
 
       await Promise.allSettled(
         pending.map(async (dim) => {
+          // Backoff: after N failures, only retry every 2^N ticks (max every ~30s)
+          const fails = dimFailCountRef.current[dim] || 0;
+          if (fails > 0 && tick % Math.min(1 << fails, 16) !== 0) return;
           try {
             const data = await getDimensionEval(project, runId, dim);
+            dimFailCountRef.current[dim] = 0;
             if (data?.violations) {
               if (data.partial) {
                 partialDimensionsRef.current.add(dim);
@@ -75,7 +83,7 @@ export function useEvaluation() {
               setLiveViolations(prev => ({ ...prev, [dim]: data.violations }));
             }
           } catch {
-            // dimension not ready yet — silently skip
+            dimFailCountRef.current[dim] = (dimFailCountRef.current[dim] || 0) + 1;
           }
         })
       );
@@ -89,14 +97,16 @@ export function useEvaluation() {
       try {
         const updated = await getEvaluation(jobId);
         setJob((prev) => ({ ...updated, repo: prev?.repo }));
+        const hasOutput = updated.outputProject && updated.outputRunId;
+        const evaluating = updated.phase === 'evidence' || updated.phase === 'scoring';
+        const canPollDims = hasOutput && (evaluating || updated.status !== 'running');
         if (updated.status !== 'running') {
           stopPolling();
-          // one final dimension sweep after job completes
-          if (updated.outputProject && updated.outputRunId && !dimPollingStarted) {
+          if (canPollDims && !dimPollingStarted) {
             dimPollingStarted = true;
             startDimensionPolling(updated.outputProject, updated.outputRunId);
           }
-        } else if (updated.outputProject && updated.outputRunId && !dimPollingStarted) {
+        } else if (canPollDims && !dimPollingStarted) {
           dimPollingStarted = true;
           startDimensionPolling(updated.outputProject, updated.outputRunId);
         }
@@ -135,6 +145,7 @@ export function useEvaluation() {
     liveViolationsRef.current = {};
     requestedDimensionsRef.current = [];
     partialDimensionsRef.current = new Set();
+    dimFailCountRef.current = {};
   }
 
   async function cancelEvaluationJob() {

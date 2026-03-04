@@ -107,6 +107,8 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
         if payload is None:
             body, status = _error("Eval file not found", 404, "NOT_FOUND")
             return jsonify(body), status
+        if payload.get("waiting"):
+            return jsonify(payload), 202
         return jsonify(payload)
 
     @app.get("/api/projects/<project>/runs/<run_id>/violations")
