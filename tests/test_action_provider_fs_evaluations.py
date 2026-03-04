@@ -156,14 +156,16 @@ def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:
         reports_dir=str(reports_dir),
     )
 
-    info_path = reports_dir / "repo" / "repository_info.json"
+    # UUID-based project directory — find the created project dir
+    project_dirs = [d for d in reports_dir.iterdir() if d.is_dir()]
+    assert len(project_dirs) == 1
+    info_path = project_dirs[0] / "repository_info.json"
     payload = json.loads(info_path.read_text())
-    assert payload == {
-        "name": "repo",
-        "discipline": "cli_bash",
-        "location": "local",
-        "path": str(repo_path.resolve()),
-    }
+    assert payload["name"] == "repo"
+    assert payload["discipline"] == "cli_bash"
+    assert payload["location"] == "local"
+    assert payload["path"] == str(repo_path.resolve())
+    assert "uuid" in payload
 
 
 def test_start_evaluation_writes_repository_info_for_online_repo(tmp_path: Path) -> None:
@@ -184,11 +186,13 @@ def test_start_evaluation_writes_repository_info_for_online_repo(tmp_path: Path)
         reports_dir=str(reports_dir),
     )
 
-    info_path = reports_dir / "acme-service" / "repository_info.json"
+    # UUID-based project directory
+    project_dirs = [d for d in reports_dir.iterdir() if d.is_dir()]
+    assert len(project_dirs) == 1
+    info_path = project_dirs[0] / "repository_info.json"
     payload = json.loads(info_path.read_text())
-    assert payload == {
-        "name": "acme-service",
-        "discipline": "backend_springboot_java",
-        "location": "online",
-        "path": repo_url,
-    }
+    assert payload["name"] == "acme-service"
+    assert payload["discipline"] == "backend_springboot_java"
+    assert payload["location"] == "online"
+    assert payload["path"] == repo_url
+    assert "uuid" in payload

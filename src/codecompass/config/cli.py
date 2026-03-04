@@ -34,16 +34,16 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     paths = default_paths(version=args.data_version)
     _ctx = ConfigureContext(paths=paths, max_parallel=resolve_parallel(args.parallel, args.sequential))
-    if args.generate_maps is not None:
-        return run_generate_evaluators(args.generate_maps, paths) or 0
-    if args.generate_dimensions:
-        run_generate_dimensions(paths)
-        return 0
-    if args.generate_practices is not None:
-        return actions.run_generate_practices(args.generate_practices, paths)
-    if args.check_sources is not None:
-        return check_sources(args.check_sources, paths)
-    if args.list_dimensions:
-        print(render_dimension_table())
-        return 0
+
+    _HANDLERS: list[tuple[str, callable]] = [
+        ("generate_maps",       lambda v: run_generate_evaluators(v, paths) or 0),
+        ("generate_dimensions", lambda _: (run_generate_dimensions(paths), 0)[1]),
+        ("generate_practices",  lambda v: actions.run_generate_practices(v, paths)),
+        ("check_sources",       lambda v: check_sources(v, paths)),
+        ("list_dimensions",     lambda _: (print(render_dimension_table()), 0)[1]),
+    ]
+    for attr, handler in _HANDLERS:
+        value = getattr(args, attr, None)
+        if value is not None and value is not False:
+            return handler(value)
     return 0
