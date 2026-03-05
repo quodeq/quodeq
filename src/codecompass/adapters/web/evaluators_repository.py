@@ -2,7 +2,10 @@ from codecompass.adapters.web.http_client import HttpClient
 from codecompass.ports.data_errors import AuthError, InvalidDataError, NotFoundError, ServerError
 
 
-def _check_response_status(response) -> None:
+from codecompass.adapters.web.http_client import HttpResponse
+
+
+def _check_response_status(response: HttpResponse) -> None:
     """Raise the appropriate error for non-success HTTP status codes."""
     if response.status in {401, 403}:
         raise AuthError("Authentication error")

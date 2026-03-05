@@ -16,8 +16,10 @@ import webbrowser
 from codecompass.logging import log_info, log_success, log_warning
 from codecompass.paths import resolve_path
 
+_HEALTH_CHECK_TIMEOUT_S = 0.5
 
-@dataclass
+
+@dataclass(frozen=True)
 class DashboardConfig:
     port: int
     reports_dir: Path
@@ -57,14 +59,14 @@ def _sources_newer_than_dist(web_root: Path, dist_index: Path) -> bool:
     dist_mtime = dist_index.stat().st_mtime
     watch_dirs = [web_root / "src", web_root / "public"]
     watch_files = [web_root / "package.json", web_root / "vite.config.js"]
-    for f in watch_files:
-        if f.exists() and f.stat().st_mtime > dist_mtime:
+    for watch_file in watch_files:
+        if watch_file.exists() and watch_file.stat().st_mtime > dist_mtime:
             return True
-    for d in watch_dirs:
-        if not d.exists():
+    for watch_dir in watch_dirs:
+        if not watch_dir.exists():
             continue
-        for f in d.rglob("*"):
-            if f.is_file() and f.stat().st_mtime > dist_mtime:
+        for watch_file in watch_dir.rglob("*"):
+            if watch_file.is_file() and watch_file.stat().st_mtime > dist_mtime:
                 return True
     return False
 
@@ -124,7 +126,7 @@ def _wait_for_action_api(base_url: str, timeout_s: float = 10) -> None:
 def _action_api_healthy(base_url: str) -> bool:
     url = f"{base_url}/api/health"
     try:
-        with urllib.request.urlopen(url, timeout=0.5) as response:
+        with urllib.request.urlopen(url, timeout=_HEALTH_CHECK_TIMEOUT_S) as response:
             if response.status != 200:
                 return False
             payload = json.loads(response.read().decode("utf-8"))
@@ -171,27 +173,35 @@ def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = N
     return base_url, process
 
 
-def run_dashboard(config: DashboardConfig) -> int:
+def _maybe_build_ui(config: DashboardConfig, static_dist: Path, repo_root: Path) -> None:
+    """Run npm build if sources are newer than the dist."""
+    if config.no_build:
+        return
+    dist_index = static_dist / "index.html"
+    if config.reinstall or _sources_newer_than_dist(repo_root / "ui/web", dist_index):
+        log_info("Building web UI (ui/web)...")
+        _npm_build(repo_root / "ui/web")
+    else:
+        log_info("Web UI is up to date, skipping build.")
+
+
+def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
+    """Resolve paths, choose a free port, and run npm build if needed.
+
+    Returns a new DashboardConfig with resolved paths.
+    """
     reports_dir = resolve_path(str(config.reports_dir))
     static_dist = resolve_path(str(config.static_dist))
     repo_root = resolve_path(str(config.repo_root))
 
-    requested_port = config.port
-    chosen_port = _choose_ui_port(requested_port)
-    if chosen_port != requested_port:
-        log_warning(f"Port {requested_port} is in use. Using {chosen_port} instead.")
-        config.port = chosen_port
+    chosen_port = _choose_ui_port(config.port)
+    if chosen_port != config.port:
+        log_warning(f"Port {config.port} is in use. Using {chosen_port} instead.")
 
-    if not config.no_build:
-        dist_index = static_dist / "index.html"
-        if config.reinstall or _sources_newer_than_dist(repo_root / "ui/web", dist_index):
-            log_info("Building web UI (ui/web)...")
-            _npm_build(repo_root / "ui/web")
-        else:
-            log_info("Web UI is up to date, skipping build.")
+    _maybe_build_ui(config, static_dist, repo_root)
 
-    config = DashboardConfig(
-        port=config.port,
+    return DashboardConfig(
+        port=chosen_port,
         reports_dir=reports_dir,
         static_dist=static_dist,
         repo_root=repo_root,
@@ -204,25 +214,9 @@ def run_dashboard(config: DashboardConfig) -> int:
         api_forced=config.api_forced,
     )
 
-    validate_paths(config)
 
-    log_info("Starting dashboard...")
-    log_info(f"Reports: {config.reports_dir}")
-    log_info(f"Static:  {config.static_dist}")
-    log_info(f"Port:    {config.port}")
-
-    action_api_host = config.api_host or "127.0.0.1"
-    action_api_port = config.api_port or config.port
-    if config.api_forced:
-        action_api_url, action_api_process = _ensure_action_api_forced(
-            action_api_host, action_api_port, static_dist=static_dist,
-        )
-    else:
-        _kill_stale_action_api(action_api_host, action_api_port)
-        action_api_url, action_api_process = _ensure_action_api(
-            action_api_host, action_api_port, static_dist=static_dist,
-        )
-
+def _serve_and_wait(action_api_url: str, action_api_process, config: DashboardConfig) -> None:
+    """Open browser, register signal handlers, and block until exit."""
     log_success(f"Dashboard running at {action_api_url}")
 
     if config.open_browser:
@@ -237,7 +231,6 @@ def run_dashboard(config: DashboardConfig) -> int:
                 action_api_process.kill()
 
     def _handle_tstp(signum, frame) -> None:
-        """Ctrl+Z: shut down cleanly instead of suspending."""
         _stop_children()
         sys.exit(0)
 
@@ -251,9 +244,34 @@ def run_dashboard(config: DashboardConfig) -> int:
                 except subprocess.TimeoutExpired:
                     pass
         else:
-            # External API — just wait for interrupt
             signal.pause()
     except KeyboardInterrupt:
         pass
     finally:
         _stop_children()
+
+
+def run_dashboard(config: DashboardConfig) -> int:
+    config = _resolve_paths_and_build(config)
+    validate_paths(config)
+
+    log_info("Starting dashboard...")
+    log_info(f"Reports: {config.reports_dir}")
+    log_info(f"Static:  {config.static_dist}")
+    log_info(f"Port:    {config.port}")
+
+    action_api_host = config.api_host or "127.0.0.1"
+    action_api_port = config.api_port or config.port
+    static_dist = config.static_dist
+    if config.api_forced:
+        action_api_url, action_api_process = _ensure_action_api_forced(
+            action_api_host, action_api_port, static_dist=static_dist,
+        )
+    else:
+        _kill_stale_action_api(action_api_host, action_api_port)
+        action_api_url, action_api_process = _ensure_action_api(
+            action_api_host, action_api_port, static_dist=static_dist,
+        )
+
+    _serve_and_wait(action_api_url, action_api_process, config)
+    return 0

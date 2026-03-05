@@ -5,6 +5,7 @@ import re
 from pathlib import Path
 
 from codecompass.evaluate.lib.common import log_error, log_info, log_success, log_warning
+from codecompass.evaluate.lib.scale import scale_multiplier
 
 DEFAULT_WEIGHT = "Medium (x2)"
 
@@ -137,6 +138,42 @@ def _build_summary(principles: dict) -> dict:
     }
 
 
+def _build_evidence_result(
+    principles: dict,
+    repo_name: str,
+    discipline: str,
+    date_str: str,
+    source_file_count: int,
+    files_read: int,
+    analysis_hash: str,
+    scoring_hash: str,
+    mapping_hash: str,
+    codecompass_version: str,
+) -> dict:
+    """Assemble the final evidence dict from processed principles."""
+    coverage_pct = (
+        round(files_read / source_file_count * 100, 1)
+        if source_file_count > 0 and files_read > 0
+        else 0.0
+    )
+    return {
+        "repository": repo_name,
+        "discipline": discipline,
+        "date": date_str,
+        "source_file_count": source_file_count,
+        "files_read": files_read,
+        "coverage_pct": coverage_pct,
+        "meta": {
+            "analysis_prompt_version": analysis_hash,
+            "scoring_prompt_version": scoring_hash,
+            "mapping_file_hash": mapping_hash,
+            "codecompass_version": codecompass_version,
+        },
+        "principles": principles,
+        "evidence_summary": _build_summary(principles),
+    }
+
+
 def assemble_evidence_from_jsonl(
     jsonl_file: str,
     output_file: str,
@@ -162,7 +199,6 @@ def assemble_evidence_from_jsonl(
 
     principles, accepted, rejected = _read_jsonl_findings(jsonl_file)
     dropped = _remove_duplicates(principles)
-    from codecompass.evaluate.lib.scale import scale_multiplier
     scale_mult = scale_multiplier(source_file_count)
     _compute_principle_metrics(principles, scale_multiplier=scale_mult)
 
@@ -170,27 +206,10 @@ def assemble_evidence_from_jsonl(
         log_error("No valid findings parsed from JSONL")
         return False
 
-    coverage_pct = (
-        round(files_read / source_file_count * 100, 1)
-        if source_file_count > 0 and files_read > 0
-        else 0.0
+    result = _build_evidence_result(
+        principles, repo_name, discipline, date_str,
+        source_file_count, files_read, analysis_hash, scoring_hash, mapping_hash, codecompass_version,
     )
-    result = {
-        "repository": repo_name,
-        "discipline": discipline,
-        "date": date_str,
-        "source_file_count": source_file_count,
-        "files_read": files_read,
-        "coverage_pct": coverage_pct,
-        "meta": {
-            "analysis_prompt_version": analysis_hash,
-            "scoring_prompt_version": scoring_hash,
-            "mapping_file_hash": mapping_hash,
-            "codecompass_version": codecompass_version,
-        },
-        "principles": principles,
-        "evidence_summary": _build_summary(principles),
-    }
 
     with open(output_file, "w") as fh:
         json.dump(result, fh, indent=2)
@@ -255,6 +274,37 @@ def validate_evidence_json(file: str) -> bool:
     return True
 
 
+def _write_minimal_evidence(
+    evidence_file: str,
+    project_name: str,
+    discipline: str,
+    today: str,
+    source_file_count: int,
+    files_read: int,
+    analysis_hash: str,
+    scoring_hash: str,
+    mapping_hash: str,
+    codecompass_version: str,
+) -> None:
+    """Write a fallback evidence file with no principles."""
+    minimal = {
+        "repository": project_name,
+        "discipline": discipline,
+        "date": today,
+        "source_file_count": source_file_count,
+        "files_read": files_read,
+        "coverage_pct": 0.0,
+        "meta": {
+            "analysis_prompt_version": analysis_hash,
+            "scoring_prompt_version": scoring_hash,
+            "mapping_file_hash": mapping_hash,
+            "codecompass_version": codecompass_version,
+        },
+        "principles": {},
+    }
+    Path(evidence_file).write_text(json.dumps(minimal))
+
+
 def build_evidence_file(
     jsonl_file: str,
     evidence_file: str,
@@ -287,21 +337,9 @@ def build_evidence_file(
 
     if not has_evidence:
         log_warning("Creating minimal evidence — scores will reflect insufficient data")
-        minimal = {
-            "repository": project_name,
-            "discipline": discipline,
-            "date": today,
-            "source_file_count": source_file_count,
-            "files_read": files_read,
-            "coverage_pct": 0.0,
-            "meta": {
-                "analysis_prompt_version": analysis_hash,
-                "scoring_prompt_version": scoring_hash,
-                "mapping_file_hash": mapping_hash,
-                "codecompass_version": codecompass_version,
-            },
-            "principles": {},
-        }
-        Path(evidence_file).write_text(json.dumps(minimal))
+        _write_minimal_evidence(
+            evidence_file, project_name, discipline, today,
+            source_file_count, files_read, analysis_hash, scoring_hash, mapping_hash, codecompass_version,
+        )
 
     return has_evidence
