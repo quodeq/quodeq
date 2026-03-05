@@ -7,10 +7,10 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 
-from codecompass.config.paths import default_paths
+from codecompass.bootstrap import DataProvider
+from codecompass.config.paths import ConfigPaths, default_paths
 from codecompass.evaluate.lib.ai_cli import run_ai_cli
 from codecompass.evaluate.lib.common import fail_with_error, log_banner, log_info, log_step, log_success, log_warning
-from codecompass.evaluate.lib.progress import format_end, format_start
 from codecompass.evaluate.lib.dimension_runner import DimensionRunContext, run_dimensions
 from codecompass.evaluate.lib.dimensions import list_available_dimensions, resolve_dimension_selection
 from codecompass.evaluate.lib.discipline_detector import (
@@ -20,13 +20,13 @@ from codecompass.evaluate.lib.discipline_detector import (
 from codecompass.evaluate.lib.evaluation import compute_prompt_hash
 from codecompass.evaluate.lib.practices_runner import build_practices_evaluation
 from codecompass.evaluate.lib.prescan import run_prescan_metrics
+from codecompass.evaluate.lib.progress import format_end, format_start
 from codecompass.evaluate.lib.repo_handler import prepare_repository
-from codecompass.utils import is_repo_url
-from codecompass.bootstrap import DataProvider
 from codecompass.ports.data_errors import NotFoundError
+from codecompass.utils import is_repo_url
 
 
-@dataclass
+@dataclass(frozen=True)
 class EvaluateConfig:
     discipline: str | None
     repo: str | None
@@ -81,24 +81,23 @@ def _parse_source_file_count(prescan_summary: str) -> int:
 from codecompass.evaluate.project_resolver import resolve_project_uuid as resolve_project_uuid  # re-export
 
 
-def run(config: EvaluateConfig) -> int:
-    if not config.repo:
-        return fail_with_error("repository path required")
-
-    ensure_reports_dir(config.reports_dir, config.reports_defaulted)
-
-    if is_repo_url(config.repo):
+def _resolve_repo_path(repo: str) -> tuple[str | None, int | None]:
+    """Resolve to a local path, cloning if needed. Returns (path, error_code)."""
+    if is_repo_url(repo):
         try:
-            repo_path = prepare_repository(config.repo)
+            return prepare_repository(repo), None
         except Exception as exc:
-            return fail_with_error(str(exc))
-    else:
-        local = Path(config.repo).resolve()
-        if not local.exists():
-            return fail_with_error(f"Local path {local} does not exist")
-        repo_path = str(local)
+            return None, fail_with_error(str(exc))
+    local = Path(repo).resolve()
+    if not local.exists():
+        return None, fail_with_error(f"Local path {local} does not exist")
+    return str(local), None
 
-    paths = default_paths(version=config.version)
+
+def _resolve_discipline_and_dimensions(
+    config: EvaluateConfig, paths: ConfigPaths,
+) -> tuple[EvaluateConfig, DataProvider | None, list[str] | None, int | None]:
+    """Detect discipline (if needed) and resolve dimension selection."""
     if not config.discipline:
         try:
             config = EvaluateConfig(
@@ -113,7 +112,7 @@ def run(config: EvaluateConfig) -> int:
                 version=config.version,
             )
         except DisciplineDetectionError as exc:
-            return fail_with_error(str(exc))
+            return config, None, None, fail_with_error(str(exc))
 
     if config.provider is not None:
         provider = config.provider
@@ -123,18 +122,79 @@ def run(config: EvaluateConfig) -> int:
     try:
         available = list_available_dimensions(provider.evaluators, config.discipline)
     except NotFoundError:
-        return fail_with_error("discipline missing or evaluators directory absent")
+        return config, None, None, fail_with_error("discipline missing or evaluators directory absent")
     try:
         selected, skipped = resolve_dimension_selection(config.dimensions or ["all"], available)
     except ValueError as exc:
-        return fail_with_error(str(exc))
+        return config, None, None, fail_with_error(str(exc))
     if skipped:
         log_warning(f"Skipped (not available for {config.discipline}): {', '.join(skipped)}")
+    return config, provider, selected, None
+
+
+def _load_templates(paths: ConfigPaths) -> tuple[str, str, str, str] | int:
+    """Load and hash analysis/scoring templates. Returns tuple or error code."""
+    analysis_path = paths.prompts_dir / "analysis.md"
+    scoring_path = paths.prompts_dir / "scoring.md"
+    if not analysis_path.exists():
+        return fail_with_error(f"Analysis template not found: {analysis_path}")
+    if not scoring_path.exists():
+        return fail_with_error(f"Scoring template not found: {scoring_path}")
+    analysis_template = analysis_path.read_text()
+    scoring_template = scoring_path.read_text()
+    return analysis_template, scoring_template, compute_prompt_hash(analysis_template), compute_prompt_hash(scoring_template)
+
+
+def _run_prescan(config: EvaluateConfig) -> tuple[str, int]:
+    """Run prescan if enabled. Returns (metrics_text, source_file_count)."""
+    if config.no_prescan:
+        return "", 0
+    log_step("Scanning repository")
+    prescan_summary = run_prescan_metrics(config.repo, config.discipline)
+    source_file_count = _parse_source_file_count(prescan_summary)
+    log_success(f"{source_file_count:,} source files")
+    return prescan_summary, source_file_count
+
+
+def _resolve_project_metadata(
+    config: EvaluateConfig, repo_path: str,
+) -> tuple[str, str, str, str]:
+    """Derive project identity fields. Returns (today, run_id, project_name, project_uuid)."""
     today = datetime.now().isoformat(timespec='seconds')
     run_id = str(uuid.uuid4())
     project_name = config.repo.split("/")[-1].replace(".git", "") if is_repo_url(config.repo) else Path(config.repo).name
     location = "online" if is_repo_url(config.repo) else "local"
     project_uuid = resolve_project_uuid(config.reports_dir, project_name, repo_path, config.discipline, location=location)
+    return today, run_id, project_name, project_uuid
+
+
+def _create_run_directories(
+    reports_dir: Path, project_uuid: str, run_id: str,
+) -> tuple[Path, Path]:
+    """Create and return (evidence_dir, evaluation_dir)."""
+    evidence_dir = reports_dir / project_uuid / run_id / "evidence"
+    evaluation_dir = reports_dir / project_uuid / run_id / "evaluation"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    evaluation_dir.mkdir(parents=True, exist_ok=True)
+    return evidence_dir, evaluation_dir
+
+
+def run(config: EvaluateConfig) -> int:
+    if not config.repo:
+        return fail_with_error("repository path required")
+
+    ensure_reports_dir(config.reports_dir, config.reports_defaulted)
+
+    repo_path, err = _resolve_repo_path(config.repo)
+    if err is not None:
+        return err
+
+    paths = default_paths(version=config.version)
+    config, provider, selected, err = _resolve_discipline_and_dimensions(config, paths)
+    if err is not None:
+        return err
+
+    today, run_id, project_name, project_uuid = _resolve_project_metadata(config, repo_path)
 
     dim_label = ", ".join(selected) if len(selected) <= 4 else f"{len(selected)} dimensions"
     log_banner([
@@ -142,35 +202,15 @@ def run(config: EvaluateConfig) -> int:
         f"Repo: {project_name}  ·  Discipline: {config.discipline}  ·  {dim_label}",
     ])
 
-    evidence_dir = config.reports_dir / project_uuid / run_id / "evidence"
-    evaluation_dir = config.reports_dir / project_uuid / run_id / "evaluation"
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    evaluation_dir.mkdir(parents=True, exist_ok=True)
+    evidence_dir, evaluation_dir = _create_run_directories(config.reports_dir, project_uuid, run_id)
     log_info(f"Report path: {evaluation_dir}")
 
-    # Load prompt templates
-    analysis_template_path = paths.prompts_dir / "analysis.md"
-    scoring_template_path = paths.prompts_dir / "scoring.md"
+    templates = _load_templates(paths)
+    if isinstance(templates, int):
+        return templates
+    analysis_template, scoring_template, analysis_hash, scoring_hash = templates
 
-    if not analysis_template_path.exists():
-        return fail_with_error(f"Analysis template not found: {analysis_template_path}")
-    if not scoring_template_path.exists():
-        return fail_with_error(f"Scoring template not found: {scoring_template_path}")
-
-    analysis_template = analysis_template_path.read_text()
-    scoring_template = scoring_template_path.read_text()
-    analysis_hash = compute_prompt_hash(analysis_template)
-    scoring_hash = compute_prompt_hash(scoring_template)
-
-    # Prescan
-    prescan_metrics = ""
-    source_file_count = 0
-    if not config.no_prescan:
-        log_step("Scanning repository")
-        prescan_summary = run_prescan_metrics(config.repo, config.discipline)
-        prescan_metrics = prescan_summary
-        source_file_count = _parse_source_file_count(prescan_summary)
-        log_success(f"{source_file_count:,} source files")
+    prescan_metrics, source_file_count = _run_prescan(config)
 
     ctx = DimensionRunContext(
         work_dir=repo_path,

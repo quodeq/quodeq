@@ -1,6 +1,7 @@
 import argparse
 import sys
 from pathlib import Path
+from typing import Callable
 
 from codecompass.config.cli import build_parser as build_config_parser
 from codecompass.config.cli import main as configure_main
@@ -72,7 +73,7 @@ def _run_configure(argv: list[str] | None) -> int:
     return configure_main(sub_argv)
 
 
-_COMMAND_HANDLERS: dict[str, callable] = {
+_COMMAND_HANDLERS: dict[str, Callable] = {
     "dashboard": _run_dashboard,
     "evaluate": _run_evaluate,
     "configure": _run_configure,

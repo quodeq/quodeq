@@ -23,7 +23,8 @@
       "Bash(/Users/marche000/Projects/codecompass/.venv/bin/python:*)",
       "Bash(pip3 install:*)",
       "Bash(/Users/marche000/Projects/codecompass/.venv/bin/pip install:*)",
-      "Bash(uv pip:*)"
+      "Bash(uv pip:*)",
+      "Bash(git reset:*)"
     ]
   }
 }

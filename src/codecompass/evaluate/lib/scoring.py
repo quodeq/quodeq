@@ -289,7 +289,11 @@ def weight_as_multiplier(weight_str: str) -> int:
 # Main scoring entry points
 # ---------------------------------------------------------------------------
 
-def _score_numerical(pdata, key, pct, weight_label, vt_counts, scale_mult, using_taxonomy, conf_level, ci) -> dict:
+def _score_numerical(
+    pdata: dict, key: str, pct: float, weight_label: str,
+    vt_counts: dict[str, int], scale_mult: int, using_taxonomy: bool,
+    conf_level: str, ci: dict,
+) -> dict:
     base_pts = score_for_compliance(pct)
     deductions = build_deductions(vt_counts, scale_multiplier=scale_mult)
     effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
@@ -310,7 +314,11 @@ def _score_numerical(pdata, key, pct, weight_label, vt_counts, scale_mult, using
     }
 
 
-def _score_non_numerical(pdata, key, pct, weight_label, vt_counts, scale_mult, using_taxonomy, conf_level, ci) -> dict:
+def _score_non_numerical(
+    pdata: dict, key: str, pct: float, weight_label: str,
+    vt_counts: dict[str, int], scale_mult: int, using_taxonomy: bool,
+    conf_level: str, ci: dict,
+) -> dict:
     base_label = grade_for_compliance(pct)
     level_drops = count_grade_drops(vt_counts, scale_multiplier=scale_mult)
     final_label = drop_grade(base_label, level_drops)
@@ -328,6 +336,34 @@ def _score_non_numerical(pdata, key, pct, weight_label, vt_counts, scale_mult, u
     }
 
 
+def _score_single_principle(
+    key: str, pdata: dict, mode: str, scale_mult: int, files_read: int,
+) -> dict:
+    """Score one principle and return its result dict."""
+    metrics = pdata.get("metrics", {})
+    pct = metrics.get("compliance_percentage", 0.0)
+    violations = pdata.get("violations", [])
+    weight_label = pdata.get("weight", DEFAULT_WEIGHT)
+    conf_level = metrics.get("confidence_level", "medium")
+
+    using_taxonomy = evidence_has_taxonomy(violations)
+    vt_counts = (
+        tally_types_by_taxonomy(violations)
+        if using_taxonomy
+        else tally_types_by_reason(violations)
+    )
+
+    ci = confidence_interval_for(
+        confidence_level=conf_level,
+        is_balanced=metrics.get("is_balanced", True),
+        total_instances=metrics.get("total_instances", 0),
+        files_read=files_read,
+    )
+
+    scorer = _score_numerical if mode == "numerical" else _score_non_numerical
+    return scorer(pdata, key, pct, weight_label, vt_counts, scale_mult, using_taxonomy, conf_level, ci)
+
+
 def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     """Compute per-principle scores and return the full result dictionary.
 
@@ -340,35 +376,14 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     Returns:
         A dict with keys: repository, discipline, date, mode, principles, overall.
     """
-    per_principle: dict = {}
     source_file_count = evidence.get("source_file_count", 0)
     files_read = evidence.get("files_read", 0)
     scale_mult = scale_multiplier(source_file_count)
-    raw_principles = evidence.get("principles", {})
 
-    for key, pdata in raw_principles.items():
-        metrics = pdata.get("metrics", {})
-        pct = metrics.get("compliance_percentage", 0.0)
-        violations = pdata.get("violations", [])
-        weight_label = pdata.get("weight", DEFAULT_WEIGHT)
-        conf_level = metrics.get("confidence_level", "medium")
-
-        using_taxonomy = evidence_has_taxonomy(violations)
-        vt_counts = (
-            tally_types_by_taxonomy(violations)
-            if using_taxonomy
-            else tally_types_by_reason(violations)
-        )
-
-        ci = confidence_interval_for(
-            confidence_level=conf_level,
-            is_balanced=metrics.get("is_balanced", True),
-            total_instances=metrics.get("total_instances", 0),
-            files_read=files_read,
-        )
-
-        scorer = _score_numerical if mode == "numerical" else _score_non_numerical
-        per_principle[key] = scorer(pdata, key, pct, weight_label, vt_counts, scale_mult, using_taxonomy, conf_level, ci)
+    per_principle = {
+        key: _score_single_principle(key, pdata, mode, scale_mult, files_read)
+        for key, pdata in evidence.get("principles", {}).items()
+    }
 
     overall = _weighted_overall(per_principle, mode)
 

@@ -1,3 +1,6 @@
+_PERCENT_MULTIPLIER = 100
+
+
 def parse_coverage_percent(value: str) -> int:
     return int(value.strip().rstrip("%"))
 
@@ -5,5 +8,5 @@ def parse_coverage_percent(value: str) -> int:
 def coverage_percent(value: str) -> int:
     if "/" in value:
         num, denom = value.split("/", 1)
-        return int(round((int(num) / int(denom)) * 100))
+        return int(round((int(num) / int(denom)) * _PERCENT_MULTIPLIER))
     return parse_coverage_percent(value)
