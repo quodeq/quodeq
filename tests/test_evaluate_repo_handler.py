@@ -15,7 +15,7 @@ def test_is_repo_url():
 def test_prepare_repository_url_creates_tmp(monkeypatch, tmp_path: Path):
     called = {}
 
-    def fake_run(cmd, check):
+    def fake_run(cmd, check, **kwargs):
         called["cmd"] = cmd
         dest = Path(cmd[-1])
         dest.mkdir(parents=True, exist_ok=True)

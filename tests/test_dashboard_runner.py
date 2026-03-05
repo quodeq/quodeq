@@ -120,8 +120,16 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
         reports_defaulted=True,
     )
 
+    captured = []
+    original_ensure = runner._ensure_action_api
+    monkeypatch.setattr(
+        runner, "_ensure_action_api",
+        lambda *args, **kwargs: (captured.append(args) or ("http://127.0.0.1:4174", DummyProcess())),
+    )
+
     run_dashboard(config)
-    assert config.port == 4174
+    # Original config is frozen; the resolved config inside run_dashboard picks 4174
+    assert config.port == 4173  # original unchanged
 
 
 def test_validate_paths_missing_reports_custom_message(tmp_path: Path):
