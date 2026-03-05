@@ -5,11 +5,13 @@ import { createApp } from './app.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const DEFAULT_PORT = 3001;
+
 function parseArgs(argv) {
   const args = {
     evaluations: './evaluations',
     repoRoot: '.',
-    port: 3001,
+    port: DEFAULT_PORT,
     staticDist: path.resolve(__dirname, '../../web/dist'),
     actionApi: null,
     help: false
@@ -90,7 +92,7 @@ function main() {
   const reportsRoot = path.resolve(parsed.evaluations);
   const repoRoot = path.resolve(parsed.repoRoot);
   const staticDistPath = path.resolve(parsed.staticDist);
-  const port = Number.isFinite(parsed.port) ? parsed.port : 3001;
+  const port = Number.isFinite(parsed.port) ? parsed.port : DEFAULT_PORT;
   const actionApiBase = parsed.actionApi ?? process.env.CODECOMPASS_ACTION_API ?? null;
 
   const distCheck = ensureDir('Static dist', staticDistPath);

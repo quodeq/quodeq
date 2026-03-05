@@ -11,7 +11,7 @@ from codecompass.evaluate.lib.evaluator_renderer import (
 )
 
 
-@dataclass
+@dataclass(frozen=True)
 class DimensionRunContext:
     """All context needed to evaluate a set of dimensions."""
     work_dir: str

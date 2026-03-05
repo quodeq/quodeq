@@ -10,7 +10,7 @@ from typing import Any, Iterable
 
 import subprocess
 
-MAX_LOG_LINES = 600
+MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 _DIMENSION_DIVIDER_RE = re.compile(r"\[\d+/\d+\]\s+(\S+)")
 

@@ -249,7 +249,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           {filename && (
                             <div className="vlive-detail-meta">
                               {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-                              <FileCopyBtn display={display} copyText={ref} />
+                              <FileCopyBtn display={display} copyText={filename} />
                             </div>
                           )}
                           {(v.code || v.snippet) && (
@@ -298,7 +298,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             <span className="vlive-detail-section-label">File</span>
                             <div className="vlive-detail-meta">
                               {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-                              <FileCopyBtn display={display} copyText={ref} />
+                              <FileCopyBtn display={display} copyText={filename} />
                             </div>
                           </div>
                         )}

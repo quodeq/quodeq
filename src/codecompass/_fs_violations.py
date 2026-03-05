@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+from typing import Any, Callable
+
+
+def parse_violations_from_evidence(evidence_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+    try:
+        data = json.loads(evidence_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    violations = []
+    for raw_key, pdata in (data.get("principles") or {}).items():
+        label = pdata.get("display_name") or raw_key
+        for violation in pdata.get("violations") or []:
+            file_path = violation.get("file")
+            line = violation.get("line")
+            violations.append({
+                "principle": label,
+                "file": f"{file_path}:{line}" if file_path and line else file_path,
+                "line": line,
+                "reason": violation.get("reason"),
+                "snippet": violation.get("snippet"),
+                "severity": violation.get("severity") or "minor",
+            })
+    return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}
+
+
+def _texts_from_assistant(event: dict) -> list[str]:
+    texts: list[str] = []
+    for block in (event.get("message") or {}).get("content") or []:
+        if block.get("type") == "text" and block.get("text"):
+            texts.append(block["text"])
+    return texts
+
+
+def _texts_from_result(event: dict) -> list[str]:
+    r = event.get("result")
+    return [r] if r else []
+
+
+def _texts_from_item_completed(event: dict) -> list[str]:
+    texts: list[str] = []
+    item = event.get("item") or {}
+    if item.get("type") == "agent_message":
+        if item.get("text"):
+            texts.append(item["text"])
+        for block in item.get("content") or []:
+            if block.get("type") in ("text", "output_text") and block.get("text"):
+                texts.append(block["text"])
+    return texts
+
+
+_TEXT_EXTRACTORS: dict[str, Callable] = {
+    "assistant": _texts_from_assistant,
+    "result": _texts_from_result,
+    "item.completed": _texts_from_item_completed,
+}
+
+
+def parse_violations_from_stream(stream_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+    try:
+        content = stream_path.read_text()
+    except OSError:
+        return None
+    violations: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for raw_line in content.splitlines():
+        stripped = raw_line.strip()
+        if not stripped:
+            continue
+        try:
+            event = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        extractor = _TEXT_EXTRACTORS.get(event.get("type"))
+        texts = extractor(event) if extractor else []
+        for text in texts:
+            for text_line in text.splitlines():
+                stripped_line = text_line.strip()
+                if not stripped_line.startswith("{"):
+                    continue
+                try:
+                    obj = json.loads(stripped_line)
+                except json.JSONDecodeError:
+                    continue
+                if not obj.get("p") or obj.get("t") != "violation":
+                    continue
+                key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}"
+                if key in seen:
+                    continue
+                seen.add(key)
+                snippet = obj.get("snippet")
+                violations.append({
+                    "principle": obj.get("d") or obj["p"],
+                    "file": obj.get("file"),
+                    "line": obj.get("line"),
+                    "reason": obj.get("reason"),
+                    "snippet": str(snippet).splitlines()[0].strip() if snippet else None,
+                    "severity": obj.get("severity") or "minor",
+                })
+    return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}

@@ -7,6 +7,14 @@ from pathlib import Path
 from codecompass.evaluate.lib.common import log_warning
 
 
+_SCORE_GRADE_BANDS: list[tuple[float, str]] = [
+    (9, "Exemplary"),
+    (7, "Good"),
+    (5, "Adequate"),
+    (3, "Poor"),
+]
+
+
 def grade_from_score(score: str | None) -> str | None:
     # Nothing to map if the input is falsy
     if not score:
@@ -19,106 +27,87 @@ def grade_from_score(score: str | None) -> str | None:
 
     numeric = float(hit.group(1))
 
-    # Thresholds are exclusive lower bounds for the next tier
-    if numeric < 3:
-        return "Critical"
-    if numeric < 5:
-        return "Poor"
-    if numeric < 7:
-        return "Adequate"
-    if numeric < 9:
-        return "Good"
-    return "Exemplary"
+    for threshold, label in _SCORE_GRADE_BANDS:
+        if numeric >= threshold:
+            return label
+    return "Critical"
 
 
-def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> dict:
-    # Pull the two sub-dicts out of the scores payload when it exists
-    per_principle_scores: dict = {}
-    aggregate: dict = {}
-    if scores:
-        per_principle_scores = scores.get("principles", {})
-        aggregate = scores.get("overall", {})
-
-    # Index scores by display_name so we can join them against evidence entries
+def _build_scores_lookup(scores: dict | None) -> tuple[dict, dict]:
+    """Extract per-principle scores lookup and aggregate from scores payload."""
+    if not scores:
+        return {}, {}
+    per_principle = scores.get("principles", {})
     lookup: dict = {}
-    for item in per_principle_scores.values():
+    for item in per_principle.values():
         key = item.get("display_name", "")
         if key:
             lookup[key] = item
+    return lookup, scores.get("overall", {})
 
+
+def _flatten_principles(
+    evidence: dict, lookup: dict,
+) -> tuple[list[dict], list[dict], list[dict], dict[str, int]]:
+    """Walk evidence principles to build rows, flat violations, flat compliance, and severity tally."""
     principle_rows: list = []
     flat_violations: list = []
     flat_compliance: list = []
-
-    # Track severity bucket counts as we iterate through violations
     sev_tally = {"critical": 0, "major": 0, "minor": 0}
 
     for raw_key, pdata in evidence.get("principles", {}).items():
         label = pdata.get("display_name", raw_key)
         matched = lookup.get(label, {})
 
-        # Build the score string only when a numeric value is present
         raw_final = matched.get("final_score")
         formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
-
-        # Prefer grade already computed by the scorer, fall back to our own mapping
         resolved_grade = matched.get("grade") or grade_from_score(formatted_score)
 
-        row: dict = {
-            "name": label,
-            "score": formatted_score,
-            "grade": resolved_grade,
-        }
-
-        # Optional fields — only include when the scorer provided them
+        row: dict = {"name": label, "score": formatted_score, "grade": resolved_grade}
         if matched.get("confidence_interval") is not None:
             row["confidence_interval"] = matched["confidence_interval"]
         if matched.get("grade_stability") is not None:
             row["grade_stability"] = matched["grade_stability"]
-
-        # Metrics live on the evidence side, not the scores side
         raw_metrics = pdata.get("metrics")
         if raw_metrics:
             row["metrics"] = raw_metrics
-
         principle_rows.append(row)
 
-        # Flatten violations, stamping each with the principle name
         for viol in pdata.get("violations", []):
             flat_entry: dict = {"principle": label}
-            flat_entry.update(
-                {field: viol.get(field) for field in ("file", "line", "reason", "snippet", "severity")}
-            )
+            flat_entry.update({field: viol.get(field) for field in ("file", "line", "reason", "snippet", "severity")})
             flat_violations.append(flat_entry)
-
             bucket = viol.get("severity", "minor")
             if bucket in sev_tally:
                 sev_tally[bucket] += 1
 
-        # Flatten compliance examples the same way
         for comp in pdata.get("compliance", []):
             flat_entry = {"principle": label}
-            flat_entry.update(
-                {field: comp.get(field) for field in ("file", "line", "reason", "snippet")}
-            )
+            flat_entry.update({field: comp.get(field) for field in ("file", "line", "reason", "snippet")})
             flat_compliance.append(flat_entry)
 
-    # Overall score only exists when the scorer produced a weighted value
+    return principle_rows, flat_violations, flat_compliance, sev_tally
+
+
+def _resolve_overall(aggregate: dict) -> tuple[str | None, str | None]:
+    """Derive top-level score and grade strings from the aggregate block."""
     weighted = aggregate.get("weighted_score")
     if weighted is not None:
         top_score = f"{round(weighted, 1)}/10"
         top_grade = aggregate.get("grade") or grade_from_score(top_score)
-    else:
-        top_score = None
-        top_grade = None
+        return top_score, top_grade
+    return None, None
 
-    # Pull the meta block; forward only the known versioning fields
+
+def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> dict:
+    lookup, aggregate = _build_scores_lookup(scores)
+    principle_rows, flat_violations, flat_compliance, sev_tally = _flatten_principles(evidence, lookup)
+    top_score, top_grade = _resolve_overall(aggregate)
     raw_meta = evidence.get("meta", {})
 
     return {
         "dimension": dimension,
         "project": evidence.get("repository", ""),
-        # runId is always empty here; write_report_json fills it in from the path
         "runId": "",
         "discipline": evidence.get("discipline", ""),
         "date": evidence.get("date", ""),
