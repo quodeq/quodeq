@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging as _logging
-import sys
 
 _eval_logger = _logging.getLogger("codecompass.evaluate")
-_eval_handler = _logging.StreamHandler(sys.stderr)
-_eval_handler.setFormatter(_logging.Formatter("%(message)s"))
-_eval_logger.addHandler(_eval_handler)
+if not _eval_logger.handlers:
+    import sys as _sys
+    _eval_handler = _logging.StreamHandler(_sys.stderr)
+    _eval_handler.setFormatter(_logging.Formatter("%(message)s"))
+    _eval_logger.addHandler(_eval_handler)
 _eval_logger.propagate = False
 _eval_logger.setLevel(_logging.DEBUG)
 

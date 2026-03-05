@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import subprocess
 
+_AI_CLI_TIMEOUT_S = 300
+
 
 def run_ai_cli(prompt: str) -> tuple[str | None, str | None]:
     cmd = os.environ.get("AI_CMD", "claude")
@@ -12,7 +14,7 @@ def run_ai_cli(prompt: str) -> tuple[str | None, str | None]:
             check=True,
             capture_output=True,
             text=True,
-            timeout=300,
+            timeout=_AI_CLI_TIMEOUT_S,
         )
     except FileNotFoundError:
         return None, f"AI command not found: {cmd}"

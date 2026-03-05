@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Callable
 
 from codecompass.evaluate.lib.ai_cli_provider import get_ai_cmd, get_ai_model
 from codecompass.evaluate.lib.common import log_beat, log_debug, log_error, log_info, log_step, log_success, log_warning
@@ -22,18 +23,18 @@ def extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
     """
     count = 0
     lines = 0
-    for tl in text.splitlines():
-        tl = tl.strip()
-        if not tl:
+    for line in text.splitlines():
+        line = line.strip()
+        if not line:
             continue
         lines += 1
-        if tl.startswith("```"):
+        if line.startswith("```"):
             continue
-        if tl.startswith("{"):
+        if line.startswith("{"):
             try:
-                obj = json.loads(tl)
+                obj = json.loads(line)
                 if obj.get("p") and obj.get("t") in ("violation", "compliance"):
-                    out.write(tl + "\n")
+                    out.write(line + "\n")
                     count += 1
             except json.JSONDecodeError:
                 pass
@@ -49,9 +50,9 @@ def process_assistant_event(data: dict, out, stats: dict, files_read: set) -> No
             text = block["text"].strip()
             if text:
                 stats["text_blocks"] += 1
-                c, l = extract_jsonl_from_text(text, out)
-                stats["jsonl_lines"] += c
-                stats["total_text_lines"] += l
+                jsonl_count, lines_scanned = extract_jsonl_from_text(text, out)
+                stats["jsonl_lines"] += jsonl_count
+                stats["total_text_lines"] += lines_scanned
         elif btype == "tool_use" and block.get("name") == "Read":
             fp = block.get("input", {}).get("file_path")
             if fp:
@@ -63,9 +64,9 @@ def process_result_event(data: dict, out, stats: dict, _files_read: set | None =
     result = data.get("result", "").strip()
     if result:
         stats["text_blocks"] += 1
-        c, l = extract_jsonl_from_text(result, out)
-        stats["jsonl_lines"] += c
-        stats["total_text_lines"] += l
+        jsonl_count, lines_scanned = extract_jsonl_from_text(result, out)
+        stats["jsonl_lines"] += jsonl_count
+        stats["total_text_lines"] += lines_scanned
 
 
 def process_item_completed_event(data: dict, out, stats: dict, files_read: set) -> None:
@@ -75,9 +76,9 @@ def process_item_completed_event(data: dict, out, stats: dict, files_read: set) 
         text = (item.get("text") or "").strip()
         if text:
             stats["text_blocks"] += 1
-            c, l = extract_jsonl_from_text(text, out)
-            stats["jsonl_lines"] += c
-            stats["total_text_lines"] += l
+            jsonl_count, lines_scanned = extract_jsonl_from_text(text, out)
+            stats["jsonl_lines"] += jsonl_count
+            stats["total_text_lines"] += lines_scanned
         for block in item.get("content", []):
             if isinstance(block, dict):
                 btype = block.get("type")
@@ -85,16 +86,18 @@ def process_item_completed_event(data: dict, out, stats: dict, files_read: set) 
                     block_text = (block.get("text") or "").strip()
                     if block_text:
                         stats["text_blocks"] += 1
-                        c, l = extract_jsonl_from_text(block_text, out)
-                        stats["jsonl_lines"] += c
-                        stats["total_text_lines"] += l
+                        jsonl_count, lines_scanned = extract_jsonl_from_text(block_text, out)
+                        stats["jsonl_lines"] += jsonl_count
+                        stats["total_text_lines"] += lines_scanned
                 elif btype == "tool_use" and block.get("name") == "Read":
                     fp = block.get("input", {}).get("file_path")
                     if fp:
                         files_read.add(fp)
 
 
-_EVENT_HANDLERS: dict[str, callable] = {
+_HEARTBEAT_INTERVAL_S = 60
+
+_EVENT_HANDLERS: dict[str, Callable] = {
     "assistant": process_assistant_event,
     "result": process_result_event,
     "item.completed": process_item_completed_event,
@@ -139,8 +142,8 @@ def is_stream_valid(stream_file: str) -> bool:
     with open(stream_file) as f:
         for line in f:
             try:
-                d = json.loads(line.strip())
-                if d.get("type") == "result" and d.get("is_error"):
+                event_data = json.loads(line.strip())
+                if event_data.get("type") == "result" and event_data.get("is_error"):
                     return False
             except json.JSONDecodeError:
                 pass
@@ -155,20 +158,20 @@ def dump_debug_sample(stream_file: str, debug_stream: str, dimension_tag: str) -
     with open(stream_file) as f:
         for line in f:
             try:
-                d = json.loads(line.strip())
+                event_data = json.loads(line.strip())
             except json.JSONDecodeError:
                 continue
 
-            if d.get("type") == "assistant":
-                for block in d.get("message", {}).get("content", []):
+            if event_data.get("type") == "assistant":
+                for block in event_data.get("message", {}).get("content", []):
                     if block.get("type") == "text":
                         text = block["text"]
                         preview = text[:400].replace("\n", "\n    ")
                         log_debug(f"  debug sample ({len(text)} chars):\n    {preview}")
                         return
 
-            if d.get("type") == "item.completed":
-                item = d.get("item", {})
+            if event_data.get("type") == "item.completed":
+                item = event_data.get("item", {})
                 if item.get("type") == "agent_message":
                     text = item.get("text", "")
                     if text:
@@ -191,10 +194,12 @@ def run_analysis_phase(
     dimension_tag: str,
     analysis_budget: str | None = None,
     deep_unrestricted: bool = False,
+    ai_cmd: str | None = None,
+    ai_model: str | None = None,
 ) -> None:
     """Run the AI analysis phase, capturing stream-json output to stream_file."""
-    cmd = get_ai_cmd()
-    model = get_ai_model()
+    cmd = ai_cmd or get_ai_cmd()
+    model = ai_model or get_ai_model()
     analysis_tools = "Bash,Glob,Grep,Read"
 
     args = [cmd, "--print", "--output-format", "stream-json", "--verbose", "--tools", analysis_tools]
@@ -210,7 +215,6 @@ def run_analysis_phase(
     env.pop("CLAUDECODE", None)  # allow claude to run even when invoked from a Claude Code session
 
     stream_err_file = stream_file + ".err"
-    heartbeat_interval = 60
     with open(stream_file, "w") as stream_out, open(stream_err_file, "w") as stream_err:
         process = subprocess.Popen(
             args,
@@ -223,9 +227,9 @@ def run_analysis_phase(
         elapsed = 0
         while process.poll() is None:
             try:
-                process.wait(timeout=heartbeat_interval)
+                process.wait(timeout=_HEARTBEAT_INTERVAL_S)
             except subprocess.TimeoutExpired:
-                elapsed += heartbeat_interval
+                elapsed += _HEARTBEAT_INTERVAL_S
                 mins, secs = divmod(elapsed, 60)
                 elapsed_label = f"{mins}m {secs}s" if mins else f"{secs}s"
                 log_beat(f"{elapsed_label} elapsed")

@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from codecompass.evaluate.lib.usage import evaluate_usage
 
 
-@dataclass
+@dataclass(frozen=True)
 class ParseResult:
     discipline: str | None = None
     repo: str | None = None
