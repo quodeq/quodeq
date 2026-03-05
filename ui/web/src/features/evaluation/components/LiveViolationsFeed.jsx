@@ -79,7 +79,7 @@ function ViolationLiveRow({ violation, index }) {
             {filename && (
               <div className="vlive-detail-meta">
                 {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-                <FileCopyBtn display={display} copyText={ref} />
+                <FileCopyBtn display={display} copyText={filename} />
               </div>
             )}
             {violation.snippet && <pre className="vlive-snippet">{violation.snippet}</pre>}

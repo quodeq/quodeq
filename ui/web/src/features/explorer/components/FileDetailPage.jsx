@@ -141,7 +141,7 @@ function ViolationCard({ v, index }) {
         {filename && (
           <div className="vlive-detail-meta">
             {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-            <FileCopyBtn display={display} copyText={ref} />
+            <FileCopyBtn display={display} copyText={filename} />
           </div>
         )}
         {v.snippet && <pre className="vlive-snippet">{v.snippet}</pre>}

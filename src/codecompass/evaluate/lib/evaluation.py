@@ -26,6 +26,71 @@ def compute_prompt_hash(content: str) -> str:
     return hashlib.md5(content.encode()).hexdigest()[:8]
 
 
+def _run_analysis_and_collect(
+    work_dir: str, dimension: str, analysis_prompt: str, evidence_file: str, dimension_tag: str,
+) -> tuple[str, int, bool]:
+    """Run analysis phase, extract JSONL evidence, and validate the stream.
+
+    Returns (jsonl_file, files_read, stream_ok).  Caller must unlink jsonl_file.
+    """
+    stream_file = str(Path(evidence_file).parent / f"{dimension}_live.stream")
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as jf:
+        jsonl_file = jf.name
+
+    run_analysis_phase(work_dir, dimension, analysis_prompt, stream_file, dimension_tag)
+    files_read = extract_jsonl_evidence(stream_file, jsonl_file, dimension)
+
+    stream_path = Path(stream_file)
+    jsonl_path = Path(jsonl_file)
+    if (
+        stream_path.exists()
+        and stream_path.stat().st_size > 0
+        and (not jsonl_path.exists() or jsonl_path.stat().st_size == 0)
+    ):
+        debug_dir = Path(evidence_file).parent
+        debug_stream = str(debug_dir / f"{dimension}_debug_stream.json")
+        dump_debug_sample(stream_file, debug_stream, dimension_tag)
+
+    stream_ok = is_stream_valid(stream_file)
+    Path(stream_file).unlink(missing_ok=True)
+    Path(stream_file + ".err").unlink(missing_ok=True)
+
+    return jsonl_file, files_read, stream_ok
+
+
+def _score_and_report(
+    evidence_file: str, eval_file: str, dimension: str,
+    mapping_file: str | None, scoring_mode: str, has_evidence: bool,
+) -> None:
+    """Compute deterministic scores and generate the dashboard JSON."""
+    scores_file = str(
+        Path(evidence_file).with_name(
+            Path(evidence_file).stem.replace("_evidence", "_scores") + ".json"
+        )
+    )
+    if mapping_file and Path(mapping_file).exists() and has_evidence:
+        try:
+            with open(evidence_file) as f:
+                evidence_data = json.load(f)
+            with open(mapping_file) as f:
+                mapping_data = json.load(f)
+            scores_data = run_scoring(evidence_data, mapping_data, scoring_mode)
+            with open(scores_file, "w") as f:
+                json.dump(scores_data, f, indent=2, sort_keys=True)
+        except Exception as exc:
+            log_warning(f"Score computation failed: {exc}")
+
+    json_out = str(Path(eval_file).parent / f"{dimension}.json")
+    try:
+        write_report_json(
+            evidence_file=evidence_file,
+            output_file=json_out,
+            scores_file=scores_file if Path(scores_file).exists() else None,
+        )
+    except Exception as exc:
+        log_warning(f"JSON report generation failed — dashboard will fall back to .md: {exc}")
+
+
 def run_two_phase_dimension(
     work_dir: str,
     dimension: str,
@@ -57,11 +122,9 @@ def run_two_phase_dimension(
     """
     dimension_tag = f"[{dimension}]"
 
-    # Ensure output directories exist
     Path(evidence_file).parent.mkdir(parents=True, exist_ok=True)
     Path(eval_file).parent.mkdir(parents=True, exist_ok=True)
 
-    # --- Build analysis prompt ---
     analysis_prompt = build_analysis_jsonl_prompt(
         template=analysis_template,
         discipline=discipline,
@@ -76,41 +139,20 @@ def run_two_phase_dimension(
 
     log_step("Gathering evidence")
 
-    # --- Phase 1: Analysis ---
-    # Use a predictable path so the server can read violations live while the stream grows.
-    stream_file = str(Path(evidence_file).parent / f"{dimension}_live.stream")
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".jsonl", delete=False) as jf:
-        jsonl_file = jf.name
-
-    files_read: int = 0
+    jsonl_file = None
     try:
-        run_analysis_phase(work_dir, dimension, analysis_prompt, stream_file, dimension_tag)
-        files_read = extract_jsonl_evidence(stream_file, jsonl_file, dimension)
-
-        # Debug sample when stream had content but no evidence was extracted
-        stream_path = Path(stream_file)
-        jsonl_path = Path(jsonl_file)
-        if (
-            stream_path.exists()
-            and stream_path.stat().st_size > 0
-            and (not jsonl_path.exists() or jsonl_path.stat().st_size == 0)
-        ):
-            debug_dir = Path(evidence_file).parent
-            debug_stream = str(debug_dir / f"{dimension}_debug_stream.json")
-            dump_debug_sample(stream_file, debug_stream, dimension_tag)
-
-        stream_ok = is_stream_valid(stream_file)
-        Path(stream_file).unlink(missing_ok=True)
-        Path(stream_file + ".err").unlink(missing_ok=True)
+        jsonl_file, files_read, stream_ok = _run_analysis_and_collect(
+            work_dir, dimension, analysis_prompt, evidence_file, dimension_tag,
+        )
 
         if not stream_ok:
+            jsonl_path = Path(jsonl_file)
             if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
                 log_warning("Analysis budget reached — proceeding with partial evidence")
             else:
                 log_error(f"{dimension_tag} Analysis produced no output")
                 return False
 
-        # --- Assemble + validate evidence ---
         has_evidence = build_evidence_file(
             jsonl_file=jsonl_file,
             evidence_file=evidence_file,
@@ -126,39 +168,13 @@ def run_two_phase_dimension(
             dimension_tag=dimension_tag,
         )
     finally:
-        Path(jsonl_file).unlink(missing_ok=True)
+        if jsonl_file:
+            Path(jsonl_file).unlink(missing_ok=True)
 
     if evidence_only:
         return has_evidence
 
-    # --- Compute deterministic scores ---
     scoring_mode = "numerical" if numerical else detect_scoring_mode(scoring_template)
-    scores_file = str(
-        Path(evidence_file).with_name(
-            Path(evidence_file).stem.replace("_evidence", "_scores") + ".json"
-        )
-    )
-    if mapping_file and Path(mapping_file).exists() and has_evidence:
-        try:
-            with open(evidence_file) as f:
-                evidence_data = json.load(f)
-            with open(mapping_file) as f:
-                mapping_data = json.load(f)
-            scores_data = run_scoring(evidence_data, mapping_data, scoring_mode)
-            with open(scores_file, "w") as f:
-                json.dump(scores_data, f, indent=2, sort_keys=True)
-        except Exception as exc:
-            log_warning(f"Score computation failed: {exc}")
-
-    # --- Generate dashboard JSON (non-fatal) ---
-    json_out = str(Path(eval_file).parent / f"{dimension}.json")
-    try:
-        write_report_json(
-            evidence_file=evidence_file,
-            output_file=json_out,
-            scores_file=scores_file if Path(scores_file).exists() else None,
-        )
-    except Exception as exc:
-        log_warning(f"JSON report generation failed — dashboard will fall back to .md: {exc}")
+    _score_and_report(evidence_file, eval_file, dimension, mapping_file, scoring_mode, has_evidence)
 
     return True
