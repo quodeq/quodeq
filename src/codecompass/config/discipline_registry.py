@@ -13,7 +13,7 @@ def _strip_quotes(value: str) -> str:
     return value
 
 
-@dataclass
+@dataclass(frozen=True)
 class DisciplineRule:
     name: str
     language: str | None = None
@@ -49,18 +49,18 @@ def _parse_csv(value: str) -> list[str]:
 
 def _parse_field(rule: DisciplineRule, key: str, value: str) -> None:
     if key in _SIMPLE_FIELDS:
-        setattr(rule, key, value)
+        object.__setattr__(rule, key, value)
     elif key in _QUOTED_FIELDS:
-        setattr(rule, key, _strip_quotes(value))
+        object.__setattr__(rule, key, _strip_quotes(value))
     elif key in _CSV_FIELDS:
-        setattr(rule, key, _parse_csv(value))
+        object.__setattr__(rule, key, _parse_csv(value))
     elif key == "detect_priority":
         try:
-            rule.detect_priority = int(value)
+            object.__setattr__(rule, "detect_priority", int(value))
         except ValueError:
-            rule.detect_priority = 99
+            object.__setattr__(rule, "detect_priority", 99)
     elif key == "detect_fallback":
-        rule.detect_fallback = value.lower() == "true"
+        object.__setattr__(rule, "detect_fallback", value.lower() == "true")
 
 
 @dataclass

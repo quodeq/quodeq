@@ -7,13 +7,41 @@ import subprocess
 import urllib.request
 from pathlib import Path
 
+from typing import Any
+
 from codecompass.adapters.fs.report_parser import safe_read_dir
+
+_CLI_MODEL_TIMEOUT_S = 8
+_ANTHROPIC_API_TIMEOUT_S = 8
+_FALLBACK_CLAUDE_MODELS = [
+    "claude-opus-4-5",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-5",
+]
+
+
+def _fetch_anthropic_models(api_key: str) -> list[str] | None:
+    """Fetch model list from the Anthropic API. Returns None on failure."""
+    try:
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/models",
+            headers={
+                "x-api-key": api_key,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        with urllib.request.urlopen(req, timeout=_ANTHROPIC_API_TIMEOUT_S) as resp:
+            data = json.loads(resp.read())
+        models = [m["id"] for m in data.get("data", []) if m.get("id")]
+        return models if models else None
+    except Exception:
+        return None
 
 
 class FsToolingMixin:
     """Mixin for browse_repo and AI client discovery methods."""
 
-    def browse_repo(self, path: str | None):
+    def browse_repo(self, path: str | None) -> dict[str, Any]:
         target = Path(path) if path else Path.home()
         target = target.resolve()
         if not target.exists():
@@ -49,7 +77,7 @@ class FsToolingMixin:
             "isGitRepo": (target / ".git").exists(),
         }
 
-    def get_ai_clients(self):
+    def get_ai_clients(self) -> dict[str, list[dict[str, str]]]:
         candidates = [
             {"id": "claude", "label": "Claude"},
             {"id": "codex", "label": "Codex"},
@@ -57,7 +85,7 @@ class FsToolingMixin:
         ]
         return {"clients": [c for c in candidates if shutil.which(c["id"])]}
 
-    def _get_cli_models(self, client_id: str):
+    def _get_cli_models(self, client_id: str) -> dict[str, list[str]]:
         if not shutil.which(client_id):
             return {"models": []}
         try:
@@ -65,7 +93,7 @@ class FsToolingMixin:
                 [client_id, "/models"],
                 capture_output=True,
                 text=True,
-                timeout=8,
+                timeout=_CLI_MODEL_TIMEOUT_S,
             )
             output = result.stdout if result.returncode == 0 else ""
         except (subprocess.TimeoutExpired, OSError):
@@ -77,30 +105,14 @@ class FsToolingMixin:
                 models.append(token)
         return {"models": models}
 
-    def get_client_models(self, client_id: str):
+    def get_client_models(self, client_id: str) -> dict[str, list[str]]:
         fetcher = self._model_fetchers.get(client_id, self._get_cli_models)
         return fetcher(client_id)
 
-    def _get_claude_models(self, _client_id: str = "claude"):
-        api_key = os.environ.get("ANTHROPIC_API_KEY")
-        if api_key:
-            try:
-                req = urllib.request.Request(
-                    "https://api.anthropic.com/v1/models",
-                    headers={
-                        "x-api-key": api_key,
-                        "anthropic-version": "2023-06-01",
-                    },
-                )
-                with urllib.request.urlopen(req, timeout=8) as resp:
-                    data = json.loads(resp.read())
-                models = [m["id"] for m in data.get("data", []) if m.get("id")]
-                if models:
-                    return {"models": models}
-            except Exception:
-                pass
-        return {"models": [
-            "claude-opus-4-5",
-            "claude-sonnet-4-5",
-            "claude-haiku-4-5",
-        ]}
+    def _get_claude_models(self, _client_id: str = "claude", api_key: str | None = None) -> dict[str, list[str]]:
+        key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        if key:
+            models = _fetch_anthropic_models(key)
+            if models:
+                return {"models": models}
+        return {"models": list(_FALLBACK_CLAUDE_MODELS)}

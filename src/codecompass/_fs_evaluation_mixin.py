@@ -6,34 +6,49 @@ from pathlib import Path
 
 from codecompass.utils import is_repo_url
 
+from typing import Any
+
+
+def _build_evaluate_cmd(
+    repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str,
+) -> list[str]:
+    """Build the CLI command list for an evaluation subprocess."""
+    reports_abs = str(Path(reports_dir).resolve())
+    cmd = [sys.executable, "-m", "codecompass.cli", "evaluate"]
+    cmd += ["--evaluations", reports_abs]
+    if dimensions:
+        cmd += ["-d", dimensions]
+    if numerical:
+        cmd.append("-n")
+    if discipline:
+        cmd.append(discipline)
+    repo_path = Path(repo)
+    if is_repo_url(repo):
+        cmd.append(repo)
+    else:
+        cmd.append(str(repo_path.resolve()))
+    return cmd
+
+
+def _register_project(repo: str, discipline: str | None, reports_dir: str) -> None:
+    """Resolve and register the project UUID before evaluation starts."""
+    from codecompass.evaluate.project_resolver import resolve_project_uuid
+    repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
+    project_name = repo.split("/")[-1].replace(".git", "") if is_repo_url(repo) else Path(repo).name
+    location = "online" if is_repo_url(repo) else "local"
+    resolve_project_uuid(Path(reports_dir), project_name, repo_resolved, discipline, location=location)
+
 
 class FsEvaluationMixin:
     """Mixin for evaluation start/status/cancel methods."""
 
-    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None):
+    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None) -> dict[str, Any]:
         repo_path = Path(repo)
         if not is_repo_url(repo) and not repo_path.exists():
             raise FileNotFoundError(f"Repository not found: {repo}")
 
-        reports_abs = str(Path(reports_dir).resolve())
-        cmd = [sys.executable, "-m", "codecompass.cli", "evaluate"]
-        cmd += ["--evaluations", reports_abs]
-        if dimensions:
-            cmd += ["-d", dimensions]
-        if numerical:
-            cmd.append("-n")
-        if discipline:
-            cmd.append(discipline)
-        if is_repo_url(repo):
-            cmd.append(repo)
-        else:
-            cmd.append(str(repo_path.resolve()))
-
-        from codecompass.evaluate.project_resolver import resolve_project_uuid
-        repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
-        project_name = repo.split("/")[-1].replace(".git", "") if is_repo_url(repo) else Path(repo).name
-        location = "online" if is_repo_url(repo) else "local"
-        resolve_project_uuid(Path(reports_dir), project_name, repo_resolved, discipline, location=location)
+        cmd = _build_evaluate_cmd(repo, discipline, dimensions, numerical, reports_dir)
+        _register_project(repo, discipline, reports_dir)
 
         env = {**os.environ, "PYTHONUNBUFFERED": "1"}
         if ai_cmd:
