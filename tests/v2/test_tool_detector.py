@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.skip(reason="detector/judge code removed in PR2")
+
 from pathlib import Path
 from unittest.mock import patch
 
