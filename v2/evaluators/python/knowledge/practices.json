@@ -12,7 +12,8 @@
       "bad": "result = eval(user_input)",
       "good": "result = json.loads(user_input)",
       "explanation": "eval() and exec() execute arbitrary code. Use json.loads(), ast.literal_eval(), or structured parsers instead.",
-      "sub_characteristic": "Authenticity"
+      "sub_characteristic": "Authenticity",
+      "principle": "Authenticity"
     },
     {
       "id": "py-002",
@@ -23,29 +24,32 @@
       "bad": "API_KEY = 'sk-prod-abc123xyz456'",
       "good": "API_KEY = os.environ['API_KEY']",
       "explanation": "Hardcoded secrets leak through version control. Use environment variables or a secrets manager.",
-      "sub_characteristic": "Confidentiality"
+      "sub_characteristic": "Confidentiality",
+      "principle": "Confidentiality"
     },
     {
       "id": "py-003",
-      "title": "Avoid os.system and shell=True — use subprocess with lists",
+      "title": "Avoid os.system and shell=True \u2014 use subprocess with lists",
       "cwe": 78,
       "dimension": "security",
       "severity": "high",
       "bad": "os.system(f'rm -rf {path}')",
       "good": "subprocess.run(['rm', '-rf', path], check=True)",
       "explanation": "os.system and shell=True enable command injection. Use subprocess with argument lists.",
-      "sub_characteristic": "Authenticity"
+      "sub_characteristic": "Authenticity",
+      "principle": "Authenticity"
     },
     {
       "id": "py-004",
-      "title": "Use parameterized queries — never f-string SQL",
+      "title": "Use parameterized queries \u2014 never f-string SQL",
       "cwe": 89,
       "dimension": "security",
       "severity": "high",
       "bad": "cursor.execute(f\"SELECT * FROM users WHERE id = {user_id}\")",
       "good": "cursor.execute(\"SELECT * FROM users WHERE id = %s\", (user_id,))",
       "explanation": "F-string SQL enables injection. Use parameterized queries with the DB-API 2.0 placeholder style.",
-      "sub_characteristic": "Integrity"
+      "sub_characteristic": "Integrity",
+      "principle": "Integrity"
     },
     {
       "id": "py-005",
@@ -54,20 +58,22 @@
       "dimension": "maintainability",
       "severity": "medium",
       "bad": "# 500-line module mixing models, views, and utilities",
-      "good": "# Split into models.py, views.py, utils.py — each under 300 lines",
+      "good": "# Split into models.py, views.py, utils.py \u2014 each under 300 lines",
       "explanation": "Large files are hard to navigate, review, and test. Extract cohesive groups of functions into separate modules.",
-      "sub_characteristic": "Modularity"
+      "sub_characteristic": "Modularity",
+      "principle": "Analyzability"
     },
     {
       "id": "py-006",
-      "title": "Keep cyclomatic complexity ≤10 per function",
+      "title": "Keep cyclomatic complexity \u226410 per function",
       "cwe": 1121,
       "dimension": "maintainability",
       "severity": "medium",
       "bad": "def process(x):\n    if x > 0:\n        if x < 10:\n            if x % 2:\n                ...\n            elif x % 3:\n                ...",
       "good": "def process(x):\n    if not _is_valid_range(x):\n        return None\n    return _apply_rule(x)",
       "explanation": "High cyclomatic complexity makes functions hard to test and understand. Extract conditions into named helper functions.",
-      "sub_characteristic": "Modularity"
+      "sub_characteristic": "Modularity",
+      "principle": "Modularity"
     },
     {
       "id": "py-007",
@@ -78,7 +84,8 @@
       "bad": "from os.path import *",
       "good": "from os.path import join, exists",
       "explanation": "Star imports pollute the namespace, create hidden coupling, and make it impossible to trace where names come from.",
-      "sub_characteristic": "Reusability"
+      "sub_characteristic": "Reusability",
+      "principle": "Modifiability"
     },
     {
       "id": "py-008",
@@ -89,7 +96,8 @@
       "bad": "def calculate_total(items, tax_rate):\n    return sum(i.price for i in items) * (1 + tax_rate)",
       "good": "def calculate_total(items: list[Item], tax_rate: float) -> float:\n    return sum(i.price for i in items) * (1 + tax_rate)",
       "explanation": "Type hints enable static analysis, improve IDE support, and serve as documentation for function contracts.",
-      "sub_characteristic": "Modifiability"
+      "sub_characteristic": "Modifiability",
+      "principle": "Modifiability"
     },
     {
       "id": "py-009",
@@ -100,18 +108,20 @@
       "bad": "f = open('data.txt')\ndata = f.read()\nf.close()",
       "good": "with open('data.txt') as f:\n    data = f.read()",
       "explanation": "Manual open/close leaks resources on exceptions. Context managers (with statement) guarantee cleanup.",
-      "sub_characteristic": "Recoverability"
+      "sub_characteristic": "Recoverability",
+      "principle": "Recoverability"
     },
     {
       "id": "py-010",
-      "title": "Never use bare except — catch specific exceptions",
+      "title": "Never use bare except \u2014 catch specific exceptions",
       "cwe": 390,
       "dimension": "reliability",
       "severity": "medium",
       "bad": "try:\n    process(data)\nexcept:\n    pass",
       "good": "try:\n    process(data)\nexcept ValueError as e:\n    logger.warning(f\"Invalid data: {e}\")",
       "explanation": "Bare except catches KeyboardInterrupt and SystemExit, hiding real errors. Always catch specific exception types.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "py-011",
@@ -122,18 +132,20 @@
       "bad": "user = get_user(id)\nprint(user.name)",
       "good": "user = get_user(id)\nif user is not None:\n    print(user.name)",
       "explanation": "Accessing attributes on None raises AttributeError. Guard optional values before use.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "py-012",
-      "title": "Handle async errors explicitly — never fire-and-forget",
+      "title": "Handle async errors explicitly \u2014 never fire-and-forget",
       "cwe": 755,
       "dimension": "reliability",
       "severity": "high",
       "bad": "asyncio.create_task(send_email(to, body))",
       "good": "task = asyncio.create_task(send_email(to, body))\ntask.add_done_callback(_handle_task_exception)",
       "explanation": "Fire-and-forget tasks swallow exceptions silently. Always attach error handlers or await tasks.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "py-013",
@@ -144,18 +156,20 @@
       "bad": "def get_all_rows():\n    return [transform(r) for r in db.fetch_all()]",
       "good": "def get_all_rows():\n    for r in db.fetch_cursor():\n        yield transform(r)",
       "explanation": "List comprehensions materialise the entire result in memory. Generators stream one item at a time.",
-      "sub_characteristic": "Resource Utilisation"
+      "sub_characteristic": "Resource Utilisation",
+      "principle": "Resource Utilisation"
     },
     {
       "id": "py-014",
-      "title": "Avoid N+1 queries — batch database access",
+      "title": "Avoid N+1 queries \u2014 batch database access",
       "cwe": 1084,
       "dimension": "performance",
       "severity": "high",
       "bad": "for user in users:\n    orders = db.query(f\"SELECT * FROM orders WHERE user_id = {user.id}\")",
       "good": "user_ids = [u.id for u in users]\norders = db.query(\"SELECT * FROM orders WHERE user_id = ANY(%s)\", [user_ids])",
       "explanation": "Querying inside a loop creates N+1 round-trips. Batch into a single query with IN or ANY clause.",
-      "sub_characteristic": "Time Behaviour"
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Time Behaviour"
     },
     {
       "id": "py-015",
@@ -166,7 +180,8 @@
       "bad": "def add_item(item, items=[]):\n    items.append(item)\n    return items",
       "good": "def add_item(item, items=None):\n    if items is None:\n        items = []\n    items.append(item)\n    return items",
       "explanation": "Mutable default arguments are shared across calls, causing subtle bugs. Use None and create fresh instances.",
-      "sub_characteristic": "Resource Utilisation"
+      "sub_characteristic": "Resource Utilisation",
+      "principle": "Resource Utilisation"
     },
     {
       "id": "py-016",
@@ -177,7 +192,8 @@
       "bad": "result = []\nfor x in items:\n    if x.active:\n        result.append(x.name)",
       "good": "result = [x.name for x in items if x.active]",
       "explanation": "List comprehensions are faster than manual loop-and-append and communicate intent more clearly.",
-      "sub_characteristic": "Time Behaviour"
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Time Behaviour"
     }
   ]
 }

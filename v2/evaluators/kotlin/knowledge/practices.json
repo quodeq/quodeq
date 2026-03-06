@@ -12,18 +12,20 @@
       "bad": "val apiKey = \"sk-prod-abc123xyz456\"",
       "good": "val apiKey = System.getenv(\"API_KEY\")",
       "explanation": "Hardcoded secrets are committed to version control and exposed in logs. Always read from environment variables or a secrets manager.",
-      "sub_characteristic": "Confidentiality"
+      "sub_characteristic": "Confidentiality",
+      "principle": "Confidentiality"
     },
     {
       "id": "kt-002",
-      "title": "Use parameterized queries — never string-template SQL",
+      "title": "Use parameterized queries \u2014 never string-template SQL",
       "cwe": 89,
       "dimension": "security",
       "severity": "high",
       "bad": "db.query(\"SELECT * FROM users WHERE id = ${userId}\")",
       "good": "db.query(\"SELECT * FROM users WHERE id = ?\", listOf(userId))",
       "explanation": "String-templated SQL enables injection attacks. Use parameterized queries or an ORM's safe query builder.",
-      "sub_characteristic": "Integrity"
+      "sub_characteristic": "Integrity",
+      "principle": "Integrity"
     },
     {
       "id": "kt-003",
@@ -34,7 +36,8 @@
       "bad": "fun handleRequest(body: String) {\n    val user = Json.decodeFromString<User>(body)\n    db.save(user)\n}",
       "good": "fun handleRequest(body: String) {\n    val user = Json.decodeFromString<User>(body)\n    require(user.name.isNotBlank()) { \"Name is required\" }\n    db.save(user)\n}",
       "explanation": "Unvalidated input leads to injection and data corruption. Validate at API boundaries using require/check.",
-      "sub_characteristic": "Integrity"
+      "sub_characteristic": "Integrity",
+      "principle": "Integrity"
     },
     {
       "id": "kt-004",
@@ -45,7 +48,8 @@
       "bad": "Runtime.getRuntime().exec(\"sh -c $userInput\")",
       "good": "ProcessBuilder(\"sh\", \"-c\", sanitizedCmd).start()",
       "explanation": "Constructing shell commands from user input enables command injection. Use ProcessBuilder with argument arrays.",
-      "sub_characteristic": "Authenticity"
+      "sub_characteristic": "Authenticity",
+      "principle": "Authenticity"
     },
     {
       "id": "kt-005",
@@ -56,7 +60,8 @@
       "bad": "class User {\n    var name: String = \"\"\n    var email: String = \"\"\n    override fun equals(other: Any?): Boolean { ... }\n    override fun hashCode(): Int { ... }\n}",
       "good": "data class User(val name: String, val email: String)",
       "explanation": "Data classes auto-generate equals, hashCode, toString, and copy. Manual implementations are error-prone and verbose.",
-      "sub_characteristic": "Reusability"
+      "sub_characteristic": "Reusability",
+      "principle": "Modifiability"
     },
     {
       "id": "kt-006",
@@ -67,7 +72,8 @@
       "bad": "open class Result\nclass Success(val data: String) : Result()\nclass Failure(val error: String) : Result()",
       "good": "sealed class Result {\n    data class Success(val data: String) : Result()\n    data class Failure(val error: String) : Result()\n}",
       "explanation": "Sealed classes ensure exhaustive when-expressions and prevent unexpected subtypes from being added outside the file.",
-      "sub_characteristic": "Reusability"
+      "sub_characteristic": "Reusability",
+      "principle": "Modifiability"
     },
     {
       "id": "kt-007",
@@ -78,7 +84,8 @@
       "bad": "object StringUtils {\n    fun isEmail(s: String): Boolean = s.contains(\"@\")\n}",
       "good": "fun String.isEmail(): Boolean = contains(\"@\")",
       "explanation": "Extension functions are more idiomatic in Kotlin and discoverable via IDE autocomplete. Avoid Java-style static utility classes.",
-      "sub_characteristic": "Reusability"
+      "sub_characteristic": "Reusability",
+      "principle": "Modifiability"
     },
     {
       "id": "kt-008",
@@ -89,7 +96,8 @@
       "bad": "// 500-line file mixing data classes, business logic, and API calls",
       "good": "// Separate into UserModel.kt, UserService.kt, UserController.kt",
       "explanation": "Large files violate Single Responsibility Principle and are hard to navigate and test.",
-      "sub_characteristic": "Modularity"
+      "sub_characteristic": "Modularity",
+      "principle": "Analyzability"
     },
     {
       "id": "kt-009",
@@ -100,7 +108,8 @@
       "bad": "try {\n    val data = fetchRemote()\n    process(data)\n} catch (e: Exception) {\n    log(e)\n}",
       "good": "runCatching { fetchRemote() }\n    .onSuccess { process(it) }\n    .onFailure { logger.error(\"Fetch failed\", it) }",
       "explanation": "runCatching provides a functional error-handling pattern with map/recover chains. Avoids broad catch blocks.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "kt-010",
@@ -111,7 +120,8 @@
       "bad": "try { riskyOp() } catch (e: Exception) { }",
       "good": "try { riskyOp() } catch (e: Exception) { logger.error(\"Failed\", e) }",
       "explanation": "Empty catch blocks hide errors and make debugging impossible. At minimum log the exception.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "kt-011",
@@ -122,7 +132,8 @@
       "bad": "GlobalScope.launch {\n    riskyOperation()\n}",
       "good": "val handler = CoroutineExceptionHandler { _, e -> logger.error(\"Coroutine failed\", e) }\nscope.launch(handler) {\n    riskyOperation()\n}",
       "explanation": "Uncaught coroutine exceptions crash the app or are silently lost. Use structured concurrency with exception handlers.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "kt-012",
@@ -133,7 +144,8 @@
       "bad": "val name = user!!.name!!",
       "good": "val name = user?.name ?: \"Unknown\"",
       "explanation": "Force unwrap (!!) crashes at runtime on null. Use safe calls (?.) and Elvis (?:) for null-safe access.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "kt-013",
@@ -144,7 +156,8 @@
       "bad": "val result = hugeList\n    .filter { it.isActive }\n    .map { transform(it) }\n    .take(10)",
       "good": "val result = hugeList.asSequence()\n    .filter { it.isActive }\n    .map { transform(it) }\n    .take(10)\n    .toList()",
       "explanation": "Collection operations create intermediate lists at each step. Sequences evaluate lazily, processing one element at a time.",
-      "sub_characteristic": "Resource Utilisation"
+      "sub_characteristic": "Resource Utilisation",
+      "principle": "Resource Utilisation"
     },
     {
       "id": "kt-014",
@@ -155,7 +168,8 @@
       "bad": "withContext(Dispatchers.Main) {\n    val data = readLargeFile()\n}",
       "good": "withContext(Dispatchers.IO) {\n    val data = readLargeFile()\n}",
       "explanation": "IO-bound work on Main dispatcher blocks the UI thread. Use Dispatchers.IO for file/network operations and Default for CPU-bound work.",
-      "sub_characteristic": "Time Behaviour"
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Time Behaviour"
     },
     {
       "id": "kt-015",
@@ -166,18 +180,20 @@
       "bad": "fun formatItems(items: List<Item>): String {\n    var result = \"\"\n    items.forEach { result += \"${it.name},\" }\n    return result\n}",
       "good": "fun formatItems(items: List<Item>): String =\n    items.joinToString(\",\") { it.name }",
       "explanation": "String concatenation in loops creates O(n) intermediate String objects. Use joinToString or StringBuilder.",
-      "sub_characteristic": "Resource Utilisation"
+      "sub_characteristic": "Resource Utilisation",
+      "principle": "Resource Utilisation"
     },
     {
       "id": "kt-016",
-      "title": "Avoid N+1 queries — batch database access",
+      "title": "Avoid N+1 queries \u2014 batch database access",
       "cwe": 1084,
       "dimension": "performance",
       "severity": "high",
       "bad": "for (user in users) {\n    val orders = orderRepo.findByUserId(user.id)\n}",
       "good": "val ids = users.map { it.id }\nval orders = orderRepo.findByUserIds(ids)",
       "explanation": "Querying inside a loop creates N+1 round-trips. Batch into a single query with IN clause.",
-      "sub_characteristic": "Time Behaviour"
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Time Behaviour"
     }
   ]
 }

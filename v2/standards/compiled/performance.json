@@ -1,0 +1,318 @@
+{
+  "id": "performance",
+  "name": "Performance Efficiency",
+  "sources": [
+    "iso25010",
+    "cisq"
+  ],
+  "principles": [
+    {
+      "name": "Time Behaviour",
+      "cwes": [
+        {
+          "id": 1046,
+          "name": "Creation of Immutable Text Using String Concatenation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-7",
+              "title": "String building in loops MUST use builder/join patterns instead of concatenation"
+            },
+            {
+              "source": "cisq",
+              "title": "String building in loops MUST use builder/join patterns instead of concatenation"
+            }
+          ]
+        },
+        {
+          "id": 1049,
+          "name": "Excessive Data Query Operations in a Large Data Table",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-8",
+              "title": "Queries on large tables MUST use indexes and MUST NOT perform full table scans"
+            },
+            {
+              "source": "cisq",
+              "title": "Queries on large tables MUST use indexes and MUST NOT perform full table scans"
+            }
+          ]
+        },
+        {
+          "id": 1067,
+          "name": "Excessive Execution of Sequential Searches of Data Resource",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-9",
+              "title": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search"
+            },
+            {
+              "source": "cisq",
+              "title": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search"
+            }
+          ]
+        },
+        {
+          "id": 1084,
+          "name": "Invokable Control Element with Excessive File or Data Access Operations",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-1",
+              "title": "Database queries inside loops are forbidden (N+1 problem)"
+            },
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-4",
+              "title": "String concatenation in loops MUST use a builder or join pattern"
+            },
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-6",
+              "title": "Hot-path code MUST NOT perform redundant computation; cache or memoize results"
+            },
+            {
+              "source": "cisq",
+              "title": "Data access operations MUST be batched; no queries inside loops"
+            }
+          ]
+        },
+        {
+          "id": 1088,
+          "name": "Synchronous Access of Remote Resource without Timeout",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-2",
+              "title": "Sequential awaits on independent async calls MUST be parallelised"
+            },
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-3",
+              "title": "Synchronous blocking I/O MUST NOT be used in async contexts"
+            },
+            {
+              "source": "cisq",
+              "title": "Remote resource access MUST use timeouts and async patterns where available"
+            }
+          ]
+        },
+        {
+          "id": 1176,
+          "name": "Inefficient CPU Computation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-10",
+              "title": "CPU computation MUST NOT be unnecessarily inefficient"
+            }
+          ]
+        },
+        {
+          "id": 1333,
+          "name": "Inefficient Regular Expression Complexity",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-TIM-5",
+              "title": "Regular expressions MUST NOT use catastrophic backtracking patterns"
+            },
+            {
+              "source": "cisq",
+              "title": "Regular expressions MUST NOT use patterns susceptible to catastrophic backtracking"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Resource Utilisation",
+      "cwes": [
+        {
+          "id": 400,
+          "name": "Uncontrolled Resource Consumption",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-RES-1",
+              "title": "Unbounded result sets MUST be paginated or limited"
+            },
+            {
+              "source": "iso25010",
+              "ref": "P-RES-2",
+              "title": "Database connections MUST use connection pooling"
+            },
+            {
+              "source": "iso25010",
+              "ref": "P-RES-3",
+              "title": "Large collections MUST use lazy iteration (generators, streams) instead of full materialization"
+            },
+            {
+              "source": "iso25010",
+              "ref": "P-RES-4",
+              "title": "Caches MUST have eviction policies; unbounded caches are forbidden"
+            },
+            {
+              "source": "cisq",
+              "title": "Resource consumption MUST be bounded with limits and timeouts"
+            }
+          ]
+        },
+        {
+          "id": 405,
+          "name": "Asymmetric Resource Consumption (Amplification)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-RES-6",
+              "title": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption"
+            },
+            {
+              "source": "cisq",
+              "title": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption"
+            }
+          ]
+        },
+        {
+          "id": 770,
+          "name": "Allocation of Resources Without Limits or Throttling",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-RES-7",
+              "title": "Resource allocation MUST be throttled with configurable limits"
+            },
+            {
+              "source": "cisq",
+              "title": "Resource allocation MUST be throttled with configurable limits"
+            }
+          ]
+        },
+        {
+          "id": 772,
+          "name": "Missing Release of Resource after Effective Lifetime",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-RES-5",
+              "title": "File and network handles MUST be released promptly after use"
+            },
+            {
+              "source": "cisq",
+              "title": "Resources MUST be released promptly after use"
+            }
+          ]
+        },
+        {
+          "id": 789,
+          "name": "Memory Allocation with Excessive Size Value",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-RES-10",
+              "title": "Memory allocation MUST NOT use excessively large size values from untrusted input"
+            }
+          ]
+        },
+        {
+          "id": 1050,
+          "name": "Excessive Platform Resource Consumption within a Loop",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-RES-8",
+              "title": "Resource allocation inside loops MUST be minimised; pre-allocate where possible"
+            },
+            {
+              "source": "cisq",
+              "title": "Resource allocation inside loops MUST be minimised; pre-allocate where possible"
+            }
+          ]
+        },
+        {
+          "id": 1057,
+          "name": "Data Access Operations Outside of Expected Data Manager Component",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-RES-9",
+              "title": "Mutable default arguments MUST NOT be used; create fresh instances per call"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Capacity",
+      "cwes": [
+        {
+          "id": 400,
+          "name": "Uncontrolled Resource Consumption",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-CAP-3",
+              "title": "Memory-intensive operations MUST use streaming instead of loading entire datasets"
+            },
+            {
+              "source": "iso25010",
+              "ref": "P-CAP-4",
+              "title": "Thread/coroutine pools MUST have bounded sizes with configurable limits"
+            },
+            {
+              "source": "cisq",
+              "title": "Resource consumption MUST be bounded with limits and timeouts"
+            }
+          ]
+        },
+        {
+          "id": 674,
+          "name": "Uncontrolled Recursion",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-CAP-5",
+              "title": "Recursive algorithms MUST have depth limits or use iterative alternatives"
+            },
+            {
+              "source": "cisq",
+              "title": "Recursive algorithms MUST have depth limits to prevent stack overflow"
+            }
+          ]
+        },
+        {
+          "id": 1084,
+          "name": "Invokable Control Element with Excessive File or Data Access Operations",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-CAP-1",
+              "title": "Batch operations MUST be preferred over individual operations for bulk data"
+            },
+            {
+              "source": "cisq",
+              "title": "Data access operations MUST be batched; no queries inside loops"
+            }
+          ]
+        },
+        {
+          "id": 1088,
+          "name": "Synchronous Access of Remote Resource without Timeout",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "P-CAP-2",
+              "title": "Background tasks MUST be offloaded from request-handling threads"
+            },
+            {
+              "source": "cisq",
+              "title": "Remote resource access MUST use timeouts and async patterns where available"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

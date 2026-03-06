@@ -12,7 +12,8 @@
       "bad": "let apiKey = \"sk-prod-abc123xyz456\"",
       "good": "let apiKey = Bundle.main.infoDictionary?[\"API_KEY\"] as? String ?? \"\"",
       "explanation": "Hardcoded secrets in Swift files are visible in the IPA binary. Use Info.plist with build-time substitution or a keychain.",
-      "sub_characteristic": "Confidentiality"
+      "sub_characteristic": "Confidentiality",
+      "principle": "Confidentiality"
     },
     {
       "id": "ios-002",
@@ -23,18 +24,20 @@
       "bad": "UserDefaults.standard.set(token, forKey: \"authToken\")",
       "good": "try Keychain.save(token, forKey: \"authToken\")",
       "explanation": "UserDefaults is stored unencrypted in a plist file. Use Keychain Services for tokens, passwords, and keys.",
-      "sub_characteristic": "Confidentiality"
+      "sub_characteristic": "Confidentiality",
+      "principle": "Confidentiality"
     },
     {
       "id": "ios-003",
-      "title": "Validate server certificates — never disable ATS",
+      "title": "Validate server certificates \u2014 never disable ATS",
       "cwe": 295,
       "dimension": "security",
       "severity": "high",
       "bad": "<!-- Info.plist -->\n<key>NSAppTransportSecurity</key>\n<dict><key>NSAllowsArbitraryLoads</key><true/></dict>",
       "good": "// Use default ATS settings; pin certificates for sensitive endpoints\nlet session = URLSession(configuration: .default, delegate: pinningDelegate, delegateQueue: nil)",
       "explanation": "Disabling ATS allows unencrypted HTTP and opens the app to man-in-the-middle attacks. Use certificate pinning for sensitive APIs.",
-      "sub_characteristic": "Confidentiality"
+      "sub_characteristic": "Confidentiality",
+      "principle": "Authenticity"
     },
     {
       "id": "ios-004",
@@ -45,7 +48,8 @@
       "bad": "webView.loadHTMLString(\"<p>\\(userInput)</p>\", baseURL: nil)",
       "good": "let escaped = userInput.replacingOccurrences(of: \"<\", with: \"&lt;\")\nwebView.loadHTMLString(\"<p>\\(escaped)</p>\", baseURL: nil)",
       "explanation": "Injecting unsanitized input into WebViews enables cross-site scripting. Escape HTML entities or use WKWebView content rules.",
-      "sub_characteristic": "Integrity"
+      "sub_characteristic": "Integrity",
+      "principle": "Integrity"
     },
     {
       "id": "ios-005",
@@ -56,7 +60,8 @@
       "bad": "class OrderService {\n    let network = NetworkManager()\n    func fetchOrders() { network.get(\"/orders\") }\n}",
       "good": "protocol NetworkClient {\n    func get(_ path: String) async throws -> Data\n}\nclass OrderService {\n    let network: NetworkClient\n    init(network: NetworkClient) { self.network = network }\n}",
       "explanation": "Protocol-based dependencies enable mock injection in tests and reduce coupling between components.",
-      "sub_characteristic": "Reusability"
+      "sub_characteristic": "Reusability",
+      "principle": "Modifiability"
     },
     {
       "id": "ios-006",
@@ -67,7 +72,8 @@
       "bad": "class ProfileVC: UIViewController, UITableViewDelegate, UITableViewDataSource {\n    // all delegate methods mixed with view logic\n}",
       "good": "class ProfileVC: UIViewController { ... }\nextension ProfileVC: UITableViewDelegate { ... }\nextension ProfileVC: UITableViewDataSource { ... }",
       "explanation": "Extensions group protocol conformances separately from core logic, improving readability and navigation.",
-      "sub_characteristic": "Modularity"
+      "sub_characteristic": "Modularity",
+      "principle": "Analyzability"
     },
     {
       "id": "ios-007",
@@ -78,7 +84,8 @@
       "bad": "// 200 lines with no sections",
       "good": "// MARK: - Properties\n// MARK: - Lifecycle\n// MARK: - Actions\n// MARK: - Private Helpers",
       "explanation": "MARK comments create navigable sections in Xcode's jump bar, making large files easier to browse.",
-      "sub_characteristic": "Modifiability"
+      "sub_characteristic": "Modifiability",
+      "principle": "Modifiability"
     },
     {
       "id": "ios-008",
@@ -89,7 +96,8 @@
       "bad": "// 500-line ViewController with networking, UI, and data logic",
       "good": "// Split into ViewModel, Coordinator, and lean ViewController",
       "explanation": "Massive view controllers are the most common iOS anti-pattern. Use MVVM or similar to separate concerns.",
-      "sub_characteristic": "Modularity"
+      "sub_characteristic": "Modularity",
+      "principle": "Analyzability"
     },
     {
       "id": "ios-009",
@@ -97,21 +105,23 @@
       "cwe": 755,
       "dimension": "reliability",
       "severity": "medium",
-      "bad": "func fetchUser() -> User? {\n    // returns nil on error — caller can't distinguish \"not found\" from \"network error\"\n}",
+      "bad": "func fetchUser() -> User? {\n    // returns nil on error \u2014 caller can't distinguish \"not found\" from \"network error\"\n}",
       "good": "func fetchUser() async throws -> User {\n    // throws specific errors the caller can handle\n}\n// or: func fetchUser() -> Result<User, FetchError>",
       "explanation": "Optional return types lose error information. Use Result or throws to propagate error context.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "ios-010",
-      "title": "Avoid force unwrap (!) — use guard let or if let",
+      "title": "Avoid force unwrap (!) \u2014 use guard let or if let",
       "cwe": 476,
       "dimension": "reliability",
       "severity": "medium",
       "bad": "let name = user.name!",
       "good": "guard let name = user.name else { return }",
       "explanation": "Force unwrap crashes at runtime if the value is nil. Use optional binding for safe access.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "ios-011",
@@ -122,7 +132,8 @@
       "bad": "networkClient.fetch { data in\n    self.update(data)\n}",
       "good": "networkClient.fetch { [weak self] data in\n    self?.update(data)\n}",
       "explanation": "Strong self references in closures create retain cycles that leak memory. Use [weak self] for closures stored by other objects.",
-      "sub_characteristic": "Recoverability"
+      "sub_characteristic": "Recoverability",
+      "principle": "Recoverability"
     },
     {
       "id": "ios-012",
@@ -133,18 +144,20 @@
       "bad": "func loadData() async {\n    let data = try! await fetchData()\n}",
       "good": "func loadData() async {\n    do {\n        let data = try await fetchData()\n        display(data)\n    } catch {\n        showError(error)\n    }\n}",
       "explanation": "try! crashes on errors. Always use do-catch for async operations that can fail.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "ios-013",
-      "title": "Avoid retain cycles — use weak references for delegates",
+      "title": "Avoid retain cycles \u2014 use weak references for delegates",
       "cwe": 772,
       "dimension": "performance",
       "severity": "high",
       "bad": "var delegate: SomeDelegate?",
       "good": "weak var delegate: SomeDelegate?",
       "explanation": "Strong delegate references create retain cycles between parent and child objects, leaking memory. Always use weak.",
-      "sub_characteristic": "Resource Utilisation"
+      "sub_characteristic": "Resource Utilisation",
+      "principle": "Resource Utilisation"
     },
     {
       "id": "ios-014",
@@ -155,7 +168,8 @@
       "bad": "let formatter: DateFormatter = {\n    let f = DateFormatter()\n    f.dateFormat = \"yyyy-MM-dd\"\n    return f\n}()",
       "good": "lazy var formatter: DateFormatter = {\n    let f = DateFormatter()\n    f.dateFormat = \"yyyy-MM-dd\"\n    return f\n}()",
       "explanation": "Eager initialization runs even if the property is never used. lazy defers creation until first access.",
-      "sub_characteristic": "Time Behaviour"
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Time Behaviour"
     },
     {
       "id": "ios-015",
@@ -166,18 +180,20 @@
       "bad": "func processImage(_ image: UIImage) {\n    let filtered = applyHeavyFilter(image) // blocks main thread\n    imageView.image = filtered\n}",
       "good": "func processImage(_ image: UIImage) {\n    DispatchQueue.global(qos: .userInitiated).async {\n        let filtered = applyHeavyFilter(image)\n        DispatchQueue.main.async {\n            self.imageView.image = filtered\n        }\n    }\n}",
       "explanation": "Heavy computation on the main thread freezes the UI. Use GCD or async/await with background actors.",
-      "sub_characteristic": "Time Behaviour"
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Time Behaviour"
     },
     {
       "id": "ios-016",
-      "title": "Avoid creating objects in cellForRowAt — reuse and cache",
+      "title": "Avoid creating objects in cellForRowAt \u2014 reuse and cache",
       "cwe": 1050,
       "dimension": "performance",
       "severity": "medium",
       "bad": "func tableView(_ tv: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {\n    let formatter = DateFormatter()\n    formatter.dateFormat = \"yyyy-MM-dd\"\n    cell.label.text = formatter.string(from: item.date)\n}",
       "good": "private lazy var dateFormatter: DateFormatter = {\n    let f = DateFormatter()\n    f.dateFormat = \"yyyy-MM-dd\"\n    return f\n}()\nfunc tableView(_ tv: UITableView, cellForRowAt ip: IndexPath) -> UITableViewCell {\n    cell.label.text = dateFormatter.string(from: item.date)\n}",
       "explanation": "Creating objects per cell causes excessive allocation during scrolling. Cache formatters and heavy objects as properties.",
-      "sub_characteristic": "Time Behaviour"
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Resource Utilisation"
     }
   ]
 }
