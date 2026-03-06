@@ -17,7 +17,7 @@ import urllib.request
 import urllib.error
 from pathlib import Path
 
-STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
+STANDARDS_DIR = Path(__file__).resolve().parent.parent / "v2" / "standards" / "iso25010"
 API_BASE = "https://cwe-api.mitre.org/api/v1/cwe/weakness"
 
 
@@ -144,7 +144,7 @@ def main() -> None:
             print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} — {r['name']}")
 
     # Write full results to JSON for further processing
-    output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe_audit.json"
+    output_path = Path(__file__).resolve().parent.parent / "v2" / "standards" / "cwe_audit.json"
     output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
     print(f"\nFull results written to {output_path}")
 

@@ -16,30 +16,21 @@ def _sub(template: str, **kwargs: str) -> str:
     return result
 
 
-def render_practices(practices_data: dict, dimension: str | None = None) -> str:
-    """Format practices from practices.json for prompt inclusion.
+def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
+    """Render compiled standards as a compact CWE checklist organized by principle."""
+    compiled_file = compiled_dir / f"{dimension}.json"
+    if not compiled_file.exists():
+        return "_No compiled standards for this dimension._"
 
-    If dimension is provided, only includes practices for that dimension.
-    """
-    practices = practices_data.get("practices", [])
-    if dimension:
-        practices = [p for p in practices if p.get("dimension") == dimension]
-
-    if not practices:
-        return "_No practices defined for this dimension._"
-
+    data = json.loads(compiled_file.read_text())
     lines = []
-    for p in practices:
-        lines.append(f"### {p['id']}: {p['title']}")
-        lines.append(f"- **Severity:** {p.get('severity', 'medium')}")
-        if p.get("cwe"):
-            lines.append(f"- **CWE:** {p['cwe']}")
-        if p.get("bad"):
-            lines.append(f"- **Bad:** `{p['bad']}`")
-        if p.get("good"):
-            lines.append(f"- **Good:** `{p['good']}`")
-        if p.get("explanation"):
-            lines.append(f"- {p['explanation']}")
+    for principle in data.get("principles", []):
+        cwes = principle.get("cwes", [])
+        if not cwes:
+            continue
+        lines.append(f"### {principle['name']} ({len(cwes)} CWEs)")
+        for cwe in cwes:
+            lines.append(f"- CWE-{cwe['id']}: {cwe['name']}")
         lines.append("")
     return "\n".join(lines)
 
@@ -98,7 +89,6 @@ def build_analysis_prompt(
     date_str: str,
     dimension: str,
     source_file_count: int,
-    practices_data: dict,
     dimensions_data: dict,
     analysis_md: str = "",
     standards_dir: Path | None = None,
@@ -112,7 +102,6 @@ def build_analysis_prompt(
         date_str: Evaluation date string.
         dimension: The dimension being evaluated (e.g. "security").
         source_file_count: Total source files in the repo.
-        practices_data: Parsed practices.json dict.
         dimensions_data: Parsed dimensions.json dict.
         analysis_md: Plugin-specific analysis guidance text.
         standards_dir: Path to v2/standards/ directory.
@@ -120,9 +109,14 @@ def build_analysis_prompt(
     Returns:
         Fully rendered prompt string.
     """
-    practices_text = render_practices(practices_data, dimension=dimension)
     dimensions_text = render_dimensions(dimensions_data, dimension, standards_dir)
     prompt_hash = hashlib.sha256(template.encode()).hexdigest()[:12]
+
+    standards_checklist = "_No compiled standards available._"
+    if standards_dir:
+        compiled_dir = standards_dir / "compiled"
+        if compiled_dir.exists():
+            standards_checklist = render_compiled_standards(compiled_dir, dimension)
 
     return _sub(
         template,
@@ -131,7 +125,7 @@ def build_analysis_prompt(
         DATE=date_str,
         DIMENSION=dimension,
         SOURCE_FILE_COUNT=str(source_file_count),
-        PRACTICES=practices_text,
+        STANDARDS_CHECKLIST=standards_checklist,
         ANALYSIS_GUIDANCE=analysis_md or "_No additional guidance._",
         DIMENSIONS=dimensions_text,
         PROMPT_HASH=prompt_hash,

@@ -314,6 +314,35 @@
   text-overflow: ellipsis;
 }
 
+.eval-status-phase {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+}
+
+.eval-status-dims {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.eval-dim-tag {
+  font-size: var(--text-xs);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.eval-dim-tag.active {
+  background: var(--color-accent-bg, rgba(59, 130, 246, 0.1));
+  color: var(--color-accent, #3b82f6);
+  border-color: var(--color-accent, #3b82f6);
+}
+
 .eval-console-toggle {
   flex-shrink: 0;
   padding: 3px 9px;

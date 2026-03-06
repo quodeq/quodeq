@@ -107,18 +107,23 @@ def parse_jsonl_to_evidence(
 
     for j in judgments:
         practice_def = practice_lookup.get(j.practice_id, {})
-        sub_char = practice_def.get("sub_characteristic", j.practice_id)
+        # Group by principle (new field), falling back to sub_characteristic (legacy), then practice_id
+        principle = (
+            practice_def.get("principle")
+            or practice_def.get("sub_characteristic")
+            or j.practice_id
+        )
         practice_title = practice_def.get("title", j.practice_id)
 
         if j.verdict == "violation":
-            sc_violations.setdefault(sub_char, []).append((j, practice_title))
+            sc_violations.setdefault(principle, []).append((j, practice_title))
         elif j.verdict == "compliance":
-            sc_compliance.setdefault(sub_char, []).append((j, practice_title))
+            sc_compliance.setdefault(principle, []).append((j, practice_title))
 
-        # Track highest severity per sub-characteristic
-        sev = practice_def.get("severity", "medium")
-        if sub_char not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[sub_char]):
-            sc_severity[sub_char] = sev
+        # Track highest severity per principle — use judgment severity for standards findings
+        sev = practice_def.get("severity") or j.severity or "medium"
+        if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
+            sc_severity[principle] = sev
 
     # Build PrincipleEvidence per sub-characteristic
     all_sub_chars = set(sc_violations.keys()) | set(sc_compliance.keys())

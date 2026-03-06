@@ -6,194 +6,495 @@
     {
       "id": "jv-001",
       "title": "Never hardcode secrets in source code",
-      "cwe": 798,
+      "cwe": {
+        "id": 798,
+        "name": "Use of Hard-coded Credentials"
+      },
       "dimension": "security",
+      "principle": "Confidentiality",
       "severity": "critical",
       "bad": "String apiKey = \"sk-prod-abc123xyz456\";",
       "good": "String apiKey = System.getenv(\"API_KEY\");",
       "explanation": "Hardcoded secrets are committed to version control and exposed in class files. Use environment variables or a vault.",
-      "sub_characteristic": "Confidentiality",
-      "principle": "Confidentiality"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-CON-1",
+          "title": "Credentials and secrets MUST NOT be hardcoded in source files"
+        },
+        {
+          "source": "cisq",
+          "title": "Credentials MUST be loaded from secure external sources, never hardcoded"
+        }
+      ]
     },
     {
       "id": "jv-002",
       "title": "Use PreparedStatement \u2014 never concatenate SQL strings",
-      "cwe": 89,
+      "cwe": {
+        "id": 89,
+        "name": "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')"
+      },
       "dimension": "security",
+      "principle": "Integrity",
       "severity": "high",
       "bad": "stmt.execute(\"SELECT * FROM users WHERE id = \" + userId);",
       "good": "PreparedStatement ps = conn.prepareStatement(\"SELECT * FROM users WHERE id = ?\");\nps.setString(1, userId);",
       "explanation": "String concatenation in SQL enables injection attacks. PreparedStatement escapes inputs automatically.",
-      "sub_characteristic": "Integrity",
-      "principle": "Integrity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-INT-2",
+          "title": "SQL queries MUST use parameterised statements; string concatenation is forbidden"
+        },
+        {
+          "source": "cisq",
+          "title": "SQL queries MUST use parameterised statements"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.3.4",
+          "section": "Validation",
+          "title": "Verify that data selection or database queries (e.g. SQL, HQL, ORM, NoSQL) use parameterized queries, ORMs, entity frameworks, or are otherwise protected from database injection attacks. ([C3](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.3.5",
+          "section": "Validation",
+          "title": "Verify that where parameterized or safer mechanisms are not present, context-specific output encoding is used to protect against injection attacks, such as the use of SQL escaping to protect against SQL injection. ([C3, C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        }
+      ]
     },
     {
       "id": "jv-003",
       "title": "Validate and sanitize all external input",
-      "cwe": 20,
+      "cwe": {
+        "id": 20,
+        "name": "Improper Input Validation"
+      },
       "dimension": "security",
+      "principle": "Integrity",
       "severity": "high",
       "bad": "String name = request.getParameter(\"name\");\ndb.save(name);",
       "good": "String name = request.getParameter(\"name\");\nif (name == null || !NAME_PATTERN.matcher(name).matches()) {\n    throw new ValidationException(\"Invalid name\");\n}\ndb.save(name);",
       "explanation": "Unvalidated input can lead to injection attacks and data corruption. Validate format and range at entry points.",
-      "sub_characteristic": "Integrity",
-      "principle": "Integrity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-INT-1",
+          "title": "All user input MUST be validated and sanitised before use"
+        },
+        {
+          "source": "cisq",
+          "title": "All external input MUST be validated against expected format and range"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.1.3",
+          "section": "Validation",
+          "title": "Verify that all input (HTML form fields, REST requests, URL parameters, HTTP headers, cookies, batch files, RSS feeds, etc) is validated using positive validation (allow lists). ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.1.4",
+          "section": "Validation",
+          "title": "Verify that structured data is strongly typed and validated against a defined schema including allowed characters, length and pattern (e.g. credit card numbers, e-mail addresses, telephone numbers, or validating that two related fields are reasonable, such as checking that suburb and zip/postcode match). ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        },
+        {
+          "source": "asvs",
+          "ref": "V13.2.2",
+          "section": "API",
+          "title": "Verify that JSON schema validation is in place and verified before accepting input."
+        },
+        {
+          "source": "asvs",
+          "ref": "V13.3.1",
+          "section": "API",
+          "title": "Verify that XSD schema validation takes place to ensure a properly formed XML document, followed by validation of each input field before any processing of that data takes place."
+        }
+      ]
     },
     {
       "id": "jv-004",
       "title": "Never use Runtime.exec with unsanitized input",
-      "cwe": 78,
+      "cwe": {
+        "id": 78,
+        "name": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+      },
       "dimension": "security",
+      "principle": "Authenticity",
       "severity": "high",
       "bad": "Runtime.getRuntime().exec(\"cmd /c \" + userInput);",
       "good": "ProcessBuilder pb = new ProcessBuilder(\"cmd\", \"/c\", sanitizedCmd);\npb.start();",
       "explanation": "Constructing shell commands from user input enables command injection. Use ProcessBuilder with argument arrays.",
-      "sub_characteristic": "Authenticity",
-      "principle": "Authenticity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-AUT-2",
+          "title": "Shell commands MUST NOT be constructed from user-controlled data"
+        },
+        {
+          "source": "cisq",
+          "title": "OS commands MUST NOT be constructed from user-controlled data"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.3.8",
+          "section": "Validation",
+          "title": "Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line output encoding. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        },
+        {
+          "source": "asvs",
+          "ref": "V12.3.5",
+          "section": "Files",
+          "title": "Verify that untrusted file metadata is not used directly with system API or libraries, to protect against OS command injection."
+        }
+      ]
     },
     {
       "id": "jv-005",
       "title": "Keep methods under 50 lines",
-      "cwe": 1080,
+      "cwe": {
+        "id": 1080,
+        "name": "Source Code File with Excessive Number of Lines of Code"
+      },
       "dimension": "maintainability",
+      "principle": "Analyzability",
       "severity": "medium",
       "bad": "public void processOrder(Order order) {\n    // 80 lines of mixed validation, business logic, and persistence\n}",
       "good": "public void processOrder(Order order) {\n    validate(order);\n    Order result = applyRules(order);\n    persist(result);\n}",
       "explanation": "Long methods are hard to understand, test, and modify. Extract logical steps into named methods.",
-      "sub_characteristic": "Modularity",
-      "principle": "Analyzability"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-ANA-1",
+          "title": "Source files MUST NOT exceed 300 lines"
+        },
+        {
+          "source": "iso25010",
+          "ref": "M-ANA-2",
+          "title": "Functions MUST NOT exceed 50 lines"
+        },
+        {
+          "source": "cisq",
+          "title": "Source files MUST NOT exceed language-appropriate line limits"
+        }
+      ]
     },
     {
       "id": "jv-006",
       "title": "Avoid God classes \u2014 keep classes under 300 lines",
-      "cwe": 1080,
+      "cwe": {
+        "id": 1080,
+        "name": "Source Code File with Excessive Number of Lines of Code"
+      },
       "dimension": "maintainability",
+      "principle": "Analyzability",
       "severity": "medium",
       "bad": "// 500-line class mixing data access, business logic, and validation",
       "good": "// Separate into UserRepository.java, UserService.java, UserValidator.java",
       "explanation": "Large classes violate Single Responsibility Principle and are hard to test. Split by concern.",
-      "sub_characteristic": "Modularity",
-      "principle": "Analyzability"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-ANA-1",
+          "title": "Source files MUST NOT exceed 300 lines"
+        },
+        {
+          "source": "iso25010",
+          "ref": "M-ANA-2",
+          "title": "Functions MUST NOT exceed 50 lines"
+        },
+        {
+          "source": "cisq",
+          "title": "Source files MUST NOT exceed language-appropriate line limits"
+        }
+      ]
     },
     {
       "id": "jv-007",
       "title": "Use enums instead of string/int constants",
-      "cwe": 1061,
+      "cwe": {
+        "id": 1061,
+        "name": "Insufficient Encapsulation"
+      },
       "dimension": "maintainability",
+      "principle": "Modifiability",
       "severity": "medium",
       "bad": "public static final int STATUS_ACTIVE = 1;\npublic static final int STATUS_INACTIVE = 2;",
       "good": "public enum Status { ACTIVE, INACTIVE }",
       "explanation": "Magic constants lack type safety and allow invalid values. Enums provide compile-time checking and self-documentation.",
-      "sub_characteristic": "Reusability",
-      "principle": "Modifiability"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-MDF-3",
+          "title": "Wildcard imports (import *) MUST NOT be used"
+        },
+        {
+          "source": "cisq",
+          "title": "Internal implementation details MUST be hidden behind public interfaces"
+        }
+      ]
     },
     {
       "id": "jv-008",
       "title": "Prefer composition and interfaces over deep inheritance",
-      "cwe": 1074,
+      "cwe": {
+        "id": 1074,
+        "name": "Class with Excessively Deep Inheritance"
+      },
       "dimension": "maintainability",
+      "principle": "Modularity",
       "severity": "medium",
       "bad": "class PremiumGoldInternationalUser extends PremiumGoldUser extends PremiumUser extends User { }",
       "good": "class User implements Billable, International {\n    private final BillingPlan plan;\n}",
       "explanation": "Deep inheritance hierarchies are rigid and hard to modify. Prefer composition with interfaces for flexible behaviour.",
-      "sub_characteristic": "Modularity",
-      "principle": "Modularity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-MOD-7",
+          "title": "Inheritance depth MUST NOT exceed 4 levels"
+        },
+        {
+          "source": "cisq",
+          "title": "Inheritance depth MUST NOT exceed 4 levels"
+        }
+      ]
     },
     {
       "id": "jv-009",
       "title": "Use try-with-resources for AutoCloseable objects",
-      "cwe": 772,
+      "cwe": {
+        "id": 772,
+        "name": "Missing Release of Resource after Effective Lifetime"
+      },
       "dimension": "reliability",
+      "principle": "Recoverability",
       "severity": "high",
       "bad": "Connection conn = pool.getConnection();\nResultSet rs = conn.query(sql);\nconn.close();",
       "good": "try (Connection conn = pool.getConnection();\n     ResultSet rs = conn.query(sql)) {\n    // process results\n}",
       "explanation": "Manual close() is skipped on exceptions, leaking resources. try-with-resources guarantees cleanup.",
-      "sub_characteristic": "Recoverability",
-      "principle": "Recoverability"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-REC-1",
+          "title": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns"
+        },
+        {
+          "source": "iso25010",
+          "ref": "R-REC-2",
+          "title": "Database transactions MUST be rolled back on error"
+        },
+        {
+          "source": "iso25010",
+          "ref": "R-REC-4",
+          "title": "Persistent operations MUST be idempotent or use transaction guards"
+        },
+        {
+          "source": "cisq",
+          "title": "Resources MUST be released in finally/defer blocks"
+        }
+      ]
     },
     {
       "id": "jv-010",
       "title": "Catch specific exceptions \u2014 never catch generic Exception",
-      "cwe": 396,
+      "cwe": {
+        "id": 396,
+        "name": "Declaration of Catch for Generic Exception"
+      },
       "dimension": "reliability",
+      "principle": "Fault Tolerance",
       "severity": "medium",
       "bad": "try { op(); } catch (Exception e) { log(e); }",
       "good": "try { op(); } catch (IOException e) { handleIO(e); } catch (ParseException e) { handleParse(e); }",
       "explanation": "Catching Exception hides programming errors (NPE, IllegalArgument) that should propagate. Catch only expected checked exceptions.",
-      "sub_characteristic": "Fault Tolerance",
-      "principle": "Fault Tolerance"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-FT-7",
+          "title": "Catch blocks MUST target specific exception types, not generic Exception"
+        },
+        {
+          "source": "cisq",
+          "title": "Catch blocks MUST target specific exception types, not generic Exception"
+        }
+      ]
     },
     {
       "id": "jv-011",
       "title": "Check for null before dereferencing",
-      "cwe": 476,
+      "cwe": {
+        "id": 476,
+        "name": "NULL Pointer Dereference"
+      },
       "dimension": "reliability",
+      "principle": "Fault Tolerance",
       "severity": "medium",
       "bad": "User user = repository.findById(id);\nString name = user.getName();",
       "good": "User user = repository.findById(id);\nif (user == null) {\n    throw new NotFoundException(\"User not found: \" + id);\n}\nString name = user.getName();",
       "explanation": "Null pointer dereference is the most common runtime exception. Guard nullable returns with explicit checks or Optional.",
-      "sub_characteristic": "Fault Tolerance",
-      "principle": "Fault Tolerance"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-FT-2",
+          "title": "Null/undefined dereferences MUST be guarded before use"
+        },
+        {
+          "source": "cisq",
+          "title": "Nullable references MUST be checked before dereferencing"
+        }
+      ]
     },
     {
       "id": "jv-012",
       "title": "Handle InterruptedException correctly \u2014 don't swallow it",
-      "cwe": 755,
+      "cwe": {
+        "id": 755,
+        "name": "Improper Handling of Exceptional Conditions"
+      },
       "dimension": "reliability",
+      "principle": "Fault Tolerance",
       "severity": "high",
       "bad": "try { Thread.sleep(1000); } catch (InterruptedException e) { }",
       "good": "try { Thread.sleep(1000); } catch (InterruptedException e) {\n    Thread.currentThread().interrupt();\n    throw new RuntimeException(\"Interrupted\", e);\n}",
       "explanation": "Swallowing InterruptedException breaks thread cancellation. Re-set the interrupt flag and propagate.",
-      "sub_characteristic": "Fault Tolerance",
-      "principle": "Fault Tolerance"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-FT-3",
+          "title": "Async operations MUST handle rejection/error paths explicitly"
+        },
+        {
+          "source": "cisq",
+          "title": "Exceptional conditions MUST be caught and handled appropriately"
+        }
+      ]
     },
     {
       "id": "jv-013",
       "title": "Use StringBuilder in loops \u2014 not string concatenation",
-      "cwe": 1046,
+      "cwe": {
+        "id": 1046,
+        "name": "Creation of Immutable Text Using String Concatenation"
+      },
       "dimension": "performance",
+      "principle": "Time Behaviour",
       "severity": "medium",
       "bad": "String result = \"\";\nfor (String s : items) {\n    result += s + \",\";\n}",
       "good": "StringBuilder sb = new StringBuilder();\nfor (String s : items) {\n    sb.append(s).append(\",\");\n}\nString result = sb.toString();",
       "explanation": "String concatenation in loops creates O(n\u00b2) intermediate objects. StringBuilder appends in-place.",
-      "sub_characteristic": "Time Behaviour",
-      "principle": "Time Behaviour"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-7",
+          "title": "String building in loops MUST use builder/join patterns instead of concatenation"
+        },
+        {
+          "source": "cisq",
+          "title": "String building in loops MUST use builder/join patterns instead of concatenation"
+        }
+      ]
     },
     {
       "id": "jv-014",
       "title": "Avoid unnecessary autoboxing \u2014 use primitives where possible",
-      "cwe": 1050,
+      "cwe": {
+        "id": 1050,
+        "name": "Excessive Platform Resource Consumption within a Loop"
+      },
       "dimension": "performance",
+      "principle": "Resource Utilisation",
       "severity": "low",
       "bad": "Integer count = 0;\nfor (Item item : items) {\n    count += item.getQuantity();\n}",
       "good": "int count = 0;\nfor (Item item : items) {\n    count += item.getQuantity();\n}",
       "explanation": "Autoboxing creates unnecessary Integer objects on every operation. Use primitive types in hot paths.",
-      "sub_characteristic": "Resource Utilisation",
-      "principle": "Resource Utilisation"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-RES-8",
+          "title": "Resource allocation inside loops MUST be minimised; pre-allocate where possible"
+        },
+        {
+          "source": "cisq",
+          "title": "Resource allocation inside loops MUST be minimised; pre-allocate where possible"
+        }
+      ]
     },
     {
       "id": "jv-015",
       "title": "Use connection pooling \u2014 never create connections per request",
-      "cwe": 400,
+      "cwe": {
+        "id": 400,
+        "name": "Uncontrolled Resource Consumption"
+      },
       "dimension": "performance",
+      "principle": "Resource Utilisation",
       "severity": "high",
       "bad": "Connection conn = DriverManager.getConnection(url, user, pass);",
       "good": "// At startup:\nHikariDataSource ds = new HikariDataSource(config);\n// Per request:\nConnection conn = ds.getConnection();",
       "explanation": "Creating database connections is expensive. Use a pool (HikariCP, c3p0) to reuse connections.",
-      "sub_characteristic": "Resource Utilisation",
-      "principle": "Resource Utilisation"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-RES-1",
+          "title": "Unbounded result sets MUST be paginated or limited"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-RES-2",
+          "title": "Database connections MUST use connection pooling"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-RES-3",
+          "title": "Large collections MUST use lazy iteration (generators, streams) instead of full materialization"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-RES-4",
+          "title": "Caches MUST have eviction policies; unbounded caches are forbidden"
+        },
+        {
+          "source": "cisq",
+          "title": "Resource consumption MUST be bounded with limits and timeouts"
+        }
+      ]
     },
     {
       "id": "jv-016",
       "title": "Avoid N+1 queries \u2014 batch database access",
-      "cwe": 1084,
+      "cwe": {
+        "id": 1084,
+        "name": "Invokable Control Element with Excessive File or Data Access Operations"
+      },
       "dimension": "performance",
+      "principle": "Time Behaviour",
       "severity": "high",
       "bad": "for (User u : users) {\n    List<Order> orders = orderRepo.findByUserId(u.getId());\n}",
       "good": "List<Long> ids = users.stream().map(User::getId).toList();\nMap<Long, List<Order>> orders = orderRepo.findByUserIds(ids);",
       "explanation": "Querying inside a loop creates N+1 round-trips. Batch into a single query with IN clause.",
-      "sub_characteristic": "Time Behaviour",
-      "principle": "Time Behaviour"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-1",
+          "title": "Database queries inside loops are forbidden (N+1 problem)"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-4",
+          "title": "String concatenation in loops MUST use a builder or join pattern"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-6",
+          "title": "Hot-path code MUST NOT perform redundant computation; cache or memoize results"
+        },
+        {
+          "source": "cisq",
+          "title": "Data access operations MUST be batched; no queries inside loops"
+        }
+      ]
     }
   ]
 }
