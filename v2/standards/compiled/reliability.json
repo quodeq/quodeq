@@ -1,0 +1,678 @@
+{
+  "id": "reliability",
+  "name": "Reliability",
+  "sources": [
+    "iso25010",
+    "cisq"
+  ],
+  "principles": [
+    {
+      "name": "Maturity",
+      "cwes": [
+        {
+          "id": 456,
+          "name": "Missing Initialization of a Variable",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-6",
+              "title": "Resources MUST be properly initialized before use"
+            }
+          ]
+        },
+        {
+          "id": 477,
+          "name": "Use of Obsolete Function",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-4",
+              "title": "Deprecated APIs MUST NOT be used; use supported alternatives"
+            },
+            {
+              "source": "cisq",
+              "title": "Deprecated functions MUST be replaced with supported alternatives"
+            }
+          ]
+        },
+        {
+          "id": 662,
+          "name": "Improper Synchronization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-7",
+              "title": "Concurrent access to shared resources MUST be properly synchronized"
+            }
+          ]
+        },
+        {
+          "id": 665,
+          "name": "Improper Initialization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-6",
+              "title": "Resources MUST be properly initialized before use"
+            }
+          ]
+        },
+        {
+          "id": 682,
+          "name": "Incorrect Calculation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-8",
+              "title": "Calculations and comparisons MUST be correct and avoid undefined behavior"
+            }
+          ]
+        },
+        {
+          "id": 758,
+          "name": "Reliance on Undefined, Unspecified, or Implementation-Defined Behavior",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-8",
+              "title": "Calculations and comparisons MUST be correct and avoid undefined behavior"
+            }
+          ]
+        },
+        {
+          "id": 820,
+          "name": "Missing Synchronization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-7",
+              "title": "Concurrent access to shared resources MUST be properly synchronized"
+            }
+          ]
+        },
+        {
+          "id": 821,
+          "name": "Incorrect Synchronization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-7",
+              "title": "Concurrent access to shared resources MUST be properly synchronized"
+            }
+          ]
+        },
+        {
+          "id": 833,
+          "name": "Deadlock",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-7",
+              "title": "Concurrent access to shared resources MUST be properly synchronized"
+            }
+          ]
+        },
+        {
+          "id": 908,
+          "name": "Use of Uninitialized Resource",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-6",
+              "title": "Resources MUST be properly initialized before use"
+            }
+          ]
+        },
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-1",
+              "title": "All public functions MUST have corresponding test files"
+            },
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-2",
+              "title": "Edge cases (empty input, boundary values) MUST be tested explicitly"
+            },
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-3",
+              "title": "Error paths MUST be tested, not only happy paths"
+            },
+            {
+              "source": "iso25010",
+              "ref": "R-MAT-5",
+              "title": "Type annotations MUST be used on public function signatures"
+            },
+            {
+              "source": "cisq",
+              "title": "Error handling behaviour MUST be documented for public APIs"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Availability",
+      "cwes": [
+        {
+          "id": 400,
+          "name": "Uncontrolled Resource Consumption",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-AVL-2",
+              "title": "Circuit breakers MUST be used for external service calls"
+            },
+            {
+              "source": "iso25010",
+              "ref": "R-AVL-3",
+              "title": "Retry logic MUST use exponential backoff with jitter"
+            }
+          ]
+        },
+        {
+          "id": 404,
+          "name": "Improper Resource Shutdown or Release",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-AVL-5",
+              "title": "Graceful shutdown handlers MUST be implemented for server processes"
+            },
+            {
+              "source": "cisq",
+              "title": "Resources MUST be shut down in the correct order during cleanup"
+            }
+          ]
+        },
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-AVL-1",
+              "title": "Health-check endpoints MUST be implemented for long-running services"
+            },
+            {
+              "source": "cisq",
+              "title": "Error handling behaviour MUST be documented for public APIs"
+            }
+          ]
+        },
+        {
+          "id": 1088,
+          "name": "Synchronous Access of Remote Resource without Timeout",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-AVL-4",
+              "title": "Timeouts MUST be set on all external HTTP and database calls"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Fault Tolerance",
+      "cwes": [
+        {
+          "id": 20,
+          "name": "Improper Input Validation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-4",
+              "title": "Input from external sources MUST be validated before processing"
+            }
+          ]
+        },
+        {
+          "id": 234,
+          "name": "Failure to Handle Missing Parameter",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-17",
+              "title": "Custom error pages MUST NOT reveal sensitive implementation details"
+            }
+          ]
+        },
+        {
+          "id": 248,
+          "name": "Uncaught Exception",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 252,
+          "name": "Unchecked Return Value",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-6",
+              "title": "Return values from fallible operations MUST be checked"
+            },
+            {
+              "source": "cisq",
+              "title": "Return values from fallible operations MUST be checked"
+            }
+          ]
+        },
+        {
+          "id": 274,
+          "name": "Improper Handling of Insufficient Privileges",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 280,
+          "name": "Improper Handling of Insufficient Permissions or Privileges ",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 369,
+          "name": "Divide By Zero",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 377,
+          "name": "Insecure Temporary File",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-13",
+              "title": "Temporary files MUST be created using secure APIs (mktemp) to prevent race conditions"
+            }
+          ]
+        },
+        {
+          "id": 390,
+          "name": "Detection of Error Condition Without Action",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-1",
+              "title": "Exceptions MUST be caught and handled; empty catch blocks are forbidden"
+            },
+            {
+              "source": "cisq",
+              "title": "All detected error conditions MUST trigger handling logic"
+            }
+          ]
+        },
+        {
+          "id": 391,
+          "name": "Unchecked Error Condition",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 394,
+          "name": "Unexpected Status Code or Return Value",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 396,
+          "name": "Declaration of Catch for Generic Exception",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-7",
+              "title": "Catch blocks MUST target specific exception types, not generic Exception"
+            },
+            {
+              "source": "cisq",
+              "title": "Catch blocks MUST target specific exception types, not generic Exception"
+            }
+          ]
+        },
+        {
+          "id": 397,
+          "name": "Declaration of Throws for Generic Exception",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-8",
+              "title": "Throw declarations MUST specify concrete exception types"
+            },
+            {
+              "source": "cisq",
+              "title": "Throw declarations MUST specify concrete exception types"
+            }
+          ]
+        },
+        {
+          "id": 460,
+          "name": "Improper Cleanup on Thrown Exception",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 476,
+          "name": "NULL Pointer Dereference",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-2",
+              "title": "Null/undefined dereferences MUST be guarded before use"
+            },
+            {
+              "source": "cisq",
+              "title": "Nullable references MUST be checked before dereferencing"
+            }
+          ]
+        },
+        {
+          "id": 478,
+          "name": "Missing Default Case in Multiple Condition Expression",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-15",
+              "title": "Switch statements MUST include default cases and break statements"
+            }
+          ]
+        },
+        {
+          "id": 480,
+          "name": "Use of Incorrect Operator",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-16",
+              "title": "Incorrect operators and type conversions MUST be avoided"
+            }
+          ]
+        },
+        {
+          "id": 484,
+          "name": "Omitted Break Statement in Switch",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-15",
+              "title": "Switch statements MUST include default cases and break statements"
+            }
+          ]
+        },
+        {
+          "id": 550,
+          "name": "Server-generated Error Message Containing Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 595,
+          "name": "Comparison of Object References Instead of Object Contents",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-16",
+              "title": "Incorrect operators and type conversions MUST be avoided"
+            }
+          ]
+        },
+        {
+          "id": 636,
+          "name": "Not Failing Securely ('Failing Open')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 674,
+          "name": "Uncontrolled Recursion",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-11",
+              "title": "Recursive functions MUST have verifiable termination conditions"
+            },
+            {
+              "source": "cisq",
+              "title": "Recursive functions MUST have verifiable termination conditions"
+            }
+          ]
+        },
+        {
+          "id": 681,
+          "name": "Incorrect Conversion between Numeric Types",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-16",
+              "title": "Incorrect operators and type conversions MUST be avoided"
+            }
+          ]
+        },
+        {
+          "id": 691,
+          "name": "Insufficient Control Flow Management",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-10",
+              "title": "Control flow MUST be structured and predictable; no unreachable statements"
+            },
+            {
+              "source": "cisq",
+              "title": "Control flow MUST be structured and predictable; no unreachable statements"
+            }
+          ]
+        },
+        {
+          "id": 703,
+          "name": "Improper Check or Handling of Exceptional Conditions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-14",
+              "title": "Error conditions MUST be detected and handled, not silently ignored"
+            }
+          ]
+        },
+        {
+          "id": 704,
+          "name": "Incorrect Type Conversion or Cast",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-16",
+              "title": "Incorrect operators and type conversions MUST be avoided"
+            }
+          ]
+        },
+        {
+          "id": 754,
+          "name": "Improper Check for Unusual or Exceptional Conditions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-9",
+              "title": "Boundary and edge-case conditions MUST be checked explicitly"
+            },
+            {
+              "source": "cisq",
+              "title": "Boundary and edge-case conditions MUST be checked explicitly"
+            }
+          ]
+        },
+        {
+          "id": 755,
+          "name": "Improper Handling of Exceptional Conditions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-3",
+              "title": "Async operations MUST handle rejection/error paths explicitly"
+            },
+            {
+              "source": "cisq",
+              "title": "Exceptional conditions MUST be caught and handled appropriately"
+            }
+          ]
+        },
+        {
+          "id": 756,
+          "name": "Missing Custom Error Page",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-17",
+              "title": "Custom error pages MUST NOT reveal sensitive implementation details"
+            }
+          ]
+        },
+        {
+          "id": 835,
+          "name": "Loop with Unreachable Exit Condition ('Infinite Loop')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-12",
+              "title": "All loops MUST have reachable termination conditions"
+            },
+            {
+              "source": "cisq",
+              "title": "All loops MUST have reachable termination conditions"
+            }
+          ]
+        },
+        {
+          "id": 1188,
+          "name": "Initialization of a Resource with an Insecure Default",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-FT-5",
+              "title": "Fallback values MUST be provided for optional configuration"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Recoverability",
+      "cwes": [
+        {
+          "id": 459,
+          "name": "Incomplete Cleanup",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-REC-3",
+              "title": "Temporary files MUST be cleaned up in finally/defer blocks"
+            },
+            {
+              "source": "cisq",
+              "title": "Temporary resources MUST be cleaned up on all exit paths"
+            }
+          ]
+        },
+        {
+          "id": 672,
+          "name": "Operation on a Resource after Expiration or Release",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-REC-6",
+              "title": "Resources MUST be properly released and cleaned up after use"
+            }
+          ]
+        },
+        {
+          "id": 755,
+          "name": "Improper Handling of Exceptional Conditions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-REC-5",
+              "title": "Error messages MUST include enough context for diagnosis (operation, input, state)"
+            },
+            {
+              "source": "cisq",
+              "title": "Exceptional conditions MUST be caught and handled appropriately"
+            }
+          ]
+        },
+        {
+          "id": 772,
+          "name": "Missing Release of Resource after Effective Lifetime",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "R-REC-1",
+              "title": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns"
+            },
+            {
+              "source": "iso25010",
+              "ref": "R-REC-2",
+              "title": "Database transactions MUST be rolled back on error"
+            },
+            {
+              "source": "iso25010",
+              "ref": "R-REC-4",
+              "title": "Persistent operations MUST be idempotent or use transaction guards"
+            },
+            {
+              "source": "cisq",
+              "title": "Resources MUST be released in finally/defer blocks"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

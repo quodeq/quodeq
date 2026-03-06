@@ -1,0 +1,1240 @@
+{
+  "id": "maintainability",
+  "name": "Maintainability",
+  "sources": [
+    "iso25010",
+    "cisq"
+  ],
+  "principles": [
+    {
+      "name": "Modularity",
+      "cwes": [
+        {
+          "id": 766,
+          "name": "Critical Data Element Declared Public",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-13",
+              "title": "Code MUST maintain proper encapsulation and data element visibility"
+            }
+          ]
+        },
+        {
+          "id": 1042,
+          "name": "Static Member Data Element outside of a Singleton Class Element",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-11",
+              "title": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns"
+            }
+          ]
+        },
+        {
+          "id": 1043,
+          "name": "Data Element Aggregating an Excessively Large Number of Non-Primitive Elements",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-11",
+              "title": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns"
+            }
+          ]
+        },
+        {
+          "id": 1045,
+          "name": "Parent Class with a Virtual Destructor and a Child Class without a Virtual Destructor",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-8",
+              "title": "Inheritance hierarchies MUST maintain consistent destructor/cleanup patterns"
+            },
+            {
+              "source": "cisq",
+              "title": "Inheritance hierarchies MUST maintain consistent destructor/cleanup patterns"
+            }
+          ]
+        },
+        {
+          "id": 1047,
+          "name": "Modules with Circular Dependencies",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-3",
+              "title": "Package dependency cycles MUST be 0"
+            },
+            {
+              "source": "cisq",
+              "title": "Module dependency graphs MUST be acyclic"
+            }
+          ]
+        },
+        {
+          "id": 1048,
+          "name": "Invokable Control Element with Large Number of Outward Calls",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-6",
+              "title": "Functions MUST limit outward calls to \u22647 distinct callees to reduce coupling"
+            },
+            {
+              "source": "cisq",
+              "title": "Functions MUST limit outward calls to \u22647 distinct callees to reduce coupling"
+            }
+          ]
+        },
+        {
+          "id": 1051,
+          "name": "Initialization with Hard-Coded Network Resource Configuration Data",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-14",
+              "title": "Modules MUST NOT have hard-coded network configuration or platform-dependent components"
+            }
+          ]
+        },
+        {
+          "id": 1054,
+          "name": "Invocation of a Control Element at an Unnecessarily Deep Horizontal Layer",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-9",
+              "title": "Components MUST call peers or immediate dependencies, not skip layers"
+            },
+            {
+              "source": "cisq",
+              "title": "Components MUST call peers or immediate dependencies, not skip layers"
+            }
+          ]
+        },
+        {
+          "id": 1055,
+          "name": "Multiple Inheritance from Concrete Classes",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-11",
+              "title": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns"
+            }
+          ]
+        },
+        {
+          "id": 1056,
+          "name": "Invokable Control Element with Variadic Parameters",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-12",
+              "title": "Functions MUST NOT have variadic parameters without type safety or excessive file/data access operations"
+            }
+          ]
+        },
+        {
+          "id": 1060,
+          "name": "Excessive Number of Inefficient Server-Side Data Accesses",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-12",
+              "title": "Functions MUST NOT have variadic parameters without type safety or excessive file/data access operations"
+            }
+          ]
+        },
+        {
+          "id": 1062,
+          "name": "Parent Class with References to Child Class",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-11",
+              "title": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns"
+            }
+          ]
+        },
+        {
+          "id": 1064,
+          "name": "Invokable Control Element with Signature Containing an Excessive Number of Parameters",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-5",
+              "title": "Functions MUST have \u22645 parameters"
+            },
+            {
+              "source": "cisq",
+              "title": "Functions MUST have \u22645 parameters"
+            }
+          ]
+        },
+        {
+          "id": 1073,
+          "name": "Non-SQL Invokable Control Element with Excessive Number of Data Resource Accesses",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-12",
+              "title": "Functions MUST NOT have variadic parameters without type safety or excessive file/data access operations"
+            }
+          ]
+        },
+        {
+          "id": 1074,
+          "name": "Class with Excessively Deep Inheritance",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-7",
+              "title": "Inheritance depth MUST NOT exceed 4 levels"
+            },
+            {
+              "source": "cisq",
+              "title": "Inheritance depth MUST NOT exceed 4 levels"
+            }
+          ]
+        },
+        {
+          "id": 1079,
+          "name": "Parent Class without Virtual Destructor Method",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-11",
+              "title": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns"
+            }
+          ]
+        },
+        {
+          "id": 1080,
+          "name": "Source Code File with Excessive Number of Lines of Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-2",
+              "title": "Each module MUST have a single clearly defined responsibility"
+            },
+            {
+              "source": "cisq",
+              "title": "Source files MUST NOT exceed language-appropriate line limits"
+            }
+          ]
+        },
+        {
+          "id": 1084,
+          "name": "Invokable Control Element with Excessive File or Data Access Operations",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-12",
+              "title": "Functions MUST NOT have variadic parameters without type safety or excessive file/data access operations"
+            }
+          ]
+        },
+        {
+          "id": 1086,
+          "name": "Class with Excessive Number of Child Classes",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-11",
+              "title": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns"
+            }
+          ]
+        },
+        {
+          "id": 1087,
+          "name": "Class with Virtual Method without a Virtual Destructor",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-11",
+              "title": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns"
+            }
+          ]
+        },
+        {
+          "id": 1090,
+          "name": "Method Containing Access of a Member Element from Another Class",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-10",
+              "title": "Trust boundaries MUST be enforced between components of different privilege levels"
+            },
+            {
+              "source": "cisq",
+              "title": "Trust boundaries MUST be enforced between components of different privilege levels"
+            }
+          ]
+        },
+        {
+          "id": 1092,
+          "name": "Use of Same Invokable Control Element in Multiple Architectural Layers",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-13",
+              "title": "Code MUST maintain proper encapsulation and data element visibility"
+            }
+          ]
+        },
+        {
+          "id": 1100,
+          "name": "Insufficient Isolation of System-Dependent Functions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-14",
+              "title": "Modules MUST NOT have hard-coded network configuration or platform-dependent components"
+            }
+          ]
+        },
+        {
+          "id": 1102,
+          "name": "Reliance on Machine-Dependent Data Representation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-14",
+              "title": "Modules MUST NOT have hard-coded network configuration or platform-dependent components"
+            }
+          ]
+        },
+        {
+          "id": 1103,
+          "name": "Use of Platform-Dependent Third Party Components",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-14",
+              "title": "Modules MUST NOT have hard-coded network configuration or platform-dependent components"
+            }
+          ]
+        },
+        {
+          "id": 1105,
+          "name": "Insufficient Encapsulation of Machine-Dependent Functionality",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-14",
+              "title": "Modules MUST NOT have hard-coded network configuration or platform-dependent components"
+            }
+          ]
+        },
+        {
+          "id": 1121,
+          "name": "Excessive McCabe Cyclomatic Complexity",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-1",
+              "title": "Cyclomatic complexity MUST be \u226410 per function"
+            },
+            {
+              "source": "iso25010",
+              "ref": "M-MOD-4",
+              "title": "Functions MUST have \u22645 parameters; use an options object for more"
+            },
+            {
+              "source": "cisq",
+              "title": "Function cyclomatic complexity MUST be \u226410"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Reusability",
+      "cwes": [
+        {
+          "id": 1041,
+          "name": "Use of Redundant Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-1",
+              "title": "Shared logic MUST be extracted into utility modules rather than duplicated"
+            },
+            {
+              "source": "cisq",
+              "title": "Duplicated logic MUST be extracted into shared functions"
+            }
+          ]
+        },
+        {
+          "id": 1057,
+          "name": "Data Access Operations Outside of Expected Data Manager Component",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-2",
+              "title": "Public functions MUST NOT depend on global mutable state"
+            },
+            {
+              "source": "cisq",
+              "title": "Data access MUST be confined to the owning component"
+            }
+          ]
+        },
+        {
+          "id": 1058,
+          "name": "Invokable Control Element in Multi-Thread Context with non-Final Static Storable or Member Element",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-6",
+              "title": "Singleton classes MUST use proper locking and synchronization for instance creation"
+            }
+          ]
+        },
+        {
+          "id": 1061,
+          "name": "Insufficient Encapsulation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-3",
+              "title": "Interfaces MUST be preferred over concrete types in function signatures"
+            },
+            {
+              "source": "cisq",
+              "title": "Internal implementation details MUST be hidden behind public interfaces"
+            }
+          ]
+        },
+        {
+          "id": 1063,
+          "name": "Creation of Class Instance within a Static Code Block",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-6",
+              "title": "Singleton classes MUST use proper locking and synchronization for instance creation"
+            }
+          ]
+        },
+        {
+          "id": 1066,
+          "name": "Missing Serialization Control Element",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-5",
+              "title": "Serialization control elements MUST be properly implemented"
+            }
+          ]
+        },
+        {
+          "id": 1070,
+          "name": "Serializable Data Element Containing non-Serializable Item Elements",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-5",
+              "title": "Serialization control elements MUST be properly implemented"
+            }
+          ]
+        },
+        {
+          "id": 1082,
+          "name": "Class Instance Self Destruction Control Element",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-7",
+              "title": "Data elements containing pointers MUST implement proper copy control"
+            }
+          ]
+        },
+        {
+          "id": 1096,
+          "name": "Singleton Class Instance Creation without Proper Locking or Synchronization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-6",
+              "title": "Singleton classes MUST use proper locking and synchronization for instance creation"
+            }
+          ]
+        },
+        {
+          "id": 1097,
+          "name": "Persistent Storable Data Element without Associated Comparison Control Element",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-7",
+              "title": "Data elements containing pointers MUST implement proper copy control"
+            }
+          ]
+        },
+        {
+          "id": 1098,
+          "name": "Data Element containing Pointer Item without Proper Copy Control Element",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-7",
+              "title": "Data elements containing pointers MUST implement proper copy control"
+            }
+          ]
+        },
+        {
+          "id": 1188,
+          "name": "Initialization of a Resource with an Insecure Default",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-REU-4",
+              "title": "Configuration MUST be injectable; modules MUST NOT read env vars directly"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Analyzability",
+      "cwes": [
+        {
+          "id": 546,
+          "name": "Suspicious Comment",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-13",
+              "title": "Comments MUST follow appropriate style and MUST NOT contain suspicious markers"
+            }
+          ]
+        },
+        {
+          "id": 563,
+          "name": "Assignment to Variable without Use",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-12",
+              "title": "Variables MUST be used for their declared purpose with appropriate scope"
+            }
+          ]
+        },
+        {
+          "id": 570,
+          "name": "Expression is Always False",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-10",
+              "title": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions"
+            }
+          ]
+        },
+        {
+          "id": 571,
+          "name": "Expression is Always True",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-10",
+              "title": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions"
+            }
+          ]
+        },
+        {
+          "id": 710,
+          "name": "Improper Adherence to Coding Standards",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-9",
+              "title": "Source code MUST follow consistent naming, formatting, and style conventions"
+            }
+          ]
+        },
+        {
+          "id": 783,
+          "name": "Operator Precedence Logic Error",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-10",
+              "title": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions"
+            }
+          ]
+        },
+        {
+          "id": 1053,
+          "name": "Missing Documentation for Design",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-5",
+              "title": "Public APIs MUST be documented with parameter and return descriptions"
+            },
+            {
+              "source": "cisq",
+              "title": "Architectural decisions MUST be documented"
+            }
+          ]
+        },
+        {
+          "id": 1068,
+          "name": "Inconsistency Between Implementation and Documented Design",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-11",
+              "title": "Documentation MUST be sufficient, accurate, and consistent with the implementation"
+            }
+          ]
+        },
+        {
+          "id": 1069,
+          "name": "Empty Exception Block",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-10",
+              "title": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions"
+            }
+          ]
+        },
+        {
+          "id": 1071,
+          "name": "Empty Code Block",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-10",
+              "title": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions"
+            }
+          ]
+        },
+        {
+          "id": 1075,
+          "name": "Unconditional Control Flow Transfer outside of Switch Block",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-6",
+              "title": "Control flow MUST NOT use unconditional jumps out of deeply nested blocks"
+            },
+            {
+              "source": "cisq",
+              "title": "Control flow MUST NOT use unconditional jumps out of deeply nested blocks"
+            }
+          ]
+        },
+        {
+          "id": 1076,
+          "name": "Insufficient Adherence to Expected Conventions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-9",
+              "title": "Source code MUST follow consistent naming, formatting, and style conventions"
+            }
+          ]
+        },
+        {
+          "id": 1078,
+          "name": "Inappropriate Source Code Style or Formatting",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-9",
+              "title": "Source code MUST follow consistent naming, formatting, and style conventions"
+            }
+          ]
+        },
+        {
+          "id": 1080,
+          "name": "Source Code File with Excessive Number of Lines of Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-1",
+              "title": "Source files MUST NOT exceed 300 lines"
+            },
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-2",
+              "title": "Functions MUST NOT exceed 50 lines"
+            },
+            {
+              "source": "cisq",
+              "title": "Source files MUST NOT exceed language-appropriate line limits"
+            }
+          ]
+        },
+        {
+          "id": 1095,
+          "name": "Loop Condition Value Update within the Loop",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-7",
+              "title": "Loop counter variables MUST NOT be modified inside the loop body"
+            },
+            {
+              "source": "cisq",
+              "title": "Loop counter variables MUST NOT be modified inside the loop body"
+            }
+          ]
+        },
+        {
+          "id": 1099,
+          "name": "Inconsistent Naming Conventions for Identifiers",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-9",
+              "title": "Source code MUST follow consistent naming, formatting, and style conventions"
+            }
+          ]
+        },
+        {
+          "id": 1109,
+          "name": "Use of Same Variable for Multiple Purposes",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-12",
+              "title": "Variables MUST be used for their declared purpose with appropriate scope"
+            }
+          ]
+        },
+        {
+          "id": 1110,
+          "name": "Incomplete Design Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-11",
+              "title": "Documentation MUST be sufficient, accurate, and consistent with the implementation"
+            }
+          ]
+        },
+        {
+          "id": 1111,
+          "name": "Incomplete I/O Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-11",
+              "title": "Documentation MUST be sufficient, accurate, and consistent with the implementation"
+            }
+          ]
+        },
+        {
+          "id": 1112,
+          "name": "Incomplete Documentation of Program Execution",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-11",
+              "title": "Documentation MUST be sufficient, accurate, and consistent with the implementation"
+            }
+          ]
+        },
+        {
+          "id": 1113,
+          "name": "Inappropriate Comment Style",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-9",
+              "title": "Source code MUST follow consistent naming, formatting, and style conventions"
+            }
+          ]
+        },
+        {
+          "id": 1114,
+          "name": "Inappropriate Whitespace Style",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-9",
+              "title": "Source code MUST follow consistent naming, formatting, and style conventions"
+            }
+          ]
+        },
+        {
+          "id": 1115,
+          "name": "Source Code Element without Standard Prologue",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-9",
+              "title": "Source code MUST follow consistent naming, formatting, and style conventions"
+            }
+          ]
+        },
+        {
+          "id": 1116,
+          "name": "Inaccurate Comments",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-11",
+              "title": "Documentation MUST be sufficient, accurate, and consistent with the implementation"
+            }
+          ]
+        },
+        {
+          "id": 1117,
+          "name": "Callable with Insufficient Behavioral Summary",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-11",
+              "title": "Documentation MUST be sufficient, accurate, and consistent with the implementation"
+            }
+          ]
+        },
+        {
+          "id": 1118,
+          "name": "Insufficient Documentation of Error Handling Techniques",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-11",
+              "title": "Documentation MUST be sufficient, accurate, and consistent with the implementation"
+            }
+          ]
+        },
+        {
+          "id": 1119,
+          "name": "Excessive Use of Unconditional Branching",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-10",
+              "title": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions"
+            }
+          ]
+        },
+        {
+          "id": 1120,
+          "name": "Excessive Code Complexity",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-8",
+              "title": "Code complexity MUST remain within measurable thresholds (Halstead, nesting depth, attack surface)"
+            }
+          ]
+        },
+        {
+          "id": 1121,
+          "name": "Excessive McCabe Cyclomatic Complexity",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-3",
+              "title": "Nesting depth MUST NOT exceed 4 levels"
+            },
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-4",
+              "title": "Boolean expressions MUST NOT combine more than 3 conditions without extraction"
+            },
+            {
+              "source": "cisq",
+              "title": "Function cyclomatic complexity MUST be \u226410"
+            }
+          ]
+        },
+        {
+          "id": 1122,
+          "name": "Excessive Halstead Complexity",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-8",
+              "title": "Code complexity MUST remain within measurable thresholds (Halstead, nesting depth, attack surface)"
+            }
+          ]
+        },
+        {
+          "id": 1124,
+          "name": "Excessively Deep Nesting",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-8",
+              "title": "Code complexity MUST remain within measurable thresholds (Halstead, nesting depth, attack surface)"
+            }
+          ]
+        },
+        {
+          "id": 1125,
+          "name": "Excessive Attack Surface",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-8",
+              "title": "Code complexity MUST remain within measurable thresholds (Halstead, nesting depth, attack surface)"
+            }
+          ]
+        },
+        {
+          "id": 1126,
+          "name": "Declaration of Variable with Unnecessarily Wide Scope",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-12",
+              "title": "Variables MUST be used for their declared purpose with appropriate scope"
+            }
+          ]
+        },
+        {
+          "id": 1164,
+          "name": "Irrelevant Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-ANA-10",
+              "title": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Modifiability",
+      "cwes": [
+        {
+          "id": 407,
+          "name": "Inefficient Algorithmic Complexity",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-6",
+              "title": "Code MUST NOT use obsolete, dangerous, or prohibited functions"
+            }
+          ]
+        },
+        {
+          "id": 474,
+          "name": "Use of Function with Inconsistent Implementations",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-6",
+              "title": "Code MUST NOT use obsolete, dangerous, or prohibited functions"
+            }
+          ]
+        },
+        {
+          "id": 475,
+          "name": "Undefined Behavior for Input to API",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-6",
+              "title": "Code MUST NOT use obsolete, dangerous, or prohibited functions"
+            }
+          ]
+        },
+        {
+          "id": 477,
+          "name": "Use of Obsolete Function",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-6",
+              "title": "Code MUST NOT use obsolete, dangerous, or prohibited functions"
+            }
+          ]
+        },
+        {
+          "id": 483,
+          "name": "Incorrect Block Delimitation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-6",
+              "title": "Code MUST NOT use obsolete, dangerous, or prohibited functions"
+            }
+          ]
+        },
+        {
+          "id": 561,
+          "name": "Dead Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-4",
+              "title": "Dead code MUST be removed, not commented out"
+            },
+            {
+              "source": "cisq",
+              "title": "Unreachable code MUST be removed from the codebase"
+            }
+          ]
+        },
+        {
+          "id": 676,
+          "name": "Use of Potentially Dangerous Function",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-6",
+              "title": "Code MUST NOT use obsolete, dangerous, or prohibited functions"
+            }
+          ]
+        },
+        {
+          "id": 1052,
+          "name": "Excessive Use of Hard-Coded Literals in Initialization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-7",
+              "title": "Hard-coded literals and magic numbers MUST be replaced with symbolic constants"
+            }
+          ]
+        },
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-1",
+              "title": "Magic numbers and strings MUST be replaced with named constants"
+            },
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-2",
+              "title": "Feature flags MUST be used for in-progress features rather than commented-out code"
+            },
+            {
+              "source": "cisq",
+              "title": "Public APIs MUST have documentation describing purpose and usage"
+            }
+          ]
+        },
+        {
+          "id": 1061,
+          "name": "Insufficient Encapsulation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-3",
+              "title": "Wildcard imports (import *) MUST NOT be used"
+            },
+            {
+              "source": "cisq",
+              "title": "Internal implementation details MUST be hidden behind public interfaces"
+            }
+          ]
+        },
+        {
+          "id": 1085,
+          "name": "Invokable Control Element with Excessive Volume of Commented-out Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-5",
+              "title": "Commented-out code MUST be removed; use version control for history"
+            },
+            {
+              "source": "cisq",
+              "title": "Commented-out code MUST be removed; use version control for history"
+            }
+          ]
+        },
+        {
+          "id": 1093,
+          "name": "Excessively Complex Data Representation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-9",
+              "title": "Data representations MUST NOT be excessively complex or machine-dependent"
+            }
+          ]
+        },
+        {
+          "id": 1101,
+          "name": "Reliance on Runtime Component in Generated Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-9",
+              "title": "Data representations MUST NOT be excessively complex or machine-dependent"
+            }
+          ]
+        },
+        {
+          "id": 1106,
+          "name": "Insufficient Use of Symbolic Constants",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-7",
+              "title": "Hard-coded literals and magic numbers MUST be replaced with symbolic constants"
+            }
+          ]
+        },
+        {
+          "id": 1107,
+          "name": "Insufficient Isolation of Symbolic Constant Definitions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-7",
+              "title": "Hard-coded literals and magic numbers MUST be replaced with symbolic constants"
+            }
+          ]
+        },
+        {
+          "id": 1108,
+          "name": "Excessive Reliance on Global Variables",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-8",
+              "title": "Global variables MUST NOT be used excessively; shared state MUST be minimized"
+            }
+          ]
+        },
+        {
+          "id": 1177,
+          "name": "Use of Prohibited Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-MDF-6",
+              "title": "Code MUST NOT use obsolete, dangerous, or prohibited functions"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Testability",
+      "cwes": [
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-TST-1",
+              "title": "Test coverage MUST be \u226580% for business-critical modules"
+            },
+            {
+              "source": "iso25010",
+              "ref": "M-TST-3",
+              "title": "All public functions MUST have corresponding test files"
+            },
+            {
+              "source": "iso25010",
+              "ref": "M-TST-4",
+              "title": "Test files MUST be co-located or mirror the source directory structure"
+            },
+            {
+              "source": "iso25010",
+              "ref": "M-TST-5",
+              "title": "Each test MUST verify a single behaviour with a descriptive name"
+            },
+            {
+              "source": "cisq",
+              "title": "Public APIs MUST have documentation describing purpose and usage"
+            }
+          ]
+        },
+        {
+          "id": 1061,
+          "name": "Insufficient Encapsulation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-TST-2",
+              "title": "Functions with side effects MUST accept dependencies as parameters for test injection"
+            },
+            {
+              "source": "cisq",
+              "title": "Internal implementation details MUST be hidden behind public interfaces"
+            }
+          ]
+        },
+        {
+          "id": 1072,
+          "name": "Data Resource Access without Use of Connection Pooling",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-TST-9",
+              "title": "Database indices MUST NOT be excessive and queries MUST use efficient access patterns"
+            }
+          ]
+        },
+        {
+          "id": 1089,
+          "name": "Large Data Table with Excessive Number of Indices",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-TST-9",
+              "title": "Database indices MUST NOT be excessive and queries MUST use efficient access patterns"
+            }
+          ]
+        },
+        {
+          "id": 1094,
+          "name": "Excessive Index Range Scan for a Data Resource",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-TST-9",
+              "title": "Database indices MUST NOT be excessive and queries MUST use efficient access patterns"
+            }
+          ]
+        },
+        {
+          "id": 1123,
+          "name": "Excessive Use of Self-Modifying Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-TST-8",
+              "title": "Code MUST NOT rely on self-modifying techniques"
+            }
+          ]
+        },
+        {
+          "id": 1127,
+          "name": "Compilation with Insufficient Warnings or Errors",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-TST-7",
+              "title": "Compilation MUST enable sufficient warnings and errors"
+            }
+          ]
+        },
+        {
+          "id": 1173,
+          "name": "Improper Use of Validation Framework",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "M-TST-6",
+              "title": "Input validation frameworks MUST be properly used"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
