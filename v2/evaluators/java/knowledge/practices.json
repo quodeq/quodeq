@@ -12,18 +12,20 @@
       "bad": "String apiKey = \"sk-prod-abc123xyz456\";",
       "good": "String apiKey = System.getenv(\"API_KEY\");",
       "explanation": "Hardcoded secrets are committed to version control and exposed in class files. Use environment variables or a vault.",
-      "sub_characteristic": "Confidentiality"
+      "sub_characteristic": "Confidentiality",
+      "principle": "Confidentiality"
     },
     {
       "id": "jv-002",
-      "title": "Use PreparedStatement — never concatenate SQL strings",
+      "title": "Use PreparedStatement \u2014 never concatenate SQL strings",
       "cwe": 89,
       "dimension": "security",
       "severity": "high",
       "bad": "stmt.execute(\"SELECT * FROM users WHERE id = \" + userId);",
       "good": "PreparedStatement ps = conn.prepareStatement(\"SELECT * FROM users WHERE id = ?\");\nps.setString(1, userId);",
       "explanation": "String concatenation in SQL enables injection attacks. PreparedStatement escapes inputs automatically.",
-      "sub_characteristic": "Integrity"
+      "sub_characteristic": "Integrity",
+      "principle": "Integrity"
     },
     {
       "id": "jv-003",
@@ -34,7 +36,8 @@
       "bad": "String name = request.getParameter(\"name\");\ndb.save(name);",
       "good": "String name = request.getParameter(\"name\");\nif (name == null || !NAME_PATTERN.matcher(name).matches()) {\n    throw new ValidationException(\"Invalid name\");\n}\ndb.save(name);",
       "explanation": "Unvalidated input can lead to injection attacks and data corruption. Validate format and range at entry points.",
-      "sub_characteristic": "Integrity"
+      "sub_characteristic": "Integrity",
+      "principle": "Integrity"
     },
     {
       "id": "jv-004",
@@ -45,7 +48,8 @@
       "bad": "Runtime.getRuntime().exec(\"cmd /c \" + userInput);",
       "good": "ProcessBuilder pb = new ProcessBuilder(\"cmd\", \"/c\", sanitizedCmd);\npb.start();",
       "explanation": "Constructing shell commands from user input enables command injection. Use ProcessBuilder with argument arrays.",
-      "sub_characteristic": "Authenticity"
+      "sub_characteristic": "Authenticity",
+      "principle": "Authenticity"
     },
     {
       "id": "jv-005",
@@ -56,18 +60,20 @@
       "bad": "public void processOrder(Order order) {\n    // 80 lines of mixed validation, business logic, and persistence\n}",
       "good": "public void processOrder(Order order) {\n    validate(order);\n    Order result = applyRules(order);\n    persist(result);\n}",
       "explanation": "Long methods are hard to understand, test, and modify. Extract logical steps into named methods.",
-      "sub_characteristic": "Modularity"
+      "sub_characteristic": "Modularity",
+      "principle": "Analyzability"
     },
     {
       "id": "jv-006",
-      "title": "Avoid God classes — keep classes under 300 lines",
+      "title": "Avoid God classes \u2014 keep classes under 300 lines",
       "cwe": 1080,
       "dimension": "maintainability",
       "severity": "medium",
       "bad": "// 500-line class mixing data access, business logic, and validation",
       "good": "// Separate into UserRepository.java, UserService.java, UserValidator.java",
       "explanation": "Large classes violate Single Responsibility Principle and are hard to test. Split by concern.",
-      "sub_characteristic": "Modularity"
+      "sub_characteristic": "Modularity",
+      "principle": "Analyzability"
     },
     {
       "id": "jv-007",
@@ -78,7 +84,8 @@
       "bad": "public static final int STATUS_ACTIVE = 1;\npublic static final int STATUS_INACTIVE = 2;",
       "good": "public enum Status { ACTIVE, INACTIVE }",
       "explanation": "Magic constants lack type safety and allow invalid values. Enums provide compile-time checking and self-documentation.",
-      "sub_characteristic": "Reusability"
+      "sub_characteristic": "Reusability",
+      "principle": "Modifiability"
     },
     {
       "id": "jv-008",
@@ -89,7 +96,8 @@
       "bad": "class PremiumGoldInternationalUser extends PremiumGoldUser extends PremiumUser extends User { }",
       "good": "class User implements Billable, International {\n    private final BillingPlan plan;\n}",
       "explanation": "Deep inheritance hierarchies are rigid and hard to modify. Prefer composition with interfaces for flexible behaviour.",
-      "sub_characteristic": "Modularity"
+      "sub_characteristic": "Modularity",
+      "principle": "Modularity"
     },
     {
       "id": "jv-009",
@@ -100,18 +108,20 @@
       "bad": "Connection conn = pool.getConnection();\nResultSet rs = conn.query(sql);\nconn.close();",
       "good": "try (Connection conn = pool.getConnection();\n     ResultSet rs = conn.query(sql)) {\n    // process results\n}",
       "explanation": "Manual close() is skipped on exceptions, leaking resources. try-with-resources guarantees cleanup.",
-      "sub_characteristic": "Recoverability"
+      "sub_characteristic": "Recoverability",
+      "principle": "Recoverability"
     },
     {
       "id": "jv-010",
-      "title": "Catch specific exceptions — never catch generic Exception",
+      "title": "Catch specific exceptions \u2014 never catch generic Exception",
       "cwe": 396,
       "dimension": "reliability",
       "severity": "medium",
       "bad": "try { op(); } catch (Exception e) { log(e); }",
       "good": "try { op(); } catch (IOException e) { handleIO(e); } catch (ParseException e) { handleParse(e); }",
       "explanation": "Catching Exception hides programming errors (NPE, IllegalArgument) that should propagate. Catch only expected checked exceptions.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "jv-011",
@@ -122,62 +132,68 @@
       "bad": "User user = repository.findById(id);\nString name = user.getName();",
       "good": "User user = repository.findById(id);\nif (user == null) {\n    throw new NotFoundException(\"User not found: \" + id);\n}\nString name = user.getName();",
       "explanation": "Null pointer dereference is the most common runtime exception. Guard nullable returns with explicit checks or Optional.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "jv-012",
-      "title": "Handle InterruptedException correctly — don't swallow it",
+      "title": "Handle InterruptedException correctly \u2014 don't swallow it",
       "cwe": 755,
       "dimension": "reliability",
       "severity": "high",
       "bad": "try { Thread.sleep(1000); } catch (InterruptedException e) { }",
       "good": "try { Thread.sleep(1000); } catch (InterruptedException e) {\n    Thread.currentThread().interrupt();\n    throw new RuntimeException(\"Interrupted\", e);\n}",
       "explanation": "Swallowing InterruptedException breaks thread cancellation. Re-set the interrupt flag and propagate.",
-      "sub_characteristic": "Fault Tolerance"
+      "sub_characteristic": "Fault Tolerance",
+      "principle": "Fault Tolerance"
     },
     {
       "id": "jv-013",
-      "title": "Use StringBuilder in loops — not string concatenation",
+      "title": "Use StringBuilder in loops \u2014 not string concatenation",
       "cwe": 1046,
       "dimension": "performance",
       "severity": "medium",
       "bad": "String result = \"\";\nfor (String s : items) {\n    result += s + \",\";\n}",
       "good": "StringBuilder sb = new StringBuilder();\nfor (String s : items) {\n    sb.append(s).append(\",\");\n}\nString result = sb.toString();",
-      "explanation": "String concatenation in loops creates O(n²) intermediate objects. StringBuilder appends in-place.",
-      "sub_characteristic": "Time Behaviour"
+      "explanation": "String concatenation in loops creates O(n\u00b2) intermediate objects. StringBuilder appends in-place.",
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Time Behaviour"
     },
     {
       "id": "jv-014",
-      "title": "Avoid unnecessary autoboxing — use primitives where possible",
+      "title": "Avoid unnecessary autoboxing \u2014 use primitives where possible",
       "cwe": 1050,
       "dimension": "performance",
       "severity": "low",
       "bad": "Integer count = 0;\nfor (Item item : items) {\n    count += item.getQuantity();\n}",
       "good": "int count = 0;\nfor (Item item : items) {\n    count += item.getQuantity();\n}",
       "explanation": "Autoboxing creates unnecessary Integer objects on every operation. Use primitive types in hot paths.",
-      "sub_characteristic": "Resource Utilisation"
+      "sub_characteristic": "Resource Utilisation",
+      "principle": "Resource Utilisation"
     },
     {
       "id": "jv-015",
-      "title": "Use connection pooling — never create connections per request",
+      "title": "Use connection pooling \u2014 never create connections per request",
       "cwe": 400,
       "dimension": "performance",
       "severity": "high",
       "bad": "Connection conn = DriverManager.getConnection(url, user, pass);",
       "good": "// At startup:\nHikariDataSource ds = new HikariDataSource(config);\n// Per request:\nConnection conn = ds.getConnection();",
       "explanation": "Creating database connections is expensive. Use a pool (HikariCP, c3p0) to reuse connections.",
-      "sub_characteristic": "Resource Utilisation"
+      "sub_characteristic": "Resource Utilisation",
+      "principle": "Resource Utilisation"
     },
     {
       "id": "jv-016",
-      "title": "Avoid N+1 queries — batch database access",
+      "title": "Avoid N+1 queries \u2014 batch database access",
       "cwe": 1084,
       "dimension": "performance",
       "severity": "high",
       "bad": "for (User u : users) {\n    List<Order> orders = orderRepo.findByUserId(u.getId());\n}",
       "good": "List<Long> ids = users.stream().map(User::getId).toList();\nMap<Long, List<Order>> orders = orderRepo.findByUserIds(ids);",
       "explanation": "Querying inside a loop creates N+1 round-trips. Batch into a single query with IN clause.",
-      "sub_characteristic": "Time Behaviour"
+      "sub_characteristic": "Time Behaviour",
+      "principle": "Time Behaviour"
     }
   ]
 }
