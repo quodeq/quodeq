@@ -76,24 +76,6 @@ def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
         "excludes": ["usability", "flexibility"],
     }, indent=2) + "\n")
 
-    # detectors.json
-    (plugin_dir / "detectors.json").write_text(json.dumps([
-        {"type": "grep", "rules": "scan_rules.ini"},
-    ], indent=2) + "\n")
-
-    # scan_rules.ini placeholder
-    ext = preset["extensions"][0]
-    (plugin_dir / "scan_rules.ini").write_text(
-        f"; evaluators/{runtime}/scan_rules.ini\n"
-        f"; Add CWE-tagged grep rules for {preset['display_name']}\n\n"
-        f"[cwe_798_secrets]\n"
-        f"label=CWE-798: Hardcoded credentials or secrets\n"
-        f"cwe=798\n"
-        f"dimension=security\n"
-        f'command=grep -rn -E "(apiKey|api_key|secret|password|token)\\s*=\\s*[\'\\"][^\'\\"]{"{8,}"}" {{src}} --include="*{ext}"\n'
-        f"format=file_list\n"
-    )
-
     # knowledge directory
     knowledge_dir = plugin_dir / "knowledge"
     knowledge_dir.mkdir()
