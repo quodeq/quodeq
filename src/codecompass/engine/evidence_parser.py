@@ -35,7 +35,7 @@ def _parse_jsonl_line(line: str) -> Judgment | None:
     )
 
 
-def _judgment_to_dict(j: Judgment, practice_title: str = "") -> dict:
+def _judgment_to_dict(j: Judgment, practice_title: str = "", cwe_id: int | None = None) -> dict:
     """Convert a Judgment to the dict format used in PrincipleEvidence lists."""
     d: dict = {"file": j.file}
     if j.line:
@@ -46,14 +46,12 @@ def _judgment_to_dict(j: Judgment, practice_title: str = "") -> dict:
         d["severity"] = j.severity
     if j.violation_type:
         d["violation_type"] = j.violation_type
-    # Include practice context in reason
-    reason_parts = []
+    if cwe_id:
+        d["cwe"] = cwe_id
     if practice_title:
-        reason_parts.append(practice_title)
+        d["title"] = practice_title
     if j.reason:
-        reason_parts.append(j.reason)
-    if reason_parts:
-        d["reason"] = " — ".join(reason_parts)
+        d["reason"] = j.reason
     return d
 
 
@@ -92,13 +90,17 @@ def parse_jsonl_to_evidence(
     """
     practice_lookup = _build_practice_lookup(practices_data)
 
-    # Parse all judgments
+    # Parse all judgments, dedup by (practice_id, verdict, file, line)
     judgments: list[Judgment] = []
+    seen: set[tuple] = set()
     content = jsonl_file.read_text() if jsonl_file.exists() else ""
     for line in content.splitlines():
         j = _parse_jsonl_line(line)
         if j is not None:
-            judgments.append(j)
+            key = (j.practice_id, j.verdict, j.file, j.line)
+            if key not in seen:
+                seen.add(key)
+                judgments.append(j)
 
     # Group judgments by sub_characteristic
     sc_violations: dict[str, list[tuple[Judgment, str]]] = {}
@@ -113,12 +115,14 @@ def parse_jsonl_to_evidence(
             or practice_def.get("sub_characteristic")
             or j.practice_id
         )
-        practice_title = practice_def.get("title", j.practice_id)
+        cwe_data = practice_def.get("cwe", {})
+        cwe_name = (cwe_data.get("name", "") if isinstance(cwe_data, dict) else "") or practice_def.get("title", j.practice_id)
+        cwe_id = cwe_data.get("id") if isinstance(cwe_data, dict) else (cwe_data if isinstance(cwe_data, int) else None)
 
         if j.verdict == "violation":
-            sc_violations.setdefault(principle, []).append((j, practice_title))
+            sc_violations.setdefault(principle, []).append((j, cwe_name, cwe_id))
         elif j.verdict == "compliance":
-            sc_compliance.setdefault(principle, []).append((j, practice_title))
+            sc_compliance.setdefault(principle, []).append((j, cwe_name, cwe_id))
 
         # Track highest severity per principle — use judgment severity for standards findings
         sev = practice_def.get("severity") or j.severity or "medium"
@@ -135,8 +139,8 @@ def parse_jsonl_to_evidence(
             display_name=sc,
             dimension=judgments[0].dimension if judgments else "",
             severity=sc_severity.get(sc, "medium"),
-            violations=[_judgment_to_dict(j, title) for j, title in sc_violations.get(sc, [])],
-            compliance=[_judgment_to_dict(j, title) for j, title in sc_compliance.get(sc, [])],
+            violations=[_judgment_to_dict(j, title, cid) for j, title, cid in sc_violations.get(sc, [])],
+            compliance=[_judgment_to_dict(j, title, cid) for j, title, cid in sc_compliance.get(sc, [])],
         )
         pe.compute_metrics()
         principles[sc] = pe

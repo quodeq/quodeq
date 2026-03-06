@@ -1,6 +1,5 @@
 import { memo, useState } from 'react';
 import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
-import { stripPrinciplePrefix } from '../../../utils/formatters.js';
 
 const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
 
@@ -117,30 +116,33 @@ function FileCopyBtn({ display, copyText }) {
 function ViolationCard({ v, principleName, index }) {
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
-  const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
   const ref = line != null ? `${filePath}:${line}` : filePath;
   const display = line != null ? `${filename}:${line}` : filename;
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}>
       <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-        {filename && <span className="vlive-file">{display}</span>}
+        <span className="vrow-label">[{principleName}]</span>
+        {filename && (
+          <FileCopyBtn display={display} copyText={ref} />
+        )}
         <CopyButton
           label="Fix plan"
           onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v, principleName))}
         />
       </div>
       <div className="vlive-detail">
-        {v.reason && (
+        {(v.title || v.reason) && (
           <div className="vlive-detail-section">
-            <span className="vlive-detail-section-label">Reason</span>
-            <p className="vlive-detail-reason">{stripPrinciplePrefix(v.reason, principleName)}</p>
-          </div>
-        )}
-        {filename && (
-          <div className="vlive-detail-meta">
-            {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-            <FileCopyBtn display={display} copyText={filename} />
+            <div className="vlive-detail-section-header">
+              <span className="vlive-detail-section-label">Reason</span>
+              {v.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${v.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{v.cwe}</a>}
+            </div>
+            {v.title && <p className="vlive-detail-title">{v.title}</p>}
+            {v.reason && <>
+              <span className="vlive-detail-section-label">Detail</span>
+              <p className="vlive-detail-reason">{v.reason}</p>
+            </>}
           </div>
         )}
         {v.snippet && <pre className="vlive-snippet">{v.snippet}</pre>}

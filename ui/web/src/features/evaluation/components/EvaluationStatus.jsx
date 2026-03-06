@@ -119,8 +119,6 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         </div>
       )}
 
-      <LiveViolationsFeed liveViolations={liveViolations} />
-
       {!isRunning && (
         <div className="job-actions">
           {isDone && (
@@ -133,6 +131,8 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
           </button>
         </div>
       )}
+
+      <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
   );
 }
