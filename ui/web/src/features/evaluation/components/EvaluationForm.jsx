@@ -1,26 +1,50 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
-import { DIMENSION_OPTIONS } from '../constants.js';
+import { listPlugins } from '../../../api/index.js';
 
 export default function EvaluationForm({ onStart, disabled }) {
   const [repo, setRepo] = useState('');
-  const [selectedDimensions, setSelectedDimensions] = useState([]);
+  const [allDimensions, setAllDimensions] = useState([]);
+  const [selectedDims, setSelectedDims] = useState(new Set());
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
 
-  function toggleDimension(code) {
-    setSelectedDimensions((prev) =>
-      prev.includes(code) ? prev.filter((d) => d !== code) : [...prev, code]
-    );
+  useEffect(() => {
+    listPlugins()
+      .then((plugins) => {
+        const seen = new Map();
+        for (const p of plugins) {
+          for (const d of p.dimensions) {
+            if (!seen.has(d.id)) {
+              seen.set(d.id, d);
+            }
+          }
+        }
+        setAllDimensions([...seen.values()]);
+      })
+      .catch(() => setAllDimensions([]));
+  }, []);
+
+  function toggleDim(id) {
+    setSelectedDims((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   }
 
   function handleSubmit(e) {
     e.preventDefault();
-    onStart({
-      repo,
-      dimensions: selectedDimensions.join(','),
-      numerical: true,
-    });
+    const payload = { repo };
+    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
+      payload.dimensions = [...selectedDims];
+    }
+    onStart(payload);
     setRepo('');
+    setSelectedDims(new Set());
   }
 
   function handleFolderSelect(path) {
@@ -28,7 +52,7 @@ export default function EvaluationForm({ onStart, disabled }) {
     setFolderBrowserOpen(false);
   }
 
-  const canSubmit = !disabled && !!repo && selectedDimensions.length > 0;
+  const canSubmit = !disabled && !!repo;
 
   return (
     <>
@@ -69,39 +93,27 @@ export default function EvaluationForm({ onStart, disabled }) {
           </div>
         </div>
 
-        {repo && (
+        {repo && allDimensions.length > 0 && (
           <div className="form-group">
-            <div className="dimension-label-row">
-              <label>Dimensions</label>
-              <div className="dimension-chip-actions">
-                <button
-                  type="button"
-                  className="dim-action-btn"
-                  onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.map((d) => d.code))}
-                >
-                  Select all
-                </button>
-                <button
-                  type="button"
-                  className="dim-action-btn"
-                  onClick={() => setSelectedDimensions([])}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
+            <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
             <div className="dimension-grid">
-              {DIMENSION_OPTIONS.map((dim) => (
+              {allDimensions.map((dim) => (
                 <button
-                  key={dim.code}
+                  key={dim.id}
                   type="button"
-                  className={`dimension-chip-btn${selectedDimensions.includes(dim.code) ? ' selected' : ''}`}
-                  onClick={() => toggleDimension(dim.code)}
+                  className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}`}
+                  title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
+                  onClick={() => toggleDim(dim.id)}
                 >
-                  {dim.name}
+                  {dim.id}
                 </button>
               ))}
             </div>
+            <p className="form-hint">
+              {selectedDims.size === 0
+                ? 'All dimensions will be evaluated.'
+                : `${selectedDims.size} of ${allDimensions.length} selected.`}
+            </p>
           </div>
         )}
 

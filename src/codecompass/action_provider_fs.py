@@ -9,7 +9,7 @@ from codecompass.action_provider import ActionProvider
 from codecompass.action_provider_jobs import JobManager
 from codecompass._fs_evaluation_mixin import FsEvaluationMixin
 from codecompass._fs_tooling_mixin import FsToolingMixin
-from codecompass._fs_violations import parse_violations_from_evidence, parse_violations_from_stream
+from codecompass._fs_violations import parse_violations_from_evidence, parse_violations_from_jsonl, parse_violations_from_stream
 from codecompass.adapters.fs.report_parser import (
     calculate_trend,
     list_runs,
@@ -329,14 +329,16 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
 
 
 def _list_available_dimensions_for_discipline(discipline: str) -> list[str]:
-    """Resolve available dimensions for a discipline via the evaluators repository."""
+    """Resolve available dimensions for a plugin via its dimensions.json."""
     try:
-        from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
-        from codecompass.config.paths import default_paths
-        from codecompass.evaluate.lib.dimensions import list_available_dimensions
-        paths = default_paths()
-        evaluators = FilesystemEvaluatorsRepository(root=paths.vroot)
-        return list_available_dimensions(evaluators, discipline)
+        import json as _json
+        from pathlib import Path as _Path
+        plugin_dir = _Path(__file__).resolve().parent.parent.parent / "evaluators" / discipline
+        dims_file = plugin_dir / "dimensions.json"
+        if dims_file.exists():
+            data = _json.loads(dims_file.read_text())
+            return [d["id"] for d in data.get("applies", [])]
+        return []
     except Exception:
         return []
 
@@ -490,7 +492,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         evidence_path = base / "evidence" / f"{dimension}_evidence.json"
         if evidence_path.exists():
             return parse_violations_from_evidence(evidence_path, project, run_id, dimension)
+        jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
         stream_path = base / "evidence" / f"{dimension}_live.stream"
+        if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
+            return parse_violations_from_jsonl(jsonl_path, stream_path, project, run_id, dimension)
         if stream_path.exists():
             return parse_violations_from_stream(stream_path, project, run_id, dimension)
         # Run exists but dimension hasn't started yet

@@ -1,0 +1,24 @@
+{
+  "characteristic": "Maintainability",
+  "source": "ISO 5055 / CISQ 2021",
+  "cwes": [
+    { "id": 1057, "name": "Data Access Outside Expected Component", "requirement": "Data access MUST be confined to the owning component" },
+    { "id": 1061, "name": "Insufficient Encapsulation", "requirement": "Internal implementation details MUST be hidden behind public interfaces" },
+    { "id": 1080, "name": "Source File With Excessive Lines of Code", "requirement": "Source files MUST NOT exceed language-appropriate line limits" },
+    { "id": 1121, "name": "Excessive McCabe Cyclomatic Complexity", "requirement": "Function cyclomatic complexity MUST be ≤10" },
+    { "id": 1047, "name": "Modules with Circular Dependencies", "requirement": "Module dependency graphs MUST be acyclic" },
+    { "id": 1059, "name": "Insufficient Technical Documentation", "requirement": "Public APIs MUST have documentation describing purpose and usage" },
+    { "id": 1041, "name": "Use of Redundant Code", "requirement": "Duplicated logic MUST be extracted into shared functions" },
+    { "id": 1053, "name": "Missing Documentation for Design", "requirement": "Architectural decisions MUST be documented" },
+    { "id": 561, "name": "Dead Code", "requirement": "Unreachable code MUST be removed from the codebase" },
+    { "id": 1064, "name": "Invokable Control Element with Signature Containing an Excessive Number of Parameters", "requirement": "Functions MUST have ≤5 parameters" },
+    { "id": 1075, "name": "Unconditional Control Flow Transfer out of Multiple Nested Blocks", "requirement": "Control flow MUST NOT use unconditional jumps out of deeply nested blocks" },
+    { "id": 1095, "name": "Loop Condition Value Update within Loop Body", "requirement": "Loop counter variables MUST NOT be modified inside the loop body" },
+    { "id": 1090, "name": "Method Invokable from Another Method of Different Trust Level", "requirement": "Trust boundaries MUST be enforced between components of different privilege levels" },
+    { "id": 1045, "name": "Parent Class with a Virtual Destructor and a Child Class without a Virtual Destructor", "requirement": "Inheritance hierarchies MUST maintain consistent destructor/cleanup patterns" },
+    { "id": 1048, "name": "Invokable Control Element with Large Number of Outward Calls", "requirement": "Functions MUST limit outward calls to ≤7 distinct callees to reduce coupling" },
+    { "id": 1074, "name": "Class with Excessively Deep Inheritance", "requirement": "Inheritance depth MUST NOT exceed 4 levels" },
+    { "id": 1085, "name": "Invokable Control Element with Excessive Volume of Commented-out Code", "requirement": "Commented-out code MUST be removed; use version control for history" },
+    { "id": 1054, "name": "Invocation of a Control Element at an Unnecessarily Deep Horizontal Layer", "requirement": "Components MUST call peers or immediate dependencies, not skip layers" }
+  ]
+}

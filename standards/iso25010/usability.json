@@ -1,0 +1,59 @@
+{
+  "id": "usability",
+  "name": "Usability",
+  "iso_25010": "Usability",
+  "version": "2023",
+  "sub_characteristics": [
+    {
+      "name": "Appropriateness Recognisability",
+      "requirements": [
+        { "id": "U-APR-1", "text": "All user-facing error messages MUST be human-readable (no stack traces exposed)", "cwe": [209] },
+        { "id": "U-APR-2", "text": "API responses MUST include machine-readable error codes alongside messages", "cwe": [1059] },
+        { "id": "U-APR-3", "text": "README MUST describe the project purpose, setup steps, and usage examples", "cwe": [1053] }
+      ]
+    },
+    {
+      "name": "Learnability",
+      "requirements": [
+        { "id": "U-LRN-1", "text": "CLI commands MUST provide --help output describing all flags", "cwe": [1053] },
+        { "id": "U-LRN-2", "text": "Public API functions MUST include usage examples in docstrings", "cwe": [1053] },
+        { "id": "U-LRN-3", "text": "Configuration options MUST have documented defaults and valid ranges", "cwe": [1059] },
+        { "id": "U-LRN-4", "text": "Error messages MUST suggest corrective actions when possible", "cwe": [1059] }
+      ]
+    },
+    {
+      "name": "Operability",
+      "requirements": [
+        { "id": "U-OPR-1", "text": "Long-running operations MUST provide progress indication or logging", "cwe": [1059] },
+        { "id": "U-OPR-2", "text": "Destructive operations MUST require confirmation or use --force flags", "cwe": [1059] },
+        { "id": "U-OPR-3", "text": "Exit codes MUST be non-zero for error conditions in CLI tools", "cwe": [252] }
+      ]
+    },
+    {
+      "name": "User Error Protection",
+      "requirements": [
+        { "id": "U-UEP-1", "text": "Input MUST be validated with clear error messages indicating what is wrong", "cwe": [20] },
+        { "id": "U-UEP-2", "text": "Dangerous defaults MUST NOT exist; fail-safe defaults are required", "cwe": [1188] },
+        { "id": "U-UEP-3", "text": "Ambiguous string formats (dates, numbers) MUST be rejected with format hints", "cwe": [20] },
+        { "id": "U-UEP-4", "text": "Required fields MUST be enforced at the type level, not just at runtime", "cwe": [1059] }
+      ]
+    },
+    {
+      "name": "User Interface Aesthetics",
+      "requirements": [
+        { "id": "U-UIA-1", "text": "Output format MUST be consistent across all commands (JSON or table, not mixed)", "cwe": [1059] },
+        { "id": "U-UIA-2", "text": "Log messages MUST use consistent severity levels and structured format", "cwe": [1059] },
+        { "id": "U-UIA-3", "text": "Terminal output MUST respect NO_COLOR and TERM environment variables", "cwe": [1059] }
+      ]
+    },
+    {
+      "name": "Accessibility",
+      "requirements": [
+        { "id": "U-ACC-1", "text": "UI components MUST include ARIA labels or semantic HTML elements", "cwe": [1059] },
+        { "id": "U-ACC-2", "text": "Colour MUST NOT be the sole means of conveying information", "cwe": [1059] },
+        { "id": "U-ACC-3", "text": "Interactive elements MUST be keyboard-navigable", "cwe": [1059] },
+        { "id": "U-ACC-4", "text": "Images MUST include alt text descriptions", "cwe": [1059] }
+      ]
+    }
+  ]
+}

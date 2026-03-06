@@ -46,9 +46,11 @@ def _normalize_date(raw: str) -> tuple[str, str] | None:
 
 
 def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
-    """Read the date from the first evidence file in a run directory."""
-    evidence_dir = reports_root / project / run_id / "evidence"
-    for entry in safe_read_dir(evidence_dir):
+    """Read the date from evidence or evaluation files in a run directory."""
+    run_dir = reports_root / project / run_id
+
+    # Try evidence/*.json first (V1 format)
+    for entry in safe_read_dir(run_dir / "evidence"):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
             try:
                 data = json.loads(Path(entry.path).read_text())
@@ -59,6 +61,20 @@ def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str 
                         return result
             except (json.JSONDecodeError, OSError):
                 pass
+
+    # Try evaluation/*.json (V2 format — per-dimension report files)
+    for entry in safe_read_dir(run_dir / "evaluation"):
+        if entry.is_file() and entry.name.endswith(".json"):
+            try:
+                data = json.loads(Path(entry.path).read_text())
+                raw = data.get("date")
+                if raw:
+                    result = _normalize_date(str(raw))
+                    if result:
+                        return result
+            except (json.JSONDecodeError, OSError):
+                pass
+
     # Fallback: try parsing the run_id itself as a date (backward compat with YYYYMMDD dirs)
     fallback = _normalize_date(run_id)
     if fallback:

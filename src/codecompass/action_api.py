@@ -175,6 +175,35 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
     def client_models(client_id: str) -> Response:
         return jsonify(provider.get_client_models(client_id))
 
+    @app.get("/api/plugins")
+    def plugins() -> Response:
+        import json as _json
+        evaluators_root = Path(__file__).resolve().parent.parent.parent / "evaluators"
+        result: list[dict[str, Any]] = []
+        if evaluators_root.is_dir():
+            for child in sorted(evaluators_root.iterdir()):
+                if not child.is_dir() or child.name.startswith("_"):
+                    continue
+                plugin_file = child / "plugin.json"
+                dims_file = child / "dimensions.json"
+                if not plugin_file.exists():
+                    continue
+                try:
+                    plugin_data = _json.loads(plugin_file.read_text())
+                    dims_data = _json.loads(dims_file.read_text()) if dims_file.exists() else {"applies": []}
+                    result.append({
+                        "id": plugin_data.get("id", child.name),
+                        "name": plugin_data.get("name", child.name),
+                        "extensions": plugin_data.get("detects", {}).get("extensions", []),
+                        "dimensions": [
+                            {"id": d["id"], "weight": d.get("weight", 1), "iso_25010": d.get("iso_25010")}
+                            for d in dims_data.get("applies", [])
+                        ],
+                    })
+                except (KeyError, ValueError):
+                    continue
+        return jsonify(result)
+
     @app.get("/api/browse")
     def browse() -> Response | tuple[Response, int]:
         path = request.args.get("path")

@@ -226,30 +226,34 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                   {(() => {
                     const { filePath, line } = parseFileRef(v.file, v.line);
                     const filename = filePath ? filePath.split('/').pop() : null;
-                    const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
+
                     const ref = line != null ? `${filePath}:${line}` : filePath;
                     const display = line != null ? `${filename}:${line}` : filename;
                     return (
                       <>
                         <div className="vdetail-row-main">
                           <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-                          {filename && <span className="vlive-file">{display}</span>}
+                          <span className="vrow-label">[{v.principle || principle}]</span>
+                          {filename && (
+                            <FileCopyBtn display={display} copyText={ref} />
+                          )}
                           <CopyButton
                             label="Fix plan"
                             onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v))}
                           />
                         </div>
                         <div className="vlive-detail">
-                          {(v.reason || v.findings) && (
+                          {(v.title || v.reason || v.findings) && (
                             <div className="vlive-detail-section">
-                              <span className="vlive-detail-section-label">Reason</span>
-                              <p className="vlive-detail-reason">{v.reason || v.findings}</p>
-                            </div>
-                          )}
-                          {filename && (
-                            <div className="vlive-detail-meta">
-                              {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-                              <FileCopyBtn display={display} copyText={filename} />
+                              <div className="vlive-detail-section-header">
+                                <span className="vlive-detail-section-label">Reason</span>
+                                {v.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${v.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{v.cwe}</a>}
+                              </div>
+                              {v.title && <p className="vlive-detail-title">{v.title}</p>}
+                              {(v.reason || v.findings) && <>
+                                <span className="vlive-detail-section-label">Detail</span>
+                                <p className="vlive-detail-reason">{v.reason || v.findings}</p>
+                              </>}
                             </div>
                           )}
                           {(v.code || v.snippet) && (
@@ -278,31 +282,33 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                 {(() => {
                   const { filePath, line } = parseFileRef(c.file, c.line);
                   const filename = filePath ? filePath.split('/').pop() : null;
-                  const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
                   const ref = line != null ? `${filePath}:${line}` : filePath;
                   const display = line != null ? `${filename}:${line}` : filename;
                   return (
                     <>
                       <div className="vdetail-row-main">
-                        {filename && <span className="vlive-file">{display}</span>}
+                        <span className="vrow-label">[{c.principle || principle}]</span>
+                        {filename && (
+                          <FileCopyBtn display={display} copyText={ref} />
+                        )}
                       </div>
                       <div className="vlive-detail">
-                        {c.reason && (
+                        {(c.title || c.reason) && (
                           <div className="vlive-detail-section">
-                            <span className="vlive-detail-section-label">Reason</span>
-                            <p className="vlive-detail-reason">{c.reason}</p>
-                          </div>
-                        )}
-                        {filename && (
-                          <div className="vlive-detail-section">
-                            <span className="vlive-detail-section-label">File</span>
-                            <div className="vlive-detail-meta">
-                              {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-                              <FileCopyBtn display={display} copyText={filename} />
+                            <div className="vlive-detail-section-header">
+                              <span className="vlive-detail-section-label">Reason</span>
+                              {c.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${c.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{c.cwe}</a>}
                             </div>
+                            {c.title && <p className="vlive-detail-title">{c.title}</p>}
+                            {c.reason && <>
+                              <span className="vlive-detail-section-label">Detail</span>
+                              <p className="vlive-detail-reason">{c.reason}</p>
+                            </>}
                           </div>
                         )}
-                        {c.snippet && <pre className="vlive-snippet">{c.snippet}</pre>}
+                        {(c.code || c.snippet) && (
+                          <pre className="vlive-snippet">{c.code || c.snippet}</pre>
+                        )}
                       </div>
                     </>
                   );
