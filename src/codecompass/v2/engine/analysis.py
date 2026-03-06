@@ -23,6 +23,49 @@ def _get_ai_model() -> str | None:
     return os.environ.get("AI_MODEL") or None
 
 
+def _count_stream_progress(stream_file: Path) -> dict:
+    """Read the stream file so far and count files read + evidence found."""
+    files_read: set[str] = set()
+    evidence_count = 0
+    try:
+        with open(stream_file) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                etype = data.get("type", "")
+                if etype == "assistant":
+                    for block in data.get("message", {}).get("content", []):
+                        if block.get("type") == "tool_use" and block.get("name") == "Read":
+                            fp = block.get("input", {}).get("file_path")
+                            if fp:
+                                files_read.add(fp)
+                        elif block.get("type") == "text":
+                            for tl in block.get("text", "").splitlines():
+                                tl = tl.strip()
+                                if tl.startswith("{"):
+                                    try:
+                                        obj = json.loads(tl)
+                                        if obj.get("p") and obj.get("t") in ("violation", "compliance"):
+                                            evidence_count += 1
+                                    except json.JSONDecodeError:
+                                        pass
+                elif etype == "item.completed":
+                    item = data.get("item", {})
+                    for block in item.get("content", []):
+                        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Read":
+                            fp = block.get("input", {}).get("file_path")
+                            if fp:
+                                files_read.add(fp)
+    except (OSError, ValueError):
+        pass
+    return {"files_read": len(files_read), "evidence": evidence_count}
+
+
 def run_analysis(
     work_dir: Path,
     prompt: str,
@@ -40,7 +83,7 @@ def run_analysis(
         stream_file: Path to write stream-json output.
         analysis_budget: Optional max budget in USD.
         heartbeat_interval: Seconds between heartbeat callbacks.
-        heartbeat_callback: Optional callable(elapsed_seconds) for progress logging.
+        heartbeat_callback: Optional callable(elapsed_seconds, progress) for progress.
     """
     cmd = _get_ai_cmd()
     model = _get_ai_model()
@@ -75,7 +118,8 @@ def run_analysis(
             except subprocess.TimeoutExpired:
                 elapsed += heartbeat_interval
                 if heartbeat_callback:
-                    heartbeat_callback(elapsed)
+                    progress = _count_stream_progress(stream_file)
+                    heartbeat_callback(elapsed, progress)
 
 
 # ---------------------------------------------------------------------------

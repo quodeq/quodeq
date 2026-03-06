@@ -23,6 +23,7 @@ def _sample_practices():
                 "cwe": 95,
                 "dimension": "security",
                 "severity": "high",
+                "sub_characteristic": "Authenticity",
             },
             {
                 "id": "ts-002",
@@ -30,6 +31,7 @@ def _sample_practices():
                 "cwe": 1121,
                 "dimension": "maintainability",
                 "severity": "medium",
+                "sub_characteristic": "Analyzability",
             },
         ],
     }
@@ -126,8 +128,8 @@ class TestParseJsonlToEvidence:
         assert ev.source_file_count == 50
         assert ev.files_read == 10
         assert ev.coverage_pct == 20.0
-        assert "ts-001" in ev.principles
-        assert "ts-002" in ev.principles
+        assert "Authenticity" in ev.principles
+        assert "Analyzability" in ev.principles
 
     def test_principle_evidence_structure(self, tmp_path):
         jsonl = tmp_path / "evidence.jsonl"
@@ -147,8 +149,8 @@ class TestParseJsonlToEvidence:
             files_read=5,
         )
 
-        pe = ev.principles["ts-001"]
-        assert pe.display_name == "Avoid eval()"
+        pe = ev.principles["Authenticity"]
+        assert pe.display_name == "Authenticity"
         assert pe.dimension == "security"
         assert pe.severity == "high"
         assert len(pe.violations) == 2
@@ -220,12 +222,12 @@ class TestParseJsonlToEvidence:
             files_read=5,
         )
 
-        v = ev.principles["ts-001"].violations[0]
+        v = ev.principles["Authenticity"].violations[0]
         assert v["file"] == "src/app.ts"
         assert v["line"] == 10
         assert v["snippet"] == "eval(userInput)"
         assert v["severity"] == "high"
-        assert v["reason"] == "eval is dangerous"
+        assert v["reason"] == "Avoid eval() — eval is dangerous"
 
     def test_malformed_lines_skipped(self, tmp_path):
         jsonl = tmp_path / "evidence.jsonl"
@@ -280,7 +282,7 @@ class TestParseJsonlToEvidence:
         v1 = ev.to_v1_evidence_dict()
         assert v1["repository"] == "test"
         assert v1["discipline"] == "typescript"
-        assert "ts-001" in v1["principles"]
-        assert "violations" in v1["principles"]["ts-001"]
-        assert "compliance" in v1["principles"]["ts-001"]
-        assert "metrics" in v1["principles"]["ts-001"]
+        assert "Authenticity" in v1["principles"]
+        assert "violations" in v1["principles"]["Authenticity"]
+        assert "compliance" in v1["principles"]["Authenticity"]
+        assert "metrics" in v1["principles"]["Authenticity"]
