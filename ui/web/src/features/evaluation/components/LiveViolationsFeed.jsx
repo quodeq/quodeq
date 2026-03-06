@@ -43,16 +43,19 @@ function parseFileRef(rawFile, rawLine) {
 
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
+  const { filePath, line } = parseFileRef(violation.file, violation.line);
+  const filename = filePath ? filePath.split('/').pop() : null;
+  const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
+  const display = line != null ? `${filename}:${line}` : filename;
 
   return (
     <div
-      className="vlive-row"
+      className={`vdetail-row vdetail-row--${violation.severity}`}
       style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
     >
-      <div className="vlive-row-main" onClick={() => setOpen(o => !o)}>
+      <div className="vdetail-row-main" onClick={() => setOpen(o => !o)}>
         <span className={`severity-tag ${violation.severity}`}>{violation.severity}</span>
-        <span className="vlive-principle">{violation.principle}</span>
-        <span className="vlive-file">{(() => { const { filePath, line } = parseFileRef(violation.file, violation.line); const name = filePath?.split('/').pop() ?? filePath; return line != null ? `${name}:${line}` : name; })()}</span>
+        {filename && <span className="vlive-file">{display}</span>}
         <svg
           className={`vlive-chevron${open ? ' open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24"
@@ -62,30 +65,23 @@ function ViolationLiveRow({ violation, index }) {
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </div>
-      {open && (() => {
-        const { filePath, line } = parseFileRef(violation.file, violation.line);
-        const filename = filePath ? filePath.split('/').pop() : null;
-        const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
-        const ref = line != null ? `${filePath}:${line}` : filePath;
-        const display = line != null ? `${filename}:${line}` : filename;
-        return (
-          <div className="vlive-detail">
-            {violation.reason && (
-              <div className="vlive-detail-section">
-                <span className="vlive-detail-section-label">Reason</span>
-                <p className="vlive-detail-reason">{violation.reason}</p>
-              </div>
-            )}
-            {filename && (
-              <div className="vlive-detail-meta">
-                {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-                <FileCopyBtn display={display} copyText={filename} />
-              </div>
-            )}
-            {violation.snippet && <pre className="vlive-snippet">{violation.snippet}</pre>}
-          </div>
-        );
-      })()}
+      {open && (
+        <div className="vlive-detail">
+          {violation.reason && (
+            <div className="vlive-detail-section">
+              <span className="vlive-detail-section-label">Reason</span>
+              <p className="vlive-detail-reason"><strong>{violation.principle}</strong> — {violation.reason}</p>
+            </div>
+          )}
+          {filename && (
+            <div className="vlive-detail-meta">
+              {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
+              <FileCopyBtn display={display} copyText={filename} />
+            </div>
+          )}
+          {violation.snippet && <pre className="vlive-snippet">{violation.snippet}</pre>}
+        </div>
+      )}
     </div>
   );
 }

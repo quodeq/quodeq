@@ -35,7 +35,8 @@ def resolve_practice(practice: dict, compiled: dict[str, dict]) -> tuple[dict, l
     pid = practice["id"]
     dimension = practice.get("dimension", "")
     principle = practice.get("principle", "")
-    cwe_id = practice.get("cwe")
+    raw_cwe = practice.get("cwe")
+    cwe_id = raw_cwe["id"] if isinstance(raw_cwe, dict) else raw_cwe
 
     if dimension not in compiled:
         warnings.append(f"{pid}: dimension '{dimension}' not in compiled standards")
@@ -137,7 +138,7 @@ def main():
             any_warnings = True
 
         if resolved_data is not None:
-            out_file = lang_dir / "knowledge" / "practices.resolved.json"
+            out_file = lang_dir / "knowledge" / "practices.json"
             out_file.write_text(json.dumps(resolved_data, indent=2) + "\n")
             n = len(resolved_data.get("practices", []))
             print(f"  {lang}: {n} practices -> {out_file}")

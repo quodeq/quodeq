@@ -9,38 +9,9 @@ import pytest
 from codecompass.v2.engine.prompt_builder import (
     build_analysis_prompt,
     load_template,
-    render_practices,
+    render_compiled_standards,
     render_dimensions,
 )
-
-
-def _sample_practices():
-    return {
-        "runtime": "typescript",
-        "version": "1.0.0",
-        "practices": [
-            {
-                "id": "ts-001",
-                "title": "Avoid eval()",
-                "cwe": 95,
-                "dimension": "security",
-                "severity": "high",
-                "bad": "eval(x)",
-                "good": "JSON.parse(x)",
-                "explanation": "eval is dangerous",
-            },
-            {
-                "id": "ts-002",
-                "title": "Keep functions small",
-                "cwe": 1121,
-                "dimension": "maintainability",
-                "severity": "medium",
-                "bad": "function f() { /* 100 lines */ }",
-                "good": "function f() { doA(); doB(); }",
-                "explanation": "Small functions are easier to test",
-            },
-        ],
-    }
 
 
 def _sample_dimensions():
@@ -54,31 +25,46 @@ def _sample_dimensions():
 
 
 # ---------------------------------------------------------------------------
-# render_practices
+# render_compiled_standards
 # ---------------------------------------------------------------------------
 
-class TestRenderPractices:
-    def test_all_practices(self):
-        text = render_practices(_sample_practices())
-        assert "ts-001" in text
-        assert "ts-002" in text
-        assert "Avoid eval()" in text
+class TestRenderCompiledStandards:
+    def test_renders_principles_and_cwes(self, tmp_path):
+        compiled = {
+            "id": "security",
+            "principles": [
+                {
+                    "name": "Confidentiality",
+                    "cwes": [
+                        {"id": 200, "name": "Exposure of Sensitive Information"},
+                        {"id": 312, "name": "Cleartext Storage of Sensitive Information"},
+                    ],
+                },
+                {
+                    "name": "Integrity",
+                    "cwes": [
+                        {"id": 79, "name": "Cross-site Scripting"},
+                    ],
+                },
+            ],
+        }
+        (tmp_path / "security.json").write_text(json.dumps(compiled))
+        text = render_compiled_standards(tmp_path, "security")
+        assert "Confidentiality (2 CWEs)" in text
+        assert "CWE-200" in text
+        assert "CWE-312" in text
+        assert "Integrity (1 CWEs)" in text
+        assert "CWE-79" in text
 
-    def test_filter_by_dimension(self):
-        text = render_practices(_sample_practices(), dimension="security")
-        assert "ts-001" in text
-        assert "ts-002" not in text
+    def test_missing_dimension(self, tmp_path):
+        text = render_compiled_standards(tmp_path, "nonexistent")
+        assert "No compiled standards" in text
 
-    def test_empty_practices(self):
-        text = render_practices({"practices": []}, dimension="security")
-        assert "No practices" in text
-
-    def test_includes_metadata(self):
-        text = render_practices(_sample_practices(), dimension="security")
-        assert "CWE" in text
-        assert "95" in text
-        assert "high" in text
-        assert "eval is dangerous" in text
+    def test_empty_principles(self, tmp_path):
+        compiled = {"id": "test", "principles": [{"name": "Empty", "cwes": []}]}
+        (tmp_path / "test.json").write_text(json.dumps(compiled))
+        text = render_compiled_standards(tmp_path, "test")
+        assert "Empty" not in text
 
 
 # ---------------------------------------------------------------------------
@@ -122,7 +108,7 @@ class TestRenderDimensions:
 def test_load_template():
     template = load_template()
     assert "{{DISCIPLINE}}" in template
-    assert "{{PRACTICES}}" in template
+    assert "{{STANDARDS_CHECKLIST}}" in template
     assert "{{DIMENSION}}" in template
 
 
@@ -138,7 +124,18 @@ def test_load_template_custom_path(tmp_path):
 # ---------------------------------------------------------------------------
 
 class TestBuildAnalysisPrompt:
-    def test_substitutes_all_variables(self):
+    def test_substitutes_all_variables(self, tmp_path):
+        # Create minimal compiled standards
+        compiled_dir = tmp_path / "compiled"
+        compiled_dir.mkdir()
+        compiled = {
+            "id": "security",
+            "principles": [
+                {"name": "Confidentiality", "cwes": [{"id": 200, "name": "Info Exposure"}]},
+            ],
+        }
+        (compiled_dir / "security.json").write_text(json.dumps(compiled))
+
         template = load_template()
         prompt = build_analysis_prompt(
             template,
@@ -147,30 +144,16 @@ class TestBuildAnalysisPrompt:
             date_str="2026-03-06",
             dimension="security",
             source_file_count=42,
-            practices_data=_sample_practices(),
             dimensions_data=_sample_dimensions(),
+            standards_dir=tmp_path,
         )
         assert "{{" not in prompt  # all placeholders resolved
         assert "my-app" in prompt
         assert "2026-03-06" in prompt
         assert "42" in prompt
-        assert "ts-001" in prompt
+        assert "Confidentiality" in prompt
+        assert "CWE-200" in prompt
         assert "security" in prompt
-
-    def test_filters_practices_to_dimension(self):
-        template = load_template()
-        prompt = build_analysis_prompt(
-            template,
-            plugin_id="typescript",
-            repo_name="test",
-            date_str="2026-03-06",
-            dimension="security",
-            source_file_count=10,
-            practices_data=_sample_practices(),
-            dimensions_data=_sample_dimensions(),
-        )
-        assert "ts-001" in prompt  # security practice
-        assert "ts-002" not in prompt  # maintainability practice filtered out
 
     def test_includes_analysis_guidance(self):
         template = load_template()
@@ -181,7 +164,6 @@ class TestBuildAnalysisPrompt:
             date_str="2026-03-06",
             dimension="security",
             source_file_count=10,
-            practices_data=_sample_practices(),
             dimensions_data=_sample_dimensions(),
             analysis_md="Look for eval() calls in route handlers",
         )
@@ -196,7 +178,6 @@ class TestBuildAnalysisPrompt:
             date_str="2026-03-06",
             dimension="security",
             source_file_count=10,
-            practices_data=_sample_practices(),
             dimensions_data=_sample_dimensions(),
         )
         assert "No additional guidance" in prompt
@@ -210,8 +191,6 @@ class TestBuildAnalysisPrompt:
             date_str="2026-03-06",
             dimension="security",
             source_file_count=10,
-            practices_data=_sample_practices(),
             dimensions_data=_sample_dimensions(),
         )
-        # Hash is 12 hex chars
         assert "PROMPT_HASH" not in prompt

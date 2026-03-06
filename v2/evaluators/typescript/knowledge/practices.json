@@ -6,194 +6,509 @@
     {
       "id": "ts-001",
       "title": "Avoid eval() and Function constructor",
-      "cwe": 95,
+      "cwe": {
+        "id": 95,
+        "name": "Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')"
+      },
       "dimension": "security",
+      "principle": "Authenticity",
       "severity": "high",
       "bad": "const result = eval(userInput);",
       "good": "const result = JSON.parse(userInput);",
       "explanation": "eval() executes arbitrary code and creates XSS and code injection vulnerabilities. Use JSON.parse() for data, or redesign to avoid dynamic evaluation entirely.",
-      "sub_characteristic": "Authenticity",
-      "principle": "Authenticity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-AUT-1",
+          "title": "Dynamic code evaluation (eval) MUST NOT be used with user-controlled input"
+        },
+        {
+          "source": "cisq",
+          "title": "Dynamic code evaluation MUST NOT process user-controlled input"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.2.4",
+          "section": "Validation",
+          "title": "Verify that the application avoids the use of eval() or other dynamic code execution features. Where there is no alternative, any user input being included must be sanitized or sandboxed before being executed."
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.5.4",
+          "section": "Validation",
+          "title": "Verify that when parsing JSON in browsers or JavaScript-based backends, JSON.parse is used to parse the JSON document. Do not use eval() to parse JSON."
+        }
+      ]
     },
     {
       "id": "ts-002",
       "title": "Keep functions under 50 lines",
-      "cwe": 1121,
+      "cwe": {
+        "id": 1121,
+        "name": "Excessive McCabe Cyclomatic Complexity"
+      },
       "dimension": "maintainability",
+      "principle": "Modularity",
       "severity": "medium",
       "bad": "function processOrder(order: Order) {\n  // 80 lines of mixed validation, business logic, and persistence\n}",
       "good": "function processOrder(order: Order) {\n  validateOrder(order);\n  const result = applyBusinessRules(order);\n  await persistOrder(result);\n}",
       "explanation": "Functions over 50 lines are hard to test and understand. Extract logical sub-steps into named functions.",
-      "sub_characteristic": "Modularity",
-      "principle": "Modularity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-MOD-1",
+          "title": "Cyclomatic complexity MUST be \u226410 per function"
+        },
+        {
+          "source": "iso25010",
+          "ref": "M-MOD-4",
+          "title": "Functions MUST have \u22645 parameters; use an options object for more"
+        },
+        {
+          "source": "cisq",
+          "title": "Function cyclomatic complexity MUST be \u226410"
+        }
+      ]
     },
     {
       "id": "ts-003",
       "title": "Never use 'any' \u2014 use unknown or generics",
-      "cwe": 1121,
+      "cwe": {
+        "id": 1121,
+        "name": "Excessive McCabe Cyclomatic Complexity"
+      },
       "dimension": "maintainability",
+      "principle": "Modularity",
       "severity": "medium",
       "bad": "function process(data: any): any { return data.value; }",
       "good": "function process<T extends { value: string }>(data: T): string { return data.value; }",
       "explanation": "'any' disables type checking entirely. Use 'unknown' when the type is genuinely unknown and narrow it, or use generics to preserve type information.",
-      "sub_characteristic": "Modularity",
-      "principle": "Modularity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-MOD-1",
+          "title": "Cyclomatic complexity MUST be \u226410 per function"
+        },
+        {
+          "source": "iso25010",
+          "ref": "M-MOD-4",
+          "title": "Functions MUST have \u22645 parameters; use an options object for more"
+        },
+        {
+          "source": "cisq",
+          "title": "Function cyclomatic complexity MUST be \u226410"
+        }
+      ]
     },
     {
       "id": "ts-004",
       "title": "Always handle Promise rejections",
-      "cwe": 755,
+      "cwe": {
+        "id": 755,
+        "name": "Improper Handling of Exceptional Conditions"
+      },
       "dimension": "reliability",
+      "principle": "Fault Tolerance",
       "severity": "high",
       "bad": "fetchData().then(data => process(data));",
       "good": "fetchData().then(data => process(data)).catch(err => logger.error('fetch failed', err));",
       "explanation": "Unhandled Promise rejections cause silent failures in Node.js. Always attach .catch() or use try/catch with async/await.",
-      "sub_characteristic": "Fault Tolerance",
-      "principle": "Fault Tolerance"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-FT-3",
+          "title": "Async operations MUST handle rejection/error paths explicitly"
+        },
+        {
+          "source": "cisq",
+          "title": "Exceptional conditions MUST be caught and handled appropriately"
+        }
+      ]
     },
     {
       "id": "ts-005",
       "title": "Avoid sequential awaits \u2014 use Promise.all",
-      "cwe": 1088,
+      "cwe": {
+        "id": 1088,
+        "name": "Synchronous Access of Remote Resource without Timeout"
+      },
       "dimension": "performance",
+      "principle": "Time Behaviour",
       "severity": "medium",
       "bad": "const a = await fetchA();\nconst b = await fetchB();",
       "good": "const [a, b] = await Promise.all([fetchA(), fetchB()]);",
       "explanation": "Sequential awaits on independent async operations waste wall-clock time. Use Promise.all() to run them concurrently.",
-      "sub_characteristic": "Time Behaviour",
-      "principle": "Time Behaviour"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-2",
+          "title": "Sequential awaits on independent async calls MUST be parallelised"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-3",
+          "title": "Synchronous blocking I/O MUST NOT be used in async contexts"
+        },
+        {
+          "source": "cisq",
+          "title": "Remote resource access MUST use timeouts and async patterns where available"
+        }
+      ]
     },
     {
       "id": "ts-006",
       "title": "Never store secrets in source code",
-      "cwe": 798,
+      "cwe": {
+        "id": 798,
+        "name": "Use of Hard-coded Credentials"
+      },
       "dimension": "security",
+      "principle": "Confidentiality",
       "severity": "critical",
       "bad": "const apiKey = 'sk-prod-abc123xyz456';",
       "good": "const apiKey = process.env.API_KEY;",
       "explanation": "Hardcoded secrets are committed to version control and exposed in logs, stack traces, and bundle files. Always read from environment variables or a secrets manager.",
-      "sub_characteristic": "Confidentiality",
-      "principle": "Confidentiality"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-CON-1",
+          "title": "Credentials and secrets MUST NOT be hardcoded in source files"
+        },
+        {
+          "source": "cisq",
+          "title": "Credentials MUST be loaded from secure external sources, never hardcoded"
+        }
+      ]
     },
     {
       "id": "ts-007",
       "title": "Use barrel exports deliberately \u2014 avoid re-exporting everything",
-      "cwe": 1047,
+      "cwe": {
+        "id": 1047,
+        "name": "Modules with Circular Dependencies"
+      },
       "dimension": "maintainability",
+      "principle": "Modularity",
       "severity": "low",
       "bad": "// index.ts\nexport * from './moduleA';\nexport * from './moduleB';\nexport * from './moduleC';",
       "good": "// index.ts \u2014 only export the public API\nexport { UserService } from './moduleA';\nexport type { User } from './types';",
       "explanation": "Wildcard barrel exports create hidden coupling between modules and slow down tree-shaking. Export only what other packages genuinely need.",
-      "sub_characteristic": "Modularity",
-      "principle": "Modularity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-MOD-3",
+          "title": "Package dependency cycles MUST be 0"
+        },
+        {
+          "source": "cisq",
+          "title": "Module dependency graphs MUST be acyclic"
+        }
+      ]
     },
     {
       "id": "ts-008",
       "title": "Prefer interfaces over type aliases for object shapes",
-      "cwe": 1061,
+      "cwe": {
+        "id": 1061,
+        "name": "Insufficient Encapsulation"
+      },
       "dimension": "maintainability",
+      "principle": "Modifiability",
       "severity": "low",
       "bad": "type User = { id: string; name: string; };",
       "good": "interface User { id: string; name: string; }",
       "explanation": "Interfaces produce better error messages, support declaration merging, and communicate intent more clearly for object shapes. Use type aliases for unions, intersections, and primitives.",
-      "sub_characteristic": "Reusability",
-      "principle": "Modifiability"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-MDF-3",
+          "title": "Wildcard imports (import *) MUST NOT be used"
+        },
+        {
+          "source": "cisq",
+          "title": "Internal implementation details MUST be hidden behind public interfaces"
+        }
+      ]
     },
     {
       "id": "ts-009",
       "title": "Never use innerHTML \u2014 use textContent or DOM APIs",
-      "cwe": 79,
+      "cwe": {
+        "id": 79,
+        "name": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')"
+      },
       "dimension": "security",
+      "principle": "Integrity",
       "severity": "high",
       "bad": "element.innerHTML = `<span>${userInput}</span>`;",
       "good": "element.textContent = userInput;",
       "explanation": "innerHTML interprets HTML and enables XSS attacks. Use textContent for text or a sanitization library for HTML.",
-      "sub_characteristic": "Integrity",
-      "principle": "Integrity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-INT-3",
+          "title": "HTML output MUST be escaped or rendered through a templating engine with auto-escaping"
+        },
+        {
+          "source": "cisq",
+          "title": "Output rendered in HTML MUST be escaped or use auto-escaping templates"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.3.3",
+          "section": "Validation",
+          "title": "Verify that context-aware, preferably automated - or at worst, manual - output escaping protects against reflected, stored, and DOM based XSS. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        }
+      ]
     },
     {
       "id": "ts-010",
       "title": "Always validate and sanitize external input",
-      "cwe": 20,
+      "cwe": {
+        "id": 20,
+        "name": "Improper Input Validation"
+      },
       "dimension": "security",
+      "principle": "Integrity",
       "severity": "high",
       "bad": "app.post('/api/user', (req, res) => {\n  db.insert(req.body);\n});",
       "good": "app.post('/api/user', (req, res) => {\n  const parsed = userSchema.parse(req.body);\n  db.insert(parsed);\n});",
       "explanation": "Unsanitized input leads to injection, XSS, and data corruption. Use a validation library (zod, joi) at API boundaries.",
-      "sub_characteristic": "Integrity",
-      "principle": "Integrity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-INT-1",
+          "title": "All user input MUST be validated and sanitised before use"
+        },
+        {
+          "source": "cisq",
+          "title": "All external input MUST be validated against expected format and range"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.1.3",
+          "section": "Validation",
+          "title": "Verify that all input (HTML form fields, REST requests, URL parameters, HTTP headers, cookies, batch files, RSS feeds, etc) is validated using positive validation (allow lists). ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.1.4",
+          "section": "Validation",
+          "title": "Verify that structured data is strongly typed and validated against a defined schema including allowed characters, length and pattern (e.g. credit card numbers, e-mail addresses, telephone numbers, or validating that two related fields are reasonable, such as checking that suburb and zip/postcode match). ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        },
+        {
+          "source": "asvs",
+          "ref": "V13.2.2",
+          "section": "API",
+          "title": "Verify that JSON schema validation is in place and verified before accepting input."
+        },
+        {
+          "source": "asvs",
+          "ref": "V13.3.1",
+          "section": "API",
+          "title": "Verify that XSD schema validation takes place to ensure a properly formed XML document, followed by validation of each input field before any processing of that data takes place."
+        }
+      ]
     },
     {
       "id": "ts-011",
       "title": "Use nullish coalescing (??) instead of logical OR for defaults",
-      "cwe": 476,
+      "cwe": {
+        "id": 476,
+        "name": "NULL Pointer Dereference"
+      },
       "dimension": "reliability",
+      "principle": "Fault Tolerance",
       "severity": "medium",
       "bad": "const port = config.port || 3000;",
       "good": "const port = config.port ?? 3000;",
       "explanation": "Logical OR treats 0, '', and false as falsy. Nullish coalescing only falls through on null/undefined, preserving valid falsy values.",
-      "sub_characteristic": "Fault Tolerance",
-      "principle": "Fault Tolerance"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-FT-2",
+          "title": "Null/undefined dereferences MUST be guarded before use"
+        },
+        {
+          "source": "cisq",
+          "title": "Nullable references MUST be checked before dereferencing"
+        }
+      ]
     },
     {
       "id": "ts-012",
       "title": "Always declare return types on exported functions",
-      "cwe": 1059,
+      "cwe": {
+        "id": 1059,
+        "name": "Insufficient Technical Documentation"
+      },
       "dimension": "reliability",
+      "principle": "Maturity",
       "severity": "medium",
       "bad": "export function getUser(id: string) {\n  return db.findUser(id);\n}",
       "good": "export function getUser(id: string): Promise<User | null> {\n  return db.findUser(id);\n}",
       "explanation": "Explicit return types catch accidental changes, improve IntelliSense, and serve as documentation for consumers.",
-      "sub_characteristic": "Maturity",
-      "principle": "Maturity"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-MAT-1",
+          "title": "All public functions MUST have corresponding test files"
+        },
+        {
+          "source": "iso25010",
+          "ref": "R-MAT-2",
+          "title": "Edge cases (empty input, boundary values) MUST be tested explicitly"
+        },
+        {
+          "source": "iso25010",
+          "ref": "R-MAT-3",
+          "title": "Error paths MUST be tested, not only happy paths"
+        },
+        {
+          "source": "iso25010",
+          "ref": "R-MAT-5",
+          "title": "Type annotations MUST be used on public function signatures"
+        },
+        {
+          "source": "cisq",
+          "title": "Error handling behaviour MUST be documented for public APIs"
+        }
+      ]
     },
     {
       "id": "ts-013",
       "title": "Clean up resources in try/finally or AbortController",
-      "cwe": 772,
+      "cwe": {
+        "id": 772,
+        "name": "Missing Release of Resource after Effective Lifetime"
+      },
       "dimension": "reliability",
+      "principle": "Recoverability",
       "severity": "medium",
       "bad": "const conn = await pool.connect();\nconst result = await conn.query(sql);\nconn.release();",
       "good": "const conn = await pool.connect();\ntry {\n  return await conn.query(sql);\n} finally {\n  conn.release();\n}",
       "explanation": "Without finally, exceptions leak resources. Always clean up in finally blocks or use AbortController/Symbol.dispose.",
-      "sub_characteristic": "Recoverability",
-      "principle": "Recoverability"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-REC-1",
+          "title": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns"
+        },
+        {
+          "source": "iso25010",
+          "ref": "R-REC-2",
+          "title": "Database transactions MUST be rolled back on error"
+        },
+        {
+          "source": "iso25010",
+          "ref": "R-REC-4",
+          "title": "Persistent operations MUST be idempotent or use transaction guards"
+        },
+        {
+          "source": "cisq",
+          "title": "Resources MUST be released in finally/defer blocks"
+        }
+      ]
     },
     {
       "id": "ts-014",
       "title": "Use lazy imports for heavy modules",
-      "cwe": 1084,
+      "cwe": {
+        "id": 1084,
+        "name": "Invokable Control Element with Excessive File or Data Access Operations"
+      },
       "dimension": "performance",
+      "principle": "Time Behaviour",
       "severity": "medium",
       "bad": "import { heavyLib } from 'heavy-lib';\n// heavyLib only used in rare code path",
       "good": "async function rarePath() {\n  const { heavyLib } = await import('heavy-lib');\n  heavyLib.process();\n}",
       "explanation": "Top-level imports of large libraries increase cold-start time. Use dynamic import() for code only needed in specific paths.",
-      "sub_characteristic": "Time Behaviour",
-      "principle": "Time Behaviour"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-1",
+          "title": "Database queries inside loops are forbidden (N+1 problem)"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-4",
+          "title": "String concatenation in loops MUST use a builder or join pattern"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-6",
+          "title": "Hot-path code MUST NOT perform redundant computation; cache or memoize results"
+        },
+        {
+          "source": "cisq",
+          "title": "Data access operations MUST be batched; no queries inside loops"
+        }
+      ]
     },
     {
       "id": "ts-015",
       "title": "Avoid synchronous fs operations in server code",
-      "cwe": 1088,
+      "cwe": {
+        "id": 1088,
+        "name": "Synchronous Access of Remote Resource without Timeout"
+      },
       "dimension": "performance",
+      "principle": "Time Behaviour",
       "severity": "high",
       "bad": "const data = fs.readFileSync('config.json', 'utf-8');",
       "good": "const data = await fs.promises.readFile('config.json', 'utf-8');",
       "explanation": "Synchronous fs calls block the event loop and stall all concurrent requests. Use fs.promises or fs callbacks.",
-      "sub_characteristic": "Time Behaviour",
-      "principle": "Time Behaviour"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-2",
+          "title": "Sequential awaits on independent async calls MUST be parallelised"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-3",
+          "title": "Synchronous blocking I/O MUST NOT be used in async contexts"
+        },
+        {
+          "source": "cisq",
+          "title": "Remote resource access MUST use timeouts and async patterns where available"
+        }
+      ]
     },
     {
       "id": "ts-016",
       "title": "Memoize expensive computations in React components",
-      "cwe": 1084,
+      "cwe": {
+        "id": 1084,
+        "name": "Invokable Control Element with Excessive File or Data Access Operations"
+      },
       "dimension": "performance",
+      "principle": "Time Behaviour",
       "severity": "medium",
       "bad": "function Table({ rows }: Props) {\n  const sorted = rows.sort((a, b) => a.name.localeCompare(b.name));\n  return <List items={sorted} />;\n}",
       "good": "function Table({ rows }: Props) {\n  const sorted = useMemo(() =>\n    [...rows].sort((a, b) => a.name.localeCompare(b.name)),\n    [rows]\n  );\n  return <List items={sorted} />;\n}",
       "explanation": "Sorting or filtering on every render wastes CPU. Use useMemo to cache derived data until dependencies change.",
-      "sub_characteristic": "Time Behaviour",
-      "principle": "Time Behaviour"
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-1",
+          "title": "Database queries inside loops are forbidden (N+1 problem)"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-4",
+          "title": "String concatenation in loops MUST use a builder or join pattern"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-6",
+          "title": "Hot-path code MUST NOT perform redundant computation; cache or memoize results"
+        },
+        {
+          "source": "cisq",
+          "title": "Data access operations MUST be batched; no queries inside loops"
+        }
+      ]
     }
   ]
 }

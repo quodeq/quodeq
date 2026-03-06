@@ -17,7 +17,20 @@
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "title": { "type": "string", "minLength": 1 },
-          "cwe": { "type": "integer" },
+          "cwe": {
+            "oneOf": [
+              { "type": "integer" },
+              {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                  "id": { "type": "integer" },
+                  "name": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
           "dimension": { "type": "string", "minLength": 1 },
           "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
           "bad": { "type": "string" },
@@ -27,7 +40,21 @@
           "sub_characteristic": { "type": "string" },
           "source": { "type": "string" },
           "source_stars": { "type": "integer" },
-          "extracted": { "type": "string" }
+          "extracted": { "type": "string" },
+          "standards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["source"],
+              "properties": {
+                "source": { "type": "string" },
+                "ref": { "type": "string" },
+                "section": { "type": "string" },
+                "title": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
         },
         "additionalProperties": false
       }
