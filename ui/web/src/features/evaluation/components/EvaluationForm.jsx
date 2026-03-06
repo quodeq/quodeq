@@ -1,25 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
-import { DIMENSION_OPTIONS } from '../constants.js';
+import { listPlugins } from '../../../api/index.js';
 
 export default function EvaluationForm({ onStart, disabled }) {
   const [repo, setRepo] = useState('');
-  const [selectedDimensions, setSelectedDimensions] = useState([]);
+  const [plugins, setPlugins] = useState([]);
+  const [selectedPlugin, setSelectedPlugin] = useState('');
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
 
-  function toggleDimension(code) {
-    setSelectedDimensions((prev) =>
-      prev.includes(code) ? prev.filter((d) => d !== code) : [...prev, code]
-    );
-  }
+  useEffect(() => {
+    listPlugins()
+      .then((data) => setPlugins(data))
+      .catch(() => setPlugins([]));
+  }, []);
+
+  const activePlugin = plugins.find((p) => p.id === selectedPlugin);
 
   function handleSubmit(e) {
     e.preventDefault();
-    onStart({
-      repo,
-      dimensions: selectedDimensions.join(','),
-      numerical: true,
-    });
+    const payload = { repo };
+    if (selectedPlugin) {
+      payload.plugin = selectedPlugin;
+    }
+    onStart(payload);
     setRepo('');
   }
 
@@ -28,7 +31,7 @@ export default function EvaluationForm({ onStart, disabled }) {
     setFolderBrowserOpen(false);
   }
 
-  const canSubmit = !disabled && !!repo && selectedDimensions.length > 0;
+  const canSubmit = !disabled && !!repo;
 
   return (
     <>
@@ -71,37 +74,37 @@ export default function EvaluationForm({ onStart, disabled }) {
 
         {repo && (
           <div className="form-group">
-            <div className="dimension-label-row">
-              <label>Dimensions</label>
-              <div className="dimension-chip-actions">
-                <button
-                  type="button"
-                  className="dim-action-btn"
-                  onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.map((d) => d.code))}
-                >
-                  Select all
-                </button>
-                <button
-                  type="button"
-                  className="dim-action-btn"
-                  onClick={() => setSelectedDimensions([])}
-                >
-                  Clear
-                </button>
-              </div>
-            </div>
+            <label htmlFor="eval-form-plugin">Plugin</label>
+            <select
+              id="eval-form-plugin"
+              value={selectedPlugin}
+              onChange={(e) => setSelectedPlugin(e.target.value)}
+            >
+              <option value="">Auto-detect</option>
+              {plugins.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} ({p.extensions.join(', ')})
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {repo && activePlugin && activePlugin.dimensions.length > 0 && (
+          <div className="form-group">
+            <label>Dimensions</label>
             <div className="dimension-grid">
-              {DIMENSION_OPTIONS.map((dim) => (
-                <button
-                  key={dim.code}
-                  type="button"
-                  className={`dimension-chip-btn${selectedDimensions.includes(dim.code) ? ' selected' : ''}`}
-                  onClick={() => toggleDimension(dim.code)}
+              {activePlugin.dimensions.map((dim) => (
+                <span
+                  key={dim.id}
+                  className="dimension-chip-btn selected"
+                  title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
                 >
-                  {dim.name}
-                </button>
+                  {dim.id} ({dim.weight}x)
+                </span>
               ))}
             </div>
+            <p className="form-hint">All dimensions are evaluated automatically.</p>
           </div>
         )}
 
