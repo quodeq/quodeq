@@ -121,10 +121,12 @@ def run_evaluate_v2(args: argparse.Namespace) -> int:
             print(f"Source files: {source_file_count}")
 
     # 5. Build config and run
+    standards_dir = Path(__file__).resolve().parents[2] / "v2" / "standards"
     config = RunConfig(
         src=src,
         plugin_id=plugin_id,
         evaluators_dir=evaluators_dir,
+        standards_dir=standards_dir if standards_dir.exists() else None,
         source_file_count=source_file_count,
     )
 
