@@ -3,8 +3,8 @@ import { getProjectInfo, listPlugins } from '../../../api/index.js';
 
 export default function ReEvaluateCard({ project, onStart, disabled }) {
   const [info, setInfo] = useState(null);
-  const [plugins, setPlugins] = useState([]);
-  const [selectedPlugin, setSelectedPlugin] = useState('');
+  const [allDimensions, setAllDimensions] = useState([]);
+  const [selectedDims, setSelectedDims] = useState(new Set());
 
   useEffect(() => {
     if (!project) return;
@@ -16,18 +16,38 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
 
   useEffect(() => {
     listPlugins()
-      .then(setPlugins)
-      .catch(() => setPlugins([]));
+      .then((plugins) => {
+        const seen = new Map();
+        for (const p of plugins) {
+          for (const d of p.dimensions) {
+            if (!seen.has(d.id)) {
+              seen.set(d.id, d);
+            }
+          }
+        }
+        setAllDimensions([...seen.values()]);
+      })
+      .catch(() => setAllDimensions([]));
   }, []);
 
   if (!info) return null;
 
-  const activePlugin = plugins.find((p) => p.id === selectedPlugin);
+  function toggleDim(id) {
+    setSelectedDims((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   function handleStart() {
     const payload = { repo: info.path };
-    if (selectedPlugin) {
-      payload.plugin = selectedPlugin;
+    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
+      payload.dimensions = [...selectedDims];
     }
     onStart(payload);
   }
@@ -44,37 +64,27 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
           <code>{info.path}</code>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="re-eval-plugin">Plugin</label>
-          <select
-            id="re-eval-plugin"
-            value={selectedPlugin}
-            onChange={(e) => setSelectedPlugin(e.target.value)}
-          >
-            <option value="">Auto-detect</option>
-            {plugins.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name} ({p.extensions.join(', ')})
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {activePlugin && activePlugin.dimensions.length > 0 && (
+        {allDimensions.length > 0 && (
           <div className="form-group">
             <label>Dimensions</label>
             <div className="dimension-grid">
-              {activePlugin.dimensions.map((dim) => (
-                <span
+              {allDimensions.map((dim) => (
+                <button
                   key={dim.id}
-                  className="dimension-chip-btn selected"
+                  type="button"
+                  className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}`}
                   title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
+                  onClick={() => toggleDim(dim.id)}
                 >
                   {dim.id} ({dim.weight}x)
-                </span>
+                </button>
               ))}
             </div>
-            <p className="form-hint">All dimensions are evaluated automatically.</p>
+            <p className="form-hint">
+              {selectedDims.size === 0
+                ? 'All dimensions will be evaluated.'
+                : `${selectedDims.size} of ${allDimensions.length} selected.`}
+            </p>
           </div>
         )}
 
