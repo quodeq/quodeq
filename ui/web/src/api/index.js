@@ -66,6 +66,10 @@ export function browseDirectory(dirPath = '') {
   return request(`/browse${q}`);
 }
 
+export function listPlugins() {
+  return request('/plugins');
+}
+
 export function getAiClients() {
   return request('/ai-clients');
 }

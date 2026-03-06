@@ -16,21 +16,22 @@ function parseDimensions(raw) {
 
 function buildArgs(payload, reportsRoot) {
   const result = [];
-  const dims = parseDimensions(payload.dimensions);
 
-  if (dims.length > 0) {
-    result.push('-d', dims.join(','));
-  }
-  if (payload.numerical) {
-    result.push('-n');
+  // V2 format: evaluate <repo> [-p plugin] [-o output] [-m mode]
+  result.push(String(payload.repo).trim());
+
+  if (payload.plugin && String(payload.plugin).trim()) {
+    result.push('-p', String(payload.plugin).trim());
   }
   if (reportsRoot) {
-    result.push('--evaluations', String(reportsRoot));
+    result.push('-o', String(reportsRoot));
   }
-  if (payload.discipline && String(payload.discipline).trim()) {
-    result.push(String(payload.discipline).trim());
+  if (payload.mode && String(payload.mode).trim()) {
+    result.push('-m', String(payload.mode).trim());
   }
-  result.push(String(payload.repo).trim());
+  if (payload.evidenceOnly) {
+    result.push('--evidence-only');
+  }
   return result;
 }
 

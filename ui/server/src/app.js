@@ -7,6 +7,7 @@ import { createJobManager } from './jobs/evaluationJobs.js';
 import { createProjectsRouter } from './routes/projects.js';
 import { createEvaluationsRouter } from './routes/evaluations.js';
 import { createBrowseRouter } from './routes/browse.js';
+import { createPluginsRouter } from './routes/plugins.js';
 import { getRegistry } from './registry.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -96,8 +97,10 @@ export function createApp(options = {}) {
       res.json({ ok: true });
     });
 
+    const evaluatorsRoot = options.evaluatorsRoot ?? path.resolve(repoRoot, 'v2', 'evaluators');
     app.use('/api', createProjectsRouter({ reportsRoot }));
     app.use('/api', createEvaluationsRouter({ jobManager }));
+    app.use('/api', createPluginsRouter({ evaluatorsRoot }));
     app.use('/api', createBrowseRouter());
   }
 
