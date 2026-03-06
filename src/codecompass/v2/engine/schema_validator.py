@@ -27,11 +27,6 @@ def validate_practices(data: dict) -> list[str]:
     return _validate(data, "practices_schema.json")
 
 
-def validate_detectors(data: list) -> list[str]:
-    """Validate detectors.json data."""
-    return _validate(data, "detectors_schema.json")
-
-
 def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
     """Validate all JSON files in a plugin directory.
 
