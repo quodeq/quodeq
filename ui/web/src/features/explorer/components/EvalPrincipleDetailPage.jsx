@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
 import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
+import { stripPrinciplePrefix } from '../../../utils/formatters.js';
 
 const EVAL_SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
 
@@ -240,18 +241,12 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           />
                         </div>
                         <div className="vlive-detail">
-                          {(v.reason || v.findings) && (() => {
-                            const raw = v.reason || v.findings;
-                            const sepIdx = raw.indexOf(' — ');
-                            const title = sepIdx > -1 ? raw.slice(0, sepIdx) : null;
-                            const explanation = sepIdx > -1 ? raw.slice(sepIdx + 3) : raw;
-                            return (
-                              <div className="vlive-detail-section">
-                                {title && <p className="vlive-detail-title">{title}</p>}
-                                <p className="vlive-detail-reason">{explanation}</p>
-                              </div>
-                            );
-                          })()}
+                          {(v.reason || v.findings) && (
+                            <div className="vlive-detail-section">
+                              {v.principle && <p className="vlive-detail-title">{v.principle}</p>}
+                              <p className="vlive-detail-reason">{stripPrinciplePrefix(v.reason || v.findings, v.principle)}</p>
+                            </div>
+                          )}
                           {filename && (
                             <div className="vlive-detail-meta">
                               {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
