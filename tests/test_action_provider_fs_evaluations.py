@@ -104,10 +104,11 @@ def test_start_evaluation_uses_cli_module(tmp_path: Path) -> None:
         "-m",
         "codecompass.cli",
         "evaluate",
-        "--evaluations",
+        str(repo_path.resolve()),
     ]
-    assert captured["cmd"][5] == str(reports_dir)
-    assert captured["cmd"][-1] == str(repo_path)
+    assert "-o" in captured["cmd"]
+    idx = captured["cmd"].index("-o")
+    assert captured["cmd"][idx + 1] == str(reports_dir.resolve())
 
 
 def test_start_evaluation_always_passes_absolute_reports_path(tmp_path: Path) -> None:
@@ -131,10 +132,9 @@ def test_start_evaluation_always_passes_absolute_reports_path(tmp_path: Path) ->
         reports_dir="reports",
     )
 
-    assert "--evaluations" in captured["cmd"]
-    idx = captured["cmd"].index("--evaluations")
+    assert "-o" in captured["cmd"]
+    idx = captured["cmd"].index("-o")
     assert Path(captured["cmd"][idx + 1]).is_absolute()
-    assert captured["cmd"][-1] == str(repo_path)
 
 
 def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:

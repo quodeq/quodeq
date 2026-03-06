@@ -1,0 +1,66 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import jsonschema
+
+_SCHEMAS_DIR = Path(__file__).parent / "schemas"
+
+
+def _load_schema(name: str) -> dict:
+    return json.loads((_SCHEMAS_DIR / name).read_text())
+
+
+def validate_plugin(data: dict) -> list[str]:
+    """Validate plugin.json data. Returns list of error messages (empty = valid)."""
+    return _validate(data, "plugin_schema.json")
+
+
+def validate_dimensions(data: dict) -> list[str]:
+    """Validate dimensions.json data."""
+    return _validate(data, "dimensions_schema.json")
+
+
+def validate_practices(data: dict) -> list[str]:
+    """Validate practices.json data."""
+    return _validate(data, "practices_schema.json")
+
+
+def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
+    """Validate all JSON files in a plugin directory.
+
+    Returns a dict mapping filename to list of errors.
+    Only files with errors appear in the result.
+    """
+    errors: dict[str, list[str]] = {}
+
+    validators = {
+        "plugin.json": validate_plugin,
+        "dimensions.json": validate_dimensions,
+    }
+
+    for filename, validator_fn in validators.items():
+        filepath = plugin_dir / filename
+        if not filepath.exists():
+            errors[filename] = [f"{filename} not found"]
+            continue
+        data = json.loads(filepath.read_text())
+        file_errors = validator_fn(data)
+        if file_errors:
+            errors[filename] = file_errors
+
+    practices_file = plugin_dir / "knowledge" / "practices.json"
+    if practices_file.exists():
+        data = json.loads(practices_file.read_text())
+        file_errors = validate_practices(data)
+        if file_errors:
+            errors["knowledge/practices.json"] = file_errors
+
+    return errors
+
+
+def _validate(data, schema_file: str) -> list[str]:
+    schema = _load_schema(schema_file)
+    validator = jsonschema.Draft202012Validator(schema)
+    return [e.message for e in validator.iter_errors(data)]

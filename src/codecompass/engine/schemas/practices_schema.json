@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plugin practices knowledge",
+  "type": "object",
+  "required": ["runtime", "version", "practices"],
+  "properties": {
+    "runtime": { "type": "string", "minLength": 1 },
+    "version": { "type": "string" },
+    "source": { "type": "string" },
+    "source_stars": { "type": "integer" },
+    "extracted": { "type": "string" },
+    "practices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "title", "cwe", "dimension", "severity", "bad", "good", "explanation"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "title": { "type": "string", "minLength": 1 },
+          "cwe": {
+            "oneOf": [
+              { "type": "integer" },
+              {
+                "type": "object",
+                "required": ["id", "name"],
+                "properties": {
+                  "id": { "type": "integer" },
+                  "name": { "type": "string" }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "dimension": { "type": "string", "minLength": 1 },
+          "severity": { "type": "string", "enum": ["low", "medium", "high", "critical"] },
+          "bad": { "type": "string" },
+          "good": { "type": "string" },
+          "explanation": { "type": "string" },
+          "principle": { "type": ["string", "null"] },
+          "sub_characteristic": { "type": "string" },
+          "source": { "type": "string" },
+          "source_stars": { "type": "integer" },
+          "extracted": { "type": "string" },
+          "standards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["source"],
+              "properties": {
+                "source": { "type": "string" },
+                "ref": { "type": "string" },
+                "section": { "type": "string" },
+                "title": { "type": "string" }
+              },
+              "additionalProperties": false
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

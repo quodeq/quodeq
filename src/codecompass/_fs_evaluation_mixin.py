@@ -12,27 +12,26 @@ from typing import Any
 def _build_evaluate_cmd(
     repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str,
 ) -> list[str]:
-    """Build the CLI command list for an evaluation subprocess."""
+    """Build the CLI command list for a V2 evaluation subprocess."""
     reports_abs = str(Path(reports_dir).resolve())
-    cmd = [sys.executable, "-m", "codecompass.cli", "evaluate"]
-    cmd += ["--evaluations", reports_abs]
-    if dimensions:
-        cmd += ["-d", dimensions]
-    if numerical:
-        cmd.append("-n")
-    if discipline:
-        cmd.append(discipline)
     repo_path = Path(repo)
-    if is_repo_url(repo):
-        cmd.append(repo)
-    else:
-        cmd.append(str(repo_path.resolve()))
+    repo_arg = repo if is_repo_url(repo) else str(repo_path.resolve())
+
+    cmd = [sys.executable, "-m", "codecompass.cli", "evaluate", repo_arg]
+    cmd += ["-o", reports_abs]
+    if dimensions:
+        if isinstance(dimensions, list):
+            cmd += ["-d", ",".join(dimensions)]
+        else:
+            cmd += ["-d", str(dimensions)]
+    if numerical:
+        cmd += ["-m", "numerical"]
     return cmd
 
 
 def _register_project(repo: str, discipline: str | None, reports_dir: str) -> None:
     """Resolve and register the project UUID before evaluation starts."""
-    from codecompass.evaluate.project_resolver import resolve_project_uuid
+    from codecompass.util.project_resolver import resolve_project_uuid
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = repo.split("/")[-1].replace(".git", "") if is_repo_url(repo) else Path(repo).name
     location = "online" if is_repo_url(repo) else "local"

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import json
 import os
 import re
 import threading
@@ -12,7 +13,6 @@ import subprocess
 
 MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
-_DIMENSION_DIVIDER_RE = re.compile(r"\[\d+/\d+\]\s+(\S+)")
 
 
 @dataclass
@@ -28,6 +28,7 @@ class Job:
     output_run_id: str | None
     phase: str | None = None
     current_dimension: str | None = None
+    dimensions: list[str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -42,6 +43,7 @@ class Job:
             "outputRunId": self.output_run_id,
             "phase": self.phase,
             "currentDimension": self.current_dimension,
+            "dimensions": self.dimensions,
         }
 
 
@@ -111,6 +113,23 @@ class JobManager:
     def _append_log(self, job: Job, line: str) -> None:
         if not line:
             return
+        # Parse structured markers — update state but don't show in console
+        if line.startswith('{"_cc"'):
+            try:
+                marker = json.loads(line)
+                phase = marker.get("_cc")
+                if phase == "setup":
+                    job.phase = "setup"
+                    job.dimensions = marker.get("dimensions")
+                elif phase == "analyzing":
+                    job.current_dimension = marker.get("dimension")
+                    job.phase = "analyzing"
+                elif phase == "scoring":
+                    job.current_dimension = marker.get("dimension")
+                    job.phase = "scoring"
+            except json.JSONDecodeError:
+                pass
+            return
         job.logs.append(line)
         if len(job.logs) > MAX_LOG_LINES:
             job.logs[:] = job.logs[-MAX_LOG_LINES:]
@@ -118,17 +137,6 @@ class JobManager:
         if match:
             job.output_project = match.group(1)
             job.output_run_id = match.group(2)
-        # Track evaluation phase from log markers
-        dim_match = _DIMENSION_DIVIDER_RE.search(line)
-        if dim_match:
-            job.current_dimension = dim_match.group(1)
-            job.phase = "evidence"
-        elif "Gathering evidence" in line:
-            job.phase = "evidence"
-        elif "Scoring" in line and job.phase == "evidence":
-            job.phase = "scoring"
-        elif "Scanning repository" in line:
-            job.phase = "scanning"
 
     def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
         if stream is None:
