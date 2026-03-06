@@ -1,0 +1,3457 @@
+{
+  "id": "security",
+  "name": "Security",
+  "sources": [
+    "iso25010",
+    "cisq",
+    "asvs"
+  ],
+  "principles": [
+    {
+      "name": "Confidentiality",
+      "cwes": [
+        {
+          "id": 16,
+          "name": "Configuration",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-7",
+              "title": "Security-sensitive configuration defaults MUST be secure out of the box"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.5.4",
+              "section": "Authentication",
+              "title": "Verify shared or default accounts are not present (e.g. \"root\", \"admin\", or \"sa\")."
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.4.4",
+              "section": "Session",
+              "title": "Verify that cookie-based session tokens use the \"__Host-\" prefix so cookies are only sent to the host that initially set the cookie."
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.4.5",
+              "section": "Session",
+              "title": "Verify that if the application is published under a domain name with other applications that set or use session cookies that might disclose the session cookies, set the path attribute in cookie-based session tokens using the most precise path possible. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V10.3.1",
+              "section": "Malicious",
+              "title": "Verify that if the application has a client or server auto-update feature, updates should be obtained over secure channels and digitally signed. The update code must validate the digital signature of the update before installing or executing the update."
+            }
+          ]
+        },
+        {
+          "id": 200,
+          "name": "Exposure of Sensitive Information to an Unauthorized Actor",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-8",
+              "title": "Sensitive information MUST NOT be exposed in error messages, stack traces, or system information disclosures"
+            },
+            {
+              "source": "asvs",
+              "ref": "V8.3.4",
+              "section": "Data",
+              "title": "Verify that all sensitive data created and processed by the application has been identified, and ensure that a policy is in place on how to deal with sensitive data. ([C8](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.3.3",
+              "section": "Config",
+              "title": "Verify that the HTTP headers or any part of the HTTP response do not expose detailed version information of system components."
+            }
+          ]
+        },
+        {
+          "id": 201,
+          "name": "Insertion of Sensitive Information Into Sent Data",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 209,
+          "name": "Generation of Error Message Containing Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 210,
+          "name": "Self-generated Error Message Containing Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-8",
+              "title": "Sensitive information MUST NOT be exposed in error messages, stack traces, or system information disclosures"
+            },
+            {
+              "source": "asvs",
+              "ref": "V7.4.1",
+              "section": "Error",
+              "title": "Verify that a generic message is shown when an unexpected or security sensitive error occurs, potentially with a unique ID which support personnel can use to investigate. ([C10](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 212,
+          "name": "Improper Removal of Sensitive Information Before Storage or Transfer",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-9",
+              "title": "Sensitive data MUST be removed or masked before storage or transfer to less-trusted environments"
+            },
+            {
+              "source": "asvs",
+              "ref": "V8.3.2",
+              "section": "Data",
+              "title": "Verify that users have a method to remove or export their data on demand."
+            }
+          ]
+        },
+        {
+          "id": 215,
+          "name": "Insertion of Sensitive Information Into Debugging Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-4",
+              "title": "Debug endpoints and verbose error details MUST be disabled in production builds"
+            }
+          ]
+        },
+        {
+          "id": 219,
+          "name": "Storage of File with Sensitive Data Under Web Root",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 256,
+          "name": "Plaintext Storage of a Password",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-16",
+              "title": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables"
+            }
+          ]
+        },
+        {
+          "id": 258,
+          "name": "Empty Password in Configuration File",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-16",
+              "title": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables"
+            }
+          ]
+        },
+        {
+          "id": 259,
+          "name": "Use of Hard-coded Password",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-6",
+              "title": "Passwords MUST NOT appear as literals in source code"
+            },
+            {
+              "source": "cisq",
+              "title": "Passwords MUST NOT appear as literals in source code"
+            }
+          ]
+        },
+        {
+          "id": 260,
+          "name": "Password in Configuration File",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-16",
+              "title": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables"
+            }
+          ]
+        },
+        {
+          "id": 261,
+          "name": "Weak Encoding for Password",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 276,
+          "name": "Incorrect Default Permissions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-18",
+              "title": "File and resource permissions MUST follow the principle of least privilege"
+            }
+          ]
+        },
+        {
+          "id": 281,
+          "name": "Improper Preservation of Permissions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-18",
+              "title": "File and resource permissions MUST follow the principle of least privilege"
+            }
+          ]
+        },
+        {
+          "id": 282,
+          "name": "Improper Ownership Management",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-18",
+              "title": "File and resource permissions MUST follow the principle of least privilege"
+            }
+          ]
+        },
+        {
+          "id": 283,
+          "name": "Unverified Ownership",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-18",
+              "title": "File and resource permissions MUST follow the principle of least privilege"
+            }
+          ]
+        },
+        {
+          "id": 296,
+          "name": "Improper Following of a Certificate's Chain of Trust",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 310,
+          "name": "Cryptographic Issues",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-11",
+              "title": "Cryptographic algorithms MUST use adequate key lengths, strong ciphers, and cryptographically secure random number generators"
+            },
+            {
+              "source": "asvs",
+              "ref": "V6.2.1",
+              "section": "Cryptography",
+              "title": "Verify that all cryptographic modules fail securely, and errors are handled in a way that does not enable Padding Oracle attacks."
+            }
+          ]
+        },
+        {
+          "id": 311,
+          "name": "Missing Encryption of Sensitive Data",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-3",
+              "title": "Sensitive data MUST be stored using platform-specific secure storage (Keychain, Vault)"
+            },
+            {
+              "source": "cisq",
+              "title": "Sensitive data at rest MUST be encrypted using platform-appropriate mechanisms"
+            }
+          ]
+        },
+        {
+          "id": 312,
+          "name": "Cleartext Storage of Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-16",
+              "title": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables"
+            }
+          ]
+        },
+        {
+          "id": 313,
+          "name": "Cleartext Storage in a File or on Disk",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-16",
+              "title": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables"
+            }
+          ]
+        },
+        {
+          "id": 315,
+          "name": "Cleartext Storage of Sensitive Information in a Cookie",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-16",
+              "title": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables"
+            }
+          ]
+        },
+        {
+          "id": 316,
+          "name": "Cleartext Storage of Sensitive Information in Memory",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-16",
+              "title": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables"
+            }
+          ]
+        },
+        {
+          "id": 319,
+          "name": "Cleartext Transmission of Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-10",
+              "title": "Sensitive data MUST be transmitted only over encrypted channels; cleartext transmission of credentials is forbidden"
+            },
+            {
+              "source": "asvs",
+              "ref": "V8.3.1",
+              "section": "Data",
+              "title": "Verify that sensitive data is sent to the server in the HTTP message body or headers, and that query string parameters from any HTTP verb do not contain sensitive data."
+            },
+            {
+              "source": "asvs",
+              "ref": "V9.1.1",
+              "section": "Communications",
+              "title": "Verify that TLS is used for all client connectivity, and does not fall back to insecure or unencrypted communications. ([C8](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 320,
+          "name": "Key Management Errors",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 321,
+          "name": "Use of Hard-coded Cryptographic Key",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 322,
+          "name": "Key Exchange without Entity Authentication",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 323,
+          "name": "Reusing a Nonce, Key Pair in Encryption",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 324,
+          "name": "Use of a Key Past its Expiration Date",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 325,
+          "name": "Missing Cryptographic Step",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 326,
+          "name": "Inadequate Encryption Strength",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-11",
+              "title": "Cryptographic algorithms MUST use adequate key lengths, strong ciphers, and cryptographically secure random number generators"
+            },
+            {
+              "source": "asvs",
+              "ref": "V9.1.2",
+              "section": "Communications",
+              "title": "Verify using up to date TLS testing tools that only strong cipher suites are enabled, with the strongest cipher suites set as preferred."
+            },
+            {
+              "source": "asvs",
+              "ref": "V9.1.3",
+              "section": "Communications",
+              "title": "Verify that only the latest recommended versions of the TLS protocol are enabled, such as TLS 1.2 and TLS 1.3. The latest version of the TLS protocol should be the preferred option."
+            }
+          ]
+        },
+        {
+          "id": 328,
+          "name": "Use of Weak Hash",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 329,
+          "name": "Generation of Predictable IV with CBC Mode",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 330,
+          "name": "Use of Insufficiently Random Values",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-11",
+              "title": "Cryptographic algorithms MUST use adequate key lengths, strong ciphers, and cryptographically secure random number generators"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.3.1",
+              "section": "Authentication",
+              "title": "Verify system generated initial passwords or activation codes SHOULD be securely randomly generated, SHOULD be at least 6 characters long, and MAY contain letters and numbers, and expire after a short period of time. These initial secrets must not be permitted to become the long term password."
+            }
+          ]
+        },
+        {
+          "id": 331,
+          "name": "Insufficient Entropy",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-11",
+              "title": "Cryptographic algorithms MUST use adequate key lengths, strong ciphers, and cryptographically secure random number generators"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.2.2",
+              "section": "Session",
+              "title": "Verify that session tokens possess at least 64 bits of entropy. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 332,
+          "name": "Insufficient Entropy in PRNG",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 334,
+          "name": "Small Space of Random Values",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 335,
+          "name": "Incorrect Usage of Seeds in Pseudo-Random Number Generator (PRNG)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 336,
+          "name": "Same Seed in Pseudo-Random Number Generator (PRNG)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 337,
+          "name": "Predictable Seed in Pseudo-Random Number Generator (PRNG)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 338,
+          "name": "Use of Cryptographically Weak Pseudo-Random Number Generator (PRNG)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 340,
+          "name": "Generation of Predictable Numbers or Identifiers",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 342,
+          "name": "Predictable Exact Value from Previous Values",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 347,
+          "name": "Improper Verification of Cryptographic Signature",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 359,
+          "name": "Exposure of Private Personal Information to an Unauthorized Actor",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 402,
+          "name": "Transmission of Private Resources into a New Sphere ('Resource Leak')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 497,
+          "name": "Exposure of Sensitive System Information to an Unauthorized Control Sphere",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-8",
+              "title": "Sensitive information MUST NOT be exposed in error messages, stack traces, or system information disclosures"
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.3.2",
+              "section": "Config",
+              "title": "Verify that web or application server and application framework debug modes are disabled in production to eliminate debug features, developer consoles, and unintended security disclosures."
+            }
+          ]
+        },
+        {
+          "id": 522,
+          "name": "Insufficiently Protected Credentials",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-19",
+              "title": "Credentials MUST be protected during transport and storage"
+            }
+          ]
+        },
+        {
+          "id": 523,
+          "name": "Unprotected Transport of Credentials",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-10",
+              "title": "Sensitive data MUST be transmitted only over encrypted channels; cleartext transmission of credentials is forbidden"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.7.4",
+              "section": "Authentication",
+              "title": "Verify that the out of band authenticator and verifier communicates over a secure independent channel."
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.4.5",
+              "section": "Config",
+              "title": "Verify that a Strict-Transport-Security header is included on all responses and for all subdomains, such as Strict-Transport-Security: max-age=15724800; includeSubdomains."
+            }
+          ]
+        },
+        {
+          "id": 525,
+          "name": "Use of Web Browser Cache Containing Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-9",
+              "title": "Sensitive data MUST be removed or masked before storage or transfer to less-trusted environments"
+            },
+            {
+              "source": "asvs",
+              "ref": "V8.2.1",
+              "section": "Data",
+              "title": "Verify the application sets sufficient anti-caching headers so that sensitive data is not cached in modern browsers."
+            }
+          ]
+        },
+        {
+          "id": 526,
+          "name": "Cleartext Storage of Sensitive Information in an Environment Variable",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-16",
+              "title": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables"
+            }
+          ]
+        },
+        {
+          "id": 532,
+          "name": "Insertion of Sensitive Information into Log File",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-2",
+              "title": "Sensitive data MUST NOT be logged (passwords, tokens, PII)"
+            },
+            {
+              "source": "cisq",
+              "title": "Logs MUST NOT contain passwords, tokens, or PII"
+            },
+            {
+              "source": "asvs",
+              "ref": "V7.1.1",
+              "section": "Error",
+              "title": "Verify that the application does not log credentials or payment details. Session tokens should only be stored in logs in an irreversible, hashed form. ([C9, C10](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V7.1.2",
+              "section": "Error",
+              "title": "Verify that the application does not log other sensitive data as defined under local privacy laws or relevant security policy. ([C9](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 538,
+          "name": "Insertion of Sensitive Information into Externally-Accessible File or Directory",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 539,
+          "name": "Use of Persistent Cookies Containing Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-12",
+              "title": "Cookies containing sensitive data MUST set Secure, HttpOnly, and SameSite attributes and MUST NOT use persistent storage for sensitive values"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.2.3",
+              "section": "Session",
+              "title": "Verify the application only stores session tokens in the browser using secure methods such as appropriately secured cookies (see section 3.4) or HTML 5 session storage."
+            }
+          ]
+        },
+        {
+          "id": 540,
+          "name": "Inclusion of Sensitive Information in Source Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 548,
+          "name": "Exposure of Information Through Directory Listing",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-13",
+              "title": "Directory listings MUST be disabled and files MUST NOT be accessible to unauthorized external parties"
+            },
+            {
+              "source": "asvs",
+              "ref": "V4.3.2",
+              "section": "Access",
+              "title": "Verify that directory browsing is disabled unless deliberately desired. Additionally, applications should not allow discovery or disclosure of file or directory metadata, such as Thumbs.db, .DS_Store, .git or .svn folders."
+            }
+          ]
+        },
+        {
+          "id": 550,
+          "name": "Server-generated Error Message Containing Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 552,
+          "name": "Files or Directories Accessible to External Parties",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-13",
+              "title": "Directory listings MUST be disabled and files MUST NOT be accessible to unauthorized external parties"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.4.1",
+              "section": "Files",
+              "title": "Verify that files obtained from untrusted sources are stored outside the web root, with limited permissions."
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.5.1",
+              "section": "Files",
+              "title": "Verify that the web tier is configured to serve only files with specific file extensions to prevent unintentional information and source code leakage. For example, backup files (e.g. .bak), temporary working files (e.g. .swp), compressed files (.zip, .tar.gz, etc) and other extensions commonly used by editors should be blocked unless required."
+            }
+          ]
+        },
+        {
+          "id": 598,
+          "name": "Use of GET Request Method With Sensitive Query Strings",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-14",
+              "title": "Sensitive data MUST NOT be passed in URL query strings via GET requests"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.1.1",
+              "section": "Session",
+              "title": "Verify the application never reveals session tokens in URL parameters."
+            },
+            {
+              "source": "asvs",
+              "ref": "V13.1.3",
+              "section": "API",
+              "title": "Verify API URLs do not expose sensitive information, such as the API key, session tokens etc."
+            }
+          ]
+        },
+        {
+          "id": 614,
+          "name": "Sensitive Cookie in HTTPS Session Without 'Secure' Attribute",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-12",
+              "title": "Cookies containing sensitive data MUST set Secure, HttpOnly, and SameSite attributes and MUST NOT use persistent storage for sensitive values"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.4.1",
+              "section": "Session",
+              "title": "Verify that cookie-based session tokens have the 'Secure' attribute set. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 615,
+          "name": "Inclusion of Sensitive Information in Source Code Comments",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-17",
+              "title": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output"
+            }
+          ]
+        },
+        {
+          "id": 668,
+          "name": "Exposure of Resource to Wrong Sphere",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-20",
+              "title": "Resources MUST NOT be exposed to wrong spheres"
+            }
+          ]
+        },
+        {
+          "id": 732,
+          "name": "Incorrect Permission Assignment for Critical Resource",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-5",
+              "title": "File permissions MUST follow least-privilege; world-readable config files are forbidden"
+            },
+            {
+              "source": "cisq",
+              "title": "Files and resources MUST use least-privilege permissions"
+            }
+          ]
+        },
+        {
+          "id": 757,
+          "name": "Selection of Less-Secure Algorithm During Negotiation ('Algorithm Downgrade')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 759,
+          "name": "Use of a One-Way Hash without a Salt",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 760,
+          "name": "Use of a One-Way Hash with a Predictable Salt",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 780,
+          "name": "Use of RSA Algorithm without OAEP",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 798,
+          "name": "Use of Hard-coded Credentials",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-1",
+              "title": "Credentials and secrets MUST NOT be hardcoded in source files"
+            },
+            {
+              "source": "cisq",
+              "title": "Credentials MUST be loaded from secure external sources, never hardcoded"
+            }
+          ]
+        },
+        {
+          "id": 916,
+          "name": "Use of Password Hash With Insufficient Computational Effort",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 922,
+          "name": "Insecure Storage of Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-9",
+              "title": "Sensitive data MUST be removed or masked before storage or transfer to less-trusted environments"
+            },
+            {
+              "source": "asvs",
+              "ref": "V8.2.2",
+              "section": "Data",
+              "title": "Verify that data stored in browser storage (such as localStorage, sessionStorage, IndexedDB, or cookies) does not contain sensitive data."
+            },
+            {
+              "source": "asvs",
+              "ref": "V8.2.3",
+              "section": "Data",
+              "title": "Verify that authenticated data is cleared from client storage, such as the browser DOM, after the client or session is terminated."
+            }
+          ]
+        },
+        {
+          "id": 1004,
+          "name": "Sensitive Cookie Without 'HttpOnly' Flag",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-12",
+              "title": "Cookies containing sensitive data MUST set Secure, HttpOnly, and SameSite attributes and MUST NOT use persistent storage for sensitive values"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.4.2",
+              "section": "Session",
+              "title": "Verify that cookie-based session tokens have the 'HttpOnly' attribute set. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 1240,
+          "name": "Use of a Cryptographic Primitive with a Risky Implementation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 1241,
+          "name": "Use of Predictable Algorithm in Random Number Generator",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-15",
+              "title": "Cryptographic algorithms and key management MUST use strong, current implementations"
+            }
+          ]
+        },
+        {
+          "id": 1275,
+          "name": "Sensitive Cookie with Improper SameSite Attribute",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-CON-12",
+              "title": "Cookies containing sensitive data MUST set Secure, HttpOnly, and SameSite attributes and MUST NOT use persistent storage for sensitive values"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.4.3",
+              "section": "Session",
+              "title": "Verify that cookie-based session tokens utilize the 'SameSite' attribute to limit exposure to cross-site request forgery attacks. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Integrity",
+      "cwes": [
+        {
+          "id": 20,
+          "name": "Improper Input Validation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-1",
+              "title": "All user input MUST be validated and sanitised before use"
+            },
+            {
+              "source": "cisq",
+              "title": "All external input MUST be validated against expected format and range"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.1.3",
+              "section": "Validation",
+              "title": "Verify that all input (HTML form fields, REST requests, URL parameters, HTTP headers, cookies, batch files, RSS feeds, etc) is validated using positive validation (allow lists). ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.1.4",
+              "section": "Validation",
+              "title": "Verify that structured data is strongly typed and validated against a defined schema including allowed characters, length and pattern (e.g. credit card numbers, e-mail addresses, telephone numbers, or validating that two related fields are reasonable, such as checking that suburb and zip/postcode match). ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V13.2.2",
+              "section": "API",
+              "title": "Verify that JSON schema validation is in place and verified before accepting input."
+            },
+            {
+              "source": "asvs",
+              "ref": "V13.3.1",
+              "section": "API",
+              "title": "Verify that XSD schema validation takes place to ensure a properly formed XML document, followed by validation of each input field before any processing of that data takes place."
+            }
+          ]
+        },
+        {
+          "id": 73,
+          "name": "External Control of File Name or Path",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-10",
+              "title": "File names and paths MUST NOT be controlled by external input; file uploads MUST restrict dangerous types and remote file inclusion MUST be prevented"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.3.2",
+              "section": "Files",
+              "title": "Verify that user-submitted filename metadata is validated or ignored to prevent the disclosure, creation, updating or removal of local files (LFI)."
+            }
+          ]
+        },
+        {
+          "id": 74,
+          "name": "Improper Neutralization of Special Elements in Output Used by a Downstream Component ('Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 76,
+          "name": "Improper Neutralization of Equivalent Special Elements",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 77,
+          "name": "Improper Neutralization of Special Elements used in a Command ('Command Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 79,
+          "name": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-3",
+              "title": "HTML output MUST be escaped or rendered through a templating engine with auto-escaping"
+            },
+            {
+              "source": "cisq",
+              "title": "Output rendered in HTML MUST be escaped or use auto-escaping templates"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.3",
+              "section": "Validation",
+              "title": "Verify that context-aware, preferably automated - or at worst, manual - output escaping protects against reflected, stored, and DOM based XSS. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 80,
+          "name": "Improper Neutralization of Script-Related HTML Tags in a Web Page (Basic XSS)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 83,
+          "name": "Improper Neutralization of Script in Attributes in a Web Page",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 86,
+          "name": "Improper Neutralization of Invalid Characters in Identifiers in Web Pages",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 88,
+          "name": "Improper Neutralization of Argument Delimiters in a Command ('Argument Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 89,
+          "name": "Improper Neutralization of Special Elements used in an SQL Command ('SQL Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-2",
+              "title": "SQL queries MUST use parameterised statements; string concatenation is forbidden"
+            },
+            {
+              "source": "cisq",
+              "title": "SQL queries MUST use parameterised statements"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.4",
+              "section": "Validation",
+              "title": "Verify that data selection or database queries (e.g. SQL, HQL, ORM, NoSQL) use parameterized queries, ORMs, entity frameworks, or are otherwise protected from database injection attacks. ([C3](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.5",
+              "section": "Validation",
+              "title": "Verify that where parameterized or safer mechanisms are not present, context-specific output encoding is used to protect against injection attacks, such as the use of SQL escaping to protect against SQL injection. ([C3, C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 90,
+          "name": "Improper Neutralization of Special Elements used in an LDAP Query ('LDAP Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-7",
+              "title": "Application MUST NOT be susceptible to LDAP, code, or XPath injection; all dynamic queries MUST use parameterised or sanitised inputs"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.7",
+              "section": "Validation",
+              "title": "Verify that the application protects against LDAP injection vulnerabilities, or that specific security controls to prevent LDAP injection have been implemented. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 91,
+          "name": "XML Injection (aka Blind XPath Injection)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 93,
+          "name": "Improper Neutralization of CRLF Sequences ('CRLF Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 94,
+          "name": "Improper Control of Generation of Code ('Code Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-7",
+              "title": "Application MUST NOT be susceptible to LDAP, code, or XPath injection; all dynamic queries MUST use parameterised or sanitised inputs"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.2.5",
+              "section": "Validation",
+              "title": "Verify that the application protects against template injection attacks by ensuring that any user input being included is sanitized or sandboxed."
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.2.8",
+              "section": "Validation",
+              "title": "Verify that the application sanitizes, disables, or sandboxes user-supplied scriptable or expression template language content, such as Markdown, CSS or XSL stylesheets, BBCode, or similar."
+            }
+          ]
+        },
+        {
+          "id": 96,
+          "name": "Improper Neutralization of Directives in Statically Saved Code ('Static Code Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 97,
+          "name": "Improper Neutralization of Server-Side Includes (SSI) Within a Web Page",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 98,
+          "name": "Improper Control of Filename for Include/Require Statement in PHP Program ('PHP Remote File Inclusion')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-10",
+              "title": "File names and paths MUST NOT be controlled by external input; file uploads MUST restrict dangerous types and remote file inclusion MUST be prevented"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.3.3",
+              "section": "Files",
+              "title": "Verify that user-submitted filename metadata is validated or ignored to prevent the disclosure or execution of remote files via Remote File Inclusion (RFI) or Server-side Request Forgery (SSRF) attacks."
+            }
+          ]
+        },
+        {
+          "id": 99,
+          "name": "Improper Control of Resource Identifiers ('Resource Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 112,
+          "name": "Missing XML Validation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 113,
+          "name": "Improper Neutralization of CRLF Sequences in HTTP Headers ('HTTP Request/Response Splitting')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 114,
+          "name": "Process Control",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 115,
+          "name": "Misinterpretation of Input",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 116,
+          "name": "Improper Encoding or Escaping of Output",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-9",
+              "title": "Output MUST be properly encoded or escaped, and alternate or Unicode encodings MUST be handled safely"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.2.1",
+              "section": "Validation",
+              "title": "Verify that all untrusted HTML input from WYSIWYG editors or similar is properly sanitized with an HTML sanitizer library or framework feature. ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.1",
+              "section": "Validation",
+              "title": "Verify that output encoding is relevant for the interpreter and context required. For example, use encoders specifically for HTML values, HTML attributes, JavaScript, URL parameters, HTTP headers, SMTP, and others as the context requires, especially from untrusted inputs (e.g. names with Unicode or apostrophes, such as \u306d\u3053 or O'Hara). ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V13.1.1",
+              "section": "API",
+              "title": "Verify that all application components use the same encodings and parsers to avoid parsing attacks that exploit different URI or file parsing behavior that could be used in SSRF and RFI attacks."
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.4.2",
+              "section": "Config",
+              "title": "Verify that all API responses contain a Content-Disposition: attachment; filename=\"api.json\" header (or other appropriate filename for the content type)."
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.4.4",
+              "section": "Config",
+              "title": "Verify that all responses contain a X-Content-Type-Options: nosniff header."
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.4.6",
+              "section": "Config",
+              "title": "Verify that a suitable Referrer-Policy header is included to avoid exposing sensitive information in the URL through the Referer header to untrusted parties."
+            }
+          ]
+        },
+        {
+          "id": 129,
+          "name": "Improper Validation of Array Index",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 134,
+          "name": "Use of Externally-Controlled Format String",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 138,
+          "name": "Improper Neutralization of Special Elements",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-8",
+              "title": "Special elements, input terminators, and invalid special element usage MUST be neutralised before processing"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.2.2",
+              "section": "Validation",
+              "title": "Verify that unstructured data is sanitized to enforce safety measures such as allowed characters and length."
+            }
+          ]
+        },
+        {
+          "id": 147,
+          "name": "Improper Neutralization of Input Terminators",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-8",
+              "title": "Special elements, input terminators, and invalid special element usage MUST be neutralised before processing"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.2.3",
+              "section": "Validation",
+              "title": "Verify that the application sanitizes user input before passing to mail systems to protect against SMTP or IMAP injection."
+            }
+          ]
+        },
+        {
+          "id": 159,
+          "name": "Improper Handling of Invalid Use of Special Elements",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-8",
+              "title": "Special elements, input terminators, and invalid special element usage MUST be neutralised before processing"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.2.7",
+              "section": "Validation",
+              "title": "Verify that the application sanitizes, disables, or sandboxes user-supplied Scalable Vector Graphics (SVG) scriptable content, especially as they relate to XSS resulting from inline scripts, and foreignObject."
+            }
+          ]
+        },
+        {
+          "id": 173,
+          "name": "Improper Handling of Alternate Encoding",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-9",
+              "title": "Output MUST be properly encoded or escaped, and alternate or Unicode encodings MUST be handled safely"
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.4.1",
+              "section": "Config",
+              "title": "Verify that every HTTP response contains a Content-Type header. Also specify a safe character set (e.g., UTF-8, ISO-8859-1) if the content types are text/*, /+xml and application/xml. Content must match with the provided Content-Type header."
+            }
+          ]
+        },
+        {
+          "id": 176,
+          "name": "Improper Handling of Unicode Encoding",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-9",
+              "title": "Output MUST be properly encoded or escaped, and alternate or Unicode encodings MUST be handled safely"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.2",
+              "section": "Validation",
+              "title": "Verify that output encoding preserves the user's chosen character set and locale, such that any Unicode character point is valid and safely handled. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 183,
+          "name": "Permissive List of Allowed Inputs",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-20",
+              "title": "Input validation MUST use strict allowlists and verify boundary conditions"
+            }
+          ]
+        },
+        {
+          "id": 235,
+          "name": "Improper Handling of Extra Parameters",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-11",
+              "title": "Extra or unexpected parameters MUST be ignored or rejected, not silently processed"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.1.1",
+              "section": "Validation",
+              "title": "Verify that the application has defenses against HTTP parameter pollution attacks, particularly if the application framework makes no distinction about the source of request parameters (GET, POST, cookies, headers, or environment variables)."
+            }
+          ]
+        },
+        {
+          "id": 327,
+          "name": "Use of a Broken or Risky Cryptographic Algorithm",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-5",
+              "title": "Cryptographic algorithms MUST use current standards (AES-256, SHA-256+); MD5/SHA-1 are forbidden"
+            },
+            {
+              "source": "cisq",
+              "title": "Only current cryptographic standards (AES-256, SHA-256+) MUST be used"
+            }
+          ]
+        },
+        {
+          "id": 345,
+          "name": "Insufficient Verification of Data Authenticity",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 353,
+          "name": "Missing Support for Integrity Check",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-12",
+              "title": "Data integrity MUST be verified using checksums or cryptographic signatures where applicable"
+            },
+            {
+              "source": "asvs",
+              "ref": "V10.3.2",
+              "section": "Malicious",
+              "title": "Verify that the application employs integrity protections, such as code signing or subresource integrity. The application must not load or execute code from untrusted sources, such as loading includes, modules, plugins, code, or libraries from untrusted sources or the Internet."
+            }
+          ]
+        },
+        {
+          "id": 362,
+          "name": "Concurrent Execution using Shared Resource with Improper Synchronization ('Race Condition')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 382,
+          "name": "J2EE Bad Practices: Use of System.exit()",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 426,
+          "name": "Untrusted Search Path",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 427,
+          "name": "Uncontrolled Search Path Element",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 434,
+          "name": "Unrestricted Upload of File with Dangerous Type",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-10",
+              "title": "File names and paths MUST NOT be controlled by external input; file uploads MUST restrict dangerous types and remote file inclusion MUST be prevented"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.5.2",
+              "section": "Files",
+              "title": "Verify that direct requests to uploaded files will never be executed as HTML/JavaScript content."
+            }
+          ]
+        },
+        {
+          "id": 436,
+          "name": "Interpretation Conflict",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-18",
+              "title": "Request and file interpretation MUST be consistent and resistant to smuggling or confusion attacks"
+            }
+          ]
+        },
+        {
+          "id": 444,
+          "name": "Inconsistent Interpretation of HTTP Requests ('HTTP Request/Response Smuggling')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-18",
+              "title": "Request and file interpretation MUST be consistent and resistant to smuggling or confusion attacks"
+            }
+          ]
+        },
+        {
+          "id": 447,
+          "name": "Unimplemented or Unsupported Feature in UI",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 451,
+          "name": "User Interface (UI) Misrepresentation of Critical Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 454,
+          "name": "External Initialization of Trusted Variables or Data Stores",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 470,
+          "name": "Use of Externally-Controlled Input to Select Classes or Code ('Unsafe Reflection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 477,
+          "name": "Use of Obsolete Function",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 494,
+          "name": "Download of Code Without Integrity Check",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 501,
+          "name": "Trust Boundary Violation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 502,
+          "name": "Deserialization of Untrusted Data",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-4",
+              "title": "Deserialization of untrusted data MUST use safe parsers (JSON, not pickle/yaml.load)"
+            },
+            {
+              "source": "cisq",
+              "title": "Untrusted data MUST NOT be deserialized using unsafe parsers"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.5.1",
+              "section": "Validation",
+              "title": "Verify that serialized objects use integrity checks or are encrypted to prevent hostile object creation or data tampering. ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.5.3",
+              "section": "Validation",
+              "title": "Verify that deserialization of untrusted data is avoided or is protected in both custom code and third-party libraries (such as JSON, XML and YAML parsers)."
+            }
+          ]
+        },
+        {
+          "id": 506,
+          "name": "Embedded Malicious Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 509,
+          "name": "Replicating Malicious Code (Virus or Worm)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-13",
+              "title": "Application MUST NOT include or execute self-replicating or malicious code patterns"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.4.2",
+              "section": "Files",
+              "title": "Verify that files obtained from untrusted sources are scanned by antivirus scanners to prevent upload and serving of known malicious content."
+            }
+          ]
+        },
+        {
+          "id": 564,
+          "name": "SQL Injection: Hibernate",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 565,
+          "name": "Reliance on Cookies without Validation and Integrity Checking",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 601,
+          "name": "URL Redirection to Untrusted Site ('Open Redirect')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-14",
+              "title": "URL redirects MUST validate target URLs against an allowlist to prevent open redirect attacks"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.1.5",
+              "section": "Validation",
+              "title": "Verify that URL redirects and forwards only allow destinations which appear on an allow list, or show a warning when redirecting to potentially untrusted content."
+            }
+          ]
+        },
+        {
+          "id": 606,
+          "name": "Unchecked Input for Loop Condition",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-20",
+              "title": "Input validation MUST use strict allowlists and verify boundary conditions"
+            }
+          ]
+        },
+        {
+          "id": 610,
+          "name": "Externally Controlled Reference to a Resource in Another Sphere",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 611,
+          "name": "Improper Restriction of XML External Entity Reference",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-6",
+              "title": "XML parsers MUST disable external entity resolution"
+            },
+            {
+              "source": "cisq",
+              "title": "XML parsers MUST disable external entity resolution"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.5.2",
+              "section": "Validation",
+              "title": "Verify that the application correctly restricts XML parsers to only use the most restrictive configuration possible and to ensure that unsafe features such as resolving external entities are disabled to prevent XML eXternal Entity (XXE) attacks."
+            }
+          ]
+        },
+        {
+          "id": 628,
+          "name": "Function Call with Incorrectly Specified Arguments",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 641,
+          "name": "Improper Restriction of Names for Files and Other Resources",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-10",
+              "title": "File names and paths MUST NOT be controlled by external input; file uploads MUST restrict dangerous types and remote file inclusion MUST be prevented"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.3.4",
+              "section": "Files",
+              "title": "Verify that the application protects against Reflective File Download (RFD) by validating or ignoring user-submitted filenames in a JSON, JSONP, or URL parameter, the response Content-Type header should be set to text/plain, and the Content-Disposition header should have a fixed filename."
+            }
+          ]
+        },
+        {
+          "id": 642,
+          "name": "External Control of Critical State Data",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 643,
+          "name": "Improper Neutralization of Data within XPath Expressions ('XPath Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-7",
+              "title": "Application MUST NOT be susceptible to LDAP, code, or XPath injection; all dynamic queries MUST use parameterised or sanitised inputs"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.10",
+              "section": "Validation",
+              "title": "Verify that the application protects against XPath injection or XML injection attacks. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 644,
+          "name": "Improper Neutralization of HTTP Headers for Scripting Syntax",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 646,
+          "name": "Reliance on File Name or Extension of Externally-Supplied File",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-18",
+              "title": "Request and file interpretation MUST be consistent and resistant to smuggling or confusion attacks"
+            }
+          ]
+        },
+        {
+          "id": 652,
+          "name": "Improper Neutralization of Data within XQuery Expressions ('XQuery Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 653,
+          "name": "Improper Isolation or Compartmentalization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 656,
+          "name": "Reliance on Security Through Obscurity",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 657,
+          "name": "Violation of Secure Design Principles",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 676,
+          "name": "Use of Potentially Dangerous Function",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 693,
+          "name": "Protection Mechanism Failure",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 784,
+          "name": "Reliance on Cookies without Validation and Integrity Checking in a Security Decision",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 807,
+          "name": "Reliance on Untrusted Inputs in a Security Decision",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 915,
+          "name": "Improperly Controlled Modification of Dynamically-Determined Object Attributes",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-15",
+              "title": "Mass assignment MUST be prevented by explicitly whitelisting allowed fields for binding"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.1.2",
+              "section": "Validation",
+              "title": "Verify that frameworks protect against mass parameter assignment attacks, or that the application has countermeasures to protect against unsafe parameter assignment, such as marking fields private or similar. ([C5](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 917,
+          "name": "Improper Neutralization of Special Elements used in an Expression Language Statement ('Expression Language Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-16",
+              "title": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection"
+            }
+          ]
+        },
+        {
+          "id": 1022,
+          "name": "Use of Web Link to Untrusted Target with window.opener Access",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 1035,
+          "name": "OWASP Top Ten 2017 Category A9 - Using Components with Known Vulnerabilities",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 1125,
+          "name": "Excessive Attack Surface",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-19",
+              "title": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults"
+            }
+          ]
+        },
+        {
+          "id": 1329,
+          "name": "Reliance on Component That is Not Updateable",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 1357,
+          "name": "Reliance on Insufficiently Trustworthy Component",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 1395,
+          "name": "Dependency on Vulnerable Third-Party Component",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-INT-17",
+              "title": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Non-repudiation",
+      "cwes": [
+        {
+          "id": 117,
+          "name": "Improper Output Neutralization for Logs",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-NRP-3",
+              "title": "Log entries MUST NOT be modifiable by application-level code"
+            }
+          ]
+        },
+        {
+          "id": 379,
+          "name": "Creation of Temporary File in Directory with Insecure Permissions",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-NRP-8",
+              "title": "Application MUST protect against UI redress and clickjacking through untrusted web content inclusion"
+            }
+          ]
+        },
+        {
+          "id": 778,
+          "name": "Insufficient Logging",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-NRP-1",
+              "title": "Authentication events (login, logout, failure) MUST be logged with timestamps"
+            },
+            {
+              "source": "iso25010",
+              "ref": "S-NRP-2",
+              "title": "State-changing operations MUST be logged with actor identity"
+            },
+            {
+              "source": "iso25010",
+              "ref": "S-NRP-4",
+              "title": "Audit logs MUST include operation type, target resource, and outcome"
+            }
+          ]
+        },
+        {
+          "id": 830,
+          "name": "Inclusion of Web Functionality from an Untrusted Source",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-NRP-5",
+              "title": "Web functionality MUST NOT be included from untrusted third-party sources without integrity verification"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.6",
+              "section": "Validation",
+              "title": "Verify that the application protects against JSON injection attacks, JSON eval attacks, and JavaScript expression evaluation. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 1021,
+          "name": "Improper Restriction of Rendered UI Layers or Frames",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-NRP-6",
+              "title": "Application MUST prevent clickjacking by restricting UI rendering in foreign frames (X-Frame-Options or CSP frame-ancestors)"
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.4.3",
+              "section": "Config",
+              "title": "Verify that a Content Security Policy (CSP) response header is in place that helps mitigate impact for XSS attacks like HTML, DOM, JSON, and JavaScript injection vulnerabilities."
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.4.7",
+              "section": "Config",
+              "title": "Verify that the content of a web application cannot be embedded in a third-party site by default and that embedding of the exact resources is only allowed where necessary by using suitable Content-Security-Policy: frame-ancestors and X-Frame-Options response headers."
+            }
+          ]
+        },
+        {
+          "id": 1026,
+          "name": "Weaknesses in OWASP Top Ten (2017)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-NRP-7",
+              "title": "Third-party component versions MUST be tracked and kept free of known vulnerabilities per OWASP Top Ten guidance"
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.2.1",
+              "section": "Config",
+              "title": "Verify that all components are up to date, preferably using a dependency checker during build or compile time. ([C2](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Accountability",
+      "cwes": [
+        {
+          "id": 15,
+          "name": "External Control of System or Configuration Setting",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-10",
+              "title": "Security configuration MUST disable debug features, restrict cross-domain policies, and limit recursive entity expansion in production"
+            }
+          ]
+        },
+        {
+          "id": 221,
+          "name": "Information Loss or Omission",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-9",
+              "title": "Security-relevant events MUST be logged with neutralized output and sufficient detail"
+            }
+          ]
+        },
+        {
+          "id": 223,
+          "name": "Omission of Security-relevant Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-9",
+              "title": "Security-relevant events MUST be logged with neutralized output and sufficient detail"
+            }
+          ]
+        },
+        {
+          "id": 306,
+          "name": "Missing Authentication for Critical Function",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-1",
+              "title": "Authentication MUST be required for all non-public endpoints"
+            },
+            {
+              "source": "cisq",
+              "title": "All state-changing endpoints MUST require authentication"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.7.1",
+              "section": "Session",
+              "title": "Verify the application ensures a full, valid login session or requires re-authentication or secondary verification before allowing any sensitive transactions or account modifications."
+            }
+          ]
+        },
+        {
+          "id": 307,
+          "name": "Improper Restriction of Excessive Authentication Attempts",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-4",
+              "title": "Rate limiting MUST be applied to authentication endpoints"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.2.1",
+              "section": "Authentication",
+              "title": "Verify that anti-automation controls are effective at mitigating breached credential testing, brute force, and account lockout attacks. Such controls include blocking the most common breached passwords, soft lockouts, rate limiting, CAPTCHA, ever increasing delays between attempts, IP address restrictions, or risk-based restrictions such as location, first login on a device, recent attempts to unlock the account, or similar. Verify that no more than 100 failed attempts per hour is possible on a single account."
+            }
+          ]
+        },
+        {
+          "id": 400,
+          "name": "Uncontrolled Resource Consumption",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-6",
+              "title": "Resource consumption MUST be bounded; rate limiting and allocation limits MUST prevent denial-of-service through resource exhaustion"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.1.1",
+              "section": "Files",
+              "title": "Verify that the application will not accept large files that could fill up storage or cause a denial of service."
+            }
+          ]
+        },
+        {
+          "id": 489,
+          "name": "Active Debug Code",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-10",
+              "title": "Security configuration MUST disable debug features, restrict cross-domain policies, and limit recursive entity expansion in production"
+            }
+          ]
+        },
+        {
+          "id": 547,
+          "name": "Use of Hard-coded, Security-relevant Constants",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-10",
+              "title": "Security configuration MUST disable debug features, restrict cross-domain policies, and limit recursive entity expansion in production"
+            }
+          ]
+        },
+        {
+          "id": 613,
+          "name": "Insufficient Session Expiration",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-3",
+              "title": "Session tokens MUST be invalidated on logout and password change"
+            },
+            {
+              "source": "cisq",
+              "title": "Sessions MUST expire after a configurable idle timeout"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.8.1",
+              "section": "Authentication",
+              "title": "Verify that time-based OTPs have a defined lifetime before expiring."
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.3.1",
+              "section": "Session",
+              "title": "Verify that logout and expiration invalidate the session token, such that the back button or a downstream relying party does not resume an authenticated session, including across relying parties. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.3.2",
+              "section": "Session",
+              "title": "If authenticators permit users to remain logged in, verify that re-authentication occurs periodically both when actively used or after an idle period. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 756,
+          "name": "Missing Custom Error Page",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-11",
+              "title": "Custom error pages MUST be used and MUST NOT reveal implementation details"
+            }
+          ]
+        },
+        {
+          "id": 770,
+          "name": "Allocation of Resources Without Limits or Throttling",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-6",
+              "title": "Resource consumption MUST be bounded; rate limiting and allocation limits MUST prevent denial-of-service through resource exhaustion"
+            },
+            {
+              "source": "asvs",
+              "ref": "V11.1.3",
+              "section": "BusLogic",
+              "title": "Verify the application has appropriate limits for specific business actions or transactions which are correctly enforced on a per user basis."
+            },
+            {
+              "source": "asvs",
+              "ref": "V11.1.4",
+              "section": "BusLogic",
+              "title": "Verify that the application has anti-automation controls to protect against excessive calls such as mass data exfiltration, business logic requests, file uploads or denial of service attacks."
+            }
+          ]
+        },
+        {
+          "id": 776,
+          "name": "Improper Restriction of Recursive Entity References in DTDs ('XML Entity Expansion')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-10",
+              "title": "Security configuration MUST disable debug features, restrict cross-domain policies, and limit recursive entity expansion in production"
+            }
+          ]
+        },
+        {
+          "id": 799,
+          "name": "Improper Control of Interaction Frequency",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-6",
+              "title": "Resource consumption MUST be bounded; rate limiting and allocation limits MUST prevent denial-of-service through resource exhaustion"
+            },
+            {
+              "source": "asvs",
+              "ref": "V11.1.2",
+              "section": "BusLogic",
+              "title": "Verify that the application will only process business logic flows with all steps being processed in realistic human time, i.e. transactions are not submitted too quickly."
+            }
+          ]
+        },
+        {
+          "id": 829,
+          "name": "Inclusion of Functionality from Untrusted Control Sphere",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-7",
+              "title": "Application MUST NOT include functionality from untrusted control spheres without explicit verification"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.9",
+              "section": "Validation",
+              "title": "Verify that the application protects against Local File Inclusion (LFI) or Remote File Inclusion (RFI) attacks."
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.2.3",
+              "section": "Config",
+              "title": "Verify that if application assets, such as JavaScript libraries, CSS or web fonts, are hosted externally on a Content Delivery Network (CDN) or external provider, Subresource Integrity (SRI) is used to validate the integrity of the asset."
+            }
+          ]
+        },
+        {
+          "id": 841,
+          "name": "Improper Enforcement of Behavioral Workflow",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-8",
+              "title": "Behavioral workflows MUST be enforced server-side to prevent step-skipping or out-of-order execution"
+            },
+            {
+              "source": "asvs",
+              "ref": "V11.1.1",
+              "section": "BusLogic",
+              "title": "Verify that the application will only process business logic flows for the same user in sequential step order and without skipping steps."
+            },
+            {
+              "source": "asvs",
+              "ref": "V11.1.5",
+              "section": "BusLogic",
+              "title": "Verify the application has business logic limits or validation to protect against likely business risks or threats, identified using threat modeling or similar methodologies."
+            }
+          ]
+        },
+        {
+          "id": 863,
+          "name": "Incorrect Authorization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-2",
+              "title": "Authorization checks MUST be enforced server-side, not client-side only"
+            },
+            {
+              "source": "cisq",
+              "title": "Authorization MUST be enforced server-side for every protected operation"
+            }
+          ]
+        },
+        {
+          "id": 942,
+          "name": "Permissive Cross-domain Policy with Untrusted Domains",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-10",
+              "title": "Security configuration MUST disable debug features, restrict cross-domain policies, and limit recursive entity expansion in production"
+            }
+          ]
+        },
+        {
+          "id": 1188,
+          "name": "Initialization of a Resource with an Insecure Default",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-ACC-5",
+              "title": "Default credentials MUST NOT exist in any deployed configuration"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Authenticity",
+      "cwes": [
+        {
+          "id": 22,
+          "name": "Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-3",
+              "title": "File paths MUST be validated against traversal attacks (../) before use"
+            },
+            {
+              "source": "cisq",
+              "title": "File paths MUST be canonicalised and validated against allowed directories"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.3.1",
+              "section": "Files",
+              "title": "Verify that user-submitted filename metadata is not used directly by system or framework filesystems and that a URL API is used to protect against path traversal."
+            }
+          ]
+        },
+        {
+          "id": 78,
+          "name": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-2",
+              "title": "Shell commands MUST NOT be constructed from user-controlled data"
+            },
+            {
+              "source": "cisq",
+              "title": "OS commands MUST NOT be constructed from user-controlled data"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.3.8",
+              "section": "Validation",
+              "title": "Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line output encoding. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.3.5",
+              "section": "Files",
+              "title": "Verify that untrusted file metadata is not used directly with system API or libraries, to protect against OS command injection."
+            }
+          ]
+        },
+        {
+          "id": 95,
+          "name": "Improper Neutralization of Directives in Dynamically Evaluated Code ('Eval Injection')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-1",
+              "title": "Dynamic code evaluation (eval) MUST NOT be used with user-controlled input"
+            },
+            {
+              "source": "cisq",
+              "title": "Dynamic code evaluation MUST NOT process user-controlled input"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.2.4",
+              "section": "Validation",
+              "title": "Verify that the application avoids the use of eval() or other dynamic code execution features. Where there is no alternative, any user input being included must be sanitized or sandboxed before being executed."
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.5.4",
+              "section": "Validation",
+              "title": "Verify that when parsing JSON in browsers or JavaScript-based backends, JSON.parse is used to parse the JSON document. Do not use eval() to parse JSON."
+            }
+          ]
+        },
+        {
+          "id": 263,
+          "name": "Password Aging with Long Expiration",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-8",
+              "title": "Passwords MUST meet minimum complexity requirements and MUST NOT use long expiration without rotation; password changes MUST verify current credentials and recovery mechanisms MUST resist abuse"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.10",
+              "section": "Authentication",
+              "title": "Verify that there are no periodic credential rotation or password history requirements."
+            }
+          ]
+        },
+        {
+          "id": 266,
+          "name": "Incorrect Privilege Assignment",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 269,
+          "name": "Improper Privilege Management",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 284,
+          "name": "Improper Access Control",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 285,
+          "name": "Improper Authorization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-10",
+              "title": "Authorization checks MUST be enforced on every request; user-controlled keys MUST NOT allow access to other users' resources (IDOR)"
+            },
+            {
+              "source": "asvs",
+              "ref": "V4.1.3",
+              "section": "Access",
+              "title": "Verify that the principle of least privilege exists - users should only be able to access functions, data files, URLs, controllers, services, and other resources, for which they possess specific authorization. This implies protection against spoofing and elevation of privilege. ([C7](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V4.1.5",
+              "section": "Access",
+              "title": "Verify that access controls fail securely including when an exception occurs. ([C10](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V8.3.3",
+              "section": "Data",
+              "title": "Verify that users are provided clear language regarding collection and use of supplied personal information and that users have provided opt-in consent for the use of that data before it is used in any way."
+            }
+          ]
+        },
+        {
+          "id": 286,
+          "name": "Incorrect User Management",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 287,
+          "name": "Improper Authentication",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-9",
+              "title": "Authentication MUST include all critical steps; multi-factor or challenge-response flows MUST NOT be bypassable"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.7.1",
+              "section": "Authentication",
+              "title": "Verify that clear text out of band (NIST \"restricted\") authenticators, such as SMS or PSTN, are not offered by default, and stronger alternatives such as push notifications are offered first."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.7.2",
+              "section": "Authentication",
+              "title": "Verify that the out of band verifier expires out of band authentication requests, codes, or tokens after 10 minutes."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.7.3",
+              "section": "Authentication",
+              "title": "Verify that the out of band verifier authentication requests, codes, or tokens are only usable once, and only for the original authentication request."
+            }
+          ]
+        },
+        {
+          "id": 288,
+          "name": "Authentication Bypass Using an Alternate Path or Channel",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 289,
+          "name": "Authentication Bypass by Alternate Name",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 290,
+          "name": "Authentication Bypass by Spoofing",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 291,
+          "name": "Reliance on IP Address for Authentication",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 293,
+          "name": "Using Referer Field for Authentication",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 294,
+          "name": "Authentication Bypass by Capture-replay",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 295,
+          "name": "Improper Certificate Validation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-7",
+              "title": "TLS certificates MUST be validated; certificate validation MUST NOT be disabled"
+            }
+          ]
+        },
+        {
+          "id": 297,
+          "name": "Improper Validation of Certificate with Host Mismatch",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 298,
+          "name": "Improper Validation of Certificate Expiration",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 299,
+          "name": "Improper Check for Certificate Revocation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 300,
+          "name": "Channel Accessible by Non-Endpoint",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 302,
+          "name": "Authentication Bypass by Assumed-Immutable Data",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 303,
+          "name": "Incorrect Implementation of Authentication Algorithm",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 304,
+          "name": "Missing Critical Step in Authentication",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-9",
+              "title": "Authentication MUST include all critical steps; multi-factor or challenge-response flows MUST NOT be bypassable"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.2.2",
+              "section": "Authentication",
+              "title": "Verify that the use of weak authenticators (such as SMS and email) is limited to secondary verification and transaction approval and not as a replacement for more secure authentication methods. Verify that stronger methods are offered before weak methods, users are aware of the risks, or that proper measures are in place to limit the risks of account compromise."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.5.5",
+              "section": "Authentication",
+              "title": "Verify that if an authentication factor is changed or replaced, that the user is notified of this event."
+            }
+          ]
+        },
+        {
+          "id": 305,
+          "name": "Authentication Bypass by Primary Weakness",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 308,
+          "name": "Use of Single-factor Authentication",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 309,
+          "name": "Use of Password System for Primary Authentication",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-18",
+              "title": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels"
+            }
+          ]
+        },
+        {
+          "id": 346,
+          "name": "Origin Validation Error",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-4",
+              "title": "CORS policies MUST not use wildcard origins for authenticated endpoints"
+            },
+            {
+              "source": "cisq",
+              "title": "Cross-origin requests MUST be validated against an allowlist"
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.5.2",
+              "section": "Config",
+              "title": "Verify that the supplied Origin header is not used for authentication or access control decisions, as the Origin header can easily be changed by an attacker."
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.5.3",
+              "section": "Config",
+              "title": "Verify that the Cross-Origin Resource Sharing (CORS) Access-Control-Allow-Origin header uses a strict allow list of trusted domains and subdomains to match against and does not support the \"null\" origin."
+            }
+          ]
+        },
+        {
+          "id": 350,
+          "name": "Reliance on Reverse DNS Resolution for a Security-Critical Action",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-12",
+              "title": "Application MUST NOT rely on reverse DNS resolution for security decisions"
+            },
+            {
+              "source": "asvs",
+              "ref": "V10.3.3",
+              "section": "Malicious",
+              "title": "Verify that the application has protection from subdomain takeovers if the application relies upon DNS entries or DNS subdomains, such as expired domain names, out of date DNS pointers or CNAMEs, expired projects at public source code repos, or transient cloud APIs, serverless functions, or storage buckets (*autogen-bucket-id*.cloud.example.com) or similar. Protections can include ensuring that DNS names used by applications are regularly checked for expiry or change."
+            }
+          ]
+        },
+        {
+          "id": 352,
+          "name": "Cross-Site Request Forgery (CSRF)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-11",
+              "title": "Sessions MUST be protected against fixation attacks and cross-site request forgery (CSRF)"
+            },
+            {
+              "source": "asvs",
+              "ref": "V4.2.2",
+              "section": "Access",
+              "title": "Verify that the application or framework enforces a strong anti-CSRF mechanism to protect authenticated functionality, and effective anti-automation or anti-CSRF protects unauthenticated functionality."
+            },
+            {
+              "source": "asvs",
+              "ref": "V13.2.3",
+              "section": "API",
+              "title": "Verify that RESTful web services that utilize cookies are protected from Cross-Site Request Forgery via the use of at least one or more of the following: double submit cookie pattern, CSRF nonces, or Origin request header checks."
+            }
+          ]
+        },
+        {
+          "id": 384,
+          "name": "Session Fixation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-11",
+              "title": "Sessions MUST be protected against fixation attacks and cross-site request forgery (CSRF)"
+            },
+            {
+              "source": "asvs",
+              "ref": "V3.2.1",
+              "section": "Session",
+              "title": "Verify the application generates a new session token on user authentication. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 419,
+          "name": "Unprotected Primary Channel",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-13",
+              "title": "Primary communication channels MUST be protected; unprotected channels MUST NOT carry authentication data"
+            },
+            {
+              "source": "asvs",
+              "ref": "V4.3.1",
+              "section": "Access",
+              "title": "Verify administrative interfaces use appropriate multi-factor authentication to prevent unauthorized use."
+            }
+          ]
+        },
+        {
+          "id": 425,
+          "name": "Direct Request ('Forced Browsing')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 441,
+          "name": "Unintended Proxy or Intermediary ('Confused Deputy')",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 472,
+          "name": "External Control of Assumed-Immutable Web Parameter",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 521,
+          "name": "Weak Password Requirements",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-8",
+              "title": "Passwords MUST meet minimum complexity requirements and MUST NOT use long expiration without rotation; password changes MUST verify current credentials and recovery mechanisms MUST resist abuse"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.1",
+              "section": "Authentication",
+              "title": "Verify that user set passwords are at least 12 characters in length (after multiple spaces are combined). ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.2",
+              "section": "Authentication",
+              "title": "Verify that passwords of at least 64 characters are permitted, and that passwords of more than 128 characters are denied. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.3",
+              "section": "Authentication",
+              "title": "Verify that password truncation is not performed. However, consecutive multiple spaces may be replaced by a single space. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.4",
+              "section": "Authentication",
+              "title": "Verify that any printable Unicode character, including language neutral characters such as spaces and Emojis are permitted in passwords."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.7",
+              "section": "Authentication",
+              "title": "Verify that passwords submitted during account registration, login, and password change are checked against a set of breached passwords either locally (such as the top 1,000 or 10,000 most common passwords which match the system's password policy) or using an external API. If using an API a zero knowledge proof or other mechanism should be used to ensure that the plain text password is not sent or used in verifying the breach status of the password. If the password is breached, the application must require the user to set a new non-breached password. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.8",
+              "section": "Authentication",
+              "title": "Verify that a password strength meter is provided to help users set a stronger password."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.9",
+              "section": "Authentication",
+              "title": "Verify that there are no password composition rules limiting the type of characters permitted. There should be no requirement for upper or lower case or numbers or special characters. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.11",
+              "section": "Authentication",
+              "title": "Verify that \"paste\" functionality, browser password helpers, and external password managers are permitted."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.12",
+              "section": "Authentication",
+              "title": "Verify that the user can choose to either temporarily view the entire masked password, or temporarily view the last typed character of the password on platforms that do not have this as built-in functionality."
+            }
+          ]
+        },
+        {
+          "id": 566,
+          "name": "Authorization Bypass Through User-Controlled SQL Primary Key",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 602,
+          "name": "Client-Side Enforcement of Server-Side Security",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-14",
+              "title": "Security controls MUST be enforced server-side; client-side enforcement alone is insufficient"
+            },
+            {
+              "source": "asvs",
+              "ref": "V4.1.1",
+              "section": "Access",
+              "title": "Verify that the application enforces access control rules on a trusted service layer, especially if client-side access control is present and could be bypassed."
+            }
+          ]
+        },
+        {
+          "id": 620,
+          "name": "Unverified Password Change",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-8",
+              "title": "Passwords MUST meet minimum complexity requirements and MUST NOT use long expiration without rotation; password changes MUST verify current credentials and recovery mechanisms MUST resist abuse"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.5",
+              "section": "Authentication",
+              "title": "Verify users can change their password."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.1.6",
+              "section": "Authentication",
+              "title": "Verify that password change functionality requires the user's current and new password."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.2.3",
+              "section": "Authentication",
+              "title": "Verify that secure notifications are sent to users after updates to authentication details, such as credential resets, email or address changes, logging in from unknown or risky locations. The use of push notifications - rather than SMS or email - is preferred, but in the absence of push notifications, SMS or email is acceptable as long as no sensitive information is disclosed in the notification."
+            }
+          ]
+        },
+        {
+          "id": 639,
+          "name": "Authorization Bypass Through User-Controlled Key",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-10",
+              "title": "Authorization checks MUST be enforced on every request; user-controlled keys MUST NOT allow access to other users' resources (IDOR)"
+            },
+            {
+              "source": "asvs",
+              "ref": "V4.1.2",
+              "section": "Access",
+              "title": "Verify that all user and data attributes and policy information used by access controls cannot be manipulated by end users unless specifically authorized."
+            },
+            {
+              "source": "asvs",
+              "ref": "V4.2.1",
+              "section": "Access",
+              "title": "Verify that sensitive data and APIs are protected against Insecure Direct Object Reference (IDOR) attacks targeting creation, reading, updating and deletion of records, such as creating or updating someone else's record, viewing everyone's records, or deleting all records."
+            }
+          ]
+        },
+        {
+          "id": 640,
+          "name": "Weak Password Recovery Mechanism for Forgotten Password",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-8",
+              "title": "Passwords MUST meet minimum complexity requirements and MUST NOT use long expiration without rotation; password changes MUST verify current credentials and recovery mechanisms MUST resist abuse"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.5.1",
+              "section": "Authentication",
+              "title": "Verify that a system generated initial activation or recovery secret is not sent in clear text to the user. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.5.2",
+              "section": "Authentication",
+              "title": "Verify password hints or knowledge-based authentication (so-called \"secret questions\") are not present."
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.5.3",
+              "section": "Authentication",
+              "title": "Verify password credential recovery does not reveal the current password in any way. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            },
+            {
+              "source": "asvs",
+              "ref": "V2.5.6",
+              "section": "Authentication",
+              "title": "Verify forgotten password, and other recovery paths use a secure recovery mechanism, such as time-based OTP (TOTP) or other soft token, mobile push, or another offline recovery mechanism. ([C6](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+            }
+          ]
+        },
+        {
+          "id": 650,
+          "name": "Trusting HTTP Permission Methods on the Server Side",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-15",
+              "title": "HTTP method permissions MUST be validated server-side; trusting HTTP methods alone for access control is forbidden"
+            },
+            {
+              "source": "asvs",
+              "ref": "V13.2.1",
+              "section": "API",
+              "title": "Verify that enabled RESTful HTTP methods are a valid choice for the user or action, such as preventing normal users using DELETE or PUT on protected API or resources."
+            }
+          ]
+        },
+        {
+          "id": 749,
+          "name": "Exposed Dangerous Method or Function",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-16",
+              "title": "Dangerous methods or functions MUST NOT be exposed to unauthorized callers"
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.5.1",
+              "section": "Config",
+              "title": "Verify that the application server only accepts the HTTP methods in use by the application/API, including pre-flight OPTIONS, and logs/alerts on any requests that are not valid for the application context."
+            }
+          ]
+        },
+        {
+          "id": 862,
+          "name": "Missing Authorization",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-20",
+              "title": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access"
+            }
+          ]
+        },
+        {
+          "id": 918,
+          "name": "Server-Side Request Forgery (SSRF)",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-6",
+              "title": "Server-side HTTP requests MUST validate target URLs against an allowlist"
+            },
+            {
+              "source": "cisq",
+              "title": "Server-side HTTP requests MUST validate target URLs against an allowlist"
+            },
+            {
+              "source": "asvs",
+              "ref": "V5.2.6",
+              "section": "Validation",
+              "title": "Verify that the application protects against SSRF attacks, by validating or sanitizing untrusted data or HTTP file metadata, such as filenames and URL input fields, and uses allow lists of protocols, domains, paths and ports."
+            },
+            {
+              "source": "asvs",
+              "ref": "V12.6.1",
+              "section": "Files",
+              "title": "Verify that the web or application server is configured with an allow list of resources or systems to which the server can send requests or load data/files from."
+            }
+          ]
+        },
+        {
+          "id": 940,
+          "name": "Improper Verification of Source of a Communication Channel",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-19",
+              "title": "Credentials MUST be unique, non-default, and sufficiently protected against disclosure"
+            }
+          ]
+        },
+        {
+          "id": 941,
+          "name": "Incorrectly Specified Destination in a Communication Channel",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-19",
+              "title": "Credentials MUST be unique, non-default, and sufficiently protected against disclosure"
+            }
+          ]
+        },
+        {
+          "id": 1002,
+          "name": "SFP Secondary Cluster: Unexpected Entry Points",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-17",
+              "title": "Application MUST NOT use broken or risky cryptographic algorithms for authentication or integrity verification"
+            },
+            {
+              "source": "asvs",
+              "ref": "V14.2.2",
+              "section": "Config",
+              "title": "Verify that all unneeded features, documentation, sample applications and configurations are removed."
+            }
+          ]
+        },
+        {
+          "id": 1104,
+          "name": "Use of Unmaintained Third Party Components",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-5",
+              "title": "Dependencies MUST be pinned to exact versions and audited for known vulnerabilities"
+            },
+            {
+              "source": "cisq",
+              "title": "Dependencies MUST be kept up-to-date and free of known vulnerabilities"
+            }
+          ]
+        },
+        {
+          "id": 1390,
+          "name": "Weak Authentication",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-19",
+              "title": "Credentials MUST be unique, non-default, and sufficiently protected against disclosure"
+            }
+          ]
+        },
+        {
+          "id": 1391,
+          "name": "Use of Weak Credentials",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-19",
+              "title": "Credentials MUST be unique, non-default, and sufficiently protected against disclosure"
+            }
+          ]
+        },
+        {
+          "id": 1392,
+          "name": "Use of Default Credentials",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-19",
+              "title": "Credentials MUST be unique, non-default, and sufficiently protected against disclosure"
+            }
+          ]
+        },
+        {
+          "id": 1393,
+          "name": "Use of Default Password",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "S-AUT-19",
+              "title": "Credentials MUST be unique, non-default, and sufficiently protected against disclosure"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
