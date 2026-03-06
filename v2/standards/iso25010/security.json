@@ -8,50 +8,735 @@
     {
       "name": "Confidentiality",
       "requirements": [
-        { "id": "S-CON-1", "text": "Credentials and secrets MUST NOT be hardcoded in source files", "cwe": [798] },
-        { "id": "S-CON-2", "text": "Sensitive data MUST NOT be logged (passwords, tokens, PII)", "cwe": [532] },
-        { "id": "S-CON-3", "text": "Sensitive data MUST be stored using platform-specific secure storage (Keychain, Vault)", "cwe": [311] },
-        { "id": "S-CON-4", "text": "Debug endpoints and verbose error details MUST be disabled in production builds", "cwe": [215] },
-        { "id": "S-CON-5", "text": "File permissions MUST follow least-privilege; world-readable config files are forbidden", "cwe": [732] }
+        {
+          "id": "S-CON-1",
+          "text": "Credentials and secrets MUST NOT be hardcoded in source files",
+          "cwe": [
+            798
+          ]
+        },
+        {
+          "id": "S-CON-2",
+          "text": "Sensitive data MUST NOT be logged (passwords, tokens, PII)",
+          "cwe": [
+            532
+          ]
+        },
+        {
+          "id": "S-CON-3",
+          "text": "Sensitive data MUST be stored using platform-specific secure storage (Keychain, Vault)",
+          "cwe": [
+            311
+          ]
+        },
+        {
+          "id": "S-CON-4",
+          "text": "Debug endpoints and verbose error details MUST be disabled in production builds",
+          "cwe": [
+            215
+          ]
+        },
+        {
+          "id": "S-CON-5",
+          "text": "File permissions MUST follow least-privilege; world-readable config files are forbidden",
+          "cwe": [
+            732
+          ]
+        },
+        {
+          "id": "S-CON-6",
+          "text": "Passwords MUST NOT appear as literals in source code",
+          "cwe": [
+            259
+          ]
+        },
+        {
+          "id": "S-CON-7",
+          "text": "Security-sensitive configuration defaults MUST be secure out of the box",
+          "cwe": [
+            16
+          ]
+        },
+        {
+          "id": "S-CON-8",
+          "text": "Sensitive information MUST NOT be exposed in error messages, stack traces, or system information disclosures",
+          "cwe": [
+            200,
+            210,
+            497
+          ]
+        },
+        {
+          "id": "S-CON-9",
+          "text": "Sensitive data MUST be removed or masked before storage or transfer to less-trusted environments",
+          "cwe": [
+            212,
+            525,
+            922
+          ]
+        },
+        {
+          "id": "S-CON-10",
+          "text": "Sensitive data MUST be transmitted only over encrypted channels; cleartext transmission of credentials is forbidden",
+          "cwe": [
+            319,
+            523
+          ]
+        },
+        {
+          "id": "S-CON-11",
+          "text": "Cryptographic algorithms MUST use adequate key lengths, strong ciphers, and cryptographically secure random number generators",
+          "cwe": [
+            310,
+            326,
+            330,
+            331
+          ]
+        },
+        {
+          "id": "S-CON-12",
+          "text": "Cookies containing sensitive data MUST set Secure, HttpOnly, and SameSite attributes and MUST NOT use persistent storage for sensitive values",
+          "cwe": [
+            614,
+            1004,
+            1275,
+            539
+          ]
+        },
+        {
+          "id": "S-CON-13",
+          "text": "Directory listings MUST be disabled and files MUST NOT be accessible to unauthorized external parties",
+          "cwe": [
+            548,
+            552
+          ]
+        },
+        {
+          "id": "S-CON-14",
+          "text": "Sensitive data MUST NOT be passed in URL query strings via GET requests",
+          "cwe": [
+            598
+          ]
+        },
+        {
+          "id": "S-CON-15",
+          "text": "Cryptographic algorithms and key management MUST use strong, current implementations",
+          "cwe": [
+            261,
+            296,
+            320,
+            321,
+            322,
+            323,
+            324,
+            325,
+            328,
+            329,
+            332,
+            334,
+            335,
+            336,
+            337,
+            338,
+            340,
+            342,
+            347,
+            757,
+            759,
+            760,
+            780,
+            916,
+            1240,
+            1241
+          ]
+        },
+        {
+          "id": "S-CON-16",
+          "text": "Sensitive data MUST NOT be stored in cleartext in files, cookies, memory, or environment variables",
+          "cwe": [
+            256,
+            258,
+            260,
+            312,
+            313,
+            315,
+            316,
+            526
+          ]
+        },
+        {
+          "id": "S-CON-17",
+          "text": "Sensitive information MUST NOT be exposed through source code, comments, error messages, or debug output",
+          "cwe": [
+            201,
+            209,
+            219,
+            359,
+            402,
+            538,
+            540,
+            550,
+            615
+          ]
+        },
+        {
+          "id": "S-CON-18",
+          "text": "File and resource permissions MUST follow the principle of least privilege",
+          "cwe": [
+            276,
+            281,
+            282,
+            283
+          ]
+        },
+        {
+          "id": "S-CON-19",
+          "text": "Credentials MUST be protected during transport and storage",
+          "cwe": [
+            522
+          ]
+        },
+        {
+          "id": "S-CON-20",
+          "text": "Resources MUST NOT be exposed to wrong spheres",
+          "cwe": [
+            668
+          ]
+        }
       ]
     },
     {
       "name": "Integrity",
       "requirements": [
-        { "id": "S-INT-1", "text": "All user input MUST be validated and sanitised before use", "cwe": [20] },
-        { "id": "S-INT-2", "text": "SQL queries MUST use parameterised statements; string concatenation is forbidden", "cwe": [89] },
-        { "id": "S-INT-3", "text": "HTML output MUST be escaped or rendered through a templating engine with auto-escaping", "cwe": [79] },
-        { "id": "S-INT-4", "text": "Deserialization of untrusted data MUST use safe parsers (JSON, not pickle/yaml.load)", "cwe": [502] },
-        { "id": "S-INT-5", "text": "Cryptographic algorithms MUST use current standards (AES-256, SHA-256+); MD5/SHA-1 are forbidden", "cwe": [327] }
+        {
+          "id": "S-INT-1",
+          "text": "All user input MUST be validated and sanitised before use",
+          "cwe": [
+            20
+          ]
+        },
+        {
+          "id": "S-INT-2",
+          "text": "SQL queries MUST use parameterised statements; string concatenation is forbidden",
+          "cwe": [
+            89
+          ]
+        },
+        {
+          "id": "S-INT-3",
+          "text": "HTML output MUST be escaped or rendered through a templating engine with auto-escaping",
+          "cwe": [
+            79
+          ]
+        },
+        {
+          "id": "S-INT-4",
+          "text": "Deserialization of untrusted data MUST use safe parsers (JSON, not pickle/yaml.load)",
+          "cwe": [
+            502
+          ]
+        },
+        {
+          "id": "S-INT-5",
+          "text": "Cryptographic algorithms MUST use current standards (AES-256, SHA-256+); MD5/SHA-1 are forbidden",
+          "cwe": [
+            327
+          ]
+        },
+        {
+          "id": "S-INT-6",
+          "text": "XML parsers MUST disable external entity resolution",
+          "cwe": [
+            611
+          ]
+        },
+        {
+          "id": "S-INT-7",
+          "text": "Application MUST NOT be susceptible to LDAP, code, or XPath injection; all dynamic queries MUST use parameterised or sanitised inputs",
+          "cwe": [
+            90,
+            94,
+            643
+          ]
+        },
+        {
+          "id": "S-INT-8",
+          "text": "Special elements, input terminators, and invalid special element usage MUST be neutralised before processing",
+          "cwe": [
+            138,
+            147,
+            159
+          ]
+        },
+        {
+          "id": "S-INT-9",
+          "text": "Output MUST be properly encoded or escaped, and alternate or Unicode encodings MUST be handled safely",
+          "cwe": [
+            116,
+            173,
+            176
+          ]
+        },
+        {
+          "id": "S-INT-10",
+          "text": "File names and paths MUST NOT be controlled by external input; file uploads MUST restrict dangerous types and remote file inclusion MUST be prevented",
+          "cwe": [
+            73,
+            98,
+            434,
+            641
+          ]
+        },
+        {
+          "id": "S-INT-11",
+          "text": "Extra or unexpected parameters MUST be ignored or rejected, not silently processed",
+          "cwe": [
+            235
+          ]
+        },
+        {
+          "id": "S-INT-12",
+          "text": "Data integrity MUST be verified using checksums or cryptographic signatures where applicable",
+          "cwe": [
+            353
+          ]
+        },
+        {
+          "id": "S-INT-13",
+          "text": "Application MUST NOT include or execute self-replicating or malicious code patterns",
+          "cwe": [
+            509
+          ]
+        },
+        {
+          "id": "S-INT-14",
+          "text": "URL redirects MUST validate target URLs against an allowlist to prevent open redirect attacks",
+          "cwe": [
+            601
+          ]
+        },
+        {
+          "id": "S-INT-15",
+          "text": "Mass assignment MUST be prevented by explicitly whitelisting allowed fields for binding",
+          "cwe": [
+            915
+          ]
+        },
+        {
+          "id": "S-INT-16",
+          "text": "Application MUST neutralize all injection vectors including command, expression, CRLF, header, and query injection",
+          "cwe": [
+            74,
+            76,
+            77,
+            80,
+            83,
+            86,
+            88,
+            91,
+            93,
+            96,
+            97,
+            99,
+            112,
+            113,
+            114,
+            115,
+            129,
+            134,
+            470,
+            564,
+            610,
+            644,
+            652,
+            917
+          ]
+        },
+        {
+          "id": "S-INT-17",
+          "text": "Software components MUST be verified for integrity, kept updated, and free from known vulnerabilities",
+          "cwe": [
+            345,
+            426,
+            427,
+            447,
+            477,
+            494,
+            506,
+            565,
+            784,
+            1035,
+            1329,
+            1357,
+            1395
+          ]
+        },
+        {
+          "id": "S-INT-18",
+          "text": "Request and file interpretation MUST be consistent and resistant to smuggling or confusion attacks",
+          "cwe": [
+            436,
+            444,
+            646
+          ]
+        },
+        {
+          "id": "S-INT-19",
+          "text": "Application design MUST follow secure design principles including defense in depth and fail-safe defaults",
+          "cwe": [
+            362,
+            382,
+            451,
+            454,
+            501,
+            628,
+            642,
+            653,
+            656,
+            657,
+            676,
+            693,
+            807,
+            1022,
+            1125
+          ]
+        },
+        {
+          "id": "S-INT-20",
+          "text": "Input validation MUST use strict allowlists and verify boundary conditions",
+          "cwe": [
+            183,
+            606
+          ]
+        }
       ]
     },
     {
       "name": "Non-repudiation",
       "requirements": [
-        { "id": "S-NRP-1", "text": "Authentication events (login, logout, failure) MUST be logged with timestamps", "cwe": [778] },
-        { "id": "S-NRP-2", "text": "State-changing operations MUST be logged with actor identity", "cwe": [778] },
-        { "id": "S-NRP-3", "text": "Log entries MUST NOT be modifiable by application-level code", "cwe": [117] },
-        { "id": "S-NRP-4", "text": "Audit logs MUST include operation type, target resource, and outcome", "cwe": [778] }
+        {
+          "id": "S-NRP-1",
+          "text": "Authentication events (login, logout, failure) MUST be logged with timestamps",
+          "cwe": [
+            778
+          ]
+        },
+        {
+          "id": "S-NRP-2",
+          "text": "State-changing operations MUST be logged with actor identity",
+          "cwe": [
+            778
+          ]
+        },
+        {
+          "id": "S-NRP-3",
+          "text": "Log entries MUST NOT be modifiable by application-level code",
+          "cwe": [
+            117
+          ]
+        },
+        {
+          "id": "S-NRP-4",
+          "text": "Audit logs MUST include operation type, target resource, and outcome",
+          "cwe": [
+            778
+          ]
+        },
+        {
+          "id": "S-NRP-5",
+          "text": "Web functionality MUST NOT be included from untrusted third-party sources without integrity verification",
+          "cwe": [
+            830
+          ]
+        },
+        {
+          "id": "S-NRP-6",
+          "text": "Application MUST prevent clickjacking by restricting UI rendering in foreign frames (X-Frame-Options or CSP frame-ancestors)",
+          "cwe": [
+            1021
+          ]
+        },
+        {
+          "id": "S-NRP-7",
+          "text": "Third-party component versions MUST be tracked and kept free of known vulnerabilities per OWASP Top Ten guidance",
+          "cwe": [
+            1026
+          ]
+        },
+        {
+          "id": "S-NRP-8",
+          "text": "Application MUST protect against UI redress and clickjacking through untrusted web content inclusion",
+          "cwe": [
+            379
+          ]
+        }
       ]
     },
     {
       "name": "Accountability",
       "requirements": [
-        { "id": "S-ACC-1", "text": "Authentication MUST be required for all non-public endpoints", "cwe": [306] },
-        { "id": "S-ACC-2", "text": "Authorization checks MUST be enforced server-side, not client-side only", "cwe": [863] },
-        { "id": "S-ACC-3", "text": "Session tokens MUST be invalidated on logout and password change", "cwe": [613] },
-        { "id": "S-ACC-4", "text": "Rate limiting MUST be applied to authentication endpoints", "cwe": [307] },
-        { "id": "S-ACC-5", "text": "Default credentials MUST NOT exist in any deployed configuration", "cwe": [1188] }
+        {
+          "id": "S-ACC-1",
+          "text": "Authentication MUST be required for all non-public endpoints",
+          "cwe": [
+            306
+          ]
+        },
+        {
+          "id": "S-ACC-2",
+          "text": "Authorization checks MUST be enforced server-side, not client-side only",
+          "cwe": [
+            863
+          ]
+        },
+        {
+          "id": "S-ACC-3",
+          "text": "Session tokens MUST be invalidated on logout and password change",
+          "cwe": [
+            613
+          ]
+        },
+        {
+          "id": "S-ACC-4",
+          "text": "Rate limiting MUST be applied to authentication endpoints",
+          "cwe": [
+            307
+          ]
+        },
+        {
+          "id": "S-ACC-5",
+          "text": "Default credentials MUST NOT exist in any deployed configuration",
+          "cwe": [
+            1188
+          ]
+        },
+        {
+          "id": "S-ACC-6",
+          "text": "Resource consumption MUST be bounded; rate limiting and allocation limits MUST prevent denial-of-service through resource exhaustion",
+          "cwe": [
+            400,
+            770,
+            799
+          ]
+        },
+        {
+          "id": "S-ACC-7",
+          "text": "Application MUST NOT include functionality from untrusted control spheres without explicit verification",
+          "cwe": [
+            829
+          ]
+        },
+        {
+          "id": "S-ACC-8",
+          "text": "Behavioral workflows MUST be enforced server-side to prevent step-skipping or out-of-order execution",
+          "cwe": [
+            841
+          ]
+        },
+        {
+          "id": "S-ACC-9",
+          "text": "Security-relevant events MUST be logged with neutralized output and sufficient detail",
+          "cwe": [
+            221,
+            223
+          ]
+        },
+        {
+          "id": "S-ACC-10",
+          "text": "Security configuration MUST disable debug features, restrict cross-domain policies, and limit recursive entity expansion in production",
+          "cwe": [
+            15,
+            489,
+            547,
+            776,
+            942
+          ]
+        },
+        {
+          "id": "S-ACC-11",
+          "text": "Custom error pages MUST be used and MUST NOT reveal implementation details",
+          "cwe": [
+            756
+          ]
+        }
       ]
     },
     {
       "name": "Authenticity",
       "requirements": [
-        { "id": "S-AUT-1", "text": "Dynamic code evaluation (eval) MUST NOT be used with user-controlled input", "cwe": [95] },
-        { "id": "S-AUT-2", "text": "Shell commands MUST NOT be constructed from user-controlled data", "cwe": [78] },
-        { "id": "S-AUT-3", "text": "File paths MUST be validated against traversal attacks (../) before use", "cwe": [22] },
-        { "id": "S-AUT-4", "text": "CORS policies MUST not use wildcard origins for authenticated endpoints", "cwe": [346] },
-        { "id": "S-AUT-5", "text": "Dependencies MUST be pinned to exact versions and audited for known vulnerabilities", "cwe": [1104] }
+        {
+          "id": "S-AUT-1",
+          "text": "Dynamic code evaluation (eval) MUST NOT be used with user-controlled input",
+          "cwe": [
+            95
+          ]
+        },
+        {
+          "id": "S-AUT-2",
+          "text": "Shell commands MUST NOT be constructed from user-controlled data",
+          "cwe": [
+            78
+          ]
+        },
+        {
+          "id": "S-AUT-3",
+          "text": "File paths MUST be validated against traversal attacks (../) before use",
+          "cwe": [
+            22
+          ]
+        },
+        {
+          "id": "S-AUT-4",
+          "text": "CORS policies MUST not use wildcard origins for authenticated endpoints",
+          "cwe": [
+            346
+          ]
+        },
+        {
+          "id": "S-AUT-5",
+          "text": "Dependencies MUST be pinned to exact versions and audited for known vulnerabilities",
+          "cwe": [
+            1104
+          ]
+        },
+        {
+          "id": "S-AUT-6",
+          "text": "Server-side HTTP requests MUST validate target URLs against an allowlist",
+          "cwe": [
+            918
+          ]
+        },
+        {
+          "id": "S-AUT-7",
+          "text": "TLS certificates MUST be validated; certificate validation MUST NOT be disabled",
+          "cwe": [
+            295
+          ]
+        },
+        {
+          "id": "S-AUT-8",
+          "text": "Passwords MUST meet minimum complexity requirements and MUST NOT use long expiration without rotation; password changes MUST verify current credentials and recovery mechanisms MUST resist abuse",
+          "cwe": [
+            263,
+            521,
+            620,
+            640
+          ]
+        },
+        {
+          "id": "S-AUT-9",
+          "text": "Authentication MUST include all critical steps; multi-factor or challenge-response flows MUST NOT be bypassable",
+          "cwe": [
+            287,
+            304
+          ]
+        },
+        {
+          "id": "S-AUT-10",
+          "text": "Authorization checks MUST be enforced on every request; user-controlled keys MUST NOT allow access to other users' resources (IDOR)",
+          "cwe": [
+            285,
+            639
+          ]
+        },
+        {
+          "id": "S-AUT-11",
+          "text": "Sessions MUST be protected against fixation attacks and cross-site request forgery (CSRF)",
+          "cwe": [
+            384,
+            352
+          ]
+        },
+        {
+          "id": "S-AUT-12",
+          "text": "Application MUST NOT rely on reverse DNS resolution for security decisions",
+          "cwe": [
+            350
+          ]
+        },
+        {
+          "id": "S-AUT-13",
+          "text": "Primary communication channels MUST be protected; unprotected channels MUST NOT carry authentication data",
+          "cwe": [
+            419
+          ]
+        },
+        {
+          "id": "S-AUT-14",
+          "text": "Security controls MUST be enforced server-side; client-side enforcement alone is insufficient",
+          "cwe": [
+            602
+          ]
+        },
+        {
+          "id": "S-AUT-15",
+          "text": "HTTP method permissions MUST be validated server-side; trusting HTTP methods alone for access control is forbidden",
+          "cwe": [
+            650
+          ]
+        },
+        {
+          "id": "S-AUT-16",
+          "text": "Dangerous methods or functions MUST NOT be exposed to unauthorized callers",
+          "cwe": [
+            749
+          ]
+        },
+        {
+          "id": "S-AUT-17",
+          "text": "Application MUST NOT use broken or risky cryptographic algorithms for authentication or integrity verification",
+          "cwe": [
+            1002
+          ]
+        },
+        {
+          "id": "S-AUT-18",
+          "text": "Authentication MUST resist spoofing, replay, certificate, and bypass attempts across all channels",
+          "cwe": [
+            288,
+            289,
+            290,
+            291,
+            293,
+            294,
+            297,
+            298,
+            299,
+            300,
+            302,
+            303,
+            305,
+            308,
+            309
+          ]
+        },
+        {
+          "id": "S-AUT-19",
+          "text": "Credentials MUST be unique, non-default, and sufficiently protected against disclosure",
+          "cwe": [
+            940,
+            941,
+            1390,
+            1391,
+            1392,
+            1393
+          ]
+        },
+        {
+          "id": "S-AUT-20",
+          "text": "Authorization MUST be enforced server-side with proper privilege management and least-privilege access",
+          "cwe": [
+            266,
+            269,
+            284,
+            286,
+            425,
+            441,
+            472,
+            566,
+            862
+          ]
+        }
       ]
     }
   ]
