@@ -1557,6 +1557,15 @@
   letter-spacing: 0.06em;
 }
 
+/* Reason: practice title (bold first line) */
+.vlive-detail-title {
+  margin: 0 0 2px 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: var(--leading-normal);
+}
+
 /* Reason: prose text */
 .vlive-detail-reason {
   margin: 0;

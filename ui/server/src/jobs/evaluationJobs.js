@@ -20,8 +20,9 @@ function buildArgs(payload, reportsRoot) {
   // V2 format: evaluate <repo> [-p plugin] [-o output] [-m mode]
   result.push(String(payload.repo).trim());
 
-  if (payload.plugin && String(payload.plugin).trim()) {
-    result.push('-p', String(payload.plugin).trim());
+  const dims = parseDimensions(payload.dimensions);
+  if (dims.length) {
+    result.push('-d', dims.join(','));
   }
   if (reportsRoot) {
     result.push('-o', String(reportsRoot));

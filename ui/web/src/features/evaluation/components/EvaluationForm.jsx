@@ -4,26 +4,47 @@ import { listPlugins } from '../../../api/index.js';
 
 export default function EvaluationForm({ onStart, disabled }) {
   const [repo, setRepo] = useState('');
-  const [plugins, setPlugins] = useState([]);
-  const [selectedPlugin, setSelectedPlugin] = useState('');
+  const [allDimensions, setAllDimensions] = useState([]);
+  const [selectedDims, setSelectedDims] = useState(new Set());
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
 
   useEffect(() => {
     listPlugins()
-      .then((data) => setPlugins(data))
-      .catch(() => setPlugins([]));
+      .then((plugins) => {
+        const seen = new Map();
+        for (const p of plugins) {
+          for (const d of p.dimensions) {
+            if (!seen.has(d.id)) {
+              seen.set(d.id, d);
+            }
+          }
+        }
+        setAllDimensions([...seen.values()]);
+      })
+      .catch(() => setAllDimensions([]));
   }, []);
 
-  const activePlugin = plugins.find((p) => p.id === selectedPlugin);
+  function toggleDim(id) {
+    setSelectedDims((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
 
   function handleSubmit(e) {
     e.preventDefault();
     const payload = { repo };
-    if (selectedPlugin) {
-      payload.plugin = selectedPlugin;
+    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
+      payload.dimensions = [...selectedDims];
     }
     onStart(payload);
     setRepo('');
+    setSelectedDims(new Set());
   }
 
   function handleFolderSelect(path) {
@@ -72,39 +93,27 @@ export default function EvaluationForm({ onStart, disabled }) {
           </div>
         </div>
 
-        {repo && (
-          <div className="form-group">
-            <label htmlFor="eval-form-plugin">Plugin</label>
-            <select
-              id="eval-form-plugin"
-              value={selectedPlugin}
-              onChange={(e) => setSelectedPlugin(e.target.value)}
-            >
-              <option value="">Auto-detect</option>
-              {plugins.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name} ({p.extensions.join(', ')})
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-
-        {repo && activePlugin && activePlugin.dimensions.length > 0 && (
+        {repo && allDimensions.length > 0 && (
           <div className="form-group">
             <label>Dimensions</label>
             <div className="dimension-grid">
-              {activePlugin.dimensions.map((dim) => (
-                <span
+              {allDimensions.map((dim) => (
+                <button
                   key={dim.id}
-                  className="dimension-chip-btn selected"
+                  type="button"
+                  className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}`}
                   title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
+                  onClick={() => toggleDim(dim.id)}
                 >
                   {dim.id} ({dim.weight}x)
-                </span>
+                </button>
               ))}
             </div>
-            <p className="form-hint">All dimensions are evaluated automatically.</p>
+            <p className="form-hint">
+              {selectedDims.size === 0
+                ? 'All dimensions will be evaluated.'
+                : `${selectedDims.size} of ${allDimensions.length} selected.`}
+            </p>
           </div>
         )}
 
