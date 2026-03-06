@@ -23,6 +23,7 @@
           "bad": { "type": "string" },
           "good": { "type": "string" },
           "explanation": { "type": "string" },
+          "sub_characteristic": { "type": "string" },
           "source": { "type": "string" },
           "source_stars": { "type": "integer" },
           "extracted": { "type": "string" }

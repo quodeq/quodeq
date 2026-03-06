@@ -161,7 +161,7 @@ def build_v1_compatible_report(evidence: Evidence, scores: dict) -> dict:
 
 
 def write_reports(evidence: Evidence, scores: dict, output_dir: Path) -> None:
-    """Write both v2 and v1-compatible report files."""
+    """Write both v2 and v1-compatible report files (legacy, uses plugin_id as name)."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
     v2_report = build_v2_report(evidence, scores)
@@ -170,3 +170,12 @@ def write_reports(evidence: Evidence, scores: dict, output_dir: Path) -> None:
     dim = evidence.plugin_id
     (output_dir / f"{dim}_v2.json").write_text(json.dumps(v2_report, indent=2))
     (output_dir / f"{dim}.json").write_text(json.dumps(v1_report, indent=2))
+
+
+def write_dimension_report(evidence: Evidence, scores: dict, dimension: str, output_dir: Path) -> None:
+    """Write a per-dimension report file matching V1 dashboard format: <dimension>.json."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    v1_report = build_v1_compatible_report(evidence, scores)
+    v1_report["dimension"] = dimension
+    (output_dir / f"{dimension}.json").write_text(json.dumps(v1_report, indent=2))

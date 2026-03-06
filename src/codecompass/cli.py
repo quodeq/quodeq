@@ -42,6 +42,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-prescan", action="store_true", help="Skip source-file counting"
     )
     evaluate_parser.add_argument(
+        "-d", "--dimensions", default=None,
+        help="Comma-separated dimensions to evaluate (default: all from plugin)",
+    )
+    evaluate_parser.add_argument(
         "--evidence-only",
         action="store_true",
         help="Produce evidence JSON only (skip scoring)",
@@ -72,6 +76,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 def run_evaluate_v2(args: argparse.Namespace) -> int:
     """Run the v2 evaluation pipeline."""
+    import uuid as _uuid
+
     from codecompass.v2.engine.runner import (
         RunConfig,
         count_source_files,
@@ -80,6 +86,7 @@ def run_evaluate_v2(args: argparse.Namespace) -> int:
         run_full,
     )
     from codecompass.v2.engine.plugin_loader import load_plugin
+    from codecompass.evaluate.project_resolver import resolve_project_uuid
 
     # 1. Resolve repo
     repo_path = args.repo
@@ -120,31 +127,52 @@ def run_evaluate_v2(args: argparse.Namespace) -> int:
             source_file_count = count_source_files(src, extensions)
             print(f"Source files: {source_file_count}")
 
-    # 5. Build config and run
+    # 5. Resolve project and create run directory
+    reports_root = Path(args.output)
+    reports_root.mkdir(parents=True, exist_ok=True)
+
+    project_name = args.repo.split("/")[-1].replace(".git", "") if is_repo_url(args.repo) else Path(args.repo).name
+    location = "online" if is_repo_url(args.repo) else "local"
+    project_uuid = resolve_project_uuid(reports_root, project_name, str(src), None, location=location)
+
+    run_id = str(_uuid.uuid4())
+    evidence_dir = reports_root / project_uuid / run_id / "evidence"
+    evaluation_dir = reports_root / project_uuid / run_id / "evaluation"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    evaluation_dir.mkdir(parents=True, exist_ok=True)
+    print(f"Report path: {evaluation_dir}")
+
+    # 6. Build config and run
     standards_dir = Path(__file__).resolve().parents[2] / "v2" / "standards"
+    dimensions_filter = None
+    if args.dimensions:
+        dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()]
+
+    if dimensions_filter:
+        print(f"Dimensions: {', '.join(dimensions_filter)}")
+    else:
+        print("Dimensions: all")
+
     config = RunConfig(
         src=src,
         plugin_id=plugin_id,
         evaluators_dir=evaluators_dir,
         standards_dir=standards_dir if standards_dir.exists() else None,
         source_file_count=source_file_count,
+        dimensions=dimensions_filter,
+        work_dir=evidence_dir,
     )
-
-    output_dir = Path(args.output)
-    output_dir.mkdir(parents=True, exist_ok=True)
-    config.work_dir = output_dir
 
     if args.evidence_only:
         import json
 
         evidence = run(config)
-        out_file = output_dir / f"{plugin_id}_evidence.json"
-        out_file.parent.mkdir(parents=True, exist_ok=True)
+        out_file = evidence_dir / f"{plugin_id}_evidence.json"
         out_file.write_text(json.dumps(evidence.to_v1_evidence_dict(), indent=2))
         print(f"Evidence written to {out_file}")
     else:
-        scores = run_full(config, output_dir, mode=args.mode)
-        print(f"Reports written to {output_dir}/")
+        scores = run_full(config, evaluation_dir, mode=args.mode)
+        print(f"Reports written to {evaluation_dir}/")
         for dim, score in scores.items():
             print(f"  {dim}: {score}")
 
