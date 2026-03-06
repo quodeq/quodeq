@@ -1,8 +1,7 @@
 from pathlib import Path
 from codecompass.v2.engine.plugin_loader import load_plugin
-from codecompass.v2.engine.detectors.grep import GrepDetector
 
-PLUGIN_DIR = Path("evaluators/typescript")
+PLUGIN_DIR = Path(__file__).parent.parent.parent / "v2" / "evaluators" / "typescript"
 
 
 def test_plugin_loads():
@@ -14,11 +13,3 @@ def test_plugin_loads():
 def test_plugin_has_knowledge():
     assert (PLUGIN_DIR / "knowledge" / "practices.json").exists()
     assert (PLUGIN_DIR / "knowledge" / "analysis.md").exists()
-
-
-def test_plugin_scan_rules_run(tmp_path):
-    (tmp_path / "bad.ts").write_text("const x = eval(input);")
-    detector = GrepDetector()
-    config = {"rules_file": str(PLUGIN_DIR / "scan_rules.ini")}
-    findings = detector.run(tmp_path, config)
-    assert len(findings) >= 1

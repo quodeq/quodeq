@@ -91,7 +91,7 @@ def run_evaluate_v2(args: argparse.Namespace) -> int:
         return 1
 
     # 2. Locate evaluators directory
-    evaluators_dir = Path(__file__).resolve().parents[2] / "evaluators"
+    evaluators_dir = Path(__file__).resolve().parents[2] / "v2" / "evaluators"
     if not evaluators_dir.exists():
         print(f"Evaluators directory not found: {evaluators_dir}", file=sys.stderr)
         return 1

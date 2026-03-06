@@ -1,3 +1,7 @@
+import pytest
+
+pytestmark = pytest.mark.skip(reason="detector/judge code removed in PR2")
+
 from pathlib import Path
 from codecompass.v2.engine.detectors.grep import GrepDetector
 
