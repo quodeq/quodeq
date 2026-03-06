@@ -131,6 +131,8 @@ def run_evaluate_v2(args: argparse.Namespace) -> int:
     )
 
     output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    config.work_dir = output_dir
 
     if args.evidence_only:
         import json
