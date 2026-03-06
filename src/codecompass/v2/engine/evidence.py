@@ -71,6 +71,7 @@ class Evidence:
     principles: dict[str, PrincipleEvidence] = field(default_factory=dict)
     dismissed_count: int = 0
     meta: dict = field(default_factory=dict)
+    plugin_name: str = ""
 
     def summary(self) -> dict:
         total = sum(p.metrics.get("total_instances", 0) for p in self.principles.values())
@@ -102,7 +103,7 @@ class Evidence:
             }
         return {
             "repository": self.repository,
-            "discipline": self.plugin_id,
+            "discipline": self.plugin_name or self.plugin_id,
             "date": self.date,
             "source_file_count": self.source_file_count,
             "files_read": self.files_read,

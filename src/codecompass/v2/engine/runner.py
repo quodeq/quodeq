@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
+from datetime import date
 from pathlib import Path
 
 from codecompass.v2.engine.analysis import (
@@ -35,6 +36,7 @@ class RunConfig:
     analysis_budget: str | None = None
     heartbeat_callback: object | None = None
     template_path: Path | None = None
+    dimensions: list[str] | None = None
 
 
 def run(config: RunConfig) -> Evidence:
@@ -45,21 +47,40 @@ def run(config: RunConfig) -> Evidence:
 
     full = load_plugin_full(plugin_dir)
     template = load_template(config.template_path)
+    date_str = date.today().isoformat()
 
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
     analysis_md = analysis_file.read_text() if analysis_file.exists() else ""
 
-    dimensions = [d["id"] for d in full["dimensions"].get("applies", [])]
+    all_dims = [d["id"] for d in full["dimensions"].get("applies", [])]
+    if config.dimensions:
+        dimensions = [d for d in all_dims if d in config.dimensions]
+    else:
+        dimensions = all_dims
     work_dir = config.work_dir or config.src
 
     all_evidence: list[Evidence] = []
+    total = len(dimensions)
 
-    for dimension in dimensions:
+    def _default_heartbeat(dim_name, src_count):
+        def _cb(elapsed, progress):
+            mins = elapsed // 60
+            files = progress.get("files_read", 0)
+            evidence = progress.get("evidence", 0)
+            if src_count > 0:
+                pct = min(round(files / src_count * 100), 100)
+                print(f"  {dim_name}: {mins}m elapsed — {files} files read ({pct}%), {evidence} findings", flush=True)
+            else:
+                print(f"  {dim_name}: {mins}m elapsed — {files} files read, {evidence} findings", flush=True)
+        return _cb
+
+    for idx, dimension in enumerate(dimensions, 1):
+        print(f"[{idx}/{total}] Analyzing {dimension}...", flush=True)
         prompt = build_analysis_prompt(
             template,
             plugin_id=config.plugin_id,
             repo_name=str(config.src),
-            date_str=full["plugin"].get("version", ""),
+            date_str=date_str,
             dimension=dimension,
             source_file_count=config.source_file_count,
             practices_data=full["practices"],
@@ -71,31 +92,128 @@ def run(config: RunConfig) -> Evidence:
         stream_file = work_dir / f"{dimension}_live.stream"
         jsonl_file = work_dir / f"{dimension}_evidence.jsonl"
 
+        heartbeat = config.heartbeat_callback or _default_heartbeat(dimension, config.source_file_count)
+
         run_analysis(
             work_dir=config.src,
             prompt=prompt,
             stream_file=stream_file,
             analysis_budget=config.analysis_budget,
-            heartbeat_callback=config.heartbeat_callback,
+            heartbeat_callback=heartbeat,
         )
 
         if not is_stream_valid(stream_file):
+            print(f"  {dimension}: no valid stream, skipping", flush=True)
             continue
 
         files_read = extract_evidence_from_stream(stream_file, jsonl_file)
+        print(f"  {dimension}: {files_read} files read", flush=True)
 
         ev = parse_jsonl_to_evidence(
             jsonl_file,
             plugin_id=config.plugin_id,
             repository=str(config.src),
-            date_str=full["plugin"].get("version", ""),
+            date_str=date_str,
             practices_data=full["practices"],
             source_file_count=config.source_file_count,
             files_read=files_read,
         )
+        ev.plugin_name = full["plugin"].get("name", config.plugin_id)
+        violations = sum(len(pe.violations) for pe in ev.principles.values())
+        compliances = sum(len(pe.compliance) for pe in ev.principles.values())
+        print(f"  {dimension}: {violations} violations, {compliances} compliances found", flush=True)
         all_evidence.append(ev)
 
     return _merge_evidence(all_evidence, config)
+
+
+def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
+    """Like run(), but returns a dict of {dimension_id: Evidence} without merging."""
+    plugin_dir = config.evaluators_dir / config.plugin_id
+    if not plugin_dir.exists():
+        raise ValueError(f"Plugin directory not found: {plugin_dir}")
+
+    full = load_plugin_full(plugin_dir)
+    template = load_template(config.template_path)
+    date_str = date.today().isoformat()
+
+    analysis_file = plugin_dir / "knowledge" / "analysis.md"
+    analysis_md = analysis_file.read_text() if analysis_file.exists() else ""
+
+    all_dims = [d["id"] for d in full["dimensions"].get("applies", [])]
+    if config.dimensions:
+        dimensions = [d for d in all_dims if d in config.dimensions]
+    else:
+        dimensions = all_dims
+    work_dir = config.work_dir or config.src
+
+    def _default_heartbeat(dim_name, src_count):
+        def _cb(elapsed, progress):
+            mins = elapsed // 60
+            files = progress.get("files_read", 0)
+            evidence = progress.get("evidence", 0)
+            if src_count > 0:
+                pct = min(round(files / src_count * 100), 100)
+                print(f"  {dim_name}: {mins}m elapsed — {files} files read ({pct}%), {evidence} findings", flush=True)
+            else:
+                print(f"  {dim_name}: {mins}m elapsed — {files} files read, {evidence} findings", flush=True)
+        return _cb
+
+    result: dict[str, Evidence] = {}
+    total = len(dimensions)
+
+    for idx, dimension in enumerate(dimensions, 1):
+        print(f"[{idx}/{total}] Analyzing {dimension}...", flush=True)
+        prompt = build_analysis_prompt(
+            template,
+            plugin_id=config.plugin_id,
+            repo_name=str(config.src),
+            date_str=date_str,
+            dimension=dimension,
+            source_file_count=config.source_file_count,
+            practices_data=full["practices"],
+            dimensions_data=full["dimensions"],
+            analysis_md=analysis_md,
+            standards_dir=config.standards_dir,
+        )
+
+        stream_file = work_dir / f"{dimension}_live.stream"
+        jsonl_file = work_dir / f"{dimension}_evidence.jsonl"
+
+        heartbeat = config.heartbeat_callback or _default_heartbeat(dimension, config.source_file_count)
+
+        run_analysis(
+            work_dir=config.src,
+            prompt=prompt,
+            stream_file=stream_file,
+            analysis_budget=config.analysis_budget,
+            heartbeat_callback=heartbeat,
+        )
+
+        if not is_stream_valid(stream_file):
+            print(f"  {dimension}: no valid stream, skipping", flush=True)
+            continue
+
+        files_read = extract_evidence_from_stream(stream_file, jsonl_file)
+        print(f"  {dimension}: {files_read} files read", flush=True)
+
+        ev = parse_jsonl_to_evidence(
+            jsonl_file,
+            plugin_id=config.plugin_id,
+            repository=str(config.src),
+            date_str=date_str,
+            practices_data=full["practices"],
+            source_file_count=config.source_file_count,
+            files_read=files_read,
+        )
+        ev.plugin_name = full["plugin"].get("name", config.plugin_id)
+
+        violations = sum(len(pe.violations) for pe in ev.principles.values())
+        compliances = sum(len(pe.compliance) for pe in ev.principles.values())
+        print(f"  {dimension}: {violations} violations, {compliances} compliances found", flush=True)
+        result[dimension] = ev
+
+    return result
 
 
 def _merge_evidence(evidence_list: list[Evidence], config: RunConfig) -> Evidence:
@@ -122,7 +240,7 @@ def _merge_evidence(evidence_list: list[Evidence], config: RunConfig) -> Evidenc
         else 0.0
     )
 
-    return Evidence(
+    merged = Evidence(
         repository=str(config.src),
         plugin_id=config.plugin_id,
         date=evidence_list[0].date if evidence_list else "",
@@ -132,13 +250,19 @@ def _merge_evidence(evidence_list: list[Evidence], config: RunConfig) -> Evidenc
         principles=merged_principles,
         dismissed_count=total_dismissed,
     )
+    if evidence_list:
+        merged.plugin_name = evidence_list[0].plugin_name
+    return merged
 
 
 def detect_plugin(src: Path, evaluators_dir: Path) -> str:
-    """Auto-detect the best plugin for a repository by counting extension matches."""
-    best_id: str | None = None
-    best_count = 0
+    """Auto-detect the best plugin for a repository.
 
+    Uses a two-pass approach:
+    1. Check for config files at repo root (strong signal — e.g. pyproject.toml → python)
+    2. Fall back to counting source files by extension (weak signal)
+    """
+    plugins: list[dict] = []
     for child in sorted(evaluators_dir.iterdir()):
         if not child.is_dir() or child.name.startswith("_"):
             continue
@@ -149,13 +273,31 @@ def detect_plugin(src: Path, evaluators_dir: Path) -> str:
             data = json.loads(pf.read_text())
         except (json.JSONDecodeError, KeyError):
             continue
+        plugins.append(data)
+
+    # Pass 1: config files at repo root
+    config_matches: list[tuple[int, str]] = []
+    for data in plugins:
+        config_files = data.get("detects", {}).get("config_files", [])
+        hits = sum(1 for cf in config_files if (src / cf).exists())
+        if hits > 0:
+            config_matches.append((hits, data.get("id", "")))
+
+    if config_matches:
+        config_matches.sort(key=lambda x: x[0], reverse=True)
+        return config_matches[0][1]
+
+    # Pass 2: file extension count
+    best_id: str | None = None
+    best_count = 0
+    for data in plugins:
         exts = set(data.get("detects", {}).get("extensions", []))
         if not exts:
             continue
         count = count_source_files(src, exts)
         if count > best_count:
             best_count = count
-            best_id = data.get("id", child.name)
+            best_id = data.get("id", "")
 
     if best_id is None:
         raise ValueError(
@@ -174,11 +316,24 @@ def count_source_files(src: Path, extensions: set[str]) -> int:
 
 
 def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> dict:
-    """Full pipeline: run → score → write reports. Returns scores dict."""
-    from codecompass.v2.engine.scoring import score_evidence
-    from codecompass.v2.engine.report import write_reports
+    """Full pipeline: run per-dimension → score each → write per-dimension reports.
 
-    evidence = run(config)
-    scores = score_evidence(evidence, mode=mode)
-    write_reports(evidence, scores, output_dir)
-    return scores
+    Returns dict of {dimension: overall_score_str}.
+    """
+    from codecompass.v2.engine.scoring import score_evidence
+    from codecompass.v2.engine.report import write_dimension_report
+
+    per_dim_evidence = run_per_dimension(config)
+    results: dict[str, str] = {}
+
+    for dimension, evidence in per_dim_evidence.items():
+        scores = score_evidence(evidence, mode=mode)
+        write_dimension_report(evidence, scores, dimension, output_dir)
+        overall = scores.get("overall", {})
+        if mode == "numerical":
+            val = overall.get("weighted_score")
+            results[dimension] = f"{val}/10" if val is not None else "N/A"
+        else:
+            results[dimension] = overall.get("weighted_grade", "N/A")
+
+    return results

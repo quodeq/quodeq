@@ -35,7 +35,7 @@ def _parse_jsonl_line(line: str) -> Judgment | None:
     )
 
 
-def _judgment_to_dict(j: Judgment) -> dict:
+def _judgment_to_dict(j: Judgment, practice_title: str = "") -> dict:
     """Convert a Judgment to the dict format used in PrincipleEvidence lists."""
     d: dict = {"file": j.file}
     if j.line:
@@ -46,8 +46,14 @@ def _judgment_to_dict(j: Judgment) -> dict:
         d["severity"] = j.severity
     if j.violation_type:
         d["violation_type"] = j.violation_type
+    # Include practice context in reason
+    reason_parts = []
+    if practice_title:
+        reason_parts.append(practice_title)
     if j.reason:
-        d["reason"] = j.reason
+        reason_parts.append(j.reason)
+    if reason_parts:
+        d["reason"] = " — ".join(reason_parts)
     return d
 
 
@@ -68,6 +74,10 @@ def parse_jsonl_to_evidence(
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object.
 
+    Findings are grouped by sub_characteristic (e.g. Modularity, Analyzability)
+    from the practice definitions. If a practice has no sub_characteristic,
+    it falls back to grouping by practice ID.
+
     Args:
         jsonl_file: Path to JSONL file with evidence lines.
         plugin_id: Plugin identifier.
@@ -78,41 +88,53 @@ def parse_jsonl_to_evidence(
         files_read: Number of files the AI read during analysis.
 
     Returns:
-        Populated Evidence object with PrincipleEvidence per practice.
+        Populated Evidence object with PrincipleEvidence per sub-characteristic.
     """
     practice_lookup = _build_practice_lookup(practices_data)
 
-    # Group judgments by practice ID
-    violations: dict[str, list[Judgment]] = {}
-    compliance: dict[str, list[Judgment]] = {}
-    dismissed = 0
-
+    # Parse all judgments
+    judgments: list[Judgment] = []
     content = jsonl_file.read_text() if jsonl_file.exists() else ""
     for line in content.splitlines():
         j = _parse_jsonl_line(line)
-        if j is None:
-            continue
-        if j.verdict == "violation":
-            violations.setdefault(j.practice_id, []).append(j)
-        elif j.verdict == "compliance":
-            compliance.setdefault(j.practice_id, []).append(j)
+        if j is not None:
+            judgments.append(j)
 
-    # Build PrincipleEvidence for each practice that has findings
-    all_practice_ids = set(violations.keys()) | set(compliance.keys())
+    # Group judgments by sub_characteristic
+    sc_violations: dict[str, list[tuple[Judgment, str]]] = {}
+    sc_compliance: dict[str, list[tuple[Judgment, str]]] = {}
+    sc_severity: dict[str, str] = {}
+
+    for j in judgments:
+        practice_def = practice_lookup.get(j.practice_id, {})
+        sub_char = practice_def.get("sub_characteristic", j.practice_id)
+        practice_title = practice_def.get("title", j.practice_id)
+
+        if j.verdict == "violation":
+            sc_violations.setdefault(sub_char, []).append((j, practice_title))
+        elif j.verdict == "compliance":
+            sc_compliance.setdefault(sub_char, []).append((j, practice_title))
+
+        # Track highest severity per sub-characteristic
+        sev = practice_def.get("severity", "medium")
+        if sub_char not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[sub_char]):
+            sc_severity[sub_char] = sev
+
+    # Build PrincipleEvidence per sub-characteristic
+    all_sub_chars = set(sc_violations.keys()) | set(sc_compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}
 
-    for pid in sorted(all_practice_ids):
-        practice_def = practice_lookup.get(pid, {})
+    for sc in sorted(all_sub_chars):
         pe = PrincipleEvidence(
-            practice_id=pid,
-            display_name=practice_def.get("title", pid),
-            dimension=practice_def.get("dimension", ""),
-            severity=practice_def.get("severity", "medium"),
-            violations=[_judgment_to_dict(j) for j in violations.get(pid, [])],
-            compliance=[_judgment_to_dict(j) for j in compliance.get(pid, [])],
+            practice_id=sc,
+            display_name=sc,
+            dimension=judgments[0].dimension if judgments else "",
+            severity=sc_severity.get(sc, "medium"),
+            violations=[_judgment_to_dict(j, title) for j, title in sc_violations.get(sc, [])],
+            compliance=[_judgment_to_dict(j, title) for j, title in sc_compliance.get(sc, [])],
         )
         pe.compute_metrics()
-        principles[pid] = pe
+        principles[sc] = pe
 
     coverage_pct = round(files_read / source_file_count * 100, 1) if source_file_count > 0 else 0.0
 
@@ -124,5 +146,12 @@ def parse_jsonl_to_evidence(
         files_read=files_read,
         coverage_pct=coverage_pct,
         principles=principles,
-        dismissed_count=dismissed,
+        dismissed_count=0,
     )
+
+
+_SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+
+def _sev_rank(sev: str) -> int:
+    return _SEV_RANKS.get(sev, 1)
