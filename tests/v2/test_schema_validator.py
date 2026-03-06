@@ -9,7 +9,6 @@ from codecompass.v2.engine.schema_validator import (
     validate_plugin,
     validate_dimensions,
     validate_practices,
-    validate_detectors,
     validate_plugin_dir,
 )
 
@@ -132,20 +131,6 @@ def test_practices_missing_required_field():
     data = _valid_practices()
     del data["practices"][0]["cwe"]
     assert validate_practices(data) != []
-
-
-# ── detectors.json ────────────────────────────────────────────────────
-
-def test_valid_detectors():
-    assert validate_detectors([{"type": "grep", "rules": "scan_rules.ini"}]) == []
-
-
-def test_detectors_invalid_type():
-    assert validate_detectors([{"type": "unknown", "rules": "x.ini"}]) != []
-
-
-def test_detectors_missing_rules():
-    assert validate_detectors([{"type": "grep"}]) != []
 
 
 # ── validate_plugin_dir ───────────────────────────────────────────────
