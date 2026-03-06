@@ -97,7 +97,6 @@ export function stripPrinciplePrefix(reason, principle) {
   }
   return reason;
 }
-
 export function mostFrequentGrade(grades) {
   if (!grades || grades.length === 0) return null;
   const counts = {};

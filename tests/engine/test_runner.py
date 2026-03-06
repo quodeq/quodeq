@@ -36,7 +36,7 @@ def _make_plugin_dir(base: Path) -> Path:
         "practices": [{
             "id": "ts-001",
             "title": "Avoid eval()",
-            "cwe": 95,
+            "cwe": {"id": 95, "name": "Eval Injection"},
             "dimension": "security",
             "severity": "high",
             "bad": "eval(x)",

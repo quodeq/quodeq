@@ -87,7 +87,7 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
         for viol in pdata.get("violations", []):
             flat_entry: dict = {"principle": label}
             flat_entry.update(
-                {field: viol.get(field) for field in ("file", "line", "reason", "snippet", "severity")}
+                {field: viol.get(field) for field in ("file", "line", "title", "reason", "snippet", "severity", "cwe") if viol.get(field) is not None}
             )
             flat_violations.append(flat_entry)
 
@@ -99,7 +99,7 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
         for comp in pdata.get("compliance", []):
             flat_entry = {"principle": label}
             flat_entry.update(
-                {field: comp.get(field) for field in ("file", "line", "reason", "snippet")}
+                {field: comp.get(field) for field in ("file", "line", "title", "reason", "snippet", "cwe") if comp.get(field) is not None}
             )
             flat_compliance.append(flat_entry)
 
