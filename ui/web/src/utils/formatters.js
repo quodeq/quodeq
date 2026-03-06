@@ -84,6 +84,20 @@ export function capitalizeGrade(str) {
  * @param {string[]} grades
  * @returns {string|null}
  */
+/**
+ * Strip leading "Principle — " or "Principle - " prefix from reason text
+ * to avoid duplication when the principle is shown separately.
+ */
+export function stripPrinciplePrefix(reason, principle) {
+  if (!reason || !principle) return reason;
+  for (const sep of [' \u2014 ', ' — ', ' - ']) {
+    if (reason.startsWith(principle + sep)) {
+      return reason.slice(principle.length + sep.length);
+    }
+  }
+  return reason;
+}
+
 export function mostFrequentGrade(grades) {
   if (!grades || grades.length === 0) return null;
   const counts = {};
