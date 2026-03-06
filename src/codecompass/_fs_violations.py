@@ -5,6 +5,56 @@ from pathlib import Path
 from typing import Any, Callable
 
 
+def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+    """Parse live JSONL findings written by the MCP server."""
+    try:
+        lines = jsonl_path.read_text().splitlines()
+    except OSError:
+        return None
+    violations: list[dict[str, Any]] = []
+    compliance: list[dict[str, Any]] = []
+    for raw in lines:
+        raw = raw.strip()
+        if not raw:
+            continue
+        try:
+            obj = json.loads(raw)
+        except json.JSONDecodeError:
+            continue
+        if not obj.get("p") or obj.get("t") not in ("violation", "compliance"):
+            continue
+        snippet = obj.get("snippet")
+        entry = {
+            "principle": obj["p"],
+            "dimension": obj.get("d", dimension),
+            "file": obj.get("file"),
+            "line": obj.get("line"),
+            "reason": obj.get("reason"),
+            "snippet": str(snippet).splitlines()[0].strip() if snippet else None,
+            "severity": obj.get("severity") or "minor",
+            "cwe": obj.get("cwe"),
+            "violationType": obj.get("vt"),
+        }
+        if obj["t"] == "violation":
+            violations.append(entry)
+        else:
+            compliance.append(entry)
+    files_read = _count_files_read(stream_path.read_text()) if stream_path and stream_path.exists() else 0
+    return {
+        "dimension": dimension,
+        "runId": run_id,
+        "project": project,
+        "violations": violations,
+        "compliance": compliance,
+        "partial": True,
+        "progress": {
+            "filesRead": files_read,
+            "violations": len(violations),
+            "compliance": len(compliance),
+        },
+    }
+
+
 def parse_violations_from_evidence(evidence_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
     try:
         data = json.loads(evidence_path.read_text())

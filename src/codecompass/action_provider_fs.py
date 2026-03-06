@@ -9,7 +9,7 @@ from codecompass.action_provider import ActionProvider
 from codecompass.action_provider_jobs import JobManager
 from codecompass._fs_evaluation_mixin import FsEvaluationMixin
 from codecompass._fs_tooling_mixin import FsToolingMixin
-from codecompass._fs_violations import parse_violations_from_evidence, parse_violations_from_stream
+from codecompass._fs_violations import parse_violations_from_evidence, parse_violations_from_jsonl, parse_violations_from_stream
 from codecompass.adapters.fs.report_parser import (
     calculate_trend,
     list_runs,
@@ -492,7 +492,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         evidence_path = base / "evidence" / f"{dimension}_evidence.json"
         if evidence_path.exists():
             return parse_violations_from_evidence(evidence_path, project, run_id, dimension)
+        jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
         stream_path = base / "evidence" / f"{dimension}_live.stream"
+        if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
+            return parse_violations_from_jsonl(jsonl_path, stream_path, project, run_id, dimension)
         if stream_path.exists():
             return parse_violations_from_stream(stream_path, project, run_id, dimension)
         # Run exists but dimension hasn't started yet

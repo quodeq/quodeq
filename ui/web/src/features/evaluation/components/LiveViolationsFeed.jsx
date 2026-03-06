@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { stripPrinciplePrefix } from '../../../utils/formatters.js';
 
 function severityOrder(s) {
   return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
@@ -43,19 +44,21 @@ function parseFileRef(rawFile, rawLine) {
 
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
-  const { filePath, line } = parseFileRef(violation.file, violation.line);
+  const v = violation;
+  const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
   const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
   const display = line != null ? `${filename}:${line}` : filename;
 
   return (
     <div
-      className={`vdetail-row vdetail-row--${violation.severity}`}
+      className={`vdetail-row vdetail-row--${v.severity}`}
       style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
     >
-      <div className="vdetail-row-main" onClick={() => setOpen(o => !o)}>
-        <span className={`severity-tag ${violation.severity}`}>{violation.severity}</span>
-        {filename && <span className="vlive-file">{display}</span>}
+      <div className="vdetail-row-main vlive-collapsible" onClick={() => setOpen(o => !o)}>
+        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        {v.dimension && <span className="vlive-dimension-inline">[{v.dimension}]</span>}
+        <span className="vlive-principle">{v.principle}</span>
         <svg
           className={`vlive-chevron${open ? ' open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24"
@@ -67,10 +70,10 @@ function ViolationLiveRow({ violation, index }) {
       </div>
       {open && (
         <div className="vlive-detail">
-          {violation.reason && (
+          {(v.principle || v.reason) && (
             <div className="vlive-detail-section">
-              <span className="vlive-detail-section-label">Reason</span>
-              <p className="vlive-detail-reason"><strong>{violation.principle}</strong> — {violation.reason}</p>
+              {v.principle && <p className="vlive-detail-title">{v.principle}</p>}
+              {v.reason && <p className="vlive-detail-reason">{stripPrinciplePrefix(v.reason, v.principle)}</p>}
             </div>
           )}
           {filename && (
@@ -79,7 +82,7 @@ function ViolationLiveRow({ violation, index }) {
               <FileCopyBtn display={display} copyText={filename} />
             </div>
           )}
-          {violation.snippet && <pre className="vlive-snippet">{violation.snippet}</pre>}
+          {v.snippet && <pre className="vlive-snippet">{v.snippet}</pre>}
         </div>
       )}
     </div>

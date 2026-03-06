@@ -16,7 +16,9 @@ from datetime import datetime
 from pathlib import Path
 
 from codecompass.engine.analysis import (
+    count_files_from_stream,
     extract_evidence_from_stream,
+    get_mcp_status,
     is_stream_valid,
     run_analysis,
 )
@@ -115,6 +117,7 @@ def run(config: RunConfig) -> Evidence:
             work_dir=config.src,
             prompt=prompt,
             stream_file=stream_file,
+            jsonl_file=jsonl_file,
             analysis_budget=config.analysis_budget,
             heartbeat_callback=heartbeat,
         )
@@ -124,7 +127,17 @@ def run(config: RunConfig) -> Evidence:
             continue
 
         _emit_marker("scoring", dimension=dimension)
-        files_read = extract_evidence_from_stream(stream_file, jsonl_file)
+
+        # MCP server writes findings directly to jsonl_file during analysis.
+        # Fall back to stream extraction if MCP produced nothing.
+        mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
+        mcp_status = get_mcp_status(stream_file)
+        if mcp_status and mcp_status != "connected":
+            print(f"  ⚠ MCP findings server {mcp_status} — falling back to stream extraction", flush=True)
+        if mcp_produced:
+            files_read = count_files_from_stream(stream_file)
+        else:
+            files_read = extract_evidence_from_stream(stream_file, jsonl_file)
 
         ev = parse_jsonl_to_evidence(
             jsonl_file,
@@ -202,6 +215,7 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
             work_dir=config.src,
             prompt=prompt,
             stream_file=stream_file,
+            jsonl_file=jsonl_file,
             analysis_budget=config.analysis_budget,
             heartbeat_callback=heartbeat,
         )
@@ -211,7 +225,15 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
             continue
 
         _emit_marker("scoring", dimension=dimension)
-        files_read = extract_evidence_from_stream(stream_file, jsonl_file)
+
+        mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
+        mcp_status = get_mcp_status(stream_file)
+        if mcp_status and mcp_status != "connected":
+            print(f"  ⚠ MCP findings server {mcp_status} — falling back to stream extraction", flush=True)
+        if mcp_produced:
+            files_read = count_files_from_stream(stream_file)
+        else:
+            files_read = extract_evidence_from_stream(stream_file, jsonl_file)
 
         ev = parse_jsonl_to_evidence(
             jsonl_file,

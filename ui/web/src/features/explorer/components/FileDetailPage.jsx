@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
 import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
+import { stripPrinciplePrefix } from '../../../utils/formatters.js';
 
 const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
 
@@ -132,10 +133,10 @@ function ViolationCard({ v, index }) {
         />
       </div>
       <div className="vlive-detail">
-        {v.reason && (
+        {(v.principle || v.reason) && (
           <div className="vlive-detail-section">
-            <span className="vlive-detail-section-label">Reason</span>
-            <p className="vlive-detail-reason">{v.reason}</p>
+            {v.principle && <p className="vlive-detail-title">{v.principle}</p>}
+            {v.reason && <p className="vlive-detail-reason">{stripPrinciplePrefix(v.reason, v.principle)}</p>}
           </div>
         )}
         {filename && (

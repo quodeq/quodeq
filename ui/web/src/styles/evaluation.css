@@ -1669,6 +1669,7 @@
   line-height: 1.5;
 }
 
+
 /* Detail rows (explorer detail pages) */
 .vdetail-row {
   animation: vlive-enter 200ms ease-out both;
@@ -1682,6 +1683,28 @@
   padding: 10px 0;
   cursor: default;
 }
+
+.vdetail-row-main.vlive-collapsible {
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  margin: 0 -8px;
+  padding: 10px 8px;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.vdetail-row-main.vlive-collapsible:hover {
+  background: var(--color-surface-alt);
+}
+
+.vdetail-row-main.vlive-collapsible:hover .vlive-principle {
+  color: var(--color-accent);
+}
+
+.vdetail-row-main.vlive-collapsible:hover .vlive-chevron {
+  color: var(--color-text);
+}
+
+
 
 .vdetail-row-main .detail-copy-btn {
   margin-left: auto;
