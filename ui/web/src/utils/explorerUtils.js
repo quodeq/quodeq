@@ -79,8 +79,10 @@ export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = In
         file: entry.file || '',
         line: entry.line || null,
         snippet: entry.snippet || '',
+        title: entry.title || '',
         reason: entry.reason || '',
         severity,
+        ...(entry.cwe ? { cwe: entry.cwe } : {}),
       });
 
       if (dimension.dimension) {

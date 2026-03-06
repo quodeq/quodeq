@@ -13,6 +13,7 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, proj
         return None
     violations: list[dict[str, Any]] = []
     compliance: list[dict[str, Any]] = []
+    seen: set[tuple] = set()
     for raw in lines:
         raw = raw.strip()
         if not raw:
@@ -23,14 +24,18 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, proj
             continue
         if not obj.get("p") or obj.get("t") not in ("violation", "compliance"):
             continue
-        snippet = obj.get("snippet")
+        dedup_key = (obj.get("p"), obj.get("t"), obj.get("file"), obj.get("line"))
+        if dedup_key in seen:
+            continue
+        seen.add(dedup_key)
         entry = {
             "principle": obj["p"],
             "dimension": obj.get("d", dimension),
             "file": obj.get("file"),
             "line": obj.get("line"),
+            "title": obj.get("w"),
             "reason": obj.get("reason"),
-            "snippet": str(snippet).splitlines()[0].strip() if snippet else None,
+            "snippet": obj.get("snippet"),
             "severity": obj.get("severity") or "minor",
             "cwe": obj.get("cwe"),
             "violationType": obj.get("vt"),
@@ -66,14 +71,18 @@ def parse_violations_from_evidence(evidence_path: Path, project: str, run_id: st
         for violation in pdata.get("violations") or []:
             file_path = violation.get("file")
             line = violation.get("line")
-            violations.append({
+            v = {
                 "principle": label,
                 "file": f"{file_path}:{line}" if file_path and line else file_path,
                 "line": line,
+                "title": violation.get("title"),
                 "reason": violation.get("reason"),
                 "snippet": violation.get("snippet"),
                 "severity": violation.get("severity") or "minor",
-            })
+            }
+            if violation.get("cwe"):
+                v["cwe"] = violation["cwe"]
+            violations.append(v)
     return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}
 
 

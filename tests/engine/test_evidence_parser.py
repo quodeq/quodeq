@@ -20,7 +20,7 @@ def _sample_practices():
             {
                 "id": "ts-001",
                 "title": "Avoid eval()",
-                "cwe": 95,
+                "cwe": {"id": 95, "name": "Eval Injection"},
                 "dimension": "security",
                 "severity": "high",
                 "sub_characteristic": "Authenticity",
@@ -28,7 +28,7 @@ def _sample_practices():
             {
                 "id": "ts-002",
                 "title": "Keep functions small",
-                "cwe": 1121,
+                "cwe": {"id": 1121, "name": "Excessive McCabe Cyclomatic Complexity"},
                 "dimension": "maintainability",
                 "severity": "medium",
                 "sub_characteristic": "Analyzability",
@@ -227,7 +227,9 @@ class TestParseJsonlToEvidence:
         assert v["line"] == 10
         assert v["snippet"] == "eval(userInput)"
         assert v["severity"] == "high"
-        assert v["reason"] == "Avoid eval() — eval is dangerous"
+        assert v["title"] == "Eval Injection"
+        assert v["cwe"] == 95
+        assert v["reason"] == "eval is dangerous"
 
     def test_malformed_lines_skipped(self, tmp_path):
         jsonl = tmp_path / "evidence.jsonl"
