@@ -66,7 +66,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
 
         {allDimensions.length > 0 && (
           <div className="form-group">
-            <label>Dimensions</label>
+            <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
             <div className="dimension-grid">
               {allDimensions.map((dim) => (
                 <button
@@ -76,7 +76,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
                   title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
                   onClick={() => toggleDim(dim.id)}
                 >
-                  {dim.id} ({dim.weight}x)
+                  {dim.id}
                 </button>
               ))}
             </div>
