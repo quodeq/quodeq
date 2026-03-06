@@ -1,9 +1,40 @@
 {
   "applies": [
-    { "id": "maintainability", "weight": 1.0, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023" },
-    { "id": "reliability",     "weight": 1.0, "iso_25010": "Reliability",     "source": "ISO/IEC 25010:2023" },
-    { "id": "security",        "weight": 1.2, "iso_25010": "Security",        "source": "OWASP ASVS L1" },
-    { "id": "performance",     "weight": 0.8, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023" }
-  ],
-  "excludes": ["usability", "flexibility"]
+    {
+      "id": "security",
+      "weight": 1.2,
+      "iso_25010": "Security",
+      "source": "ISO/IEC 25010:2023"
+    },
+    {
+      "id": "reliability",
+      "weight": 1.0,
+      "iso_25010": "Reliability",
+      "source": "ISO/IEC 25010:2023"
+    },
+    {
+      "id": "maintainability",
+      "weight": 1.0,
+      "iso_25010": "Maintainability",
+      "source": "ISO/IEC 25010:2023"
+    },
+    {
+      "id": "performance",
+      "weight": 0.8,
+      "iso_25010": "Performance Efficiency",
+      "source": "ISO/IEC 25010:2023"
+    },
+    {
+      "id": "usability",
+      "weight": 0.6,
+      "iso_25010": "Usability",
+      "source": "ISO/IEC 25010:2023"
+    },
+    {
+      "id": "flexibility",
+      "weight": 0.6,
+      "iso_25010": "Flexibility",
+      "source": "ISO/IEC 25010:2023"
+    }
+  ]
 }

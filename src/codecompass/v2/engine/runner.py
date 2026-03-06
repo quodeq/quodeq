@@ -10,8 +10,9 @@ Merge per-dimension Evidence into a single Evidence object.
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import datetime
 from pathlib import Path
 
 from codecompass.v2.engine.analysis import (
@@ -39,6 +40,23 @@ class RunConfig:
     dimensions: list[str] | None = None
 
 
+def _emit_marker(phase: str, **kwargs) -> None:
+    """Emit a structured JSON marker for job tracking.
+
+    Only emitted when stdout is captured by the job manager (not a TTY).
+    """
+    if sys.stdout.isatty():
+        return
+    print(json.dumps({"_cc": phase, **kwargs}), flush=True)
+
+
+def _cleanup_stream(stream_file: Path) -> None:
+    """Remove stream and stderr files after successful evidence extraction."""
+    stream_file.unlink(missing_ok=True)
+    err_file = Path(str(stream_file) + ".err")
+    err_file.unlink(missing_ok=True)
+
+
 def run(config: RunConfig) -> Evidence:
     """Orchestrate: load plugin → per-dimension AI analysis → merged Evidence."""
     plugin_dir = config.evaluators_dir / config.plugin_id
@@ -47,7 +65,7 @@ def run(config: RunConfig) -> Evidence:
 
     full = load_plugin_full(plugin_dir)
     template = load_template(config.template_path)
-    date_str = date.today().isoformat()
+    date_str = datetime.now().isoformat(timespec="seconds")
 
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
     analysis_md = analysis_file.read_text() if analysis_file.exists() else ""
@@ -61,21 +79,21 @@ def run(config: RunConfig) -> Evidence:
 
     all_evidence: list[Evidence] = []
     total = len(dimensions)
+    _emit_marker("setup", dimensions=dimensions)
 
-    def _default_heartbeat(dim_name, src_count):
+    def _default_heartbeat(dim_name, idx, total, src_count):
         def _cb(elapsed, progress):
+            secs = elapsed % 60
             mins = elapsed // 60
             files = progress.get("files_read", 0)
             evidence = progress.get("evidence", 0)
-            if src_count > 0:
-                pct = min(round(files / src_count * 100), 100)
-                print(f"  {dim_name}: {mins}m elapsed — {files} files read ({pct}%), {evidence} findings", flush=True)
-            else:
-                print(f"  {dim_name}: {mins}m elapsed — {files} files read, {evidence} findings", flush=True)
+            pct_str = f" ({min(round(files / src_count * 100), 100)}%)" if src_count > 0 else ""
+            print(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {files} files{pct_str} | {evidence} findings", flush=True)
         return _cb
 
     for idx, dimension in enumerate(dimensions, 1):
-        print(f"[{idx}/{total}] Analyzing {dimension}...", flush=True)
+        _emit_marker("analyzing", dimension=dimension)
+        print(f"→ [{idx}/{total}] Analyzing {dimension}", flush=True)
         prompt = build_analysis_prompt(
             template,
             plugin_id=config.plugin_id,
@@ -83,7 +101,6 @@ def run(config: RunConfig) -> Evidence:
             date_str=date_str,
             dimension=dimension,
             source_file_count=config.source_file_count,
-            practices_data=full["practices"],
             dimensions_data=full["dimensions"],
             analysis_md=analysis_md,
             standards_dir=config.standards_dir,
@@ -92,7 +109,7 @@ def run(config: RunConfig) -> Evidence:
         stream_file = work_dir / f"{dimension}_live.stream"
         jsonl_file = work_dir / f"{dimension}_evidence.jsonl"
 
-        heartbeat = config.heartbeat_callback or _default_heartbeat(dimension, config.source_file_count)
+        heartbeat = config.heartbeat_callback or _default_heartbeat(dimension, idx, total, config.source_file_count)
 
         run_analysis(
             work_dir=config.src,
@@ -103,11 +120,11 @@ def run(config: RunConfig) -> Evidence:
         )
 
         if not is_stream_valid(stream_file):
-            print(f"  {dimension}: no valid stream, skipping", flush=True)
+            print(f"  [{idx}/{total}] {dimension} — no valid stream, skipping", flush=True)
             continue
 
+        _emit_marker("scoring", dimension=dimension)
         files_read = extract_evidence_from_stream(stream_file, jsonl_file)
-        print(f"  {dimension}: {files_read} files read", flush=True)
 
         ev = parse_jsonl_to_evidence(
             jsonl_file,
@@ -121,7 +138,7 @@ def run(config: RunConfig) -> Evidence:
         ev.plugin_name = full["plugin"].get("name", config.plugin_id)
         violations = sum(len(pe.violations) for pe in ev.principles.values())
         compliances = sum(len(pe.compliance) for pe in ev.principles.values())
-        print(f"  {dimension}: {violations} violations, {compliances} compliances found", flush=True)
+        print(f"✓ [{idx}/{total}] {dimension} — {files_read} files, {violations}v/{compliances}c", flush=True)
         all_evidence.append(ev)
 
     return _merge_evidence(all_evidence, config)
@@ -135,7 +152,7 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
 
     full = load_plugin_full(plugin_dir)
     template = load_template(config.template_path)
-    date_str = date.today().isoformat()
+    date_str = datetime.now().isoformat(timespec="seconds")
 
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
     analysis_md = analysis_file.read_text() if analysis_file.exists() else ""
@@ -147,23 +164,23 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
         dimensions = all_dims
     work_dir = config.work_dir or config.src
 
-    def _default_heartbeat(dim_name, src_count):
+    def _default_heartbeat(dim_name, idx, total, src_count):
         def _cb(elapsed, progress):
+            secs = elapsed % 60
             mins = elapsed // 60
             files = progress.get("files_read", 0)
             evidence = progress.get("evidence", 0)
-            if src_count > 0:
-                pct = min(round(files / src_count * 100), 100)
-                print(f"  {dim_name}: {mins}m elapsed — {files} files read ({pct}%), {evidence} findings", flush=True)
-            else:
-                print(f"  {dim_name}: {mins}m elapsed — {files} files read, {evidence} findings", flush=True)
+            pct_str = f" ({min(round(files / src_count * 100), 100)}%)" if src_count > 0 else ""
+            print(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {files} files{pct_str} | {evidence} findings", flush=True)
         return _cb
 
     result: dict[str, Evidence] = {}
     total = len(dimensions)
+    _emit_marker("setup", dimensions=dimensions)
 
     for idx, dimension in enumerate(dimensions, 1):
-        print(f"[{idx}/{total}] Analyzing {dimension}...", flush=True)
+        _emit_marker("analyzing", dimension=dimension)
+        print(f"→ [{idx}/{total}] Analyzing {dimension}", flush=True)
         prompt = build_analysis_prompt(
             template,
             plugin_id=config.plugin_id,
@@ -171,7 +188,6 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
             date_str=date_str,
             dimension=dimension,
             source_file_count=config.source_file_count,
-            practices_data=full["practices"],
             dimensions_data=full["dimensions"],
             analysis_md=analysis_md,
             standards_dir=config.standards_dir,
@@ -180,7 +196,7 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
         stream_file = work_dir / f"{dimension}_live.stream"
         jsonl_file = work_dir / f"{dimension}_evidence.jsonl"
 
-        heartbeat = config.heartbeat_callback or _default_heartbeat(dimension, config.source_file_count)
+        heartbeat = config.heartbeat_callback or _default_heartbeat(dimension, idx, total, config.source_file_count)
 
         run_analysis(
             work_dir=config.src,
@@ -191,11 +207,11 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
         )
 
         if not is_stream_valid(stream_file):
-            print(f"  {dimension}: no valid stream, skipping", flush=True)
+            print(f"  [{idx}/{total}] {dimension} — no valid stream, skipping", flush=True)
             continue
 
+        _emit_marker("scoring", dimension=dimension)
         files_read = extract_evidence_from_stream(stream_file, jsonl_file)
-        print(f"  {dimension}: {files_read} files read", flush=True)
 
         ev = parse_jsonl_to_evidence(
             jsonl_file,
@@ -210,7 +226,7 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
 
         violations = sum(len(pe.violations) for pe in ev.principles.values())
         compliances = sum(len(pe.compliance) for pe in ev.principles.values())
-        print(f"  {dimension}: {violations} violations, {compliances} compliances found", flush=True)
+        print(f"✓ [{idx}/{total}] {dimension} — {files_read} files, {violations}v/{compliances}c", flush=True)
         result[dimension] = ev
 
     return result
@@ -323,12 +339,15 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> di
     from codecompass.v2.engine.scoring import score_evidence
     from codecompass.v2.engine.report import write_dimension_report
 
+    work_dir = config.work_dir or config.src
     per_dim_evidence = run_per_dimension(config)
     results: dict[str, str] = {}
 
     for dimension, evidence in per_dim_evidence.items():
         scores = score_evidence(evidence, mode=mode)
         write_dimension_report(evidence, scores, dimension, output_dir)
+        # Clean up stream now that the eval JSON exists
+        _cleanup_stream(work_dir / f"{dimension}_live.stream")
         overall = scores.get("overall", {})
         if mode == "numerical":
             val = overall.get("weighted_score")

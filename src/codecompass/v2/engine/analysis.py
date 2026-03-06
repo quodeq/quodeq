@@ -40,8 +40,8 @@ def _count_stream_progress(stream_file: Path) -> dict:
                 etype = data.get("type", "")
                 if etype == "assistant":
                     for block in data.get("message", {}).get("content", []):
-                        if block.get("type") == "tool_use" and block.get("name") == "Read":
-                            fp = block.get("input", {}).get("file_path")
+                        if block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
+                            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
                             if fp:
                                 files_read.add(fp)
                         elif block.get("type") == "text":
@@ -57,8 +57,8 @@ def _count_stream_progress(stream_file: Path) -> dict:
                 elif etype == "item.completed":
                     item = data.get("item", {})
                     for block in item.get("content", []):
-                        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Read":
-                            fp = block.get("input", {}).get("file_path")
+                        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
+                            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
                             if fp:
                                 files_read.add(fp)
     except (OSError, ValueError):
@@ -72,7 +72,7 @@ def run_analysis(
     stream_file: Path,
     *,
     analysis_budget: str | None = None,
-    heartbeat_interval: int = 60,
+    heartbeat_interval: int = 10,
     heartbeat_callback: object | None = None,
 ) -> None:
     """Spawn AI CLI subprocess with tools, capturing stream-json to *stream_file*.

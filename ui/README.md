@@ -4,7 +4,6 @@ Local dashboard for analyzed projects under `reports/`.
 
 ## Structure
 
-- `ui/server`: Express gateway that forwards UI requests to the Python Action API
 - `ui/web`: React + Vite dashboard
 
 ## Run with `codecompass dashboard` (recommended)
@@ -49,15 +48,7 @@ Start the Python Action API:
 uv run python -m codecompass.action_api
 ```
 
-Then in one terminal:
-
-```bash
-cd ui/server
-npm install
-CODECOMPASS_ACTION_API=http://127.0.0.1:8001 npm run dev
-```
-
-In another terminal:
+Then in another terminal:
 
 ```bash
 cd ui/web
@@ -79,10 +70,3 @@ Then open `http://localhost:5173`.
 - `GET /api/evaluations/:jobId`
 - `GET /api/browse`
 
-## Evaluation command override
-
-The UI server can still run evaluations directly when no Action API is configured. You can override the command:
-
-```bash
-export CODECOMPASS_EVALUATE_CMD="uv run codecompass evaluate"
-```

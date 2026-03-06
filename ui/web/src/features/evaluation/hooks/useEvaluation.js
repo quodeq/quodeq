@@ -34,6 +34,7 @@ export function useEvaluation() {
     liveViolationsRef.current = liveViolations;
   }, [liveViolations]);
 
+
   function stopPolling() {
     if (pollRef.current) {
       clearInterval(pollRef.current);
@@ -51,39 +52,27 @@ export function useEvaluation() {
   function startDimensionPolling(project, runId) {
     stopDimensionPolling();
     dimFailCountRef.current = {};
-    let tick = 0;
     dimPollRef.current = setInterval(async () => {
-      tick++;
-      const dims = requestedDimensionsRef.current;
-      if (!dims.length) {
-        stopDimensionPolling();
-        return;
-      }
-
-      const pending = dims.filter(d => !liveViolationsRef.current[d] || partialDimensionsRef.current.has(d));
-      if (!pending.length) {
-        stopDimensionPolling();
-        return;
-      }
+      // Only poll dimensions that are still partial (stream-based)
+      const partial = [...partialDimensionsRef.current];
+      if (!partial.length) return;
 
       await Promise.allSettled(
-        pending.map(async (dim) => {
-          // Backoff: after N failures, only retry every 2^N ticks (max every ~30s)
-          const fails = dimFailCountRef.current[dim] || 0;
-          if (fails > 0 && tick % Math.min(1 << fails, 16) !== 0) return;
+        partial.map(async (dim) => {
           try {
             const data = await getDimensionEval(project, runId, dim);
             dimFailCountRef.current[dim] = 0;
             if (data?.violations) {
-              if (data.partial) {
-                partialDimensionsRef.current.add(dim);
-              } else {
+              setLiveViolations(prev => ({ ...prev, [dim]: data.violations }));
+              if (!data.partial) {
+                // Final scored result — stop polling this dimension
                 partialDimensionsRef.current.delete(dim);
               }
-              setLiveViolations(prev => ({ ...prev, [dim]: data.violations }));
             }
           } catch {
-            dimFailCountRef.current[dim] = (dimFailCountRef.current[dim] || 0) + 1;
+            const fails = (dimFailCountRef.current[dim] || 0) + 1;
+            dimFailCountRef.current[dim] = fails;
+            if (fails > 10) partialDimensionsRef.current.delete(dim);
           }
         })
       );
@@ -97,9 +86,16 @@ export function useEvaluation() {
       try {
         const updated = await getEvaluation(jobId);
         setJob((prev) => ({ ...updated, repo: prev?.repo }));
+        // Use dimensions list from job (emitted during setup phase)
+        if (updated.dimensions?.length && !requestedDimensionsRef.current.length) {
+          requestedDimensionsRef.current = updated.dimensions;
+        }
+        // When a dimension enters analyzing phase, start polling it
+        if (updated.phase === 'analyzing' && updated.currentDimension) {
+          partialDimensionsRef.current.add(updated.currentDimension);
+        }
         const hasOutput = updated.outputProject && updated.outputRunId;
-        const evaluating = updated.phase === 'evidence' || updated.phase === 'scoring';
-        const canPollDims = hasOutput && (evaluating || updated.status !== 'running');
+        const canPollDims = hasOutput && (updated.phase === 'analyzing' || updated.phase === 'scoring' || updated.status !== 'running');
         if (updated.status !== 'running') {
           stopPolling();
           if (canPollDims && !dimPollingStarted) {

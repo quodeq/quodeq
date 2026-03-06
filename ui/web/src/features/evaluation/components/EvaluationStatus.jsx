@@ -14,6 +14,16 @@ function statusTitle(status) {
   return 'Evaluation Cancelled';
 }
 
+function phaseLabel(job) {
+  if (!job || job.status !== 'running') return null;
+  switch (job.phase) {
+    case 'setup': return 'Setting up';
+    case 'analyzing': return 'Analyzing';
+    case 'scoring': return 'Scoring';
+    default: return 'Starting';
+  }
+}
+
 export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel }) {
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
@@ -83,9 +93,14 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
 
       {isRunning && (
         <div className="eval-status-row">
-          <span className="eval-status-line">
-            {lastRelevantLog(job?.logs) ?? 'Starting…'}
-          </span>
+          <span className="eval-status-phase">{phaseLabel(job)}</span>
+          {job.dimensions?.length > 0 && (
+            <span className="eval-status-dims">
+              {job.dimensions.map(d => (
+                <span key={d} className={`eval-dim-tag${d === job.currentDimension ? ' active' : ''}`}>{d}</span>
+              ))}
+            </span>
+          )}
           <button
             type="button"
             className="eval-console-toggle"
