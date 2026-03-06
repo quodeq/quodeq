@@ -151,7 +151,7 @@ def test_detectors_missing_rules():
 # ── validate_plugin_dir ───────────────────────────────────────────────
 
 def test_validate_real_typescript_plugin():
-    ts_dir = Path(__file__).parent.parent.parent / "evaluators" / "typescript"
+    ts_dir = Path(__file__).parent.parent.parent / "v2" / "evaluators" / "typescript"
     if not ts_dir.exists():
         pytest.skip("TypeScript plugin not available")
     errors = validate_plugin_dir(ts_dir)
@@ -162,12 +162,10 @@ def test_validate_plugin_dir_missing_files(tmp_path):
     errors = validate_plugin_dir(tmp_path)
     assert "plugin.json" in errors
     assert "dimensions.json" in errors
-    assert "detectors.json" in errors
 
 
 def test_validate_plugin_dir_with_invalid_plugin(tmp_path):
     (tmp_path / "plugin.json").write_text(json.dumps({"id": "BAD"}))
     (tmp_path / "dimensions.json").write_text(json.dumps({"applies": [{"id": "x", "weight": 1}]}))
-    (tmp_path / "detectors.json").write_text(json.dumps([{"type": "grep", "rules": "r.ini"}]))
     errors = validate_plugin_dir(tmp_path)
     assert "plugin.json" in errors

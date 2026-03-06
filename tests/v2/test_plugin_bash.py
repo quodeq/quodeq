@@ -5,9 +5,8 @@ from pathlib import Path
 
 from codecompass.v2.engine.plugin_loader import load_plugin
 from codecompass.v2.engine.schema_validator import validate_plugin_dir
-from codecompass.v2.engine.detectors.grep import GrepDetector
 
-PLUGIN_DIR = Path(__file__).parent.parent.parent / "evaluators" / "bash"
+PLUGIN_DIR = Path(__file__).parent.parent.parent / "v2" / "evaluators" / "bash"
 
 
 def test_plugin_loads():
@@ -23,11 +22,3 @@ def test_plugin_has_knowledge():
 def test_plugin_passes_validation():
     errors = validate_plugin_dir(PLUGIN_DIR)
     assert errors == {}, f"Validation errors: {errors}"
-
-
-def test_scan_rules_detect_secrets(tmp_path):
-    bad_file = tmp_path / "deploy.sh"
-    bad_file.write_text("API_KEY='sk-prod-abc123xyz456789'\n")
-    detector = GrepDetector()
-    findings = detector.run(tmp_path, {"rules_file": str(PLUGIN_DIR / "scan_rules.ini")})
-    assert any(f.cwe == 798 for f in findings)

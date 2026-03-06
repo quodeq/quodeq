@@ -43,7 +43,6 @@ def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
     validators = {
         "plugin.json": validate_plugin,
         "dimensions.json": validate_dimensions,
-        "detectors.json": validate_detectors,
     }
 
     for filename, validator_fn in validators.items():

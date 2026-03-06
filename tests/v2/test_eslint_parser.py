@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import pytest
+
+pytestmark = pytest.mark.skip(reason="detector/judge code removed in PR2")
+
 import json
 
 from codecompass.v2.engine.detectors.parsers.eslint import parse_eslint_output

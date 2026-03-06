@@ -2,7 +2,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-STANDARDS_DIR = Path(__file__).parent.parent.parent.parent.parent / "standards"
+STANDARDS_DIR = Path(__file__).parent.parent.parent.parent.parent / "v2" / "standards"
 
 
 def load_dimension(dimension_id: str) -> dict:
