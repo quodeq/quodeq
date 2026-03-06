@@ -15,7 +15,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-STANDARDS_DIR = Path(__file__).resolve().parent.parent / "v2" / "standards" / "iso25010"
+STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 
 # ---------------------------------------------------------------------------
 # Mapping: dimension → principle → [(requirement_text, [cwe_ids])]

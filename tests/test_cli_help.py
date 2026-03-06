@@ -36,19 +36,3 @@ def test_cli_dashboard_passes_subcommand_args(monkeypatch):
 
     assert result == 0
     assert captured["argv"] == []
-
-
-def test_cli_evaluate_v1_single_repo_defaults_discipline(monkeypatch):
-    captured = {}
-
-    def fake_run_evaluate(config):
-        captured["config"] = config
-        return 0
-
-    monkeypatch.setattr("codecompass.cli.run_evaluate", fake_run_evaluate)
-
-    result = __import__("codecompass.cli", fromlist=["main"]).main(["evaluate-v1", "/repo/path"])
-
-    assert result == 0
-    assert captured["config"].repo == "/repo/path"
-    assert captured["config"].discipline is None

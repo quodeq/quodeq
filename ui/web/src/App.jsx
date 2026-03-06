@@ -254,13 +254,14 @@ export default function App() {
   // Header meta (discipline, repository, source files)
   // -------------------------------------------------------------------------
   const headerMeta = useMemo(() => {
-    const dims = accumulated?.dimensions || [];
-    if (dims.length === 0) return null;
-    const discipline = dims.find((d) => d.discipline)?.discipline ?? null;
-    const repository = dims.find((d) => d.repository)?.repository ?? null;
-    const totalFiles = dims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
+    const accDims = accumulated?.dimensions || [];
+    if (accDims.length === 0) return null;
+    const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
+    const repository = accDims.find((d) => d.repository)?.repository ?? null;
+    const runDims = dashboard?.dimensions || [];
+    const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
     return { discipline, repository, totalFiles };
-  }, [accumulated]);
+  }, [accumulated, dashboard]);
 
   const { selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
     if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };

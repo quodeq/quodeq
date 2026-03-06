@@ -12,8 +12,8 @@ import sys
 from pathlib import Path
 
 repo_root = Path(__file__).resolve().parents[1]
-COMPILED_DIR = repo_root / "v2" / "standards" / "compiled"
-EVALUATORS_DIR = repo_root / "v2" / "evaluators"
+COMPILED_DIR = repo_root / "standards" / "compiled"
+EVALUATORS_DIR = repo_root / "evaluators"
 
 
 def load_compiled_standards(compiled_dir: Path) -> dict[str, dict]:

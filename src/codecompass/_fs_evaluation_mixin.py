@@ -31,7 +31,7 @@ def _build_evaluate_cmd(
 
 def _register_project(repo: str, discipline: str | None, reports_dir: str) -> None:
     """Resolve and register the project UUID before evaluation starts."""
-    from codecompass.evaluate.project_resolver import resolve_project_uuid
+    from codecompass.util.project_resolver import resolve_project_uuid
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = repo.split("/")[-1].replace(".git", "") if is_repo_url(repo) else Path(repo).name
     location = "online" if is_repo_url(repo) else "local"

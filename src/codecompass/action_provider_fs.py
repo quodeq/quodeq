@@ -329,14 +329,16 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
 
 
 def _list_available_dimensions_for_discipline(discipline: str) -> list[str]:
-    """Resolve available dimensions for a discipline via the evaluators repository."""
+    """Resolve available dimensions for a plugin via its dimensions.json."""
     try:
-        from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
-        from codecompass.config.paths import default_paths
-        from codecompass.evaluate.lib.dimensions import list_available_dimensions
-        paths = default_paths()
-        evaluators = FilesystemEvaluatorsRepository(root=paths.vroot)
-        return list_available_dimensions(evaluators, discipline)
+        import json as _json
+        from pathlib import Path as _Path
+        plugin_dir = _Path(__file__).resolve().parent.parent.parent / "evaluators" / discipline
+        dims_file = plugin_dir / "dimensions.json"
+        if dims_file.exists():
+            data = _json.loads(dims_file.read_text())
+            return [d["id"] for d in data.get("applies", [])]
+        return []
     except Exception:
         return []
 
