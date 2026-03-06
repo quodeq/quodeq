@@ -7,41 +7,293 @@
     {
       "name": "Maturity",
       "requirements": [
-        { "id": "R-MAT-1", "text": "All public functions MUST have corresponding test files", "cwe": [1059] },
-        { "id": "R-MAT-2", "text": "Edge cases (empty input, boundary values) MUST be tested explicitly", "cwe": [1059] },
-        { "id": "R-MAT-3", "text": "Error paths MUST be tested, not only happy paths", "cwe": [1059] },
-        { "id": "R-MAT-4", "text": "Deprecated APIs MUST NOT be used; use supported alternatives", "cwe": [477] },
-        { "id": "R-MAT-5", "text": "Type annotations MUST be used on public function signatures", "cwe": [1059] }
+        {
+          "id": "R-MAT-1",
+          "text": "All public functions MUST have corresponding test files",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "R-MAT-2",
+          "text": "Edge cases (empty input, boundary values) MUST be tested explicitly",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "R-MAT-3",
+          "text": "Error paths MUST be tested, not only happy paths",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "R-MAT-4",
+          "text": "Deprecated APIs MUST NOT be used; use supported alternatives",
+          "cwe": [
+            477
+          ]
+        },
+        {
+          "id": "R-MAT-5",
+          "text": "Type annotations MUST be used on public function signatures",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "R-MAT-6",
+          "text": "Resources MUST be properly initialized before use",
+          "cwe": [
+            456,
+            665,
+            908
+          ]
+        },
+        {
+          "id": "R-MAT-7",
+          "text": "Concurrent access to shared resources MUST be properly synchronized",
+          "cwe": [
+            662,
+            820,
+            821,
+            833
+          ]
+        },
+        {
+          "id": "R-MAT-8",
+          "text": "Calculations and comparisons MUST be correct and avoid undefined behavior",
+          "cwe": [
+            682,
+            758
+          ]
+        }
       ]
     },
     {
       "name": "Availability",
       "requirements": [
-        { "id": "R-AVL-1", "text": "Health-check endpoints MUST be implemented for long-running services", "cwe": [1059] },
-        { "id": "R-AVL-2", "text": "Circuit breakers MUST be used for external service calls", "cwe": [400] },
-        { "id": "R-AVL-3", "text": "Retry logic MUST use exponential backoff with jitter", "cwe": [400] },
-        { "id": "R-AVL-4", "text": "Timeouts MUST be set on all external HTTP and database calls", "cwe": [1088] },
-        { "id": "R-AVL-5", "text": "Graceful shutdown handlers MUST be implemented for server processes", "cwe": [404] }
+        {
+          "id": "R-AVL-1",
+          "text": "Health-check endpoints MUST be implemented for long-running services",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "R-AVL-2",
+          "text": "Circuit breakers MUST be used for external service calls",
+          "cwe": [
+            400
+          ]
+        },
+        {
+          "id": "R-AVL-3",
+          "text": "Retry logic MUST use exponential backoff with jitter",
+          "cwe": [
+            400
+          ]
+        },
+        {
+          "id": "R-AVL-4",
+          "text": "Timeouts MUST be set on all external HTTP and database calls",
+          "cwe": [
+            1088
+          ]
+        },
+        {
+          "id": "R-AVL-5",
+          "text": "Graceful shutdown handlers MUST be implemented for server processes",
+          "cwe": [
+            404
+          ]
+        }
       ]
     },
     {
       "name": "Fault Tolerance",
       "requirements": [
-        { "id": "R-FT-1", "text": "Exceptions MUST be caught and handled; empty catch blocks are forbidden", "cwe": [390] },
-        { "id": "R-FT-2", "text": "Null/undefined dereferences MUST be guarded before use", "cwe": [476] },
-        { "id": "R-FT-3", "text": "Async operations MUST handle rejection/error paths explicitly", "cwe": [755] },
-        { "id": "R-FT-4", "text": "Input from external sources MUST be validated before processing", "cwe": [20] },
-        { "id": "R-FT-5", "text": "Fallback values MUST be provided for optional configuration", "cwe": [1188] }
+        {
+          "id": "R-FT-1",
+          "text": "Exceptions MUST be caught and handled; empty catch blocks are forbidden",
+          "cwe": [
+            390
+          ]
+        },
+        {
+          "id": "R-FT-2",
+          "text": "Null/undefined dereferences MUST be guarded before use",
+          "cwe": [
+            476
+          ]
+        },
+        {
+          "id": "R-FT-3",
+          "text": "Async operations MUST handle rejection/error paths explicitly",
+          "cwe": [
+            755
+          ]
+        },
+        {
+          "id": "R-FT-4",
+          "text": "Input from external sources MUST be validated before processing",
+          "cwe": [
+            20
+          ]
+        },
+        {
+          "id": "R-FT-5",
+          "text": "Fallback values MUST be provided for optional configuration",
+          "cwe": [
+            1188
+          ]
+        },
+        {
+          "id": "R-FT-6",
+          "text": "Return values from fallible operations MUST be checked",
+          "cwe": [
+            252
+          ]
+        },
+        {
+          "id": "R-FT-7",
+          "text": "Catch blocks MUST target specific exception types, not generic Exception",
+          "cwe": [
+            396
+          ]
+        },
+        {
+          "id": "R-FT-8",
+          "text": "Throw declarations MUST specify concrete exception types",
+          "cwe": [
+            397
+          ]
+        },
+        {
+          "id": "R-FT-9",
+          "text": "Boundary and edge-case conditions MUST be checked explicitly",
+          "cwe": [
+            754
+          ]
+        },
+        {
+          "id": "R-FT-10",
+          "text": "Control flow MUST be structured and predictable; no unreachable statements",
+          "cwe": [
+            691
+          ]
+        },
+        {
+          "id": "R-FT-11",
+          "text": "Recursive functions MUST have verifiable termination conditions",
+          "cwe": [
+            674
+          ]
+        },
+        {
+          "id": "R-FT-12",
+          "text": "All loops MUST have reachable termination conditions",
+          "cwe": [
+            835
+          ]
+        },
+        {
+          "id": "R-FT-13",
+          "text": "Temporary files MUST be created using secure APIs (mktemp) to prevent race conditions",
+          "cwe": [
+            377
+          ]
+        },
+        {
+          "id": "R-FT-14",
+          "text": "Error conditions MUST be detected and handled, not silently ignored",
+          "cwe": [
+            248,
+            274,
+            280,
+            369,
+            391,
+            394,
+            460,
+            550,
+            636,
+            703
+          ]
+        },
+        {
+          "id": "R-FT-15",
+          "text": "Switch statements MUST include default cases and break statements",
+          "cwe": [
+            478,
+            484
+          ]
+        },
+        {
+          "id": "R-FT-16",
+          "text": "Incorrect operators and type conversions MUST be avoided",
+          "cwe": [
+            480,
+            595,
+            681,
+            704
+          ]
+        },
+        {
+          "id": "R-FT-17",
+          "text": "Custom error pages MUST NOT reveal sensitive implementation details",
+          "cwe": [
+            234,
+            756
+          ]
+        }
       ]
     },
     {
       "name": "Recoverability",
       "requirements": [
-        { "id": "R-REC-1", "text": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns", "cwe": [772] },
-        { "id": "R-REC-2", "text": "Database transactions MUST be rolled back on error", "cwe": [772] },
-        { "id": "R-REC-3", "text": "Temporary files MUST be cleaned up in finally/defer blocks", "cwe": [459] },
-        { "id": "R-REC-4", "text": "Persistent operations MUST be idempotent or use transaction guards", "cwe": [772] },
-        { "id": "R-REC-5", "text": "Error messages MUST include enough context for diagnosis (operation, input, state)", "cwe": [755] }
+        {
+          "id": "R-REC-1",
+          "text": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns",
+          "cwe": [
+            772
+          ]
+        },
+        {
+          "id": "R-REC-2",
+          "text": "Database transactions MUST be rolled back on error",
+          "cwe": [
+            772
+          ]
+        },
+        {
+          "id": "R-REC-3",
+          "text": "Temporary files MUST be cleaned up in finally/defer blocks",
+          "cwe": [
+            459
+          ]
+        },
+        {
+          "id": "R-REC-4",
+          "text": "Persistent operations MUST be idempotent or use transaction guards",
+          "cwe": [
+            772
+          ]
+        },
+        {
+          "id": "R-REC-5",
+          "text": "Error messages MUST include enough context for diagnosis (operation, input, state)",
+          "cwe": [
+            755
+          ]
+        },
+        {
+          "id": "R-REC-6",
+          "text": "Resources MUST be properly released and cleaned up after use",
+          "cwe": [
+            672
+          ]
+        }
       ]
     }
   ]

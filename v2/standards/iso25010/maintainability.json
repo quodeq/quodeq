@@ -7,48 +7,443 @@
     {
       "name": "Modularity",
       "requirements": [
-        { "id": "M-MOD-1", "text": "Cyclomatic complexity MUST be ≤10 per function", "cwe": [1121] },
-        { "id": "M-MOD-2", "text": "Each module MUST have a single clearly defined responsibility", "cwe": [1080] },
-        { "id": "M-MOD-3", "text": "Package dependency cycles MUST be 0", "cwe": [1047] },
-        { "id": "M-MOD-4", "text": "Functions MUST have ≤5 parameters; use an options object for more", "cwe": [1121] }
+        {
+          "id": "M-MOD-1",
+          "text": "Cyclomatic complexity MUST be ≤10 per function",
+          "cwe": [
+            1121
+          ]
+        },
+        {
+          "id": "M-MOD-2",
+          "text": "Each module MUST have a single clearly defined responsibility",
+          "cwe": [
+            1080
+          ]
+        },
+        {
+          "id": "M-MOD-3",
+          "text": "Package dependency cycles MUST be 0",
+          "cwe": [
+            1047
+          ]
+        },
+        {
+          "id": "M-MOD-4",
+          "text": "Functions MUST have ≤5 parameters; use an options object for more",
+          "cwe": [
+            1121
+          ]
+        },
+        {
+          "id": "M-MOD-5",
+          "text": "Functions MUST have ≤5 parameters",
+          "cwe": [
+            1064
+          ]
+        },
+        {
+          "id": "M-MOD-6",
+          "text": "Functions MUST limit outward calls to ≤7 distinct callees to reduce coupling",
+          "cwe": [
+            1048
+          ]
+        },
+        {
+          "id": "M-MOD-7",
+          "text": "Inheritance depth MUST NOT exceed 4 levels",
+          "cwe": [
+            1074
+          ]
+        },
+        {
+          "id": "M-MOD-8",
+          "text": "Inheritance hierarchies MUST maintain consistent destructor/cleanup patterns",
+          "cwe": [
+            1045
+          ]
+        },
+        {
+          "id": "M-MOD-9",
+          "text": "Components MUST call peers or immediate dependencies, not skip layers",
+          "cwe": [
+            1054
+          ]
+        },
+        {
+          "id": "M-MOD-10",
+          "text": "Trust boundaries MUST be enforced between components of different privilege levels",
+          "cwe": [
+            1090
+          ]
+        },
+        {
+          "id": "M-MOD-11",
+          "text": "Class hierarchies MUST avoid excessive depth, circular dependencies, and improper virtual destructor patterns",
+          "cwe": [
+            1042,
+            1043,
+            1055,
+            1062,
+            1079,
+            1086,
+            1087
+          ]
+        },
+        {
+          "id": "M-MOD-12",
+          "text": "Functions MUST NOT have variadic parameters without type safety or excessive file/data access operations",
+          "cwe": [
+            1056,
+            1060,
+            1073,
+            1084
+          ]
+        },
+        {
+          "id": "M-MOD-13",
+          "text": "Code MUST maintain proper encapsulation and data element visibility",
+          "cwe": [
+            766,
+            1092
+          ]
+        },
+        {
+          "id": "M-MOD-14",
+          "text": "Modules MUST NOT have hard-coded network configuration or platform-dependent components",
+          "cwe": [
+            1051,
+            1100,
+            1102,
+            1103,
+            1105
+          ]
+        }
       ]
     },
     {
       "name": "Reusability",
       "requirements": [
-        { "id": "M-REU-1", "text": "Shared logic MUST be extracted into utility modules rather than duplicated", "cwe": [1041] },
-        { "id": "M-REU-2", "text": "Public functions MUST NOT depend on global mutable state", "cwe": [1057] },
-        { "id": "M-REU-3", "text": "Interfaces MUST be preferred over concrete types in function signatures", "cwe": [1061] },
-        { "id": "M-REU-4", "text": "Configuration MUST be injectable; modules MUST NOT read env vars directly", "cwe": [1188] }
+        {
+          "id": "M-REU-1",
+          "text": "Shared logic MUST be extracted into utility modules rather than duplicated",
+          "cwe": [
+            1041
+          ]
+        },
+        {
+          "id": "M-REU-2",
+          "text": "Public functions MUST NOT depend on global mutable state",
+          "cwe": [
+            1057
+          ]
+        },
+        {
+          "id": "M-REU-3",
+          "text": "Interfaces MUST be preferred over concrete types in function signatures",
+          "cwe": [
+            1061
+          ]
+        },
+        {
+          "id": "M-REU-4",
+          "text": "Configuration MUST be injectable; modules MUST NOT read env vars directly",
+          "cwe": [
+            1188
+          ]
+        },
+        {
+          "id": "M-REU-5",
+          "text": "Serialization control elements MUST be properly implemented",
+          "cwe": [
+            1066,
+            1070
+          ]
+        },
+        {
+          "id": "M-REU-6",
+          "text": "Singleton classes MUST use proper locking and synchronization for instance creation",
+          "cwe": [
+            1058,
+            1063,
+            1096
+          ]
+        },
+        {
+          "id": "M-REU-7",
+          "text": "Data elements containing pointers MUST implement proper copy control",
+          "cwe": [
+            1082,
+            1097,
+            1098
+          ]
+        }
       ]
     },
     {
       "name": "Analyzability",
       "requirements": [
-        { "id": "M-ANA-1", "text": "Source files MUST NOT exceed 300 lines", "cwe": [1080] },
-        { "id": "M-ANA-2", "text": "Functions MUST NOT exceed 50 lines", "cwe": [1080] },
-        { "id": "M-ANA-3", "text": "Nesting depth MUST NOT exceed 4 levels", "cwe": [1121] },
-        { "id": "M-ANA-4", "text": "Boolean expressions MUST NOT combine more than 3 conditions without extraction", "cwe": [1121] },
-        { "id": "M-ANA-5", "text": "Public APIs MUST be documented with parameter and return descriptions", "cwe": [1053] }
+        {
+          "id": "M-ANA-1",
+          "text": "Source files MUST NOT exceed 300 lines",
+          "cwe": [
+            1080
+          ]
+        },
+        {
+          "id": "M-ANA-2",
+          "text": "Functions MUST NOT exceed 50 lines",
+          "cwe": [
+            1080
+          ]
+        },
+        {
+          "id": "M-ANA-3",
+          "text": "Nesting depth MUST NOT exceed 4 levels",
+          "cwe": [
+            1121
+          ]
+        },
+        {
+          "id": "M-ANA-4",
+          "text": "Boolean expressions MUST NOT combine more than 3 conditions without extraction",
+          "cwe": [
+            1121
+          ]
+        },
+        {
+          "id": "M-ANA-5",
+          "text": "Public APIs MUST be documented with parameter and return descriptions",
+          "cwe": [
+            1053
+          ]
+        },
+        {
+          "id": "M-ANA-6",
+          "text": "Control flow MUST NOT use unconditional jumps out of deeply nested blocks",
+          "cwe": [
+            1075
+          ]
+        },
+        {
+          "id": "M-ANA-7",
+          "text": "Loop counter variables MUST NOT be modified inside the loop body",
+          "cwe": [
+            1095
+          ]
+        },
+        {
+          "id": "M-ANA-8",
+          "text": "Code complexity MUST remain within measurable thresholds (Halstead, nesting depth, attack surface)",
+          "cwe": [
+            1120,
+            1122,
+            1124,
+            1125
+          ]
+        },
+        {
+          "id": "M-ANA-9",
+          "text": "Source code MUST follow consistent naming, formatting, and style conventions",
+          "cwe": [
+            710,
+            1076,
+            1078,
+            1099,
+            1113,
+            1114,
+            1115
+          ]
+        },
+        {
+          "id": "M-ANA-10",
+          "text": "Code MUST NOT contain dead code, empty blocks, irrelevant code, or redundant expressions",
+          "cwe": [
+            570,
+            571,
+            783,
+            1069,
+            1071,
+            1119,
+            1164
+          ]
+        },
+        {
+          "id": "M-ANA-11",
+          "text": "Documentation MUST be sufficient, accurate, and consistent with the implementation",
+          "cwe": [
+            1068,
+            1110,
+            1111,
+            1112,
+            1116,
+            1117,
+            1118
+          ]
+        },
+        {
+          "id": "M-ANA-12",
+          "text": "Variables MUST be used for their declared purpose with appropriate scope",
+          "cwe": [
+            563,
+            1109,
+            1126
+          ]
+        },
+        {
+          "id": "M-ANA-13",
+          "text": "Comments MUST follow appropriate style and MUST NOT contain suspicious markers",
+          "cwe": [
+            546
+          ]
+        }
       ]
     },
     {
       "name": "Modifiability",
       "requirements": [
-        { "id": "M-MDF-1", "text": "Magic numbers and strings MUST be replaced with named constants", "cwe": [1059] },
-        { "id": "M-MDF-2", "text": "Feature flags MUST be used for in-progress features rather than commented-out code", "cwe": [1059] },
-        { "id": "M-MDF-3", "text": "Wildcard imports (import *) MUST NOT be used", "cwe": [1061] },
-        { "id": "M-MDF-4", "text": "Dead code MUST be removed, not commented out", "cwe": [561] }
+        {
+          "id": "M-MDF-1",
+          "text": "Magic numbers and strings MUST be replaced with named constants",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "M-MDF-2",
+          "text": "Feature flags MUST be used for in-progress features rather than commented-out code",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "M-MDF-3",
+          "text": "Wildcard imports (import *) MUST NOT be used",
+          "cwe": [
+            1061
+          ]
+        },
+        {
+          "id": "M-MDF-4",
+          "text": "Dead code MUST be removed, not commented out",
+          "cwe": [
+            561
+          ]
+        },
+        {
+          "id": "M-MDF-5",
+          "text": "Commented-out code MUST be removed; use version control for history",
+          "cwe": [
+            1085
+          ]
+        },
+        {
+          "id": "M-MDF-6",
+          "text": "Code MUST NOT use obsolete, dangerous, or prohibited functions",
+          "cwe": [
+            407,
+            474,
+            475,
+            477,
+            483,
+            676,
+            1177
+          ]
+        },
+        {
+          "id": "M-MDF-7",
+          "text": "Hard-coded literals and magic numbers MUST be replaced with symbolic constants",
+          "cwe": [
+            1052,
+            1106,
+            1107
+          ]
+        },
+        {
+          "id": "M-MDF-8",
+          "text": "Global variables MUST NOT be used excessively; shared state MUST be minimized",
+          "cwe": [
+            1108
+          ]
+        },
+        {
+          "id": "M-MDF-9",
+          "text": "Data representations MUST NOT be excessively complex or machine-dependent",
+          "cwe": [
+            1093,
+            1101
+          ]
+        }
       ]
     },
     {
       "name": "Testability",
       "requirements": [
-        { "id": "M-TST-1", "text": "Test coverage MUST be ≥80% for business-critical modules", "cwe": [1059] },
-        { "id": "M-TST-2", "text": "Functions with side effects MUST accept dependencies as parameters for test injection", "cwe": [1061] },
-        { "id": "M-TST-3", "text": "All public functions MUST have corresponding test files", "cwe": [1059] },
-        { "id": "M-TST-4", "text": "Test files MUST be co-located or mirror the source directory structure", "cwe": [1059] },
-        { "id": "M-TST-5", "text": "Each test MUST verify a single behaviour with a descriptive name", "cwe": [1059] }
+        {
+          "id": "M-TST-1",
+          "text": "Test coverage MUST be ≥80% for business-critical modules",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "M-TST-2",
+          "text": "Functions with side effects MUST accept dependencies as parameters for test injection",
+          "cwe": [
+            1061
+          ]
+        },
+        {
+          "id": "M-TST-3",
+          "text": "All public functions MUST have corresponding test files",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "M-TST-4",
+          "text": "Test files MUST be co-located or mirror the source directory structure",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "M-TST-5",
+          "text": "Each test MUST verify a single behaviour with a descriptive name",
+          "cwe": [
+            1059
+          ]
+        },
+        {
+          "id": "M-TST-6",
+          "text": "Input validation frameworks MUST be properly used",
+          "cwe": [
+            1173
+          ]
+        },
+        {
+          "id": "M-TST-7",
+          "text": "Compilation MUST enable sufficient warnings and errors",
+          "cwe": [
+            1127
+          ]
+        },
+        {
+          "id": "M-TST-8",
+          "text": "Code MUST NOT rely on self-modifying techniques",
+          "cwe": [
+            1123
+          ]
+        },
+        {
+          "id": "M-TST-9",
+          "text": "Database indices MUST NOT be excessive and queries MUST use efficient access patterns",
+          "cwe": [
+            1072,
+            1089,
+            1094
+          ]
+        }
       ]
     }
   ]
