@@ -43,7 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Show what would change without writing files")
     # Plugin scaffolding
     parser.add_argument("--scaffold-plugin", metavar="RUNTIME",
-                        help="Generate a new v2 plugin skeleton for the given runtime")
+                        help="Generate a new plugin skeleton for the given runtime")
     return parser
 
 

@@ -178,7 +178,7 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
     @app.get("/api/plugins")
     def plugins() -> Response:
         import json as _json
-        evaluators_root = Path(__file__).resolve().parent.parent.parent / "v2" / "evaluators"
+        evaluators_root = Path(__file__).resolve().parent.parent.parent / "evaluators"
         result: list[dict[str, Any]] = []
         if evaluators_root.is_dir():
             for child in sorted(evaluators_root.iterdir()):

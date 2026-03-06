@@ -13,7 +13,7 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root / "src"))
 
-STANDARDS_DIR = repo_root / "v2" / "standards"
+STANDARDS_DIR = repo_root / "standards"
 OUTPUT_DIR = STANDARDS_DIR / "compiled"
 
 ALL_DIMENSIONS = ["maintainability", "security", "reliability", "performance",
