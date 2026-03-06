@@ -1,0 +1,216 @@
+{
+  "id": "usability",
+  "name": "Usability",
+  "sources": [
+    "iso25010"
+  ],
+  "principles": [
+    {
+      "name": "Appropriateness Recognisability",
+      "cwes": [
+        {
+          "id": 209,
+          "name": "Generation of Error Message Containing Sensitive Information",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-APR-1",
+              "title": "All user-facing error messages MUST be human-readable (no stack traces exposed)"
+            }
+          ]
+        },
+        {
+          "id": 1053,
+          "name": "Missing Documentation for Design",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-APR-3",
+              "title": "README MUST describe the project purpose, setup steps, and usage examples"
+            }
+          ]
+        },
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-APR-2",
+              "title": "API responses MUST include machine-readable error codes alongside messages"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Learnability",
+      "cwes": [
+        {
+          "id": 1053,
+          "name": "Missing Documentation for Design",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-LRN-1",
+              "title": "CLI commands MUST provide --help output describing all flags"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-LRN-2",
+              "title": "Public API functions MUST include usage examples in docstrings"
+            }
+          ]
+        },
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-LRN-3",
+              "title": "Configuration options MUST have documented defaults and valid ranges"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-LRN-4",
+              "title": "Error messages MUST suggest corrective actions when possible"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Operability",
+      "cwes": [
+        {
+          "id": 252,
+          "name": "Unchecked Return Value",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-OPR-3",
+              "title": "Exit codes MUST be non-zero for error conditions in CLI tools"
+            }
+          ]
+        },
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-OPR-1",
+              "title": "Long-running operations MUST provide progress indication or logging"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-OPR-2",
+              "title": "Destructive operations MUST require confirmation or use --force flags"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Error Protection",
+      "cwes": [
+        {
+          "id": 20,
+          "name": "Improper Input Validation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-UEP-1",
+              "title": "Input MUST be validated with clear error messages indicating what is wrong"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-UEP-3",
+              "title": "Ambiguous string formats (dates, numbers) MUST be rejected with format hints"
+            }
+          ]
+        },
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-UEP-4",
+              "title": "Required fields MUST be enforced at the type level, not just at runtime"
+            }
+          ]
+        },
+        {
+          "id": 1188,
+          "name": "Initialization of a Resource with an Insecure Default",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-UEP-2",
+              "title": "Dangerous defaults MUST NOT exist; fail-safe defaults are required"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "User Interface Aesthetics",
+      "cwes": [
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-UIA-1",
+              "title": "Output format MUST be consistent across all commands (JSON or table, not mixed)"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-UIA-2",
+              "title": "Log messages MUST use consistent severity levels and structured format"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-UIA-3",
+              "title": "Terminal output MUST respect NO_COLOR and TERM environment variables"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Accessibility",
+      "cwes": [
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "U-ACC-1",
+              "title": "UI components MUST include ARIA labels or semantic HTML elements"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-ACC-2",
+              "title": "Colour MUST NOT be the sole means of conveying information"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-ACC-3",
+              "title": "Interactive elements MUST be keyboard-navigable"
+            },
+            {
+              "source": "iso25010",
+              "ref": "U-ACC-4",
+              "title": "Images MUST include alt text descriptions"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -20,9 +20,11 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
             "principle": v.get("principle"),
             "file": v.get("file"),
             "line": v.get("line"),
+            "title": v.get("title"),
             "reason": v.get("reason"),
             "severity": v.get("severity", "minor"),
             "snippet": v.get("snippet"),
+            **({"cwe": v["cwe"]} if v.get("cwe") else {}),
         }
         for v in data.get("violations", [])
     ]
@@ -31,8 +33,10 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
             "principle": c.get("principle"),
             "file": c.get("file"),
             "line": c.get("line"),
+            "title": c.get("title"),
             "reason": c.get("reason"),
             "snippet": c.get("snippet"),
+            **({"cwe": c["cwe"]} if c.get("cwe") else {}),
         }
         for c in data.get("compliance", [])
     ]
@@ -113,12 +117,16 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
             principle_map[key] = {"name": key, "score": None, "grade": None, "violations": [], "compliance": [], "justification": "", "recommendations": [], "metrics": None}
         f = v.get("file")
         line = v.get("line")
-        principle_map[key]["violations"].append({
+        vd = {
             "code": v.get("snippet", ""),
             "severity": v.get("severity", "minor"),
             "file": f"{f}:{line}" if f and line else f,
+            "title": v.get("title", ""),
             "reason": v.get("reason", ""),
-        })
+        }
+        if v.get("cwe"):
+            vd["cwe"] = v["cwe"]
+        principle_map[key]["violations"].append(vd)
     for c in data.get("compliance", []):
         key = c.get("principle", "")
         if key not in principle_map:

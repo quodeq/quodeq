@@ -19,7 +19,8 @@ function FileCopyBtn({ display, copyText }) {
     <button
       type="button"
       className="vlive-detail-file-btn"
-      onClick={() => {
+      onClick={(e) => {
+        e.stopPropagation();
         navigator.clipboard.writeText(copyText);
         setCopied(true);
         setTimeout(() => setCopied(false), 1500);
@@ -43,16 +44,22 @@ function parseFileRef(rawFile, rawLine) {
 
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
+  const v = violation;
+  const { filePath, line } = parseFileRef(v.file, v.line);
+  const filename = filePath ? filePath.split('/').pop() : null;
+  const ref = line != null ? `${filePath}:${line}` : filePath;
+  const display = line != null ? `${filename}:${line}` : filename;
 
   return (
     <div
-      className="vlive-row"
+      className={`vdetail-row vdetail-row--${v.severity}`}
       style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
     >
-      <div className="vlive-row-main" onClick={() => setOpen(o => !o)}>
-        <span className={`severity-tag ${violation.severity}`}>{violation.severity}</span>
-        <span className="vlive-principle">{violation.principle}</span>
-        <span className="vlive-file">{(() => { const { filePath, line } = parseFileRef(violation.file, violation.line); const name = filePath?.split('/').pop() ?? filePath; return line != null ? `${name}:${line}` : name; })()}</span>
+      <div className="vdetail-row-main vlive-collapsible" onClick={() => setOpen(o => !o)}>
+        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+        {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
+        {v.principle && <span className="vrow-label">[{v.principle}]</span>}
+        {filename && <FileCopyBtn display={display} copyText={ref} />}
         <svg
           className={`vlive-chevron${open ? ' open' : ''}`}
           width="14" height="14" viewBox="0 0 24 24"
@@ -62,30 +69,24 @@ function ViolationLiveRow({ violation, index }) {
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </div>
-      {open && (() => {
-        const { filePath, line } = parseFileRef(violation.file, violation.line);
-        const filename = filePath ? filePath.split('/').pop() : null;
-        const dir = filePath?.includes('/') ? filePath.substring(0, filePath.lastIndexOf('/') + 1) : null;
-        const ref = line != null ? `${filePath}:${line}` : filePath;
-        const display = line != null ? `${filename}:${line}` : filename;
-        return (
-          <div className="vlive-detail">
-            {violation.reason && (
-              <div className="vlive-detail-section">
+      {open && (
+        <div className="vlive-detail">
+          {(v.title || v.reason) && (
+            <div className="vlive-detail-section">
+              <div className="vlive-detail-section-header">
                 <span className="vlive-detail-section-label">Reason</span>
-                <p className="vlive-detail-reason">{violation.reason}</p>
+                {v.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${v.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{v.cwe}</a>}
               </div>
-            )}
-            {filename && (
-              <div className="vlive-detail-meta">
-                {dir && <span className="vlive-detail-meta-dir">{dir}</span>}
-                <FileCopyBtn display={display} copyText={filename} />
-              </div>
-            )}
-            {violation.snippet && <pre className="vlive-snippet">{violation.snippet}</pre>}
-          </div>
-        );
-      })()}
+              {v.title && <p className="vlive-detail-title">{v.title}</p>}
+              {v.reason && <>
+                <span className="vlive-detail-section-label">Detail</span>
+                <p className="vlive-detail-reason">{v.reason}</p>
+              </>}
+            </div>
+          )}
+          {v.snippet && <pre className="vlive-snippet">{v.snippet}</pre>}
+        </div>
+      )}
     </div>
   );
 }

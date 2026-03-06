@@ -1,0 +1,479 @@
+{
+  "runtime": "bash",
+  "version": "1.0.0",
+  "source": "manually curated",
+  "practices": [
+    {
+      "id": "sh-001",
+      "title": "Always quote variable expansions",
+      "cwe": {
+        "id": 78,
+        "name": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+      },
+      "dimension": "security",
+      "principle": "Authenticity",
+      "severity": "high",
+      "bad": "rm -rf $DIRECTORY",
+      "good": "rm -rf \"${DIRECTORY}\"",
+      "explanation": "Unquoted variables undergo word splitting and glob expansion, enabling injection when variables contain spaces or special characters.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-AUT-2",
+          "title": "Shell commands MUST NOT be constructed from user-controlled data"
+        },
+        {
+          "source": "cisq",
+          "title": "OS commands MUST NOT be constructed from user-controlled data"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.3.8",
+          "section": "Validation",
+          "title": "Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line output encoding. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        },
+        {
+          "source": "asvs",
+          "ref": "V12.3.5",
+          "section": "Files",
+          "title": "Verify that untrusted file metadata is not used directly with system API or libraries, to protect against OS command injection."
+        }
+      ]
+    },
+    {
+      "id": "sh-002",
+      "title": "Never hardcode secrets in shell scripts",
+      "cwe": {
+        "id": 798,
+        "name": "Use of Hard-coded Credentials"
+      },
+      "dimension": "security",
+      "principle": "Confidentiality",
+      "severity": "critical",
+      "bad": "API_KEY='sk-prod-abc123xyz456'",
+      "good": "API_KEY=\"${API_KEY:?API_KEY not set}\"",
+      "explanation": "Hardcoded secrets in shell scripts are visible in process listings and version control.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-CON-1",
+          "title": "Credentials and secrets MUST NOT be hardcoded in source files"
+        },
+        {
+          "source": "cisq",
+          "title": "Credentials MUST be loaded from secure external sources, never hardcoded"
+        }
+      ]
+    },
+    {
+      "id": "sh-003",
+      "title": "Use arrays for commands \u2014 avoid eval and word splitting",
+      "cwe": {
+        "id": 78,
+        "name": "Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+      },
+      "dimension": "security",
+      "principle": "Authenticity",
+      "severity": "high",
+      "bad": "eval \"$user_command\"",
+      "good": "cmd=(\"ls\" \"-la\" \"${target_dir}\")\n\"${cmd[@]}\"",
+      "explanation": "eval and unquoted expansion enable arbitrary code execution. Use bash arrays to safely construct commands.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-AUT-2",
+          "title": "Shell commands MUST NOT be constructed from user-controlled data"
+        },
+        {
+          "source": "cisq",
+          "title": "OS commands MUST NOT be constructed from user-controlled data"
+        },
+        {
+          "source": "asvs",
+          "ref": "V5.3.8",
+          "section": "Validation",
+          "title": "Verify that the application protects against OS command injection and that operating system calls use parameterized OS queries or use contextual command line output encoding. ([C4](https://owasp.org/www-project-proactive-controls/#div-numbering))"
+        },
+        {
+          "source": "asvs",
+          "ref": "V12.3.5",
+          "section": "Files",
+          "title": "Verify that untrusted file metadata is not used directly with system API or libraries, to protect against OS command injection."
+        }
+      ]
+    },
+    {
+      "id": "sh-004",
+      "title": "Validate input before using in file paths or commands",
+      "cwe": {
+        "id": 22,
+        "name": "Improper Limitation of a Pathname to a Restricted Directory ('Path Traversal')"
+      },
+      "dimension": "security",
+      "principle": "Authenticity",
+      "severity": "high",
+      "bad": "cat \"/data/${user_input}/config\"",
+      "good": "if [[ \"${user_input}\" =~ ^[a-zA-Z0-9_-]+$ ]]; then\n    cat \"/data/${user_input}/config\"\nfi",
+      "explanation": "Unsanitized input in paths enables directory traversal (../) attacks. Validate against an allowlist pattern.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "S-AUT-3",
+          "title": "File paths MUST be validated against traversal attacks (../) before use"
+        },
+        {
+          "source": "cisq",
+          "title": "File paths MUST be canonicalised and validated against allowed directories"
+        },
+        {
+          "source": "asvs",
+          "ref": "V12.3.1",
+          "section": "Files",
+          "title": "Verify that user-submitted filename metadata is not used directly by system or framework filesystems and that a URL API is used to protect against path traversal."
+        }
+      ]
+    },
+    {
+      "id": "sh-005",
+      "title": "Use functions to organise scripts",
+      "cwe": {
+        "id": 1080,
+        "name": "Source Code File with Excessive Number of Lines of Code"
+      },
+      "dimension": "maintainability",
+      "principle": "Analyzability",
+      "severity": "medium",
+      "bad": "# 200 lines of linear script with no structure",
+      "good": "validate_args() { ... }\nprocess_data() { ... }\ncleanup() { ... }\nmain() {\n    validate_args \"$@\"\n    process_data\n    cleanup\n}\nmain \"$@\"",
+      "explanation": "Linear scripts are hard to debug and test. Functions provide named scopes and enable selective testing.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-ANA-1",
+          "title": "Source files MUST NOT exceed 300 lines"
+        },
+        {
+          "source": "iso25010",
+          "ref": "M-ANA-2",
+          "title": "Functions MUST NOT exceed 50 lines"
+        },
+        {
+          "source": "cisq",
+          "title": "Source files MUST NOT exceed language-appropriate line limits"
+        }
+      ]
+    },
+    {
+      "id": "sh-006",
+      "title": "Use meaningful variable names \u2014 avoid single letters",
+      "cwe": {
+        "id": 1059,
+        "name": "Insufficient Technical Documentation"
+      },
+      "dimension": "maintainability",
+      "principle": "Modifiability",
+      "severity": "low",
+      "bad": "for f in $(ls *.txt); do\n    x=$(wc -l < \"$f\")\ndone",
+      "good": "for filename in ./*.txt; do\n    line_count=$(wc -l < \"${filename}\")\ndone",
+      "explanation": "Single-letter variables make scripts unreadable. Use descriptive names that convey purpose.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-MDF-1",
+          "title": "Magic numbers and strings MUST be replaced with named constants"
+        },
+        {
+          "source": "iso25010",
+          "ref": "M-MDF-2",
+          "title": "Feature flags MUST be used for in-progress features rather than commented-out code"
+        },
+        {
+          "source": "cisq",
+          "title": "Public APIs MUST have documentation describing purpose and usage"
+        }
+      ]
+    },
+    {
+      "id": "sh-007",
+      "title": "Keep scripts under 200 lines \u2014 extract functions or split files",
+      "cwe": {
+        "id": 1080,
+        "name": "Source Code File with Excessive Number of Lines of Code"
+      },
+      "dimension": "maintainability",
+      "principle": "Analyzability",
+      "severity": "medium",
+      "bad": "# 300-line monolithic script",
+      "good": "main() { validate_args; process_data; cleanup; }\nmain \"$@\"",
+      "explanation": "Long scripts are hard to debug and test. Extract reusable logic into functions or sourced helper scripts.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-ANA-1",
+          "title": "Source files MUST NOT exceed 300 lines"
+        },
+        {
+          "source": "iso25010",
+          "ref": "M-ANA-2",
+          "title": "Functions MUST NOT exceed 50 lines"
+        },
+        {
+          "source": "cisq",
+          "title": "Source files MUST NOT exceed language-appropriate line limits"
+        }
+      ]
+    },
+    {
+      "id": "sh-008",
+      "title": "Run ShellCheck on all scripts",
+      "cwe": {
+        "id": 1121,
+        "name": "Excessive McCabe Cyclomatic Complexity"
+      },
+      "dimension": "maintainability",
+      "principle": "Modularity",
+      "severity": "medium",
+      "bad": "# No linting \u2014 bugs caught in production",
+      "good": "# In CI: shellcheck -x *.sh",
+      "explanation": "ShellCheck catches quoting bugs, POSIX issues, and common mistakes automatically. Run it in CI.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "M-MOD-1",
+          "title": "Cyclomatic complexity MUST be \u226410 per function"
+        },
+        {
+          "source": "iso25010",
+          "ref": "M-MOD-4",
+          "title": "Functions MUST have \u22645 parameters; use an options object for more"
+        },
+        {
+          "source": "cisq",
+          "title": "Function cyclomatic complexity MUST be \u226410"
+        }
+      ]
+    },
+    {
+      "id": "sh-009",
+      "title": "Use trap for cleanup on exit",
+      "cwe": {
+        "id": 459,
+        "name": "Incomplete Cleanup"
+      },
+      "dimension": "reliability",
+      "principle": "Recoverability",
+      "severity": "high",
+      "bad": "TMPDIR=$(mktemp -d)\n# ... script runs ...\nrm -rf \"$TMPDIR\"",
+      "good": "TMPDIR=$(mktemp -d)\ntrap 'rm -rf \"${TMPDIR}\"' EXIT\n# ... script runs ...",
+      "explanation": "Without trap, early exits and errors leave temp files behind. trap EXIT ensures cleanup on all exit paths.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-REC-3",
+          "title": "Temporary files MUST be cleaned up in finally/defer blocks"
+        },
+        {
+          "source": "cisq",
+          "title": "Temporary resources MUST be cleaned up on all exit paths"
+        }
+      ]
+    },
+    {
+      "id": "sh-010",
+      "title": "Check return codes \u2014 use set -euo pipefail",
+      "cwe": {
+        "id": 252,
+        "name": "Unchecked Return Value"
+      },
+      "dimension": "reliability",
+      "principle": "Fault Tolerance",
+      "severity": "medium",
+      "bad": "cd /some/dir\nrm -rf *",
+      "good": "set -euo pipefail\ncd /some/dir || exit 1\nrm -rf *",
+      "explanation": "Without error checking, commands silently fail and subsequent commands run in wrong state.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-FT-6",
+          "title": "Return values from fallible operations MUST be checked"
+        },
+        {
+          "source": "cisq",
+          "title": "Return values from fallible operations MUST be checked"
+        }
+      ]
+    },
+    {
+      "id": "sh-011",
+      "title": "Validate required arguments at script start",
+      "cwe": {
+        "id": 20,
+        "name": "Improper Input Validation"
+      },
+      "dimension": "reliability",
+      "principle": "Fault Tolerance",
+      "severity": "medium",
+      "bad": "INPUT_FILE=\"$1\"\nprocess \"${INPUT_FILE}\"",
+      "good": "if [[ $# -lt 1 ]]; then\n    echo \"Usage: $0 <input-file>\" >&2\n    exit 1\nfi\nINPUT_FILE=\"$1\"",
+      "explanation": "Missing argument validation causes cryptic errors downstream. Check required args early with clear usage messages.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-FT-4",
+          "title": "Input from external sources MUST be validated before processing"
+        }
+      ]
+    },
+    {
+      "id": "sh-012",
+      "title": "Use mktemp for temporary files \u2014 never hardcode paths",
+      "cwe": {
+        "id": 377,
+        "name": "Insecure Temporary File"
+      },
+      "dimension": "reliability",
+      "principle": "Fault Tolerance",
+      "severity": "medium",
+      "bad": "echo \"data\" > /tmp/myapp_temp.txt",
+      "good": "tmpfile=$(mktemp /tmp/myapp.XXXXXX)\necho \"data\" > \"${tmpfile}\"",
+      "explanation": "Hardcoded temp paths create race conditions and symlink attacks. mktemp generates unique, safe filenames.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "R-FT-13",
+          "title": "Temporary files MUST be created using secure APIs (mktemp) to prevent race conditions"
+        }
+      ]
+    },
+    {
+      "id": "sh-013",
+      "title": "Avoid useless cat \u2014 pipe directly or use redirection",
+      "cwe": {
+        "id": 1084,
+        "name": "Invokable Control Element with Excessive File or Data Access Operations"
+      },
+      "dimension": "performance",
+      "principle": "Time Behaviour",
+      "severity": "low",
+      "bad": "cat file.txt | grep 'pattern'",
+      "good": "grep 'pattern' file.txt",
+      "explanation": "Piping cat into another command adds an unnecessary process. Most commands accept file arguments directly.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-1",
+          "title": "Database queries inside loops are forbidden (N+1 problem)"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-4",
+          "title": "String concatenation in loops MUST use a builder or join pattern"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-6",
+          "title": "Hot-path code MUST NOT perform redundant computation; cache or memoize results"
+        },
+        {
+          "source": "cisq",
+          "title": "Data access operations MUST be batched; no queries inside loops"
+        }
+      ]
+    },
+    {
+      "id": "sh-014",
+      "title": "Use built-in string operations instead of external commands",
+      "cwe": {
+        "id": 1084,
+        "name": "Invokable Control Element with Excessive File or Data Access Operations"
+      },
+      "dimension": "performance",
+      "principle": "Time Behaviour",
+      "severity": "low",
+      "bad": "ext=$(echo \"$file\" | sed 's/.*\\.//')",
+      "good": "ext=\"${file##*.}\"",
+      "explanation": "Bash built-in parameter expansion is faster than spawning sed/awk. Use ${var#}, ${var%}, ${var//} for simple string ops.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-1",
+          "title": "Database queries inside loops are forbidden (N+1 problem)"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-4",
+          "title": "String concatenation in loops MUST use a builder or join pattern"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-6",
+          "title": "Hot-path code MUST NOT perform redundant computation; cache or memoize results"
+        },
+        {
+          "source": "cisq",
+          "title": "Data access operations MUST be batched; no queries inside loops"
+        }
+      ]
+    },
+    {
+      "id": "sh-015",
+      "title": "Avoid subshells in loops \u2014 use while-read or built-ins",
+      "cwe": {
+        "id": 1050,
+        "name": "Excessive Platform Resource Consumption within a Loop"
+      },
+      "dimension": "performance",
+      "principle": "Resource Utilisation",
+      "severity": "medium",
+      "bad": "for f in $(find . -name '*.log'); do\n    count=$(wc -l < \"$f\")\ndone",
+      "good": "find . -name '*.log' -print0 | while IFS= read -r -d '' f; do\n    count=$(wc -l < \"$f\")\ndone",
+      "explanation": "$(find ...) in for loops breaks on spaces and forks a subshell. Use find -print0 | while read for safe iteration.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-RES-8",
+          "title": "Resource allocation inside loops MUST be minimised; pre-allocate where possible"
+        },
+        {
+          "source": "cisq",
+          "title": "Resource allocation inside loops MUST be minimised; pre-allocate where possible"
+        }
+      ]
+    },
+    {
+      "id": "sh-016",
+      "title": "Pre-compute values outside loops",
+      "cwe": {
+        "id": 1084,
+        "name": "Invokable Control Element with Excessive File or Data Access Operations"
+      },
+      "dimension": "performance",
+      "principle": "Time Behaviour",
+      "severity": "low",
+      "bad": "for i in $(seq 1 100); do\n    today=$(date +%Y-%m-%d)\n    echo \"${today}: item ${i}\"\ndone",
+      "good": "today=$(date +%Y-%m-%d)\nfor i in $(seq 1 100); do\n    echo \"${today}: item ${i}\"\ndone",
+      "explanation": "Calling external commands inside loops spawns a process per iteration. Move invariant computations outside the loop.",
+      "standards": [
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-1",
+          "title": "Database queries inside loops are forbidden (N+1 problem)"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-4",
+          "title": "String concatenation in loops MUST use a builder or join pattern"
+        },
+        {
+          "source": "iso25010",
+          "ref": "P-TIM-6",
+          "title": "Hot-path code MUST NOT perform redundant computation; cache or memoize results"
+        },
+        {
+          "source": "cisq",
+          "title": "Data access operations MUST be batched; no queries inside loops"
+        }
+      ]
+    }
+  ]
+}

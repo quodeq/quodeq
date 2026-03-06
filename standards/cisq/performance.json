@@ -1,0 +1,18 @@
+{
+  "characteristic": "Performance Efficiency",
+  "source": "ISO 5055 / CISQ 2021",
+  "cwes": [
+    { "id": 400, "name": "Uncontrolled Resource Consumption", "requirement": "Resource consumption MUST be bounded with limits and timeouts" },
+    { "id": 1084, "name": "Invokable Control Element with Excessive File or Data Access Operations", "requirement": "Data access operations MUST be batched; no queries inside loops" },
+    { "id": 1088, "name": "Synchronous Access of Remote Resource without Timeout", "requirement": "Remote resource access MUST use timeouts and async patterns where available" },
+    { "id": 1046, "name": "Creation of Immutable Text Using String Concatenation", "requirement": "String building in loops MUST use builder/join patterns instead of concatenation" },
+    { "id": 1049, "name": "Excessive Data Query Operations in Large Data Table", "requirement": "Queries on large tables MUST use indexes and MUST NOT perform full table scans" },
+    { "id": 1050, "name": "Excessive Platform Resource Consumption within a Loop", "requirement": "Resource allocation inside loops MUST be minimised; pre-allocate where possible" },
+    { "id": 1067, "name": "Excessive Execution of Sequential Searches of Data Resource", "requirement": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search" },
+    { "id": 674, "name": "Uncontrolled Recursion", "requirement": "Recursive algorithms MUST have depth limits to prevent stack overflow" },
+    { "id": 770, "name": "Allocation of Resources Without Limits or Throttling", "requirement": "Resource allocation MUST be throttled with configurable limits" },
+    { "id": 772, "name": "Missing Release of Resource after Effective Lifetime", "requirement": "Resources MUST be released promptly after use" },
+    { "id": 1333, "name": "Inefficient Regular Expression Complexity", "requirement": "Regular expressions MUST NOT use patterns susceptible to catastrophic backtracking" },
+    { "id": 405, "name": "Asymmetric Resource Consumption (Amplification)", "requirement": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption" }
+  ]
+}

@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { getProjectInfo } from '../../../api/index.js';
-import { DIMENSION_OPTIONS } from '../constants.js';
+import { getProjectInfo, listPlugins } from '../../../api/index.js';
 
 export default function ReEvaluateCard({ project, onStart, disabled }) {
   const [info, setInfo] = useState(null);
-  const [selectedDimensions, setSelectedDimensions] = useState([]);
+  const [allDimensions, setAllDimensions] = useState([]);
+  const [selectedDims, setSelectedDims] = useState(new Set());
 
   useEffect(() => {
     if (!project) return;
@@ -14,26 +14,43 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
       .catch(() => setInfo(null));
   }, [project]);
 
+  useEffect(() => {
+    listPlugins()
+      .then((plugins) => {
+        const seen = new Map();
+        for (const p of plugins) {
+          for (const d of p.dimensions) {
+            if (!seen.has(d.id)) {
+              seen.set(d.id, d);
+            }
+          }
+        }
+        setAllDimensions([...seen.values()]);
+      })
+      .catch(() => setAllDimensions([]));
+  }, []);
+
   if (!info) return null;
 
-  const available = new Set(info.availableDimensions ?? []);
-  const hasFilter = available.size > 0;
-
-  function toggleDimension(code) {
-    setSelectedDimensions((prev) =>
-      prev.includes(code) ? prev.filter((d) => d !== code) : [...prev, code]
-    );
-  }
-
-  function handleStart() {
-    onStart({
-      repo: info.path,
-      dimensions: selectedDimensions.join(','),
-      numerical: true,
+  function toggleDim(id) {
+    setSelectedDims((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
     });
   }
 
-  const canStart = !disabled && selectedDimensions.length > 0;
+  function handleStart() {
+    const payload = { repo: info.path };
+    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
+      payload.dimensions = [...selectedDims];
+    }
+    onStart(payload);
+  }
 
   return (
     <div className="panel evaluate-panel">
@@ -47,49 +64,34 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
           <code>{info.path}</code>
         </div>
 
-        <div className="form-group">
-          <div className="dimension-label-row">
-            <label>Dimensions</label>
-            <div className="dimension-chip-actions">
-              <button
-                type="button"
-                className="dim-action-btn"
-                onClick={() => setSelectedDimensions(DIMENSION_OPTIONS.filter((d) => !hasFilter || available.has(d.code)).map((d) => d.code))}
-              >
-                Select all
-              </button>
-              <button
-                type="button"
-                className="dim-action-btn"
-                onClick={() => setSelectedDimensions([])}
-              >
-                Clear
-              </button>
-            </div>
-          </div>
-          <div className="dimension-grid">
-            {DIMENSION_OPTIONS.map((dim) => {
-              const enabled = !hasFilter || available.has(dim.code);
-              return (
+        {allDimensions.length > 0 && (
+          <div className="form-group">
+            <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
+            <div className="dimension-grid">
+              {allDimensions.map((dim) => (
                 <button
-                  key={dim.code}
+                  key={dim.id}
                   type="button"
-                  className={`dimension-chip-btn${selectedDimensions.includes(dim.code) ? ' selected' : ''}`}
-                  disabled={!enabled}
-                  title={!enabled ? 'Not available for this discipline' : undefined}
-                  onClick={() => enabled && toggleDimension(dim.code)}
+                  className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}`}
+                  title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
+                  onClick={() => toggleDim(dim.id)}
                 >
-                  {dim.name}
+                  {dim.id}
                 </button>
-              );
-            })}
+              ))}
+            </div>
+            <p className="form-hint">
+              {selectedDims.size === 0
+                ? 'All dimensions will be evaluated.'
+                : `${selectedDims.size} of ${allDimensions.length} selected.`}
+            </p>
           </div>
-        </div>
+        )}
 
         <button
           type="button"
           className="evaluate-submit-btn"
-          disabled={!canStart}
+          disabled={disabled}
           onClick={handleStart}
         >
           {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}

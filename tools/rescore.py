@@ -76,7 +76,7 @@ def main():
         print(f"Project dir not found: {project_dir}")
         sys.exit(1)
 
-    evaluators_root = repo_root / "v1" / "evaluators"
+    evaluators_root = repo_root / "evaluators"
     evidence_files = sorted(project_dir.glob("*/evidence/*_evidence.json"))
 
     print(f"Found {len(evidence_files)} evidence files in {project_dir}\n")

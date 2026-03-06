@@ -1,0 +1,163 @@
+{
+  "id": "flexibility",
+  "name": "Flexibility",
+  "sources": [
+    "iso25010"
+  ],
+  "principles": [
+    {
+      "name": "Adaptability",
+      "cwes": [
+        {
+          "id": 1061,
+          "name": "Insufficient Encapsulation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-ADP-3",
+              "title": "Platform-specific code MUST be isolated behind abstraction layers"
+            }
+          ]
+        },
+        {
+          "id": 1188,
+          "name": "Initialization of a Resource with an Insecure Default",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-ADP-1",
+              "title": "Configuration MUST be externalised (env vars or config files); no hardcoded env-specific values"
+            },
+            {
+              "source": "iso25010",
+              "ref": "F-ADP-2",
+              "title": "Feature toggles MUST be used for environment-specific behaviour"
+            },
+            {
+              "source": "iso25010",
+              "ref": "F-ADP-4",
+              "title": "Locale and timezone MUST NOT be hardcoded; use runtime configuration"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Scalability",
+      "cwes": [
+        {
+          "id": 1057,
+          "name": "Data Access Operations Outside of Expected Data Manager Component",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-SCL-1",
+              "title": "Stateless request handling MUST be preferred; session state MUST be externalised"
+            }
+          ]
+        },
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-SCL-3",
+              "title": "Database schemas MUST support migration tooling for non-destructive evolution"
+            }
+          ]
+        },
+        {
+          "id": 1061,
+          "name": "Insufficient Encapsulation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-SCL-2",
+              "title": "File-based storage MUST be replaceable with distributed alternatives"
+            },
+            {
+              "source": "iso25010",
+              "ref": "F-SCL-4",
+              "title": "Work dispatching MUST support horizontal scaling (queue-based or partitioned)"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Installability",
+      "cwes": [
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-INS-2",
+              "title": "Build and run instructions MUST be documented and reproducible"
+            },
+            {
+              "source": "iso25010",
+              "ref": "F-INS-3",
+              "title": "System-level dependencies MUST be declared explicitly (not assumed)"
+            }
+          ]
+        },
+        {
+          "id": 1104,
+          "name": "Use of Unmaintained Third Party Components",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-INS-1",
+              "title": "Dependencies MUST be declared in a lockfile with exact versions"
+            },
+            {
+              "source": "iso25010",
+              "ref": "F-INS-4",
+              "title": "Container images MUST use specific base image tags, not :latest"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Replaceability",
+      "cwes": [
+        {
+          "id": 1059,
+          "name": "Insufficient Technical Documentation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-RPL-2",
+              "title": "Public interfaces MUST be versioned; breaking changes require a major version bump"
+            },
+            {
+              "source": "iso25010",
+              "ref": "F-RPL-4",
+              "title": "Data formats MUST be versioned for backward-compatible deserialization"
+            }
+          ]
+        },
+        {
+          "id": 1061,
+          "name": "Insufficient Encapsulation",
+          "refs": [
+            {
+              "source": "iso25010",
+              "ref": "F-RPL-1",
+              "title": "Components MUST be replaceable without modifying callers (dependency inversion)"
+            },
+            {
+              "source": "iso25010",
+              "ref": "F-RPL-3",
+              "title": "External service integrations MUST use adapter/wrapper patterns"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

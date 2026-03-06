@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Plugin dimensions configuration",
+  "type": "object",
+  "required": ["applies"],
+  "properties": {
+    "applies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "weight"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "weight": { "type": "number", "minimum": 0 },
+          "iso_25010": { "type": "string" },
+          "source": { "type": "string" }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "excludes": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  },
+  "additionalProperties": false
+}
