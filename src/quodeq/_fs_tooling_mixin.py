@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import subprocess
+import urllib.error
 import urllib.request
 from pathlib import Path
 
@@ -34,7 +35,7 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
             data = json.loads(resp.read())
         models = [m["id"] for m in data.get("data", []) if m.get("id")]
         return models if models else None
-    except Exception:
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, KeyError, ValueError):
         return None
 
 
