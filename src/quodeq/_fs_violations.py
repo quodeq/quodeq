@@ -139,6 +139,46 @@ def _count_files_read(content: str) -> int:
     return len(files)
 
 
+def _parse_entries_from_texts(
+    texts: list[str], dimension: str, seen: set[str]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Parse violation/compliance entries from a list of text blocks."""
+    violations: list[dict[str, Any]] = []
+    compliance: list[dict[str, Any]] = []
+    for text in texts:
+        for text_line in text.splitlines():
+            stripped_line = text_line.strip()
+            if not stripped_line.startswith("{"):
+                continue
+            try:
+                obj = json.loads(stripped_line)
+            except json.JSONDecodeError:
+                continue
+            if not obj.get("p") or obj.get("t") not in ("violation", "compliance"):
+                continue
+            key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
+            if key in seen:
+                continue
+            seen.add(key)
+            snippet = obj.get("snippet")
+            entry = {
+                "principle": obj["p"],
+                "dimension": obj.get("d", dimension),
+                "file": obj.get("file"),
+                "line": obj.get("line"),
+                "reason": obj.get("reason"),
+                "snippet": str(snippet).splitlines()[0].strip() if snippet else None,
+                "severity": obj.get("severity") or "minor",
+                "cwe": obj.get("cwe"),
+                "violationType": obj.get("vt"),
+            }
+            if obj["t"] == "violation":
+                violations.append(entry)
+            else:
+                compliance.append(entry)
+    return violations, compliance
+
+
 def parse_violations_from_stream(stream_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
     try:
         content = stream_path.read_text()
@@ -157,37 +197,9 @@ def parse_violations_from_stream(stream_path: Path, project: str, run_id: str, d
             continue
         extractor = _TEXT_EXTRACTORS.get(event.get("type"))
         texts = extractor(event) if extractor else []
-        for text in texts:
-            for text_line in text.splitlines():
-                stripped_line = text_line.strip()
-                if not stripped_line.startswith("{"):
-                    continue
-                try:
-                    obj = json.loads(stripped_line)
-                except json.JSONDecodeError:
-                    continue
-                if not obj.get("p") or obj.get("t") not in ("violation", "compliance"):
-                    continue
-                key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
-                if key in seen:
-                    continue
-                seen.add(key)
-                snippet = obj.get("snippet")
-                entry = {
-                    "principle": obj["p"],
-                    "dimension": obj.get("d", dimension),
-                    "file": obj.get("file"),
-                    "line": obj.get("line"),
-                    "reason": obj.get("reason"),
-                    "snippet": str(snippet).splitlines()[0].strip() if snippet else None,
-                    "severity": obj.get("severity") or "minor",
-                    "cwe": obj.get("cwe"),
-                    "violationType": obj.get("vt"),
-                }
-                if obj["t"] == "violation":
-                    violations.append(entry)
-                else:
-                    compliance.append(entry)
+        new_v, new_c = _parse_entries_from_texts(texts, dimension, seen)
+        violations.extend(new_v)
+        compliance.extend(new_c)
 
     files_read = _count_files_read(content)
     return {
