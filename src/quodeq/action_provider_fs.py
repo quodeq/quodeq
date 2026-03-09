@@ -269,7 +269,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs) -> dict[str,
         latest_grade = summary.get("overallGrade")
         latest_score = summary.get("numericAverage")
         files_count = next((d.get("sourceFileCount") for d in dims if d.get("sourceFileCount")), None)
-    except Exception:
+    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
         pass
     path_exists = Path(path).exists() if location == "local" and path else None
     return {
@@ -323,7 +323,7 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
                     found = json.loads(Path(ev.path).read_text()).get("discipline")
                     if found:
                         return found
-                except Exception:
+                except (OSError, json.JSONDecodeError):
                     pass
     return None
 
@@ -331,15 +331,13 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
 def _list_available_dimensions_for_discipline(discipline: str) -> list[str]:
     """Resolve available dimensions for a plugin via its dimensions.json."""
     try:
-        import json as _json
-        from pathlib import Path as _Path
-        plugin_dir = _Path(__file__).resolve().parent.parent.parent / "evaluators" / discipline
+        plugin_dir = Path(__file__).resolve().parent.parent.parent / "evaluators" / discipline
         dims_file = plugin_dir / "dimensions.json"
         if dims_file.exists():
-            data = _json.loads(dims_file.read_text())
+            data = json.loads(dims_file.read_text())
             return [d["id"] for d in data.get("applies", [])]
         return []
-    except Exception:
+    except (OSError, json.JSONDecodeError, KeyError, TypeError):
         return []
 
 

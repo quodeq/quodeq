@@ -1,7 +1,7 @@
 [project]
 name = "quodeq"
 version = "0.1.0"
-description = "Add your description here"
+description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
 authors = [
     { name = "Victor Purcallas Marchesi", email = "vpurcallas@gmail.com" }

@@ -52,6 +52,18 @@ def _emit_marker(phase: str, **kwargs) -> None:
     print(json.dumps({"_cc": phase, **kwargs}), flush=True)
 
 
+def _make_heartbeat(dim_name: str, idx: int, total: int, src_count: int):
+    """Return a heartbeat callback that prints progress to stdout."""
+    def _cb(elapsed: int, progress: dict) -> None:
+        secs = elapsed % 60
+        mins = elapsed // 60
+        files = progress.get("files_read", 0)
+        evidence = progress.get("evidence", 0)
+        pct_str = f" ({min(round(files / src_count * 100), 100)}%)" if src_count > 0 else ""
+        print(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {files} files{pct_str} | {evidence} findings", flush=True)
+    return _cb
+
+
 def _cleanup_stream(stream_file: Path) -> None:
     """Remove stream and stderr files after successful evidence extraction."""
     stream_file.unlink(missing_ok=True)
@@ -83,16 +95,6 @@ def run(config: RunConfig) -> Evidence:
     total = len(dimensions)
     _emit_marker("setup", dimensions=dimensions)
 
-    def _default_heartbeat(dim_name, idx, total, src_count):
-        def _cb(elapsed, progress):
-            secs = elapsed % 60
-            mins = elapsed // 60
-            files = progress.get("files_read", 0)
-            evidence = progress.get("evidence", 0)
-            pct_str = f" ({min(round(files / src_count * 100), 100)}%)" if src_count > 0 else ""
-            print(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {files} files{pct_str} | {evidence} findings", flush=True)
-        return _cb
-
     for idx, dimension in enumerate(dimensions, 1):
         _emit_marker("analyzing", dimension=dimension)
         print(f"→ [{idx}/{total}] Analyzing {dimension}", flush=True)
@@ -111,7 +113,7 @@ def run(config: RunConfig) -> Evidence:
         stream_file = work_dir / f"{dimension}_live.stream"
         jsonl_file = work_dir / f"{dimension}_evidence.jsonl"
 
-        heartbeat = config.heartbeat_callback or _default_heartbeat(dimension, idx, total, config.source_file_count)
+        heartbeat = config.heartbeat_callback or _make_heartbeat(dimension, idx, total, config.source_file_count)
 
         run_analysis(
             work_dir=config.src,
@@ -177,16 +179,6 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
         dimensions = all_dims
     work_dir = config.work_dir or config.src
 
-    def _default_heartbeat(dim_name, idx, total, src_count):
-        def _cb(elapsed, progress):
-            secs = elapsed % 60
-            mins = elapsed // 60
-            files = progress.get("files_read", 0)
-            evidence = progress.get("evidence", 0)
-            pct_str = f" ({min(round(files / src_count * 100), 100)}%)" if src_count > 0 else ""
-            print(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {files} files{pct_str} | {evidence} findings", flush=True)
-        return _cb
-
     result: dict[str, Evidence] = {}
     total = len(dimensions)
     _emit_marker("setup", dimensions=dimensions)
@@ -209,7 +201,7 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
         stream_file = work_dir / f"{dimension}_live.stream"
         jsonl_file = work_dir / f"{dimension}_evidence.jsonl"
 
-        heartbeat = config.heartbeat_callback or _default_heartbeat(dimension, idx, total, config.source_file_count)
+        heartbeat = config.heartbeat_callback or _make_heartbeat(dimension, idx, total, config.source_file_count)
 
         run_analysis(
             work_dir=config.src,
