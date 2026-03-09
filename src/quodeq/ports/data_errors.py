@@ -1,22 +1,25 @@
+"""Domain-specific exception hierarchy for data access errors."""
+
+
 class DataError(Exception):
-    pass
+    """Base exception for all data access errors."""
 
 
 class AuthError(DataError):
-    pass
+    """Raised when authentication or authorization fails."""
 
 
 class NotFoundError(DataError):
-    pass
+    """Raised when the requested resource does not exist."""
 
 
 class NetworkError(DataError):
-    pass
+    """Raised when a network request fails."""
 
 
 class ServerError(DataError):
-    pass
+    """Raised when the remote server returns an error."""
 
 
 class InvalidDataError(DataError):
-    pass
+    """Raised when received data is malformed or invalid."""

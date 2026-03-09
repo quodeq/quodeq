@@ -1,20 +1,20 @@
-from quodeq.ports.data_errors import InvalidDataError, NetworkError, ServerError
+"""Hybrid repository that tries the web adapter first, falling back to filesystem."""
+
+from quodeq.adapters.hybrid._hybrid_call import hybrid_call
 from quodeq.ports.evaluators import EvaluatorsRepository
 
 
 class HybridEvaluatorsRepository:
+    """Evaluators repository that delegates to web then falls back to filesystem."""
+
     def __init__(self, web: EvaluatorsRepository, fs: EvaluatorsRepository) -> None:
         self._web = web
         self._fs = fs
 
     def list_evaluators(self, discipline: str) -> list[str]:
-        try:
-            return self._web.list_evaluators(discipline)
-        except (NetworkError, ServerError, InvalidDataError):
-            return self._fs.list_evaluators(discipline)
+        """Return all evaluator names for a discipline, preferring the web source."""
+        return hybrid_call(self._web.list_evaluators, self._fs.list_evaluators, discipline)
 
     def get_evaluator(self, discipline: str, dimension: str) -> dict:
-        try:
-            return self._web.get_evaluator(discipline, dimension)
-        except (NetworkError, ServerError, InvalidDataError):
-            return self._fs.get_evaluator(discipline, dimension)
+        """Fetch a single evaluator definition, preferring the web source."""
+        return hybrid_call(self._web.get_evaluator, self._fs.get_evaluator, discipline, dimension)

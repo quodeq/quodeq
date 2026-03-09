@@ -1,3 +1,4 @@
+"""Dashboard CLI — argument parsing and entry point for the dashboard server."""
 import argparse
 import sys
 from pathlib import Path
@@ -6,6 +7,7 @@ from .runner import DashboardConfig, run_dashboard
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Create the argument parser for the dashboard command."""
     parser = argparse.ArgumentParser(prog="quodeq dashboard")
     parser.add_argument("--port", type=int, default=4173)
     parser.add_argument("--evaluations", default="evaluations")
@@ -20,6 +22,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def parse_args(argv: list[str] | None = None) -> DashboardConfig:
+    """Parse CLI arguments and return a DashboardConfig."""
     parser = build_parser()
     args = parser.parse_args(argv)
     raw_argv = argv if argv is not None else sys.argv[1:]
@@ -41,5 +44,6 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Entry point for the dashboard command."""
     config = parse_args(argv)
     return run_dashboard(config)

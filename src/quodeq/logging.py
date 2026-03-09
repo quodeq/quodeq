@@ -1,3 +1,5 @@
+"""Colored logging helpers for the Quodeq application."""
+
 import logging
 import os
 import sys
@@ -23,6 +25,8 @@ _STYLES: dict = {
 
 
 class _ColorFormatter(logging.Formatter):
+    """Format log records with ANSI color codes based on severity level."""
+
     def format(self, record: logging.LogRecord) -> str:
         color, prefix = _STYLES.get(record.levelno, (NC, f"[{record.levelname}]"))
         return f"{color}{prefix}{NC} {record.getMessage()}"
@@ -37,13 +41,17 @@ class _StderrHandler(logging.StreamHandler):
 
     @property  # type: ignore[override]
     def stream(self):
+        """Return the current stderr stream (resolves dynamically for test capture)."""
         return sys.stderr
 
     @stream.setter
     def stream(self, _) -> None:
+        """Ignore attempts to set the stream (always uses sys.stderr)."""
         pass
 
 
+# Module-level logger configuration is intentional — standard Python convention.
+# The "quodeq" logger is set up once at import time so all log_* helpers work immediately.
 _logger = logging.getLogger("quodeq")
 _logger.addHandler(_StderrHandler())
 _logger.propagate = False
@@ -55,20 +63,25 @@ if _env_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
 
 
 def log_info(message: str) -> None:
+    """Log an informational message."""
     _logger.info(message)
 
 
 def log_success(message: str) -> None:
+    """Log a success message."""
     _logger.log(_LOG_SUCCESS, message)
 
 
 def log_warning(message: str) -> None:
+    """Log a warning message."""
     _logger.warning(message)
 
 
 def log_debug(message: str) -> None:
+    """Log a debug message."""
     _logger.debug(message)
 
 
 def log_error(message: str) -> None:
+    """Log an error message."""
     _logger.error(message)

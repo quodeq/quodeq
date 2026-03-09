@@ -1,3 +1,5 @@
+"""Mixin providing evaluation lifecycle methods for the filesystem provider."""
+
 from __future__ import annotations
 
 import os
@@ -5,7 +7,7 @@ import sys
 from pathlib import Path
 
 from quodeq.action_provider import EvaluationOptions
-from quodeq.utils import is_repo_url
+from quodeq.utils import is_repo_url, project_name_from_repo
 
 from typing import Any
 
@@ -34,7 +36,7 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str) -> No
     """Resolve and register the project UUID before evaluation starts."""
     from quodeq.util.project_resolver import resolve_project_uuid
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
-    project_name = repo.split("/")[-1].replace(".git", "") if is_repo_url(repo) else Path(repo).name
+    project_name = project_name_from_repo(repo)
     location = "online" if is_repo_url(repo) else "local"
     resolve_project_uuid(Path(reports_dir), project_name, repo_resolved, discipline, location=location)
 
@@ -43,6 +45,7 @@ class FsEvaluationMixin:
     """Mixin for evaluation start/status/cancel methods."""
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
+        """Start an asynchronous evaluation subprocess for a repository."""
         repo_path = Path(repo)
         if not is_repo_url(repo) and not repo_path.exists():
             raise FileNotFoundError(f"Repository not found: {repo}")
@@ -60,10 +63,13 @@ class FsEvaluationMixin:
         return self._jobs.start_job(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str):
+        """Return the current status of an evaluation job."""
         return self._jobs.get_job(job_id)
 
     def cancel_evaluation(self, job_id: str) -> bool:
+        """Cancel a running evaluation job."""
         return self._jobs.cancel_job(job_id)
 
     def list_evaluations(self) -> list[dict]:
+        """Return all evaluation jobs (running, done, failed, cancelled)."""
         return self._jobs.list_jobs()

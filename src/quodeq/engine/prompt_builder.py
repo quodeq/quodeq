@@ -7,11 +7,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
-def _prompts_dir() -> Path:
-    from quodeq.config.paths import default_paths
-    return default_paths().prompts_dir
-
-
 def _sub(template: str, **kwargs: str) -> str:
     """Replace {{KEY}} placeholders in a template string."""
     result = template
@@ -79,14 +74,25 @@ def render_dimensions(dimensions_data: dict, dimension: str, standards_dir: Path
     return "\n".join(lines)
 
 
-def load_template(template_path: Path | None = None) -> str:
-    """Load the compass.md prompt template."""
-    path = template_path or (_prompts_dir() / "compass.md")
-    return path.read_text()
+def load_template(template_path: Path | None = None, *, prompts_dir: Path | None = None) -> str:
+    """Load the compass.md prompt template.
+
+    Args:
+        template_path: Explicit path to a template file (takes priority).
+        prompts_dir: Directory containing prompt templates; used to locate
+            ``compass.md`` when *template_path* is not given.
+    """
+    if template_path:
+        return template_path.read_text()
+    if prompts_dir is None:
+        from quodeq.config.paths import default_paths
+        prompts_dir = default_paths().prompts_dir
+    return (prompts_dir / "compass.md").read_text()
 
 
 @dataclass
 class PromptContext:
+    """Parameters for rendering a per-dimension analysis prompt."""
     plugin_id: str
     repo_name: str
     date_str: str

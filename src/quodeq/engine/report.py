@@ -1,3 +1,4 @@
+"""Report builder — assembles scored evaluation data into JSON report files."""
 from __future__ import annotations
 
 import json
@@ -8,6 +9,7 @@ from quodeq.engine.evidence import Evidence
 
 
 def grade_from_score(score: str | None) -> str | None:
+    """Convert a numeric score string (e.g. '7/10') to a letter grade (Critical..Exemplary)."""
     # Nothing to map if the input is falsy
     if not score:
         return None
@@ -93,6 +95,7 @@ def _build_principle_rows(
 
 
 def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> dict:
+    """Build a complete JSON report dict from evidence and scoring data for one dimension."""
     per_principle_scores: dict = {}
     aggregate: dict = {}
     if scores:

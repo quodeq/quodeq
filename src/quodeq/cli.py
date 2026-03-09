@@ -1,3 +1,5 @@
+"""Command-line interface for Quodeq evaluation and dashboard commands."""
+
 import argparse
 import sys
 from pathlib import Path
@@ -6,10 +8,12 @@ from typing import Callable
 from quodeq.config.cli import build_parser as build_config_parser
 from quodeq.config.cli import main as configure_main
 from quodeq.dashboard.cli import main as dashboard_main
-from quodeq.util.repo_handler import is_repo_url, prepare_repository
+from quodeq.util.repo_handler import prepare_repository
+from quodeq.utils import is_repo_url, project_name_from_repo
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(prog="quodeq")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -58,10 +62,41 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_evaluate(args: argparse.Namespace) -> int:
-    """Run the evaluation pipeline."""
+def _resolve_repo(args: argparse.Namespace) -> Path | None:
+    """Resolve the repo argument to a local path (cloning if needed)."""
+    repo_path = args.repo
+    if is_repo_url(repo_path):
+        repo_path = prepare_repository(repo_path)
+    src = Path(repo_path).resolve()
+    if not src.exists():
+        print(f"Repository path does not exist: {src}", file=sys.stderr)
+        return None
+    return src
+
+
+def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Path]:
+    """Resolve project UUID and create evidence/evaluation directories."""
     import uuid as _uuid
 
+    from quodeq.util.project_resolver import resolve_project_uuid
+
+    reports_root = Path(args.output)
+    reports_root.mkdir(parents=True, exist_ok=True)
+
+    project_name = project_name_from_repo(args.repo)
+    location = "online" if is_repo_url(args.repo) else "local"
+    project_uuid = resolve_project_uuid(reports_root, project_name, str(src), None, location=location)
+
+    run_id = str(_uuid.uuid4())
+    evidence_dir = reports_root / project_uuid / run_id / "evidence"
+    evaluation_dir = reports_root / project_uuid / run_id / "evaluation"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    evaluation_dir.mkdir(parents=True, exist_ok=True)
+    return reports_root, evidence_dir, evaluation_dir
+
+
+def run_evaluate(args: argparse.Namespace) -> int:
+    """Run the evaluation pipeline."""
     from quodeq.engine.analysis import AnalysisError
     from quodeq.engine.runner import (
         RunConfig,
@@ -71,25 +106,20 @@ def run_evaluate(args: argparse.Namespace) -> int:
         run_full,
     )
     from quodeq.engine.plugin_loader import load_plugin
-    from quodeq.util.project_resolver import resolve_project_uuid
 
-    # 1. Resolve repo
-    repo_path = args.repo
-    if is_repo_url(repo_path):
-        repo_path = prepare_repository(repo_path)
-    src = Path(repo_path).resolve()
-    if not src.exists():
-        print(f"Repository path does not exist: {src}", file=sys.stderr)
+    # 1-2. Resolve repo, check exists
+    src = _resolve_repo(args)
+    if src is None:
         return 1
 
-    # 2. Locate evaluators directory
+    # 3. Locate evaluators directory
     from quodeq.config.paths import default_paths
     evaluators_dir = default_paths().evaluators_dir
     if not evaluators_dir.exists():
         print(f"Evaluators directory not found: {evaluators_dir}", file=sys.stderr)
         return 1
 
-    # 3. Detect or use explicit plugin
+    # 4. Detect or use explicit plugin
     plugin_id = args.plugin
     if plugin_id is None:
         try:
@@ -104,7 +134,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
         print(f"Plugin directory not found: {plugin_dir}", file=sys.stderr)
         return 1
 
-    # 4. Prescan
+    # 5. Prescan
     source_file_count = 0
     if not args.no_prescan:
         plugin_data = load_plugin(plugin_dir)
@@ -113,22 +143,11 @@ def run_evaluate(args: argparse.Namespace) -> int:
             source_file_count = count_source_files(src, extensions)
             print(f"Source files: {source_file_count}")
 
-    # 5. Resolve project and create run directory
-    reports_root = Path(args.output)
-    reports_root.mkdir(parents=True, exist_ok=True)
-
-    project_name = args.repo.split("/")[-1].replace(".git", "") if is_repo_url(args.repo) else Path(args.repo).name
-    location = "online" if is_repo_url(args.repo) else "local"
-    project_uuid = resolve_project_uuid(reports_root, project_name, str(src), None, location=location)
-
-    run_id = str(_uuid.uuid4())
-    evidence_dir = reports_root / project_uuid / run_id / "evidence"
-    evaluation_dir = reports_root / project_uuid / run_id / "evaluation"
-    evidence_dir.mkdir(parents=True, exist_ok=True)
-    evaluation_dir.mkdir(parents=True, exist_ok=True)
+    # 6. Resolve project and create run directories
+    _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
     print(f"Report path: {evaluation_dir}")
 
-    # 6. Build config and run
+    # 7. Build config and run
     standards_dir = default_paths().standards_dir
     dimensions_filter = None
     if args.dimensions:
@@ -186,6 +205,7 @@ _COMMAND_HANDLERS: dict[str, Callable] = {
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse arguments and dispatch to the appropriate subcommand handler."""
     parser = build_parser()
     args = parser.parse_args(argv)
     if args._command == "evaluate":

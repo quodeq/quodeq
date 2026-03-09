@@ -1,3 +1,5 @@
+"""Parsers for extracting violation and compliance data from evidence files and streams."""
+
 from __future__ import annotations
 
 import json
@@ -63,6 +65,7 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, proj
 
 
 def parse_violations_from_evidence(evidence_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+    """Extract violations from a completed evidence JSON file."""
     try:
         data = json.loads(evidence_path.read_text())
     except (OSError, json.JSONDecodeError):
@@ -162,6 +165,7 @@ def _parse_entries_from_texts(
 
 
 def parse_violations_from_stream(stream_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+    """Extract violations from a live-stream event log file."""
     try:
         content = stream_path.read_text()
     except OSError:

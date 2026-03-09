@@ -1,8 +1,11 @@
+"""Validation and lookup helpers for discipline definitions."""
+
 from quodeq.config.paths import ConfigPaths
 from quodeq.logging import log_error
 
 
 def validate_new_discipline(name: str, language: str, category: str) -> int:
+    """Validate that name, language, and category are acceptable for a new discipline."""
     if not name or not language:
         log_error(
             "Usage: add-discipline <name> <language> [--category=<backend|frontend|mobile|infra>]"
@@ -15,6 +18,7 @@ def validate_new_discipline(name: str, language: str, category: str) -> int:
 
 
 def get_discipline_language(name: str, paths: ConfigPaths) -> str | None:
+    """Look up the programming language configured for a discipline."""
     conf = paths.root / "config" / "disciplines.conf"
     if not conf.exists():
         return None

@@ -14,6 +14,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+from typing import TypedDict
 
 from quodeq.engine.analysis import (
     count_files_from_stream,
@@ -30,6 +31,7 @@ from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, l
 
 @dataclass
 class RunConfig:
+    """Configuration for a single evaluation run (source path, plugin, options)."""
     src: Path
     plugin_id: str
     evaluators_dir: Path
@@ -42,7 +44,13 @@ class RunConfig:
     dimensions: list[str] | None = None
 
 
-def _emit_marker(phase: str, **kwargs) -> None:
+class _MarkerFields(TypedDict, total=False):
+    """Fields that may appear in a structured JSON marker."""
+    dimension: str
+    dimensions: list[str]
+
+
+def _emit_marker(phase: str, **kwargs: _MarkerFields) -> None:
     """Emit a structured JSON marker for job tracking.
 
     Only emitted when stdout is captured by the job manager (not a TTY).
@@ -71,6 +79,87 @@ def _cleanup_stream(stream_file: Path) -> None:
     err_file.unlink(missing_ok=True)
 
 
+def _build_dimension_prompt(
+    config: RunConfig, dim_id: str, dimensions_data: dict,
+    analysis_md: str, date_str: str, template: str,
+) -> str:
+    """Build the analysis prompt for a single dimension."""
+    return build_analysis_prompt(
+        template,
+        PromptContext(
+            plugin_id=config.plugin_id,
+            repo_name=str(config.src),
+            date_str=date_str,
+            dimension=dim_id,
+            source_file_count=config.source_file_count,
+            dimensions_data=dimensions_data,
+            analysis_md=analysis_md,
+            standards_dir=config.standards_dir,
+        ),
+    )
+
+
+def _run_dimension_analysis(
+    config: RunConfig, dim_id: str, prompt: str, evidence_dir: Path,
+    idx: int, total: int,
+) -> tuple[Path, Path]:
+    """Run the AI analysis subprocess for a single dimension.
+
+    Returns (stream_file, jsonl_file).
+    """
+    stream_file = evidence_dir / f"{dim_id}_live.stream"
+    jsonl_file = evidence_dir / f"{dim_id}_evidence.jsonl"
+
+    heartbeat = config.heartbeat_callback or _make_heartbeat(dim_id, idx, total, config.source_file_count)
+
+    run_analysis(
+        work_dir=config.src,
+        prompt=prompt,
+        stream_file=stream_file,
+        jsonl_file=jsonl_file,
+        analysis_budget=config.analysis_budget,
+        heartbeat_callback=heartbeat,
+    )
+    return stream_file, jsonl_file
+
+
+def _parse_dimension_evidence(
+    config: RunConfig, dim_id: str, stream_file: Path, jsonl_file: Path,
+    date_str: str, plugin_name: str,
+) -> Evidence | None:
+    """Extract and parse evidence from stream/JSONL files for a single dimension.
+
+    Returns Evidence or None if the stream is invalid.
+    """
+    if not is_stream_valid(stream_file):
+        return None
+
+    # MCP server writes findings directly to jsonl_file during analysis.
+    # Fall back to stream extraction if MCP produced nothing.
+    mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
+    mcp_status = get_mcp_status(stream_file)
+    if mcp_status and mcp_status != "connected":
+        print(f"  MCP findings server {mcp_status} — falling back to stream extraction", flush=True)
+    if mcp_produced:
+        files_read = count_files_from_stream(stream_file)
+    else:
+        files_read = extract_evidence_from_stream(stream_file, jsonl_file)
+
+    ev = parse_jsonl_to_evidence(
+        jsonl_file,
+        EvidenceContext(
+            plugin_id=config.plugin_id,
+            repository=str(config.src),
+            date_str=date_str,
+            source_file_count=config.source_file_count,
+            files_read=files_read,
+        ),
+        standards_dir=config.standards_dir,
+    )
+    ev.plugin_name = plugin_name
+    return ev
+
+
 def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
     plugin_dir = config.evaluators_dir / config.plugin_id
@@ -93,71 +182,25 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
 
     result: dict[str, Evidence] = {}
     total = len(dimensions)
+    plugin_name = full["plugin"].get("name", config.plugin_id)
     _emit_marker("setup", dimensions=dimensions)
 
     for idx, dimension in enumerate(dimensions, 1):
         _emit_marker("analyzing", dimension=dimension)
         print(f"→ [{idx}/{total}] Analyzing {dimension}", flush=True)
-        prompt = build_analysis_prompt(
-            template,
-            PromptContext(
-                plugin_id=config.plugin_id,
-                repo_name=str(config.src),
-                date_str=date_str,
-                dimension=dimension,
-                source_file_count=config.source_file_count,
-                dimensions_data=full["dimensions"],
-                analysis_md=analysis_md,
-                standards_dir=config.standards_dir,
-            ),
-        )
 
-        stream_file = work_dir / f"{dimension}_live.stream"
-        jsonl_file = work_dir / f"{dimension}_evidence.jsonl"
+        prompt = _build_dimension_prompt(config, dimension, full["dimensions"], analysis_md, date_str, template)
+        stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, work_dir, idx, total)
 
-        heartbeat = config.heartbeat_callback or _make_heartbeat(dimension, idx, total, config.source_file_count)
-
-        run_analysis(
-            work_dir=config.src,
-            prompt=prompt,
-            stream_file=stream_file,
-            jsonl_file=jsonl_file,
-            analysis_budget=config.analysis_budget,
-            heartbeat_callback=heartbeat,
-        )
-
-        if not is_stream_valid(stream_file):
+        ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, date_str, plugin_name)
+        if ev is None:
             print(f"  [{idx}/{total}] {dimension} — no valid stream, skipping", flush=True)
             continue
 
         _emit_marker("scoring", dimension=dimension)
-
-        # MCP server writes findings directly to jsonl_file during analysis.
-        # Fall back to stream extraction if MCP produced nothing.
-        mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
-        mcp_status = get_mcp_status(stream_file)
-        if mcp_status and mcp_status != "connected":
-            print(f"  ⚠ MCP findings server {mcp_status} — falling back to stream extraction", flush=True)
-        if mcp_produced:
-            files_read = count_files_from_stream(stream_file)
-        else:
-            files_read = extract_evidence_from_stream(stream_file, jsonl_file)
-
-        ev = parse_jsonl_to_evidence(
-            jsonl_file,
-            EvidenceContext(
-                plugin_id=config.plugin_id,
-                repository=str(config.src),
-                date_str=date_str,
-                source_file_count=config.source_file_count,
-                files_read=files_read,
-            ),
-            standards_dir=config.standards_dir,
-        )
-        ev.plugin_name = full["plugin"].get("name", config.plugin_id)
         violations = sum(len(pe.violations) for pe in ev.principles.values())
         compliances = sum(len(pe.compliance) for pe in ev.principles.values())
-        print(f"✓ [{idx}/{total}] {dimension} — {files_read} files, {violations}v/{compliances}c", flush=True)
+        print(f"✓ [{idx}/{total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c", flush=True)
         result[dimension] = ev
 
     return result

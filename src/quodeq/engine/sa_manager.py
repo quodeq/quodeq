@@ -1,5 +1,8 @@
 """Static Analysis Manager — manages SA findings as a shrinking work queue.
 
+TODO: Stub module — implementation is tracked. Remove NotImplementedError stubs
+once SA providers are integrated (see MCP tool integration plan below).
+
 Future integration plan:
     When SA providers are added, this module will be exposed to the LLM
     via an MCP (Model Context Protocol) tool server. The MCP server will

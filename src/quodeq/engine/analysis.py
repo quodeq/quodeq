@@ -13,6 +13,8 @@ import sys
 import tempfile
 from pathlib import Path
 
+from quodeq.utils import AI_CMD_DEFAULT
+
 
 # ---------------------------------------------------------------------------
 # MCP config for real-time findings
@@ -43,7 +45,7 @@ def _create_mcp_config(jsonl_file: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 def _get_ai_cmd() -> str:
-    return os.environ.get("AI_CMD", "claude")
+    return os.environ.get("AI_CMD", AI_CMD_DEFAULT)
 
 
 def _get_ai_model() -> str | None:
@@ -58,6 +60,29 @@ def _count_jsonl_lines(jsonl_file: Path) -> int:
         return sum(1 for line in jsonl_file.read_text().splitlines() if line.strip())
     except OSError:
         return 0
+
+
+def _extract_files_from_assistant_event(data: dict) -> set[str]:
+    """Extract file paths from Read/Grep tool_use blocks in an assistant event."""
+    files: set[str] = set()
+    for block in data.get("message", {}).get("content", []):
+        if block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
+            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
+            if fp:
+                files.add(fp)
+    return files
+
+
+def _extract_files_from_item_completed_event(data: dict) -> set[str]:
+    """Extract file paths from Read/Grep tool_use blocks in an item.completed event."""
+    files: set[str] = set()
+    item = data.get("item", {})
+    for block in item.get("content", []):
+        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
+            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
+            if fp:
+                files.add(fp)
+    return files
 
 
 def _count_files_from_stream(stream_file: Path) -> set[str]:
@@ -75,18 +100,9 @@ def _count_files_from_stream(stream_file: Path) -> set[str]:
                     continue
                 etype = data.get("type", "")
                 if etype == "assistant":
-                    for block in data.get("message", {}).get("content", []):
-                        if block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
-                            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
-                            if fp:
-                                files.add(fp)
+                    files.update(_extract_files_from_assistant_event(data))
                 elif etype == "item.completed":
-                    item = data.get("item", {})
-                    for block in item.get("content", []):
-                        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
-                            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
-                            if fp:
-                                files.add(fp)
+                    files.update(_extract_files_from_item_completed_event(data))
     except (OSError, ValueError):
         pass
     return files
@@ -109,6 +125,61 @@ def count_files_from_stream(stream_file: Path) -> int:
 
 class AnalysisError(RuntimeError):
     """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""
+
+
+def _build_ai_cmd(
+    prompt: str,
+    *,
+    ai_cmd: str | None = None,
+    ai_model: str | None = None,
+    jsonl_file: Path | None = None,
+    analysis_budget: str | None = None,
+) -> tuple[list[str], Path | None]:
+    """Build the AI CLI command line and optional MCP config path.
+
+    Returns (args_list, mcp_config_path_or_None).
+    """
+    cmd = ai_cmd or _get_ai_cmd()
+    model = ai_model or _get_ai_model()
+    tools = "Bash,Glob,Grep,Read"
+
+    args = [cmd, "--print", "--output-format", "stream-json", "--verbose", "--tools", tools]
+
+    mcp_config_path: Path | None = None
+    if jsonl_file is not None:
+        mcp_config_path = _create_mcp_config(jsonl_file)
+        args.extend(["--mcp-config", str(mcp_config_path)])
+        args.extend(["--allowedTools", "mcp__findings__report_finding"])
+        # MCP servers require permission approval; in --print mode there is no
+        # interactive prompt, so we must bypass permissions for the server to start.
+        args.extend(["--permission-mode", "bypassPermissions"])
+
+    if model:
+        args.extend(["--model", model])
+    if analysis_budget:
+        args.extend(["--max-budget-usd", str(analysis_budget)])
+    args.extend(["-p", prompt])
+
+    return args, mcp_config_path
+
+
+def _run_with_heartbeat(
+    process: subprocess.Popen,
+    heartbeat_interval: int,
+    heartbeat_callback: object | None,
+    stream_file: Path,
+    jsonl_file: Path | None,
+) -> None:
+    """Wait for process to finish, emitting heartbeat callbacks at intervals."""
+    elapsed = 0
+    while process.poll() is None:
+        try:
+            process.wait(timeout=heartbeat_interval)
+        except subprocess.TimeoutExpired:
+            elapsed += heartbeat_interval
+            if heartbeat_callback:
+                progress = _count_stream_progress(stream_file, jsonl_file)
+                heartbeat_callback(elapsed, progress)
 
 
 def run_analysis(
@@ -140,26 +211,13 @@ def run_analysis(
         heartbeat_interval: Seconds between heartbeat callbacks.
         heartbeat_callback: Optional callable(elapsed_seconds, progress) for progress.
     """
-    cmd = ai_cmd or _get_ai_cmd()
-    model = ai_model or _get_ai_model()
-    tools = "Bash,Glob,Grep,Read"
-
-    args = [cmd, "--print", "--output-format", "stream-json", "--verbose", "--tools", tools]
-
-    mcp_config_path: Path | None = None
-    if jsonl_file is not None:
-        mcp_config_path = _create_mcp_config(jsonl_file)
-        args.extend(["--mcp-config", str(mcp_config_path)])
-        args.extend(["--allowedTools", "mcp__findings__report_finding"])
-        # MCP servers require permission approval; in --print mode there is no
-        # interactive prompt, so we must bypass permissions for the server to start.
-        args.extend(["--permission-mode", "bypassPermissions"])
-
-    if model:
-        args.extend(["--model", model])
-    if analysis_budget:
-        args.extend(["--max-budget-usd", str(analysis_budget)])
-    args.extend(["-p", prompt])
+    args, mcp_config_path = _build_ai_cmd(
+        prompt,
+        ai_cmd=ai_cmd,
+        ai_model=ai_model,
+        jsonl_file=jsonl_file,
+        analysis_budget=analysis_budget,
+    )
 
     env = os.environ.copy()
     if "CODEX_SANDBOX" not in env:
@@ -177,15 +235,7 @@ def run_analysis(
                 stderr=err,
                 stdin=subprocess.DEVNULL,
             )
-            elapsed = 0
-            while process.poll() is None:
-                try:
-                    process.wait(timeout=heartbeat_interval)
-                except subprocess.TimeoutExpired:
-                    elapsed += heartbeat_interval
-                    if heartbeat_callback:
-                        progress = _count_stream_progress(stream_file, jsonl_file)
-                        heartbeat_callback(elapsed, progress)
+            _run_with_heartbeat(process, heartbeat_interval, heartbeat_callback, stream_file, jsonl_file)
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
@@ -255,6 +305,25 @@ def _process_result_event(data: dict, out, stats: dict) -> None:
         stats["total_text_lines"] += l
 
 
+def _extract_from_content_blocks(blocks: list, out, stats: dict, files_read: set) -> None:
+    """Process content blocks from an item.completed event, extracting text and file reads."""
+    for block in blocks:
+        if not isinstance(block, dict):
+            continue
+        btype = block.get("type")
+        if btype in ("text", "output_text"):
+            block_text = (block.get("text") or "").strip()
+            if block_text:
+                stats["text_blocks"] += 1
+                c, l = _extract_jsonl_from_text(block_text, out)
+                stats["jsonl_lines"] += c
+                stats["total_text_lines"] += l
+        elif btype == "tool_use" and block.get("name") == "Read":
+            fp = block.get("input", {}).get("file_path")
+            if fp:
+                files_read.add(fp)
+
+
 def _process_item_completed_event(data: dict, out, stats: dict, files_read: set) -> None:
     item = data.get("item", {})
     if item.get("type") == "agent_message":
@@ -264,20 +333,7 @@ def _process_item_completed_event(data: dict, out, stats: dict, files_read: set)
             c, l = _extract_jsonl_from_text(text, out)
             stats["jsonl_lines"] += c
             stats["total_text_lines"] += l
-        for block in item.get("content", []):
-            if isinstance(block, dict):
-                btype = block.get("type")
-                if btype in ("text", "output_text"):
-                    block_text = (block.get("text") or "").strip()
-                    if block_text:
-                        stats["text_blocks"] += 1
-                        c, l = _extract_jsonl_from_text(block_text, out)
-                        stats["jsonl_lines"] += c
-                        stats["total_text_lines"] += l
-                elif btype == "tool_use" and block.get("name") == "Read":
-                    fp = block.get("input", {}).get("file_path")
-                    if fp:
-                        files_read.add(fp)
+        _extract_from_content_blocks(item.get("content", []), out, stats, files_read)
 
 
 def extract_evidence_from_stream(stream_file: Path, jsonl_file: Path) -> int:
@@ -316,39 +372,6 @@ def extract_evidence_from_stream(stream_file: Path, jsonl_file: Path) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Stream validation
+# Stream validation (re-exported for backward compatibility)
 # ---------------------------------------------------------------------------
-
-def get_mcp_status(stream_file: Path) -> str | None:
-    """Return MCP server status from the stream init event, or None if unavailable."""
-    path = Path(stream_file)
-    if not path.exists() or path.stat().st_size == 0:
-        return None
-    try:
-        with open(path) as f:
-            first = f.readline().strip()
-            if not first:
-                return None
-            d = json.loads(first)
-            for srv in d.get("mcp_servers", []):
-                if srv.get("name") == "findings":
-                    return srv.get("status")
-    except (json.JSONDecodeError, OSError):
-        pass
-    return None
-
-
-def is_stream_valid(stream_file: Path) -> bool:
-    """Return True if stream exists, is non-empty, and has no error events."""
-    path = Path(stream_file)
-    if not path.exists() or path.stat().st_size == 0:
-        return False
-    with open(path) as f:
-        for line in f:
-            try:
-                d = json.loads(line.strip())
-                if d.get("type") == "result" and d.get("is_error"):
-                    return False
-            except json.JSONDecodeError:
-                pass
-    return True
+from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid  # noqa: E402, F401

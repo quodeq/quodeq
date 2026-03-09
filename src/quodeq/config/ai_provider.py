@@ -1,3 +1,5 @@
+"""AI provider selection and configuration persistence."""
+
 from __future__ import annotations
 
 import os
@@ -13,6 +15,7 @@ PROVIDERS = {
 
 
 def get_current_provider(paths: ConfigPaths) -> str:
+    """Return the currently configured AI provider name, defaulting to 'claude'."""
     if paths.env_file.exists():
         for line in paths.env_file.read_text().splitlines():
             if line.strip().startswith("export AI_PROVIDER="):
@@ -41,6 +44,7 @@ def _ensure_gitignore(paths: ConfigPaths) -> None:
 
 
 def configure_provider_noninteractive(provider: str, paths: ConfigPaths) -> int:
+    """Write the chosen AI provider to the env file without interactive prompts."""
     if provider not in PROVIDERS:
         log_error(f"Invalid provider: {provider}. Expected: claude, copilot, or codex.")
         return 1

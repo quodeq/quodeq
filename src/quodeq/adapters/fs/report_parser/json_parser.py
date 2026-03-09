@@ -1,3 +1,5 @@
+"""Parsers for JSON-format evaluation reports and evidence files."""
+
 from __future__ import annotations
 
 import json
@@ -8,6 +10,7 @@ from quodeq.adapters.fs.report_parser.grades import build_totals
 
 
 def parse_report_json(json_path: Path) -> dict[str, Any] | None:
+    """Parse a dimension evaluation JSON file into a normalized report dict."""
     try:
         data = json.loads(json_path.read_text())
     except OSError:
@@ -57,6 +60,7 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
 
 
 def parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
+    """Extract dimension metadata from an evidence JSON file."""
     dimension = evidence_path.name.replace("_evidence.json", "")
     try:
         data = json.loads(evidence_path.read_text())
@@ -72,7 +76,55 @@ def parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
     }
 
 
+def _empty_principle(key: str) -> dict:
+    """Return a blank principle dict with all expected fields."""
+    return {
+        "name": key,
+        "score": None,
+        "grade": None,
+        "violations": [],
+        "compliance": [],
+        "justification": "",
+        "recommendations": [],
+        "metrics": None,
+    }
+
+
+def _build_principle_map(data: dict[str, Any]) -> dict[str, Any]:
+    """Build a mapping from principle name to its aggregated violations/compliance."""
+    principle_map: dict[str, Any] = {}
+    for p in data.get("principles", []):
+        name = p.get("name", "")
+        entry = _empty_principle(name)
+        entry["score"] = p.get("score")
+        entry["grade"] = p.get("grade")
+        principle_map[name] = entry
+    for v in data.get("violations", []):
+        key = v.get("principle", "")
+        if key not in principle_map:
+            principle_map[key] = _empty_principle(key)
+        f = v.get("file")
+        line = v.get("line")
+        vd = {
+            "code": v.get("snippet", ""),
+            "severity": v.get("severity", "minor"),
+            "file": f"{f}:{line}" if f and line else f,
+            "title": v.get("title", ""),
+            "reason": v.get("reason", ""),
+        }
+        if v.get("cwe"):
+            vd["cwe"] = v["cwe"]
+        principle_map[key]["violations"].append(vd)
+    for c in data.get("compliance", []):
+        key = c.get("principle", "")
+        if key not in principle_map:
+            principle_map[key] = _empty_principle(key)
+        principle_map[key]["compliance"].append(c.get("snippet") or c.get("reason") or "")
+    return principle_map
+
+
 def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+    """Parse a JSON evaluation file into a detailed report with principle breakdowns."""
     try:
         data = json.loads(json_path.read_text())
     except OSError:
@@ -98,40 +150,7 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
         }
     )
 
-    principle_map: dict[str, Any] = {}
-    for p in data.get("principles", []):
-        name = p.get("name", "")
-        principle_map[name] = {
-            "name": name,
-            "score": p.get("score"),
-            "grade": p.get("grade"),
-            "violations": [],
-            "compliance": [],
-            "justification": "",
-            "recommendations": [],
-            "metrics": None,
-        }
-    for v in data.get("violations", []):
-        key = v.get("principle", "")
-        if key not in principle_map:
-            principle_map[key] = {"name": key, "score": None, "grade": None, "violations": [], "compliance": [], "justification": "", "recommendations": [], "metrics": None}
-        f = v.get("file")
-        line = v.get("line")
-        vd = {
-            "code": v.get("snippet", ""),
-            "severity": v.get("severity", "minor"),
-            "file": f"{f}:{line}" if f and line else f,
-            "title": v.get("title", ""),
-            "reason": v.get("reason", ""),
-        }
-        if v.get("cwe"):
-            vd["cwe"] = v["cwe"]
-        principle_map[key]["violations"].append(vd)
-    for c in data.get("compliance", []):
-        key = c.get("principle", "")
-        if key not in principle_map:
-            principle_map[key] = {"name": key, "score": None, "grade": None, "violations": [], "compliance": [], "justification": "", "recommendations": [], "metrics": None}
-        principle_map[key]["compliance"].append(c.get("snippet") or c.get("reason") or "")
+    principle_map = _build_principle_map(data)
 
     return {
         "dimension": dimension,

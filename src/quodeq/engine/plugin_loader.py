@@ -1,3 +1,4 @@
+"""Plugin loader — discovers and validates evaluator plugin directories."""
 from __future__ import annotations
 import json
 from pathlib import Path
@@ -24,6 +25,7 @@ def discover_plugins(evaluators_dir: Path) -> list[dict]:
 
 
 def load_plugin(plugin_dir: Path) -> dict:
+    """Load and return the plugin.json contents from a plugin directory."""
     plugin_file = plugin_dir / "plugin.json"
     return json.loads(plugin_file.read_text())
 
