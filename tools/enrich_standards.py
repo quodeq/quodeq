@@ -28,35 +28,8 @@ _MAPPING_PATH = Path(__file__).resolve().parent / "enrich_standards_mapping.json
 MAPPING: dict = json.loads(_MAPPING_PATH.read_text())
 
 # Prefix map: dimension → principle → id prefix
-_PREFIX_MAP = {
-    "security": {
-        "Confidentiality": "S-CON",
-        "Integrity": "S-INT",
-        "Non-repudiation": "S-NRP",
-        "Accountability": "S-ACC",
-        "Authenticity": "S-AUT",
-    },
-    "reliability": {
-        "Maturity": "R-MAT",
-        "Availability": "R-AVA",
-        "Fault Tolerance": "R-FT",
-        "Recoverability": "R-REC",
-    },
-    "maintainability": {
-        "Modularity": "M-MOD",
-        "Reusability": "M-REU",
-        "Analyzability": "M-ANA",
-        "Modifiability": "M-MDF",
-        "Testability": "M-TST",
-    },
-    "performance": {
-        "Time Behaviour": "P-TIM",
-        "Resource Utilisation": "P-RES",
-        "Capacity": "P-CAP",
-    },
-    "usability": {},
-    "flexibility": {},
-}
+_PREFIX_MAP_PATH = Path(__file__).resolve().parent / "enrich_standards_prefix_map.json"
+_PREFIX_MAP: dict = json.loads(_PREFIX_MAP_PATH.read_text())
 
 
 def _get_existing_cwes(data: dict) -> set[int]:
