@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="res/quodeq-logo-dark.svg" />
-    <img src="res/quodeq-logo.svg" alt="Quodeq" width="280" />
+    <img src="res/quodeq-logo.svg" alt="Quodeq" width="220" />
   </picture>
 </p>
 
