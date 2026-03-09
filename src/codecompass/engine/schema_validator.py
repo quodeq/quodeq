@@ -22,11 +22,6 @@ def validate_dimensions(data: dict) -> list[str]:
     return _validate(data, "dimensions_schema.json")
 
 
-def validate_practices(data: dict) -> list[str]:
-    """Validate practices.json data."""
-    return _validate(data, "practices_schema.json")
-
-
 def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
     """Validate all JSON files in a plugin directory.
 
@@ -49,13 +44,6 @@ def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
         file_errors = validator_fn(data)
         if file_errors:
             errors[filename] = file_errors
-
-    practices_file = plugin_dir / "knowledge" / "practices.json"
-    if practices_file.exists():
-        data = json.loads(practices_file.read_text())
-        file_errors = validate_practices(data)
-        if file_errors:
-            errors["knowledge/practices.json"] = file_errors
 
     return errors
 

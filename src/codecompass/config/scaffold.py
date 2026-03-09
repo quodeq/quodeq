@@ -80,13 +80,6 @@ def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
     knowledge_dir = plugin_dir / "knowledge"
     knowledge_dir.mkdir()
 
-    (knowledge_dir / "practices.json").write_text(json.dumps({
-        "runtime": runtime,
-        "version": "1.0.0",
-        "source": "manually curated",
-        "practices": [],
-    }, indent=2) + "\n")
-
     (knowledge_dir / "analysis.md").write_text(
         f"# {preset['display_name']} Codebase Analysis Guidance\n\n"
         f"## Where to look first\n\n"

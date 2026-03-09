@@ -14,7 +14,6 @@ def test_scaffold_creates_all_files(tmp_path, runtime):
     plugin_dir = scaffold_plugin(runtime, tmp_path)
     assert (plugin_dir / "plugin.json").exists()
     assert (plugin_dir / "dimensions.json").exists()
-    assert (plugin_dir / "knowledge" / "practices.json").exists()
     assert (plugin_dir / "knowledge" / "analysis.md").exists()
 
 

@@ -107,6 +107,10 @@ def count_files_from_stream(stream_file: Path) -> int:
     return len(_count_files_from_stream(stream_file))
 
 
+class AnalysisError(RuntimeError):
+    """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""
+
+
 def run_analysis(
     work_dir: Path,
     prompt: str,
@@ -121,6 +125,9 @@ def run_analysis(
 
     When *jsonl_file* is provided, an MCP findings server is configured so
     the AI reports findings as tool calls that stream directly to *jsonl_file*.
+
+    Raises:
+        AnalysisError: If the subprocess exits with a non-zero code.
 
     Args:
         work_dir: Repository directory to analyse.
@@ -180,6 +187,15 @@ def run_analysis(
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
+
+    if process.returncode != 0:
+        stderr_text = ""
+        if stream_err.exists():
+            stderr_text = stream_err.read_text().strip()
+        raise AnalysisError(
+            f"AI CLI exited with code {process.returncode}"
+            + (f": {stderr_text}" if stderr_text else "")
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -321,10 +337,10 @@ def get_mcp_status(stream_file: Path) -> str | None:
 
 
 def is_stream_valid(stream_file: Path) -> bool:
-    """Return True if stream has no error events. Empty/missing files are valid."""
+    """Return True if stream exists, is non-empty, and has no error events."""
     path = Path(stream_file)
     if not path.exists() or path.stat().st_size == 0:
-        return True
+        return False
     with open(path) as f:
         for line in f:
             try:

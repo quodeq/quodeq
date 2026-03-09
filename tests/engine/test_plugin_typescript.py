@@ -10,6 +10,5 @@ def test_plugin_loads():
     assert ".ts" in plugin["detects"]["extensions"]
 
 
-def test_plugin_has_knowledge():
-    assert (PLUGIN_DIR / "knowledge" / "practices.json").exists()
+def test_plugin_has_analysis_md():
     assert (PLUGIN_DIR / "knowledge" / "analysis.md").exists()

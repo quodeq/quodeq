@@ -8,7 +8,6 @@ import pytest
 from codecompass.engine.schema_validator import (
     validate_plugin,
     validate_dimensions,
-    validate_practices,
     validate_plugin_dir,
 )
 
@@ -86,51 +85,6 @@ def test_dimensions_missing_applies():
 def test_dimensions_missing_weight():
     data = {"applies": [{"id": "security"}]}
     assert validate_dimensions(data) != []
-
-
-# ── practices.json ────────────────────────────────────────────────────
-
-def _valid_practices():
-    return {
-        "runtime": "typescript",
-        "version": "1.0.0",
-        "practices": [
-            {
-                "id": "ts-001",
-                "title": "Avoid eval()",
-                "cwe": 95,
-                "dimension": "security",
-                "severity": "high",
-                "bad": "eval(x)",
-                "good": "JSON.parse(x)",
-                "explanation": "eval is dangerous",
-            }
-        ],
-    }
-
-
-def test_valid_practices():
-    assert validate_practices(_valid_practices()) == []
-
-
-def test_practices_with_provenance():
-    data = _valid_practices()
-    data["source"] = "github/cursor-rules"
-    data["source_stars"] = 1500
-    data["extracted"] = "2026-03-01"
-    assert validate_practices(data) == []
-
-
-def test_practices_bad_severity():
-    data = _valid_practices()
-    data["practices"][0]["severity"] = "extreme"
-    assert validate_practices(data) != []
-
-
-def test_practices_missing_required_field():
-    data = _valid_practices()
-    del data["practices"][0]["cwe"]
-    assert validate_practices(data) != []
 
 
 # ── validate_plugin_dir ───────────────────────────────────────────────
