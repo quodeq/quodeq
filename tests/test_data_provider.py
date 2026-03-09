@@ -1,7 +1,7 @@
 from codecompass.bootstrap import DataProvider
-from codecompass.adapters.fs.practices_repository import FilesystemPracticesRepository
+from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
 
 
-def test_data_provider_exposes_practices_repo(tmp_path):
-    provider = DataProvider(practices=FilesystemPracticesRepository(root=tmp_path))
-    assert provider.practices is not None
+def test_data_provider_exposes_evaluators_repo(tmp_path):
+    provider = DataProvider(evaluators=FilesystemEvaluatorsRepository(root=tmp_path))
+    assert provider.evaluators is not None
