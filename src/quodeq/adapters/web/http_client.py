@@ -2,11 +2,23 @@ from dataclasses import dataclass
 import json
 from urllib import request
 
+from quodeq.ports.data_errors import AuthError, NotFoundError, ServerError
+
 
 @dataclass(frozen=True)
 class HttpResponse:
     status: int
     data: dict
+
+
+def check_response_status(response: HttpResponse) -> None:
+    """Raise the appropriate error for non-success HTTP status codes."""
+    if response.status in {401, 403}:
+        raise AuthError("Authentication error")
+    if response.status == 404:
+        raise NotFoundError("Not found")
+    if response.status >= 500:
+        raise ServerError("Server error")
 
 
 class HttpClient:

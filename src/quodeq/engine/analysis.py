@@ -120,6 +120,8 @@ def run_analysis(
     analysis_budget: str | None = None,
     heartbeat_interval: int = 10,
     heartbeat_callback: object | None = None,
+    ai_cmd: str | None = None,
+    ai_model: str | None = None,
 ) -> None:
     """Spawn AI CLI subprocess with tools, capturing stream-json to *stream_file*.
 
@@ -138,8 +140,8 @@ def run_analysis(
         heartbeat_interval: Seconds between heartbeat callbacks.
         heartbeat_callback: Optional callable(elapsed_seconds, progress) for progress.
     """
-    cmd = _get_ai_cmd()
-    model = _get_ai_model()
+    cmd = ai_cmd or _get_ai_cmd()
+    model = ai_model or _get_ai_model()
     tools = "Bash,Glob,Grep,Read"
 
     args = [cmd, "--print", "--output-format", "stream-json", "--verbose", "--tools", tools]
