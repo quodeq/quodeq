@@ -199,8 +199,8 @@ class TestIsStreamValid:
     def test_empty_file(self, tmp_path):
         stream = tmp_path / "stream.json"
         stream.write_text("")
-        assert is_stream_valid(stream) is True
+        assert is_stream_valid(stream) is False
 
     def test_missing_file(self, tmp_path):
         stream = tmp_path / "nonexistent.json"
-        assert is_stream_valid(stream) is True
+        assert is_stream_valid(stream) is False

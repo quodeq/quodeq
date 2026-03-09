@@ -303,6 +303,15 @@
   border-radius: var(--radius-md);
 }
 
+.eval-status-row--clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.eval-status-row--clickable:hover {
+  border-color: var(--color-text-muted);
+}
+
 .eval-status-line {
   flex: 1;
   font-family: var(--font-mono);
@@ -318,6 +327,12 @@
   font-weight: 500;
   color: var(--color-text);
   white-space: nowrap;
+}
+
+.eval-status-phase--error {
+  color: var(--color-danger);
+  white-space: normal;
+  overflow-wrap: break-word;
 }
 
 .eval-status-dims {
@@ -342,23 +357,30 @@
   border-color: var(--color-accent, #3b82f6);
 }
 
-.eval-console-toggle {
+.eval-console-indicator {
   flex-shrink: 0;
-  padding: 3px 9px;
-  background: transparent;
-  border: 1px solid var(--color-border);
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
   border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
   color: var(--color-text-muted);
-  font-family: var(--font-mono);
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: border-color 120ms ease, color 120ms ease;
+  font-size: 0.85rem;
   line-height: 1;
+  transition: color 150ms, border-color 150ms;
 }
 
-.eval-console-toggle:hover {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+.eval-status-row--clickable:hover .eval-console-indicator {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.eval-console-icon {
+  width: 16px;
+  height: 16px;
 }
 
 /* Action row */

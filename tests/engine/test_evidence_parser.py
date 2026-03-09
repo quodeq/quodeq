@@ -12,31 +12,6 @@ from codecompass.engine.evidence_parser import (
 )
 
 
-def _sample_practices():
-    return {
-        "runtime": "typescript",
-        "version": "1.0.0",
-        "practices": [
-            {
-                "id": "ts-001",
-                "title": "Avoid eval()",
-                "cwe": {"id": 95, "name": "Eval Injection"},
-                "dimension": "security",
-                "severity": "high",
-                "sub_characteristic": "Authenticity",
-            },
-            {
-                "id": "ts-002",
-                "title": "Keep functions small",
-                "cwe": {"id": 1121, "name": "Excessive McCabe Cyclomatic Complexity"},
-                "dimension": "maintainability",
-                "severity": "medium",
-                "sub_characteristic": "Analyzability",
-            },
-        ],
-    }
-
-
 def _evidence_line(**overrides) -> str:
     obj = {
         "p": "ts-001",
@@ -99,6 +74,10 @@ class TestParseJsonlLine:
         assert j.line == 0
         assert j.severity == "medium"
 
+    def test_cwe_parsed(self):
+        j = _parse_jsonl_line(_evidence_line(cwe=95))
+        assert j.cwe == 95
+
 
 # ---------------------------------------------------------------------------
 # parse_jsonl_to_evidence
@@ -118,7 +97,6 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test-repo",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=50,
             files_read=10,
         )
@@ -128,8 +106,8 @@ class TestParseJsonlToEvidence:
         assert ev.source_file_count == 50
         assert ev.files_read == 10
         assert ev.coverage_pct == 20.0
-        assert "Authenticity" in ev.principles
-        assert "Analyzability" in ev.principles
+        assert "ts-001" in ev.principles
+        assert "ts-002" in ev.principles
 
     def test_principle_evidence_structure(self, tmp_path):
         jsonl = tmp_path / "evidence.jsonl"
@@ -144,13 +122,12 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=10,
             files_read=5,
         )
 
-        pe = ev.principles["Authenticity"]
-        assert pe.display_name == "Authenticity"
+        pe = ev.principles["ts-001"]
+        assert pe.display_name == "ts-001"
         assert pe.dimension == "security"
         assert pe.severity == "high"
         assert len(pe.violations) == 2
@@ -167,7 +144,6 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=10,
             files_read=0,
         )
@@ -183,7 +159,6 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=10,
             files_read=0,
         )
@@ -199,12 +174,10 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=10,
             files_read=5,
         )
 
-        # Still creates a PrincipleEvidence, just with practice_id as display name
         assert "unknown-001" in ev.principles
         assert ev.principles["unknown-001"].display_name == "unknown-001"
 
@@ -217,19 +190,71 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=10,
             files_read=5,
         )
 
-        v = ev.principles["Authenticity"].violations[0]
+        v = ev.principles["ts-001"].violations[0]
         assert v["file"] == "src/app.ts"
         assert v["line"] == 10
         assert v["snippet"] == "eval(userInput)"
         assert v["severity"] == "high"
-        assert v["title"] == "Eval Injection"
-        assert v["cwe"] == 95
         assert v["reason"] == "eval is dangerous"
+
+    def test_cwe_and_title_from_standards_dir(self, tmp_path):
+        """CWE ID from JSONL is resolved to a name via compiled standards."""
+        compiled_dir = tmp_path / "standards" / "compiled"
+        compiled_dir.mkdir(parents=True)
+        (compiled_dir / "security.json").write_text(json.dumps({
+            "id": "security", "name": "Security", "sources": [],
+            "principles": [{"name": "Confidentiality", "cwes": [
+                {"id": 798, "name": "Use of Hard-coded Credentials", "refs": []},
+            ]}],
+        }))
+
+        jsonl = tmp_path / "evidence.jsonl"
+        jsonl.write_text(json.dumps({
+            "p": "Confidentiality", "t": "violation", "d": "security",
+            "w": "hardcoded secret", "file": "src/config.py", "line": 5,
+            "severity": "critical", "reason": "API key in source", "cwe": 798,
+        }) + "\n")
+
+        ev = parse_jsonl_to_evidence(
+            jsonl,
+            plugin_id="python",
+            repository="test",
+            date_str="2026-03-09",
+            source_file_count=10,
+            files_read=5,
+            standards_dir=tmp_path / "standards",
+        )
+
+        v = ev.principles["Confidentiality"].violations[0]
+        assert v["cwe"] == 798
+        assert v["title"] == "Use of Hard-coded Credentials"
+        assert v["reason"] == "Use of Hard-coded Credentials — API key in source"
+
+    def test_cwe_without_standards_dir(self, tmp_path):
+        """CWE ID is still stored even without standards_dir; title is absent."""
+        jsonl = tmp_path / "evidence.jsonl"
+        jsonl.write_text(json.dumps({
+            "p": "Confidentiality", "t": "violation", "d": "security",
+            "w": "hardcoded secret", "file": "src/config.py", "line": 5,
+            "severity": "critical", "reason": "API key in source", "cwe": 798,
+        }) + "\n")
+
+        ev = parse_jsonl_to_evidence(
+            jsonl,
+            plugin_id="python",
+            repository="test",
+            date_str="2026-03-09",
+            source_file_count=10,
+            files_read=5,
+        )
+
+        v = ev.principles["Confidentiality"].violations[0]
+        assert v["cwe"] == 798
+        assert "title" not in v
 
     def test_malformed_lines_skipped(self, tmp_path):
         jsonl = tmp_path / "evidence.jsonl"
@@ -240,7 +265,6 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=10,
             files_read=5,
         )
@@ -256,7 +280,6 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=0,
             files_read=0,
         )
@@ -276,7 +299,6 @@ class TestParseJsonlToEvidence:
             plugin_id="typescript",
             repository="test",
             date_str="2026-03-06",
-            practices_data=_sample_practices(),
             source_file_count=10,
             files_read=5,
         )
@@ -284,7 +306,7 @@ class TestParseJsonlToEvidence:
         d = ev.to_evidence_dict()
         assert d["repository"] == "test"
         assert d["discipline"] == "typescript"
-        assert "Authenticity" in d["principles"]
-        assert "violations" in d["principles"]["Authenticity"]
-        assert "compliance" in d["principles"]["Authenticity"]
-        assert "metrics" in d["principles"]["Authenticity"]
+        assert "ts-001" in d["principles"]
+        assert "violations" in d["principles"]["ts-001"]
+        assert "compliance" in d["principles"]["ts-001"]
+        assert "metrics" in d["principles"]["ts-001"]

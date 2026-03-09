@@ -32,7 +32,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     if (!logs?.length) return null;
     for (let i = logs.length - 1; i >= 0; i--) {
       const line = logs[i].trim();
-      if (line.startsWith('→') || line.startsWith('✓')) return line;
+      if (line.startsWith('→') || line.startsWith('✓') || line.startsWith('Error:') || line.includes('failed')) return line;
     }
     return null;
   }
@@ -44,13 +44,14 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
   }, [job?.logs]);
 
   useEffect(() => {
-    setConsoleOpen(false);
-  }, [job?.jobId]);
+    setConsoleOpen(job?.status === 'failed');
+  }, [job?.jobId, job?.status]);
 
   if (!job) return null;
 
   const isRunning = job.status === 'running';
   const isDone = job.status === 'done';
+  const isFailed = job.status === 'failed';
   const projectName = deriveProjectName(job.repo);
 
   return (
@@ -91,26 +92,32 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         )}
       </div>
 
-      {isRunning && (
-        <div className="eval-status-row">
-          <span className="eval-status-phase">{phaseLabel(job)}</span>
-          {job.dimensions?.length > 0 && (
-            <span className="eval-status-dims">
-              {job.dimensions.map(d => (
-                <span key={d} className={`eval-dim-tag${d === job.currentDimension ? ' active' : ''}`}>{d}</span>
-              ))}
-            </span>
-          )}
-          <button
-            type="button"
-            className="eval-console-toggle"
-            onClick={() => setConsoleOpen(o => !o)}
-            title={consoleOpen ? 'Hide console' : 'Show console'}
-          >
-            {consoleOpen ? '▴' : '···'}
-          </button>
-        </div>
-      )}
+      <div
+        className="eval-status-row eval-status-row--clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => setConsoleOpen(o => !o)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen(o => !o); } }}
+        title={consoleOpen ? 'Hide console' : 'Show console'}
+      >
+        {isRunning && <span className="eval-status-phase">{phaseLabel(job)}</span>}
+        {isFailed && <span className="eval-status-phase eval-status-phase--error">{lastRelevantLog(job.logs) || 'Analysis failed'}</span>}
+        {isRunning && job.dimensions?.length > 0 && (
+          <span className="eval-status-dims">
+            {job.dimensions.map(d => (
+              <span key={d} className={`eval-dim-tag${d === job.currentDimension ? ' active' : ''}`}>{d}</span>
+            ))}
+          </span>
+        )}
+        <span className="eval-console-indicator">
+          <svg className="eval-console-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="2" width="14" height="12" rx="2" />
+            <polyline points="4.5,6.5 7,9 4.5,11.5" />
+            <line x1="9" y1="11" x2="12" y2="11" />
+          </svg>
+          {consoleOpen ? '▾' : '▸'}
+        </span>
+      </div>
       {consoleOpen && (
         <div className="console-output">
           <pre ref={logViewerRef}>
