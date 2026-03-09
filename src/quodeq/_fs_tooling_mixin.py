@@ -17,12 +17,16 @@ from quodeq.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION
 
 _CLI_MODEL_TIMEOUT_S = 8
 _ANTHROPIC_API_TIMEOUT_S = 8
-# Updated when Anthropic releases new major model versions (used when the API is unreachable).
-_FALLBACK_CLAUDE_MODELS = [
-    "claude-opus-4-5",
-    "claude-sonnet-4-5",
-    "claude-haiku-4-5",
-]
+_AI_DEFAULTS_PATH = Path(__file__).resolve().parent / "config" / "ai_defaults.json"
+
+
+def _load_fallback_claude_models() -> list[str]:
+    """Load fallback Claude model list from config/ai_defaults.json."""
+    try:
+        data = json.loads(_AI_DEFAULTS_PATH.read_text())
+        return data.get("fallback_claude_models", [])
+    except (OSError, json.JSONDecodeError):
+        return []
 
 
 def _fetch_anthropic_models(api_key: str) -> list[str] | None:
@@ -122,4 +126,4 @@ class FsToolingMixin:
             models = _fetch_anthropic_models(key)
             if models:
                 return {"models": models}
-        return {"models": list(_FALLBACK_CLAUDE_MODELS)}
+        return {"models": _load_fallback_claude_models()}

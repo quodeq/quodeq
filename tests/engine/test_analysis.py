@@ -9,8 +9,8 @@ import pytest
 from quodeq.engine.analysis import (
     extract_evidence_from_stream,
     is_stream_valid,
-    _extract_jsonl_from_text,
 )
+from quodeq.engine.stream_parser import _extract_jsonl_from_text
 
 
 # ---------------------------------------------------------------------------

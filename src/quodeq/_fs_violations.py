@@ -123,7 +123,6 @@ _TEXT_EXTRACTORS: dict[str, Callable] = {
 }
 
 
-
 def _parse_entries_from_texts(
     texts: list[str], dimension: str, seen: set[str]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:

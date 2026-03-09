@@ -13,7 +13,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from quodeq.utils import AI_CMD_DEFAULT
+from quodeq.utils import get_ai_cmd, get_ai_model
 
 
 # ---------------------------------------------------------------------------
@@ -45,11 +45,11 @@ def _create_mcp_config(jsonl_file: Path) -> Path:
 # ---------------------------------------------------------------------------
 
 def _get_ai_cmd() -> str:
-    return os.environ.get("AI_CMD", AI_CMD_DEFAULT)
+    return get_ai_cmd()
 
 
 def _get_ai_model() -> str | None:
-    return os.environ.get("AI_MODEL") or None
+    return get_ai_model()
 
 
 def _count_jsonl_lines(jsonl_file: Path) -> int:
@@ -182,6 +182,27 @@ def _run_with_heartbeat(
                 heartbeat_callback(elapsed, progress)
 
 
+def _build_analysis_env() -> dict[str, str]:
+    """Build the subprocess environment for the AI CLI."""
+    env = os.environ.copy()
+    if "CODEX_SANDBOX" not in env:
+        env["CODEX_SANDBOX"] = "read-only"
+    env.pop("CLAUDECODE", None)
+    return env
+
+
+def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
+    """Raise AnalysisError if the process exited with a non-zero code."""
+    if process.returncode != 0:
+        stderr_text = ""
+        if stream_err.exists():
+            stderr_text = stream_err.read_text().strip()
+        raise AnalysisError(
+            f"AI CLI exited with code {process.returncode}"
+            + (f": {stderr_text}" if stderr_text else "")
+        )
+
+
 def run_analysis(
     work_dir: Path,
     prompt: str,
@@ -201,61 +222,32 @@ def run_analysis(
 
     Raises:
         AnalysisError: If the subprocess exits with a non-zero code.
-
-    Args:
-        work_dir: Repository directory to analyse.
-        prompt: Full analysis prompt text.
-        stream_file: Path to write stream-json output.
-        jsonl_file: Path for MCP server to write findings (enables real-time streaming).
-        analysis_budget: Optional max budget in USD.
-        heartbeat_interval: Seconds between heartbeat callbacks.
-        heartbeat_callback: Optional callable(elapsed_seconds, progress) for progress.
     """
     args, mcp_config_path = _build_ai_cmd(
-        prompt,
-        ai_cmd=ai_cmd,
-        ai_model=ai_model,
-        jsonl_file=jsonl_file,
-        analysis_budget=analysis_budget,
+        prompt, ai_cmd=ai_cmd, ai_model=ai_model,
+        jsonl_file=jsonl_file, analysis_budget=analysis_budget,
     )
-
-    env = os.environ.copy()
-    if "CODEX_SANDBOX" not in env:
-        env["CODEX_SANDBOX"] = "read-only"
-    env.pop("CLAUDECODE", None)
-
+    env = _build_analysis_env()
     stream_err = Path(str(stream_file) + ".err")
+
     try:
         with open(stream_file, "w") as out, open(stream_err, "w") as err:
             process = subprocess.Popen(
-                args,
-                cwd=str(work_dir),
-                env=env,
-                stdout=out,
-                stderr=err,
-                stdin=subprocess.DEVNULL,
+                args, cwd=str(work_dir), env=env,
+                stdout=out, stderr=err, stdin=subprocess.DEVNULL,
             )
             _run_with_heartbeat(process, heartbeat_interval, heartbeat_callback, stream_file, jsonl_file)
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
 
-    if process.returncode != 0:
-        stderr_text = ""
-        if stream_err.exists():
-            stderr_text = stream_err.read_text().strip()
-        raise AnalysisError(
-            f"AI CLI exited with code {process.returncode}"
-            + (f": {stderr_text}" if stderr_text else "")
-        )
+    _check_process_result(process, stream_err)
 
 
 # ---------------------------------------------------------------------------
-# JSONL extraction (delegated to stream_parser) and re-exports
+# Re-exports — public APIs only (consumers of private symbols should
+# import from stream_parser directly).
 # ---------------------------------------------------------------------------
 
-from quodeq.engine.stream_parser import (  # noqa: F401
-    _extract_jsonl_from_text,
-    extract_evidence_from_stream,
-)
+from quodeq.engine.stream_parser import extract_evidence_from_stream  # noqa: F401
 from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid  # noqa: F401

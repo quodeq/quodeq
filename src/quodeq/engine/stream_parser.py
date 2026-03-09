@@ -38,9 +38,9 @@ def _process_assistant_event(data: dict, out, stats: dict, files_read: set) -> N
             text = block["text"].strip()
             if text:
                 stats["text_blocks"] += 1
-                c, l = _extract_jsonl_from_text(text, out)
+                c, scanned = _extract_jsonl_from_text(text, out)
                 stats["jsonl_lines"] += c
-                stats["total_text_lines"] += l
+                stats["total_text_lines"] += scanned
         elif btype == "tool_use" and block.get("name") == "Read":
             fp = block.get("input", {}).get("file_path")
             if fp:
@@ -51,9 +51,9 @@ def _process_result_event(data: dict, out, stats: dict) -> None:
     result = data.get("result", "").strip()
     if result:
         stats["text_blocks"] += 1
-        c, l = _extract_jsonl_from_text(result, out)
+        c, scanned = _extract_jsonl_from_text(result, out)
         stats["jsonl_lines"] += c
-        stats["total_text_lines"] += l
+        stats["total_text_lines"] += scanned
 
 
 def _extract_from_content_blocks(blocks: list, out, stats: dict, files_read: set) -> None:
@@ -66,9 +66,9 @@ def _extract_from_content_blocks(blocks: list, out, stats: dict, files_read: set
             block_text = (block.get("text") or "").strip()
             if block_text:
                 stats["text_blocks"] += 1
-                c, l = _extract_jsonl_from_text(block_text, out)
+                c, scanned = _extract_jsonl_from_text(block_text, out)
                 stats["jsonl_lines"] += c
-                stats["total_text_lines"] += l
+                stats["total_text_lines"] += scanned
         elif btype == "tool_use" and block.get("name") == "Read":
             fp = block.get("input", {}).get("file_path")
             if fp:
@@ -81,9 +81,9 @@ def _process_item_completed_event(data: dict, out, stats: dict, files_read: set)
         text = (item.get("text") or "").strip()
         if text:
             stats["text_blocks"] += 1
-            c, l = _extract_jsonl_from_text(text, out)
+            c, scanned = _extract_jsonl_from_text(text, out)
             stats["jsonl_lines"] += c
-            stats["total_text_lines"] += l
+            stats["total_text_lines"] += scanned
         _extract_from_content_blocks(item.get("content", []), out, stats, files_read)
 
 

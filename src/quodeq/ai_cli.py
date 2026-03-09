@@ -1,16 +1,16 @@
+"""AI CLI subprocess runner for executing prompts via the configured AI command."""
 from __future__ import annotations
 
-import os
 import subprocess
 
-from quodeq.utils import AI_CMD_DEFAULT
+from quodeq.utils import get_ai_cmd
 
 _AI_CLI_TIMEOUT_S = 300
 
 
 def run_ai_cli(prompt: str) -> tuple[str | None, str | None]:
     """Run the configured AI CLI with the given prompt and return (stdout, error)."""
-    cmd = os.environ.get("AI_CMD", AI_CMD_DEFAULT)
+    cmd = get_ai_cmd()
     try:
         result = subprocess.run(
             [cmd, "--print", "-p", prompt],

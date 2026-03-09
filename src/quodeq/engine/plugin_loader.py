@@ -7,6 +7,7 @@ from quodeq.engine.schema_validator import (
     validate_plugin,
     validate_dimensions,
 )
+from quodeq.utils import read_json
 
 
 def discover_plugins(evaluators_dir: Path) -> list[dict]:
@@ -26,8 +27,7 @@ def discover_plugins(evaluators_dir: Path) -> list[dict]:
 
 def load_plugin(plugin_dir: Path) -> dict:
     """Load and return the plugin.json contents from a plugin directory."""
-    plugin_file = plugin_dir / "plugin.json"
-    return json.loads(plugin_file.read_text())
+    return read_json(plugin_dir / "plugin.json")
 
 
 def load_plugin_full(plugin_dir: Path) -> dict:
@@ -36,15 +36,12 @@ def load_plugin_full(plugin_dir: Path) -> dict:
     Returns {"plugin": dict, "dimensions": dict}.
     Raises ValueError on validation failure.
     """
-    plugin_file = plugin_dir / "plugin.json"
-    dims_file = plugin_dir / "dimensions.json"
-
-    plugin_data = json.loads(plugin_file.read_text())
+    plugin_data = read_json(plugin_dir / "plugin.json")
     errors = validate_plugin(plugin_data)
     if errors:
         raise ValueError(f"plugin.json: {'; '.join(errors)}")
 
-    dims_data = json.loads(dims_file.read_text())
+    dims_data = read_json(plugin_dir / "dimensions.json")
     errors = validate_dimensions(dims_data)
     if errors:
         raise ValueError(f"dimensions.json: {'; '.join(errors)}")
@@ -60,7 +57,7 @@ def _try_load(plugin_dir: Path) -> dict | None:
     if not plugin_file.exists():
         return None
     try:
-        data = json.loads(plugin_file.read_text())
+        data = read_json(plugin_file)
         errors = validate_plugin(data)
         if errors:
             return None

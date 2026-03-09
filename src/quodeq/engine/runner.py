@@ -25,6 +25,7 @@ from quodeq.engine.analysis import (
 )
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.engine.plugin_detector import count_source_files, detect_plugin  # noqa: F401
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 
@@ -256,9 +257,6 @@ def _merge_evidence(evidence_list: list[Evidence], config: RunConfig) -> Evidenc
     if evidence_list:
         merged.plugin_name = evidence_list[0].plugin_name
     return merged
-
-
-from quodeq.engine.plugin_detector import count_source_files, detect_plugin  # noqa: F401
 
 
 def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> dict:

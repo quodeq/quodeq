@@ -21,6 +21,15 @@ def parse_numeric_score(score_text: str | None) -> float | None:
     return float(match.group(1))
 
 
+def _grade_rank(grade: str) -> int:
+    """Return the ordinal rank of a grade (higher is better), or -1 if unknown."""
+    if grade in NUMERIC_GRADE_ORDER:
+        return NUMERIC_GRADE_ORDER.index(grade)
+    if grade in TEXT_GRADE_ORDER:
+        return TEXT_GRADE_ORDER.index(grade)
+    return -1
+
+
 def most_frequent_grade(grades: list[str]) -> str | None:
     """Return the most common grade, breaking ties by higher grade rank."""
     if not grades:
@@ -28,22 +37,8 @@ def most_frequent_grade(grades: list[str]) -> str | None:
     counts: dict[str, int] = {}
     for grade in grades:
         counts[grade] = counts.get(grade, 0) + 1
-    winner = grades[0]
-    winner_count = counts[winner]
-    for grade, count in counts.items():
-        if count > winner_count:
-            winner = grade
-            winner_count = count
-            continue
-        if count == winner_count:
-            if grade in NUMERIC_GRADE_ORDER and winner in NUMERIC_GRADE_ORDER:
-                if NUMERIC_GRADE_ORDER.index(grade) > NUMERIC_GRADE_ORDER.index(winner):
-                    winner = grade
-                    continue
-            if grade in TEXT_GRADE_ORDER and winner in TEXT_GRADE_ORDER:
-                if TEXT_GRADE_ORDER.index(grade) > TEXT_GRADE_ORDER.index(winner):
-                    winner = grade
-    return winner
+    # Sort by (-count, -rank) so the highest-count, highest-rank grade wins.
+    return max(counts, key=lambda g: (counts[g], _grade_rank(g)))
 
 
 def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, Any]]) -> dict[str, Any]:

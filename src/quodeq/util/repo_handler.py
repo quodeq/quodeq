@@ -1,11 +1,12 @@
+"""Repository preparation utility — clones remote repos to temporary directories."""
 from __future__ import annotations
 
 import atexit
+import os
 import shutil
+import subprocess
 import tempfile
 from pathlib import Path
-import os
-import subprocess
 
 
 def prepare_repository(repo_input: str) -> str:

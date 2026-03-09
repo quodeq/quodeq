@@ -8,28 +8,29 @@ from pathlib import Path
 from quodeq.engine.evidence import Evidence
 
 
+# Score thresholds — exclusive lower bounds for each grade tier.
+_GRADE_THRESHOLDS = (
+    (3, "Critical"),
+    (5, "Poor"),
+    (7, "Adequate"),
+    (9, "Good"),
+)
+
+
 def grade_from_score(score: str | None) -> str | None:
     """Convert a numeric score string (e.g. '7/10') to a letter grade (Critical..Exemplary)."""
-    # Nothing to map if the input is falsy
     if not score:
         return None
 
-    # Accept both "7/10" and plain "7" — pull the leading number out
     hit = re.match(r"(\d+(?:\.\d+)?)", str(score))
     if not hit:
         return None
 
     numeric = float(hit.group(1))
 
-    # Thresholds are exclusive lower bounds for the next tier
-    if numeric < 3:
-        return "Critical"
-    if numeric < 5:
-        return "Poor"
-    if numeric < 7:
-        return "Adequate"
-    if numeric < 9:
-        return "Good"
+    for threshold, label in _GRADE_THRESHOLDS:
+        if numeric < threshold:
+            return label
     return "Exemplary"
 
 

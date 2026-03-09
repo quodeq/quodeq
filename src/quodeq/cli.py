@@ -26,7 +26,7 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     dashboard_parser = subparsers.add_parser("dashboard", help="Run the dashboard")
-    dashboard_parser.set_defaults(_command="dashboard")
+    dashboard_parser.set_defaults(handler_command="dashboard")
 
     evaluate_parser = subparsers.add_parser(
         "evaluate", help="Run evaluation (auto-detects plugin)"
@@ -57,7 +57,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Produce evidence JSON only (skip scoring)",
     )
-    evaluate_parser.set_defaults(_command="evaluate")
+    evaluate_parser.set_defaults(handler_command="evaluate")
 
     configure_parser = subparsers.add_parser("configure", help="Configure Quodeq")
     for action in build_config_parser()._actions:
@@ -65,7 +65,7 @@ def build_parser() -> argparse.ArgumentParser:
             continue
         if action.option_strings or action.nargs is not None:
             configure_parser._add_action(action)
-    configure_parser.set_defaults(_command="configure")
+    configure_parser.set_defaults(handler_command="configure")
 
     return parser
 
@@ -200,9 +200,9 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate subcommand handler."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    if args._command == "evaluate":
+    if args.handler_command == "evaluate":
         return run_evaluate(args)
-    handler = _COMMAND_HANDLERS.get(args._command)
+    handler = _COMMAND_HANDLERS.get(args.handler_command)
     if handler:
         return handler(argv)
     return 1

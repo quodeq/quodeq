@@ -91,31 +91,14 @@ def _judgment_to_dict(j: Judgment, cwe_name: str = "", cwe_id: int | None = None
     return d
 
 
-def parse_jsonl_to_evidence(
-    jsonl_file: Path,
-    context: EvidenceContext,
-    *,
-    standards_dir: Path | None = None,
-) -> Evidence:
-    """Parse extracted JSONL file into a complete Evidence object.
-
-    Findings are grouped by principle name (the p field the AI reports).
-    CWE names are resolved from compiled standards when available.
-    """
-    plugin_id = context.plugin_id
-    repository = context.repository
-    date_str = context.date_str
-    source_file_count = context.source_file_count
-    files_read = context.files_read
-    cwe_name_lookup = _build_cwe_name_lookup(standards_dir) if standards_dir else {}
-
-    judgments: list[Judgment] = []
-    content = jsonl_file.read_text() if jsonl_file.exists() else ""
-    for line in content.splitlines():
-        j = _parse_jsonl_line(line)
-        if j is not None:
-            judgments.append(j)
-
+def _group_judgments(
+    judgments: list[Judgment], cwe_name_lookup: dict[int, str],
+) -> tuple[
+    dict[str, list[tuple[Judgment, str, int | None]]],
+    dict[str, list[tuple[Judgment, str, int | None]]],
+    dict[str, str],
+]:
+    """Group judgments by principle into violations, compliance, and max severity."""
     sc_violations: dict[str, list[tuple[Judgment, str, int | None]]] = {}
     sc_compliance: dict[str, list[tuple[Judgment, str, int | None]]] = {}
     sc_severity: dict[str, str] = {}
@@ -134,6 +117,30 @@ def parse_jsonl_to_evidence(
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
 
+    return sc_violations, sc_compliance, sc_severity
+
+
+def parse_jsonl_to_evidence(
+    jsonl_file: Path,
+    context: EvidenceContext,
+    *,
+    standards_dir: Path | None = None,
+) -> Evidence:
+    """Parse extracted JSONL file into a complete Evidence object.
+
+    Findings are grouped by principle name (the p field the AI reports).
+    CWE names are resolved from compiled standards when available.
+    """
+    cwe_name_lookup = _build_cwe_name_lookup(standards_dir) if standards_dir else {}
+
+    judgments: list[Judgment] = []
+    content = jsonl_file.read_text() if jsonl_file.exists() else ""
+    for line in content.splitlines():
+        j = _parse_jsonl_line(line)
+        if j is not None:
+            judgments.append(j)
+
+    sc_violations, sc_compliance, sc_severity = _group_judgments(judgments, cwe_name_lookup)
     all_principles = set(sc_violations.keys()) | set(sc_compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}
 
@@ -149,12 +156,14 @@ def parse_jsonl_to_evidence(
         pe.compute_metrics()
         principles[sc] = pe
 
+    files_read = context.files_read
+    source_file_count = context.source_file_count
     coverage_pct = round(files_read / source_file_count * 100, 1) if source_file_count > 0 else 0.0
 
     return Evidence(
-        repository=repository,
-        plugin_id=plugin_id,
-        date=date_str,
+        repository=context.repository,
+        plugin_id=context.plugin_id,
+        date=context.date_str,
         source_file_count=source_file_count,
         files_read=files_read,
         coverage_pct=coverage_pct,

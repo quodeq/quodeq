@@ -1,6 +1,7 @@
 """Minimal HTTP client for JSON API communication."""
 
 from dataclasses import dataclass
+from http import HTTPStatus
 import json
 from urllib import request
 
@@ -17,11 +18,11 @@ class HttpResponse:
 
 def check_response_status(response: HttpResponse) -> None:
     """Raise the appropriate error for non-success HTTP status codes."""
-    if response.status in {401, 403}:
+    if response.status in {HTTPStatus.UNAUTHORIZED, HTTPStatus.FORBIDDEN}:
         raise AuthError("Authentication error")
-    if response.status == 404:
+    if response.status == HTTPStatus.NOT_FOUND:
         raise NotFoundError("Not found")
-    if response.status >= 500:
+    if response.status >= HTTPStatus.INTERNAL_SERVER_ERROR:
         raise ServerError("Server error")
 
 

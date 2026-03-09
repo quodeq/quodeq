@@ -50,37 +50,35 @@ def _normalize_date(raw: str) -> tuple[str, str] | None:
     return None
 
 
+def _find_date_in_dir(directory: Path, suffix: str) -> tuple[str | None, str] | None:
+    """Scan JSON files in *directory* matching *suffix* for a parsable date field."""
+    for entry in safe_read_dir(directory):
+        if not entry.is_file() or not entry.name.endswith(suffix):
+            continue
+        try:
+            data = json.loads(Path(entry.path).read_text())
+            raw = data.get("date")
+            if raw:
+                result = _normalize_date(str(raw))
+                if result:
+                    return result
+        except (json.JSONDecodeError, OSError):
+            pass
+    return None
+
+
 def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
     """Read the date from evidence or evaluation files in a run directory."""
     run_dir = reports_root / project / run_id
 
-    # Try evidence/*.json first (V1 format)
-    for entry in safe_read_dir(run_dir / "evidence"):
-        if entry.is_file() and entry.name.endswith("_evidence.json"):
-            try:
-                data = json.loads(Path(entry.path).read_text())
-                raw = data.get("date")
-                if raw:
-                    result = _normalize_date(str(raw))
-                    if result:
-                        return result
-            except (json.JSONDecodeError, OSError):
-                pass
+    result = _find_date_in_dir(run_dir / "evidence", "_evidence.json")
+    if result:
+        return result
 
-    # Try evaluation/*.json (V2 format — per-dimension report files)
-    for entry in safe_read_dir(run_dir / "evaluation"):
-        if entry.is_file() and entry.name.endswith(".json"):
-            try:
-                data = json.loads(Path(entry.path).read_text())
-                raw = data.get("date")
-                if raw:
-                    result = _normalize_date(str(raw))
-                    if result:
-                        return result
-            except (json.JSONDecodeError, OSError):
-                pass
+    result = _find_date_in_dir(run_dir / "evaluation", ".json")
+    if result:
+        return result
 
-    # Fallback: try parsing the run_id itself as a date (backward compat with YYYYMMDD dirs)
     fallback = _normalize_date(run_id)
     if fallback:
         return fallback
@@ -106,15 +104,12 @@ def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | 
     }
 
 
-def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
-    """Load all dimension evaluations and evidence for a single run."""
-    run_dir = reports_root / project / run_id
-    evaluation_dir = run_dir / "evaluation"
-    evidence_dir = run_dir / "evidence"
-
+def _load_evaluations(evaluation_dir: Path) -> list[dict[str, Any]]:
+    """Load parsed evaluation dicts from a run's evaluation directory."""
     evaluations: list[dict[str, Any]] = []
     seen_dimensions: set[str] = set()
     entries = safe_read_dir(evaluation_dir)
+
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith("_eval.md"):
             continue
@@ -136,11 +131,24 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[st
             evaluations.append(parsed)
             seen_dimensions.add(dimension)
 
+    return evaluations
+
+
+def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
+    """Load evidence files keyed by dimension name."""
     evidence_map: dict[str, dict[str, Any]] = {}
     for entry in safe_read_dir(evidence_dir):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
             parsed_ev = parse_evidence_file(Path(entry.path))
             evidence_map[parsed_ev["dimension"]] = parsed_ev
+    return evidence_map
+
+
+def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
+    """Load all dimension evaluations and evidence for a single run."""
+    run_dir = reports_root / project / run_id
+    evaluations = _load_evaluations(run_dir / "evaluation")
+    evidence_map = _load_evidence_map(run_dir / "evidence")
 
     dimensions = []
     for evaluation in evaluations:
@@ -173,6 +181,7 @@ def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
 
 
 def _get_previous_run_for_dimension(reports_root: Path, project: str, current_run_id: str, dimension: str) -> dict[str, Any] | None:
+    """Return the most recent run data for *dimension* before *current_run_id*, or None."""
     project_path = reports_root / project
     if not project_path.exists():
         return None

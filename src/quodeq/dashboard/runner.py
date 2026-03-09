@@ -89,10 +89,11 @@ def _choose_ui_port(start: int, host: str = "127.0.0.1") -> int:
 
 def _kill_stale_action_api(host: str, port: int) -> None:
     """Kill any lingering action API processes so the dashboard always loads fresh code."""
-    try:
-        subprocess.run(["pkill", "-f", ACTION_API_MODULE], capture_output=True)
-    except OSError:
-        pass
+    if sys.platform != "win32":
+        try:
+            subprocess.run(["pkill", "-f", ACTION_API_MODULE], capture_output=True)
+        except OSError:
+            pass
     deadline = time.monotonic() + 3
     while _is_port_open(host, port) and time.monotonic() < deadline:
         time.sleep(0.1)

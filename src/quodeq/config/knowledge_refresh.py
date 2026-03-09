@@ -6,6 +6,7 @@ import json
 import urllib.error
 import urllib.request
 import urllib.parse
+from functools import lru_cache
 from pathlib import Path
 
 from quodeq.ai_cli import run_ai_cli
@@ -13,14 +14,11 @@ from quodeq.ai_cli import run_ai_cli
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
 _GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
-_linter_sources_cache: dict[str, str] | None = None
 
 
+@lru_cache(maxsize=1)
 def _get_linter_sources() -> dict[str, str]:
-    global _linter_sources_cache
-    if _linter_sources_cache is None:
-        _linter_sources_cache = json.loads(_LINTER_SOURCES_PATH.read_text())
-    return _linter_sources_cache
+    return json.loads(_LINTER_SOURCES_PATH.read_text())
 
 
 def refresh_practices(

@@ -43,8 +43,8 @@ def _build_project_zip(project_path: Path) -> "io.BytesIO":
     return buf
 
 
-def _register_project_routes(app: Flask, provider: ActionProvider) -> None:
-    """Register /api/projects/* routes."""
+def _register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
+    """Register project listing, mutation, and export routes."""
 
     @app.get("/api/projects")
     def list_projects() -> Response:
@@ -92,6 +92,10 @@ def _register_project_routes(app: Flask, provider: ActionProvider) -> None:
             body, status = _error("Project info not found", 404, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(info)
+
+
+def _register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
+    """Register project dashboard, accumulated, evaluation, and violation routes."""
 
     @app.get("/api/projects/<project>/dashboard")
     def dashboard(project: str) -> Response | tuple[Response, int]:
@@ -277,7 +281,8 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
         """Return a simple health-check response."""
         return jsonify({"ok": True})
 
-    _register_project_routes(app, provider)
+    _register_project_list_routes(app, provider)
+    _register_project_data_routes(app, provider)
     _register_evaluation_routes(app, provider)
     _register_discovery_routes(app, provider)
     _register_static_routes(app, static_dist)

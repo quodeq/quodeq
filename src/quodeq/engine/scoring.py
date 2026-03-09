@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from quodeq.engine.evidence import DEFAULT_WEIGHT, Evidence
 from quodeq.engine.scoring_internals import (
     GRADE_LADDER,
@@ -53,71 +55,101 @@ def confidence_label(level: str) -> str:
 # Branch helpers for run_scoring
 # ---------------------------------------------------------------------------
 
-def _score_principle_numerical(
-    key: str,
-    pdata: dict,
-    pct: float,
-    vt_counts: dict[str, int],
-    using_taxonomy: bool,
-    conf_level: str,
-    ci: dict,
-    scale_mult: int,
-) -> dict:
+@dataclass(frozen=True)
+class _PrincipleContext:
+    """Scoring context for a single principle — reduces parameter count."""
+    key: str
+    pdata: dict
+    pct: float
+    vt_counts: dict[str, int]
+    using_taxonomy: bool
+    conf_level: str
+    ci: dict
+    scale_mult: int
+
+
+def _score_principle_numerical(ctx: _PrincipleContext) -> dict:
     """Score a single principle in numerical mode."""
-    base_pts = score_for_compliance(pct)
-    deductions = build_deductions(vt_counts, scale_multiplier=scale_mult)
+    base_pts = score_for_compliance(ctx.pct)
+    deductions = build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
 
     effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
     adjusted = min(effective_cap, round(base_pts - deductions["total_deduction"], 1))
     final_pts = max(0.0, min(10.0, adjusted))
 
     return {
-        "display_name": pdata.get("display_name", key),
-        "weight": pdata.get("weight", DEFAULT_WEIGHT),
-        "compliance_percentage": pct,
+        "display_name": ctx.pdata.get("display_name", ctx.key),
+        "weight": ctx.pdata.get("weight", DEFAULT_WEIGHT),
+        "compliance_percentage": ctx.pct,
         "base_score": base_pts,
         "deductions": deductions,
         "final_score": final_pts,
         "grade": score_to_grade_label(final_pts),
-        "taxonomy_used": using_taxonomy,
-        "confidence_level": conf_level,
-        "confidence_interval": ci["confidence_interval"],
-        "grade_stability": ci["grade_stability"],
+        "taxonomy_used": ctx.using_taxonomy,
+        "confidence_level": ctx.conf_level,
+        "confidence_interval": ctx.ci["confidence_interval"],
+        "grade_stability": ctx.ci["grade_stability"],
     }
 
 
-def _score_principle_graded(
-    key: str,
-    pdata: dict,
-    pct: float,
-    vt_counts: dict[str, int],
-    using_taxonomy: bool,
-    conf_level: str,
-    ci: dict,
-    scale_mult: int,
-) -> dict:
+def _score_principle_graded(ctx: _PrincipleContext) -> dict:
     """Score a single principle in non-numerical (graded) mode."""
-    base_label = grade_for_compliance(pct)
-    level_drops = count_grade_drops(vt_counts, scale_multiplier=scale_mult)
+    base_label = grade_for_compliance(ctx.pct)
+    level_drops = count_grade_drops(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
     final_label = drop_grade(base_label, level_drops)
 
     return {
-        "display_name": pdata.get("display_name", key),
-        "weight": pdata.get("weight", DEFAULT_WEIGHT),
-        "compliance_percentage": pct,
+        "display_name": ctx.pdata.get("display_name", ctx.key),
+        "weight": ctx.pdata.get("weight", DEFAULT_WEIGHT),
+        "compliance_percentage": ctx.pct,
         "base_grade": base_label,
         "severity_drops": level_drops,
         "grade": final_label,
-        "taxonomy_used": using_taxonomy,
-        "confidence_level": conf_level,
-        "confidence_interval": ci["confidence_interval"],
-        "grade_stability": ci["grade_stability"],
+        "taxonomy_used": ctx.using_taxonomy,
+        "confidence_level": ctx.conf_level,
+        "confidence_interval": ctx.ci["confidence_interval"],
+        "grade_stability": ctx.ci["grade_stability"],
     }
 
 
 # ---------------------------------------------------------------------------
 # Main scoring entry points
 # ---------------------------------------------------------------------------
+
+def _score_all_principles(
+    raw_principles: dict, mode: str, scale_mult: int, files_read: int,
+) -> dict:
+    """Score every principle in *raw_principles* and return the per-principle dict."""
+    per_principle: dict = {}
+    for key, pdata in raw_principles.items():
+        metrics = pdata.get("metrics", {})
+        pct = metrics.get("compliance_percentage", 0.0)
+        violations = pdata.get("violations", [])
+        conf_level = metrics.get("confidence_level", "medium")
+
+        using_taxonomy = evidence_has_taxonomy(violations)
+        vt_counts = (
+            tally_types_by_taxonomy(violations)
+            if using_taxonomy
+            else tally_types_by_reason(violations)
+        )
+        ci = confidence_interval_for(
+            confidence_level=conf_level,
+            is_balanced=metrics.get("is_balanced", True),
+            total_instances=metrics.get("total_instances", 0),
+            files_read=files_read,
+        )
+        ctx = _PrincipleContext(
+            key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
+            using_taxonomy=using_taxonomy, conf_level=conf_level,
+            ci=ci, scale_mult=scale_mult,
+        )
+        if mode == "numerical":
+            per_principle[key] = _score_principle_numerical(ctx)
+        else:
+            per_principle[key] = _score_principle_graded(ctx)
+    return per_principle
+
 
 def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     """Compute per-principle scores and return the full result dictionary.
@@ -131,41 +163,13 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     Returns:
         A dict with keys: repository, discipline, date, mode, principles, overall.
     """
-    per_principle: dict = {}
     source_file_count = evidence.get("source_file_count", 0)
     files_read = evidence.get("files_read", 0)
     scale_mult = _scale_multiplier(source_file_count)
-    raw_principles = evidence.get("principles", {})
 
-    for key, pdata in raw_principles.items():
-        metrics = pdata.get("metrics", {})
-        pct = metrics.get("compliance_percentage", 0.0)
-        violations = pdata.get("violations", [])
-        conf_level = metrics.get("confidence_level", "medium")
-
-        using_taxonomy = evidence_has_taxonomy(violations)
-        vt_counts = (
-            tally_types_by_taxonomy(violations)
-            if using_taxonomy
-            else tally_types_by_reason(violations)
-        )
-
-        ci = confidence_interval_for(
-            confidence_level=conf_level,
-            is_balanced=metrics.get("is_balanced", True),
-            total_instances=metrics.get("total_instances", 0),
-            files_read=files_read,
-        )
-
-        if mode == "numerical":
-            per_principle[key] = _score_principle_numerical(
-                key, pdata, pct, vt_counts, using_taxonomy, conf_level, ci, scale_mult,
-            )
-        else:
-            per_principle[key] = _score_principle_graded(
-                key, pdata, pct, vt_counts, using_taxonomy, conf_level, ci, scale_mult,
-            )
-
+    per_principle = _score_all_principles(
+        evidence.get("principles", {}), mode, scale_mult, files_read,
+    )
     overall = _weighted_overall(per_principle, mode)
 
     return {

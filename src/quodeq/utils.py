@@ -1,6 +1,7 @@
 """Shared utilities, constants, and helpers for the Quodeq package."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 # Shared default for the AI CLI command name (used by ai_cli.py and engine/analysis.py).
@@ -25,3 +26,20 @@ def project_name_from_repo(repo: str) -> str:
     if is_repo_url(repo):
         return repo.split("/")[-1].replace(".git", "")
     return Path(repo).name
+
+
+def read_json(path: Path) -> dict:
+    """Read and parse a JSON file, returning the parsed dict."""
+    return json.loads(path.read_text())
+
+
+def get_ai_cmd() -> str:
+    """Return the AI CLI command from environment or default."""
+    import os
+    return os.environ.get("AI_CMD", AI_CMD_DEFAULT)
+
+
+def get_ai_model() -> str | None:
+    """Return the AI model from environment, or None."""
+    import os
+    return os.environ.get("AI_MODEL") or None

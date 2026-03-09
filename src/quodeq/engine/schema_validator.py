@@ -1,3 +1,4 @@
+"""Schema validation for plugin and dimensions JSON files."""
 from __future__ import annotations
 
 import json

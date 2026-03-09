@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from quodeq.action_provider_fs_accumulated import compute_accumulated  # noqa: F401
 from quodeq.adapters.fs.report_parser import (
     calculate_trend,
     list_runs,
@@ -58,6 +59,19 @@ def _find_stale_from_run(
     return results
 
 
+def _record_stale_entry(entry: dict, stale_dim_map: dict[str, dict[str, Any]]) -> None:
+    """Add a stale dimension entry to the map if not already present."""
+    dim_name = entry["dim_name"]
+    if dim_name not in stale_dim_map:
+        stale_dim_map[dim_name] = {
+            **entry["dim"],
+            "stale": True,
+            "fromRunId": entry["run_id"],
+            "fromDateISO": entry["date_iso"],
+            "fromDateLabel": entry["date_label"],
+        }
+
+
 def _collect_stale_dimensions(
     runs, selected_index: int, selected_dim_names: set, get_run_dimensions
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
@@ -68,32 +82,17 @@ def _collect_stale_dimensions(
 
     for older_idx in range(selected_index + 1, len(runs)):
         for entry in _find_stale_from_run(runs[older_idx], selected_dim_names, get_run_dimensions):
-            dim_name = entry["dim_name"]
-            if dim_name not in stale_dim_map:
-                stale_dim_map[dim_name] = {
-                    **entry["dim"],
-                    "stale": True,
-                    "fromRunId": entry["run_id"],
-                    "fromDateISO": entry["date_iso"],
-                    "fromDateLabel": entry["date_label"],
-                }
+            _record_stale_entry(entry, stale_dim_map)
             grade = entry["grade"]
             if grade and str(grade).upper() not in _SKIP_GRADES:
+                dim_name = entry["dim_name"]
                 non_na_count[dim_name] = non_na_count.get(dim_name, 0) + 1
                 if non_na_count[dim_name] == 2 and dim_name not in stale_previous_by_dimension:
                     stale_previous_by_dimension[dim_name] = entry["dim"]
 
     for newer_idx in range(selected_index):
         for entry in _find_stale_from_run(runs[newer_idx], selected_dim_names, get_run_dimensions):
-            dim_name = entry["dim_name"]
-            if dim_name not in stale_dim_map:
-                stale_dim_map[dim_name] = {
-                    **entry["dim"],
-                    "stale": True,
-                    "fromRunId": entry["run_id"],
-                    "fromDateISO": entry["date_iso"],
-                    "fromDateLabel": entry["date_label"],
-                }
+            _record_stale_entry(entry, stale_dim_map)
 
     stale_dimensions = sorted(stale_dim_map.values(), key=lambda d: d.get("dimension") or "")
     return stale_dimensions, stale_previous_by_dimension
@@ -147,9 +146,6 @@ def _build_accumulated_trend(runs, get_run_dimensions) -> list[dict[str, Any]]:
         )
     trend.reverse()
     return trend
-
-
-from quodeq.action_provider_fs_accumulated import compute_accumulated  # noqa: F401
 
 
 def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:

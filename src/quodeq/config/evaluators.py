@@ -22,31 +22,36 @@ class EvaluatorContext:
 def build_evaluator_prompt(
     *,
     template_path: Path,
-    discipline: str,
-    dimension: str,
-    practices_dir: Path,
-    dimensions_dir: Path,
-    output_path: Path,
-    date_value: str,
+    context: EvaluatorContext | None = None,
+    discipline: str = "",
+    dimension: str = "",
+    practices_dir: Path | None = None,
+    dimensions_dir: Path | None = None,
+    output_path: Path | None = None,
+    date_value: str = "",
 ) -> str:
-    """Render an evaluator prompt by substituting context values into a template."""
-    ctx = EvaluatorContext(
-        discipline=discipline,
-        dimension=dimension,
-        practices_dir=practices_dir,
-        dimensions_dir=dimensions_dir,
-        output_path=output_path,
-        date_value=date_value,
-    )
+    """Render an evaluator prompt by substituting context values into a template.
+
+    Accepts either a pre-built *context* or individual keyword arguments.
+    """
+    if context is None:
+        context = EvaluatorContext(
+            discipline=discipline,
+            dimension=dimension,
+            practices_dir=practices_dir or Path(),
+            dimensions_dir=dimensions_dir or Path(),
+            output_path=output_path or Path(),
+            date_value=date_value,
+        )
     template = template_path.read_text()
     return render_template(
         template,
         {
-            "DISCIPLINE": ctx.discipline,
-            "DIMENSION": ctx.dimension,
-            "PRACTICES_DIR": str(ctx.practices_dir),
-            "DIMENSIONS_DIR": str(ctx.dimensions_dir),
-            "OUTPUT": str(ctx.output_path),
-            "DATE": ctx.date_value,
+            "DISCIPLINE": context.discipline,
+            "DIMENSION": context.dimension,
+            "PRACTICES_DIR": str(context.practices_dir),
+            "DIMENSIONS_DIR": str(context.dimensions_dir),
+            "OUTPUT": str(context.output_path),
+            "DATE": context.date_value,
         },
     )

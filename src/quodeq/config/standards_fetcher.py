@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 import json
+import os
 import urllib.request
 from datetime import date
 from pathlib import Path
 
-ASVS_URL = (
+_DEFAULT_ASVS_URL = (
     "https://raw.githubusercontent.com/OWASP/ASVS/v4.0.3/4.0/docs_en/"
     "OWASP%20Application%20Security%20Verification%20Standard%204.0.3-en.json"
 )
+ASVS_URL = os.environ.get("QUODEQ_ASVS_URL", _DEFAULT_ASVS_URL)
 
 
 def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
@@ -41,17 +43,24 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
 def _parse_asvs_l1(raw: dict) -> list[dict]:
     requirements = []
     for chapter in raw.get("Requirements", []):
-        for section in chapter.get("Items", []):
-            for req in section.get("Items", []):
-                if req.get("L1", {}).get("Required"):
-                    requirements.append({
-                        "id": req["Shortcode"],
-                        "level": 1,
-                        "text": req["Description"],
-                        "cwe": req.get("CWE", []),
-                        "section": chapter["ShortName"],
-                    })
+        requirements.extend(_extract_l1_from_chapter(chapter))
     return requirements
+
+
+def _extract_l1_from_chapter(chapter: dict) -> list[dict]:
+    """Extract L1-required items from a single ASVS chapter."""
+    items = []
+    for section in chapter.get("Items", []):
+        for req in section.get("Items", []):
+            if req.get("L1", {}).get("Required"):
+                items.append({
+                    "id": req["Shortcode"],
+                    "level": 1,
+                    "text": req["Description"],
+                    "cwe": req.get("CWE", []),
+                    "section": chapter["ShortName"],
+                })
+    return items
 
 
 def _show_diff(path: Path, new_content: str) -> None:
