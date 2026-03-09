@@ -1,5 +1,5 @@
-from quodeq.adapters.web.http_client import HttpClient
-from quodeq.ports.data_errors import AuthError, InvalidDataError, NotFoundError, ServerError
+from quodeq.adapters.web.http_client import HttpClient, check_response_status
+from quodeq.ports.data_errors import InvalidDataError
 
 
 class WebEvaluationsRepository:
@@ -9,24 +9,14 @@ class WebEvaluationsRepository:
 
     def list_reports(self) -> list[str]:
         response = self.client.get_json(f"{self.base_url}/reports", {})
-        if response.status in {401, 403}:
-            raise AuthError("Authentication error")
-        elif response.status == 404:
-            raise NotFoundError("Not found")
-        elif response.status >= 500:
-            raise ServerError("Server error")
+        check_response_status(response)
         if not isinstance(response.data, dict) or "reports" not in response.data or not isinstance(response.data["reports"], list):
             raise InvalidDataError("Invalid data format")
         return response.data["reports"]
 
     def get_report(self, report_id: str) -> dict:
         response = self.client.get_json(f"{self.base_url}/reports/{report_id}", {})
-        if response.status in {401, 403}:
-            raise AuthError("Authentication error")
-        elif response.status == 404:
-            raise NotFoundError("Not found")
-        elif response.status >= 500:
-            raise ServerError("Server error")
+        check_response_status(response)
         if not isinstance(response.data, dict):
             raise InvalidDataError("Invalid data format")
         return response.data
