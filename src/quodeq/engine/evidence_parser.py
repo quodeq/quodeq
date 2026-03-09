@@ -60,6 +60,7 @@ def _parse_jsonl_line(line: str) -> Judgment | None:
         violation_type=obj.get("vt", ""),
         reason=obj.get("reason", ""),
         cwe=obj.get("cwe"),
+        title=obj.get("w", ""),
     )
 
 
@@ -76,8 +77,9 @@ def _judgment_to_dict(j: Judgment, cwe_name: str = "", cwe_id: int | None = None
         d["violation_type"] = j.violation_type
     if cwe_id:
         d["cwe"] = cwe_id
-    if cwe_name:
-        d["title"] = cwe_name
+    effective_title = cwe_name or j.title
+    if effective_title:
+        d["title"] = effective_title
     reason_parts = []
     if cwe_name:
         reason_parts.append(cwe_name)

@@ -250,7 +250,7 @@ class TestParseJsonlToEvidence:
         assert v["reason"] == "Use of Hard-coded Credentials — API key in source"
 
     def test_cwe_without_standards_dir(self, tmp_path):
-        """CWE ID is still stored even without standards_dir; title is absent."""
+        """CWE ID is still stored even without standards_dir; title falls back to w."""
         jsonl = tmp_path / "evidence.jsonl"
         jsonl.write_text(json.dumps({
             "p": "Confidentiality", "t": "violation", "d": "security",
@@ -271,7 +271,7 @@ class TestParseJsonlToEvidence:
 
         v = ev.principles["Confidentiality"].violations[0]
         assert v["cwe"] == 798
-        assert "title" not in v
+        assert v["title"] == "hardcoded secret"
 
     def test_malformed_lines_skipped(self, tmp_path):
         jsonl = tmp_path / "evidence.jsonl"
