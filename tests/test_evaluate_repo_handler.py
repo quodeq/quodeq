@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from codecompass.util.repo_handler import is_repo_url, prepare_repository
+from quodeq.util.repo_handler import is_repo_url, prepare_repository
 
 
 def test_is_repo_url():

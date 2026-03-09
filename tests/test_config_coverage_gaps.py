@@ -1,4 +1,4 @@
-from codecompass.config.coverage import coverage_percent
+from quodeq.config.coverage import coverage_percent
 
 
 def test_coverage_percent_parses_fraction():

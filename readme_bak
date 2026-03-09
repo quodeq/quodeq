@@ -30,7 +30,7 @@ uv sync
 ### Run the Dashboard
 
 ```bash
-uv run codecompass dashboard
+uv run quodeq dashboard
 ```
 
 This will:
@@ -43,37 +43,37 @@ This will:
 
 ```bash
 # Evaluate a local repository (auto-detects language plugin)
-uv run codecompass evaluate /path/to/your/project
+uv run quodeq evaluate /path/to/your/project
 
 # Evaluate a remote repository
-uv run codecompass evaluate git@github.com:org/repo.git
+uv run quodeq evaluate git@github.com:org/repo.git
 
 # Evaluate specific dimensions only
-uv run codecompass evaluate /path/to/project -d security,reliability
+uv run quodeq evaluate /path/to/project -d security,reliability
 
 # Use a specific plugin
-uv run codecompass evaluate /path/to/project -p typescript
+uv run quodeq evaluate /path/to/project -p typescript
 
 # Evidence only (skip scoring)
-uv run codecompass evaluate /path/to/project --evidence-only
+uv run quodeq evaluate /path/to/project --evidence-only
 ```
 
 ### Configure AI Client
 
 ```bash
-uv run codecompass configure
+uv run quodeq configure
 ```
 
 ## Dashboard Options
 
 ```bash
-uv run codecompass dashboard --port 8080           # custom port
-uv run codecompass dashboard --open false           # skip auto-opening browser
-uv run codecompass dashboard --no-build             # skip web UI build (requires ui/web/dist)
-uv run codecompass dashboard --evaluations <dir>    # custom evaluations directory
-uv run codecompass dashboard --api-host 127.0.0.1   # override Action API host
-uv run codecompass dashboard --api-port 8001        # override Action API port
-uv run codecompass dashboard --reinstall            # force reinstall npm dependencies
+uv run quodeq dashboard --port 8080           # custom port
+uv run quodeq dashboard --open false           # skip auto-opening browser
+uv run quodeq dashboard --no-build             # skip web UI build (requires ui/web/dist)
+uv run quodeq dashboard --evaluations <dir>    # custom evaluations directory
+uv run quodeq dashboard --api-host 127.0.0.1   # override Action API host
+uv run quodeq dashboard --api-port 8001        # override Action API port
+uv run quodeq dashboard --reinstall            # force reinstall npm dependencies
 ```
 
 ## Development
@@ -83,7 +83,7 @@ uv run codecompass dashboard --reinstall            # force reinstall npm depend
 Start the Action API:
 
 ```bash
-uv run python -m codecompass.action_api
+uv run python -m quodeq.action_api
 ```
 
 Then in another terminal:
@@ -105,8 +105,8 @@ uv run pytest
 ## Project Structure
 
 ```
-codecompass/
-  src/codecompass/          # Python package
+quodeq/
+  src/quodeq/          # Python package
     engine/                 # V2 evaluation engine (analysis, scoring, reporting)
     dashboard/              # Dashboard server
     adapters/               # Report parsers and filesystem adapters

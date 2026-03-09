@@ -1,4 +1,4 @@
-// Vite configuration for the CodeCompass web UI.
+// Vite configuration for the Quodeq web UI.
 // Dev server proxies /api to the local Node.js server (VITE_API_TARGET).
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';

@@ -1,4 +1,4 @@
-from codecompass.engine.standards import load_dimension, load_asvs_l1, load_cisq
+from quodeq.engine.standards import load_dimension, load_asvs_l1, load_cisq
 
 
 def test_load_maintainability_dimension():

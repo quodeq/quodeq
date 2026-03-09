@@ -46,7 +46,7 @@ const TREND_COLOR = {
   down:       '#f09070',
 };
 
-// Shortcodes mirror src/codecompass/config/dimensions.py
+// Shortcodes mirror src/quodeq/config/dimensions.py
 const DIM_CODE = {
   affordability:  'aff',
   availability:   'avl',

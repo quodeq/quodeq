@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from codecompass.engine.sa_manager import (
+from quodeq.engine.sa_manager import (
     init_pending,
     get_findings,
     consume_findings,

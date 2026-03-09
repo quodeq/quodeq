@@ -528,7 +528,7 @@ needs updating. The mapping is based on CWE → ISO 25010 sub-characteristic.
 - Modify: `evaluators/kotlin/knowledge/practices.json`
 - Modify: `evaluators/bash/knowledge/practices.json`
 - Modify: `evaluators/mobile_ios/knowledge/practices.json`
-- Modify: `src/codecompass/v2/engine/schemas/practices_schema.json`
+- Modify: `src/quodeq/v2/engine/schemas/practices_schema.json`
 
 **Step 1: Update practices_schema.json**
 
@@ -582,7 +582,7 @@ Expected: PASS (plugins validate their practices against schema)
 **Step 4: Commit**
 
 ```bash
-git add evaluators/*/knowledge/practices.json src/codecompass/v2/engine/schemas/practices_schema.json
+git add evaluators/*/knowledge/practices.json src/quodeq/v2/engine/schemas/practices_schema.json
 git commit -m "feat(evaluators): add principle field to all practices"
 ```
 

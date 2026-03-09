@@ -1,0 +1,180 @@
+from __future__ import annotations
+
+import json
+import os
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from quodeq.adapters.fs.report_parser.grades import summarize_dimensions
+from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
+from quodeq.utils import is_repo_url
+
+
+@dataclass(frozen=True)
+class RunInfo:
+    run_id: str
+    date_iso: str | None
+    date_label: str
+
+
+def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
+    try:
+        with os.scandir(path) as it:
+            return list(it)
+    except OSError:
+        return []
+
+
+def _normalize_date(raw: str) -> tuple[str, str] | None:
+    """Parse a date/datetime string and return (sortable_iso, human_label).
+
+    Accepts ISO datetime (2026-03-01T14:30:25), ISO date (2026-03-01),
+    or compact date (20260301).  The first element is the full string
+    (including time when available) so that same-day runs sort correctly.
+    """
+    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
+        try:
+            parsed = datetime.strptime(raw, fmt)
+            sortable = parsed.isoformat(timespec='seconds') if "T" in fmt else parsed.date().isoformat()
+            label = parsed.strftime("%b %d, %Y")
+            return sortable, label
+        except ValueError:
+            continue
+    return None
+
+
+def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
+    """Read the date from evidence or evaluation files in a run directory."""
+    run_dir = reports_root / project / run_id
+
+    # Try evidence/*.json first (V1 format)
+    for entry in safe_read_dir(run_dir / "evidence"):
+        if entry.is_file() and entry.name.endswith("_evidence.json"):
+            try:
+                data = json.loads(Path(entry.path).read_text())
+                raw = data.get("date")
+                if raw:
+                    result = _normalize_date(str(raw))
+                    if result:
+                        return result
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    # Try evaluation/*.json (V2 format — per-dimension report files)
+    for entry in safe_read_dir(run_dir / "evaluation"):
+        if entry.is_file() and entry.name.endswith(".json"):
+            try:
+                data = json.loads(Path(entry.path).read_text())
+                raw = data.get("date")
+                if raw:
+                    result = _normalize_date(str(raw))
+                    if result:
+                        return result
+            except (json.JSONDecodeError, OSError):
+                pass
+
+    # Fallback: try parsing the run_id itself as a date (backward compat with YYYYMMDD dirs)
+    fallback = _normalize_date(run_id)
+    if fallback:
+        return fallback
+    return None, run_id
+
+
+def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | None]:
+    if is_repo_url(repo):
+        name = repo.split("/")[-1].replace(".git", "")
+        return {
+            "name": name,
+            "discipline": discipline,
+            "location": "online",
+            "path": repo,
+        }
+    resolved = Path(repo).resolve()
+    return {
+        "name": resolved.name,
+        "discipline": discipline,
+        "location": "local",
+        "path": str(resolved),
+    }
+
+
+def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
+    run_dir = reports_root / project / run_id
+    evaluation_dir = run_dir / "evaluation"
+    evidence_dir = run_dir / "evidence"
+
+    evaluations: list[dict[str, Any]] = []
+    seen_dimensions: set[str] = set()
+    entries = safe_read_dir(evaluation_dir)
+    for entry in entries:
+        if not entry.is_file() or not entry.name.endswith("_eval.md"):
+            continue
+        dimension = entry.name[:-8]
+        json_path = evaluation_dir / f"{dimension}.json"
+        parsed = parse_report_json(json_path) if json_path.exists() else None
+        if parsed:
+            evaluations.append(parsed)
+            seen_dimensions.add(dimension)
+
+    for entry in entries:
+        if not entry.is_file() or not entry.name.endswith(".json"):
+            continue
+        dimension = entry.name[:-5]
+        if dimension in seen_dimensions:
+            continue
+        parsed = parse_report_json(Path(entry.path))
+        if parsed:
+            evaluations.append(parsed)
+            seen_dimensions.add(dimension)
+
+    evidence_map: dict[str, dict[str, Any]] = {}
+    for entry in safe_read_dir(evidence_dir):
+        if entry.is_file() and entry.name.endswith("_evidence.json"):
+            parsed_ev = parse_evidence_file(Path(entry.path))
+            evidence_map[parsed_ev["dimension"]] = parsed_ev
+
+    dimensions = []
+    for evaluation in evaluations:
+        dimension = evaluation.get("dimension")
+        evidence = evidence_map.get(dimension, {})
+        dimensions.append(
+            {
+                **evaluation,
+                "sourceFileCount": evidence.get("sourceFileCount"),
+                "evidenceDate": evidence.get("date"),
+                "discipline": evidence.get("discipline"),
+            }
+        )
+
+    dimensions.sort(key=lambda item: item.get("dimension") or "")
+    return dimensions
+
+
+def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
+    project_dir = reports_root / project
+    run_infos: list[RunInfo] = []
+    for entry in safe_read_dir(project_dir):
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        date_iso, date_label = _parse_run_date(reports_root, project, entry.name)
+        run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label))
+    run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)
+    return run_infos
+
+
+def _get_previous_run_for_dimension(reports_root: Path, project: str, current_run_id: str, dimension: str) -> dict[str, Any] | None:
+    project_path = reports_root / project
+    if not project_path.exists():
+        return None
+    all_runs = list_runs(reports_root, project)
+    current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
+    if current_idx < 0:
+        return None
+    for run_info in all_runs[current_idx + 1:]:
+        dims = read_run_data(reports_root, project, run_info.run_id)
+        dim = next((d for d in dims if d.get("dimension") == dimension), None)
+        if dim:
+            return {"runId": run_info.run_id, "dimension": dim}
+    return None

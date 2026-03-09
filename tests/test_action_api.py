@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from codecompass.action_api import create_app
-from codecompass.action_provider import ActionProvider
+from quodeq.action_api import create_app
+from quodeq.action_provider import ActionProvider
 
 
 class StubProvider(ActionProvider):

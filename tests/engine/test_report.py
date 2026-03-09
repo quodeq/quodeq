@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from codecompass.engine.evidence import Evidence, PrincipleEvidence
-from codecompass.engine.report import build_full_report, build_dashboard_report, write_reports
-from codecompass.engine.scoring import score_evidence
+from quodeq.engine.evidence import Evidence, PrincipleEvidence
+from quodeq.engine.report import build_full_report, build_dashboard_report, write_reports
+from quodeq.engine.scoring import score_evidence
 
 
 def _make_evidence() -> Evidence:

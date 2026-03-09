@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from codecompass.engine.analysis import (
+from quodeq.engine.analysis import (
     extract_evidence_from_stream,
     is_stream_valid,
     _extract_jsonl_from_text,

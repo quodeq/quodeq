@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from codecompass.engine.schema_validator import (
+from quodeq.engine.schema_validator import (
     validate_plugin,
     validate_dimensions,
     validate_plugin_dir,

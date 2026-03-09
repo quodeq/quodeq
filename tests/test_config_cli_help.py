@@ -4,7 +4,7 @@ import sys
 
 def test_configure_subcommand_help():
     result = subprocess.run(
-        [sys.executable, "-m", "codecompass.cli", "configure", "--help"],
+        [sys.executable, "-m", "quodeq.cli", "configure", "--help"],
         capture_output=True,
         text=True,
     )
@@ -14,7 +14,7 @@ def test_configure_subcommand_help():
 
 def test_configure_help_mentions_core_options():
     result = subprocess.run(
-        [sys.executable, "-m", "codecompass.cli", "configure", "--help"],
+        [sys.executable, "-m", "quodeq.cli", "configure", "--help"],
         capture_output=True,
         text=True,
     )

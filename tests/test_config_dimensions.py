@@ -4,7 +4,7 @@ import sys
 
 def test_configure_dimensions_list():
     result = subprocess.run(
-        [sys.executable, "-m", "codecompass.cli", "configure", "-d"],
+        [sys.executable, "-m", "quodeq.cli", "configure", "-d"],
         capture_output=True,
         text=True,
     )
