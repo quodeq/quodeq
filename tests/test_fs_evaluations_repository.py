@@ -1,5 +1,5 @@
 import json
-from codecompass.adapters.fs.evaluations_repository import FilesystemEvaluationsRepository
+from quodeq.adapters.fs.evaluations_repository import FilesystemEvaluationsRepository
 
 
 def test_fs_evaluations_repository_reads_report(tmp_path):

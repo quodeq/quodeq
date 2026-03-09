@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from codecompass.engine.evidence import Evidence, Judgment, PrincipleEvidence
+from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
 
 
 def test_judgment_defaults():

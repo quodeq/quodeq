@@ -1,5 +1,5 @@
 import json
-from codecompass.adapters.fs.dimensions_repository import FilesystemDimensionsRepository
+from quodeq.adapters.fs.dimensions_repository import FilesystemDimensionsRepository
 
 
 def test_fs_dimensions_repository_reads_dimension(tmp_path):

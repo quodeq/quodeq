@@ -13,7 +13,7 @@
 ### Task 1: Backend — expose `parent` in list_projects
 
 **Files:**
-- Modify: `src/codecompass/action_provider_fs.py:123-141`
+- Modify: `src/quodeq/action_provider_fs.py:123-141`
 
 **Step 1: Edit `list_projects` to read `repository_info.json` per project**
 
@@ -61,7 +61,7 @@ Expected: each project object includes a `"parent"` key (null if not set). Add a
 **Step 3: Commit**
 
 ```bash
-git add src/codecompass/action_provider_fs.py
+git add src/quodeq/action_provider_fs.py
 git commit -m "feat: include parent field in list_projects response"
 ```
 
@@ -531,7 +531,7 @@ git commit -m "feat: show parent › child in content header"
 The `latestDate` already exists. For grade/score: the simplest approach is to read the latest run summary from the reports folder in `list_projects`.
 
 **Files:**
-- Modify: `src/codecompass/action_provider_fs.py:123-141` (the list_projects method from Task 1)
+- Modify: `src/quodeq/action_provider_fs.py:123-141` (the list_projects method from Task 1)
 
 **Step 1: Extend `list_projects` to include latest grade/score**
 
@@ -579,7 +579,7 @@ Expected: each project includes `latestGrade` (e.g. `"good"`) and `latestScore` 
 **Step 4: Commit**
 
 ```bash
-git add src/codecompass/action_provider_fs.py
+git add src/quodeq/action_provider_fs.py
 git commit -m "feat: include latestGrade and latestScore in list_projects"
 ```
 

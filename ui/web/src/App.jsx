@@ -129,7 +129,7 @@ export default function App() {
   // -------------------------------------------------------------------------
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(() => {
-    try { return localStorage.getItem('codecompass_selected_project') || ''; } catch { return ''; }
+    try { return localStorage.getItem('quodeq_selected_project') || ''; } catch { return ''; }
   });
   const [selectedRun, setSelectedRun] = useState('latest');
 
@@ -139,7 +139,7 @@ export default function App() {
         const list = data.projects || data || [];
         setProjects(list);
         if (list.length > 0) {
-          const current = selectedProject || localStorage.getItem('codecompass_selected_project') || '';
+          const current = selectedProject || localStorage.getItem('quodeq_selected_project') || '';
           const match = current && list.find((p) => (p.id || p.name) === current);
           if (!match) {
             const pick = list[0].id || list[0].name || list[0];
@@ -158,7 +158,7 @@ export default function App() {
 
   function handleProjectChange(name) {
     setSelectedProject(name);
-    try { localStorage.setItem('codecompass_selected_project', name); } catch {}
+    try { localStorage.setItem('quodeq_selected_project', name); } catch {}
     setSelectedRun('latest');
     navReset();
   }
@@ -541,7 +541,7 @@ export default function App() {
                 </div>
                 <div>
                   <h1 className="settings-title">Settings</h1>
-                  <p className="settings-subtitle">Manage your CodeCompass preferences</p>
+                  <p className="settings-subtitle">Manage your Quodeq preferences</p>
                 </div>
               </div>
             </div>
@@ -554,7 +554,7 @@ export default function App() {
                 <div className="settings-row">
                   <div className="settings-row-label">
                     <span className="settings-label">Theme</span>
-                    <span className="settings-description">Choose how CodeCompass looks to you</span>
+                    <span className="settings-description">Choose how Quodeq looks to you</span>
                   </div>
                   <div className="theme-toggle">
                     {[
@@ -609,7 +609,7 @@ export default function App() {
                     <div className="settings-row-label">
                       <span className="settings-label">No AI client detected</span>
                       <span className="settings-description">
-                        Install one of the supported CLI tools and restart CodeCompass.
+                        Install one of the supported CLI tools and restart Quodeq.
                       </span>
                     </div>
                     <div className="settings-install-options">
@@ -669,9 +669,9 @@ export default function App() {
       <aside className="sidebar">
         <div className="sidebar-header">
           <div className="sidebar-brand-icon">
-            <img src="/logo.png" alt="CodeCompass" width="36" height="36" />
+            <img src="/logo.png" alt="Quodeq" width="36" height="36" />
           </div>
-          <span className="sidebar-brand-text">CodeCompass</span>
+          <span className="sidebar-brand-text">Quodeq</span>
         </div>
 
         <nav className="sidebar-nav">

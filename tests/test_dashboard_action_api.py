@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from codecompass.dashboard import runner
+from quodeq.dashboard import runner
 
 
 def test_spawn_action_api_sets_env(monkeypatch):
@@ -20,7 +20,7 @@ def test_spawn_action_api_sets_env(monkeypatch):
 
     monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
     runner._spawn_action_api(8001)
-    assert captured["env"]["CODECOMPASS_ACTION_API_PORT"] == "8001"
+    assert captured["env"]["QUODEQ_ACTION_API_PORT"] == "8001"
 
 
 def test_spawn_action_api_sets_static_dist(monkeypatch):
@@ -40,7 +40,7 @@ def test_spawn_action_api_sets_static_dist(monkeypatch):
 
     monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
     runner._spawn_action_api(8001, static_dist=Path("/tmp/dist"))
-    assert captured["env"]["CODECOMPASS_STATIC_DIST"] == "/tmp/dist"
+    assert captured["env"]["QUODEQ_STATIC_DIST"] == "/tmp/dist"
 
 
 def test_force_action_api_host_port(monkeypatch):

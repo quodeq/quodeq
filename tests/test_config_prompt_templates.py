@@ -1,4 +1,4 @@
-from codecompass.config.prompt_templates import render_template
+from quodeq.config.prompt_templates import render_template
 
 
 def test_render_template_replaces_tokens():

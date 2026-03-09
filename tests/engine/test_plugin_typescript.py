@@ -1,5 +1,5 @@
 from pathlib import Path
-from codecompass.engine.plugin_loader import load_plugin
+from quodeq.engine.plugin_loader import load_plugin
 
 PLUGIN_DIR = Path(__file__).parent.parent.parent / "evaluators" / "typescript"
 

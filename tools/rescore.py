@@ -6,7 +6,7 @@ Usage:
 
 Defaults:
     evaluations_dir = evaluations/
-    project         = codecompass
+    project         = quodeq
 """
 import json
 import sys
@@ -16,8 +16,8 @@ from pathlib import Path
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root / "src"))
 
-from codecompass.evaluate.lib.scoring import run_scoring
-from codecompass.evaluate.lib.report_json import write_report_json
+from quodeq.evaluate.lib.scoring import run_scoring
+from quodeq.evaluate.lib.report_json import write_report_json
 
 SCORING_MODE_BY_HASH = {
     "6fee1ee3": "numerical",
@@ -69,7 +69,7 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path) -> bool:
 
 def main():
     evals_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else repo_root / "evaluations"
-    project = sys.argv[2] if len(sys.argv) > 2 else "codecompass"
+    project = sys.argv[2] if len(sys.argv) > 2 else "quodeq"
     project_dir = evals_dir / project
 
     if not project_dir.exists():

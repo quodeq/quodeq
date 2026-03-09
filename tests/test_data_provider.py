@@ -1,5 +1,5 @@
-from codecompass.bootstrap import DataProvider
-from codecompass.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
+from quodeq.bootstrap import DataProvider
+from quodeq.adapters.fs.evaluators_repository import FilesystemEvaluatorsRepository
 
 
 def test_data_provider_exposes_evaluators_repo(tmp_path):
