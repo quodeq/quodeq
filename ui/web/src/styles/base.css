@@ -341,7 +341,7 @@ button {
   gap: var(--space-2);
   padding: var(--space-2) var(--space-5);
   background: var(--color-accent);
-  color: #fff;
+  color: var(--color-on-accent);
   border: none;
   border-radius: var(--radius-md);
   font-family: var(--font-sans);
@@ -466,7 +466,7 @@ textarea:focus {
   background: var(--color-accent);
   border: none;
   border-radius: var(--radius-md);
-  color: #fff;
+  color: var(--color-on-accent);
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
   cursor: pointer;
@@ -498,7 +498,7 @@ textarea:focus {
 .code-snippet.violation.minor    { border-left: 3px solid var(--color-sev-minor-text); }
 
 .code-snippet.compliance {
-  border-left: 3px solid #5ee6a0;
+  border-left: 3px solid var(--color-compliance);
 }
 
 .violation-file {
@@ -742,9 +742,9 @@ textarea:focus {
 }
 
 .severity-tag.compliance {
-  color: #5ee6a0;
-  background: color-mix(in srgb, #5ee6a0 12%, transparent);
-  border-color: color-mix(in srgb, #5ee6a0 35%, transparent);
+  color: var(--color-compliance);
+  background: var(--color-compliance-bg);
+  border-color: var(--color-compliance-border);
 }
 
 /* ── Grade chips ──────────────────────────────────────── */
@@ -783,16 +783,16 @@ textarea:focus {
 }
 
 .trend-badge-up {
-  color: #5ee6a0;
+  color: var(--color-trend-up);
 }
 .trend-badge-soft-up {
-  color: #92c9a8;
+  color: var(--color-trend-soft-up);
 }
 .trend-badge-soft-down {
-  color: #c8956c;
+  color: var(--color-trend-soft-down);
 }
 .trend-badge-down {
-  color: #f09070;
+  color: var(--color-trend-down);
 }
 .trend-badge-same,
 .trend-badge-none {
@@ -816,27 +816,19 @@ textarea:focus {
   letter-spacing: -0.08em;
 }
 
-.trend-arrow-up { color: #5ee6a0; }
-.trend-arrow-up-big { color: #2ecc71; }
+.trend-arrow-up { color: var(--color-trend-up); }
+.trend-arrow-up-big { color: var(--color-trend-strong-up); }
 .trend-arrow-same { color: var(--color-text-muted); font-size: 0.8rem; }
-.trend-up { color: #5ee6a0; }
-.trend-soft-up { color: #92c9a8; }
-.trend-soft-down { color: #c8956c; }
-.trend-down { color: #f09070; }
-.trend-arrow-down-big { color: #e74c3c; }
+.trend-up { color: var(--color-trend-up); }
+.trend-soft-up { color: var(--color-trend-soft-up); }
+.trend-soft-down { color: var(--color-trend-soft-down); }
+.trend-down { color: var(--color-trend-down); }
+.trend-arrow-down-big { color: var(--color-trend-strong-down); }
 
 .trend-arrow {
   font-size: 1rem;
   font-weight: bold;
   margin-left: 8px;
-}
-
-.trend-up {
-  color: var(--success, #22c55e);
-}
-
-.trend-down {
-  color: var(--danger, #ef4444);
 }
 
 .trend-same {

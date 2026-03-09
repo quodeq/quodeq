@@ -91,7 +91,7 @@
 .job-error {
   margin-top: 16px;
   padding: 12px 16px;
-  background: rgba(255, 111, 111, 0.1);
+  background: var(--color-danger-bg);
   border: 1px solid var(--color-danger);
   border-radius: var(--radius-lg);
   color: var(--color-danger);
@@ -162,8 +162,8 @@
 }
 
 .job-status-badge.pending {
-  background: rgba(255, 193, 7, 0.12);
-  color: #d4a400;
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
 }
 
 .job-status-badge.running {
@@ -261,7 +261,7 @@
 
 /* Console */
 .console-output {
-  background: #0d1117;
+  background: var(--color-console-bg);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   padding: 16px;
@@ -278,7 +278,7 @@
 }
 
 .console-output::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--color-text) 10%, transparent);
   border-radius: 3px;
 }
 
@@ -287,7 +287,7 @@
   font-family: var(--font-mono);
   font-size: 0.8rem;
   line-height: 1.65;
-  color: #8bc34a;
+  color: var(--color-console-success);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -352,9 +352,9 @@
 }
 
 .eval-dim-tag.active {
-  background: var(--color-accent-bg, rgba(59, 130, 246, 0.1));
-  color: var(--color-accent, #3b82f6);
-  border-color: var(--color-accent, #3b82f6);
+  background: var(--color-accent-bg);
+  color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
 .eval-console-indicator {
@@ -737,7 +737,7 @@
   width: 24px;
   height: 24px;
   padding: 0;
-  background: rgba(255, 255, 255, 0.08);
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
   border: none;
   border-radius: 50%;
   color: var(--color-text-muted);
@@ -747,8 +747,8 @@
 }
 
 .input-clear-btn:hover {
-  background: rgba(255, 100, 100, 0.15);
-  color: #ff6b6b;
+  background: var(--color-danger-bg);
+  color: var(--color-danger-text);
   opacity: 1;
   transform: translateY(-50%) scale(1.1);
 }
@@ -1055,7 +1055,7 @@
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: var(--color-overlay-heavy);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1125,9 +1125,9 @@
 }
 
 .modal-close:hover {
-  background: rgba(255, 100, 100, 0.1);
-  border-color: rgba(255, 100, 100, 0.3);
-  color: #ff6b6b;
+  background: var(--color-danger-bg);
+  border-color: var(--color-danger-border);
+  color: var(--color-danger-text);
 }
 
 .folder-browser-path {
@@ -1135,7 +1135,7 @@
   align-items: center;
   gap: 10px;
   padding: 14px 20px;
-  background: rgba(0, 0, 0, 0.2);
+  background: color-mix(in srgb, var(--color-text) 20%, transparent);
   border-bottom: 1px solid var(--color-border);
 }
 
@@ -1227,7 +1227,7 @@
   overflow-y: auto;
   padding: 12px;
   max-height: 380px;
-  background: linear-gradient(180deg, transparent 0%, rgba(0, 0, 0, 0.1) 100%);
+  background: linear-gradient(180deg, transparent 0%, color-mix(in srgb, var(--color-text) 10%, transparent) 100%);
 }
 
 .folder-browser-list::-webkit-scrollbar {
@@ -1295,8 +1295,8 @@
 }
 
 .folder-item:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: rgba(255, 255, 255, 0.06);
+  background: color-mix(in srgb, var(--color-text) 4%, transparent);
+  border-color: color-mix(in srgb, var(--color-text) 6%, transparent);
 }
 
 .folder-item.is-git-repo {
@@ -1314,7 +1314,7 @@
   justify-content: center;
   width: 32px;
   height: 32px;
-  background: rgba(255, 255, 255, 0.05);
+  background: color-mix(in srgb, var(--color-text) 5%, transparent);
   border-radius: 8px;
   font-size: 1rem;
   transition: all 180ms ease;
@@ -1440,7 +1440,7 @@
 
 .btn-cancel {
   padding: 12px 22px;
-  background: rgba(255, 255, 255, 0.03);
+  background: color-mix(in srgb, var(--color-text) 3%, transparent);
   border: 1px solid var(--color-border);
   border-radius: 10px;
   color: var(--color-text-muted);
@@ -1451,8 +1451,8 @@
 }
 
 .btn-cancel:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
+  background: color-mix(in srgb, var(--color-text) 8%, transparent);
+  border-color: color-mix(in srgb, var(--color-text) 20%, transparent);
   color: var(--color-text);
   transform: translateY(-1px);
 }
