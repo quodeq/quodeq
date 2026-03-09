@@ -1,3 +1,5 @@
+"""High-level configuration actions invoked by the CLI."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -14,11 +16,13 @@ from quodeq.logging import log_error
 
 @dataclass(frozen=True)
 class ConfigureContext:
+    """Immutable bundle of paths and parallelism settings for a configure run."""
     paths: ConfigPaths
     max_parallel: int
 
 
 def resolve_parallel(parallel: str | None, sequential: bool) -> int:
+    """Determine the parallelism level from CLI flags."""
     if sequential:
         return 1
     if parallel is None:
@@ -27,6 +31,7 @@ def resolve_parallel(parallel: str | None, sequential: bool) -> int:
 
 
 def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
+    """Generate evaluator JSON files for every dimension of a discipline."""
     if not discipline:
         log_error("--generate-maps requires a dimension name")
         return 1
@@ -49,6 +54,7 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
 
 
 def run_generate_dimensions(paths: ConfigPaths) -> None:
+    """Generate dimension definitions via the AI CLI and save the output."""
     template = (paths.prompts_dir / "dimensions-generator.md").read_text()
     prompt = template.replace("{{DIMENSIONS}}", ", ".join(DIMENSION_NAMES))
     prompt = prompt.replace("{{OUTPUT_DIR}}", str(paths.dimensions_dir))
@@ -61,6 +67,7 @@ def run_generate_dimensions(paths: ConfigPaths) -> None:
 
 
 def add_discipline(name: str, language: str, category: str, paths: ConfigPaths) -> None:
+    """Register a new discipline by creating its directory and config entry."""
     (paths.evaluators_dir / name).mkdir(parents=True, exist_ok=True)
     registry = paths.root / "config" / "disciplines.conf"
     registry.parent.mkdir(parents=True, exist_ok=True)
@@ -76,6 +83,7 @@ def run_refresh_practices(
     min_stars: int = 500,
     dry_run: bool = False,
 ) -> int:
+    """Refresh practices data for a plugin runtime from GitHub cursor-rules."""
     from quodeq.config.knowledge_refresh import refresh_practices
     evaluators_dir = paths.root / "evaluators"
     return refresh_practices(runtime, evaluators_dir, min_stars=min_stars, dry_run=dry_run)
@@ -87,12 +95,14 @@ def run_refresh_analysis(
     *,
     dry_run: bool = False,
 ) -> int:
+    """Refresh analysis data for a plugin runtime from linter documentation."""
     from quodeq.config.knowledge_refresh import refresh_analysis
     evaluators_dir = paths.root / "evaluators"
     return refresh_analysis(runtime, evaluators_dir, dry_run=dry_run)
 
 
 def run_refresh_standards(paths: ConfigPaths, *, dry_run: bool = False) -> int:
+    """Re-fetch OWASP ASVS Level 1 requirements into the standards directory."""
     from quodeq.config.standards_fetcher import fetch_asvs_l1
     standards_dir = paths.root / "standards"
     count = fetch_asvs_l1(standards_dir, dry_run=dry_run)
@@ -102,6 +112,7 @@ def run_refresh_standards(paths: ConfigPaths, *, dry_run: bool = False) -> int:
 
 
 def run_scaffold_plugin(runtime: str, paths: ConfigPaths) -> int:
+    """Create a new plugin skeleton directory for the given runtime."""
     from quodeq.config.scaffold import scaffold_plugin
     evaluators_dir = paths.root / "evaluators"
     try:
@@ -114,6 +125,7 @@ def run_scaffold_plugin(runtime: str, paths: ConfigPaths) -> int:
 
 
 def check_sources(discipline: str, paths: ConfigPaths) -> int:
+    """Verify that every practice file in a discipline has a sources table."""
     practices_dir = paths.practices_dir / discipline
     if not practices_dir.exists():
         log_error(f"Practices directory not found: {practices_dir}")

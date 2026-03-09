@@ -1,3 +1,5 @@
+"""Grade calculation, scoring, and dimension summary helpers."""
+
 from __future__ import annotations
 
 import re
@@ -10,6 +12,7 @@ SEVERITIES = {"critical", "major", "minor", "unknown"}
 
 
 def parse_numeric_score(score_text: str | None) -> float | None:
+    """Extract the first numeric value from a score string, or return None."""
     if not score_text:
         return None
     match = re.search(r"(\d+(?:\.\d+)?)", str(score_text))
@@ -19,6 +22,7 @@ def parse_numeric_score(score_text: str | None) -> float | None:
 
 
 def most_frequent_grade(grades: list[str]) -> str | None:
+    """Return the most common grade, breaking ties by higher grade rank."""
     if not grades:
         return None
     counts: dict[str, int] = {}
@@ -43,6 +47,7 @@ def most_frequent_grade(grades: list[str]) -> str | None:
 
 
 def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, Any]]) -> dict[str, Any]:
+    """Aggregate violation and compliance counts grouped by severity."""
     severity = {"critical": 0, "major": 0, "minor": 0, "unknown": 0}
     for entry in violations:
         key = entry.get("severity", "unknown")
@@ -57,6 +62,7 @@ def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, An
 
 
 def calculate_trend(current_score: Any, previous_score: Any) -> str:
+    """Compare two scores and return a trend direction: 'up', 'down', 'same', or 'none'."""
     current = parse_numeric_score(str(current_score)) if current_score is not None else None
     previous = parse_numeric_score(str(previous_score)) if previous_score is not None else None
     if current is None or previous is None:
@@ -69,6 +75,7 @@ def calculate_trend(current_score: Any, previous_score: Any) -> str:
 
 
 def summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
+    """Produce an aggregate summary across multiple dimension evaluation results."""
     overall_grades = [d.get("overallGrade") for d in dimensions if d.get("overallGrade")]
     numeric_scores = [
         score for score in (parse_numeric_score(d.get("overallScore")) for d in dimensions) if score is not None

@@ -1,3 +1,4 @@
+"""Dashboard runner — builds the UI, starts the action API, and serves the dashboard."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,12 +16,14 @@ import webbrowser
 
 from quodeq.logging import log_info, log_success, log_warning
 from quodeq.paths import resolve_path
+from quodeq.utils import ACTION_API_MODULE
 
 _HEALTH_CHECK_TIMEOUT_S = 0.5
 
 
 @dataclass(frozen=True)
 class DashboardConfig:
+    """Immutable configuration for the dashboard server (ports, paths, build options)."""
     port: int
     reports_dir: Path
     static_dist: Path
@@ -35,6 +38,7 @@ class DashboardConfig:
 
 
 def validate_paths(config: DashboardConfig) -> None:
+    """Verify that required directories and files exist, creating defaults if needed."""
     if not config.reports_dir.exists():
         if config.reports_defaulted:
             config.reports_dir.mkdir(parents=True, exist_ok=True)
@@ -86,7 +90,7 @@ def _choose_ui_port(start: int, host: str = "127.0.0.1") -> int:
 def _kill_stale_action_api(host: str, port: int) -> None:
     """Kill any lingering action API processes so the dashboard always loads fresh code."""
     try:
-        subprocess.run(["pkill", "-f", "quodeq.action_api"], capture_output=True)
+        subprocess.run(["pkill", "-f", ACTION_API_MODULE], capture_output=True)
     except OSError:
         pass
     deadline = time.monotonic() + 3
@@ -101,7 +105,7 @@ def _spawn_action_api(port: int, static_dist: Path | None = None) -> subprocess.
     if static_dist:
         env["QUODEQ_STATIC_DIST"] = str(static_dist)
     return subprocess.Popen(
-        [sys.executable, "-m", "quodeq.action_api"],
+        [sys.executable, "-m", ACTION_API_MODULE],
         env=env,
         start_new_session=True,
     )
@@ -147,7 +151,7 @@ def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_d
         process = _spawn_action_api(port, static_dist=static_dist)
         try:
             _wait_for_action_api(base_url)
-        except Exception:
+        except (subprocess.TimeoutExpired, OSError, TimeoutError):
             if process.poll() is None:
                 process.terminate()
                 process.wait()
@@ -252,6 +256,7 @@ def _serve_and_wait(action_api_url: str, action_api_process, config: DashboardCo
 
 
 def run_dashboard(config: DashboardConfig) -> int:
+    """Start the dashboard: resolve paths, launch the action API, and serve until exit."""
     config = _resolve_paths_and_build(config)
     validate_paths(config)
 

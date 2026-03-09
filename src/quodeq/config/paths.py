@@ -1,9 +1,13 @@
+"""Filesystem path resolution for quodeq configuration directories."""
+
 from dataclasses import dataclass
 from pathlib import Path
 
 
 @dataclass(frozen=True)
 class ConfigPaths:
+    """Immutable set of resolved paths to all configuration directories and files."""
+
     root: Path
     evaluators_dir: Path
     practices_dir: Path
@@ -15,10 +19,12 @@ class ConfigPaths:
 
     @property
     def vroot(self) -> Path:
+        """Return the versioned root path (currently identical to root)."""
         return self.root
 
     @classmethod
     def from_root(cls, root: Path, version: str | None = None) -> "ConfigPaths":
+        """Construct a ConfigPaths instance by deriving all paths from a root directory."""
         return cls(
             root=root,
             evaluators_dir=root / "evaluators",
@@ -39,6 +45,7 @@ def _looks_like_project_root(root: Path) -> bool:
 
 
 def default_paths(version: str | None = None) -> ConfigPaths:
+    """Locate the project root automatically and return its ConfigPaths."""
     module_path = Path(__file__).resolve()
     for root in module_path.parent.parents:
         if _looks_like_project_root(root):

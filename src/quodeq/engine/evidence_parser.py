@@ -10,6 +10,7 @@ from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
 
 @dataclass
 class EvidenceContext:
+    """Metadata needed to construct an Evidence object from parsed JSONL."""
     plugin_id: str
     repository: str
     date_str: str

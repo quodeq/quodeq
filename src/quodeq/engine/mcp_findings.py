@@ -53,7 +53,51 @@ def _ok(req_id: object, result: dict) -> dict:
     return {"jsonrpc": "2.0", "id": req_id, "result": result}
 
 
+def _handle_initialize(request_id: object, msg: dict) -> dict:
+    """Handle the 'initialize' JSON-RPC method."""
+    client_version = msg.get("params", {}).get("protocolVersion", "2024-11-05")
+    return _ok(request_id, {
+        "protocolVersion": client_version,
+        "capabilities": {"tools": {}},
+        "serverInfo": {"name": "quodeq-findings", "version": "1.0.0"},
+    })
+
+
+def _handle_tools_list(request_id: object) -> dict:
+    """Handle the 'tools/list' JSON-RPC method."""
+    return _ok(request_id, {"tools": [{
+        "name": TOOL_NAME,
+        "description": TOOL_DESC,
+        "inputSchema": TOOL_SCHEMA,
+    }]})
+
+
+def _handle_tools_call(request_id: object, params: dict, findings_file: str, counter: int) -> tuple[dict, int]:
+    """Handle the 'tools/call' JSON-RPC method.
+
+    Returns (response_dict, updated_counter).
+    """
+    name = params.get("name")
+    args = params.get("arguments", {})
+
+    if name != TOOL_NAME:
+        return _ok(request_id, {
+            "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
+            "isError": True,
+        }), counter
+
+    finding = {k: v for k, v in args.items() if v is not None}
+    with open(findings_file, "a") as f:
+        f.write(json.dumps(finding) + "\n")
+    counter += 1
+
+    return _ok(request_id, {
+        "content": [{"type": "text", "text": f"Finding #{counter} recorded."}],
+    }), counter
+
+
 def main() -> None:
+    """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
     # Accept findings path as CLI arg (preferred) or env var (fallback).
     findings_file = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("FINDINGS_FILE")
     if not findings_file:
@@ -70,41 +114,15 @@ def main() -> None:
         req_id = msg.get("id")
 
         if method == "initialize":
-            # Echo back the client's protocol version for compatibility.
-            client_version = msg.get("params", {}).get("protocolVersion", "2024-11-05")
-            _send(_ok(req_id, {
-                "protocolVersion": client_version,
-                "capabilities": {"tools": {}},
-                "serverInfo": {"name": "quodeq-findings", "version": "1.0.0"},
-            }))
+            _send(_handle_initialize(req_id, msg))
         elif method in ("notifications/initialized", "notifications/cancelled"):
             pass
         elif method == "tools/list":
-            _send(_ok(req_id, {"tools": [{
-                "name": TOOL_NAME,
-                "description": TOOL_DESC,
-                "inputSchema": TOOL_SCHEMA,
-            }]}))
+            _send(_handle_tools_list(req_id))
         elif method == "tools/call":
             params = msg.get("params", {})
-            name = params.get("name")
-            args = params.get("arguments", {})
-
-            if name != TOOL_NAME:
-                _send(_ok(req_id, {
-                    "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
-                    "isError": True,
-                }))
-                continue
-
-            finding = {k: v for k, v in args.items() if v is not None}
-            with open(findings_file, "a") as f:
-                f.write(json.dumps(finding) + "\n")
-            counter += 1
-
-            _send(_ok(req_id, {
-                "content": [{"type": "text", "text": f"Finding #{counter} recorded."}],
-            }))
+            response, counter = _handle_tools_call(req_id, params, findings_file, counter)
+            _send(response)
         elif method == "ping":
             _send(_ok(req_id, {}))
         elif req_id is not None:

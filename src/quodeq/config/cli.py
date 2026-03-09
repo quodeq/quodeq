@@ -1,8 +1,8 @@
+"""Command-line interface for the ``quodeq configure`` subcommand."""
+
 import argparse
 
-from quodeq.config.actions import ConfigureContext
 from quodeq.config.actions import check_sources
-from quodeq.config.actions import resolve_parallel
 from quodeq.config.actions import run_generate_dimensions
 from quodeq.config.actions import run_generate_evaluators
 from quodeq.config.actions import run_refresh_analysis
@@ -14,6 +14,7 @@ from quodeq.config.paths import default_paths
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build and return the argument parser for the configure subcommand."""
     parser = argparse.ArgumentParser(prog="quodeq configure")
     parser.add_argument("--ai-cli", nargs="?")
     parser.add_argument("-d", dest="list_dimensions", action="store_true")
@@ -46,10 +47,10 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Parse arguments and dispatch to the appropriate configuration action."""
     parser = build_parser()
     args = parser.parse_args(argv)
     paths = default_paths(version=args.data_version)
-    _ctx = ConfigureContext(paths=paths, max_parallel=resolve_parallel(args.parallel, args.sequential))
 
     _HANDLERS: list[tuple[str, callable]] = [
         ("generate_maps",       lambda v: run_generate_evaluators(v, paths) or 0),

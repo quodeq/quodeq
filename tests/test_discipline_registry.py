@@ -25,7 +25,7 @@ detect_priority=5
 
     registry = DisciplineRegistry.from_file(conf)
     assert "frontend_react" in registry.disciplines
-    assert registry.disciplines["frontend_react"].detect_file == "package.json"
+    assert registry.disciplines["frontend_react"].detect_files == ("package.json",)
     assert registry.disciplines["backend_springboot_java"].detect_priority == 5
 
 
@@ -41,7 +41,7 @@ suggested_topics=React Best Practices,Frontend Architecture,TypeScript Standards
 
     registry = DisciplineRegistry.from_file(conf)
     rule = registry.disciplines["frontend_react"]
-    assert rule.detect_contains == "react"
+    assert rule.detect_contains == ("react",)
     assert rule.suggested_topics == [
         "React Best Practices",
         "Frontend Architecture",

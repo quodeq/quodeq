@@ -8,9 +8,6 @@ import os
 import subprocess
 
 
-from quodeq.utils import is_repo_url as is_repo_url  # re-export from shared location
-
-
 def prepare_repository(repo_input: str) -> str:
     """Clone a remote repository to a temporary directory and return its path."""
     repo_name = repo_input.split("/")[-1].replace(".git", "")

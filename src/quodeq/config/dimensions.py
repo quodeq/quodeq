@@ -1,3 +1,5 @@
+"""Quality dimension codes and display helpers."""
+
 DIMENSION_CODES = [
     ("aff", "affordability"),
     ("avl", "availability"),
@@ -20,6 +22,7 @@ DIMENSION_NAMES = [full for _, full in DIMENSION_CODES]
 
 
 def render_dimension_table() -> str:
+    """Return a human-readable table mapping shortcodes to dimension names."""
     lines = ["Dimension shortcodes:", ""]
     for code, full in DIMENSION_CODES:
         lines.append(f"  {code:<4} : {full}")

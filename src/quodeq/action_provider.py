@@ -1,3 +1,5 @@
+"""Protocol definitions for the action provider abstraction layer."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -6,6 +8,7 @@ from typing import Protocol, runtime_checkable
 
 @dataclass
 class EvaluationOptions:
+    """Options controlling an evaluation run (discipline, dimensions, scoring mode)."""
     discipline: str | None = None
     dimensions: str = ""
     numerical: bool = False

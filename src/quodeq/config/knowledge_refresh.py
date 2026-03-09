@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import urllib.error
 import urllib.request
 import urllib.parse
 from pathlib import Path
@@ -10,7 +11,14 @@ from quodeq.config import generators
 
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
-_LINTER_SOURCES: dict[str, str] = json.loads(_LINTER_SOURCES_PATH.read_text())
+_linter_sources_cache: dict[str, str] | None = None
+
+
+def _get_linter_sources() -> dict[str, str]:
+    global _linter_sources_cache
+    if _linter_sources_cache is None:
+        _linter_sources_cache = json.loads(_LINTER_SOURCES_PATH.read_text())
+    return _linter_sources_cache
 
 _GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 
@@ -77,10 +85,11 @@ def refresh_analysis(
     """
     out_path = evaluators_dir / runtime / "knowledge" / "analysis.md"
 
-    source_url = _LINTER_SOURCES.get(runtime)
+    linter_sources = _get_linter_sources()
+    source_url = linter_sources.get(runtime)
     if not source_url:
         print(f"No linter source configured for runtime={runtime!r}")
-        print(f"Supported runtimes: {', '.join(sorted(_LINTER_SOURCES))}")
+        print(f"Supported runtimes: {', '.join(sorted(linter_sources))}")
         return 1
 
     linter_docs = _fetch_url(source_url)
@@ -153,7 +162,7 @@ def _fetch_url(url: str, headers: dict | None = None) -> str | None:
         req = urllib.request.Request(url, headers=headers or {})
         with urllib.request.urlopen(req, timeout=15) as r:
             return r.read().decode("utf-8", errors="replace")
-    except Exception:
+    except (urllib.error.URLError, OSError, ValueError):
         return None
 
 

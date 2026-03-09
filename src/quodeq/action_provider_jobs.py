@@ -1,3 +1,5 @@
+"""Background job management for evaluation subprocesses."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,6 +19,8 @@ REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\
 
 @dataclass
 class Job:
+    """State of a single evaluation subprocess."""
+
     job_id: str
     status: str
     command: list[str]
@@ -31,6 +35,7 @@ class Job:
     dimensions: list[str] | None = None
 
     def to_dict(self) -> dict[str, Any]:
+        """Serialize the job state to a JSON-compatible dict."""
         return {
             "jobId": self.job_id,
             "status": self.status,
@@ -48,6 +53,8 @@ class Job:
 
 
 class JobManager:
+    """Thread-safe manager for spawning and tracking evaluation subprocesses."""
+
     def __init__(self, spawn_impl=None) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._jobs: dict[str, Job] = {}
@@ -55,6 +62,7 @@ class JobManager:
         self._lock = threading.Lock()
 
     def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
+        """Spawn a subprocess and return its initial job state."""
         job_id = str(uuid.uuid4())
         job = Job(
             job_id=job_id,
@@ -88,6 +96,7 @@ class JobManager:
         return job.to_dict()
 
     def cancel_job(self, job_id: str) -> bool:
+        """Terminate a running job. Return True if cancelled successfully."""
         with self._lock:
             job = self._jobs.get(job_id)
             process = self._processes.get(job_id)
@@ -100,6 +109,7 @@ class JobManager:
         return True
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
+        """Return the current state of a job, or None if not found."""
         with self._lock:
             job = self._jobs.get(job_id)
             if not job:
@@ -107,6 +117,7 @@ class JobManager:
             return job.to_dict()
 
     def list_jobs(self) -> list[dict[str, Any]]:
+        """Return all tracked jobs as serialized dicts."""
         with self._lock:
             return [job.to_dict() for job in self._jobs.values()]
 
@@ -128,7 +139,7 @@ class JobManager:
                     job.current_dimension = marker.get("dimension")
                     job.phase = "scoring"
             except json.JSONDecodeError:
-                pass
+                pass  # Malformed marker line — skip silently; not a user-visible log
             return
         job.logs.append(line)
         if len(job.logs) > MAX_LOG_LINES:
@@ -149,7 +160,7 @@ class JobManager:
                     return
                 self._append_log(job, stripped)
 
-    def _monitor_process(self, job_id: str, process: Any) -> None:
+    def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
         exit_code = process.wait()
         with self._lock:
             self._processes.pop(job_id, None)

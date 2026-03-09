@@ -1,3 +1,5 @@
+"""Application bootstrapping and dependency wiring."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -8,6 +10,7 @@ from quodeq.ports.evaluators import EvaluatorsRepository
 
 @dataclass(frozen=True)
 class DataProvider:
+    """Container for application-level repository dependencies."""
     evaluators: EvaluatorsRepository | None = None
     dimensions: object | None = None
     reports: object | None = None

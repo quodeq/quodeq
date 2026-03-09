@@ -1,3 +1,5 @@
+"""Discipline detection rules parsed from a .conf file."""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -15,15 +17,13 @@ def _strip_quotes(value: str) -> str:
 
 @dataclass(frozen=True)
 class DisciplineRule:
+    """A single discipline's detection criteria and metadata."""
+
     name: str
     language: str | None = None
     category: str | None = None
-    detect_file: str | None = None
-    detect_contains: str | None = None
-    detect_file_alt: str | None = None
-    detect_contains_alt: str | None = None
-    detect_file_alt2: str | None = None
-    detect_contains_alt2: str | None = None
+    detect_files: tuple[str, ...] = ()
+    detect_contains: tuple[str, ...] = ()
     detect_glob: str | None = None
     detect_dir: str | None = None
     detect_requires_file: str | None = None
@@ -33,12 +33,12 @@ class DisciplineRule:
     suggested_topics: list[str] | None = None
 
 
+# Conf keys that map to indexed positions in detect_files / detect_contains
+_FILE_KEYS = {"detect_file": 0, "detect_file_alt": 1, "detect_file_alt2": 2}
+_CONTAINS_KEYS = {"detect_contains": 0, "detect_contains_alt": 1, "detect_contains_alt2": 2}
+
 _SIMPLE_FIELDS = {
-    "language", "category", "detect_file", "detect_file_alt",
-    "detect_file_alt2", "detect_glob", "detect_dir", "detect_requires_file",
-}
-_QUOTED_FIELDS = {
-    "detect_contains", "detect_contains_alt", "detect_contains_alt2",
+    "language", "category", "detect_glob", "detect_dir", "detect_requires_file",
 }
 _CSV_FIELDS = {"detect_excludes", "suggested_topics"}
 
@@ -47,49 +47,85 @@ def _parse_csv(value: str) -> list[str]:
     return [part.strip() for part in value.split(",") if part.strip()]
 
 
-def _parse_field(rule: DisciplineRule, key: str, value: str) -> None:
-    if key in _SIMPLE_FIELDS:
-        object.__setattr__(rule, key, value)
-    elif key in _QUOTED_FIELDS:
-        object.__setattr__(rule, key, _strip_quotes(value))
-    elif key in _CSV_FIELDS:
-        object.__setattr__(rule, key, _parse_csv(value))
-    elif key == "detect_priority":
-        try:
-            object.__setattr__(rule, "detect_priority", int(value))
-        except ValueError:
-            object.__setattr__(rule, "detect_priority", 99)
-    elif key == "detect_fallback":
-        object.__setattr__(rule, "detect_fallback", value.lower() == "true")
+def _set_indexed(lst: list[str | None], index: int, value: str) -> None:
+    """Ensure *lst* has at least *index+1* slots and set the value."""
+    while len(lst) < index + 1:
+        lst.append(None)
+    lst[index] = value
+
+
+def _parse_fields(lines: Iterable[tuple[str, str]]) -> dict:
+    """Parse key=value pairs into a kwargs dict for DisciplineRule construction."""
+    kwargs: dict = {}
+    files: list[str | None] = []
+    contains: list[str | None] = []
+
+    for key, value in lines:
+        if key in _SIMPLE_FIELDS:
+            kwargs[key] = value
+        elif key in _FILE_KEYS:
+            _set_indexed(files, _FILE_KEYS[key], value)
+        elif key in _CONTAINS_KEYS:
+            _set_indexed(contains, _CONTAINS_KEYS[key], _strip_quotes(value))
+        elif key in _CSV_FIELDS:
+            kwargs[key] = _parse_csv(value)
+        elif key == "detect_priority":
+            try:
+                kwargs["detect_priority"] = int(value)
+            except ValueError:
+                kwargs["detect_priority"] = 99
+        elif key == "detect_fallback":
+            kwargs["detect_fallback"] = value.lower() == "true"
+
+    # Pad both lists to the same length so they pair up by index
+    max_len = max(len(files), len(contains))
+    while len(files) < max_len:
+        files.append(None)
+    while len(contains) < max_len:
+        contains.append(None)
+
+    kwargs["detect_files"] = tuple(f for f in files if f is not None)
+    kwargs["detect_contains"] = tuple(
+        c if c is not None else ""
+        for c in contains[:max_len]
+        if c is not None
+    )
+    return kwargs
 
 
 @dataclass
 class DisciplineRegistry:
+    """Collection of discipline rules loaded from a configuration file."""
+
     disciplines: dict[str, DisciplineRule]
 
     @classmethod
     def from_file(cls, path: Path) -> "DisciplineRegistry":
-        current = None
-        rules: dict[str, DisciplineRule] = {}
+        """Parse an INI-style disciplines.conf file into a registry."""
+        sections: dict[str, list[tuple[str, str]]] = {}
+        current_name: str | None = None
         for raw in path.read_text().splitlines():
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
             if line.startswith("[") and line.endswith("]"):
-                name = line[1:-1]
-                current = DisciplineRule(name=name)
-                rules[name] = current
+                current_name = line[1:-1]
+                sections[current_name] = []
                 continue
-            if not current or "=" not in line:
+            if current_name is None or "=" not in line:
                 continue
             key, value = line.split("=", 1)
-            key = key.strip()
-            value = value.strip()
-            _parse_field(current, key, value)
+            sections[current_name].append((key.strip(), value.strip()))
+
+        rules: dict[str, DisciplineRule] = {}
+        for name, kvs in sections.items():
+            kwargs = _parse_fields(kvs)
+            rules[name] = DisciplineRule(name=name, **kwargs)
 
         return cls(rules)
 
     def iter_disciplines(self) -> Iterable[DisciplineRule]:
+        """Yield all discipline rules sorted by detection priority."""
         return sorted(self.disciplines.values(), key=lambda rule: rule.detect_priority)
 
     def _file_contains(self, path: Path, needle: str) -> bool:
@@ -106,25 +142,20 @@ class DisciplineRegistry:
         if rule.detect_requires_file and not any(repo.glob(rule.detect_requires_file)):
             return False
 
-        def match_file(file_name: str | None, contains: str | None) -> bool:
-            if not file_name:
-                return False
+        for i, file_name in enumerate(rule.detect_files):
             path = repo / file_name
             if not path.exists():
-                return False
-            if contains:
-                return self._file_contains(path, contains)
-            return True
-
-        if match_file(rule.detect_file, rule.detect_contains):
-            return True
-        if match_file(rule.detect_file_alt, rule.detect_contains_alt):
-            return True
-        if match_file(rule.detect_file_alt2, rule.detect_contains_alt2):
-            return True
+                continue
+            needle = rule.detect_contains[i] if i < len(rule.detect_contains) else ""
+            if needle:
+                if self._file_contains(path, needle):
+                    return True
+            else:
+                return True
         return False
 
     def detect_matches(self, repo: Path) -> list[str]:
+        """Return the names of all disciplines whose rules match the given repo."""
         matches: list[str] = []
         matched_names: set[str] = set()
         for rule in self.iter_disciplines():
@@ -138,6 +169,7 @@ class DisciplineRegistry:
         return matches
 
     def choose_highest_priority(self, matches: list[str]) -> str:
+        """Select the discipline with the lowest (highest-priority) detect_priority value."""
         rules = [self.disciplines[name] for name in matches if name in self.disciplines]
         if not rules:
             return matches[0]

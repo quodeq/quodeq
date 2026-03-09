@@ -1,3 +1,5 @@
+"""Run discovery, date parsing, and report aggregation for filesystem reports."""
+
 from __future__ import annotations
 
 import json
@@ -14,12 +16,15 @@ from quodeq.utils import is_repo_url
 
 @dataclass(frozen=True)
 class RunInfo:
+    """Metadata for a single evaluation run (ID and date information)."""
+
     run_id: str
     date_iso: str | None
     date_label: str
 
 
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
+    """List directory entries, returning an empty list on OS errors."""
     try:
         with os.scandir(path) as it:
             return list(it)
@@ -83,6 +88,7 @@ def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str 
 
 
 def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | None]:
+    """Build a repository metadata dict from a local path or remote URL."""
     if is_repo_url(repo):
         name = repo.split("/")[-1].replace(".git", "")
         return {
@@ -101,6 +107,7 @@ def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | 
 
 
 def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
+    """Load all dimension evaluations and evidence for a single run."""
     run_dir = reports_root / project / run_id
     evaluation_dir = run_dir / "evaluation"
     evidence_dir = run_dir / "evidence"
@@ -153,6 +160,7 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[st
 
 
 def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
+    """Return all runs for a project, sorted newest-first by date."""
     project_dir = reports_root / project
     run_infos: list[RunInfo] = []
     for entry in safe_read_dir(project_dir):

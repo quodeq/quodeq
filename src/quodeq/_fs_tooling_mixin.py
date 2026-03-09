@@ -1,3 +1,5 @@
+"""Mixin providing repo browsing and AI client discovery for the filesystem provider."""
+
 from __future__ import annotations
 
 import json
@@ -11,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser import safe_read_dir
+from quodeq.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION
 
 _CLI_MODEL_TIMEOUT_S = 8
 _ANTHROPIC_API_TIMEOUT_S = 8
@@ -25,10 +28,10 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
     """Fetch model list from the Anthropic API. Returns None on failure."""
     try:
         req = urllib.request.Request(
-            "https://api.anthropic.com/v1/models",
+            ANTHROPIC_API_URL,
             headers={
                 "x-api-key": api_key,
-                "anthropic-version": "2023-06-01",
+                "anthropic-version": ANTHROPIC_API_VERSION,
             },
         )
         with urllib.request.urlopen(req, timeout=_ANTHROPIC_API_TIMEOUT_S) as resp:
@@ -43,6 +46,7 @@ class FsToolingMixin:
     """Mixin for browse_repo and AI client discovery methods."""
 
     def browse_repo(self, path: str | None) -> dict[str, Any]:
+        """List directories at the given path for repository browsing."""
         target = Path(path) if path else Path.home()
         target = target.resolve()
         if not target.exists():
@@ -79,6 +83,7 @@ class FsToolingMixin:
         }
 
     def get_ai_clients(self) -> dict[str, list[dict[str, str]]]:
+        """Return AI CLI clients that are installed on the system."""
         candidates = [
             {"id": "claude", "label": "Claude"},
             {"id": "codex", "label": "Codex"},
@@ -107,10 +112,12 @@ class FsToolingMixin:
         return {"models": models}
 
     def get_client_models(self, client_id: str) -> dict[str, list[str]]:
+        """Return available models for a specific AI client."""
         fetcher = self._model_fetchers.get(client_id, self._get_cli_models)
         return fetcher(client_id)
 
     def _get_claude_models(self, _client_id: str = "claude", api_key: str | None = None) -> dict[str, list[str]]:
+        # API key is intentionally read from env at call time (not cached) for security.
         key = api_key or os.environ.get("ANTHROPIC_API_KEY")
         if key:
             models = _fetch_anthropic_models(key)

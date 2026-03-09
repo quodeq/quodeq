@@ -1,7 +1,10 @@
+"""Port interface for accessing evaluator definitions."""
+
 from typing import Protocol
 
 
 class EvaluatorsRepository(Protocol):
+    """Repository for listing and retrieving evaluator configurations."""
     def list_evaluators(self, discipline: str) -> list[str]:
         """Return the dimension names available for *discipline*."""
         ...

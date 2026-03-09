@@ -1,3 +1,4 @@
+"""Evidence model — dataclasses for judgments, principles, and evaluation output."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -35,6 +36,7 @@ class PrincipleEvidence:
     metrics: dict = field(default_factory=dict)
 
     def compute_metrics(self, scale_multiplier: int = 1) -> None:
+        """Calculate compliance percentage and confidence level from violation/compliance counts."""
         high_threshold = 10 * scale_multiplier
         medium_threshold = 5 * scale_multiplier
 
@@ -75,6 +77,7 @@ class Evidence:
     plugin_name: str = ""
 
     def summary(self) -> dict:
+        """Return an aggregate summary of findings, confidence, and balance across all principles."""
         total = sum(p.metrics.get("total_instances", 0) for p in self.principles.values())
         low_conf = [k for k, p in self.principles.items() if p.metrics.get("confidence_level") == "low"]
         unbalanced = [k for k, p in self.principles.items() if not p.metrics.get("is_balanced", True)]
