@@ -14,6 +14,7 @@ from quodeq._fs_tooling_mixin import FsToolingMixin
 from quodeq._fs_violations import parse_violations_from_evidence, parse_violations_from_jsonl, parse_violations_from_stream
 from quodeq.action_provider_fs_dashboard import build_dashboard, compute_accumulated
 from quodeq.adapters.fs.report_parser import (
+    RunInfo,
     list_runs,
     parse_eval_from_json,
     parse_eval_markdown,
@@ -26,26 +27,21 @@ from quodeq.adapters.fs.report_parser import (
 _MAX_VIOLATION_FILES = 20
 
 
-def _build_project_entry(reports_root: Path, entry_name: str, runs) -> dict[str, Any]:
+def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, Any]:
     """Build a single project dict from its directory and run list."""
-    parent = None
-    discipline = None
-    path = None
-    location = None
-    display_name = None
-    project_name = entry_name
+    info: dict[str, Any] = {}
     info_path = reports_root / entry_name / "repository_info.json"
     if info_path.exists():
         try:
             info = json.loads(info_path.read_text())
-            parent = info.get("parent") or None
-            discipline = info.get("discipline") or None
-            path = info.get("path") or None
-            location = info.get("location") or None
-            display_name = info.get("displayName") or None
-            project_name = info.get("name") or entry_name
         except (json.JSONDecodeError, OSError):
             pass
+    parent = info.get("parent") or None
+    discipline = info.get("discipline") or None
+    path = info.get("path") or None
+    location = info.get("location") or None
+    display_name = info.get("displayName") or None
+    project_name = info.get("name") or entry_name
     latest_grade = None
     latest_score = None
     files_count = None
@@ -55,7 +51,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs) -> dict[str,
         latest_grade = summary.get("overallGrade")
         latest_score = summary.get("numericAverage")
         files_count = next((d.get("sourceFileCount") for d in dims if d.get("sourceFileCount")), None)
-    except (OSError, json.JSONDecodeError, KeyError, TypeError, ValueError):
+    except (OSError, json.JSONDecodeError, KeyError):
         pass
     path_exists = Path(path).exists() if location == "local" and path else None
     return {
@@ -131,6 +127,37 @@ def _list_available_dimensions_for_discipline(discipline: str) -> list[str]:
         return []
     except (OSError, json.JSONDecodeError, KeyError, TypeError):
         return []
+
+
+def _resolve_dimension_eval(
+    base: Path, project: str, run_id: str, dimension: str,
+) -> dict[str, Any] | None:
+    """Try successive file formats to load evaluation data for a dimension."""
+    eval_path = base / "evaluation" / f"{dimension}.json"
+    if eval_path.exists():
+        return parse_eval_from_json(eval_path, project, run_id, dimension)
+
+    markdown_path = base / "evaluation" / f"{dimension}_eval.md"
+    if markdown_path.exists():
+        try:
+            content = markdown_path.read_text()
+        except OSError:
+            return None
+        return parse_eval_markdown(content, project, run_id, dimension)
+
+    evidence_path = base / "evidence" / f"{dimension}_evidence.json"
+    if evidence_path.exists():
+        return parse_violations_from_evidence(evidence_path, project, run_id, dimension)
+
+    jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
+    stream_path = base / "evidence" / f"{dimension}_live.stream"
+    if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
+        return parse_violations_from_jsonl(jsonl_path, stream_path, project, run_id, dimension)
+
+    if stream_path.exists():
+        return parse_violations_from_stream(stream_path, project, run_id, dimension)
+
+    return None
 
 
 class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider):
@@ -217,25 +244,9 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
         """Return parsed evaluation data for a single dimension in a run."""
         base = Path(reports_dir) / project / run_id
-        eval_path = base / "evaluation" / f"{dimension}.json"
-        if eval_path.exists():
-            return parse_eval_from_json(eval_path, project, run_id, dimension)
-        markdown_path = base / "evaluation" / f"{dimension}_eval.md"
-        if markdown_path.exists():
-            try:
-                content = markdown_path.read_text()
-            except OSError:
-                return None
-            return parse_eval_markdown(content, project, run_id, dimension)
-        evidence_path = base / "evidence" / f"{dimension}_evidence.json"
-        if evidence_path.exists():
-            return parse_violations_from_evidence(evidence_path, project, run_id, dimension)
-        jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
-        stream_path = base / "evidence" / f"{dimension}_live.stream"
-        if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
-            return parse_violations_from_jsonl(jsonl_path, stream_path, project, run_id, dimension)
-        if stream_path.exists():
-            return parse_violations_from_stream(stream_path, project, run_id, dimension)
+        result = _resolve_dimension_eval(base, project, run_id, dimension)
+        if result is not None:
+            return result
         # Run exists but dimension hasn't started yet
         if base.is_dir():
             return {"waiting": True, "project": project, "runId": run_id, "dimension": dimension}

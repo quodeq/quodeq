@@ -4,8 +4,9 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
+from quodeq.engine._event_text import TEXT_EXTRACTORS
 from quodeq.engine.analysis import count_files_from_stream
 
 
@@ -91,38 +92,6 @@ def parse_violations_from_evidence(evidence_path: Path, project: str, run_id: st
     return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}
 
 
-def _texts_from_assistant(event: dict) -> list[str]:
-    texts: list[str] = []
-    for block in (event.get("message") or {}).get("content") or []:
-        if block.get("type") == "text" and block.get("text"):
-            texts.append(block["text"])
-    return texts
-
-
-def _texts_from_result(event: dict) -> list[str]:
-    r = event.get("result")
-    return [r] if r else []
-
-
-def _texts_from_item_completed(event: dict) -> list[str]:
-    texts: list[str] = []
-    item = event.get("item") or {}
-    if item.get("type") == "agent_message":
-        if item.get("text"):
-            texts.append(item["text"])
-        for block in item.get("content") or []:
-            if block.get("type") in ("text", "output_text") and block.get("text"):
-                texts.append(block["text"])
-    return texts
-
-
-_TEXT_EXTRACTORS: dict[str, Callable] = {
-    "assistant": _texts_from_assistant,
-    "result": _texts_from_result,
-    "item.completed": _texts_from_item_completed,
-}
-
-
 def _parse_entries_from_texts(
     texts: list[str], dimension: str, seen: set[str]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -180,7 +149,7 @@ def parse_violations_from_stream(stream_path: Path, project: str, run_id: str, d
             event = json.loads(stripped)
         except json.JSONDecodeError:
             continue
-        extractor = _TEXT_EXTRACTORS.get(event.get("type"))
+        extractor = TEXT_EXTRACTORS.get(event.get("type"))
         texts = extractor(event) if extractor else []
         new_v, new_c = _parse_entries_from_texts(texts, dimension, seen)
         violations.extend(new_v)

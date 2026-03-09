@@ -11,7 +11,10 @@ _DEFAULT_ASVS_URL = (
     "https://raw.githubusercontent.com/OWASP/ASVS/v4.0.3/4.0/docs_en/"
     "OWASP%20Application%20Security%20Verification%20Standard%204.0.3-en.json"
 )
-ASVS_URL = os.environ.get("QUODEQ_ASVS_URL", _DEFAULT_ASVS_URL)
+
+
+def _get_asvs_url() -> str:
+    return os.environ.get("QUODEQ_ASVS_URL", _DEFAULT_ASVS_URL)
 
 
 def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
@@ -19,7 +22,7 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
 
     Returns the number of requirements fetched.
     """
-    with urllib.request.urlopen(ASVS_URL) as r:
+    with urllib.request.urlopen(_get_asvs_url()) as r:
         raw = json.loads(r.read())
 
     requirements = _parse_asvs_l1(raw)

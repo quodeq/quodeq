@@ -220,7 +220,7 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     )
 
 
-def _serve_and_wait(action_api_url: str, action_api_process, config: DashboardConfig) -> None:
+def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | None, config: DashboardConfig) -> None:
     """Open browser, register signal handlers, and block until exit."""
     log_success(f"Dashboard running at {action_api_url}")
 

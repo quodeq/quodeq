@@ -6,11 +6,8 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.engine.analysis import (
-    extract_evidence_from_stream,
-    is_stream_valid,
-)
-from quodeq.engine.stream_parser import _extract_jsonl_from_text
+from quodeq.engine.stream_parser import _extract_jsonl_from_text, extract_evidence_from_stream
+from quodeq.engine.stream_validation import is_stream_valid
 
 
 # ---------------------------------------------------------------------------

@@ -22,7 +22,7 @@ ALL_DIMENSIONS = ["maintainability", "security", "reliability", "performance",
 CISQ_DIMENSIONS = {"maintainability", "security", "reliability", "performance"}
 
 
-def _load_cwe_names():
+def _load_cwe_names() -> object:
     """Load canonical CWE names from the cwe2 library."""
     from cwe2.database import Database
     db = Database()
@@ -33,22 +33,12 @@ def _get_cwe_name(db, cwe_id: int) -> str:
     """Get canonical name for a CWE ID, with fallback."""
     try:
         return db.get(cwe_id).name
-    except Exception:
+    except (AttributeError, KeyError):
         return f"CWE-{cwe_id}"
 
 
-def build_cwe_index(
-    standards_dir: Path,
-    dimension: str,
-    cwe_db=None,
-) -> dict[str, dict[int, dict]]:
-    """Build a principle -> {cwe_id -> {name, refs}} index for a dimension.
-
-    Returns: {"Modularity": {1121: {"name": "...", "refs": [...]}}, ...}
-    """
-    iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    iso_data = json.loads(iso_file.read_text())
-
+def _build_iso_index(iso_data: dict, cwe_db: object | None) -> dict[str, dict[int, dict]]:
+    """Build the base principle→CWE index from ISO 25010 data."""
     index: dict[str, dict[int, dict]] = {}
     for sc in iso_data.get("sub_characteristics", []):
         principle = sc["name"]
@@ -63,41 +53,66 @@ def build_cwe_index(
                     "ref": req["id"],
                     "title": req["text"],
                 })
+    return index
 
-    # Attach CISQ refs
-    if dimension in CISQ_DIMENSIONS:
-        cisq_file = standards_dir / "cisq" / f"{dimension}.json"
-        if cisq_file.exists():
-            cisq_data = json.loads(cisq_file.read_text())
-            cisq_lookup = {c["id"]: c for c in cisq_data.get("cwes", [])}
-            for principle, cwes in index.items():
-                for cwe_id, entry in cwes.items():
-                    if cwe_id in cisq_lookup:
-                        entry["refs"].append({
-                            "source": "cisq",
-                            "title": cisq_lookup[cwe_id]["requirement"],
-                        })
 
-    # Attach ASVS refs (security only, overlap only)
-    if dimension == "security":
-        asvs_file = standards_dir / "asvs" / "level1.json"
-        if asvs_file.exists():
-            asvs_data = json.loads(asvs_file.read_text())
-            asvs_by_cwe: dict[int, list[dict]] = {}
-            for req in asvs_data.get("requirements", []):
-                for cwe_id in req.get("cwe", []):
-                    asvs_by_cwe.setdefault(cwe_id, []).append(req)
-            for principle, cwes in index.items():
-                for cwe_id, entry in cwes.items():
-                    if cwe_id in asvs_by_cwe:
-                        for asvs_req in asvs_by_cwe[cwe_id]:
-                            entry["refs"].append({
-                                "source": "asvs",
-                                "ref": asvs_req["id"],
-                                "section": asvs_req.get("section", ""),
-                                "title": asvs_req["text"],
-                            })
+def _attach_cisq_refs(index: dict[str, dict[int, dict]], standards_dir: Path, dimension: str) -> None:
+    """Attach CISQ cross-references to an existing CWE index (in-place)."""
+    if dimension not in CISQ_DIMENSIONS:
+        return
+    cisq_file = standards_dir / "cisq" / f"{dimension}.json"
+    if not cisq_file.exists():
+        return
+    cisq_data = json.loads(cisq_file.read_text())
+    cisq_lookup = {c["id"]: c for c in cisq_data.get("cwes", [])}
+    for cwes in index.values():
+        for cwe_id, entry in cwes.items():
+            if cwe_id in cisq_lookup:
+                entry["refs"].append({
+                    "source": "cisq",
+                    "title": cisq_lookup[cwe_id]["requirement"],
+                })
 
+
+def _attach_asvs_refs(index: dict[str, dict[int, dict]], standards_dir: Path, dimension: str) -> None:
+    """Attach ASVS cross-references to an existing CWE index (in-place, security only)."""
+    if dimension != "security":
+        return
+    asvs_file = standards_dir / "asvs" / "level1.json"
+    if not asvs_file.exists():
+        return
+    asvs_data = json.loads(asvs_file.read_text())
+    asvs_by_cwe: dict[int, list[dict]] = {}
+    for req in asvs_data.get("requirements", []):
+        for cwe_id in req.get("cwe", []):
+            asvs_by_cwe.setdefault(cwe_id, []).append(req)
+    for cwes in index.values():
+        for cwe_id, entry in cwes.items():
+            if cwe_id in asvs_by_cwe:
+                for asvs_req in asvs_by_cwe[cwe_id]:
+                    entry["refs"].append({
+                        "source": "asvs",
+                        "ref": asvs_req["id"],
+                        "section": asvs_req.get("section", ""),
+                        "title": asvs_req["text"],
+                    })
+
+
+def build_cwe_index(
+    standards_dir: Path,
+    dimension: str,
+    cwe_db: object | None = None,
+) -> dict[str, dict[int, dict]]:
+    """Build a principle -> {cwe_id -> {name, refs}} index for a dimension.
+
+    Returns: {"Modularity": {1121: {"name": "...", "refs": [...]}}, ...}
+    """
+    iso_file = standards_dir / "iso25010" / f"{dimension}.json"
+    iso_data = json.loads(iso_file.read_text())
+
+    index = _build_iso_index(iso_data, cwe_db)
+    _attach_cisq_refs(index, standards_dir, dimension)
+    _attach_asvs_refs(index, standards_dir, dimension)
     return index
 
 
@@ -160,7 +175,7 @@ def report_gaps(standards_dir: Path, dimension: str) -> list[str]:
     return warnings
 
 
-def main():
+def main() -> None:
     parser = argparse.ArgumentParser(description="Compile standards into merged dimension files")
     parser.add_argument("--dimension", "-d", help="Compile a single dimension")
     parser.add_argument("--gaps", action="store_true", help="Report orphan CWEs only, don't write")

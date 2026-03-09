@@ -233,7 +233,7 @@ def drop_grade(grade: str, drops: int) -> str:
 # ---------------------------------------------------------------------------
 
 def confidence_interval_for(
-    confidence_level,
+    confidence_level: str,
     is_balanced: bool,
     total_instances: int,
     files_read: int = 0,

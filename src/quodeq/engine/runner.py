@@ -16,18 +16,23 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, TypedDict
 
-from quodeq.engine.analysis import (
-    count_files_from_stream,
-    extract_evidence_from_stream,
-    get_mcp_status,
-    is_stream_valid,
-    run_analysis,
-)
+from quodeq.engine.analysis import count_files_from_stream, run_analysis
+from quodeq.engine.stream_parser import extract_evidence_from_stream
+from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.engine.plugin_detector import count_source_files, detect_plugin  # noqa: F401
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
+
+
+@dataclass
+class AnalysisOptions:
+    """Optional runtime settings for an evaluation run."""
+    analysis_budget: str | None = None
+    heartbeat_callback: object | None = None
+    template_path: Path | None = None
+    dimensions: list[str] | None = None
 
 
 @dataclass
@@ -39,10 +44,7 @@ class RunConfig:
     standards_dir: Path | None = None
     source_file_count: int = 0
     work_dir: Path | None = None
-    analysis_budget: str | None = None
-    heartbeat_callback: object | None = None
-    template_path: Path | None = None
-    dimensions: list[str] | None = None
+    options: AnalysisOptions = field(default_factory=AnalysisOptions)
 
 
 CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
@@ -114,14 +116,14 @@ def _run_dimension_analysis(
     stream_file = evidence_dir / f"{dim_id}_live.stream"
     jsonl_file = evidence_dir / f"{dim_id}_evidence.jsonl"
 
-    heartbeat = config.heartbeat_callback or _make_heartbeat(dim_id, idx, total, config.source_file_count)
+    heartbeat = config.options.heartbeat_callback or _make_heartbeat(dim_id, idx, total, config.source_file_count)
 
     run_analysis(
         work_dir=config.src,
         prompt=prompt,
         stream_file=stream_file,
         jsonl_file=jsonl_file,
-        analysis_budget=config.analysis_budget,
+        analysis_budget=config.options.analysis_budget,
         heartbeat_callback=heartbeat,
     )
     return stream_file, jsonl_file
@@ -171,15 +173,15 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
         raise ValueError(f"Plugin directory not found: {plugin_dir}")
 
     full = load_plugin_full(plugin_dir)
-    template = load_template(config.template_path)
+    template = load_template(config.options.template_path)
     date_str = datetime.now().isoformat(timespec="seconds")
 
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
     analysis_md = analysis_file.read_text() if analysis_file.exists() else ""
 
     all_dims = [d["id"] for d in full["dimensions"].get("applies", [])]
-    if config.dimensions:
-        dimensions = [d for d in all_dims if d in config.dimensions]
+    if config.options.dimensions:
+        dimensions = [d for d in all_dims if d in config.options.dimensions]
     else:
         dimensions = all_dims
     work_dir = config.work_dir or config.src

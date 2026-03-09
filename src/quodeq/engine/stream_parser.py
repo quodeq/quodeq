@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.engine._event_text import TEXT_EXTRACTORS
+
 
 def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
     """Scan text for JSONL evidence objects.
@@ -30,61 +32,35 @@ def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
     return count, lines
 
 
-def _process_assistant_event(data: dict, out, stats: dict, files_read: set) -> None:
-    msg = data.get("message", {})
-    for block in msg.get("content", []):
-        btype = block.get("type")
-        if btype == "text":
-            text = block["text"].strip()
-            if text:
-                stats["text_blocks"] += 1
-                c, scanned = _extract_jsonl_from_text(text, out)
-                stats["jsonl_lines"] += c
-                stats["total_text_lines"] += scanned
-        elif btype == "tool_use" and block.get("name") == "Read":
+def _collect_file_reads(data: dict) -> set[str]:
+    """Extract file paths from Read tool_use blocks in an event."""
+    files: set[str] = set()
+    # assistant events
+    for block in data.get("message", {}).get("content", []):
+        if block.get("type") == "tool_use" and block.get("name") == "Read":
             fp = block.get("input", {}).get("file_path")
             if fp:
-                files_read.add(fp)
+                files.add(fp)
+    # item.completed events
+    item = data.get("item", {})
+    for block in item.get("content", []):
+        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Read":
+            fp = block.get("input", {}).get("file_path")
+            if fp:
+                files.add(fp)
+    return files
 
 
-def _process_result_event(data: dict, out, stats: dict) -> None:
-    result = data.get("result", "").strip()
-    if result:
+def _process_texts(texts: list[str], out, stats: dict) -> None:
+    """Write JSONL evidence from extracted text blocks, updating stats."""
+    for text in texts:
+        text = text.strip()
+        if not text:
+            continue
         stats["text_blocks"] += 1
-        c, scanned = _extract_jsonl_from_text(result, out)
+        c, scanned = _extract_jsonl_from_text(text, out)
         stats["jsonl_lines"] += c
         stats["total_text_lines"] += scanned
-
-
-def _extract_from_content_blocks(blocks: list, out, stats: dict, files_read: set) -> None:
-    """Process content blocks from an item.completed event, extracting text and file reads."""
-    for block in blocks:
-        if not isinstance(block, dict):
-            continue
-        btype = block.get("type")
-        if btype in ("text", "output_text"):
-            block_text = (block.get("text") or "").strip()
-            if block_text:
-                stats["text_blocks"] += 1
-                c, scanned = _extract_jsonl_from_text(block_text, out)
-                stats["jsonl_lines"] += c
-                stats["total_text_lines"] += scanned
-        elif btype == "tool_use" and block.get("name") == "Read":
-            fp = block.get("input", {}).get("file_path")
-            if fp:
-                files_read.add(fp)
-
-
-def _process_item_completed_event(data: dict, out, stats: dict, files_read: set) -> None:
-    item = data.get("item", {})
-    if item.get("type") == "agent_message":
-        text = (item.get("text") or "").strip()
-        if text:
-            stats["text_blocks"] += 1
-            c, scanned = _extract_jsonl_from_text(text, out)
-            stats["jsonl_lines"] += c
-            stats["total_text_lines"] += scanned
-        _extract_from_content_blocks(item.get("content", []), out, stats, files_read)
 
 
 def extract_evidence_from_stream(stream_file: Path, jsonl_file: Path) -> int:
@@ -111,12 +87,9 @@ def extract_evidence_from_stream(stream_file: Path, jsonl_file: Path) -> int:
                 continue
 
             etype = data.get("type", "unknown")
-
-            if etype == "assistant":
-                _process_assistant_event(data, out, stats, files_read)
-            elif etype == "result":
-                _process_result_event(data, out, stats)
-            elif etype == "item.completed":
-                _process_item_completed_event(data, out, stats, files_read)
+            extractor = TEXT_EXTRACTORS.get(etype)
+            if extractor:
+                _process_texts(extractor(data), out, stats)
+                files_read.update(_collect_file_reads(data))
 
     return len(files_read)

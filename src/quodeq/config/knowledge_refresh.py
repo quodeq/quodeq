@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import difflib
 import json
+import os
 import urllib.error
 import urllib.request
 import urllib.parse
@@ -13,7 +14,8 @@ from quodeq.ai_cli import run_ai_cli
 
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
-_GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
+_DEFAULT_GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
+_GITHUB_SEARCH_URL = os.environ.get("QUODEQ_GITHUB_SEARCH_URL", _DEFAULT_GITHUB_SEARCH_URL)
 
 
 @lru_cache(maxsize=1)

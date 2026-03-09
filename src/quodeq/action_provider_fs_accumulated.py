@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser import (
+    RunInfo,
     calculate_trend,
     list_runs,
     most_frequent_grade,
@@ -14,7 +15,7 @@ from quodeq.adapters.fs.report_parser import (
 
 
 def _read_all_run_data(
-    reports_root: Path, project: str, all_run_infos, runs: list[str]
+    reports_root: Path, project: str, all_run_infos: list[RunInfo], runs: list[str],
 ) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
     """Pre-read all run data and build the latest-by-dimension lookup."""
     run_lookup = {r.run_id: r for r in all_run_infos}

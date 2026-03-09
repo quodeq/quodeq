@@ -11,9 +11,21 @@ import os
 import subprocess
 import sys
 import tempfile
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.utils import get_ai_cmd, get_ai_model
+
+
+@dataclass(frozen=True)
+class AnalysisConfig:
+    """Configuration for an AI CLI analysis run."""
+    jsonl_file: Path | None = None
+    analysis_budget: str | None = None
+    heartbeat_interval: int = 10
+    heartbeat_callback: object | None = None
+    ai_cmd: str | None = None
+    ai_model: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -208,6 +220,7 @@ def run_analysis(
     prompt: str,
     stream_file: Path,
     *,
+    config: AnalysisConfig | None = None,
     jsonl_file: Path | None = None,
     analysis_budget: str | None = None,
     heartbeat_interval: int = 10,
@@ -217,15 +230,21 @@ def run_analysis(
 ) -> None:
     """Spawn AI CLI subprocess with tools, capturing stream-json to *stream_file*.
 
+    Accepts either an *AnalysisConfig* or individual keyword arguments.
     When *jsonl_file* is provided, an MCP findings server is configured so
     the AI reports findings as tool calls that stream directly to *jsonl_file*.
 
     Raises:
         AnalysisError: If the subprocess exits with a non-zero code.
     """
-    args, mcp_config_path = _build_ai_cmd(
-        prompt, ai_cmd=ai_cmd, ai_model=ai_model,
+    cfg = config or AnalysisConfig(
         jsonl_file=jsonl_file, analysis_budget=analysis_budget,
+        heartbeat_interval=heartbeat_interval, heartbeat_callback=heartbeat_callback,
+        ai_cmd=ai_cmd, ai_model=ai_model,
+    )
+    args, mcp_config_path = _build_ai_cmd(
+        prompt, ai_cmd=cfg.ai_cmd, ai_model=cfg.ai_model,
+        jsonl_file=cfg.jsonl_file, analysis_budget=cfg.analysis_budget,
     )
     env = _build_analysis_env()
     stream_err = Path(str(stream_file) + ".err")
@@ -236,7 +255,7 @@ def run_analysis(
                 args, cwd=str(work_dir), env=env,
                 stdout=out, stderr=err, stdin=subprocess.DEVNULL,
             )
-            _run_with_heartbeat(process, heartbeat_interval, heartbeat_callback, stream_file, jsonl_file)
+            _run_with_heartbeat(process, cfg.heartbeat_interval, cfg.heartbeat_callback, stream_file, cfg.jsonl_file)
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
@@ -244,10 +263,3 @@ def run_analysis(
     _check_process_result(process, stream_err)
 
 
-# ---------------------------------------------------------------------------
-# Re-exports — public APIs only (consumers of private symbols should
-# import from stream_parser directly).
-# ---------------------------------------------------------------------------
-
-from quodeq.engine.stream_parser import extract_evidence_from_stream  # noqa: F401
-from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid  # noqa: F401

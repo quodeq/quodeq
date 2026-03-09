@@ -9,7 +9,7 @@ import os
 import re
 import threading
 import uuid
-from typing import Any, Iterable
+from typing import Any, Callable, Iterable
 
 import subprocess
 
@@ -58,7 +58,7 @@ class Job:
 class JobManager:
     """Thread-safe manager for spawning and tracking evaluation subprocesses."""
 
-    def __init__(self, spawn_impl=None) -> None:
+    def __init__(self, spawn_impl: Callable[..., subprocess.Popen] | None = None) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._jobs: dict[str, Job] = {}
         self._processes: dict[str, Any] = {}

@@ -2,19 +2,13 @@
 
 from __future__ import annotations
 
-import os
-from typing import Any
-
 from pathlib import Path
+from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
 from quodeq.action_provider import ActionProvider
-from quodeq.utils import ACTION_API_PORT
-
-_DEFAULT_REPORTS_DIR = "evaluations"
-_EVALUATIONS_DIR_ENV = "QUODEQ_EVALUATIONS_DIR"
-
+from quodeq.utils import get_action_api_host, get_action_api_port, get_evaluations_dir, get_static_dist
 
 def _default_provider() -> ActionProvider:
     """Create the default filesystem-based provider (lazy import)."""
@@ -27,7 +21,7 @@ def _error(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
 
 
 def _reports_dir() -> str:
-    return request.args.get("evaluations") or os.environ.get(_EVALUATIONS_DIR_ENV, _DEFAULT_REPORTS_DIR)
+    return request.args.get("evaluations") or get_evaluations_dir()
 
 
 def _build_project_zip(project_path: Path) -> "io.BytesIO":
@@ -291,11 +285,8 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
 
 def main() -> None:
     """Start the Flask development server using environment configuration."""
-    port = int(os.environ.get("QUODEQ_ACTION_API_PORT", str(ACTION_API_PORT)))
-    host = os.environ.get("QUODEQ_ACTION_API_HOST", "127.0.0.1")
-    static_dist = os.environ.get("QUODEQ_STATIC_DIST")
-    app = create_app(static_dist=static_dist)
-    app.run(host=host, port=port)
+    app = create_app(static_dist=get_static_dist())
+    app.run(host=get_action_api_host(), port=get_action_api_port())
 
 
 if __name__ == "__main__":

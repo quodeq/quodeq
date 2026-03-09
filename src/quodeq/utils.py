@@ -43,3 +43,27 @@ def get_ai_model() -> str | None:
     """Return the AI model from environment, or None."""
     import os
     return os.environ.get("AI_MODEL") or None
+
+
+def get_action_api_port() -> int:
+    """Return the action API port from environment or default."""
+    import os
+    return int(os.environ.get("QUODEQ_ACTION_API_PORT", str(ACTION_API_PORT)))
+
+
+def get_action_api_host() -> str:
+    """Return the action API host from environment or default."""
+    import os
+    return os.environ.get("QUODEQ_ACTION_API_HOST", "127.0.0.1")
+
+
+def get_static_dist() -> str | None:
+    """Return the static dist path from environment, or None."""
+    import os
+    return os.environ.get("QUODEQ_STATIC_DIST")
+
+
+def get_evaluations_dir(default: str = "evaluations") -> str:
+    """Return the evaluations directory from environment or default."""
+    import os
+    return os.environ.get("QUODEQ_EVALUATIONS_DIR", default)

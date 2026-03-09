@@ -14,7 +14,7 @@ from quodeq.dashboard.cli import main as dashboard_main
 from quodeq.engine.analysis import AnalysisError
 from quodeq.engine.plugin_loader import load_plugin
 from quodeq.engine.plugin_detector import count_source_files, detect_plugin
-from quodeq.engine.runner import RunConfig, run, run_full
+from quodeq.engine.runner import AnalysisOptions, RunConfig, run, run_full
 from quodeq.util.project_resolver import resolve_project_uuid
 from quodeq.util.repo_handler import prepare_repository
 from quodeq.utils import is_repo_url, project_name_from_repo
@@ -158,8 +158,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
         evaluators_dir=evaluators_dir,
         standards_dir=standards_dir if standards_dir.exists() else None,
         source_file_count=source_file_count,
-        dimensions=dimensions_filter,
         work_dir=evidence_dir,
+        options=AnalysisOptions(dimensions=dimensions_filter),
     )
 
     try:

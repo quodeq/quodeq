@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from quodeq.action_provider_fs_accumulated import compute_accumulated  # noqa: F401
 from quodeq.adapters.fs.report_parser import (
+    RunInfo,
     calculate_trend,
     list_runs,
     most_frequent_grade,
@@ -20,7 +21,8 @@ _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 
 
 def _collect_previous_scores(
-    runs, selected_index: int, selected_dim_names: set, get_run_dimensions
+    runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
+    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
 ) -> dict[str, dict[str, Any]]:
     """Find the most recent previous score for each dimension in the selected run."""
     previous_by_dimension: dict[str, dict[str, Any]] = {}
@@ -39,8 +41,9 @@ def _collect_previous_scores(
 
 
 def _find_stale_from_run(
-    run_dir, selected_dim_names: set, get_run_dimensions
-) -> list[dict]:
+    run_dir: RunInfo, selected_dim_names: set[str],
+    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
     """Return stale dimension dicts found in a single run directory."""
     results: list[dict] = []
     run_dimensions = get_run_dimensions(run_dir.run_id)
@@ -73,7 +76,8 @@ def _record_stale_entry(entry: dict, stale_dim_map: dict[str, dict[str, Any]]) -
 
 
 def _collect_stale_dimensions(
-    runs, selected_index: int, selected_dim_names: set, get_run_dimensions
+    runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
+    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     """Find dimensions present in other runs but absent from the selected run."""
     stale_dim_map: dict[str, dict[str, Any]] = {}
@@ -117,7 +121,10 @@ def _enrich_dimensions_with_trend(
     return result
 
 
-def _build_accumulated_trend(runs, get_run_dimensions) -> list[dict[str, Any]]:
+def _build_accumulated_trend(
+    runs: list[RunInfo],
+    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
+) -> list[dict[str, Any]]:
     """Build trend using accumulated scores across all runs (oldest to newest)."""
     trend: list[dict[str, Any]] = []
     acc_by_dim: dict[str, dict[str, Any]] = {}
