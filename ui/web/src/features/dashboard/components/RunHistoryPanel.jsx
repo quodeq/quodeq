@@ -32,20 +32,20 @@ const GRADE_VAR = {
 };
 
 function gradeBarColor(grade) {
-  if (!grade) return cssVar('--color-accent', '#e8795a');
+  if (!grade) return cssVar('--color-accent');
   const key = grade.trim().toLowerCase();
   const varName = GRADE_VAR[key] ?? GRADE_VAR[key.charAt(0)];
-  return varName ? cssVar(varName, '#e8795a') : cssVar('--color-accent', '#e8795a');
+  return varName ? cssVar(varName) : cssVar('--color-accent');
 }
 
 // Trend direction — mirrors the logic in TrendBadge
 const TREND_ARROW = { up: '↑', 'soft-up': '↗', same: '→', 'soft-down': '↘', down: '↓' };
 const TREND_COLOR = {
-  up:         '#5ee6a0',
-  'soft-up':  '#92c9a8',
-  same:       '#94a3b8',
-  'soft-down':'#c8956c',
-  down:       '#f09070',
+  up:         cssVar('--color-trend-up'),
+  'soft-up':  cssVar('--color-trend-soft-up'),
+  same:       cssVar('--color-text-muted'),
+  'soft-down':cssVar('--color-trend-soft-down'),
+  down:       cssVar('--color-trend-down'),
 };
 
 function trendDir(delta) {
@@ -115,24 +115,24 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
       </div>
       <ResponsiveContainer width="100%" height={160}>
         <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
-          <CartesianGrid vertical={false} stroke={cssVar('--color-border', '#383532')} />
+          <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
           <XAxis
             dataKey="dateLabel"
-            tick={{ fontSize: 11, fill: cssVar('--color-text-muted', '#9a9490') }}
+            tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             axisLine={false}
             tickLine={false}
           />
           <YAxis
             domain={[0, 10]}
             ticks={[0, 2.5, 5, 7.5, 10]}
-            tick={{ fontSize: 11, fill: cssVar('--color-text-muted', '#9a9490') }}
+            tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             axisLine={false}
             tickLine={false}
           />
           <Tooltip content={RunHistoryTooltip} cursor={false} isAnimationActive={false} offset={20} />
-          <ReferenceLine y={2.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
-          <ReferenceLine y={5}   stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.3} />
-          <ReferenceLine y={7.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={2.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={5}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+          <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <Bar
             dataKey="numericAverage"
             radius={[3, 3, 0, 0]}
@@ -149,7 +149,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
                 key={entry.runId ?? i}
                 fill={gradeBarColor(entry.overallGrade)}
                 opacity={entry.runId === selectedRunId ? 1 : 0.55}
-                stroke={hoveredIndex === i ? 'rgba(255,255,255,0.25)' : 'none'}
+                stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
                 strokeWidth={hoveredIndex === i ? 1.5 : 0}
               />
             ))}
@@ -158,7 +158,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             isAnimationActive={false}
             dataKey="numericAverage"
             type="monotone"
-            stroke={cssVar('--color-text', '#1a1a1a')}
+            stroke={cssVar('--color-chart-line')}
             strokeOpacity={0.55}
             strokeWidth={2.5}
             dot={false}
