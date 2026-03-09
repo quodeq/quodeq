@@ -3,7 +3,7 @@ from __future__ import annotations
 import io
 import time
 
-from codecompass.action_provider_jobs import JobManager
+from quodeq.action_provider_jobs import JobManager
 
 
 class FakeProcess:

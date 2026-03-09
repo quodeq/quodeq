@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from codecompass.config.scaffold import scaffold_plugin, RUNTIME_PRESETS
-from codecompass.engine.schema_validator import validate_plugin_dir
+from quodeq.config.scaffold import scaffold_plugin, RUNTIME_PRESETS
+from quodeq.engine.schema_validator import validate_plugin_dir
 
 
 @pytest.mark.parametrize("runtime", list(RUNTIME_PRESETS.keys()))

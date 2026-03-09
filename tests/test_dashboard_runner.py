@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from codecompass.dashboard import runner
-from codecompass.dashboard.runner import DashboardConfig, run_dashboard, validate_paths
+from quodeq.dashboard import runner
+from quodeq.dashboard.runner import DashboardConfig, run_dashboard, validate_paths
 
 
 def test_validate_paths_missing_reports(tmp_path: Path):

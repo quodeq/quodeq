@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from codecompass.config.evaluators import build_evaluator_prompt
+from quodeq.config.evaluators import build_evaluator_prompt
 
 
 def test_build_evaluator_prompt_replaces_tokens(tmp_path):

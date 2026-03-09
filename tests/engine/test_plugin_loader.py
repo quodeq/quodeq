@@ -1,5 +1,5 @@
 from pathlib import Path
-from codecompass.engine.plugin_loader import discover_plugins, load_plugin
+from quodeq.engine.plugin_loader import discover_plugins, load_plugin
 
 FIXTURES = Path(__file__).parent / "fixtures" / "evaluators"
 

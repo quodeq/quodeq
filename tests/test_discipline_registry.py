@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from codecompass.config.discipline_registry import DisciplineRegistry
+from quodeq.config.discipline_registry import DisciplineRegistry
 
 
 def test_registry_parses_disciplines(tmp_path: Path):

@@ -1,5 +1,5 @@
-from codecompass.config.disciplines import get_discipline_language, validate_new_discipline
-from codecompass.config.paths import ConfigPaths
+from quodeq.config.disciplines import get_discipline_language, validate_new_discipline
+from quodeq.config.paths import ConfigPaths
 
 
 def test_validate_new_discipline_requires_name():

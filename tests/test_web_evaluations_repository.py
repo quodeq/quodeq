@@ -1,5 +1,5 @@
-from codecompass.adapters.web.http_client import HttpResponse
-from codecompass.adapters.web.evaluations_repository import WebEvaluationsRepository
+from quodeq.adapters.web.http_client import HttpResponse
+from quodeq.adapters.web.evaluations_repository import WebEvaluationsRepository
 
 
 class FakeClient:

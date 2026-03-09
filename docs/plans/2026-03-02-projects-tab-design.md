@@ -105,7 +105,7 @@ No change when there is no parent.
 
 | File | Change |
 |---|---|
-| `src/codecompass/action_provider_fs.py` | Add `parent` to `list_projects` response |
+| `src/quodeq/action_provider_fs.py` | Add `parent` to `list_projects` response |
 | `ui/web/src/App.jsx` | Add Projects nav, remove dropdown, add `case 'projects'`, update header |
 | `ui/web/src/features/dashboard/components/ProjectsPage.jsx` | New component |
 | `ui/web/src/styles/dashboard.css` | Styles for projects page |

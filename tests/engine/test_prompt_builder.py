@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from codecompass.engine.prompt_builder import (
+from quodeq.engine.prompt_builder import (
     build_analysis_prompt,
     load_template,
     render_compiled_standards,

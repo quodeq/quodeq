@@ -1,4 +1,4 @@
-from codecompass.action_api import create_app
+from quodeq.action_api import create_app
 
 
 def test_action_api_health():
