@@ -1,0 +1,29 @@
+{
+  "security": {
+    "Confidentiality": "S-CON",
+    "Integrity": "S-INT",
+    "Non-repudiation": "S-NRP",
+    "Accountability": "S-ACC",
+    "Authenticity": "S-AUT"
+  },
+  "reliability": {
+    "Maturity": "R-MAT",
+    "Availability": "R-AVA",
+    "Fault Tolerance": "R-FT",
+    "Recoverability": "R-REC"
+  },
+  "maintainability": {
+    "Modularity": "M-MOD",
+    "Reusability": "M-REU",
+    "Analyzability": "M-ANA",
+    "Modifiability": "M-MDF",
+    "Testability": "M-TST"
+  },
+  "performance": {
+    "Time Behaviour": "P-TIM",
+    "Resource Utilisation": "P-RES",
+    "Capacity": "P-CAP"
+  },
+  "usability": {},
+  "flexibility": {}
+}
