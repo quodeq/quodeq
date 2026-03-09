@@ -429,8 +429,6 @@ def main() -> None:
         print("\nRecompiling standards...")
         tools_dir = Path(__file__).resolve().parent
         subprocess.run([sys.executable, str(tools_dir / "compile_standards.py")], check=True)
-        print("\nRe-resolving practices...")
-        subprocess.run([sys.executable, str(tools_dir / "resolve_practices.py"), "--all"], check=True)
         print("\nRunning gap report...")
         subprocess.run([sys.executable, str(tools_dir / "compile_standards.py"), "--gaps"], check=True)
 

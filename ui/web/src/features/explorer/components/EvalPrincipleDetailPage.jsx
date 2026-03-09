@@ -246,7 +246,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           {(v.title || v.reason || v.findings) && (
                             <div className="vlive-detail-section">
                               <div className="vlive-detail-section-header">
-                                <span className="vlive-detail-section-label">Reason</span>
+                                {v.title && <span className="vlive-detail-section-label">Reason</span>}
                                 {v.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${v.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{v.cwe}</a>}
                               </div>
                               {v.title && <p className="vlive-detail-title">{v.title}</p>}
@@ -296,7 +296,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                         {(c.title || c.reason) && (
                           <div className="vlive-detail-section">
                             <div className="vlive-detail-section-header">
-                              <span className="vlive-detail-section-label">Reason</span>
+                              {c.title && <span className="vlive-detail-section-label">Reason</span>}
                               {c.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${c.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{c.cwe}</a>}
                             </div>
                             {c.title && <p className="vlive-detail-title">{c.title}</p>}

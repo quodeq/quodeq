@@ -30,21 +30,6 @@ def _make_plugin_dir(base: Path) -> Path:
 
     knowledge = plugin_dir / "knowledge"
     knowledge.mkdir()
-    (knowledge / "practices.json").write_text(json.dumps({
-        "runtime": "typescript",
-        "version": "1.0.0",
-        "practices": [{
-            "id": "ts-001",
-            "title": "Avoid eval()",
-            "cwe": {"id": 95, "name": "Eval Injection"},
-            "dimension": "security",
-            "severity": "high",
-            "bad": "eval(x)",
-            "good": "JSON.parse(x)",
-            "explanation": "eval is dangerous",
-        }],
-    }))
-
     (knowledge / "analysis.md").write_text("# Analysis\nLook for eval().\n")
 
     return base / "evaluators"

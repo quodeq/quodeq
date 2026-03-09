@@ -62,6 +62,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
     import uuid as _uuid
 
+    from codecompass.engine.analysis import AnalysisError
     from codecompass.engine.runner import (
         RunConfig,
         count_source_files,
@@ -147,18 +148,22 @@ def run_evaluate(args: argparse.Namespace) -> int:
         work_dir=evidence_dir,
     )
 
-    if args.evidence_only:
-        import json
+    try:
+        if args.evidence_only:
+            import json
 
-        evidence = run(config)
-        out_file = evidence_dir / f"{plugin_id}_evidence.json"
-        out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2))
-        print(f"Evidence written to {out_file}")
-    else:
-        scores = run_full(config, evaluation_dir, mode=args.mode)
-        print(f"Reports written to {evaluation_dir}/")
-        for dim, score in scores.items():
-            print(f"  {dim}: {score}")
+            evidence = run(config)
+            out_file = evidence_dir / f"{plugin_id}_evidence.json"
+            out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2))
+            print(f"Evidence written to {out_file}")
+        else:
+            scores = run_full(config, evaluation_dir, mode=args.mode)
+            print(f"Reports written to {evaluation_dir}/")
+            for dim, score in scores.items():
+                print(f"  {dim}: {score}")
+    except AnalysisError as exc:
+        print(f"\nError: {exc}", file=sys.stderr)
+        return 1
 
     return 0
 

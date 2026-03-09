@@ -1,6 +1,5 @@
 import argparse
 
-from codecompass.config import actions
 from codecompass.config.actions import ConfigureContext
 from codecompass.config.actions import check_sources
 from codecompass.config.actions import resolve_parallel
@@ -19,7 +18,6 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--ai-cli", nargs="?")
     parser.add_argument("-d", dest="list_dimensions", action="store_true")
     parser.add_argument("--generate-maps", nargs="?", const="")
-    parser.add_argument("--generate-practices")
     parser.add_argument("--generate-dimensions", action="store_true")
     parser.add_argument("--validate-evaluators")
     parser.add_argument("--patch-evaluator", nargs=3)
@@ -56,7 +54,6 @@ def main(argv: list[str] | None = None) -> int:
     _HANDLERS: list[tuple[str, callable]] = [
         ("generate_maps",       lambda v: run_generate_evaluators(v, paths) or 0),
         ("generate_dimensions", lambda _: (run_generate_dimensions(paths), 0)[1]),
-        ("generate_practices",  lambda v: actions.run_generate_practices(v, paths)),
         ("check_sources",       lambda v: check_sources(v, paths)),
         ("list_dimensions",     lambda _: (print(render_dimension_table()), 0)[1]),
         ("refresh_practices",   lambda v: run_refresh_practices(v, paths,

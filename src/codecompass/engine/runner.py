@@ -144,9 +144,9 @@ def run(config: RunConfig) -> Evidence:
             plugin_id=config.plugin_id,
             repository=str(config.src),
             date_str=date_str,
-            practices_data=full["practices"],
             source_file_count=config.source_file_count,
             files_read=files_read,
+            standards_dir=config.standards_dir,
         )
         ev.plugin_name = full["plugin"].get("name", config.plugin_id)
         violations = sum(len(pe.violations) for pe in ev.principles.values())
@@ -240,9 +240,9 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
             plugin_id=config.plugin_id,
             repository=str(config.src),
             date_str=date_str,
-            practices_data=full["practices"],
             source_file_count=config.source_file_count,
             files_read=files_read,
+            standards_dir=config.standards_dir,
         )
         ev.plugin_name = full["plugin"].get("name", config.plugin_id)
 
