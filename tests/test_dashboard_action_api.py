@@ -66,17 +66,21 @@ def test_force_action_api_host_port(monkeypatch):
     monkeypatch.setattr(runner, "validate_paths", lambda *_args, **_kwargs: None)
 
     config = runner.DashboardConfig(
-        port=3000,
+        server=runner.ServerConfig(
+            port=3000,
+            api_host="0.0.0.0",
+            api_port=9000,
+            api_forced=True,
+        ),
+        build=runner.BuildConfig(
+            open_browser=False,
+            no_build=True,
+            reinstall=False,
+        ),
         reports_dir=Path("reports"),
         static_dist=Path("ui/web/dist"),
         repo_root=Path("."),
-        open_browser=False,
-        no_build=True,
-        reinstall=False,
         reports_defaulted=True,
-        api_host="0.0.0.0",
-        api_port=9000,
-        api_forced=True,
     )
 
     runner.run_dashboard(config)

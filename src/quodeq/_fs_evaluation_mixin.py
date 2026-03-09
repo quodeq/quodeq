@@ -13,7 +13,7 @@ from typing import Any
 
 
 def _build_evaluate_cmd(
-    repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str,
+    repo: str, options: EvaluationOptions, reports_dir: str,
 ) -> list[str]:
     """Build the CLI command list for a V2 evaluation subprocess."""
     reports_abs = str(Path(reports_dir).resolve())
@@ -22,12 +22,12 @@ def _build_evaluate_cmd(
 
     cmd = [sys.executable, "-m", "quodeq.cli", "evaluate", repo_arg]
     cmd += ["-o", reports_abs]
-    if dimensions:
-        if isinstance(dimensions, list):
-            cmd += ["-d", ",".join(dimensions)]
+    if options.dimensions:
+        if isinstance(options.dimensions, list):
+            cmd += ["-d", ",".join(options.dimensions)]
         else:
-            cmd += ["-d", str(dimensions)]
-    if numerical:
+            cmd += ["-d", str(options.dimensions)]
+    if options.numerical:
         cmd += ["-m", "numerical"]
     return cmd
 
@@ -50,7 +50,7 @@ class FsEvaluationMixin:
         if not is_repo_url(repo) and not repo_path.exists():
             raise FileNotFoundError(f"Repository not found: {repo}")
 
-        cmd = _build_evaluate_cmd(repo, options.discipline, options.dimensions, options.numerical, reports_dir)
+        cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir)
 
         env = {**os.environ, "PYTHONUNBUFFERED": "1"}

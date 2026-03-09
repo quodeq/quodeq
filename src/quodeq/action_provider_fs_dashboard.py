@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.action_provider_fs_accumulated import compute_accumulated  # noqa: F401
+
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
     calculate_trend,

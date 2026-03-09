@@ -44,6 +44,20 @@ def _build_score_lookup(per_principle_scores: dict) -> dict:
     return lookup
 
 
+_VIOLATION_FIELDS = ("file", "line", "title", "reason", "snippet", "severity", "cwe")
+_COMPLIANCE_FIELDS = ("file", "line", "title", "reason", "snippet", "cwe")
+
+
+def _flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[dict]:
+    """Flatten a list of finding dicts, tagging each with *label* and keeping only *fields*."""
+    result: list[dict] = []
+    for item in items:
+        entry: dict = {"principle": label}
+        entry.update({f: item.get(f) for f in fields if item.get(f) is not None})
+        result.append(entry)
+    return result
+
+
 def _build_principle_rows(
     evidence: dict, lookup: dict
 ) -> tuple[list, list, list, dict]:
@@ -75,22 +89,14 @@ def _build_principle_rows(
             row["metrics"] = raw_metrics
         principle_rows.append(row)
 
-        for viol in pdata.get("violations", []):
-            flat_entry: dict = {"principle": label}
-            flat_entry.update(
-                {f: viol.get(f) for f in ("file", "line", "title", "reason", "snippet", "severity", "cwe") if viol.get(f) is not None}
-            )
-            flat_violations.append(flat_entry)
-            bucket = viol.get("severity", "minor")
+        viols = _flatten_findings(pdata.get("violations", []), label, _VIOLATION_FIELDS)
+        flat_violations.extend(viols)
+        for v in viols:
+            bucket = v.get("severity", "minor")
             if bucket in sev_tally:
                 sev_tally[bucket] += 1
 
-        for comp in pdata.get("compliance", []):
-            flat_entry = {"principle": label}
-            flat_entry.update(
-                {f: comp.get(f) for f in ("file", "line", "title", "reason", "snippet", "cwe") if comp.get(f) is not None}
-            )
-            flat_compliance.append(flat_entry)
+        flat_compliance.extend(_flatten_findings(pdata.get("compliance", []), label, _COMPLIANCE_FIELDS))
 
     return principle_rows, flat_violations, flat_compliance, sev_tally
 

@@ -7,6 +7,8 @@ from urllib import request
 
 from quodeq.ports.data_errors import AuthError, NotFoundError, ServerError
 
+_HTTP_TIMEOUT_S = 10
+
 
 @dataclass(frozen=True)
 class HttpResponse:
@@ -33,7 +35,7 @@ class HttpClient:
         """Send a GET request to the URL and return the parsed JSON response."""
         req = request.Request(url, headers=headers)
         try:
-            with request.urlopen(req, timeout=10) as resp:
+            with request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))
                 return HttpResponse(resp.status, payload)
         except request.HTTPError as exc:

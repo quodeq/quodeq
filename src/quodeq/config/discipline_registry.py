@@ -57,6 +57,14 @@ def _set_indexed(lst: list[str | None], index: int, value: str) -> None:
     lst[index] = value
 
 
+def _parse_priority(value: str) -> int:
+    """Parse a detect_priority value, falling back to the default."""
+    try:
+        return int(value)
+    except ValueError:
+        return _DEFAULT_DETECT_PRIORITY
+
+
 def _dispatch_field(
     key: str,
     value: str,
@@ -74,10 +82,7 @@ def _dispatch_field(
     elif key in _CSV_FIELDS:
         kwargs[key] = _parse_csv(value)
     elif key == "detect_priority":
-        try:
-            kwargs["detect_priority"] = int(value)
-        except ValueError:
-            kwargs["detect_priority"] = _DEFAULT_DETECT_PRIORITY
+        kwargs["detect_priority"] = _parse_priority(value)
     elif key == "detect_fallback":
         kwargs["detect_fallback"] = value.lower() == "true"
 

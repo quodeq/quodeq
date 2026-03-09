@@ -3,19 +3,24 @@ from pathlib import Path
 import pytest
 
 from quodeq.dashboard import runner
-from quodeq.dashboard.runner import DashboardConfig, run_dashboard, validate_paths
+from quodeq.dashboard.runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard, validate_paths
+
+
+def _make_config(tmp_path: Path, **overrides) -> DashboardConfig:
+    """Build a DashboardConfig with sensible test defaults, overridable by keyword."""
+    defaults = {
+        "server": ServerConfig(port=4173),
+        "build": BuildConfig(open_browser=False, no_build=True, reinstall=False),
+        "reports_dir": tmp_path / "reports",
+        "static_dist": tmp_path / "ui/web/dist",
+        "repo_root": tmp_path,
+    }
+    defaults.update(overrides)
+    return DashboardConfig(**defaults)
 
 
 def test_validate_paths_missing_reports(tmp_path: Path):
-    cfg = DashboardConfig(
-        port=4173,
-        reports_dir=tmp_path / "missing",
-        static_dist=tmp_path / "ui/web/dist",
-        repo_root=tmp_path,
-        open_browser=False,
-        no_build=True,
-        reinstall=False,
-    )
+    cfg = _make_config(tmp_path, reports_dir=tmp_path / "missing")
     with pytest.raises(FileNotFoundError):
         validate_paths(cfg)
 
@@ -49,15 +54,7 @@ def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkey
     monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
     monkeypatch.setattr(runner, "_ensure_action_api", fake_ensure)
 
-    config = DashboardConfig(
-        port=4173,
-        reports_dir=tmp_path / "reports",
-        static_dist=static_dist,
-        repo_root=tmp_path,
-        open_browser=False,
-        no_build=True,
-        reinstall=False,
-    )
+    config = _make_config(tmp_path, static_dist=static_dist)
 
     run_dashboard(config)
     assert captured["static_dist"] is not None
@@ -75,16 +72,7 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
     )
 
     reports_dir = tmp_path / "reports"
-    config = DashboardConfig(
-        port=4173,
-        reports_dir=reports_dir,
-        static_dist=static_dist,
-        repo_root=tmp_path,
-        open_browser=False,
-        no_build=True,
-        reinstall=False,
-        reports_defaulted=True,
-    )
+    config = _make_config(tmp_path, reports_dir=reports_dir, static_dist=static_dist, reports_defaulted=True)
 
     run_dashboard(config)
     assert reports_dir.exists()
@@ -109,16 +97,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == 4173)
 
-    config = DashboardConfig(
-        port=4173,
-        reports_dir=tmp_path / "reports",
-        static_dist=static_dist,
-        repo_root=tmp_path,
-        open_browser=False,
-        no_build=True,
-        reinstall=False,
-        reports_defaulted=True,
-    )
+    config = _make_config(tmp_path, static_dist=static_dist, reports_defaulted=True)
 
     captured = []
     original_ensure = runner._ensure_action_api
@@ -133,16 +112,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
 
 
 def test_validate_paths_missing_reports_custom_message(tmp_path: Path):
-    cfg = DashboardConfig(
-        port=4173,
-        reports_dir=tmp_path / "missing",
-        static_dist=tmp_path / "ui/web/dist",
-        repo_root=tmp_path,
-        open_browser=False,
-        no_build=True,
-        reinstall=False,
-        reports_defaulted=False,
-    )
+    cfg = _make_config(tmp_path, reports_dir=tmp_path / "missing", reports_defaulted=False)
     with pytest.raises(FileNotFoundError) as excinfo:
         validate_paths(cfg)
     message = str(excinfo.value)

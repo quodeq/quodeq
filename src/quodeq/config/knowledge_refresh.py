@@ -15,7 +15,12 @@ from quodeq.ai_cli import run_ai_cli
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
 _DEFAULT_GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
-_GITHUB_SEARCH_URL = os.environ.get("QUODEQ_GITHUB_SEARCH_URL", _DEFAULT_GITHUB_SEARCH_URL)
+_FETCH_TIMEOUT_S = 15
+
+
+def _get_github_search_url() -> str:
+    """Return the GitHub search URL, reading from the environment at call time."""
+    return os.environ.get("QUODEQ_GITHUB_SEARCH_URL", _DEFAULT_GITHUB_SEARCH_URL)
 
 
 @lru_cache(maxsize=1)
@@ -125,7 +130,7 @@ def _fetch_cursor_rules_repos(runtime: str, min_stars: int) -> list[dict]:
         "order": "desc",
         "per_page": "10",
     })
-    url = f"{_GITHUB_SEARCH_URL}?{query}"
+    url = f"{_get_github_search_url()}?{query}"
     raw = _fetch_url(url, headers={"Accept": "application/vnd.github+json"})
     if not raw:
         return []
@@ -160,7 +165,7 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
 def _fetch_url(url: str, headers: dict | None = None) -> str | None:
     try:
         req = urllib.request.Request(url, headers=headers or {})
-        with urllib.request.urlopen(req, timeout=15) as r:
+        with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT_S) as r:
             return r.read().decode("utf-8", errors="replace")
     except (urllib.error.URLError, OSError, ValueError):
         return None

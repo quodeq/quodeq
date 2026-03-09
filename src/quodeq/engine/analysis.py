@@ -56,12 +56,6 @@ def _create_mcp_config(jsonl_file: Path) -> Path:
 # AI CLI subprocess
 # ---------------------------------------------------------------------------
 
-def _get_ai_cmd() -> str:
-    return get_ai_cmd()
-
-
-def _get_ai_model() -> str | None:
-    return get_ai_model()
 
 
 def _count_jsonl_lines(jsonl_file: Path) -> int:
@@ -151,8 +145,8 @@ def _build_ai_cmd(
 
     Returns (args_list, mcp_config_path_or_None).
     """
-    cmd = ai_cmd or _get_ai_cmd()
-    model = ai_model or _get_ai_model()
+    cmd = ai_cmd or get_ai_cmd()
+    model = ai_model or get_ai_model()
     tools = "Bash,Glob,Grep,Read"
 
     args = [cmd, "--print", "--output-format", "stream-json", "--verbose", "--tools", tools]
@@ -219,29 +213,17 @@ def run_analysis(
     work_dir: Path,
     prompt: str,
     stream_file: Path,
-    *,
     config: AnalysisConfig | None = None,
-    jsonl_file: Path | None = None,
-    analysis_budget: str | None = None,
-    heartbeat_interval: int = 10,
-    heartbeat_callback: object | None = None,
-    ai_cmd: str | None = None,
-    ai_model: str | None = None,
 ) -> None:
     """Spawn AI CLI subprocess with tools, capturing stream-json to *stream_file*.
 
-    Accepts either an *AnalysisConfig* or individual keyword arguments.
-    When *jsonl_file* is provided, an MCP findings server is configured so
-    the AI reports findings as tool calls that stream directly to *jsonl_file*.
+    When *config.jsonl_file* is provided, an MCP findings server is configured so
+    the AI reports findings as tool calls that stream directly to the JSONL file.
 
     Raises:
         AnalysisError: If the subprocess exits with a non-zero code.
     """
-    cfg = config or AnalysisConfig(
-        jsonl_file=jsonl_file, analysis_budget=analysis_budget,
-        heartbeat_interval=heartbeat_interval, heartbeat_callback=heartbeat_callback,
-        ai_cmd=ai_cmd, ai_model=ai_model,
-    )
+    cfg = config or AnalysisConfig()
     args, mcp_config_path = _build_ai_cmd(
         prompt, ai_cmd=cfg.ai_cmd, ai_model=cfg.ai_model,
         jsonl_file=cfg.jsonl_file, analysis_budget=cfg.analysis_budget,

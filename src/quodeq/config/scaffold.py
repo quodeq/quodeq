@@ -44,6 +44,33 @@ RUNTIME_PRESETS: dict[str, dict] = {
 }
 
 
+def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:
+    """Write plugin.json with detection metadata."""
+    (plugin_dir / "plugin.json").write_text(json.dumps({
+        "id": runtime,
+        "name": preset["display_name"],
+        "version": _DEFAULT_PLUGIN_VERSION,
+        "engine_version": _MIN_ENGINE_VERSION,
+        "detects": {
+            "extensions": preset["extensions"],
+            "config_files": preset["config_files"],
+        },
+    }, indent=2) + "\n")
+
+
+def _write_dimensions_json(plugin_dir: Path) -> None:
+    """Write dimensions.json with default dimension weights."""
+    (plugin_dir / "dimensions.json").write_text(json.dumps({
+        "applies": [
+            {"id": "maintainability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
+            {"id": "reliability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
+            {"id": "security", "weight": _SECURITY_DIMENSION_WEIGHT, "iso_25010": "Security", "source": "OWASP ASVS L1"},
+            {"id": "performance", "weight": _PERFORMANCE_DIMENSION_WEIGHT, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
+        ],
+        "excludes": ["usability", "flexibility"],
+    }, indent=2) + "\n")
+
+
 def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
     """Generate a full plugin directory with schema-valid boilerplate.
 
@@ -60,33 +87,11 @@ def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
     preset = RUNTIME_PRESETS[runtime]
     plugin_dir.mkdir(parents=True)
 
-    # plugin.json
-    (plugin_dir / "plugin.json").write_text(json.dumps({
-        "id": runtime,
-        "name": preset["display_name"],
-        "version": _DEFAULT_PLUGIN_VERSION,
-        "engine_version": _MIN_ENGINE_VERSION,
-        "detects": {
-            "extensions": preset["extensions"],
-            "config_files": preset["config_files"],
-        },
-    }, indent=2) + "\n")
+    _write_plugin_json(plugin_dir, runtime, preset)
+    _write_dimensions_json(plugin_dir)
 
-    # dimensions.json
-    (plugin_dir / "dimensions.json").write_text(json.dumps({
-        "applies": [
-            {"id": "maintainability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
-            {"id": "reliability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
-            {"id": "security", "weight": _SECURITY_DIMENSION_WEIGHT, "iso_25010": "Security", "source": "OWASP ASVS L1"},
-            {"id": "performance", "weight": _PERFORMANCE_DIMENSION_WEIGHT, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
-        ],
-        "excludes": ["usability", "flexibility"],
-    }, indent=2) + "\n")
-
-    # knowledge directory
     knowledge_dir = plugin_dir / "knowledge"
     knowledge_dir.mkdir()
-
     (knowledge_dir / "analysis.md").write_text(
         f"# {preset['display_name']} Codebase Analysis Guidance\n\n"
         f"## Where to look first\n\n"

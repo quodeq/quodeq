@@ -10,6 +10,22 @@ from quodeq.engine._event_text import TEXT_EXTRACTORS
 from quodeq.engine.analysis import count_files_from_stream
 
 
+def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
+    """Build a normalized finding dict from a raw JSON object."""
+    return {
+        "principle": obj["p"],
+        "dimension": obj.get("d", dimension),
+        "file": obj.get("file"),
+        "line": obj.get("line"),
+        "title": obj.get("w"),
+        "reason": obj.get("reason"),
+        "snippet": obj.get("snippet"),
+        "severity": obj.get("severity") or "minor",
+        "cwe": obj.get("cwe"),
+        "violationType": obj.get("vt"),
+    }
+
+
 def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
     """Parse live JSONL findings written by the MCP server."""
     try:
@@ -33,18 +49,7 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, proj
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
-        entry = {
-            "principle": obj["p"],
-            "dimension": obj.get("d", dimension),
-            "file": obj.get("file"),
-            "line": obj.get("line"),
-            "title": obj.get("w"),
-            "reason": obj.get("reason"),
-            "snippet": obj.get("snippet"),
-            "severity": obj.get("severity") or "minor",
-            "cwe": obj.get("cwe"),
-            "violationType": obj.get("vt"),
-        }
+        entry = _build_finding_entry(obj, dimension)
         if obj["t"] == "violation":
             violations.append(entry)
         else:
@@ -113,18 +118,10 @@ def _parse_entries_from_texts(
             if key in seen:
                 continue
             seen.add(key)
-            snippet = obj.get("snippet")
-            entry = {
-                "principle": obj["p"],
-                "dimension": obj.get("d", dimension),
-                "file": obj.get("file"),
-                "line": obj.get("line"),
-                "reason": obj.get("reason"),
-                "snippet": str(snippet).splitlines()[0].strip() if snippet else None,
-                "severity": obj.get("severity") or "minor",
-                "cwe": obj.get("cwe"),
-                "violationType": obj.get("vt"),
-            }
+            entry = _build_finding_entry(obj, dimension)
+            snippet = entry.get("snippet")
+            if snippet:
+                entry["snippet"] = str(snippet).splitlines()[0].strip()
             if obj["t"] == "violation":
                 violations.append(entry)
             else:

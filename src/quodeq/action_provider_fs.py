@@ -12,7 +12,8 @@ from quodeq.action_provider_jobs import JobManager
 from quodeq._fs_evaluation_mixin import FsEvaluationMixin
 from quodeq._fs_tooling_mixin import FsToolingMixin
 from quodeq._fs_violations import parse_violations_from_evidence, parse_violations_from_jsonl, parse_violations_from_stream
-from quodeq.action_provider_fs_dashboard import build_dashboard, compute_accumulated
+from quodeq.action_provider_fs_accumulated import compute_accumulated
+from quodeq.action_provider_fs_dashboard import build_dashboard
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
     list_runs,
@@ -27,42 +28,50 @@ from quodeq.adapters.fs.report_parser import (
 _MAX_VIOLATION_FILES = 20
 
 
+def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
+    """Read repository_info.json for a project, returning an empty dict on failure."""
+    info_path = reports_root / entry_name / "repository_info.json"
+    if not info_path.exists():
+        return {}
+    try:
+        return json.loads(info_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def _read_latest_run_summary(
+    reports_root: Path, entry_name: str, run_id: str,
+) -> tuple[str | None, str | None, int | None]:
+    """Read latest grade, score, and file count from a run. Returns (grade, score, files)."""
+    try:
+        dims = read_run_data(reports_root, entry_name, run_id)
+        summary = summarize_dimensions(dims)
+        grade = summary.get("overallGrade")
+        score = summary.get("numericAverage")
+        files = next((d.get("sourceFileCount") for d in dims if d.get("sourceFileCount")), None)
+        return grade, score, files
+    except (OSError, json.JSONDecodeError, KeyError):
+        return None, None, None
+
+
 def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, Any]:
     """Build a single project dict from its directory and run list."""
-    info: dict[str, Any] = {}
-    info_path = reports_root / entry_name / "repository_info.json"
-    if info_path.exists():
-        try:
-            info = json.loads(info_path.read_text())
-        except (json.JSONDecodeError, OSError):
-            pass
-    parent = info.get("parent") or None
-    discipline = info.get("discipline") or None
+    info = _read_repo_info(reports_root, entry_name)
     path = info.get("path") or None
     location = info.get("location") or None
-    display_name = info.get("displayName") or None
-    project_name = info.get("name") or entry_name
-    latest_grade = None
-    latest_score = None
-    files_count = None
-    try:
-        dims = read_run_data(reports_root, entry_name, runs[0].run_id)
-        summary = summarize_dimensions(dims)
-        latest_grade = summary.get("overallGrade")
-        latest_score = summary.get("numericAverage")
-        files_count = next((d.get("sourceFileCount") for d in dims if d.get("sourceFileCount")), None)
-    except (OSError, json.JSONDecodeError, KeyError):
-        pass
+    latest_grade, latest_score, files_count = _read_latest_run_summary(
+        reports_root, entry_name, runs[0].run_id,
+    )
     path_exists = Path(path).exists() if location == "local" and path else None
     return {
         "id": entry_name,
-        "name": project_name,
+        "name": info.get("name") or entry_name,
         "runsCount": len(runs),
         "latestRunId": runs[0].run_id,
         "latestDate": runs[0].date_iso,
-        "parent": parent,
-        "displayName": display_name,
-        "discipline": discipline,
+        "parent": info.get("parent") or None,
+        "displayName": info.get("displayName") or None,
+        "discipline": info.get("discipline") or None,
         "path": path,
         "location": location,
         "pathExists": path_exists,
@@ -70,6 +79,20 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
         "latestGrade": latest_grade,
         "latestScore": latest_score,
     }
+
+
+def _find_best_parent(p_path: str, project_id: str, candidates: list[dict[str, Any]]) -> str | None:
+    """Find the candidate whose path is the longest prefix of *p_path*."""
+    best_parent = None
+    best_len = 0
+    for candidate in candidates:
+        if candidate["id"] == project_id:
+            continue
+        c_path = candidate["path"].rstrip("/")
+        if p_path.startswith(c_path + "/") and len(c_path) > best_len:
+            best_parent = candidate["id"]
+            best_len = len(c_path)
+    return best_parent
 
 
 def _auto_detect_parents(projects: list[dict[str, Any]]) -> None:
@@ -80,18 +103,9 @@ def _auto_detect_parents(projects: list[dict[str, Any]]) -> None:
             continue
         if project.get("location") != "local" or not project.get("path"):
             continue
-        p_path = project["path"].rstrip("/")
-        best_parent = None
-        best_len = 0
-        for candidate in local_with_path:
-            if candidate["id"] == project["id"]:
-                continue
-            c_path = candidate["path"].rstrip("/")
-            if p_path.startswith(c_path + "/") and len(c_path) > best_len:
-                best_parent = candidate["id"]
-                best_len = len(c_path)
-        if best_parent:
-            project["parent"] = best_parent
+        best = _find_best_parent(project["path"].rstrip("/"), project["id"], local_with_path)
+        if best:
+            project["parent"] = best
 
 
 def _read_discipline_from_eval(eval_path: Path) -> str | None:

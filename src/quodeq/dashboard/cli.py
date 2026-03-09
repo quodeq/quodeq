@@ -3,7 +3,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from .runner import DashboardConfig, run_dashboard
+from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -29,17 +29,21 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
     reports_defaulted = "--evaluations" not in raw_argv
     api_forced = "--api-host" in raw_argv or "--api-port" in raw_argv
     return DashboardConfig(
-        port=args.port,
+        server=ServerConfig(
+            port=args.port,
+            api_host=args.api_host,
+            api_port=args.api_port,
+            api_forced=api_forced,
+        ),
+        build=BuildConfig(
+            open_browser=args.open.lower() != "false",
+            no_build=args.no_build,
+            reinstall=args.reinstall,
+        ),
         reports_dir=Path(args.evaluations),
         static_dist=Path(args.static_dist),
         repo_root=Path(args.repo_root),
-        open_browser=args.open.lower() != "false",
-        no_build=args.no_build,
-        reinstall=args.reinstall,
         reports_defaulted=reports_defaulted,
-        api_host=args.api_host,
-        api_port=args.api_port,
-        api_forced=api_forced,
     )
 
 

@@ -22,19 +22,60 @@ _HEALTH_CHECK_TIMEOUT_S = 0.5
 
 
 @dataclass(frozen=True)
-class DashboardConfig:
-    """Immutable configuration for the dashboard server (ports, paths, build options)."""
+class ServerConfig:
+    """Network and API server settings."""
     port: int
-    reports_dir: Path
-    static_dist: Path
-    repo_root: Path
-    open_browser: bool
-    no_build: bool
-    reinstall: bool
-    reports_defaulted: bool = False
     api_host: str | None = None
     api_port: int | None = None
     api_forced: bool = False
+
+
+@dataclass(frozen=True)
+class BuildConfig:
+    """UI build and browser options."""
+    open_browser: bool
+    no_build: bool
+    reinstall: bool
+
+
+@dataclass(frozen=True)
+class DashboardConfig:
+    """Immutable configuration for the dashboard server (ports, paths, build options)."""
+    server: ServerConfig
+    build: BuildConfig
+    reports_dir: Path
+    static_dist: Path
+    repo_root: Path
+    reports_defaulted: bool = False
+
+    # Convenience accessors for backward compatibility
+    @property
+    def port(self) -> int:
+        return self.server.port
+
+    @property
+    def open_browser(self) -> bool:
+        return self.build.open_browser
+
+    @property
+    def no_build(self) -> bool:
+        return self.build.no_build
+
+    @property
+    def reinstall(self) -> bool:
+        return self.build.reinstall
+
+    @property
+    def api_host(self) -> str | None:
+        return self.server.api_host
+
+    @property
+    def api_port(self) -> int | None:
+        return self.server.api_port
+
+    @property
+    def api_forced(self) -> bool:
+        return self.server.api_forced
 
 
 def validate_paths(config: DashboardConfig) -> None:
@@ -206,17 +247,17 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     _maybe_build_ui(config, static_dist, repo_root)
 
     return DashboardConfig(
-        port=chosen_port,
+        server=ServerConfig(
+            port=chosen_port,
+            api_host=config.api_host,
+            api_port=config.api_port,
+            api_forced=config.api_forced,
+        ),
+        build=config.build,
         reports_dir=reports_dir,
         static_dist=static_dist,
         repo_root=repo_root,
-        open_browser=config.open_browser,
-        no_build=config.no_build,
-        reinstall=config.reinstall,
         reports_defaulted=config.reports_defaulted,
-        api_host=config.api_host,
-        api_port=config.api_port,
-        api_forced=config.api_forced,
     )
 
 

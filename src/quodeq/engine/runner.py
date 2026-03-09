@@ -16,12 +16,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, TypedDict
 
-from quodeq.engine.analysis import count_files_from_stream, run_analysis
+from quodeq.engine.analysis import AnalysisConfig, count_files_from_stream, run_analysis
 from quodeq.engine.stream_parser import extract_evidence_from_stream
 from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.engine.plugin_detector import count_source_files, detect_plugin  # noqa: F401
+
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 
@@ -122,9 +122,11 @@ def _run_dimension_analysis(
         work_dir=config.src,
         prompt=prompt,
         stream_file=stream_file,
-        jsonl_file=jsonl_file,
-        analysis_budget=config.options.analysis_budget,
-        heartbeat_callback=heartbeat,
+        config=AnalysisConfig(
+            jsonl_file=jsonl_file,
+            analysis_budget=config.options.analysis_budget,
+            heartbeat_callback=heartbeat,
+        ),
     )
     return stream_file, jsonl_file
 

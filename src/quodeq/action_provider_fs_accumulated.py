@@ -90,25 +90,34 @@ def _aggregate_severity_counts(all_dimensions: list[dict[str, Any]]) -> dict[str
     }
 
 
+def _numeric_average(dimensions: list[dict[str, Any]]) -> float | None:
+    """Compute the average numeric score from a list of dimension dicts."""
+    raw = [d.get("overallScore") for d in dimensions if d.get("overallScore")]
+    numeric = [s for s in (parse_numeric_score(v) for v in raw) if s is not None]
+    return round(sum(numeric) / len(numeric), 1) if numeric else None
+
+
+def _collect_previous_latest(
+    runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
+) -> list[dict[str, Any]]:
+    """Collect the most recent dimension data from all runs except the first."""
+    prev_latest: dict[str, dict[str, Any]] = {}
+    for run_id in runs[1:]:
+        for dim in all_run_data[run_id]:
+            dim_name = dim.get("dimension")
+            if dim_name and dim_name not in prev_latest:
+                prev_latest[dim_name] = dim
+    return list(prev_latest.values())
+
+
 def _compute_accumulated_scores(
     all_dimensions: list[dict[str, Any]], runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
 ) -> tuple[float | None, float | None]:
     """Compute current and previous overall average scores."""
-    scores = [d.get("overallScore") for d in all_dimensions if d.get("overallScore")]
-    numeric_scores = [s for s in (parse_numeric_score(v) for v in scores) if s is not None]
-    avg_score = round(sum(numeric_scores) / len(numeric_scores), 1) if numeric_scores else None
-
+    avg_score = _numeric_average(all_dimensions)
     prev_avg_score = None
     if len(runs) >= 2:
-        prev_latest: dict[str, dict[str, Any]] = {}
-        for run_id in runs[1:]:
-            for dim in all_run_data[run_id]:
-                dim_name = dim.get("dimension")
-                if dim_name and dim_name not in prev_latest:
-                    prev_latest[dim_name] = dim
-        prev_raw = [d.get("overallScore") for d in prev_latest.values() if d.get("overallScore")]
-        prev_numeric = [s for s in (parse_numeric_score(v) for v in prev_raw) if s is not None]
-        prev_avg_score = round(sum(prev_numeric) / len(prev_numeric), 1) if prev_numeric else None
+        prev_avg_score = _numeric_average(_collect_previous_latest(runs, all_run_data))
     return avg_score, prev_avg_score
 
 
