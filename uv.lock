@@ -228,6 +228,10 @@ source = { editable = "." }
 dependencies = [
     { name = "flask" },
     { name = "jsonschema" },
+]
+
+[package.dev-dependencies]
+dev = [
     { name = "pytest" },
 ]
 
@@ -235,8 +239,10 @@ dependencies = [
 requires-dist = [
     { name = "flask", specifier = ">=3.0.0" },
     { name = "jsonschema" },
-    { name = "pytest", specifier = ">=9.0.2" },
 ]
+
+[package.metadata.requires-dev]
+dev = [{ name = "pytest", specifier = ">=9.0.2" }]
 
 [[package]]
 name = "referencing"
