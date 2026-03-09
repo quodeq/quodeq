@@ -8,7 +8,7 @@
 <h1 align="center">quodeq</h1>
 
 <p align="center">
-  quoming soon
+  quodeq dashboard — quoming soon
 </p>
 
 <p align="center">

@@ -19,6 +19,7 @@ class Judgment:
     dimension: str = ""
     cwe: int | None = None
     violation_type: str = ""
+    title: str = ""
 
 
 @dataclass
