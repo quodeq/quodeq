@@ -31,19 +31,19 @@ const GRADE_VAR = {
 };
 
 function gradeBarColor(grade) {
-  if (!grade) return cssVar('--color-accent', '#e8795a');
+  if (!grade) return cssVar('--color-accent');
   const key = grade.trim().toLowerCase();
   const varName = GRADE_VAR[key] ?? GRADE_VAR[key.charAt(0)];
-  return varName ? cssVar(varName, '#e8795a') : cssVar('--color-accent', '#e8795a');
+  return varName ? cssVar(varName) : cssVar('--color-accent');
 }
 
 const TREND_ARROW = { up: '↑', 'soft-up': '↗', same: '→', 'soft-down': '↘', down: '↓' };
 const TREND_COLOR = {
-  up:         '#5ee6a0',
-  'soft-up':  '#92c9a8',
-  same:       '#94a3b8',
-  'soft-down':'#c8956c',
-  down:       '#f09070',
+  up:         cssVar('--color-trend-up'),
+  'soft-up':  cssVar('--color-trend-soft-up'),
+  same:       cssVar('--color-text-muted'),
+  'soft-down':cssVar('--color-trend-soft-down'),
+  down:       cssVar('--color-trend-down'),
 };
 
 // Shortcodes mirror src/codecompass/config/dimensions.py
@@ -129,11 +129,11 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick }) {
       </div>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
-          <CartesianGrid vertical={false} stroke={cssVar('--color-border', '#383532')} />
+          <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
           <XAxis
             dataKey="dimension"
             tickFormatter={dimCode}
-            tick={{ fontSize: 11, fill: cssVar('--color-text-muted', '#9a9490') }}
+            tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             interval={0}
             axisLine={false}
             tickLine={false}
@@ -141,14 +141,14 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick }) {
           <YAxis
             domain={[0, 10]}
             ticks={[0, 2.5, 5, 7.5, 10]}
-            tick={{ fontSize: 11, fill: cssVar('--color-text-muted', '#9a9490') }}
+            tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             axisLine={false}
             tickLine={false}
           />
           <Tooltip content={DimensionTooltip} cursor={false} isAnimationActive={false} />
-          <ReferenceLine y={2.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
-          <ReferenceLine y={5}   stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.3} />
-          <ReferenceLine y={7.5} stroke={cssVar('--color-text-muted', '#9a9490')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={2.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={5}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+          <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <Bar
             dataKey="numericScore"
             radius={[3, 3, 0, 0]}
