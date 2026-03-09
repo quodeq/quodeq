@@ -8,12 +8,6 @@
 <h1 align="center">quodeq</h1>
 
 <p align="center">
-  <i>A quieter way to think about code quality.</i>
-</p>
-
----
-
-<p align="center">
   quoming soon
 </p>
 
@@ -32,5 +26,3 @@
 <p align="center">
   bearing quode with you
 </p>
-
----
