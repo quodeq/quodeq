@@ -4,6 +4,8 @@ import json
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.engine.analysis import count_files_from_stream
+
 
 def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
     """Parse live JSONL findings written by the MCP server."""
@@ -44,7 +46,7 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, proj
             violations.append(entry)
         else:
             compliance.append(entry)
-    files_read = _count_files_read(stream_path.read_text()) if stream_path and stream_path.exists() else 0
+    files_read = count_files_from_stream(stream_path) if stream_path and stream_path.exists() else 0
     return {
         "dimension": dimension,
         "runId": run_id,
@@ -118,26 +120,6 @@ _TEXT_EXTRACTORS: dict[str, Callable] = {
 }
 
 
-def _count_files_read(content: str) -> int:
-    """Count unique files read by the AI from tool_use events in the stream."""
-    files: set[str] = set()
-    for raw_line in content.splitlines():
-        stripped = raw_line.strip()
-        if not stripped:
-            continue
-        try:
-            event = json.loads(stripped)
-        except json.JSONDecodeError:
-            continue
-        etype = event.get("type", "")
-        if etype == "assistant":
-            for block in (event.get("message") or {}).get("content") or []:
-                if block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
-                    fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
-                    if fp:
-                        files.add(fp)
-    return len(files)
-
 
 def _parse_entries_from_texts(
     texts: list[str], dimension: str, seen: set[str]
@@ -201,7 +183,7 @@ def parse_violations_from_stream(stream_path: Path, project: str, run_id: str, d
         violations.extend(new_v)
         compliance.extend(new_c)
 
-    files_read = _count_files_read(content)
+    files_read = count_files_from_stream(stream_path)
     return {
         "dimension": dimension,
         "runId": run_id,

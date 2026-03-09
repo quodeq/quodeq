@@ -71,8 +71,8 @@ def _cleanup_stream(stream_file: Path) -> None:
     err_file.unlink(missing_ok=True)
 
 
-def run(config: RunConfig) -> Evidence:
-    """Orchestrate: load plugin → per-dimension AI analysis → merged Evidence."""
+def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
+    """Run AI analysis for each dimension and return per-dimension Evidence."""
     plugin_dir = config.evaluators_dir / config.plugin_id
     if not plugin_dir.exists():
         raise ValueError(f"Plugin directory not found: {plugin_dir}")
@@ -91,7 +91,7 @@ def run(config: RunConfig) -> Evidence:
         dimensions = all_dims
     work_dir = config.work_dir or config.src
 
-    all_evidence: list[Evidence] = []
+    result: dict[str, Evidence] = {}
     total = len(dimensions)
     _emit_marker("setup", dimensions=dimensions)
 
@@ -158,100 +158,19 @@ def run(config: RunConfig) -> Evidence:
         violations = sum(len(pe.violations) for pe in ev.principles.values())
         compliances = sum(len(pe.compliance) for pe in ev.principles.values())
         print(f"✓ [{idx}/{total}] {dimension} — {files_read} files, {violations}v/{compliances}c", flush=True)
-        all_evidence.append(ev)
+        result[dimension] = ev
 
-    return _merge_evidence(all_evidence, config)
+    return result
+
+
+def run(config: RunConfig) -> Evidence:
+    """Orchestrate: load plugin → per-dimension AI analysis → merged Evidence."""
+    return _merge_evidence(list(_run_dimensions(config).values()), config)
 
 
 def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
     """Like run(), but returns a dict of {dimension_id: Evidence} without merging."""
-    plugin_dir = config.evaluators_dir / config.plugin_id
-    if not plugin_dir.exists():
-        raise ValueError(f"Plugin directory not found: {plugin_dir}")
-
-    full = load_plugin_full(plugin_dir)
-    template = load_template(config.template_path)
-    date_str = datetime.now().isoformat(timespec="seconds")
-
-    analysis_file = plugin_dir / "knowledge" / "analysis.md"
-    analysis_md = analysis_file.read_text() if analysis_file.exists() else ""
-
-    all_dims = [d["id"] for d in full["dimensions"].get("applies", [])]
-    if config.dimensions:
-        dimensions = [d for d in all_dims if d in config.dimensions]
-    else:
-        dimensions = all_dims
-    work_dir = config.work_dir or config.src
-
-    result: dict[str, Evidence] = {}
-    total = len(dimensions)
-    _emit_marker("setup", dimensions=dimensions)
-
-    for idx, dimension in enumerate(dimensions, 1):
-        _emit_marker("analyzing", dimension=dimension)
-        print(f"→ [{idx}/{total}] Analyzing {dimension}", flush=True)
-        prompt = build_analysis_prompt(
-            template,
-            PromptContext(
-                plugin_id=config.plugin_id,
-                repo_name=str(config.src),
-                date_str=date_str,
-                dimension=dimension,
-                source_file_count=config.source_file_count,
-                dimensions_data=full["dimensions"],
-                analysis_md=analysis_md,
-                standards_dir=config.standards_dir,
-            ),
-        )
-
-        stream_file = work_dir / f"{dimension}_live.stream"
-        jsonl_file = work_dir / f"{dimension}_evidence.jsonl"
-
-        heartbeat = config.heartbeat_callback or _make_heartbeat(dimension, idx, total, config.source_file_count)
-
-        run_analysis(
-            work_dir=config.src,
-            prompt=prompt,
-            stream_file=stream_file,
-            jsonl_file=jsonl_file,
-            analysis_budget=config.analysis_budget,
-            heartbeat_callback=heartbeat,
-        )
-
-        if not is_stream_valid(stream_file):
-            print(f"  [{idx}/{total}] {dimension} — no valid stream, skipping", flush=True)
-            continue
-
-        _emit_marker("scoring", dimension=dimension)
-
-        mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
-        mcp_status = get_mcp_status(stream_file)
-        if mcp_status and mcp_status != "connected":
-            print(f"  ⚠ MCP findings server {mcp_status} — falling back to stream extraction", flush=True)
-        if mcp_produced:
-            files_read = count_files_from_stream(stream_file)
-        else:
-            files_read = extract_evidence_from_stream(stream_file, jsonl_file)
-
-        ev = parse_jsonl_to_evidence(
-            jsonl_file,
-            EvidenceContext(
-                plugin_id=config.plugin_id,
-                repository=str(config.src),
-                date_str=date_str,
-                source_file_count=config.source_file_count,
-                files_read=files_read,
-            ),
-            standards_dir=config.standards_dir,
-        )
-        ev.plugin_name = full["plugin"].get("name", config.plugin_id)
-
-        violations = sum(len(pe.violations) for pe in ev.principles.values())
-        compliances = sum(len(pe.compliance) for pe in ev.principles.values())
-        print(f"✓ [{idx}/{total}] {dimension} — {files_read} files, {violations}v/{compliances}c", flush=True)
-        result[dimension] = ev
-
-    return result
+    return _run_dimensions(config)
 
 
 def _merge_evidence(evidence_list: list[Evidence], config: RunConfig) -> Evidence:
