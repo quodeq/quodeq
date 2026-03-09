@@ -23,9 +23,6 @@ from quodeq.adapters.fs.report_parser.markdown import (
 )
 from quodeq.adapters.fs.report_parser.runs import (
     RunInfo,
-    _get_previous_run_for_dimension,
-    _normalize_date,
-    _parse_run_date,
     build_repository_info,
     list_runs,
     read_run_data,

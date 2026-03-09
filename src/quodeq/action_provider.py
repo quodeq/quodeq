@@ -1,6 +1,16 @@
 from __future__ import annotations
 
+from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
+
+
+@dataclass
+class EvaluationOptions:
+    discipline: str | None = None
+    dimensions: str = ""
+    numerical: bool = False
+    ai_cmd: str | None = None
+    ai_model: str | None = None
 
 
 class ProjectActions(Protocol):
@@ -42,7 +52,7 @@ class ReportActions(Protocol):
 class EvaluationActions(Protocol):
     """Methods for running and managing evaluations."""
 
-    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None) -> dict:
+    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict:
         """Start an asynchronous evaluation job and return job metadata."""
         ...
 

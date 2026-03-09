@@ -137,14 +137,17 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
             body, status = _error("Repository is required", 400, "INVALID_INPUT")
             return jsonify(body), status
         try:
+            from quodeq.action_provider import EvaluationOptions
             job = provider.start_evaluation(
                 repo=repo,
-                discipline=payload.get("discipline"),
-                dimensions=payload.get("dimensions") or "",
-                numerical=bool(payload.get("numerical")),
                 reports_dir=_reports_dir(),
-                ai_cmd=payload.get("aiCmd") or None,
-                ai_model=payload.get("aiModel") or None,
+                options=EvaluationOptions(
+                    discipline=payload.get("discipline"),
+                    dimensions=payload.get("dimensions") or "",
+                    numerical=bool(payload.get("numerical")),
+                    ai_cmd=payload.get("aiCmd") or None,
+                    ai_model=payload.get("aiModel") or None,
+                ),
             )
         except FileNotFoundError as exc:
             body, status = _error(str(exc), 400, "INVALID_INPUT")
@@ -178,7 +181,8 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
     @app.get("/api/plugins")
     def plugins() -> Response:
         import json as _json
-        evaluators_root = Path(__file__).resolve().parent.parent.parent / "evaluators"
+        from quodeq.config.paths import default_paths
+        evaluators_root = default_paths().evaluators_dir
         result: list[dict[str, Any]] = []
         if evaluators_root.is_dir():
             for child in sorted(evaluators_root.iterdir()):

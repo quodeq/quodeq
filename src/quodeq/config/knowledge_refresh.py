@@ -9,27 +9,8 @@ from pathlib import Path
 from quodeq.config import generators
 
 # Per-runtime linter documentation sources
-_LINTER_SOURCES: dict[str, str] = {
-    "typescript": (
-        "https://raw.githubusercontent.com/typescript-eslint/typescript-eslint"
-        "/main/packages/eslint-plugin/README.md"
-    ),
-    "kotlin": (
-        "https://raw.githubusercontent.com/detekt/detekt/main/website/docs/rules/complexity.md"
-    ),
-    "python": (
-        "https://raw.githubusercontent.com/astral-sh/ruff/main/docs/rules.md"
-    ),
-    "bash": (
-        "https://raw.githubusercontent.com/koalaman/shellcheck/master/README.md"
-    ),
-    "java": (
-        "https://raw.githubusercontent.com/pmd/pmd/main/docs/pages/pmd/rules/java/bestpractices.md"
-    ),
-    "mobile_ios": (
-        "https://raw.githubusercontent.com/realm/SwiftLint/main/README.md"
-    ),
-}
+_LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
+_LINTER_SOURCES: dict[str, str] = json.loads(_LINTER_SOURCES_PATH.read_text())
 
 _GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 

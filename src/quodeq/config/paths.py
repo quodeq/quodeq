@@ -9,6 +9,7 @@ class ConfigPaths:
     practices_dir: Path
     dimensions_dir: Path
     prompts_dir: Path
+    standards_dir: Path
     env_file: Path
     gitignore_file: Path
 
@@ -24,6 +25,7 @@ class ConfigPaths:
             practices_dir=root / "practices",
             dimensions_dir=root / "dimensions",
             prompts_dir=root / "prompts",
+            standards_dir=root / "standards",
             env_file=root / ".quodeq.env",
             gitignore_file=root / ".gitignore",
         )

@@ -3,9 +3,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
-_PROMPTS_DIR = Path(__file__).parent.parent.parent.parent / "prompts"
+
+def _prompts_dir() -> Path:
+    from quodeq.config.paths import default_paths
+    return default_paths().prompts_dir
 
 
 def _sub(template: str, **kwargs: str) -> str:
@@ -77,56 +81,42 @@ def render_dimensions(dimensions_data: dict, dimension: str, standards_dir: Path
 
 def load_template(template_path: Path | None = None) -> str:
     """Load the compass.md prompt template."""
-    path = template_path or (_PROMPTS_DIR / "compass.md")
+    path = template_path or (_prompts_dir() / "compass.md")
     return path.read_text()
 
 
-def build_analysis_prompt(
-    template: str,
-    *,
-    plugin_id: str,
-    repo_name: str,
-    date_str: str,
-    dimension: str,
-    source_file_count: int,
-    dimensions_data: dict,
-    analysis_md: str = "",
-    standards_dir: Path | None = None,
-) -> str:
-    """Build a complete per-dimension analysis prompt from the template.
+@dataclass
+class PromptContext:
+    plugin_id: str
+    repo_name: str
+    date_str: str
+    dimension: str
+    source_file_count: int
+    dimensions_data: dict
+    analysis_md: str = ""
+    standards_dir: Path | None = None
 
-    Args:
-        template: Raw compass.md template text.
-        plugin_id: Plugin identifier (e.g. "typescript").
-        repo_name: Repository name.
-        date_str: Evaluation date string.
-        dimension: The dimension being evaluated (e.g. "security").
-        source_file_count: Total source files in the repo.
-        dimensions_data: Parsed dimensions.json dict.
-        analysis_md: Plugin-specific analysis guidance text.
-        standards_dir: Path to standards/ directory.
 
-    Returns:
-        Fully rendered prompt string.
-    """
-    dimensions_text = render_dimensions(dimensions_data, dimension, standards_dir)
+def build_analysis_prompt(template: str, context: PromptContext) -> str:
+    """Build a complete per-dimension analysis prompt from the template."""
+    dimensions_text = render_dimensions(context.dimensions_data, context.dimension, context.standards_dir)
     prompt_hash = hashlib.sha256(template.encode()).hexdigest()[:12]
 
     standards_checklist = "_No compiled standards available._"
-    if standards_dir:
-        compiled_dir = standards_dir / "compiled"
+    if context.standards_dir:
+        compiled_dir = context.standards_dir / "compiled"
         if compiled_dir.exists():
-            standards_checklist = render_compiled_standards(compiled_dir, dimension)
+            standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
 
     return _sub(
         template,
-        DISCIPLINE=plugin_id,
-        REPO_NAME=repo_name,
-        DATE=date_str,
-        DIMENSION=dimension,
-        SOURCE_FILE_COUNT=str(source_file_count),
+        DISCIPLINE=context.plugin_id,
+        REPO_NAME=context.repo_name,
+        DATE=context.date_str,
+        DIMENSION=context.dimension,
+        SOURCE_FILE_COUNT=str(context.source_file_count),
         STANDARDS_CHECKLIST=standards_checklist,
-        ANALYSIS_GUIDANCE=analysis_md or "_No additional guidance._",
+        ANALYSIS_GUIDANCE=context.analysis_md or "_No additional guidance._",
         DIMENSIONS=dimensions_text,
         PROMPT_HASH=prompt_hash,
     )

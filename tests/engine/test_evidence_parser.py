@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.engine.evidence_parser import (
+    EvidenceContext,
     parse_jsonl_to_evidence,
     _parse_jsonl_line,
 )
@@ -94,11 +95,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test-repo",
-            date_str="2026-03-06",
-            source_file_count=50,
-            files_read=10,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test-repo",
+                date_str="2026-03-06",
+                source_file_count=50,
+                files_read=10,
+            ),
         )
 
         assert ev.repository == "test-repo"
@@ -119,11 +122,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test",
-            date_str="2026-03-06",
-            source_file_count=10,
-            files_read=5,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test",
+                date_str="2026-03-06",
+                source_file_count=10,
+                files_read=5,
+            ),
         )
 
         pe = ev.principles["ts-001"]
@@ -141,11 +146,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test",
-            date_str="2026-03-06",
-            source_file_count=10,
-            files_read=0,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test",
+                date_str="2026-03-06",
+                source_file_count=10,
+                files_read=0,
+            ),
         )
 
         assert len(ev.principles) == 0
@@ -156,11 +163,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test",
-            date_str="2026-03-06",
-            source_file_count=10,
-            files_read=0,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test",
+                date_str="2026-03-06",
+                source_file_count=10,
+                files_read=0,
+            ),
         )
 
         assert len(ev.principles) == 0
@@ -171,11 +180,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test",
-            date_str="2026-03-06",
-            source_file_count=10,
-            files_read=5,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test",
+                date_str="2026-03-06",
+                source_file_count=10,
+                files_read=5,
+            ),
         )
 
         assert "unknown-001" in ev.principles
@@ -187,11 +198,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test",
-            date_str="2026-03-06",
-            source_file_count=10,
-            files_read=5,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test",
+                date_str="2026-03-06",
+                source_file_count=10,
+                files_read=5,
+            ),
         )
 
         v = ev.principles["ts-001"].violations[0]
@@ -221,11 +234,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="python",
-            repository="test",
-            date_str="2026-03-09",
-            source_file_count=10,
-            files_read=5,
+            EvidenceContext(
+                plugin_id="python",
+                repository="test",
+                date_str="2026-03-09",
+                source_file_count=10,
+                files_read=5,
+            ),
             standards_dir=tmp_path / "standards",
         )
 
@@ -245,11 +260,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="python",
-            repository="test",
-            date_str="2026-03-09",
-            source_file_count=10,
-            files_read=5,
+            EvidenceContext(
+                plugin_id="python",
+                repository="test",
+                date_str="2026-03-09",
+                source_file_count=10,
+                files_read=5,
+            ),
         )
 
         v = ev.principles["Confidentiality"].violations[0]
@@ -262,11 +279,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test",
-            date_str="2026-03-06",
-            source_file_count=10,
-            files_read=5,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test",
+                date_str="2026-03-06",
+                source_file_count=10,
+                files_read=5,
+            ),
         )
 
         assert len(ev.principles) == 1
@@ -277,11 +296,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test",
-            date_str="2026-03-06",
-            source_file_count=0,
-            files_read=0,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test",
+                date_str="2026-03-06",
+                source_file_count=0,
+                files_read=0,
+            ),
         )
 
         assert ev.coverage_pct == 0.0
@@ -296,11 +317,13 @@ class TestParseJsonlToEvidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl,
-            plugin_id="typescript",
-            repository="test",
-            date_str="2026-03-06",
-            source_file_count=10,
-            files_read=5,
+            EvidenceContext(
+                plugin_id="typescript",
+                repository="test",
+                date_str="2026-03-06",
+                source_file_count=10,
+                files_read=5,
+            ),
         )
 
         d = ev.to_evidence_dict()
