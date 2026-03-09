@@ -174,6 +174,13 @@
   /* On-accent text (theme-invariant) */
   --color-on-accent: #ffffff;
 
+  /* Logo (defaults for themes that don't override) */
+  --logo-q:              #d80c18;
+  --logo-chevron:        #14161b;
+  --logo-chevron-hover:  #d80c18;
+  --logo-needle:         #f1171e;
+  --logo-needle-dark:    #aa0000;
+
   /* Compliance */
   --color-compliance:        #5ee6a0;
   --color-compliance-bg:     color-mix(in srgb, #5ee6a0 12%, transparent);
@@ -600,10 +607,11 @@ html[data-theme="ember"]:root {
   --shadow-lg: none;
 
   /* Logo */
-  --logo-q:           #d80c18;
-  --logo-chevron:     #f0e8e0;
-  --logo-needle:      #f1171e;
-  --logo-needle-dark: #aa0000;
+  --logo-q:              #d80c18;
+  --logo-chevron:        #f0e8e0;
+  --logo-chevron-hover:  #d80c18;
+  --logo-needle:         #f1171e;
+  --logo-needle-dark:    #aa0000;
 }
 
 /* ── Forest — nature greens, sage ───────────────────────── */
@@ -668,10 +676,11 @@ html[data-theme="forest"]:root {
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
 
   /* Logo */
-  --logo-q:           #d80c18;
-  --logo-chevron:     #1b4332;
-  --logo-needle:      #2d6a4f;
-  --logo-needle-dark: #1b4332;
+  --logo-q:              #d80c18;
+  --logo-chevron:        #1b4332;
+  --logo-chevron-hover:  #2d6a4f;
+  --logo-needle:         #2d6a4f;
+  --logo-needle-dark:    #1b4332;
 }
 
 /* ── Midnight — deep navy, cyan accents ─────────────────── */
@@ -736,10 +745,11 @@ html[data-theme="midnight"]:root {
   --shadow-lg: none;
 
   /* Logo */
-  --logo-q:           #d80c18;
-  --logo-chevron:     #00d4ff;
-  --logo-needle:      #00d4ff;
-  --logo-needle-dark: #0090b0;
+  --logo-q:              #d80c18;
+  --logo-chevron:        #00d4ff;
+  --logo-chevron-hover:  #33e0ff;
+  --logo-needle:         #00d4ff;
+  --logo-needle-dark:    #0090b0;
 }
 
 /* ── Slate — minimal monochrome, logo red accent ────────── */
@@ -804,10 +814,11 @@ html[data-theme="slate"]:root {
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
 
   /* Logo */
-  --logo-q:           #d80c18;
-  --logo-chevron:     #333333;
-  --logo-needle:      #d80c18;
-  --logo-needle-dark: #aa0000;
+  --logo-q:              #d80c18;
+  --logo-chevron:        #333333;
+  --logo-chevron-hover:  #d80c18;
+  --logo-needle:         #d80c18;
+  --logo-needle-dark:    #aa0000;
 }
 
 /* ── Horizon — AI/tech, cool whites, indigo accent ──────── */
@@ -872,10 +883,11 @@ html[data-theme="horizon"]:root {
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
 
   /* Logo */
-  --logo-q:           #6366f1;
-  --logo-chevron:     #4f46e5;
-  --logo-needle:      #6366f1;
-  --logo-needle-dark: #4338ca;
+  --logo-q:              #6366f1;
+  --logo-chevron:        #4f46e5;
+  --logo-chevron-hover:  #6366f1;
+  --logo-needle:         #6366f1;
+  --logo-needle-dark:    #4338ca;
 }
 
 /* ── 5. Typography ────────────────────────────────────────

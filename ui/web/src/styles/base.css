@@ -83,6 +83,12 @@ body {
   font-family: var(--font-sans);
 }
 
+.sidebar-brand-icon #left-chevron:hover,
+.sidebar-brand-icon #right-chevron:hover {
+  fill: var(--logo-chevron-hover) !important;
+  filter: url(#chevron-glow);
+}
+
 .sidebar-brand-text {
   font-size: var(--text-sm);
   font-weight: var(--weight-semibold);
