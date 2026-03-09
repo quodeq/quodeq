@@ -115,6 +115,48 @@
   --color-grade-low-bg:      rgba(154, 52, 18, 0.08);
   --color-grade-bottom-text: #991b1b;
   --color-grade-bottom-bg:   rgba(153, 27, 27, 0.08);
+
+  /* Trend (theme-invariant) */
+  --color-trend-strong-up:   #2ecc71;
+  --color-trend-up:          #5ee6a0;
+  --color-trend-soft-up:     #92c9a8;
+  --color-trend-soft-down:   #c8956c;
+  --color-trend-down:        #f09070;
+  --color-trend-strong-down: #e74c3c;
+
+  /* Console (theme-invariant) */
+  --color-console-bg:      #0d1117;
+  --color-console-text:    #cfdaea;
+  --color-console-success: #8bc34a;
+
+  /* On-accent text (theme-invariant) */
+  --color-on-accent: #ffffff;
+
+  /* Compliance */
+  --color-compliance:        #5ee6a0;
+  --color-compliance-bg:     color-mix(in srgb, #5ee6a0 12%, transparent);
+  --color-compliance-border: color-mix(in srgb, #5ee6a0 35%, transparent);
+
+  /* Warning */
+  --color-warning:      #b45309;
+  --color-warning-text: #b45309;
+  --color-warning-bg:   rgba(180, 83, 9, 0.08);
+
+  /* Danger variants */
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+
+  /* Overlays */
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+
+  /* Chart */
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   var(--color-text-muted);
+  --color-chart-line:   var(--color-text);
+  --color-chart-stroke: transparent;
 }
 
 /* ── 3. Semantic tokens — Dark mode override ──────────────
@@ -161,6 +203,26 @@
     --color-grade-low-bg:      rgba(251, 146, 60, 0.1);
     --color-grade-bottom-text: #f87171;
     --color-grade-bottom-bg:   rgba(248, 113, 113, 0.1);
+
+    /* Warning */
+    --color-warning:      #fbbf24;
+    --color-warning-text: #fbbf24;
+    --color-warning-bg:   rgba(251, 191, 36, 0.1);
+
+    /* Danger variants */
+    --color-danger-text:   #ff6b6b;
+    --color-danger-bg:     rgba(255, 100, 100, 0.15);
+    --color-danger-border: rgba(255, 100, 100, 0.3);
+
+    /* Overlays */
+    --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
+    --color-overlay-medium: rgba(0, 0, 0, 0.82);
+    --color-overlay-light:  rgba(0, 0, 0, 0.72);
+
+    /* Chart */
+    --color-chart-grid:   #383532;
+    --color-chart-axis:   #9a9490;
+    --color-chart-stroke: rgba(255, 255, 255, 0.25);
   }
 }
 
@@ -208,6 +270,26 @@ html[data-theme="dark"]:root {
   --color-grade-bottom-text: #f87171;
   --color-grade-bottom-bg:   rgba(248, 113, 113, 0.1);
 
+  /* Warning */
+  --color-warning:      #fbbf24;
+  --color-warning-text: #fbbf24;
+  --color-warning-bg:   rgba(251, 191, 36, 0.1);
+
+  /* Danger variants */
+  --color-danger-text:   #ff6b6b;
+  --color-danger-bg:     rgba(255, 100, 100, 0.15);
+  --color-danger-border: rgba(255, 100, 100, 0.3);
+
+  /* Overlays */
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
+  --color-overlay-medium: rgba(0, 0, 0, 0.82);
+  --color-overlay-light:  rgba(0, 0, 0, 0.72);
+
+  /* Chart */
+  --color-chart-grid:   #383532;
+  --color-chart-axis:   #9a9490;
+  --color-chart-stroke: rgba(255, 255, 255, 0.25);
+
   --shadow-sm: none;
   --shadow-md: none;
   --shadow-lg: none;
@@ -251,6 +333,26 @@ html[data-theme="light"]:root {
   --color-grade-low-bg:      rgba(154, 52, 18, 0.08);
   --color-grade-bottom-text: #991b1b;
   --color-grade-bottom-bg:   rgba(153, 27, 27, 0.08);
+
+  /* Warning */
+  --color-warning:      #b45309;
+  --color-warning-text: #b45309;
+  --color-warning-bg:   rgba(180, 83, 9, 0.08);
+
+  /* Danger variants */
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+
+  /* Overlays */
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+
+  /* Chart */
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   var(--color-text-muted);
+  --color-chart-stroke: transparent;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
@@ -303,6 +405,26 @@ html[data-theme="media-light"]:root {
   --color-grade-bottom-text: #c93530;
   --color-grade-bottom-bg:   rgba(230, 70, 60, 0.10);
 
+  /* Warning */
+  --color-warning:      #8a6e00;
+  --color-warning-text: #8a6e00;
+  --color-warning-bg:   rgba(250, 187, 34, 0.1);
+
+  /* Danger variants */
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+
+  /* Overlays */
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+
+  /* Chart */
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   var(--color-text-muted);
+  --color-chart-stroke: transparent;
+
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
@@ -348,6 +470,26 @@ html[data-theme="media-dark"]:root {
   --color-grade-low-bg:      rgba(230, 70, 60, 0.10);
   --color-grade-bottom-text: #f05855;
   --color-grade-bottom-bg:   rgba(230, 70, 60, 0.14);
+
+  /* Warning */
+  --color-warning:      #fabb22;
+  --color-warning-text: #fabb22;
+  --color-warning-bg:   rgba(250, 187, 34, 0.12);
+
+  /* Danger variants */
+  --color-danger-text:   #f05855;
+  --color-danger-bg:     rgba(230, 70, 60, 0.12);
+  --color-danger-border: rgba(230, 70, 60, 0.28);
+
+  /* Overlays */
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
+  --color-overlay-medium: rgba(0, 0, 0, 0.82);
+  --color-overlay-light:  rgba(0, 0, 0, 0.72);
+
+  /* Chart */
+  --color-chart-grid:   #3a3a3a;
+  --color-chart-axis:   #a0a0a0;
+  --color-chart-stroke: rgba(255, 255, 255, 0.25);
 
   --shadow-sm: none;
   --shadow-md: none;
