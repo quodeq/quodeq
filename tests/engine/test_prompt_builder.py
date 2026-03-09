@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from quodeq.engine.prompt_builder import (
+    PromptContext,
     build_analysis_prompt,
     load_template,
     render_compiled_standards,
@@ -139,13 +140,15 @@ class TestBuildAnalysisPrompt:
         template = load_template()
         prompt = build_analysis_prompt(
             template,
-            plugin_id="typescript",
-            repo_name="my-app",
-            date_str="2026-03-06",
-            dimension="security",
-            source_file_count=42,
-            dimensions_data=_sample_dimensions(),
-            standards_dir=tmp_path,
+            PromptContext(
+                plugin_id="typescript",
+                repo_name="my-app",
+                date_str="2026-03-06",
+                dimension="security",
+                source_file_count=42,
+                dimensions_data=_sample_dimensions(),
+                standards_dir=tmp_path,
+            ),
         )
         assert "{{" not in prompt  # all placeholders resolved
         assert "my-app" in prompt
@@ -159,13 +162,15 @@ class TestBuildAnalysisPrompt:
         template = load_template()
         prompt = build_analysis_prompt(
             template,
-            plugin_id="typescript",
-            repo_name="test",
-            date_str="2026-03-06",
-            dimension="security",
-            source_file_count=10,
-            dimensions_data=_sample_dimensions(),
-            analysis_md="Look for eval() calls in route handlers",
+            PromptContext(
+                plugin_id="typescript",
+                repo_name="test",
+                date_str="2026-03-06",
+                dimension="security",
+                source_file_count=10,
+                dimensions_data=_sample_dimensions(),
+                analysis_md="Look for eval() calls in route handlers",
+            ),
         )
         assert "Look for eval() calls in route handlers" in prompt
 
@@ -173,12 +178,14 @@ class TestBuildAnalysisPrompt:
         template = load_template()
         prompt = build_analysis_prompt(
             template,
-            plugin_id="typescript",
-            repo_name="test",
-            date_str="2026-03-06",
-            dimension="security",
-            source_file_count=10,
-            dimensions_data=_sample_dimensions(),
+            PromptContext(
+                plugin_id="typescript",
+                repo_name="test",
+                date_str="2026-03-06",
+                dimension="security",
+                source_file_count=10,
+                dimensions_data=_sample_dimensions(),
+            ),
         )
         assert "No additional guidance" in prompt
 
@@ -186,11 +193,13 @@ class TestBuildAnalysisPrompt:
         template = load_template()
         prompt = build_analysis_prompt(
             template,
-            plugin_id="typescript",
-            repo_name="test",
-            date_str="2026-03-06",
-            dimension="security",
-            source_file_count=10,
-            dimensions_data=_sample_dimensions(),
+            PromptContext(
+                plugin_id="typescript",
+                repo_name="test",
+                date_str="2026-03-06",
+                dimension="security",
+                source_file_count=10,
+                dimensions_data=_sample_dimensions(),
+            ),
         )
         assert "PROMPT_HASH" not in prompt

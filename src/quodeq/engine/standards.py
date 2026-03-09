@@ -2,18 +2,21 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-STANDARDS_DIR = Path(__file__).parent.parent.parent.parent / "standards"
+
+def _standards_dir() -> Path:
+    from quodeq.config.paths import default_paths
+    return default_paths().standards_dir
 
 
 def load_dimension(dimension_id: str) -> dict:
-    path = STANDARDS_DIR / "iso25010" / f"{dimension_id}.json"
+    path = _standards_dir() / "iso25010" / f"{dimension_id}.json"
     return json.loads(path.read_text())
 
 
 def load_asvs_l1() -> dict:
-    return json.loads((STANDARDS_DIR / "asvs" / "level1.json").read_text())
+    return json.loads((_standards_dir() / "asvs" / "level1.json").read_text())
 
 
 def load_cisq(characteristic: str) -> dict:
-    path = STANDARDS_DIR / "cisq" / f"{characteristic}.json"
+    path = _standards_dir() / "cisq" / f"{characteristic}.json"
     return json.loads(path.read_text())

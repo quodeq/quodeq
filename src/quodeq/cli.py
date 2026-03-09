@@ -83,7 +83,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
         return 1
 
     # 2. Locate evaluators directory
-    evaluators_dir = Path(__file__).resolve().parents[2] / "evaluators"
+    from quodeq.config.paths import default_paths
+    evaluators_dir = default_paths().evaluators_dir
     if not evaluators_dir.exists():
         print(f"Evaluators directory not found: {evaluators_dir}", file=sys.stderr)
         return 1
@@ -128,7 +129,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     print(f"Report path: {evaluation_dir}")
 
     # 6. Build config and run
-    standards_dir = Path(__file__).resolve().parents[2] / "standards"
+    standards_dir = default_paths().standards_dir
     dimensions_filter = None
     if args.dimensions:
         dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()]

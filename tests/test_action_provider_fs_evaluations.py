@@ -2,6 +2,7 @@ from pathlib import Path
 import json
 import sys
 
+from quodeq.action_provider import EvaluationOptions
 from quodeq.action_provider_fs import FilesystemActionProvider
 
 
@@ -93,10 +94,8 @@ def test_start_evaluation_uses_cli_module(tmp_path: Path) -> None:
 
     provider.start_evaluation(
         repo=str(repo_path),
-        discipline=None,
-        dimensions="",
-        numerical=False,
         reports_dir=str(reports_dir),
+        options=EvaluationOptions(),
     )
 
     assert captured["cmd"][:5] == [
@@ -126,10 +125,8 @@ def test_start_evaluation_always_passes_absolute_reports_path(tmp_path: Path) ->
 
     provider.start_evaluation(
         repo=str(repo_path),
-        discipline=None,
-        dimensions="",
-        numerical=False,
         reports_dir="reports",
+        options=EvaluationOptions(),
     )
 
     assert "-o" in captured["cmd"]
@@ -150,10 +147,8 @@ def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:
 
     provider.start_evaluation(
         repo=str(repo_path),
-        discipline="cli_bash",
-        dimensions="",
-        numerical=False,
         reports_dir=str(reports_dir),
+        options=EvaluationOptions(discipline="cli_bash"),
     )
 
     # UUID-based project directory — find the created project dir
@@ -180,10 +175,8 @@ def test_start_evaluation_writes_repository_info_for_online_repo(tmp_path: Path)
 
     provider.start_evaluation(
         repo=repo_url,
-        discipline="backend_springboot_java",
-        dimensions="",
-        numerical=False,
         reports_dir=str(reports_dir),
+        options=EvaluationOptions(discipline="backend_springboot_java"),
     )
 
     # UUID-based project directory

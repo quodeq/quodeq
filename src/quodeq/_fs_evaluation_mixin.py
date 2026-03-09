@@ -4,6 +4,7 @@ import os
 import sys
 from pathlib import Path
 
+from quodeq.action_provider import EvaluationOptions
 from quodeq.utils import is_repo_url
 
 from typing import Any
@@ -41,19 +42,19 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str) -> No
 class FsEvaluationMixin:
     """Mixin for evaluation start/status/cancel methods."""
 
-    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str, ai_cmd: str | None = None, ai_model: str | None = None) -> dict[str, Any]:
+    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
         repo_path = Path(repo)
         if not is_repo_url(repo) and not repo_path.exists():
             raise FileNotFoundError(f"Repository not found: {repo}")
 
-        cmd = _build_evaluate_cmd(repo, discipline, dimensions, numerical, reports_dir)
-        _register_project(repo, discipline, reports_dir)
+        cmd = _build_evaluate_cmd(repo, options.discipline, options.dimensions, options.numerical, reports_dir)
+        _register_project(repo, options.discipline, reports_dir)
 
         env = {**os.environ, "PYTHONUNBUFFERED": "1"}
-        if ai_cmd:
-            env["AI_CMD"] = ai_cmd
-        if ai_model:
-            env["AI_MODEL"] = ai_model
+        if options.ai_cmd:
+            env["AI_CMD"] = options.ai_cmd
+        if options.ai_model:
+            env["AI_MODEL"] = options.ai_model
 
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(repo_path.resolve())
         return self._jobs.start_job(cmd, cwd=cwd, env=env)

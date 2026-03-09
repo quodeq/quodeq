@@ -65,6 +65,48 @@
   --primitive-media-text-900:   #1c1c1c;
   --primitive-media-text-500:   #6b6b6b;
   --primitive-media-text-400:   #9b9b9b;
+
+  /* Ember palette (warm dark, logo-derived) */
+  --primitive-ember-950: #12100e;
+  --primitive-ember-900: #1c1916;
+  --primitive-ember-800: #262220;
+  --primitive-ember-700: #3a3330;
+  --primitive-ember-500: #9a8e84;
+  --primitive-ember-200: #f0e8e0;
+
+  /* Forest palette (nature greens, sage) */
+  --primitive-forest-50:  #f4f7f4;
+  --primitive-forest-100: #e8ede8;
+  --primitive-forest-200: #c8d4c8;
+  --primitive-forest-300: #a8bca8;
+  --primitive-forest-700: #2d6a4f;
+  --primitive-forest-800: #1b4332;
+  --primitive-forest-900: #1a2e1a;
+
+  /* Midnight palette (deep navy, cyan accents) */
+  --primitive-midnight-950: #0a0e14;
+  --primitive-midnight-900: #111822;
+  --primitive-midnight-800: #1a2230;
+  --primitive-midnight-700: #2a3545;
+  --primitive-midnight-500: #6a8aaa;
+  --primitive-midnight-200: #d4e0f0;
+
+  /* Slate palette (neutral monochrome) */
+  --primitive-slate-50:  #f5f5f5;
+  --primitive-slate-100: #eaeaea;
+  --primitive-slate-200: #d4d4d4;
+  --primitive-slate-300: #b0b0b0;
+  --primitive-slate-700: #4a4a4a;
+  --primitive-slate-900: #1a1a1a;
+
+  /* Horizon palette (cool whites, indigo accent) */
+  --primitive-horizon-50:  #f8f9fc;
+  --primitive-horizon-100: #eef1f8;
+  --primitive-horizon-200: #d8dce8;
+  --primitive-horizon-300: #b0b8d0;
+  --primitive-horizon-700: #4f46e5;
+  --primitive-horizon-800: #4338ca;
+  --primitive-horizon-900: #111827;
 }
 
 /* ── 2. Semantic tokens — Light mode (default) ────────────
@@ -494,6 +536,346 @@ html[data-theme="media-dark"]:root {
   --shadow-sm: none;
   --shadow-md: none;
   --shadow-lg: none;
+}
+
+/* ── Ember — warm dark, logo-derived ────────────────────── */
+
+html[data-theme="ember"]:root {
+  --color-bg:           var(--primitive-ember-950);
+  --color-surface:      var(--primitive-ember-900);
+  --color-surface-alt:  var(--primitive-ember-800);
+  --color-border:       var(--primitive-ember-700);
+  --color-border-focus: #f1171e;
+
+  --color-text:         var(--primitive-ember-200);
+  --color-text-muted:   var(--primitive-ember-500);
+  --color-text-subtle:  #706050;
+
+  --color-accent:       #d80c18;
+  --color-accent-hover: #f1171e;
+  --color-accent-soft:  rgba(216, 12, 24, 0.14);
+
+  --color-danger:  #e05c4b;
+  --color-success: #4caf7d;
+
+  --color-sev-critical-text:   #f87171;
+  --color-sev-critical-bg:     rgba(248, 113, 113, 0.1);
+  --color-sev-critical-border: rgba(248, 113, 113, 0.2);
+  --color-sev-major-text:      #fbbf24;
+  --color-sev-major-bg:        rgba(251, 191, 36, 0.1);
+  --color-sev-major-border:    rgba(251, 191, 36, 0.2);
+  --color-sev-minor-text:      var(--primitive-ember-500);
+  --color-sev-minor-bg:        rgba(154, 142, 132, 0.08);
+  --color-sev-minor-border:    var(--primitive-ember-700);
+
+  --color-grade-top-text:    #4ade80;
+  --color-grade-top-bg:      rgba(74, 222, 128, 0.1);
+  --color-grade-high-text:   #2dd4bf;
+  --color-grade-high-bg:     rgba(45, 212, 191, 0.1);
+  --color-grade-mid-text:    #fcd34d;
+  --color-grade-mid-bg:      rgba(252, 211, 77, 0.1);
+  --color-grade-low-text:    #fb923c;
+  --color-grade-low-bg:      rgba(251, 146, 60, 0.1);
+  --color-grade-bottom-text: #f87171;
+  --color-grade-bottom-bg:   rgba(248, 113, 113, 0.1);
+
+  --color-warning:      #fbbf24;
+  --color-warning-text: #fbbf24;
+  --color-warning-bg:   rgba(251, 191, 36, 0.1);
+
+  --color-danger-text:   #ff6b6b;
+  --color-danger-bg:     rgba(255, 100, 100, 0.15);
+  --color-danger-border: rgba(255, 100, 100, 0.3);
+
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
+  --color-overlay-medium: rgba(0, 0, 0, 0.82);
+  --color-overlay-light:  rgba(0, 0, 0, 0.72);
+
+  --color-chart-grid:   #3a3330;
+  --color-chart-axis:   #9a8e84;
+  --color-chart-stroke: rgba(255, 255, 255, 0.25);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  /* Logo */
+  --logo-q:           #d80c18;
+  --logo-chevron:     #f0e8e0;
+  --logo-needle:      #f1171e;
+  --logo-needle-dark: #aa0000;
+}
+
+/* ── Forest — nature greens, sage ───────────────────────── */
+
+html[data-theme="forest"]:root {
+  --color-bg:           var(--primitive-forest-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-forest-100);
+  --color-border:       var(--primitive-forest-200);
+  --color-border-focus: var(--primitive-forest-700);
+
+  --color-text:         var(--primitive-forest-900);
+  --color-text-muted:   #5a7a5a;
+  --color-text-subtle:  #7a9a7a;
+
+  --color-accent:       var(--primitive-forest-700);
+  --color-accent-hover: var(--primitive-forest-800);
+  --color-accent-soft:  rgba(45, 106, 79, 0.08);
+
+  --color-danger:  #c0392b;
+  --color-success: #2d7a4f;
+
+  --color-sev-critical-text:   #b91c1c;
+  --color-sev-critical-bg:     rgba(185, 28, 28, 0.08);
+  --color-sev-critical-border: rgba(185, 28, 28, 0.2);
+  --color-sev-major-text:      #b45309;
+  --color-sev-major-bg:        rgba(180, 83, 9, 0.08);
+  --color-sev-major-border:    rgba(180, 83, 9, 0.2);
+  --color-sev-minor-text:      #5a7a5a;
+  --color-sev-minor-bg:        rgba(90, 122, 90, 0.06);
+  --color-sev-minor-border:    var(--primitive-forest-200);
+
+  --color-grade-top-text:    #166534;
+  --color-grade-top-bg:      rgba(22, 101, 52, 0.08);
+  --color-grade-high-text:   #0f766e;
+  --color-grade-high-bg:     rgba(15, 118, 110, 0.08);
+  --color-grade-mid-text:    #92400e;
+  --color-grade-mid-bg:      rgba(146, 64, 14, 0.08);
+  --color-grade-low-text:    #9a3412;
+  --color-grade-low-bg:      rgba(154, 52, 18, 0.08);
+  --color-grade-bottom-text: #991b1b;
+  --color-grade-bottom-bg:   rgba(153, 27, 27, 0.08);
+
+  --color-warning:      #b45309;
+  --color-warning-text: #b45309;
+  --color-warning-bg:   rgba(180, 83, 9, 0.08);
+
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   var(--color-text-muted);
+  --color-chart-stroke: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+
+  /* Logo */
+  --logo-q:           #d80c18;
+  --logo-chevron:     #1b4332;
+  --logo-needle:      #2d6a4f;
+  --logo-needle-dark: #1b4332;
+}
+
+/* ── Midnight — deep navy, cyan accents ─────────────────── */
+
+html[data-theme="midnight"]:root {
+  --color-bg:           var(--primitive-midnight-950);
+  --color-surface:      var(--primitive-midnight-900);
+  --color-surface-alt:  var(--primitive-midnight-800);
+  --color-border:       var(--primitive-midnight-700);
+  --color-border-focus: #00d4ff;
+
+  --color-text:         var(--primitive-midnight-200);
+  --color-text-muted:   var(--primitive-midnight-500);
+  --color-text-subtle:  #4a6a88;
+
+  --color-accent:       #00d4ff;
+  --color-accent-hover: #33e0ff;
+  --color-accent-soft:  rgba(0, 212, 255, 0.10);
+
+  --color-danger:  #e05c4b;
+  --color-success: #4caf7d;
+
+  --color-sev-critical-text:   #f87171;
+  --color-sev-critical-bg:     rgba(248, 113, 113, 0.1);
+  --color-sev-critical-border: rgba(248, 113, 113, 0.2);
+  --color-sev-major-text:      #fbbf24;
+  --color-sev-major-bg:        rgba(251, 191, 36, 0.1);
+  --color-sev-major-border:    rgba(251, 191, 36, 0.2);
+  --color-sev-minor-text:      var(--primitive-midnight-500);
+  --color-sev-minor-bg:        rgba(106, 138, 170, 0.08);
+  --color-sev-minor-border:    var(--primitive-midnight-700);
+
+  --color-grade-top-text:    #4ade80;
+  --color-grade-top-bg:      rgba(74, 222, 128, 0.1);
+  --color-grade-high-text:   #2dd4bf;
+  --color-grade-high-bg:     rgba(45, 212, 191, 0.1);
+  --color-grade-mid-text:    #fcd34d;
+  --color-grade-mid-bg:      rgba(252, 211, 77, 0.1);
+  --color-grade-low-text:    #fb923c;
+  --color-grade-low-bg:      rgba(251, 146, 60, 0.1);
+  --color-grade-bottom-text: #f87171;
+  --color-grade-bottom-bg:   rgba(248, 113, 113, 0.1);
+
+  --color-warning:      #fbbf24;
+  --color-warning-text: #fbbf24;
+  --color-warning-bg:   rgba(251, 191, 36, 0.1);
+
+  --color-danger-text:   #ff6b6b;
+  --color-danger-bg:     rgba(255, 100, 100, 0.15);
+  --color-danger-border: rgba(255, 100, 100, 0.3);
+
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
+  --color-overlay-medium: rgba(0, 0, 0, 0.82);
+  --color-overlay-light:  rgba(0, 0, 0, 0.72);
+
+  --color-chart-grid:   #2a3545;
+  --color-chart-axis:   #6a8aaa;
+  --color-chart-stroke: rgba(255, 255, 255, 0.25);
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  /* Logo */
+  --logo-q:           #d80c18;
+  --logo-chevron:     #00d4ff;
+  --logo-needle:      #00d4ff;
+  --logo-needle-dark: #0090b0;
+}
+
+/* ── Slate — minimal monochrome, logo red accent ────────── */
+
+html[data-theme="slate"]:root {
+  --color-bg:           var(--primitive-slate-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-slate-100);
+  --color-border:       var(--primitive-slate-200);
+  --color-border-focus: #d80c18;
+
+  --color-text:         var(--primitive-slate-900);
+  --color-text-muted:   #6b6b6b;
+  --color-text-subtle:  #9a9a9a;
+
+  --color-accent:       #d80c18;
+  --color-accent-hover: #b00a14;
+  --color-accent-soft:  rgba(216, 12, 24, 0.06);
+
+  --color-danger:  #c0392b;
+  --color-success: #2d7a4f;
+
+  --color-sev-critical-text:   #b91c1c;
+  --color-sev-critical-bg:     rgba(185, 28, 28, 0.08);
+  --color-sev-critical-border: rgba(185, 28, 28, 0.2);
+  --color-sev-major-text:      #b45309;
+  --color-sev-major-bg:        rgba(180, 83, 9, 0.08);
+  --color-sev-major-border:    rgba(180, 83, 9, 0.2);
+  --color-sev-minor-text:      #6b6b6b;
+  --color-sev-minor-bg:        rgba(107, 107, 107, 0.06);
+  --color-sev-minor-border:    var(--primitive-slate-200);
+
+  --color-grade-top-text:    #166534;
+  --color-grade-top-bg:      rgba(22, 101, 52, 0.08);
+  --color-grade-high-text:   #0f766e;
+  --color-grade-high-bg:     rgba(15, 118, 110, 0.08);
+  --color-grade-mid-text:    #92400e;
+  --color-grade-mid-bg:      rgba(146, 64, 14, 0.08);
+  --color-grade-low-text:    #9a3412;
+  --color-grade-low-bg:      rgba(154, 52, 18, 0.08);
+  --color-grade-bottom-text: #991b1b;
+  --color-grade-bottom-bg:   rgba(153, 27, 27, 0.08);
+
+  --color-warning:      #b45309;
+  --color-warning-text: #b45309;
+  --color-warning-bg:   rgba(180, 83, 9, 0.08);
+
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   var(--color-text-muted);
+  --color-chart-stroke: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+
+  /* Logo */
+  --logo-q:           #d80c18;
+  --logo-chevron:     #333333;
+  --logo-needle:      #d80c18;
+  --logo-needle-dark: #aa0000;
+}
+
+/* ── Horizon — AI/tech, cool whites, indigo accent ──────── */
+
+html[data-theme="horizon"]:root {
+  --color-bg:           var(--primitive-horizon-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-horizon-100);
+  --color-border:       var(--primitive-horizon-200);
+  --color-border-focus: #6366f1;
+
+  --color-text:         var(--primitive-horizon-900);
+  --color-text-muted:   #6b7280;
+  --color-text-subtle:  #9ca3af;
+
+  --color-accent:       #6366f1;
+  --color-accent-hover: #4f46e5;
+  --color-accent-soft:  rgba(99, 102, 241, 0.08);
+
+  --color-danger:  #dc2626;
+  --color-success: #16a34a;
+
+  --color-sev-critical-text:   #dc2626;
+  --color-sev-critical-bg:     rgba(220, 38, 38, 0.08);
+  --color-sev-critical-border: rgba(220, 38, 38, 0.2);
+  --color-sev-major-text:      #d97706;
+  --color-sev-major-bg:        rgba(217, 119, 6, 0.08);
+  --color-sev-major-border:    rgba(217, 119, 6, 0.2);
+  --color-sev-minor-text:      #6b7280;
+  --color-sev-minor-bg:        rgba(107, 114, 128, 0.06);
+  --color-sev-minor-border:    var(--primitive-horizon-200);
+
+  --color-grade-top-text:    #166534;
+  --color-grade-top-bg:      rgba(22, 101, 52, 0.08);
+  --color-grade-high-text:   #0f766e;
+  --color-grade-high-bg:     rgba(15, 118, 110, 0.08);
+  --color-grade-mid-text:    #92400e;
+  --color-grade-mid-bg:      rgba(146, 64, 14, 0.08);
+  --color-grade-low-text:    #9a3412;
+  --color-grade-low-bg:      rgba(154, 52, 18, 0.08);
+  --color-grade-bottom-text: #991b1b;
+  --color-grade-bottom-bg:   rgba(153, 27, 27, 0.08);
+
+  --color-warning:      #d97706;
+  --color-warning-text: #d97706;
+  --color-warning-bg:   rgba(217, 119, 6, 0.08);
+
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   var(--color-text-muted);
+  --color-chart-stroke: transparent;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+
+  /* Logo */
+  --logo-q:           #6366f1;
+  --logo-chevron:     #4f46e5;
+  --logo-needle:      #6366f1;
+  --logo-needle-dark: #4338ca;
 }
 
 /* ── 5. Typography ────────────────────────────────────────

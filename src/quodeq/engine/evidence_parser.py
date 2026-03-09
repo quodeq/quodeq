@@ -2,9 +2,19 @@
 from __future__ import annotations
 
 import json
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
+
+
+@dataclass
+class EvidenceContext:
+    plugin_id: str
+    repository: str
+    date_str: str
+    source_file_count: int
+    files_read: int
 
 
 def _build_cwe_name_lookup(standards_dir: Path) -> dict[int, str]:
@@ -80,12 +90,8 @@ def _judgment_to_dict(j: Judgment, cwe_name: str = "", cwe_id: int | None = None
 
 def parse_jsonl_to_evidence(
     jsonl_file: Path,
+    context: EvidenceContext,
     *,
-    plugin_id: str,
-    repository: str,
-    date_str: str,
-    source_file_count: int,
-    files_read: int,
     standards_dir: Path | None = None,
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object.
@@ -93,6 +99,11 @@ def parse_jsonl_to_evidence(
     Findings are grouped by principle name (the p field the AI reports).
     CWE names are resolved from compiled standards when available.
     """
+    plugin_id = context.plugin_id
+    repository = context.repository
+    date_str = context.date_str
+    source_file_count = context.source_file_count
+    files_read = context.files_read
     cwe_name_lookup = _build_cwe_name_lookup(standards_dir) if standards_dir else {}
 
     judgments: list[Judgment] = []

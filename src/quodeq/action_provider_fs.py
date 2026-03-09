@@ -331,7 +331,8 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
 def _list_available_dimensions_for_discipline(discipline: str) -> list[str]:
     """Resolve available dimensions for a plugin via its dimensions.json."""
     try:
-        plugin_dir = Path(__file__).resolve().parent.parent.parent / "evaluators" / discipline
+        from quodeq.config.paths import default_paths
+        plugin_dir = default_paths().evaluators_dir / discipline
         dims_file = plugin_dir / "dimensions.json"
         if dims_file.exists():
             data = json.loads(dims_file.read_text())

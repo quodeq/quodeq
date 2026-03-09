@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from quodeq.action_api import create_app
-from quodeq.action_provider import ActionProvider
+from quodeq.action_provider import ActionProvider, EvaluationOptions
 
 
 class StubProvider(ActionProvider):
@@ -23,7 +23,7 @@ class StubProvider(ActionProvider):
     def get_violations(self, reports_dir: str, project: str, run_id: str):
         return {"total": 0, "critical": 0, "major": 0, "minor": 0, "files": []}
 
-    def start_evaluation(self, repo: str, discipline: str | None, dimensions: str, numerical: bool, reports_dir: str):
+    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict:
         return {"jobId": "job-1", "status": "running", "logs": []}
 
     def get_evaluation_status(self, job_id: str):
