@@ -1,3 +1,4 @@
+"""Refresh pipeline for AI analysis guidance and engineering practices from GitHub."""
 from __future__ import annotations
 
 import difflib
@@ -7,10 +8,11 @@ import urllib.request
 import urllib.parse
 from pathlib import Path
 
-from quodeq.config import generators
+from quodeq.ai_cli import run_ai_cli
 
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
+_GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 _linter_sources_cache: dict[str, str] | None = None
 
 
@@ -19,8 +21,6 @@ def _get_linter_sources() -> dict[str, str]:
     if _linter_sources_cache is None:
         _linter_sources_cache = json.loads(_LINTER_SOURCES_PATH.read_text())
     return _linter_sources_cache
-
-_GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
 
 
 def refresh_practices(
@@ -49,7 +49,7 @@ def refresh_practices(
         return 1
 
     prompt = _build_practices_prompt(runtime, content_samples, out_path)
-    stdout, err = generators.run_ai_cli(prompt)
+    stdout, err = run_ai_cli(prompt)
     if err:
         print(f"LLM error: {err}")
         return 1
@@ -98,7 +98,7 @@ def refresh_analysis(
         return 1
 
     prompt = _build_analysis_prompt(runtime, linter_docs, out_path)
-    stdout, err = generators.run_ai_cli(prompt)
+    stdout, err = run_ai_cli(prompt)
     if err:
         print(f"LLM error: {err}")
         return 1

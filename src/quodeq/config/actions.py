@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from quodeq.config import generators
+from quodeq.ai_cli import run_ai_cli
 from quodeq.config.dimensions import DIMENSION_NAMES
 from quodeq.config.evaluators import build_evaluator_prompt
 from quodeq.config.sources import has_required_sources_table
@@ -47,7 +47,7 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
             output_path=output_path,
             date_value=date.today().isoformat(),
         )
-        stdout, err = generators.run_ai_cli(prompt)
+        stdout, err = run_ai_cli(prompt)
         if err:
             raise RuntimeError(err)
         output_path.write_text(stdout)
@@ -59,7 +59,7 @@ def run_generate_dimensions(paths: ConfigPaths) -> None:
     prompt = template.replace("{{DIMENSIONS}}", ", ".join(DIMENSION_NAMES))
     prompt = prompt.replace("{{OUTPUT_DIR}}", str(paths.dimensions_dir))
     prompt = prompt.replace("{{DATE}}", date.today().isoformat())
-    stdout, err = generators.run_ai_cli(prompt)
+    stdout, err = run_ai_cli(prompt)
     if err:
         raise RuntimeError(err)
     output_path = paths.dimensions_dir / "generated.json"

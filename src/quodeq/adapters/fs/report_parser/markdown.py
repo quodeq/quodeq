@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import parse_numeric_score
+from quodeq.engine.scoring_internals import score_to_grade_label
 
 
 def clean_cell(value: str) -> str:
@@ -64,16 +65,7 @@ def _parse_grade_and_score(cells: list[str], is_four_col: bool) -> tuple[str | N
     if not grade and score:
         grade_score = parse_numeric_score(score)
         if grade_score is not None:
-            if grade_score >= 9:
-                grade = "Exemplary"
-            elif grade_score >= 7:
-                grade = "Good"
-            elif grade_score >= 5:
-                grade = "Adequate"
-            elif grade_score >= 3:
-                grade = "Poor"
-            else:
-                grade = "Critical"
+            grade = score_to_grade_label(grade_score)
     return grade, score
 
 

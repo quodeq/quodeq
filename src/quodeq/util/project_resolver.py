@@ -1,3 +1,4 @@
+"""Persistent UUID-based project identity resolution for the reports directory."""
 from __future__ import annotations
 
 import json

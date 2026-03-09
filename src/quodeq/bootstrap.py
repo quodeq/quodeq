@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from quodeq.ports.dimensions import DimensionsRepository
+from quodeq.ports.evaluations import EvaluationsRepository
 from quodeq.ports.evaluators import EvaluatorsRepository
 
 
@@ -12,8 +14,8 @@ from quodeq.ports.evaluators import EvaluatorsRepository
 class DataProvider:
     """Container for application-level repository dependencies."""
     evaluators: EvaluatorsRepository | None = None
-    dimensions: object | None = None
-    reports: object | None = None
+    dimensions: DimensionsRepository | None = None
+    reports: EvaluationsRepository | None = None
 
 
 def default_provider(root: Path) -> DataProvider:

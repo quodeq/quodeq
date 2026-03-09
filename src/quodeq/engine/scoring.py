@@ -1,10 +1,9 @@
 from __future__ import annotations
 
-from quodeq.engine.evidence import Evidence
+from quodeq.engine.evidence import DEFAULT_WEIGHT, Evidence
 from quodeq.engine.scoring_internals import (
-    DEFAULT_WEIGHT,
-    _GRADE_LADDER,
-    _SCALE_TIER_NAMES,
+    GRADE_LADDER,
+    SCALE_TIER_NAMES,
     _scale_multiplier,
     build_deductions,
     confidence_interval_for,
@@ -177,7 +176,7 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
         "principles": per_principle,
         "overall": overall,
         "scale": {
-            "tier": _SCALE_TIER_NAMES.get(scale_mult, "Small"),
+            "tier": SCALE_TIER_NAMES.get(scale_mult, "Small"),
             "multiplier": scale_mult,
             "files_read": files_read,
         },
@@ -202,7 +201,7 @@ def _weighted_overall(principles_scores: dict, mode: str) -> dict:
         if mode == "numerical":
             total_value += pdata["final_score"] * multiplier
         else:
-            grade_index = _GRADE_LADDER.index(pdata["grade"])
+            grade_index = GRADE_LADDER.index(pdata["grade"])
             total_value += grade_index * multiplier
 
     if total_weight == 0:
@@ -219,9 +218,9 @@ def _weighted_overall(principles_scores: dict, mode: str) -> dict:
         }
     else:
         mean_index = total_value / total_weight
-        ladder_pos = min(len(_GRADE_LADDER) - 1, round(mean_index))
+        ladder_pos = min(len(GRADE_LADDER) - 1, round(mean_index))
         return {
-            "weighted_grade": _GRADE_LADDER[ladder_pos],
+            "weighted_grade": GRADE_LADDER[ladder_pos],
             "total_weight": total_weight,
         }
 

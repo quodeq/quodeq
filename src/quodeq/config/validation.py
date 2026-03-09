@@ -14,7 +14,3 @@ def validate_evaluators(discipline: str, paths: ConfigPaths) -> int:
         log_error(f"No evaluator files found in: {evaluator_dir}")
         return 1
     return 0
-
-
-# Backward-compatible alias
-validate_mappings = validate_evaluators

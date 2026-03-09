@@ -34,6 +34,29 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
     return "\n".join(lines)
 
 
+def _load_iso_requirements(standards_dir: Path, dimension: str) -> list[str]:
+    """Load ISO 25010 sub-characteristic requirements for a dimension.
+
+    Returns a list of formatted lines, or an empty list if the file is absent or invalid.
+    """
+    std_file = standards_dir / "iso25010" / f"{dimension}.json"
+    if not std_file.exists():
+        return []
+    try:
+        std = json.loads(std_file.read_text())
+        sub_chars = std.get("sub_characteristics", [])
+        if not sub_chars or not isinstance(sub_chars[0], dict):
+            return []
+        lines = ["\n**Requirements:**"]
+        for sc in sub_chars:
+            lines.append(f"\n#### {sc['name']}")
+            for req in sc.get("requirements", []):
+                lines.append(f"- **{req['id']}**: {req['text']}")
+        return lines
+    except (json.JSONDecodeError, KeyError):
+        return []
+
+
 def render_dimensions(dimensions_data: dict, dimension: str, standards_dir: Path | None = None) -> str:
     """Format dimension info with ISO 25010 requirements for prompt inclusion."""
     applies = dimensions_data.get("applies", [])
@@ -55,21 +78,8 @@ def render_dimensions(dimensions_data: dict, dimension: str, standards_dir: Path
     if source:
         lines.append(f"**Source:** {source}")
 
-    # Load ISO 25010 standards if available
     if standards_dir and iso:
-        std_file = standards_dir / "iso25010" / f"{dimension}.json"
-        if std_file.exists():
-            try:
-                std = json.loads(std_file.read_text())
-                sub_chars = std.get("sub_characteristics", [])
-                if sub_chars and isinstance(sub_chars[0], dict):
-                    lines.append("\n**Requirements:**")
-                    for sc in sub_chars:
-                        lines.append(f"\n#### {sc['name']}")
-                        for req in sc.get("requirements", []):
-                            lines.append(f"- **{req['id']}**: {req['text']}")
-            except (json.JSONDecodeError, KeyError):
-                pass
+        lines.extend(_load_iso_requirements(standards_dir, dimension))
 
     return "\n".join(lines)
 

@@ -169,7 +169,7 @@ def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = N
     process = _spawn_action_api(port, static_dist=static_dist)
     try:
         _wait_for_action_api(base_url)
-    except Exception:
+    except (subprocess.TimeoutExpired, OSError, TimeoutError):
         if process.poll() is None:
             process.terminate()
             process.wait()

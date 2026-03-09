@@ -7,6 +7,9 @@ from pathlib import Path
 from typing import Iterable
 
 
+_DEFAULT_DETECT_PRIORITY = 99  # lowest priority — used as fallback catch-all
+
+
 def _strip_quotes(value: str) -> str:
     if len(value) >= 2 and (
         (value[0] == value[-1] == '"') or (value[0] == value[-1] == "'")
@@ -27,7 +30,7 @@ class DisciplineRule:
     detect_glob: str | None = None
     detect_dir: str | None = None
     detect_requires_file: str | None = None
-    detect_priority: int = 99
+    detect_priority: int = _DEFAULT_DETECT_PRIORITY
     detect_excludes: list[str] | None = None
     detect_fallback: bool = False
     suggested_topics: list[str] | None = None
@@ -54,42 +57,52 @@ def _set_indexed(lst: list[str | None], index: int, value: str) -> None:
     lst[index] = value
 
 
-def _parse_fields(lines: Iterable[tuple[str, str]]) -> dict:
-    """Parse key=value pairs into a kwargs dict for DisciplineRule construction."""
-    kwargs: dict = {}
-    files: list[str | None] = []
-    contains: list[str | None] = []
+def _dispatch_field(
+    key: str,
+    value: str,
+    kwargs: dict,
+    files: list[str | None],
+    contains: list[str | None],
+) -> None:
+    """Apply one key=value pair to the accumulator kwargs / files / contains lists."""
+    if key in _SIMPLE_FIELDS:
+        kwargs[key] = value
+    elif key in _FILE_KEYS:
+        _set_indexed(files, _FILE_KEYS[key], value)
+    elif key in _CONTAINS_KEYS:
+        _set_indexed(contains, _CONTAINS_KEYS[key], _strip_quotes(value))
+    elif key in _CSV_FIELDS:
+        kwargs[key] = _parse_csv(value)
+    elif key == "detect_priority":
+        try:
+            kwargs["detect_priority"] = int(value)
+        except ValueError:
+            kwargs["detect_priority"] = _DEFAULT_DETECT_PRIORITY
+    elif key == "detect_fallback":
+        kwargs["detect_fallback"] = value.lower() == "true"
 
-    for key, value in lines:
-        if key in _SIMPLE_FIELDS:
-            kwargs[key] = value
-        elif key in _FILE_KEYS:
-            _set_indexed(files, _FILE_KEYS[key], value)
-        elif key in _CONTAINS_KEYS:
-            _set_indexed(contains, _CONTAINS_KEYS[key], _strip_quotes(value))
-        elif key in _CSV_FIELDS:
-            kwargs[key] = _parse_csv(value)
-        elif key == "detect_priority":
-            try:
-                kwargs["detect_priority"] = int(value)
-            except ValueError:
-                kwargs["detect_priority"] = 99
-        elif key == "detect_fallback":
-            kwargs["detect_fallback"] = value.lower() == "true"
 
-    # Pad both lists to the same length so they pair up by index
+def _pad_and_finalize(files: list[str | None], contains: list[str | None], kwargs: dict) -> None:
+    """Pad file/contains lists to equal length and write the tuples into kwargs."""
     max_len = max(len(files), len(contains))
     while len(files) < max_len:
         files.append(None)
     while len(contains) < max_len:
         contains.append(None)
-
     kwargs["detect_files"] = tuple(f for f in files if f is not None)
     kwargs["detect_contains"] = tuple(
-        c if c is not None else ""
-        for c in contains[:max_len]
-        if c is not None
+        c for c in contains[:max_len] if c is not None
     )
+
+
+def _parse_fields(lines: Iterable[tuple[str, str]]) -> dict:
+    """Parse key=value pairs into a kwargs dict for DisciplineRule construction."""
+    kwargs: dict = {}
+    files: list[str | None] = []
+    contains: list[str | None] = []
+    for key, value in lines:
+        _dispatch_field(key, value, kwargs, files, contains)
+    _pad_and_finalize(files, contains, kwargs)
     return kwargs
 
 

@@ -1,0 +1,69 @@
+"""Plugin detection — select the best evaluator plugin for a repository."""
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+
+def count_source_files(src: Path, extensions: set[str]) -> int:
+    """Count files under *src* whose suffix is in *extensions*."""
+    total = 0
+    for p in src.rglob("*"):
+        if p.is_file() and p.suffix in extensions:
+            total += 1
+    return total
+
+
+def _detect_by_config_files(plugins: list[dict], src: Path) -> str | None:
+    """Pass 1: return the plugin with the most matching config-file hits, or None."""
+    config_matches: list[tuple[int, str]] = []
+    for data in plugins:
+        config_files = data.get("detects", {}).get("config_files", [])
+        hits = sum(1 for cf in config_files if (src / cf).exists())
+        if hits > 0:
+            config_matches.append((hits, data.get("id", "")))
+    if not config_matches:
+        return None
+    config_matches.sort(key=lambda x: x[0], reverse=True)
+    return config_matches[0][1]
+
+
+def _detect_by_extension_count(plugins: list[dict], src: Path) -> str | None:
+    """Pass 2: return the plugin whose file extensions are most prevalent, or None."""
+    best_id: str | None = None
+    best_count = 0
+    for data in plugins:
+        exts = set(data.get("detects", {}).get("extensions", []))
+        if not exts:
+            continue
+        count = count_source_files(src, exts)
+        if count > best_count:
+            best_count = count
+            best_id = data.get("id", "")
+    return best_id
+
+
+def detect_plugin(src: Path, evaluators_dir: Path) -> str:
+    """Auto-detect the best plugin for a repository.
+
+    Uses a two-pass approach:
+    1. Check for config files at repo root (strong signal — e.g. pyproject.toml → python)
+    2. Fall back to counting source files by extension (weak signal)
+    """
+    plugins: list[dict] = []
+    for child in sorted(evaluators_dir.iterdir()):
+        if not child.is_dir() or child.name.startswith("_"):
+            continue
+        pf = child / "plugin.json"
+        if not pf.exists():
+            continue
+        try:
+            data = json.loads(pf.read_text())
+        except (json.JSONDecodeError, KeyError):
+            continue
+        plugins.append(data)
+
+    plugin_id = _detect_by_config_files(plugins, src) or _detect_by_extension_count(plugins, src)
+    if plugin_id is None:
+        raise ValueError(f"No plugin in {evaluators_dir} matched any file in {src}")
+    return plugin_id

@@ -13,7 +13,10 @@ from typing import Any, Iterable
 
 import subprocess
 
+from quodeq.engine.runner import CC_MARKER_KEY
+
 MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
+_CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 
 
@@ -125,7 +128,7 @@ class JobManager:
         if not line:
             return
         # Parse structured markers — update state but don't show in console
-        if line.startswith('{"_cc"'):
+        if line.startswith(_CC_MARKER_PREFIX):
             try:
                 marker = json.loads(line)
                 phase = marker.get("_cc")

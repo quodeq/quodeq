@@ -5,8 +5,6 @@ from __future__ import annotations
 # Constants and lookup tables
 # ---------------------------------------------------------------------------
 
-DEFAULT_WEIGHT = "Medium (x2)"
-
 # Each entry is (minimum_compliance_pct_exclusive, score).
 # Walk the list top-to-bottom; the first threshold the compliance % exceeds
 # wins. Last row acts as a catch-all for the 0 % case.
@@ -34,7 +32,7 @@ _GRADE_BANDS: list[tuple[float, str]] = [
 
 # Canonical ordering from worst to best — used to convert grades to integers
 # for arithmetic and to clamp drop operations.
-_GRADE_LADDER: list[str] = [
+GRADE_LADDER: list[str] = [
     "Insufficient",
     "Developing",
     "Proficient",
@@ -66,7 +64,7 @@ _SCALE_TIERS: list[tuple[int, int]] = [
     (      0, 1),
 ]
 
-_SCALE_TIER_NAMES: dict[int, str] = {
+SCALE_TIER_NAMES: dict[int, str] = {
     1: "Small",
     2: "Medium",
     3: "Large",
@@ -225,9 +223,9 @@ def count_grade_drops(violation_type_counts: dict[str, int], scale_multiplier: i
 
 def drop_grade(grade: str, drops: int) -> str:
     """Reduce a grade by the requested number of levels, flooring at Insufficient."""
-    position = _GRADE_LADDER.index(grade)
+    position = GRADE_LADDER.index(grade)
     new_position = max(0, position - drops)
-    return _GRADE_LADDER[new_position]
+    return GRADE_LADDER[new_position]
 
 
 # ---------------------------------------------------------------------------

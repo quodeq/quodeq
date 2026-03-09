@@ -43,10 +43,6 @@ class ReportActions(Protocol):
         """Return parsed evaluation data for a single dimension in a run."""
         ...
 
-    def get_run_plan(self, reports_dir: str, project: str, run_id: str) -> dict:
-        """Return the remediation plan for a run."""
-        ...
-
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> dict:
         """Return aggregated violation summary for a run."""
         ...

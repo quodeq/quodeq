@@ -14,7 +14,7 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 from quodeq.engine.analysis import (
     count_files_from_stream,
@@ -44,6 +44,9 @@ class RunConfig:
     dimensions: list[str] | None = None
 
 
+CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
+
+
 class _MarkerFields(TypedDict, total=False):
     """Fields that may appear in a structured JSON marker."""
     dimension: str
@@ -57,10 +60,10 @@ def _emit_marker(phase: str, **kwargs: _MarkerFields) -> None:
     """
     if sys.stdout.isatty():
         return
-    print(json.dumps({"_cc": phase, **kwargs}), flush=True)
+    print(json.dumps({CC_MARKER_KEY: phase, **kwargs}), flush=True)
 
 
-def _make_heartbeat(dim_name: str, idx: int, total: int, src_count: int):
+def _make_heartbeat(dim_name: str, idx: int, total: int, src_count: int) -> Callable[[int, dict], None]:
     """Return a heartbeat callback that prints progress to stdout."""
     def _cb(elapsed: int, progress: dict) -> None:
         secs = elapsed % 60
@@ -255,64 +258,7 @@ def _merge_evidence(evidence_list: list[Evidence], config: RunConfig) -> Evidenc
     return merged
 
 
-def detect_plugin(src: Path, evaluators_dir: Path) -> str:
-    """Auto-detect the best plugin for a repository.
-
-    Uses a two-pass approach:
-    1. Check for config files at repo root (strong signal — e.g. pyproject.toml → python)
-    2. Fall back to counting source files by extension (weak signal)
-    """
-    plugins: list[dict] = []
-    for child in sorted(evaluators_dir.iterdir()):
-        if not child.is_dir() or child.name.startswith("_"):
-            continue
-        pf = child / "plugin.json"
-        if not pf.exists():
-            continue
-        try:
-            data = json.loads(pf.read_text())
-        except (json.JSONDecodeError, KeyError):
-            continue
-        plugins.append(data)
-
-    # Pass 1: config files at repo root
-    config_matches: list[tuple[int, str]] = []
-    for data in plugins:
-        config_files = data.get("detects", {}).get("config_files", [])
-        hits = sum(1 for cf in config_files if (src / cf).exists())
-        if hits > 0:
-            config_matches.append((hits, data.get("id", "")))
-
-    if config_matches:
-        config_matches.sort(key=lambda x: x[0], reverse=True)
-        return config_matches[0][1]
-
-    # Pass 2: file extension count
-    best_id: str | None = None
-    best_count = 0
-    for data in plugins:
-        exts = set(data.get("detects", {}).get("extensions", []))
-        if not exts:
-            continue
-        count = count_source_files(src, exts)
-        if count > best_count:
-            best_count = count
-            best_id = data.get("id", "")
-
-    if best_id is None:
-        raise ValueError(
-            f"No plugin in {evaluators_dir} matched any file in {src}"
-        )
-    return best_id
-
-
-def count_source_files(src: Path, extensions: set[str]) -> int:
-    """Count files under *src* whose suffix is in *extensions*."""
-    total = 0
-    for p in src.rglob("*"):
-        if p.is_file() and p.suffix in extensions:
-            total += 1
-    return total
+from quodeq.engine.plugin_detector import count_source_files, detect_plugin  # noqa: F401
 
 
 def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> dict:

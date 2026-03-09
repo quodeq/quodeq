@@ -62,7 +62,7 @@ class FsEvaluationMixin:
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(repo_path.resolve())
         return self._jobs.start_job(cmd, cwd=cwd, env=env)
 
-    def get_evaluation_status(self, job_id: str):
+    def get_evaluation_status(self, job_id: str) -> dict[str, Any] | None:
         """Return the current status of an evaluation job."""
         return self._jobs.get_job(job_id)
 

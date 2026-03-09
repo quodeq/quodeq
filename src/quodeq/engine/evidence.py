@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 DEFAULT_WEIGHT = "Medium (x2)"
+_HIGH_CONFIDENCE_THRESHOLD = 10  # minimum total instances for "high" confidence
+_MEDIUM_CONFIDENCE_THRESHOLD = 5  # minimum total instances for "medium" confidence
 
 
 @dataclass
@@ -37,8 +39,8 @@ class PrincipleEvidence:
 
     def compute_metrics(self, scale_multiplier: int = 1) -> None:
         """Calculate compliance percentage and confidence level from violation/compliance counts."""
-        high_threshold = 10 * scale_multiplier
-        medium_threshold = 5 * scale_multiplier
+        high_threshold = _HIGH_CONFIDENCE_THRESHOLD * scale_multiplier
+        medium_threshold = _MEDIUM_CONFIDENCE_THRESHOLD * scale_multiplier
 
         n_violations = len(self.violations)
         n_compliance = len(self.compliance)

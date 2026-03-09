@@ -1,7 +1,14 @@
+"""Scaffold boilerplate plugin directories from runtime presets."""
 from __future__ import annotations
 
 import json
 from pathlib import Path
+
+_DEFAULT_PLUGIN_VERSION = "1.0.0"
+_MIN_ENGINE_VERSION = ">=2.0.0"
+_DEFAULT_DIMENSION_WEIGHT = 1.0
+_SECURITY_DIMENSION_WEIGHT = 1.2
+_PERFORMANCE_DIMENSION_WEIGHT = 0.8
 
 RUNTIME_PRESETS: dict[str, dict] = {
     "typescript": {
@@ -57,8 +64,8 @@ def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
     (plugin_dir / "plugin.json").write_text(json.dumps({
         "id": runtime,
         "name": preset["display_name"],
-        "version": "1.0.0",
-        "engine_version": ">=2.0.0",
+        "version": _DEFAULT_PLUGIN_VERSION,
+        "engine_version": _MIN_ENGINE_VERSION,
         "detects": {
             "extensions": preset["extensions"],
             "config_files": preset["config_files"],
@@ -68,10 +75,10 @@ def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
     # dimensions.json
     (plugin_dir / "dimensions.json").write_text(json.dumps({
         "applies": [
-            {"id": "maintainability", "weight": 1.0, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
-            {"id": "reliability", "weight": 1.0, "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
-            {"id": "security", "weight": 1.2, "iso_25010": "Security", "source": "OWASP ASVS L1"},
-            {"id": "performance", "weight": 0.8, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
+            {"id": "maintainability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
+            {"id": "reliability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
+            {"id": "security", "weight": _SECURITY_DIMENSION_WEIGHT, "iso_25010": "Security", "source": "OWASP ASVS L1"},
+            {"id": "performance", "weight": _PERFORMANCE_DIMENSION_WEIGHT, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
         ],
         "excludes": ["usability", "flexibility"],
     }, indent=2) + "\n")

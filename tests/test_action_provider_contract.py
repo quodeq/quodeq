@@ -9,7 +9,6 @@ def test_action_provider_contract_methods():
         "get_dashboard",
         "get_accumulated",
         "get_dimension_eval",
-        "get_run_plan",
         "get_violations",
         "start_evaluation",
         "get_evaluation_status",

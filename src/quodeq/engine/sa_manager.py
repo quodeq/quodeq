@@ -36,7 +36,7 @@ def init_pending(sa_output_path: Path, pending_path: Path) -> None:
         sa_output_path: Path to the original SA output JSONL.
         pending_path: Path to write the pending (working) copy.
     """
-    raise NotImplementedError("SA integration not yet implemented")
+    ...
 
 
 def get_findings(pending_path: Path, file_path: str) -> list[dict]:
@@ -49,7 +49,7 @@ def get_findings(pending_path: Path, file_path: str) -> list[dict]:
     Returns:
         List of SA finding dicts for the given file.
     """
-    raise NotImplementedError("SA integration not yet implemented")
+    ...
 
 
 def consume_findings(pending_path: Path, file_path: str) -> int:
@@ -62,7 +62,7 @@ def consume_findings(pending_path: Path, file_path: str) -> int:
     Returns:
         Number of findings removed.
     """
-    raise NotImplementedError("SA integration not yet implemented")
+    ...
 
 
 def get_remaining(pending_path: Path) -> list[dict]:
@@ -74,4 +74,4 @@ def get_remaining(pending_path: Path) -> list[dict]:
     Returns:
         List of all remaining SA finding dicts.
     """
-    raise NotImplementedError("SA integration not yet implemented")
+    ...

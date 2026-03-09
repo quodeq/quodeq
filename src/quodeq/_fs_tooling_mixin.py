@@ -17,6 +17,7 @@ from quodeq.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION
 
 _CLI_MODEL_TIMEOUT_S = 8
 _ANTHROPIC_API_TIMEOUT_S = 8
+# Updated when Anthropic releases new major model versions (used when the API is unreachable).
 _FALLBACK_CLAUDE_MODELS = [
     "claude-opus-4-5",
     "claude-sonnet-4-5",
@@ -61,9 +62,7 @@ class FsToolingMixin:
             if not entry.is_dir():
                 continue
             entry_path = target / entry.name
-            try:
-                os.access(entry_path, os.R_OK)
-            except OSError:
+            if not os.access(entry_path, os.R_OK):
                 continue
             directories.append(
                 {

@@ -9,6 +9,12 @@ import json
 import os
 import sys
 
+_JSONRPC_VERSION = "2.0"
+_MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
+_SERVER_NAME = "quodeq-findings"
+_SERVER_VERSION = "1.0.0"
+_JSONRPC_METHOD_NOT_FOUND = -32601
+
 TOOL_NAME = "report_finding"
 TOOL_DESC = (
     "Report a code quality finding (violation or compliance). "
@@ -50,16 +56,16 @@ def _send(msg: dict) -> None:
 
 
 def _ok(req_id: object, result: dict) -> dict:
-    return {"jsonrpc": "2.0", "id": req_id, "result": result}
+    return {"jsonrpc": _JSONRPC_VERSION, "id": req_id, "result": result}
 
 
 def _handle_initialize(request_id: object, msg: dict) -> dict:
     """Handle the 'initialize' JSON-RPC method."""
-    client_version = msg.get("params", {}).get("protocolVersion", "2024-11-05")
+    client_version = msg.get("params", {}).get("protocolVersion", _MCP_DEFAULT_PROTOCOL_VERSION)
     return _ok(request_id, {
         "protocolVersion": client_version,
         "capabilities": {"tools": {}},
-        "serverInfo": {"name": "quodeq-findings", "version": "1.0.0"},
+        "serverInfo": {"name": _SERVER_NAME, "version": _SERVER_VERSION},
     })
 
 
@@ -96,6 +102,13 @@ def _handle_tools_call(request_id: object, params: dict, findings_file: str, cou
     }), counter
 
 
+def _handle_unknown_method(req_id: object, method: str) -> None:
+    """Send a JSON-RPC method-not-found error for unrecognised methods."""
+    if req_id is not None:
+        _send({"jsonrpc": _JSONRPC_VERSION, "id": req_id,
+               "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
+
+
 def main() -> None:
     """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
     # Accept findings path as CLI arg (preferred) or env var (fallback).
@@ -113,10 +126,10 @@ def main() -> None:
         method = msg.get("method", "")
         req_id = msg.get("id")
 
+        if method in ("notifications/initialized", "notifications/cancelled"):
+            continue
         if method == "initialize":
             _send(_handle_initialize(req_id, msg))
-        elif method in ("notifications/initialized", "notifications/cancelled"):
-            pass
         elif method == "tools/list":
             _send(_handle_tools_list(req_id))
         elif method == "tools/call":
@@ -125,9 +138,8 @@ def main() -> None:
             _send(response)
         elif method == "ping":
             _send(_ok(req_id, {}))
-        elif req_id is not None:
-            _send({"jsonrpc": "2.0", "id": req_id,
-                    "error": {"code": -32601, "message": f"Method not found: {method}"}})
+        else:
+            _handle_unknown_method(req_id, method)
 
 
 if __name__ == "__main__":

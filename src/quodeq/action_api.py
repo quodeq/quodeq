@@ -13,6 +13,7 @@ from quodeq.action_provider import ActionProvider
 from quodeq.utils import ACTION_API_PORT
 
 _DEFAULT_REPORTS_DIR = "evaluations"
+_EVALUATIONS_DIR_ENV = "QUODEQ_EVALUATIONS_DIR"
 
 
 def _default_provider() -> ActionProvider:
@@ -26,7 +27,7 @@ def _error(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
 
 
 def _reports_dir() -> str:
-    return request.args.get("evaluations") or os.environ.get("QUODEQ_EVALUATIONS_DIR", _DEFAULT_REPORTS_DIR)
+    return request.args.get("evaluations") or os.environ.get(_EVALUATIONS_DIR_ENV, _DEFAULT_REPORTS_DIR)
 
 
 def _build_project_zip(project_path: Path) -> "io.BytesIO":

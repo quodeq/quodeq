@@ -1,3 +1,4 @@
+"""Fetch and cache OWASP ASVS Level 1 requirements into the standards directory."""
 from __future__ import annotations
 
 import json

@@ -1,13 +1,21 @@
 """Command-line interface for Quodeq evaluation and dashboard commands."""
 
 import argparse
+import json
 import sys
+import uuid
 from pathlib import Path
 from typing import Callable
 
 from quodeq.config.cli import build_parser as build_config_parser
 from quodeq.config.cli import main as configure_main
+from quodeq.config.paths import default_paths
 from quodeq.dashboard.cli import main as dashboard_main
+from quodeq.engine.analysis import AnalysisError
+from quodeq.engine.plugin_loader import load_plugin
+from quodeq.engine.plugin_detector import count_source_files, detect_plugin
+from quodeq.engine.runner import RunConfig, run, run_full
+from quodeq.util.project_resolver import resolve_project_uuid
 from quodeq.util.repo_handler import prepare_repository
 from quodeq.utils import is_repo_url, project_name_from_repo
 
@@ -76,10 +84,6 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
 
 def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Path]:
     """Resolve project UUID and create evidence/evaluation directories."""
-    import uuid as _uuid
-
-    from quodeq.util.project_resolver import resolve_project_uuid
-
     reports_root = Path(args.output)
     reports_root.mkdir(parents=True, exist_ok=True)
 
@@ -87,7 +91,7 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     location = "online" if is_repo_url(args.repo) else "local"
     project_uuid = resolve_project_uuid(reports_root, project_name, str(src), None, location=location)
 
-    run_id = str(_uuid.uuid4())
+    run_id = str(uuid.uuid4())
     evidence_dir = reports_root / project_uuid / run_id / "evidence"
     evaluation_dir = reports_root / project_uuid / run_id / "evaluation"
     evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -95,68 +99,58 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     return reports_root, evidence_dir, evaluation_dir
 
 
-def run_evaluate(args: argparse.Namespace) -> int:
-    """Run the evaluation pipeline."""
-    from quodeq.engine.analysis import AnalysisError
-    from quodeq.engine.runner import (
-        RunConfig,
-        count_source_files,
-        detect_plugin,
-        run,
-        run_full,
-    )
-    from quodeq.engine.plugin_loader import load_plugin
-
-    # 1-2. Resolve repo, check exists
-    src = _resolve_repo(args)
-    if src is None:
-        return 1
-
-    # 3. Locate evaluators directory
-    from quodeq.config.paths import default_paths
-    evaluators_dir = default_paths().evaluators_dir
-    if not evaluators_dir.exists():
-        print(f"Evaluators directory not found: {evaluators_dir}", file=sys.stderr)
-        return 1
-
-    # 4. Detect or use explicit plugin
+def _resolve_plugin(args: argparse.Namespace, src: Path, evaluators_dir: Path) -> str | None:
+    """Detect or validate the plugin for a repo. Returns plugin_id or None on error."""
     plugin_id = args.plugin
     if plugin_id is None:
         try:
             plugin_id = detect_plugin(src, evaluators_dir)
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
-            return 1
+            return None
     print(f"Plugin: {plugin_id}")
-
     plugin_dir = evaluators_dir / plugin_id
     if not plugin_dir.exists():
         print(f"Plugin directory not found: {plugin_dir}", file=sys.stderr)
+        return None
+    return plugin_id
+
+
+def _prescan_sources(args: argparse.Namespace, plugin_dir: Path, src: Path) -> int:
+    """Count source files for the plugin if prescan is not disabled."""
+    if args.no_prescan:
+        return 0
+    plugin_data = load_plugin(plugin_dir)
+    extensions = set(plugin_data.get("detects", {}).get("extensions", []))
+    if not extensions:
+        return 0
+    source_file_count = count_source_files(src, extensions)
+    print(f"Source files: {source_file_count}")
+    return source_file_count
+
+
+def run_evaluate(args: argparse.Namespace) -> int:
+    """Run the evaluation pipeline."""
+    src = _resolve_repo(args)
+    if src is None:
         return 1
 
-    # 5. Prescan
-    source_file_count = 0
-    if not args.no_prescan:
-        plugin_data = load_plugin(plugin_dir)
-        extensions = set(plugin_data.get("detects", {}).get("extensions", []))
-        if extensions:
-            source_file_count = count_source_files(src, extensions)
-            print(f"Source files: {source_file_count}")
+    evaluators_dir = default_paths().evaluators_dir
+    if not evaluators_dir.exists():
+        print(f"Evaluators directory not found: {evaluators_dir}", file=sys.stderr)
+        return 1
 
-    # 6. Resolve project and create run directories
+    plugin_id = _resolve_plugin(args, src, evaluators_dir)
+    if plugin_id is None:
+        return 1
+
+    source_file_count = _prescan_sources(args, evaluators_dir / plugin_id, src)
     _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
     print(f"Report path: {evaluation_dir}")
 
-    # 7. Build config and run
     standards_dir = default_paths().standards_dir
-    dimensions_filter = None
-    if args.dimensions:
-        dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()]
-
-    if dimensions_filter:
-        print(f"Dimensions: {', '.join(dimensions_filter)}")
-    else:
-        print("Dimensions: all")
+    dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
+    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
 
     config = RunConfig(
         src=src,
@@ -170,8 +164,6 @@ def run_evaluate(args: argparse.Namespace) -> int:
 
     try:
         if args.evidence_only:
-            import json
-
             evidence = run(config)
             out_file = evidence_dir / f"{plugin_id}_evidence.json"
             out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2))
