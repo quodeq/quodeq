@@ -2,7 +2,7 @@ from pathlib import Path
 import json
 import sys
 
-from codecompass.action_provider_fs import FilesystemActionProvider
+from quodeq.action_provider_fs import FilesystemActionProvider
 
 
 def _write_json(path: Path, payload: dict) -> None:
@@ -102,7 +102,7 @@ def test_start_evaluation_uses_cli_module(tmp_path: Path) -> None:
     assert captured["cmd"][:5] == [
         sys.executable,
         "-m",
-        "codecompass.cli",
+        "quodeq.cli",
         "evaluate",
         str(repo_path.resolve()),
     ]

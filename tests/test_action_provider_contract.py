@@ -1,5 +1,5 @@
-from codecompass.action_provider import ActionProvider
-from codecompass.action_provider_fs import FilesystemActionProvider
+from quodeq.action_provider import ActionProvider
+from quodeq.action_provider_fs import FilesystemActionProvider
 
 
 def test_action_provider_contract_methods():

@@ -7,8 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from codecompass.engine.runner import run, run_full, RunConfig, _merge_evidence
-from codecompass.engine.evidence import Evidence, PrincipleEvidence
+from quodeq.engine.runner import run, run_full, RunConfig, _merge_evidence
+from quodeq.engine.evidence import Evidence, PrincipleEvidence
 
 
 def _make_plugin_dir(base: Path) -> Path:
@@ -79,7 +79,7 @@ class TestRun:
         with pytest.raises(ValueError, match="not found"):
             run(config)
 
-    @patch("codecompass.engine.runner.run_analysis")
+    @patch("quodeq.engine.runner.run_analysis")
     def test_end_to_end_with_mock(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -108,7 +108,7 @@ class TestRun:
         assert len(pe.compliance) == 1
         assert pe.metrics["is_balanced"] is True
 
-    @patch("codecompass.engine.runner.run_analysis")
+    @patch("quodeq.engine.runner.run_analysis")
     def test_empty_project(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -128,7 +128,7 @@ class TestRun:
         assert evidence.principles == {}
         assert evidence.coverage_pct == 0.0
 
-    @patch("codecompass.engine.runner.run_analysis")
+    @patch("quodeq.engine.runner.run_analysis")
     def test_invalid_stream_skipped(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -148,7 +148,7 @@ class TestRun:
         evidence = run(config)
         assert evidence.principles == {}
 
-    @patch("codecompass.engine.runner.run_analysis")
+    @patch("quodeq.engine.runner.run_analysis")
     def test_stream_files_created(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"

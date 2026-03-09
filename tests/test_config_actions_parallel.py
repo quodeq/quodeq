@@ -1,4 +1,4 @@
-from codecompass.config.actions import resolve_parallel
+from quodeq.config.actions import resolve_parallel
 
 
 def test_resolve_parallel_defaults_unlimited():

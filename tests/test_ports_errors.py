@@ -1,4 +1,4 @@
-from codecompass.ports.data_errors import AuthError, NotFoundError, NetworkError, ServerError, InvalidDataError
+from quodeq.ports.data_errors import AuthError, NotFoundError, NetworkError, ServerError, InvalidDataError
 
 
 def test_data_errors_are_distinct_types():

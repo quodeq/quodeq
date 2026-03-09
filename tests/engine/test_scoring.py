@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from codecompass.engine.evidence import Evidence, PrincipleEvidence
-from codecompass.engine.scoring import score_evidence
+from quodeq.engine.evidence import Evidence, PrincipleEvidence
+from quodeq.engine.scoring import score_evidence
 
 
 def _make_evidence(violations=None, compliance=None) -> Evidence:

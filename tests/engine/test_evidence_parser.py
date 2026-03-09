@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from codecompass.engine.evidence_parser import (
+from quodeq.engine.evidence_parser import (
     parse_jsonl_to_evidence,
     _parse_jsonl_line,
 )

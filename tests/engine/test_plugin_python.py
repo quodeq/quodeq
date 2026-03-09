@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from codecompass.engine.plugin_loader import load_plugin
-from codecompass.engine.schema_validator import validate_plugin_dir
+from quodeq.engine.plugin_loader import load_plugin
+from quodeq.engine.schema_validator import validate_plugin_dir
 
 PLUGIN_DIR = Path(__file__).parent.parent.parent / "evaluators" / "python"
 

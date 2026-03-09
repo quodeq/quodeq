@@ -1,5 +1,5 @@
-from codecompass.config.paths import ConfigPaths
-from codecompass.config.validation import validate_evaluators
+from quodeq.config.paths import ConfigPaths
+from quodeq.config.validation import validate_evaluators
 
 
 def test_validate_evaluators_reports_missing(tmp_path):

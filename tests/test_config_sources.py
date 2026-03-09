@@ -1,4 +1,4 @@
-from codecompass.config.sources import has_required_sources_table
+from quodeq.config.sources import has_required_sources_table
 
 
 def test_sources_table_detection():

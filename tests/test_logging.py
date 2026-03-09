@@ -1,4 +1,4 @@
-from codecompass.logging import log_info, log_debug
+from quodeq.logging import log_info, log_debug
 
 
 def test_log_info_format(capsys):

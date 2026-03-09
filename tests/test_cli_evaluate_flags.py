@@ -1,4 +1,4 @@
-from codecompass.cli import build_parser
+from quodeq.cli import build_parser
 
 
 def test_evaluate_flags():
