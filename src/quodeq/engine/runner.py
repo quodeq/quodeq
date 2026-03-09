@@ -23,9 +23,9 @@ from quodeq.engine.analysis import (
     run_analysis,
 )
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
-from quodeq.engine.evidence_parser import parse_jsonl_to_evidence
+from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.engine.plugin_loader import load_plugin_full
-from quodeq.engine.prompt_builder import build_analysis_prompt, load_template
+from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 
 
 @dataclass
@@ -100,14 +100,16 @@ def run(config: RunConfig) -> Evidence:
         print(f"→ [{idx}/{total}] Analyzing {dimension}", flush=True)
         prompt = build_analysis_prompt(
             template,
-            plugin_id=config.plugin_id,
-            repo_name=str(config.src),
-            date_str=date_str,
-            dimension=dimension,
-            source_file_count=config.source_file_count,
-            dimensions_data=full["dimensions"],
-            analysis_md=analysis_md,
-            standards_dir=config.standards_dir,
+            PromptContext(
+                plugin_id=config.plugin_id,
+                repo_name=str(config.src),
+                date_str=date_str,
+                dimension=dimension,
+                source_file_count=config.source_file_count,
+                dimensions_data=full["dimensions"],
+                analysis_md=analysis_md,
+                standards_dir=config.standards_dir,
+            ),
         )
 
         stream_file = work_dir / f"{dimension}_live.stream"
@@ -143,11 +145,13 @@ def run(config: RunConfig) -> Evidence:
 
         ev = parse_jsonl_to_evidence(
             jsonl_file,
-            plugin_id=config.plugin_id,
-            repository=str(config.src),
-            date_str=date_str,
-            source_file_count=config.source_file_count,
-            files_read=files_read,
+            EvidenceContext(
+                plugin_id=config.plugin_id,
+                repository=str(config.src),
+                date_str=date_str,
+                source_file_count=config.source_file_count,
+                files_read=files_read,
+            ),
             standards_dir=config.standards_dir,
         )
         ev.plugin_name = full["plugin"].get("name", config.plugin_id)
@@ -188,14 +192,16 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
         print(f"→ [{idx}/{total}] Analyzing {dimension}", flush=True)
         prompt = build_analysis_prompt(
             template,
-            plugin_id=config.plugin_id,
-            repo_name=str(config.src),
-            date_str=date_str,
-            dimension=dimension,
-            source_file_count=config.source_file_count,
-            dimensions_data=full["dimensions"],
-            analysis_md=analysis_md,
-            standards_dir=config.standards_dir,
+            PromptContext(
+                plugin_id=config.plugin_id,
+                repo_name=str(config.src),
+                date_str=date_str,
+                dimension=dimension,
+                source_file_count=config.source_file_count,
+                dimensions_data=full["dimensions"],
+                analysis_md=analysis_md,
+                standards_dir=config.standards_dir,
+            ),
         )
 
         stream_file = work_dir / f"{dimension}_live.stream"
@@ -229,11 +235,13 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
 
         ev = parse_jsonl_to_evidence(
             jsonl_file,
-            plugin_id=config.plugin_id,
-            repository=str(config.src),
-            date_str=date_str,
-            source_file_count=config.source_file_count,
-            files_read=files_read,
+            EvidenceContext(
+                plugin_id=config.plugin_id,
+                repository=str(config.src),
+                date_str=date_str,
+                source_file_count=config.source_file_count,
+                files_read=files_read,
+            ),
             standards_dir=config.standards_dir,
         )
         ev.plugin_name = full["plugin"].get("name", config.plugin_id)
