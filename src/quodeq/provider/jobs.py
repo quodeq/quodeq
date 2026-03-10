@@ -16,6 +16,7 @@ import subprocess
 from quodeq.engine.runner import CC_MARKER_KEY
 
 MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
+_ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 
@@ -145,7 +146,7 @@ class JobManager:
         if line.startswith(_CC_MARKER_PREFIX):
             self._apply_marker(job, line)
             return
-        job.logs.append(line)
+        job.logs.append(_ANSI_RE.sub("", line))
         if len(job.logs) > MAX_LOG_LINES:
             job.logs[:] = job.logs[-MAX_LOG_LINES:]
         match = REPORT_PATH_RE.search(line)

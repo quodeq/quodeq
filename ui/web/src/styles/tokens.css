@@ -228,10 +228,9 @@
   --color-trend-down:        var(--primitive-ired-900);
   --color-trend-strong-down: var(--primitive-crimson-600);
 
-  /* Console — always dark (terminal convention) */
-  --color-console-bg:      #0d1117;
-  --color-console-text:    #cfdaea;
-  --color-console-success: #8bc34a;
+  /* Console — always dark (terminal convention); text auto-adapts to accent */
+  --color-console-bg:   #0d1117;
+  --color-console-text: color-mix(in srgb, var(--color-accent) 35%, #dce8f2);
 
   /* On-accent text (theme-invariant) */
   --color-on-accent: #ffffff;
@@ -429,9 +428,7 @@ html[data-theme="dark"]:root {
   --color-trend-strong-down: var(--primitive-crimson-200);
 
   /* Console — cool-dark tint */
-  --color-console-bg:      #060810;
-  --color-console-text:    #c8d2e0;
-  --color-console-success: var(--primitive-green-200);
+  --color-console-bg: #060810;
 
   /* Logo — monochrome light */
   --logo-q:              var(--primitive-brand-200);
@@ -586,9 +583,7 @@ html[data-theme="ember"]:root {
   --color-trend-strong-down: var(--primitive-crimson-300);
 
   /* Console — warm tint */
-  --color-console-bg:      #100c06;
-  --color-console-text:    #e8dece;
-  --color-console-success: var(--primitive-emerald-300);
+  --color-console-bg: #100c06;
 
   --shadow-sm: none;
   --shadow-md: none;
@@ -747,9 +742,7 @@ html[data-theme="midnight"]:root {
   --color-trend-strong-down: var(--primitive-crimson-300);
 
   /* Console — navy tint */
-  --color-console-bg:      #060c16;
-  --color-console-text:    #c8d8ee;
-  --color-console-success: var(--primitive-cyan-300);
+  --color-console-bg: #060c16;
 
   --shadow-sm: none;
   --shadow-md: none;

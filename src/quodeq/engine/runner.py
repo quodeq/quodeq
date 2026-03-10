@@ -70,15 +70,13 @@ def _emit_marker(phase: str, **kwargs: _MarkerFields) -> None:
     print(json.dumps({CC_MARKER_KEY: phase, **kwargs}), flush=True)
 
 
-def _make_heartbeat(dim_name: str, idx: int, total: int, src_count: int) -> Callable[[int, dict], None]:
+def _make_heartbeat(dim_name: str, idx: int, total: int) -> Callable[[int, dict], None]:
     """Return a heartbeat callback that prints progress to stdout."""
     def _cb(elapsed: int, progress: dict) -> None:
         secs = elapsed % 60
         mins = elapsed // 60
-        files = progress.get("files_read", 0)
         evidence = progress.get("evidence", 0)
-        pct_str = f" ({min(round(files / src_count * 100), 100)}%)" if src_count > 0 else ""
-        log_info(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {files} files{pct_str} | {evidence} findings")
+        log_info(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {evidence} findings")
     return _cb
 
 
@@ -131,7 +129,7 @@ def _run_dimension_analysis(
     stream_file = evidence_dir / f"{dim_id}_live.stream"
     jsonl_file = evidence_dir / f"{dim_id}_evidence.jsonl"
 
-    heartbeat = config.options.heartbeat_callback or _make_heartbeat(dim_id, idx, ctx.total, config.source_file_count)
+    heartbeat = config.options.heartbeat_callback or _make_heartbeat(dim_id, idx, ctx.total)
 
     ac_kwargs: dict[str, Any] = dict(
         jsonl_file=jsonl_file,
