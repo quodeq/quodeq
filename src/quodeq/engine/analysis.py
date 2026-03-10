@@ -190,17 +190,39 @@ def _run_with_heartbeat(
 
     Terminates the process if *max_duration* seconds elapse.
     Returns True if the process was terminated due to timeout.
+
+    Uses an incremental byte-offset reader so each heartbeat only processes
+    new bytes appended since the last read, avoiding repeated full-file scans.
     """
     elapsed = 0
     max_dur = config.max_duration
     timed_out = False
+    _stream_offset = 0
+    _seen_files: set[str] = set()
+
+    def _read_stream_incremental() -> dict:
+        nonlocal _stream_offset
+        try:
+            with open(stream_file, "rb") as f:
+                f.seek(_stream_offset)
+                new_bytes = f.read()
+                _stream_offset += len(new_bytes)
+            for line in new_bytes.decode("utf-8", errors="replace").splitlines():
+                data = _parse_stream_event(line)
+                if data is not None:
+                    _seen_files.update(_extract_files_from_event(data))
+        except (OSError, ValueError) as exc:
+            log_debug(f"Failed to read stream {stream_file}: {exc}")
+        evidence_count = _count_jsonl_lines(config.jsonl_file) if config.jsonl_file is not None else 0
+        return {"files_read": len(_seen_files), "evidence": evidence_count}
+
     while process.poll() is None:
         try:
             process.wait(timeout=config.heartbeat_interval)
         except subprocess.TimeoutExpired:
             elapsed += config.heartbeat_interval
             if config.heartbeat_callback:
-                progress = _count_stream_progress(stream_file, config.jsonl_file)
+                progress = _read_stream_incremental()
                 config.heartbeat_callback(elapsed, progress)
             if max_dur is not None and elapsed >= max_dur:
                 log_warning(f"Analysis exceeded max duration ({max_dur}s) — terminating")

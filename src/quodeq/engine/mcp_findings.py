@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
+from typing import TextIO
 
 _JSONRPC_VERSION = "2.0"
 _MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
@@ -81,7 +82,7 @@ def _handle_tools_list(request_id: object) -> dict:
     }]})
 
 
-def _handle_tools_call(request_id: object, params: dict, findings_file: str, counter: int) -> tuple[dict, int]:
+def _handle_tools_call(request_id: object, params: dict, findings_fh: TextIO, counter: int) -> tuple[dict, int]:
     """Handle the 'tools/call' JSON-RPC method.
 
     Returns (response_dict, updated_counter).
@@ -96,8 +97,8 @@ def _handle_tools_call(request_id: object, params: dict, findings_file: str, cou
         }), counter
 
     finding = {k: v for k, v in args.items() if v is not None}
-    with open(findings_file, "a") as f:
-        f.write(json.dumps(finding) + "\n")
+    findings_fh.write(json.dumps(finding) + "\n")
+    findings_fh.flush()
     counter += 1
 
     return _ok(request_id, {
@@ -112,7 +113,7 @@ def _handle_unknown_method(req_id: object, method: str) -> None:
                "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
 
 
-def _dispatch(msg: dict, findings_file: str, counter: int) -> int:
+def _dispatch(msg: dict, findings_fh: TextIO, counter: int) -> int:
     """Route a single JSON-RPC message and return the updated counter."""
     method = msg.get("method", "")
     req_id = msg.get("id")
@@ -124,7 +125,7 @@ def _dispatch(msg: dict, findings_file: str, counter: int) -> int:
     elif method == "tools/list":
         _send(_handle_tools_list(req_id))
     elif method == "tools/call":
-        response, counter = _handle_tools_call(req_id, msg.get("params", {}), findings_file, counter)
+        response, counter = _handle_tools_call(req_id, msg.get("params", {}), findings_fh, counter)
         _send(response)
     elif method == "ping":
         _send(_ok(req_id, {}))
@@ -142,11 +143,12 @@ def main() -> None:
         sys.exit(1)
 
     counter = 0
-    while True:
-        msg = _read_message()
-        if msg is None:
-            break
-        counter = _dispatch(msg, findings_file, counter)
+    with open(findings_file, "a") as findings_fh:
+        while True:
+            msg = _read_message()
+            if msg is None:
+                break
+            counter = _dispatch(msg, findings_fh, counter)
 
 
 if __name__ == "__main__":

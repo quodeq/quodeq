@@ -11,12 +11,16 @@ NUMERIC_GRADE_ORDER = ["Critical", "Poor", "Adequate", "Good", "Exemplary"]
 TEXT_GRADE_ORDER = GRADE_LADDER
 SEVERITIES = {"critical", "major", "minor", "unknown"}
 
+_SCORE_RE = re.compile(r"(\d+(?:\.\d+)?)")
+_NUMERIC_RANK: dict[str, int] = {g: i for i, g in enumerate(NUMERIC_GRADE_ORDER)}
+_TEXT_RANK: dict[str, int] = {g: i for i, g in enumerate(TEXT_GRADE_ORDER)}
+
 
 def parse_numeric_score(score_text: str | None) -> float | None:
     """Extract the first numeric value from a score string, or return None."""
     if not score_text:
         return None
-    match = re.search(r"(\d+(?:\.\d+)?)", str(score_text))
+    match = _SCORE_RE.search(str(score_text))
     if not match:
         return None
     return float(match.group(1))
@@ -24,11 +28,10 @@ def parse_numeric_score(score_text: str | None) -> float | None:
 
 def _grade_rank(grade: str) -> int:
     """Return the ordinal rank of a grade (higher is better), or -1 if unknown."""
-    if grade in NUMERIC_GRADE_ORDER:
-        return NUMERIC_GRADE_ORDER.index(grade)
-    if grade in TEXT_GRADE_ORDER:
-        return TEXT_GRADE_ORDER.index(grade)
-    return -1
+    rank = _NUMERIC_RANK.get(grade)
+    if rank is not None:
+        return rank
+    return _TEXT_RANK.get(grade, -1)
 
 
 def most_frequent_grade(grades: list[str]) -> str | None:

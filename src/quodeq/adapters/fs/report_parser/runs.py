@@ -7,7 +7,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
 from quodeq.shared.logging import log_debug
@@ -193,17 +193,40 @@ def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
     return run_infos
 
 
-def _get_previous_run_for_dimension(reports_root: Path, project: str, current_run_id: str, dimension: str) -> dict[str, Any] | None:
-    """Return the most recent run data for *dimension* before *current_run_id*, or None."""
+def _get_previous_run_for_dimension(
+    reports_root: Path,
+    project: str,
+    current_run_id: str,
+    dimension: str,
+    *,
+    cached_runs: list[RunInfo] | None = None,
+    get_run_data: Callable[[str], list[dict[str, Any]]] | None = None,
+) -> dict[str, Any] | None:
+    """Return the most recent run data for *dimension* before *current_run_id*, or None.
+
+    Callers processing multiple dimensions for the same project should pass
+    *cached_runs* (the result of a single list_runs call) and *get_run_data*
+    (a dict-backed callable) to share I/O across calls rather than repeating
+    the directory scan and file reads for each dimension.
+    """
     project_path = reports_root / project
     if not project_path.exists():
         return None
-    all_runs = list_runs(reports_root, project)
+    all_runs = cached_runs if cached_runs is not None else list_runs(reports_root, project)
     current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
     if current_idx < 0:
         return None
+    _data_cache: dict[str, list[dict[str, Any]]] = {}
+
+    def _fetch(run_id: str) -> list[dict[str, Any]]:
+        if get_run_data is not None:
+            return get_run_data(run_id)
+        if run_id not in _data_cache:
+            _data_cache[run_id] = read_run_data(reports_root, project, run_id)
+        return _data_cache[run_id]
+
     for run_info in all_runs[current_idx + 1:]:
-        dims = read_run_data(reports_root, project, run_info.run_id)
+        dims = _fetch(run_info.run_id)
         dim = next((d for d in dims if d.get("dimension") == dimension), None)
         if dim:
             return {"runId": run_info.run_id, "dimension": dim}

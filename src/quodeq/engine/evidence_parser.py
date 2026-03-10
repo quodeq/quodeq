@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
@@ -26,6 +27,7 @@ class EvidenceContext:
     files_read: int
 
 
+@lru_cache(maxsize=None)
 def _build_cwe_name_lookup(standards_dir: Path) -> dict[int, str]:
     """Build CWE ID -> name from all compiled standards files."""
     lookup: dict[int, str] = {}

@@ -1,15 +1,16 @@
 """Route registration helpers for the action API."""
 from __future__ import annotations
 
-import io
 import logging
+import os
 import re
+import tempfile
 import zipfile
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, jsonify, request, send_file, send_from_directory
+from flask import Flask, Response, after_this_request, jsonify, request, send_file, send_from_directory
 
 from quodeq.provider.base import ActionProvider
 from quodeq.shared.utils import get_evaluations_dir
@@ -39,21 +40,25 @@ def _reports_dir() -> str:
     return str(resolved)
 
 
-def _build_project_zip(project_path: Path) -> io.BytesIO:
-    """Create an in-memory zip archive of a project directory."""
-    buf = io.BytesIO()
+def _build_project_zip(project_path: Path) -> Path:
+    """Create a temporary zip archive of a project directory and return its path."""
+    fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="quodeq_export_")
+    os.close(fd)
     total_size = 0
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        for file_entry in project_path.rglob("*"):
-            if file_entry.is_symlink():
-                continue
-            if file_entry.is_file():
-                total_size += file_entry.stat().st_size
-                if total_size > _MAX_ZIP_SIZE_BYTES:
-                    raise ValueError("Project exceeds maximum export size")
-                zf.write(file_entry, file_entry.relative_to(project_path.parent))
-    buf.seek(0)
-    return buf
+    try:
+        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for file_entry in project_path.rglob("*"):
+                if file_entry.is_symlink():
+                    continue
+                if file_entry.is_file():
+                    total_size += file_entry.stat().st_size
+                    if total_size > _MAX_ZIP_SIZE_BYTES:
+                        raise ValueError("Project exceeds maximum export size")
+                    zf.write(file_entry, file_entry.relative_to(project_path.parent))
+    except ValueError:
+        os.unlink(tmp_path)
+        raise
+    return Path(tmp_path)
 
 
 def _export_project_zip(project: str, reports_dir: str) -> Response | tuple[Response, int]:
@@ -63,11 +68,20 @@ def _export_project_zip(project: str, reports_dir: str) -> Response | tuple[Resp
         body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status
     try:
-        buf = _build_project_zip(project_path)
+        tmp_path = _build_project_zip(project_path)
     except ValueError:
         body, status = _error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
         return jsonify(body), status
-    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")
+
+    @after_this_request
+    def _cleanup(response: Response) -> Response:
+        try:
+            os.unlink(str(tmp_path))
+        except OSError:
+            pass
+        return response
+
+    return send_file(str(tmp_path), mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")
 
 
 def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:

@@ -6,7 +6,6 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
-from quodeq.engine.analysis import count_files_from_stream
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 
 
@@ -145,6 +144,24 @@ def _parse_entries_from_texts(
     return violations, compliance
 
 
+def _extract_files_from_stream_event(event: dict) -> set[str]:
+    """Extract file paths from Read/Grep tool_use blocks in a stream event."""
+    files: set[str] = set()
+    etype = event.get("type", "")
+    if etype == "assistant":
+        blocks = event.get("message", {}).get("content", [])
+    elif etype == "item.completed":
+        blocks = event.get("item", {}).get("content", [])
+    else:
+        return files
+    for block in blocks:
+        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
+            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
+            if fp:
+                files.add(fp)
+    return files
+
+
 def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a live-stream event log file."""
     try:
@@ -154,6 +171,7 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
     violations: list[dict[str, Any]] = []
     compliance: list[dict[str, Any]] = []
     seen: set[str] = set()
+    files_read: set[str] = set()
     for raw_line in content.splitlines():
         stripped = raw_line.strip()
         if not stripped:
@@ -167,8 +185,8 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
         new_v, new_c = _parse_entries_from_texts(texts, ctx.dimension, seen)
         violations.extend(new_v)
         compliance.extend(new_c)
+        files_read.update(_extract_files_from_stream_event(event))
 
-    files_read = count_files_from_stream(stream_path)
     return {
         "dimension": ctx.dimension,
         "runId": ctx.run_id,
@@ -177,7 +195,7 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
         "compliance": compliance,
         "partial": True,
         "progress": {
-            "filesRead": files_read,
+            "filesRead": len(files_read),
             "violations": len(violations),
             "compliance": len(compliance),
         },

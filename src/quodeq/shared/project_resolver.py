@@ -6,6 +6,8 @@ import uuid
 from dataclasses import dataclass
 from pathlib import Path
 
+_INDEX_FILE = "project_index.json"
+
 
 @dataclass(frozen=True)
 class ProjectIdentity:
@@ -16,8 +18,38 @@ class ProjectIdentity:
     location: str = "local"
 
 
+def _index_key(identity: ProjectIdentity) -> str:
+    """Return a stable string key for the (name, path) pair."""
+    return f"{identity.project_name}\x00{identity.repo_path}"
+
+
+def _load_index(reports_dir: Path) -> dict[str, str]:
+    """Load the project index file, returning an empty dict on missing/corrupt file."""
+    try:
+        return json.loads((reports_dir / _INDEX_FILE).read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
+def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
+    """Write the project index file."""
+    (reports_dir / _INDEX_FILE).write_text(json.dumps(index, indent=2))
+
+
 def _find_existing_project(reports_dir: Path, identity: ProjectIdentity) -> str | None:
-    """Search reports_dir for a project directory matching *identity*."""
+    """Look up project by (name, path) in the index; fall back to directory scan for
+    projects created before the index existed, updating the index on success."""
+    key = _index_key(identity)
+    index = _load_index(reports_dir)
+    if key in index:
+        # Verify the directory still exists (guard against manual deletion)
+        if (reports_dir / index[key]).is_dir():
+            return index[key]
+        # Index is stale — remove the entry and fall through to scan
+        del index[key]
+        _save_index(reports_dir, index)
+
+    # Legacy scan: find projects created before the index was introduced
     for entry in reports_dir.iterdir():
         if not entry.is_dir() or entry.name.startswith("."):
             continue
@@ -29,12 +61,15 @@ def _find_existing_project(reports_dir: Path, identity: ProjectIdentity) -> str 
         except (json.JSONDecodeError, OSError):
             continue
         if info.get("name") == identity.project_name and info.get("path") == identity.repo_path:
+            # Back-fill the index so future lookups are O(1)
+            index[key] = entry.name
+            _save_index(reports_dir, index)
             return entry.name
     return None
 
 
 def _create_project(reports_dir: Path, identity: ProjectIdentity) -> str:
-    """Create a new UUID project directory and write repository_info.json."""
+    """Create a new UUID project directory, write repository_info.json, and index it."""
     project_uuid = str(uuid.uuid4())
     project_dir = reports_dir / project_uuid
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -46,6 +81,9 @@ def _create_project(reports_dir: Path, identity: ProjectIdentity) -> str:
         "path": identity.repo_path,
     }
     (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
+    index = _load_index(reports_dir)
+    index[_index_key(identity)] = project_uuid
+    _save_index(reports_dir, index)
     return project_uuid
 
 
