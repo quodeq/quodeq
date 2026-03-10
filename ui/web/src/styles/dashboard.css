@@ -1456,10 +1456,6 @@
 }
 
 @media (max-width: 1180px) {
-  .app-shell {
-    grid-template-columns: 300px 1fr;
-  }
-
   .metrics-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
