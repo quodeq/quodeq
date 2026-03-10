@@ -11,7 +11,7 @@ const PHRASES = [
   'quality covers <b>reliability</b>, <b>security</b>, <b>maintainability</b>, <b>performance</b>, and more',
 ];
 
-const AUTO_ADVANCE_MS = 5000;
+const AUTO_ADVANCE_MS = 7000;
 const TRANSITION_MS = 180;
 
 export default function SettingsAside() {
