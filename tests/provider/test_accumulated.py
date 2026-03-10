@@ -11,7 +11,6 @@ from quodeq.provider.accumulated import (
     _aggregate_severity_counts,
     _compute_accumulated_scores,
     _compute_accumulated_trends,
-    _find_previous_run,
     numeric_average,
     _read_all_run_data,
     compute_accumulated,
@@ -106,31 +105,6 @@ class TestAggregateSeverityCounts:
         result = _aggregate_severity_counts([])
         assert result["totalViolations"] == 0
         assert result["critical"] == 0
-
-
-# ---------------------------------------------------------------------------
-# _find_previous_run
-# ---------------------------------------------------------------------------
-
-class TestFindPreviousRun:
-    def test_finds_previous(self):
-        runs = ["run3", "run2", "run1"]
-        all_data = {
-            "run3": [_dim("maintainability")],
-            "run2": [_dim("security")],
-            "run1": [_dim("maintainability", "6.0")],
-        }
-        result = _find_previous_run("maintainability", "run3", runs, all_data)
-        assert result is not None
-        assert result["runId"] == "run1"
-
-    def test_returns_none_when_no_previous(self):
-        runs = ["run1"]
-        all_data = {"run1": [_dim("maintainability")]}
-        assert _find_previous_run("maintainability", "run1", runs, all_data) is None
-
-    def test_returns_none_for_unknown_run(self):
-        assert _find_previous_run("x", "unknown", ["run1"], {"run1": []}) is None
 
 
 # ---------------------------------------------------------------------------

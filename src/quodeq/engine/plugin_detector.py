@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from collections import Counter
 from pathlib import Path
 
 
@@ -29,14 +30,23 @@ def _detect_by_config_files(plugins: list[dict], src: Path) -> str | None:
 
 
 def _detect_by_extension_count(plugins: list[dict], src: Path) -> str | None:
-    """Pass 2: return the plugin whose file extensions are most prevalent, or None."""
+    """Pass 2: return the plugin whose file extensions are most prevalent, or None.
+
+    Performs a single rglob traversal to collect suffix counts, then scores each
+    plugin in O(1) per extension — O(n) total regardless of plugin count.
+    """
+    suffix_counts: Counter[str] = Counter(
+        p.suffix for p in src.rglob("*") if p.is_file() and p.suffix
+    )
+    if not suffix_counts:
+        return None
     best_id: str | None = None
     best_count = 0
     for data in plugins:
         exts = set(data.get("detects", {}).get("extensions", []))
         if not exts:
             continue
-        count = count_source_files(src, exts)
+        count = sum(suffix_counts.get(ext, 0) for ext in exts)
         if count > best_count:
             best_count = count
             best_id = data.get("id", "")

@@ -6,6 +6,7 @@ import os
 import urllib.error
 import urllib.request
 import urllib.parse
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
 from pathlib import Path
 
@@ -147,8 +148,7 @@ def _fetch_cursor_rules_repos(runtime: str, min_stars: int) -> list[dict]:
 
 
 def _fetch_repo_content(repos: list[dict]) -> list[str]:
-    samples = []
-    for repo in repos:
+    def _try_repo(repo: dict) -> str | None:
         for filename in (".cursorrules", "cursor-rules.md", ".cursor/rules/main.mdc"):
             url = (
                 f"{get_github_raw_base_url()}/{repo['name']}"
@@ -157,9 +157,19 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
             content = _fetch_url(url)
             if content:
                 header = f"# Source: {repo['name']} ({repo['stars']} stars)\n\n"
-                samples.append(header + content[:_CONTENT_SAMPLE_LIMIT])
-                break
-    return samples
+                return header + content[:_CONTENT_SAMPLE_LIMIT]
+        return None
+
+    results: dict[str, str] = {}
+    with ThreadPoolExecutor(max_workers=len(repos)) as executor:
+        future_to_repo = {executor.submit(_try_repo, repo): repo for repo in repos}
+        for future in as_completed(future_to_repo):
+            repo = future_to_repo[future]
+            result = future.result()
+            if result:
+                results[repo["name"]] = result
+
+    return [results[repo["name"]] for repo in repos if repo["name"] in results]
 
 
 def _fetch_url(url: str, headers: dict | None = None) -> str | None:

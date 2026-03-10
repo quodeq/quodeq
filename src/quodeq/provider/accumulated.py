@@ -16,50 +16,58 @@ from quodeq.adapters.fs.report_parser import (
 
 def _read_all_run_data(
     reports_root: Path, project: str, all_run_infos: list[RunInfo], runs: list[str],
-) -> tuple[dict[str, list[dict[str, Any]]], dict[str, dict[str, Any]]]:
-    """Pre-read all run data and build the latest-by-dimension lookup."""
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    """Build accumulated data structures in a single sequential pass.
+
+    Returns:
+        latest_by_dimension: most recent dimension data, keyed by dimension name.
+        prev_occurrence: for each dimension, its data from the next-older run
+            (used for trend computation — replaces the O(n²) _find_previous_run).
+        prev_run_latest: most recent dimension data from runs[1:] (for previous average).
+    """
     run_lookup = {r.run_id: r for r in all_run_infos}
-    all_run_data: dict[str, list[dict[str, Any]]] = {}
     latest_by_dimension: dict[str, dict[str, Any]] = {}
-    for run_id in runs:
+    prev_occurrence: dict[str, dict[str, Any]] = {}
+    prev_run_latest_map: dict[str, dict[str, Any]] = {}
+
+    for run_idx_i, run_id in enumerate(runs):
         dims = read_run_data(reports_root, project, run_id)
-        all_run_data[run_id] = dims
         run_info = run_lookup.get(run_id)
+        is_first_run = (run_idx_i == 0)
+
         for dim in dims:
             dim_name = dim.get("dimension")
-            if dim_name and dim_name not in latest_by_dimension:
+            if not dim_name:
+                continue
+            if dim_name not in latest_by_dimension:
                 latest_by_dimension[dim_name] = {
                     **dim,
                     "fromRunId": run_id,
                     "fromDateISO": run_info.date_iso if run_info else None,
                     "fromDateLabel": run_info.date_label if run_info else None,
                 }
-    return all_run_data, latest_by_dimension
+            elif dim_name not in prev_occurrence:
+                prev_occurrence[dim_name] = {"runId": run_id, "dimension": dim}
 
+            if not is_first_run and dim_name not in prev_run_latest_map:
+                prev_run_latest_map[dim_name] = dim
 
-def _find_previous_run(
-    dim_name: str, from_run: str, runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
-) -> dict[str, Any] | None:
-    """Find the previous run containing *dim_name* after *from_run*."""
-    from_idx = runs.index(from_run) if from_run in runs else -1
-    if from_idx < 0:
-        return None
-    for rid in runs[from_idx + 1:]:
-        found = next((x for x in all_run_data.get(rid, []) if x.get("dimension") == dim_name), None)
-        if found:
-            return {"runId": rid, "dimension": found}
-    return None
+    return latest_by_dimension, prev_occurrence, list(prev_run_latest_map.values())
 
 
 def _compute_accumulated_trends(
-    all_dimensions: list[dict[str, Any]], runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
+    all_dimensions: list[dict[str, Any]],
+    prev_occurrence: dict[str, dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Compute trend data for each accumulated dimension."""
+    """Compute trend data for each accumulated dimension using pre-built prev_occurrence."""
     result = []
     for dim in all_dimensions:
-        from_run = dim.get("fromRunId")
-        previous = _find_previous_run(dim.get("dimension"), from_run, runs, all_run_data) if from_run else None
-        trend = calculate_trend(dim.get("overallScore"), previous.get("dimension", {}).get("overallScore") if previous else None)
+        dim_name = dim.get("dimension")
+        previous = prev_occurrence.get(dim_name) if dim_name else None
+        trend = calculate_trend(
+            dim.get("overallScore"),
+            previous.get("dimension", {}).get("overallScore") if previous else None,
+        )
         result.append(
             {
                 **dim,
@@ -102,27 +110,12 @@ def numeric_average(dimensions: list[dict[str, Any]]) -> float | None:
     return round(sum(numeric) / len(numeric), 1) if numeric else None
 
 
-def _collect_previous_latest(
-    runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
-) -> list[dict[str, Any]]:
-    """Collect the most recent dimension data from all runs except the first."""
-    prev_latest: dict[str, dict[str, Any]] = {}
-    for run_id in runs[1:]:
-        for dim in all_run_data[run_id]:
-            dim_name = dim.get("dimension")
-            if dim_name and dim_name not in prev_latest:
-                prev_latest[dim_name] = dim
-    return list(prev_latest.values())
-
-
 def _compute_accumulated_scores(
-    all_dimensions: list[dict[str, Any]], runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
+    all_dimensions: list[dict[str, Any]], prev_run_latest: list[dict[str, Any]],
 ) -> tuple[float | None, float | None]:
     """Compute current and previous overall average scores."""
     avg_score = numeric_average(all_dimensions)
-    prev_avg_score = None
-    if len(runs) >= 2:
-        prev_avg_score = numeric_average(_collect_previous_latest(runs, all_run_data))
+    prev_avg_score = numeric_average(prev_run_latest) if prev_run_latest else None
     return avg_score, prev_avg_score
 
 
@@ -141,11 +134,13 @@ def compute_accumulated(reports_dir: str, project: str, as_of: str | None) -> di
     if not runs:
         return None
 
-    all_run_data, latest_by_dimension = _read_all_run_data(reports_root, project, all_run_infos, runs)
+    latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
+        reports_root, project, all_run_infos, runs
+    )
     all_dimensions = list(latest_by_dimension.values())
-    dimensions_with_trend = _compute_accumulated_trends(all_dimensions, runs, all_run_data)
+    dimensions_with_trend = _compute_accumulated_trends(all_dimensions, prev_occurrence)
     severity = _aggregate_severity_counts(all_dimensions)
-    avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, runs, all_run_data)
+    avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, prev_run_latest)
 
     return {
         "project": project,

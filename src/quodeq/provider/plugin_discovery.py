@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from typing import Any
 
 from quodeq.engine.plugin_loader import scan_plugin_dirs
 
 
+@lru_cache(maxsize=1)
 def discover_plugins() -> list[dict[str, Any]]:
     """Scan the evaluators directory and return plugin metadata."""
     from quodeq.config.paths import default_paths

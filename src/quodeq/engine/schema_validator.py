@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from functools import lru_cache
 from pathlib import Path
 
 import jsonschema
@@ -9,6 +10,7 @@ import jsonschema
 _SCHEMAS_DIR = Path(__file__).parent / "schemas"
 
 
+@lru_cache(maxsize=None)
 def _load_schema(name: str) -> dict:
     return json.loads((_SCHEMAS_DIR / name).read_text())
 

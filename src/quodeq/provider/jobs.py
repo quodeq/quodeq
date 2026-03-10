@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from collections import deque
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import os
@@ -16,6 +17,7 @@ import subprocess
 from quodeq.engine.runner import CC_MARKER_KEY
 
 MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
+_MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
@@ -31,9 +33,9 @@ class Job:
     started_at: str
     ended_at: str | None
     exit_code: int | None
-    logs: list[str]
-    output_project: str | None
-    output_run_id: str | None
+    logs: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_LOG_LINES))
+    output_project: str | None = None
+    output_run_id: str | None = None
     phase: str | None = None
     current_dimension: str | None = None
     dimensions: list[str] | None = None
@@ -75,9 +77,6 @@ class JobManager:
             started_at=datetime.now(timezone.utc).isoformat(),
             ended_at=None,
             exit_code=None,
-            logs=[],
-            output_project=None,
-            output_run_id=None,
         )
 
         process = self._spawn(
@@ -147,8 +146,6 @@ class JobManager:
             self._apply_marker(job, line)
             return
         job.logs.append(_ANSI_RE.sub("", line))
-        if len(job.logs) > MAX_LOG_LINES:
-            job.logs[:] = job.logs[-MAX_LOG_LINES:]
         match = REPORT_PATH_RE.search(line)
         if match:
             job.output_project = match.group(1)
@@ -165,6 +162,14 @@ class JobManager:
                     return
                 self._append_log(job, stripped)
 
+    def _evict_completed_jobs(self) -> None:
+        """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
+        completed = [jid for jid, j in self._jobs.items() if j.status != "running"]
+        excess = len(completed) - _MAX_COMPLETED_JOBS
+        if excess > 0:
+            for jid in completed[:excess]:
+                del self._jobs[jid]
+
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
         exit_code = process.wait()
         with self._lock:
@@ -175,3 +180,4 @@ class JobManager:
             job.exit_code = exit_code
             job.ended_at = datetime.now(timezone.utc).isoformat()
             job.status = "done" if exit_code == 0 else "failed"
+            self._evict_completed_jobs()

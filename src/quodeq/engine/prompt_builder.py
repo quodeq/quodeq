@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from functools import lru_cache
 from pathlib import Path
 
 from quodeq.config.prompt_templates import render_template
@@ -107,10 +108,16 @@ class PromptContext:
     standards_dir: Path | None = None
 
 
+@lru_cache(maxsize=None)
+def _template_hash(template: str) -> str:
+    """Return a short hash of the template string, computed once per unique template."""
+    return hashlib.sha256(template.encode()).hexdigest()[:12]
+
+
 def build_analysis_prompt(template: str, context: PromptContext) -> str:
     """Build a complete per-dimension analysis prompt from the template."""
     dimensions_text = render_dimensions(context.dimensions_data, context.dimension, context.standards_dir)
-    prompt_hash = hashlib.sha256(template.encode()).hexdigest()[:12]
+    prompt_hash = _template_hash(template)
 
     standards_checklist = "_No compiled standards available._"
     if context.standards_dir:

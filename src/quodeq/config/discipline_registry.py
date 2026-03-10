@@ -125,6 +125,11 @@ class DisciplineRegistry:
 
     disciplines: dict[str, DisciplineRule]
 
+    def __post_init__(self) -> None:
+        self._sorted_disciplines: list[DisciplineRule] = sorted(
+            self.disciplines.values(), key=lambda rule: rule.detect_priority
+        )
+
     @classmethod
     def from_file(cls, path: Path) -> "DisciplineRegistry":
         """Parse an INI-style disciplines.conf file into a registry."""
@@ -152,7 +157,7 @@ class DisciplineRegistry:
 
     def iter_disciplines(self) -> Iterable[DisciplineRule]:
         """Yield all discipline rules sorted by detection priority."""
-        return sorted(self.disciplines.values(), key=lambda rule: rule.detect_priority)
+        return self._sorted_disciplines
 
     def _file_contains(self, path: Path, needle: str) -> bool:
         try:
