@@ -7,7 +7,7 @@ from typing import Any
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
 from quodeq.engine.analysis import count_files_from_stream
-from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base
+from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 
 
 def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
@@ -81,7 +81,6 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, ctx:
 
 def _build_violation_from_principle(violation: dict, label: str) -> dict[str, Any]:
     """Build a normalized violation dict from a principle's violation entry."""
-    from quodeq.provider.violation_context import format_file_line
     return build_finding_base(FindingSpec(
         principle=label,
         file=format_file_line(violation.get("file"), violation.get("line")),

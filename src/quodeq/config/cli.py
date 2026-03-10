@@ -55,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     paths = default_paths(version=args.data_version)
 
-    _HANDLERS: list[tuple[str, Callable]] = [
+    handlers: list[tuple[str, Callable]] = [
         ("generate_maps",       lambda v: run_generate_evaluators(v, paths) or 0),
         ("generate_dimensions", lambda _: (run_generate_dimensions(paths), 0)[1]),
         ("check_sources",       lambda v: check_sources(v, paths)),
@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> int:
         ("refresh_standards",   lambda _: run_refresh_standards(paths, dry_run=args.dry_run)),
         ("scaffold_plugin",     lambda v: run_scaffold_plugin(v, paths)),
     ]
-    for attr, handler in _HANDLERS:
+    for attr, handler in handlers:
         value = getattr(args, attr, None)
         if value is not None and value is not False:
             return handler(value)

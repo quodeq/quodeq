@@ -95,7 +95,7 @@ def _aggregate_severity_counts(all_dimensions: list[dict[str, Any]]) -> dict[str
     }
 
 
-def _numeric_average(dimensions: list[dict[str, Any]]) -> float | None:
+def numeric_average(dimensions: list[dict[str, Any]]) -> float | None:
     """Compute the average numeric score from a list of dimension dicts."""
     raw = [d.get("overallScore") for d in dimensions if d.get("overallScore")]
     numeric = [s for s in (parse_numeric_score(v) for v in raw) if s is not None]
@@ -119,10 +119,10 @@ def _compute_accumulated_scores(
     all_dimensions: list[dict[str, Any]], runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
 ) -> tuple[float | None, float | None]:
     """Compute current and previous overall average scores."""
-    avg_score = _numeric_average(all_dimensions)
+    avg_score = numeric_average(all_dimensions)
     prev_avg_score = None
     if len(runs) >= 2:
-        prev_avg_score = _numeric_average(_collect_previous_latest(runs, all_run_data))
+        prev_avg_score = numeric_average(_collect_previous_latest(runs, all_run_data))
     return avg_score, prev_avg_score
 
 

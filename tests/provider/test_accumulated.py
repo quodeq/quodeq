@@ -12,7 +12,7 @@ from quodeq.provider.accumulated import (
     _compute_accumulated_scores,
     _compute_accumulated_trends,
     _find_previous_run,
-    _numeric_average,
+    numeric_average,
     _read_all_run_data,
     compute_accumulated,
 )
@@ -64,19 +64,19 @@ def _setup_project(tmp_path: Path, project: str, runs: list[tuple[str, list[dict
 class TestNumericAverage:
     def test_computes_average(self):
         dims = [_dim("a", "8.0"), _dim("b", "6.0")]
-        assert _numeric_average(dims) == 7.0
+        assert numeric_average(dims) == 7.0
 
     def test_returns_none_for_empty(self):
-        assert _numeric_average([]) is None
+        assert numeric_average([]) is None
 
     def test_skips_none_scores(self):
         dims = [_dim("a", "8.0"), {"dimension": "b", "overallScore": None}]
-        assert _numeric_average(dims) == 8.0
+        assert numeric_average(dims) == 8.0
 
     def test_handles_grade_strings(self):
         dims = [_dim("a", "A"), _dim("b", "9.0")]
         # "A" is not numeric, should be skipped
-        result = _numeric_average(dims)
+        result = numeric_average(dims)
         assert result == 9.0
 
 

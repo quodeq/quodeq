@@ -1,4 +1,14 @@
-"""Dashboard runner — builds the UI, starts the action API, and serves the dashboard."""
+"""Dashboard runner — builds the UI, starts the action API, and serves the dashboard.
+
+Key functions and their contracts:
+- validate_paths: verifies required directories/files exist before serving.
+- _kill_stale_action_api: terminates a previously-recorded action API process via
+  PID file; waits up to _STALE_KILL_DEADLINE_S for the port to free.
+- _ensure_action_api: finds a free port, spawns the action API, and waits for it
+  to become healthy; returns (base_url, process) or (base_url, None) if already up.
+- _ensure_action_api_forced: like _ensure_action_api but uses an exact port; raises
+  RuntimeError if the port is occupied by a non-healthy process.
+"""
 from __future__ import annotations
 
 from pathlib import Path
@@ -47,7 +57,6 @@ def validate_paths(config: DashboardConfig) -> None:
             )
     if not (config.static_dist / "index.html").exists():
         raise FileNotFoundError("Static dist missing index.html. Run without --no-build to build.")
-
 
 
 def _is_port_open(host: str, port: int) -> bool:
@@ -156,7 +165,6 @@ def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = N
     return _spawn_and_wait(port, base_url, static_dist)
 
 
-
 def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     """Resolve paths, choose a free port, and run npm build if needed.
 
@@ -211,7 +219,7 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
             except subprocess.TimeoutExpired:
                 action_api_process.kill()
 
-    def _handle_tstp(signum, frame) -> None:
+    def _handle_tstp(_signum, _frame) -> None:
         _stop_children()
         sys.exit(0)
 

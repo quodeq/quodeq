@@ -16,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from quodeq.shared.logging import log_debug
+from quodeq.shared.logging import log_debug, log_warning
 from quodeq.shared.utils import get_ai_cmd, get_ai_model
 
 HeartbeatCallback = Callable[[int, dict], None]
@@ -129,8 +129,10 @@ def count_files_from_stream(stream_file: Path) -> int:
     return len(_count_files_from_stream(stream_file))
 
 
-_AI_TOOLS = "Bash,Glob,Grep,Read"
-_BASE_AI_ARGS = ("--print", "--output-format", "stream-json", "--verbose")
+_AI_TOOLS: str = os.environ.get("QUODEQ_AI_TOOLS", "Bash,Glob,Grep,Read")
+_BASE_AI_ARGS: tuple[str, ...] = tuple(
+    os.environ.get("QUODEQ_AI_BASE_ARGS", "--print --output-format stream-json --verbose").split()
+)
 
 
 class AnalysisError(RuntimeError):
@@ -189,8 +191,6 @@ def _run_with_heartbeat(
     Terminates the process if *max_duration* seconds elapse.
     Returns True if the process was terminated due to timeout.
     """
-    from quodeq.shared.logging import log_warning
-
     elapsed = 0
     max_dur = config.max_duration
     timed_out = False

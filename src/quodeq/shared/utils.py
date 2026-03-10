@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -19,7 +20,7 @@ class Config:
     supports safe overrides via the :meth:`override` context manager.
     """
 
-    _data: dict[str, Any] = field(default_factory=dict)
+    _data: dict[str, Any] = field(default_factory=dict, init=False)
 
     def __getitem__(self, key: str) -> Any:
         return self._data[key]
@@ -45,24 +46,33 @@ class Config:
 
     @classmethod
     def from_file(cls, path: Path) -> Config:
-        return cls(_data=json.loads(path.read_text()))
+        obj = cls()
+        obj._data = json.loads(path.read_text())
+        return obj
 
 
 # Derived constants (not URLs, safe to keep inline).
 ACTION_API_MODULE = "quodeq.action_api"
 
 
+_config_lock = threading.Lock()
+_config_instance: Config | None = None
+
+
 def _get_config() -> Config:
-    """Return the lazily-loaded singleton Config instance."""
-    if not hasattr(_get_config, "_instance"):
-        _get_config._instance = Config.from_file(_DEFAULTS_PATH)
-    return _get_config._instance
+    """Return the lazily-loaded singleton Config instance (thread-safe)."""
+    global _config_instance
+    if _config_instance is None:
+        with _config_lock:
+            if _config_instance is None:
+                _config_instance = Config.from_file(_DEFAULTS_PATH)
+    return _config_instance
 
 
 # Public accessors for defaults used as constants by other modules.
-ANTHROPIC_API_URL: str = Config.from_file(_DEFAULTS_PATH)["anthropic_api_url"]
-ANTHROPIC_API_VERSION: str = Config.from_file(_DEFAULTS_PATH)["anthropic_api_version"]
-DEFAULT_HOST: str = Config.from_file(_DEFAULTS_PATH)["default_host"]
+ANTHROPIC_API_URL: str = _get_config()["anthropic_api_url"]
+ANTHROPIC_API_VERSION: str = _get_config()["anthropic_api_version"]
+DEFAULT_HOST: str = _get_config()["default_host"]
 
 
 def is_repo_url(repo_input: str) -> bool:

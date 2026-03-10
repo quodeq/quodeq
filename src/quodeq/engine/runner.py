@@ -278,5 +278,3 @@ def run(config: RunConfig) -> Evidence:
 def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
     """Like run(), but returns a dict of {dimension_id: Evidence} without merging."""
     return _run_dimensions(config)
-
-

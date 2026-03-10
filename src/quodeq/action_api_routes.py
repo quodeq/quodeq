@@ -56,6 +56,20 @@ def _build_project_zip(project_path: Path) -> io.BytesIO:
     return buf
 
 
+def _export_project_zip(project: str, reports_dir: str) -> Response | tuple[Response, int]:
+    """Build and return a zip archive download response for a project directory."""
+    project_path = Path(reports_dir) / project
+    if not project_path.exists() or not project_path.is_dir():
+        body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
+    try:
+        buf = _build_project_zip(project_path)
+    except ValueError:
+        body, status = _error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+        return jsonify(body), status
+    return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")
+
+
 def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     """Register project listing, mutation, and export routes."""
 
@@ -82,16 +96,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
         """Download a project's report directory as a zip archive."""
-        project_path = Path(_reports_dir()) / project
-        if not project_path.exists() or not project_path.is_dir():
-            body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        try:
-            buf = _build_project_zip(project_path)
-        except ValueError:
-            body, status = _error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
-            return jsonify(body), status
-        return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")
+        return _export_project_zip(project, _reports_dir())
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:

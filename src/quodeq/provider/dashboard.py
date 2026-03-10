@@ -1,23 +1,30 @@
 """Dashboard and accumulated-view logic, split from action_provider_fs."""
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
-
 
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
     calculate_trend,
     list_runs,
     most_frequent_grade,
-    parse_numeric_score,
     read_run_data,
     summarize_dimensions,
 )
-# parse_numeric_score is used by _build_accumulated_trend
+from quodeq.provider.accumulated import numeric_average
 
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
+
+
+@dataclass
+class _StaleDimState:
+    """Groups the three mutable tracking dicts used by _collect_stale_dimensions."""
+    stale_dim_map: dict[str, dict[str, Any]] = field(default_factory=dict)
+    non_na_count: dict[str, int] = field(default_factory=dict)
+    stale_previous_by_dimension: dict[str, dict[str, Any]] = field(default_factory=dict)
 
 
 def _collect_previous_scores(
@@ -62,11 +69,11 @@ def _find_stale_from_run(
     return results
 
 
-def _record_stale_entry(entry: dict, stale_dim_map: dict[str, dict[str, Any]]) -> None:
+def _record_stale_entry(entry: dict, state: _StaleDimState) -> None:
     """Add a stale dimension entry to the map if not already present."""
     dim_name = entry["dim_name"]
-    if dim_name not in stale_dim_map:
-        stale_dim_map[dim_name] = {
+    if dim_name not in state.stale_dim_map:
+        state.stale_dim_map[dim_name] = {
             **entry["dim"],
             "stale": True,
             "fromRunId": entry["run_id"],
@@ -75,18 +82,15 @@ def _record_stale_entry(entry: dict, stale_dim_map: dict[str, dict[str, Any]]) -
         }
 
 
-def _track_stale_grade(
-    entry: dict, non_na_count: dict[str, int],
-    stale_previous_by_dimension: dict[str, dict[str, Any]],
-) -> None:
+def _track_stale_grade(entry: dict, state: _StaleDimState) -> None:
     """Track grade counts for stale entries to identify the second valid score."""
     grade = entry["grade"]
     if not grade or str(grade).upper() in _SKIP_GRADES:
         return
     dim_name = entry["dim_name"]
-    non_na_count[dim_name] = non_na_count.get(dim_name, 0) + 1
-    if non_na_count[dim_name] == 2 and dim_name not in stale_previous_by_dimension:
-        stale_previous_by_dimension[dim_name] = entry["dim"]
+    state.non_na_count[dim_name] = state.non_na_count.get(dim_name, 0) + 1
+    if state.non_na_count[dim_name] == 2 and dim_name not in state.stale_previous_by_dimension:
+        state.stale_previous_by_dimension[dim_name] = entry["dim"]
 
 
 def _collect_stale_dimensions(
@@ -94,21 +98,19 @@ def _collect_stale_dimensions(
     get_run_dimensions: Callable[[str], list[dict[str, Any]]],
 ) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
     """Find dimensions present in other runs but absent from the selected run."""
-    stale_dim_map: dict[str, dict[str, Any]] = {}
-    non_na_count: dict[str, int] = {}
-    stale_previous_by_dimension: dict[str, dict[str, Any]] = {}
+    state = _StaleDimState()
 
     for older_idx in range(selected_index + 1, len(runs)):
         for entry in _find_stale_from_run(runs[older_idx], selected_dim_names, get_run_dimensions):
-            _record_stale_entry(entry, stale_dim_map)
-            _track_stale_grade(entry, non_na_count, stale_previous_by_dimension)
+            _record_stale_entry(entry, state)
+            _track_stale_grade(entry, state)
 
     for newer_idx in range(selected_index):
         for entry in _find_stale_from_run(runs[newer_idx], selected_dim_names, get_run_dimensions):
-            _record_stale_entry(entry, stale_dim_map)
+            _record_stale_entry(entry, state)
 
-    stale_dimensions = sorted(stale_dim_map.values(), key=lambda d: d.get("dimension") or "")
-    return stale_dimensions, stale_previous_by_dimension
+    stale_dimensions = sorted(state.stale_dim_map.values(), key=lambda d: d.get("dimension") or "")
+    return stale_dimensions, state.stale_previous_by_dimension
 
 
 def _enrich_dimensions_with_trend(
@@ -145,11 +147,8 @@ def _build_accumulated_trend(
                 acc_by_dim[dim_name] = dim
         if not run_dims:
             continue
-        acc_scores = [
-            s for s in (parse_numeric_score(d.get("overallScore")) for d in acc_by_dim.values())
-            if s is not None
-        ]
-        acc_grades = [d.get("overallGrade") for d in acc_by_dim.values() if d.get("overallGrade")]
+        acc_dims = list(acc_by_dim.values())
+        acc_grades = [d.get("overallGrade") for d in acc_dims if d.get("overallGrade")]
         trend.append(
             {
                 "runId": item.run_id,
@@ -157,7 +156,7 @@ def _build_accumulated_trend(
                 "dateLabel": item.date_label,
                 "dimensionsCount": len(acc_by_dim),
                 "overallGrade": most_frequent_grade(acc_grades) if acc_grades else None,
-                "numericAverage": round(sum(acc_scores) / len(acc_scores), 1) if acc_scores else None,
+                "numericAverage": numeric_average(acc_dims),
             }
         )
     trend.reverse()
@@ -192,7 +191,9 @@ def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
     selected_dimensions = read_run_data(reports_root, project, selected_run.run_id)
     selected_summary = summarize_dimensions(selected_dimensions)
     selected_dim_names = {d.get("dimension") for d in selected_dimensions}
-    selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), 0)
+    selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), None)
+    if selected_index is None:
+        raise RuntimeError(f"Run {selected_run.run_id!r} disappeared from the run list unexpectedly.")
 
     get_run_dimensions = _make_run_dimension_fetcher(reports_root, project)
     previous_by_dimension = _collect_previous_scores(runs, selected_index, selected_dim_names, get_run_dimensions)

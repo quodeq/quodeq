@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quodeq.provider.base import EvaluationOptions
+from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
 
@@ -37,7 +38,6 @@ def _build_evaluate_cmd(
 
 def _register_project(repo: str, discipline: str | None, reports_dir: str) -> None:
     """Resolve and register the project UUID before evaluation starts."""
-    from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = project_name_from_repo(repo)
     location = "online" if is_repo_url(repo) else "local"
