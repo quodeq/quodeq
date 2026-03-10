@@ -12,7 +12,7 @@ from quodeq.provider.base import EvaluationOptions
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
 _REPO_URL_RE = re.compile(
-    r"^(https?://[\w.\-]+/[\w.\-/]+\.git|git@[\w.\-]+:[\w.\-/]+\.git)$"
+    r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?|git@[\w.\-]+:[\w.\-/]+(\.git)?)$"
 )
 
 if TYPE_CHECKING:

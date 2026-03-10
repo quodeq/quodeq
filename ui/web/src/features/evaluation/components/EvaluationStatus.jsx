@@ -43,9 +43,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     }
   }, [job?.logs]);
 
-  useEffect(() => {
-    setConsoleOpen(job?.status === 'failed');
-  }, [job?.jobId, job?.status]);
+
 
   if (!job) return null;
 

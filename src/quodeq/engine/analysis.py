@@ -128,7 +128,7 @@ def count_files_from_stream(stream_file: Path) -> int:
     return len(_count_files_from_stream(stream_file))
 
 
-_AI_TOOLS = "Glob,Grep,Read"
+_AI_TOOLS = "Bash,Glob,Grep,Read"
 _BASE_AI_ARGS = ("--print", "--output-format", "stream-json", "--verbose")
 
 
@@ -155,8 +155,8 @@ def _build_ai_cmd(
         args.extend(["--mcp-config", str(mcp_config_path)])
         args.extend(["--allowedTools", "mcp__findings__report_finding"])
         # MCP servers require permission approval; in --print mode there is no
-        # interactive prompt, so we must approve only the MCP server tool.
-        args.extend(["--permission-prompt-tool", "mcp__findings__report_finding"])
+        # interactive prompt, so we must bypass permissions for the server to start.
+        args.extend(["--permission-mode", "bypassPermissions"])
 
     if model:
         args.extend(["--model", model])

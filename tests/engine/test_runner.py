@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.engine._runner_report import run_full
-from quodeq.engine.runner import run, RunConfig, _merge_evidence
+from quodeq.engine.runner import run, RunConfig, EvaluationError, _merge_evidence
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
 
 
@@ -148,6 +148,31 @@ class TestRun:
         )
         evidence = run(config)
         assert evidence.principles == {}
+
+    @patch("quodeq.engine.runner.run_analysis")
+    def test_zero_findings_raises_error(self, mock_analysis, tmp_path):
+        """An evaluation with source files but 0 findings is broken, not successful."""
+        evaluators_dir = _make_plugin_dir(tmp_path)
+        src = tmp_path / "src"
+        src.mkdir()
+        (src / "app.ts").write_text("const x = 1;\n")
+
+        # Valid stream with no evidence lines — simulates tools being blocked
+        empty_stream = json.dumps({
+            "type": "assistant",
+            "message": {"content": [{"type": "text", "text": "I could not read any files."}]},
+        }) + "\n" + json.dumps({"type": "result", "result": "done"}) + "\n"
+        mock_analysis.side_effect = _mock_run_analysis_factory(empty_stream)
+
+        config = RunConfig(
+            src=src,
+            plugin_id="typescript",
+            evaluators_dir=evaluators_dir,
+            source_file_count=5,
+            work_dir=tmp_path,
+        )
+        with pytest.raises(EvaluationError, match="0 findings"):
+            run(config)
 
     @patch("quodeq.engine.runner.run_analysis")
     def test_stream_files_created(self, mock_analysis, tmp_path):

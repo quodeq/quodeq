@@ -304,11 +304,9 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
-        # Auth: require Bearer token unless explicitly disabled
+        # Auth: only enforce when QUODEQ_API_KEY is explicitly set
         if request.path != "/api/health":
             api_key = os.environ.get("QUODEQ_API_KEY")
-            if api_key is None and not os.environ.get("QUODEQ_AUTH_DISABLED"):
-                return jsonify({"error": "API key not configured", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
             if api_key:
                 auth = request.headers.get("Authorization", "")
                 if not hmac.compare_digest(auth, f"Bearer {api_key}"):

@@ -14,6 +14,7 @@ from quodeq.config.cli import main as configure_main
 from quodeq.config.paths import default_paths
 from quodeq.dashboard.cli import main as dashboard_main
 from quodeq.engine.analysis import AnalysisError
+from quodeq.engine.runner import EvaluationError
 from quodeq.engine.plugin_loader import load_plugin
 from quodeq.engine.plugin_detector import count_source_files, detect_plugin
 from quodeq.engine._runner_report import run_full
@@ -151,7 +152,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
             print(f"Reports written to {evaluation_dir}/")
             for dim, score in scores.items():
                 print(f"  {dim}: {score}")
-    except AnalysisError as exc:
+    except (AnalysisError, EvaluationError) as exc:
         print(f"\nError: {exc}", file=sys.stderr)
         return 1
     return 0

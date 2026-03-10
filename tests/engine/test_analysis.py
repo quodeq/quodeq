@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from quodeq.engine.analysis import AnalysisConfig, _build_ai_cmd
 from quodeq.engine.stream_parser import _extract_jsonl_from_text, extract_evidence_from_stream
 from quodeq.engine.stream_validation import is_stream_valid
 
@@ -201,3 +202,58 @@ class TestIsStreamValid:
     def test_missing_file(self, tmp_path):
         stream = tmp_path / "nonexistent.json"
         assert is_stream_valid(stream) is False
+
+
+# ---------------------------------------------------------------------------
+# _build_ai_cmd — prevent regressions in CLI tool/permission flags
+# ---------------------------------------------------------------------------
+
+class TestBuildAiCmd:
+    """Guard against regressions that silently break evaluations (0 findings)."""
+
+    def test_bash_in_allowed_tools(self):
+        """Bash must be in the tools list — analysis prompts rely on it."""
+        args, _ = _build_ai_cmd("test prompt", AnalysisConfig())
+        tools_idx = args.index("--tools")
+        tools_value = args[tools_idx + 1]
+        assert "Bash" in tools_value.split(",")
+
+    def test_read_glob_grep_in_allowed_tools(self):
+        """File exploration tools must be available."""
+        args, _ = _build_ai_cmd("test prompt", AnalysisConfig())
+        tools_idx = args.index("--tools")
+        tools_value = args[tools_idx + 1]
+        for tool in ("Read", "Glob", "Grep"):
+            assert tool in tools_value.split(","), f"{tool} missing from --tools"
+
+    def test_bypass_permissions_with_mcp(self, tmp_path):
+        """MCP mode must use bypassPermissions — without it, tools are blocked
+        in --print mode and the evaluation silently produces 0 findings."""
+        jsonl = tmp_path / "findings.jsonl"
+        args, mcp_path = _build_ai_cmd(
+            "test prompt", AnalysisConfig(jsonl_file=jsonl),
+        )
+        assert "--permission-mode" in args, (
+            "--permission-mode flag is missing; without bypassPermissions "
+            "the AI cannot use tools in --print mode"
+        )
+        perm_idx = args.index("--permission-mode")
+        assert args[perm_idx + 1] == "bypassPermissions"
+
+    def test_mcp_config_created_with_jsonl(self, tmp_path):
+        """When jsonl_file is set, MCP config must be generated."""
+        jsonl = tmp_path / "findings.jsonl"
+        args, mcp_path = _build_ai_cmd(
+            "test prompt", AnalysisConfig(jsonl_file=jsonl),
+        )
+        assert mcp_path is not None
+        assert "--mcp-config" in args
+        assert "mcp__findings__report_finding" in args
+
+    def test_print_mode_always_set(self):
+        """Analysis must run in --print (non-interactive) mode."""
+        args, _ = _build_ai_cmd("test prompt", AnalysisConfig())
+        assert "--print" in args
+        assert "--output-format" in args
+        fmt_idx = args.index("--output-format")
+        assert args[fmt_idx + 1] == "stream-json"

@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 _REPO_URL_RE = re.compile(
-    r"^(https?://[\w.\-]+/[\w.\-/]+\.git|git@[\w.\-]+:[\w.\-/]+\.git)$"
+    r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?|git@[\w.\-]+:[\w.\-/]+(\.git)?)$"
 )
 
 

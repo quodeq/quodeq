@@ -209,11 +209,16 @@ def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
     return dimensions, ctx
 
 
+class EvaluationError(RuntimeError):
+    """Raised when an evaluation completes but produces no usable findings."""
+
+
 def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
     dimensions, ctx = _load_plugin_context(config)
     result: dict[str, Evidence] = {}
     _emit_marker("setup", dimensions=dimensions)
+    skipped_count = 0
 
     for idx, dimension in enumerate(dimensions, 1):
         _emit_marker("analyzing", dimension=dimension)
@@ -225,6 +230,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
         ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
         if ev is None:
             log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid stream, skipping")
+            skipped_count += 1
             continue
 
         _emit_marker("scoring", dimension=dimension)
@@ -232,6 +238,22 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
         compliances = sum(len(pe.compliance) for pe in ev.principles.values())
         log_success(f"[{idx}/{ctx.total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")
         result[dimension] = ev
+
+    # Guard: an evaluation that ran on a real project but produced zero findings
+    # across all dimensions is almost certainly broken (e.g. tools blocked,
+    # permissions misconfigured). Only trigger when there were source files to
+    # analyze and at least one dimension had a valid stream (result is non-empty).
+    if result and config.source_file_count > 0:
+        total_findings = sum(
+            sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
+            for ev in result.values()
+        )
+        if total_findings == 0:
+            raise EvaluationError(
+                f"Evaluation produced 0 findings across {len(result)} dimensions "
+                f"({skipped_count} skipped). This usually means the AI CLI could not "
+                f"read files or report findings — check tool permissions and MCP configuration."
+            )
 
     return result
 
