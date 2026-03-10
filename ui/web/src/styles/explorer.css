@@ -404,7 +404,7 @@
 .file-picker-item {
   padding: 8px 16px;
   font-size: 0.82rem;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-family: var(--font-data);
   cursor: pointer;
   color: var(--color-text-muted);
   transition: background 100ms ease;
@@ -446,7 +446,7 @@
   padding: 10px;
   border-radius: 10px;
   text-align: left;
-  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  font-family: var(--font-data);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
