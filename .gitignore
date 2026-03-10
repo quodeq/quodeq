@@ -6,6 +6,7 @@ ui/web/node_modules/
 ui/web/dist/
 __pycache__/
 *.pyc
+.venv/
 evaluations/
 
 docs/

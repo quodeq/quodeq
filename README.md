@@ -33,13 +33,12 @@ Evaluate any repository across six quality dimensions — **Security**, **Reliab
 
 ```bash
 uv sync
-uv pip install -e .
 ```
 
 ### Run the Dashboard
 
 ```bash
-quodeq dashboard
+uv run quodeq dashboard
 ```
 
 This will:
@@ -54,33 +53,33 @@ Evaluations can also be launched directly from the dashboard UI. If you want to 
 
 ```bash
 # Evaluate a local repository (auto-detects language plugin)
-quodeq evaluate /path/to/your/project
+uv run quodeq evaluate /path/to/your/project
 
 # Evaluate a remote repository
-quodeq evaluate git@github.com:org/repo.git
+uv run quodeq evaluate git@github.com:org/repo.git
 
 # Evaluate specific dimensions only
-quodeq evaluate /path/to/project -d security,reliability
+uv run quodeq evaluate /path/to/project -d security,reliability
 
 # Use a specific plugin
-quodeq evaluate /path/to/project -p typescript
+uv run quodeq evaluate /path/to/project -p typescript
 
 # Evidence only (skip scoring)
-quodeq evaluate /path/to/project --evidence-only
+uv run quodeq evaluate /path/to/project --evidence-only
 
 # Limit AI turns or duration per dimension
-quodeq evaluate /path/to/project --max-turns 100 --max-duration 900
+uv run quodeq evaluate /path/to/project --max-turns 100 --max-duration 900
 ```
 
 ### Configure AI Client
 
 ```bash
-quodeq configure
+uv run quodeq configure
 ```
 
 ## CLI Reference
 
-### `quodeq evaluate`
+### `uv run quodeq evaluate`
 
 | Flag | Default | Description |
 |------|---------|-------------|
