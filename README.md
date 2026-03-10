@@ -1,19 +1,18 @@
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="res/quodeq-logo-dark.svg" />
-  <img src="res/quodeq-logo.svg" alt="Quodeq" width="220" align="left" />
-</picture>
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="res/quodeq-logo-dark.svg" />
+    <img src="res/quodeq-logo.svg" alt="Quodeq" width="340" />
+  </picture>
+</p>
 
-# quodeq
+<h2 align="center">quodeq</h2>
 
-*human aligned quode*
-
-*less drift, quode safe*
-
-*code with quore* ♥️
-
-*bearing quode with you*
-
-<br clear="all" />
+<p align="center">
+  <em>human aligned quode</em><br>
+  <em>less drift, quode safe</em><br>
+  <em>code with quore</em> ♥️<br>
+  <em>bearing quode with you</em>
+</p>
 
 <p align="center"><i>Navigate your codebase to excellence — AI-driven quality analysis powered by ISO 25010.</i></p>
 
