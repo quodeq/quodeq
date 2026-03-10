@@ -1189,7 +1189,7 @@ textarea:focus {
 }
 
 .settings-about-phrase-row {
-  justify-content: flex-end;
+  align-items: flex-end;
   padding-top: var(--space-4);
   padding-bottom: var(--space-4);
 }
