@@ -1150,6 +1150,37 @@ textarea:focus {
   white-space: nowrap;
 }
 
+.settings-about-value {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+}
+
+.settings-about-link {
+  font-size: var(--text-sm);
+  color: var(--color-accent);
+  text-decoration: none;
+}
+
+.settings-about-link:hover {
+  text-decoration: underline;
+}
+
+.settings-about-phrase-row {
+  justify-content: center;
+  padding-top: var(--space-6);
+  padding-bottom: var(--space-6);
+}
+
+.settings-about-phrase {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  letter-spacing: 0.12em;
+  text-transform: lowercase;
+  text-align: center;
+  font-style: italic;
+}
+
 /* Shared field base for controls on the right side of a row */
 .settings-select,
 .settings-input {

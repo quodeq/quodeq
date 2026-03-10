@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { listProjects, getAiClients } from './api/index.js';
+import { listProjects, getAiClients, getHealth } from './api/index.js';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import RunNavigator from './features/dashboard/components/RunNavigator.jsx';
@@ -301,6 +301,24 @@ export default function App() {
   // -------------------------------------------------------------------------
   const [aiCmd, setAiCmd] = useState(localStorage.getItem('cc-ai-cmd') || '');
   const [availableClients, setAvailableClients] = useState(null);
+  const [appVersion, setAppVersion] = useState(null);
+  const [settingsPhrase, setSettingsPhrase] = useState('');
+
+  const _SETTINGS_PHRASES = [
+    'quode with cuore ♥',
+    'human aligned quode',
+    'quode safe',
+    'navigate your quode to excellence',
+    'code quality compass',
+  ];
+
+  useEffect(() => {
+    if (activePage.page !== 'settings') return;
+    setSettingsPhrase(_SETTINGS_PHRASES[Math.floor(Math.random() * _SETTINGS_PHRASES.length)]);
+    if (appVersion === null) {
+      getHealth().then((d) => setAppVersion(d.version || null)).catch(() => {});
+    }
+  }, [activePage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activePage.page !== 'settings' || availableClients !== null) return;
@@ -646,6 +664,34 @@ export default function App() {
                         Uses your client's default model. Run <code>{aiCmd} --help</code> to see how to change it.
                       </span>
                     </div>
+                  </div>
+                )}
+              </section>
+              <section className="panel settings-section">
+                <div className="panel-header">
+                  <h2 className="settings-section-title">About</h2>
+                </div>
+                <div className="settings-row">
+                  <div className="settings-row-label">
+                    <span className="settings-label">Version</span>
+                  </div>
+                  <span className="settings-about-value">{appVersion ?? '—'}</span>
+                </div>
+                <div className="settings-row">
+                  <div className="settings-row-label">
+                    <span className="settings-label">Website</span>
+                  </div>
+                  <a className="settings-about-link" href="https://quodeq.ai" target="_blank" rel="noopener noreferrer">quodeq.ai</a>
+                </div>
+                <div className="settings-row">
+                  <div className="settings-row-label">
+                    <span className="settings-label">Repository</span>
+                  </div>
+                  <a className="settings-about-link" href="https://github.com/quodeq/quodeq" target="_blank" rel="noopener noreferrer">github.com/quodeq/quodeq</a>
+                </div>
+                {settingsPhrase && (
+                  <div className="settings-row settings-row--last settings-about-phrase-row">
+                    <span className="settings-about-phrase">{settingsPhrase}</span>
                   </div>
                 )}
               </section>
