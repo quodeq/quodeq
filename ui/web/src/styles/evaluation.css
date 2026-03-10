@@ -888,6 +888,11 @@
   background: var(--color-accent-soft);
 }
 
+.dim-action-btn:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+
 /* Dimension grid */
 .dimension-grid {
   display: grid;

@@ -627,7 +627,7 @@
 .qd-card-stat-compliance {
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  color: color-mix(in srgb, var(--color-grade-top-text) 80%, black);
+  color: color-mix(in srgb, var(--color-grade-top-text) 65%, black);
   background: var(--color-grade-top-bg);
   border: 1px solid color-mix(in srgb, var(--color-grade-top-text) 48%, transparent);
   border-radius: var(--radius-sm);
@@ -2186,9 +2186,8 @@
 .run-history-panel .recharts-surface,
 .run-history-panel .recharts-tooltip-wrapper,
 .run-history-panel svg,
-.run-history-panel svg *,
-.run-history-panel *:focus {
-  outline: none !important;
+.run-history-panel svg * {
+  outline: none;
   user-select: none;
 }
 

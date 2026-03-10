@@ -108,6 +108,7 @@
   --primitive-crimson-500: #d80c18;
   --primitive-crimson-400: #e82030;
   --primitive-crimson-300: #f1171e;
+  --primitive-crimson-200: #ff4a4a;
 
   /* Brand extensions */
   --primitive-brand-600: #454b57;
@@ -142,7 +143,7 @@
   /* Issue-intensity heat scale (gray → crimson, default light + dark) */
   --primitive-ired-200: #c09090;   /* dark B: muted rose-gray */
   --primitive-ired-300: #d86060;   /* dark C: rose-red */
-  --primitive-ired-400: #f04040;   /* dark D: bright red */
+  --primitive-ired-400: #f55050;   /* dark D: bright red */
   --primitive-ired-700: #7d606a;   /* light B: warm rose-gray */
   --primitive-ired-800: #9a4040;   /* light C: muted dark red */
   --primitive-ired-900: #c02020;   /* light D: medium red */
@@ -311,8 +312,8 @@
     --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 14%, transparent);
     --color-grade-low-text:    var(--primitive-ired-400);
     --color-grade-low-bg:      color-mix(in srgb, var(--primitive-ired-400) 15%, transparent);
-    --color-grade-bottom-text: var(--primitive-crimson-300);
-    --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-300) 15%, transparent);
+    --color-grade-bottom-text: var(--primitive-crimson-200);
+    --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-200) 15%, transparent);
 
     /* Warning */
     --color-warning:      var(--primitive-amber-400);
