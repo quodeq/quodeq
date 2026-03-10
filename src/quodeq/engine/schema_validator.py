@@ -10,7 +10,7 @@ import jsonschema
 _SCHEMAS_DIR = Path(__file__).parent / "schemas"
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=32)
 def _load_schema(name: str) -> dict:
     return json.loads((_SCHEMAS_DIR / name).read_text())
 

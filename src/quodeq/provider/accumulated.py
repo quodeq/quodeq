@@ -1,8 +1,9 @@
 """Accumulated (cross-run) view logic for the filesystem action provider."""
 from __future__ import annotations
 
+from collections import OrderedDict
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
@@ -13,9 +14,32 @@ from quodeq.adapters.fs.report_parser import (
     read_run_data,
 )
 
+# Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
+_ACC_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
+_ACC_DIM_CACHE_MAX = 256
+
+
+def _make_acc_dimension_fetcher(
+    reports_root: Path, project: str,
+) -> Callable[[str], list[dict[str, Any]]]:
+    """Return a cached fetcher for run dimension data (LRU, bounded at _ACC_DIM_CACHE_MAX)."""
+    def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
+        key = (reports_root, project, run_id)
+        if key in _ACC_DIM_CACHE:
+            _ACC_DIM_CACHE.move_to_end(key)
+            return _ACC_DIM_CACHE[key]
+        data = read_run_data(reports_root, project, run_id)
+        _ACC_DIM_CACHE[key] = data
+        _ACC_DIM_CACHE.move_to_end(key)
+        if len(_ACC_DIM_CACHE) > _ACC_DIM_CACHE_MAX:
+            _ACC_DIM_CACHE.popitem(last=False)
+        return data
+    return get_run_dimensions
+
 
 def _read_all_run_data(
     reports_root: Path, project: str, all_run_infos: list[RunInfo], runs: list[str],
+    get_run_data: Callable[[str], list[dict[str, Any]]] | None = None,
 ) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], list[dict[str, Any]]]:
     """Build accumulated data structures in a single sequential pass.
 
@@ -29,9 +53,10 @@ def _read_all_run_data(
     latest_by_dimension: dict[str, dict[str, Any]] = {}
     prev_occurrence: dict[str, dict[str, Any]] = {}
     prev_run_latest_map: dict[str, dict[str, Any]] = {}
+    _fetch = get_run_data or (lambda rid: read_run_data(reports_root, project, rid))
 
     for run_idx_i, run_id in enumerate(runs):
-        dims = read_run_data(reports_root, project, run_id)
+        dims = _fetch(run_id)
         run_info = run_lookup.get(run_id)
         is_first_run = (run_idx_i == 0)
 
@@ -144,8 +169,9 @@ def compute_accumulated(reports_dir: str, project: str, as_of: str | None) -> di
     if not runs:
         return None
 
+    get_run_data = _make_acc_dimension_fetcher(reports_root, project)
     latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, all_run_infos, runs
+        reports_root, project, all_run_infos, runs, get_run_data
     )
     all_dimensions = list(latest_by_dimension.values())
     dimensions_with_trend = _compute_accumulated_trends(all_dimensions, prev_occurrence)

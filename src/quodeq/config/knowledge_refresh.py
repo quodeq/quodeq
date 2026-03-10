@@ -20,6 +20,7 @@ _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
 _REFRESH_TEMPLATES_DIR = Path(__file__).parent / "refresh_templates"
 _FETCH_TIMEOUT_S = 15
 _CONTENT_SAMPLE_LIMIT = 4000
+_MAX_FETCH_WORKERS = 8
 _LINTER_DOCS_LIMIT = 6000
 _EXISTING_CONTENT_LIMIT = 2000
 
@@ -161,7 +162,7 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
         return None
 
     results: dict[str, str] = {}
-    with ThreadPoolExecutor(max_workers=len(repos)) as executor:
+    with ThreadPoolExecutor(max_workers=min(len(repos), _MAX_FETCH_WORKERS)) as executor:
         future_to_repo = {executor.submit(_try_repo, repo): repo for repo in repos}
         for future in as_completed(future_to_repo):
             repo = future_to_repo[future]
