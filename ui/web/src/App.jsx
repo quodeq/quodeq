@@ -561,8 +561,6 @@ export default function App() {
                       { value: 'system',      label: 'System' },
                       { value: 'light',       label: 'Light' },
                       { value: 'dark',        label: 'Dark' },
-                      { value: 'media-light', label: 'Media Lt' },
-                      { value: 'media-dark',  label: 'Media Dk' },
                       { value: 'ember',       label: 'Ember' },
                       { value: 'forest',      label: 'Forest' },
                       { value: 'midnight',    label: 'Midnight' },

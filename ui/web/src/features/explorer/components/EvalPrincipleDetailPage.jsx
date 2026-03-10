@@ -289,6 +289,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                   return (
                     <>
                       <div className="vdetail-row-main">
+                        <span className="severity-tag compliance">compliant</span>
                         <span className="vrow-label">[{c.principle || principle}]</span>
                         {filename && (
                           <FileCopyBtn display={display} copyText={ref} />

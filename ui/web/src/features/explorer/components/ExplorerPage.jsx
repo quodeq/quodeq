@@ -3,7 +3,7 @@ import { getDimensionEval } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
-import { gradeColorClass } from '../../../utils/formatters.js';
+import { gradeColorClass, scoreColorClass } from '../../../utils/formatters.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 
 export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate }) {
@@ -112,7 +112,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
         </div>
 
         <div className="acc-eval-hero">
-          <span className={`acc-eval-grade-chip chip ${gradeColorClass(overallGrade?.grade)}`}>
+          <span className={`acc-eval-grade-chip chip ${scoreColorClass(overallGrade?.score)}`}>
             {overallGrade?.grade || '—'}
           </span>
           {overallGrade?.score && (

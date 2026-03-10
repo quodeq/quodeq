@@ -527,12 +527,6 @@
   color: var(--color-text-muted);
 }
 
-.dimension-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-  margin-top: 10px;
-}
 
 .dimension-chip-btn:disabled {
   opacity: 0.35;
@@ -570,7 +564,7 @@
   }
 
   .dimension-grid {
-    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 6px;
   }
 
   .vrow-file {
@@ -897,15 +891,19 @@
 /* Dimension grid */
 .dimension-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
-  gap: 8px;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 6px;
+  padding: 12px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
 }
 
 .dimension-chip-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 8px 10px;
+  padding: 7px 10px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -915,13 +913,17 @@
   color: var(--color-text-muted);
   text-align: center;
   cursor: pointer;
-  transition: border-color 150ms, background 150ms, color 150ms;
+  transition: border-color 150ms, background 150ms, color 150ms, box-shadow 150ms;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .dimension-chip-btn:hover:not(:disabled) {
-  background: var(--color-surface-alt);
-  border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
+  background: var(--color-surface);
+  border-color: color-mix(in srgb, var(--color-accent) 50%, transparent);
   color: var(--color-text);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
 .dimension-chip-btn.selected {
@@ -929,6 +931,7 @@
   border-color: var(--color-accent);
   color: var(--color-accent);
   font-weight: var(--weight-semibold);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
 /* Improve submit button */
@@ -1596,7 +1599,7 @@
 .vlive-detail {
   margin: 0 0 4px;
   padding: 12px 14px;
-  background: var(--color-bg);
+  background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   display: flex;
@@ -1816,4 +1819,4 @@
 .vdetail-row--major     { border-color: var(--color-sev-major-border); }
 .vdetail-row--minor     { border-color: var(--color-sev-minor-border); }
 .vdetail-row--unknown   { border-color: var(--color-border); }
-.vdetail-row--compliant { border-color: var(--color-success); }
+.vdetail-row--compliant { border-color: color-mix(in srgb, var(--color-grade-top-text) 55%, transparent); }

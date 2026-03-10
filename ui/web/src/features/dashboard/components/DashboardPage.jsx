@@ -6,7 +6,7 @@ import ViolationsByPrincipleTable from './ViolationsByPrincipleTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
-import { formatRunId, gradeColorClass, mostFrequentGrade, splitScore } from '../../../utils/formatters.js';
+import { formatRunId, gradeColorClass, scoreColorClass, mostFrequentGrade, splitScore } from '../../../utils/formatters.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 
@@ -111,15 +111,19 @@ function AccumulatedOverviewPanel({
     return (curr - prev).toFixed(1);
   }, [accumulated]);
 
-  const accumulatedLastDate = useMemo(() => {
+  const accumulatedLastRun = useMemo(() => {
     // Find the most recent date using fromDateISO (already in API response)
     const withDates = accumulatedDimensions
       .filter((d) => d.fromRunId)
       .map((d) => ({ runId: d.fromRunId, dateISO: d.fromDateISO, dateLabel: d.fromDateLabel }));
-    if (withDates.length === 0) return null;
+    if (withDates.length === 0) return { date: null, runId: null };
     withDates.sort((a, b) => (b.dateISO || '').localeCompare(a.dateISO || ''));
-    return withDates[0].dateLabel || formatRunId(withDates[0].runId);
+    return {
+      date: withDates[0].dateLabel || formatRunId(withDates[0].runId),
+      runId: withDates[0].runId,
+    };
   }, [accumulatedDimensions]);
+  const accumulatedLastDate = accumulatedLastRun.date;
 
   const accumulatedUniquePrinciples = useMemo(
     () => new Set(accumulatedViolationsByPrinciple.map((v) => v.principle).filter(Boolean)).size,
@@ -144,7 +148,7 @@ function AccumulatedOverviewPanel({
 
         <div className="acc-eval-hero">
           <span
-            className={`acc-eval-grade-chip chip ${gradeColorClass(accumulated?.summary?.overallGrade)}`}
+            className={`acc-eval-grade-chip chip ${scoreColorClass(accumulated?.summary?.numericAverage)}`}
           >
             {accumulated?.summary?.overallGrade || '—'}
           </span>
@@ -213,7 +217,12 @@ function AccumulatedOverviewPanel({
           selectedRunScore={accumulated?.summary?.numericAverage}
           onBarClick={onRunClick}
         />
-        <DimensionScorePanel dimensions={accumulatedDimensions} onBarClick={onDimensionClick} />
+        <DimensionScorePanel
+          dimensions={accumulatedDimensions}
+          onBarClick={onDimensionClick}
+          runDate={accumulatedLastDate}
+          runId={accumulatedLastRun.runId}
+        />
       </div>
 
       {/* Quality dimension cards */}
@@ -405,7 +414,7 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
         </div>
 
         <div className="acc-eval-hero">
-          <span className={`acc-eval-grade-chip chip ${gradeColorClass(runSummary.overallGrade)}`}>
+          <span className={`acc-eval-grade-chip chip ${scoreColorClass(runSummary.numericAverage)}`}>
             {runSummary.overallGrade || '—'}
           </span>
           <div className="acc-eval-score-row">
