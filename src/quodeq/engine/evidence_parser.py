@@ -27,7 +27,7 @@ class EvidenceContext:
     files_read: int
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=32)
 def _build_cwe_name_lookup(standards_dir: Path) -> dict[int, str]:
     """Build CWE ID -> name from all compiled standards files."""
     lookup: dict[int, str] = {}

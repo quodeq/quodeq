@@ -5,7 +5,7 @@ from __future__ import annotations
 import hmac
 import os
 import time
-from collections import defaultdict
+from collections import OrderedDict
 from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
@@ -57,26 +57,38 @@ def _check_csrf() -> Response | tuple[Response, int] | None:
     return None
 
 
-def _check_rate_limit(rate_store: dict[str, list[float]]) -> Response | tuple[Response, int] | None:
-    """Enforce rate limiting on state-changing requests."""
+def _check_rate_limit(rate_store: OrderedDict) -> Response | tuple[Response, int] | None:
+    """Enforce rate limiting on state-changing requests.
+
+    rate_store is an LRU-ordered OrderedDict (most-recently-used at the end),
+    which lets the stale-IP scan stop at the first non-stale entry instead of
+    scanning all 10,000 tracked IPs on every state-changing request.
+    """
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return None
     ip = request.remote_addr or "unknown"
     now = time.monotonic()
     if len(rate_store) > _RATE_STORE_MAX_IPS:
-        stale = [k for k, v in rate_store.items() if all(now - t >= _RATE_LIMIT_WINDOW for t in v)]
+        stale = []
+        for k, v in rate_store.items():
+            if all(now - t >= _RATE_LIMIT_WINDOW for t in v):
+                stale.append(k)
+            else:
+                break  # LRU order: first non-stale entry means the rest are newer
         for k in stale:
             del rate_store[k]
         if len(rate_store) > _RATE_STORE_MAX_IPS:
             rate_store.clear()
-    timestamps = [t for t in rate_store[ip] if now - t < _RATE_LIMIT_WINDOW]
+    timestamps = [t for t in rate_store.get(ip, []) if now - t < _RATE_LIMIT_WINDOW]
     if not timestamps:
         rate_store.pop(ip, None)
     else:
         rate_store[ip] = timestamps
+        rate_store.move_to_end(ip)
     if len(timestamps) >= _RATE_LIMIT_MAX:
         return jsonify({"error": "Too many requests", "code": "RATE_LIMITED"}), HTTPStatus.TOO_MANY_REQUESTS
-    rate_store[ip].append(now)
+    rate_store.setdefault(ip, []).append(now)
+    rate_store.move_to_end(ip)
     return None
 
 
@@ -84,7 +96,7 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
     """Create and configure the Flask application with all API routes."""
     app = Flask(__name__)
     provider = provider or _default_provider()
-    rate_store: dict[str, list[float]] = defaultdict(list)
+    rate_store: OrderedDict[str, list[float]] = OrderedDict()
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:

@@ -94,22 +94,28 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
 
 
 def _find_best_parent(p_path: str, project_id: str, candidates: list[dict[str, Any]]) -> str | None:
-    """Find the candidate whose path is the longest prefix of *p_path*."""
-    best_parent = None
-    best_len = 0
+    """Find the candidate whose path is the longest prefix of *p_path*.
+
+    Candidates must be pre-sorted by descending path length so the first
+    matching candidate is always the longest (best) prefix — O(1) average case.
+    """
     for candidate in candidates:
         if candidate["id"] == project_id:
             continue
         c_path = candidate["path"].rstrip("/")
-        if p_path.startswith(c_path + "/") and len(c_path) > best_len:
-            best_parent = candidate["id"]
-            best_len = len(c_path)
-    return best_parent
+        if p_path.startswith(c_path + "/"):
+            return candidate["id"]
+    return None
+
+
+_MAX_PROJECTS_LISTED = 200
 
 
 def _auto_detect_parents(projects: list[dict[str, Any]]) -> None:
     """Set parent for local projects that share a path prefix with another project."""
     local_with_path = [p for p in projects if p.get("location") == "local" and p.get("path")]
+    # Sort descending by path length so _find_best_parent returns on first match.
+    local_with_path.sort(key=lambda p: len(p["path"]), reverse=True)
     for project in projects:
         if project.get("parent") is not None:
             continue
@@ -194,6 +200,8 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             if not runs:
                 continue
             projects.append(_build_project_entry(reports_root, entry.name, runs))
+            if len(projects) >= _MAX_PROJECTS_LISTED:
+                break
         projects.sort(key=lambda item: item["name"])
         _auto_detect_parents(projects)
         return {"projects": projects}
