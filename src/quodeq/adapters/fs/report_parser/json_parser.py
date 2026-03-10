@@ -119,7 +119,7 @@ def _collect_compliance(compliance: list[dict], principle_map: dict[str, Any]) -
             principle_map[key] = _empty_principle(key)
         cd: dict[str, Any] = {
             "code": c.get("snippet", ""),
-            "file": c.get("file"),
+            "file": format_file_line(c.get("file"), c.get("line")),
             "title": c.get("title", ""),
             "reason": c.get("reason", ""),
         }
