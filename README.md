@@ -1,22 +1,18 @@
-<table width="100%" cellspacing="0" cellpadding="0" border="0" style="border: none;">
-<tr style="border: none;">
-<td width="50%" align="center" style="border: none;">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="res/quodeq-logo-dark.svg" />
-    <img src="res/quodeq-logo.svg" alt="Quodeq" width="220" />
-  </picture>
-  <h1>quodeq</h1>
-</td>
-<td width="50%" align="center" style="border: none;">
-  <p>human aligned quode</p>
-  <p>less drift, quode safe</p>
-  <p>code with quore ♥️</p>
-  <p>bearing quode with you</p>
-</td>
-</tr>
-</table>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="res/quodeq-logo-dark.svg" />
+  <img src="res/quodeq-logo.svg" alt="Quodeq" width="220" align="left" />
+</picture>
 
-<p><i>Navigate your codebase to excellence — AI-driven quality analysis powered by ISO 25010.</i></p>
+### quodeq
+
+*human aligned quode*
+*less drift, quode safe*
+*code with quore* ♥️
+*bearing quode with you*
+
+<br clear="all" />
+
+<p align="center"><i>Navigate your codebase to excellence — AI-driven quality analysis powered by ISO 25010.</i></p>
 
 ---
 
@@ -35,12 +31,13 @@ Evaluate any repository across six quality dimensions — **Security**, **Reliab
 
 ```bash
 uv sync
+uv pip install -e .
 ```
 
 ### Run the Dashboard
 
 ```bash
-uv run quodeq dashboard
+quodeq dashboard
 ```
 
 This will:
@@ -51,30 +48,32 @@ This will:
 
 ### Run an Evaluation
 
+Evaluations can also be launched directly from the dashboard UI. If you want to run them without the dashboard:
+
 ```bash
 # Evaluate a local repository (auto-detects language plugin)
-uv run quodeq evaluate /path/to/your/project
+quodeq evaluate /path/to/your/project
 
 # Evaluate a remote repository
-uv run quodeq evaluate git@github.com:org/repo.git
+quodeq evaluate git@github.com:org/repo.git
 
 # Evaluate specific dimensions only
-uv run quodeq evaluate /path/to/project -d security,reliability
+quodeq evaluate /path/to/project -d security,reliability
 
 # Use a specific plugin
-uv run quodeq evaluate /path/to/project -p typescript
+quodeq evaluate /path/to/project -p typescript
 
 # Evidence only (skip scoring)
-uv run quodeq evaluate /path/to/project --evidence-only
+quodeq evaluate /path/to/project --evidence-only
 
 # Limit AI turns or duration per dimension
-uv run quodeq evaluate /path/to/project --max-turns 100 --max-duration 900
+quodeq evaluate /path/to/project --max-turns 100 --max-duration 900
 ```
 
 ### Configure AI Client
 
 ```bash
-uv run quodeq configure
+quodeq configure
 ```
 
 ## CLI Reference
