@@ -30,39 +30,46 @@ def _sample_dimensions():
 # ---------------------------------------------------------------------------
 
 class TestRenderCompiledStandards:
-    def test_renders_principles_and_cwes(self, tmp_path):
+    def test_renders_principles_and_requirements(self, tmp_path):
         compiled = {
-            "id": "security",
+            "id": "reliability",
             "principles": [
                 {
-                    "name": "Confidentiality",
-                    "cwes": [
-                        {"id": 200, "name": "Exposure of Sensitive Information"},
-                        {"id": 312, "name": "Cleartext Storage of Sensitive Information"},
+                    "name": "Fault Tolerance",
+                    "source": "iso25010",
+                    "requirements": [
+                        {"id": "R-FT-1", "source": "iso25010",
+                         "text": "Exceptions MUST be caught and handled", "refs": []},
+                        {"id": "R-FT-2", "source": "iso25010",
+                         "text": "Null dereferences MUST be guarded", "refs": []},
                     ],
                 },
                 {
-                    "name": "Integrity",
-                    "cwes": [
-                        {"id": 79, "name": "Cross-site Scripting"},
+                    "name": "Maturity",
+                    "source": "iso25010",
+                    "requirements": [
+                        {"id": "R-MAT-1", "source": "iso25010",
+                         "text": "All public functions MUST have tests", "refs": []},
                     ],
                 },
             ],
         }
-        (tmp_path / "security.json").write_text(json.dumps(compiled))
-        text = render_compiled_standards(tmp_path, "security")
-        assert "Confidentiality (2 CWEs)" in text
-        assert "CWE-200" in text
-        assert "CWE-312" in text
-        assert "Integrity (1 CWEs)" in text
-        assert "CWE-79" in text
+        (tmp_path / "reliability.json").write_text(json.dumps(compiled))
+        text = render_compiled_standards(tmp_path, "reliability")
+        assert "### Fault Tolerance" in text
+        assert "**R-FT-1**" in text
+        assert "Exceptions MUST be caught and handled" in text
+        assert "**R-FT-2**" in text
+        assert "### Maturity" in text
+        assert "**R-MAT-1**" in text
+        assert "CWE-" not in text
 
     def test_missing_dimension(self, tmp_path):
         text = render_compiled_standards(tmp_path, "nonexistent")
         assert "No compiled standards" in text
 
-    def test_empty_principles(self, tmp_path):
-        compiled = {"id": "test", "principles": [{"name": "Empty", "cwes": []}]}
+    def test_empty_requirements(self, tmp_path):
+        compiled = {"id": "test", "principles": [{"name": "Empty", "source": "iso25010", "requirements": []}]}
         (tmp_path / "test.json").write_text(json.dumps(compiled))
         text = render_compiled_standards(tmp_path, "test")
         assert "Empty" not in text
@@ -83,23 +90,10 @@ class TestRenderDimensions:
         text = render_dimensions(_sample_dimensions(), "nonexistent")
         assert "not configured" in text
 
-    def test_with_standards(self, tmp_path):
-        iso_dir = tmp_path / "iso25010"
-        iso_dir.mkdir()
-        std = {
-            "sub_characteristics": [
-                {
-                    "name": "Confidentiality",
-                    "requirements": [
-                        {"id": "S-CON-1", "text": "Secrets MUST NOT be hardcoded"},
-                    ],
-                },
-            ],
-        }
-        (iso_dir / "security.json").write_text(json.dumps(std))
-        text = render_dimensions(_sample_dimensions(), "security", standards_dir=tmp_path)
-        assert "Confidentiality" in text
-        assert "S-CON-1" in text
+    def test_renders_weight_and_iso(self):
+        text = render_dimensions(_sample_dimensions(), "security")
+        assert "**Weight:** 1.2" in text
+        assert "**ISO 25010:** Security" in text
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +126,14 @@ class TestBuildAnalysisPrompt:
         compiled = {
             "id": "security",
             "principles": [
-                {"name": "Confidentiality", "cwes": [{"id": 200, "name": "Info Exposure"}]},
+                {
+                    "name": "Confidentiality",
+                    "source": "iso25010",
+                    "requirements": [
+                        {"id": "S-CON-1", "source": "iso25010",
+                         "text": "Secrets MUST NOT be hardcoded in source", "refs": []}
+                    ],
+                },
             ],
         }
         (compiled_dir / "security.json").write_text(json.dumps(compiled))
@@ -155,7 +156,8 @@ class TestBuildAnalysisPrompt:
         assert "2026-03-06" in prompt
         assert "42" in prompt
         assert "Confidentiality" in prompt
-        assert "CWE-200" in prompt
+        assert "S-CON-1" in prompt
+        assert "Secrets MUST NOT be hardcoded" in prompt
         assert "security" in prompt
 
     def test_includes_analysis_guidance(self):

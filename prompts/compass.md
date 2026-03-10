@@ -28,7 +28,7 @@ For EVERY finding (violation or compliance), call the `report_finding` tool with
 - `snippet` — the relevant code (keep under 200 chars)
 - `severity` — `critical`, `major`, or `minor`
 - `reason` — brief explanation of why this is a violation or compliance
-- `cwe` — CWE ID number from the standards checklist below (e.g. 79, 89). **Always include this** when the finding maps to a CWE in the checklist.
+- `req` — Requirement ID from the standards checklist below (e.g. "R-FT-1", "S-CON-3"). **Always include this** when the finding maps to a requirement in the checklist.
 - `vt` — violation type (e.g. "hardcoded-secret", "missing-error-handler")
 
 ## Severity Definitions
@@ -39,7 +39,7 @@ For EVERY finding (violation or compliance), call the `report_finding` tool with
 
 ## Search Strategy
 
-1. **Grep first** — Use Grep to find patterns relevant to the CWEs in the standards checklist
+1. **Grep first** — Use Grep to find patterns relevant to the requirements in the standards checklist
 2. **Read to confirm** — Read the surrounding code to verify the finding is real (not in tests, comments, or dead code)
 3. **Report immediately** — Call `report_finding` as soon as you confirm a finding
 
@@ -58,10 +58,10 @@ For EVERY finding (violation or compliance), call the `report_finding` tool with
 
 > *[Grep for hardcoded secrets]* → found match in config.py:12
 > *[Read config.py]* → confirmed, API key is hardcoded
-> *[Call `report_finding` with p="Confidentiality", t="violation", d="security", w="Hardcoded API key", file="config.py", line=12, severity="critical", vt="hardcoded-secret", reason="API key exposed in source code", cwe=798]*
+> *[Call `report_finding` with p="Confidentiality", t="violation", d="security", w="Hardcoded API key", file="config.py", line=12, severity="critical", vt="hardcoded-secret", reason="API key exposed in source code", req="S-CON-1"]*
 > *[Grep for SQL injection]* → found match in db.py:45
 > *[Read db.py]* → confirmed, string concatenation in query
-> *[Call `report_finding` with p="Confidentiality", t="violation", d="security", w="SQL injection via string concat", file="db.py", line=45, severity="critical", vt="sql-injection", reason="User input concatenated into SQL query", cwe=89]*
+> *[Call `report_finding` with p="Confidentiality", t="violation", d="security", w="SQL injection via string concat", file="db.py", line=45, severity="critical", vt="sql-injection", reason="User input concatenated into SQL query", req="S-INT-2"]*
 
 **DO NOT do this (batching at the end):**
 > *[Grep...]* → *[Read...]* → *[Grep...]* → *[Read...]* → ... → *[report all findings at the end]*
@@ -98,7 +98,7 @@ Skip these directories (they contain generated, vendored, or non-source content)
 
 ## Standards Checklist
 
-This is the comprehensive CWE checklist for this dimension, organized by ISO 25010 principle. Use the **principle name** as the `p` field in your JSONL output.
+This is the comprehensive requirements checklist for this dimension, organized by ISO 25010 principle. Use the **principle name** as the `p` field in your JSONL output.
 
 {{STANDARDS_CHECKLIST}}
 
