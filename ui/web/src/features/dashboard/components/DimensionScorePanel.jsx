@@ -9,6 +9,7 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
+import { formatShortDate } from '../../../utils/formatters.js';
 
 function cssVar(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -115,7 +116,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
         <span className="run-history-title">Dimension Scores</span>
         {(runDate || runId) && (
           <span className="dim-panel-run-meta">
-            {runDate && <span className="dim-panel-run-date">{runDate}</span>}
+            {runDate && <span className="dim-panel-run-date">{formatShortDate(runDate)}</span>}
             {runId && <span className="dim-panel-run-id">{runId}</span>}
           </span>
         )}

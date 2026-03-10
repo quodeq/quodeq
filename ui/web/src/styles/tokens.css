@@ -158,6 +158,7 @@
   --primitive-amber-800:   #a16207;
   --primitive-daruma-600:  #d9a010;  /* warm yellow-gold — daruma eye rings */
   --primitive-daruma-400:  #d4d8e0;  /* light gray for dark backgrounds — visibly lighter than grade-high */
+  --primitive-brand-300:   #b8bec8;  /* mid gray for dark grade-high — between brand-400 (text-muted) and brand-200 */
   --primitive-emerald-300: #6ee7a0;
   --primitive-rust-700:    #9f3a28;
   --primitive-brown-500:   #92581a;
@@ -294,9 +295,9 @@
     --color-success: var(--primitive-green-400);
 
     /* Severity — traditional: red=critical, amber=major, green=minor */
-    --color-sev-critical-text:   var(--primitive-crimson-300);
-    --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-300) 4%, transparent);
-    --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-300) 42%, transparent);
+    --color-sev-critical-text:   var(--primitive-crimson-200);
+    --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
+    --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-200) 42%, transparent);
     --color-sev-major-text:      var(--primitive-ired-300);
     --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ired-300) 4%, transparent);
     --color-sev-major-border:    color-mix(in srgb, var(--primitive-ired-300) 38%, transparent);
@@ -306,8 +307,8 @@
 
     --color-grade-top-text:    var(--primitive-daruma-400);
     --color-grade-top-bg:      color-mix(in srgb, var(--primitive-daruma-400) 14%, transparent);
-    --color-grade-high-text:   var(--primitive-brand-400);
-    --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-400) 14%, transparent);
+    --color-grade-high-text:   var(--primitive-brand-300);
+    --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-300) 14%, transparent);
     --color-grade-mid-text:    var(--primitive-ired-300);
     --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 14%, transparent);
     --color-grade-low-text:    var(--primitive-ired-400);
@@ -321,9 +322,9 @@
     --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 12%, transparent);
 
     /* Danger variants */
-    --color-danger-text:   var(--primitive-crimson-300);
-    --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-300) 12%, transparent);
-    --color-danger-border: color-mix(in srgb, var(--primitive-crimson-300) 25%, transparent);
+    --color-danger-text:   var(--primitive-crimson-200);
+    --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 12%, transparent);
+    --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 25%, transparent);
 
     /* Overlays */
     --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
@@ -337,12 +338,12 @@
     --color-chart-stroke: rgba(255, 255, 255, 0.2);
 
     /* Trend — gray → crimson on dark backgrounds */
-    --color-trend-strong-up:   var(--primitive-brand-400);
+    --color-trend-strong-up:   var(--primitive-brand-300);
     --color-trend-up:          var(--primitive-ired-200);
     --color-trend-soft-up:     var(--primitive-brand-500);
     --color-trend-soft-down:   var(--primitive-ired-300);
     --color-trend-down:        var(--primitive-ired-400);
-    --color-trend-strong-down: var(--primitive-crimson-300);
+    --color-trend-strong-down: var(--primitive-crimson-200);
 
     /* Logo — monochrome light */
     --logo-q:              var(--primitive-brand-200);
@@ -377,9 +378,9 @@ html[data-theme="dark"]:root {
   --color-success: var(--primitive-green-400);
 
   /* Severity — traditional: red=critical, amber=major, green=minor */
-  --color-sev-critical-text:   var(--primitive-crimson-300);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-300) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-300) 42%, transparent);
+  --color-sev-critical-text:   var(--primitive-crimson-200);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-200) 42%, transparent);
   --color-sev-major-text:      var(--primitive-ired-300);
   --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ired-300) 4%, transparent);
   --color-sev-major-border:    color-mix(in srgb, var(--primitive-ired-300) 38%, transparent);
@@ -389,14 +390,14 @@ html[data-theme="dark"]:root {
 
   --color-grade-top-text:    var(--primitive-daruma-400);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-daruma-400) 14%, transparent);
-  --color-grade-high-text:   var(--primitive-brand-400);
-  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-400) 14%, transparent);
+  --color-grade-high-text:   var(--primitive-brand-300);
+  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-300) 14%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-300);
   --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 14%, transparent);
   --color-grade-low-text:    var(--primitive-ired-400);
   --color-grade-low-bg:      color-mix(in srgb, var(--primitive-ired-400) 15%, transparent);
-  --color-grade-bottom-text: var(--primitive-crimson-300);
-  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-300) 15%, transparent);
+  --color-grade-bottom-text: var(--primitive-crimson-200);
+  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-200) 15%, transparent);
 
   /* Warning */
   --color-warning:      var(--primitive-amber-400);
@@ -404,9 +405,9 @@ html[data-theme="dark"]:root {
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 12%, transparent);
 
   /* Danger variants */
-  --color-danger-text:   var(--primitive-crimson-300);
-  --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-300) 12%, transparent);
-  --color-danger-border: color-mix(in srgb, var(--primitive-crimson-300) 25%, transparent);
+  --color-danger-text:   var(--primitive-crimson-200);
+  --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 12%, transparent);
+  --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 25%, transparent);
 
   /* Overlays */
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
@@ -420,12 +421,12 @@ html[data-theme="dark"]:root {
   --color-chart-stroke: rgba(255, 255, 255, 0.2);
 
   /* Trend — gray → crimson on dark backgrounds */
-  --color-trend-strong-up:   var(--primitive-brand-400);
+  --color-trend-strong-up:   var(--primitive-brand-300);
   --color-trend-up:          var(--primitive-ired-200);
   --color-trend-soft-up:     var(--primitive-brand-500);
   --color-trend-soft-down:   var(--primitive-ired-300);
   --color-trend-down:        var(--primitive-ired-400);
-  --color-trend-strong-down: var(--primitive-crimson-300);
+  --color-trend-strong-down: var(--primitive-crimson-200);
 
   /* Console — cool-dark tint */
   --color-console-bg:      #060810;
@@ -538,9 +539,9 @@ html[data-theme="ember"]:root {
   --color-danger:  #e05c4b;
   --color-success: #4caf7d;
 
-  --color-sev-critical-text:   var(--primitive-crimson-300);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-300) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-300) 42%, transparent);
+  --color-sev-critical-text:   var(--primitive-crimson-200);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-200) 42%, transparent);
   --color-sev-major-text:      var(--primitive-ired-300);
   --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ired-300) 4%, transparent);
   --color-sev-major-border:    color-mix(in srgb, var(--primitive-ired-300) 38%, transparent);
@@ -550,22 +551,22 @@ html[data-theme="ember"]:root {
 
   --color-grade-top-text:    var(--primitive-emerald-300);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-emerald-300) 12%, transparent);
-  --color-grade-high-text:   var(--primitive-ember-500);
-  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-ember-500) 10%, transparent);
+  --color-grade-high-text:   #c0b5ae;
+  --color-grade-high-bg:     color-mix(in srgb, #c0b5ae 12%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-300);
   --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 12%, transparent);
   --color-grade-low-text:    var(--primitive-ired-400);
   --color-grade-low-bg:      color-mix(in srgb, var(--primitive-ired-400) 13%, transparent);
-  --color-grade-bottom-text: var(--primitive-crimson-300);
-  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-300) 4%, transparent);
+  --color-grade-bottom-text: var(--primitive-crimson-200);
+  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
 
   --color-warning:      var(--primitive-amber-400);
   --color-warning-text: var(--primitive-amber-400);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
 
-  --color-danger-text:   var(--primitive-crimson-300);
-  --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-300) 15%, transparent);
-  --color-danger-border: color-mix(in srgb, var(--primitive-crimson-300) 30%, transparent);
+  --color-danger-text:   var(--primitive-crimson-200);
+  --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 15%, transparent);
+  --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 30%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -699,9 +700,9 @@ html[data-theme="midnight"]:root {
   --color-danger:  #e05c4b;
   --color-success: #4caf7d;
 
-  --color-sev-critical-text:   var(--primitive-crimson-300);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-300) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-300) 42%, transparent);
+  --color-sev-critical-text:   var(--primitive-crimson-200);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-200) 42%, transparent);
   --color-sev-major-text:      var(--primitive-ired-300);
   --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ired-300) 4%, transparent);
   --color-sev-major-border:    color-mix(in srgb, var(--primitive-ired-300) 38%, transparent);
@@ -711,14 +712,14 @@ html[data-theme="midnight"]:root {
 
   --color-grade-top-text:    #00d4ff;
   --color-grade-top-bg:      color-mix(in srgb, #00d4ff 12%, transparent);
-  --color-grade-high-text:   var(--primitive-midnight-500);
-  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-midnight-500) 12%, transparent);
+  --color-grade-high-text:   #8aafcc;
+  --color-grade-high-bg:     color-mix(in srgb, #8aafcc 12%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-300);
   --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 12%, transparent);
   --color-grade-low-text:    var(--primitive-ired-400);
   --color-grade-low-bg:      color-mix(in srgb, var(--primitive-ired-400) 13%, transparent);
-  --color-grade-bottom-text: var(--primitive-crimson-300);
-  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-300) 4%, transparent);
+  --color-grade-bottom-text: var(--primitive-crimson-200);
+  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
 
   --color-warning:      var(--primitive-amber-400);
   --color-warning-text: var(--primitive-amber-400);

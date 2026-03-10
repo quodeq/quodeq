@@ -64,6 +64,20 @@ export function gradeColorClass(grade) {
 }
 
 /**
+ * Format a date string as "20 Feb" (day + abbreviated month, no year).
+ * Falls back to the original string if it cannot be parsed as a date.
+ *
+ * @param {string|null|undefined} dateStr
+ * @returns {string}
+ */
+export function formatShortDate(dateStr) {
+  if (!dateStr) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+/**
  * Format a run identifier for display.
  * - If a dateLabel is provided, use it directly.
  * - "latest" (or falsy) becomes "Latest".

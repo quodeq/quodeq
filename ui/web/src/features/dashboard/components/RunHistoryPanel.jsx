@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatShortDate } from '../../../utils/formatters.js';
 import {
   ComposedChart,
   Bar,
@@ -109,6 +110,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
           <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
           <XAxis
             dataKey="dateLabel"
+            tickFormatter={formatShortDate}
             tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             axisLine={false}
             tickLine={false}
