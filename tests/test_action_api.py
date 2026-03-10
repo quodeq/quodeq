@@ -1,7 +1,17 @@
 from __future__ import annotations
 
+import os
+
+import pytest
+
 from quodeq.action_api import create_app
 from quodeq.provider.base import ActionProvider, EvaluationOptions
+
+
+@pytest.fixture(autouse=True)
+def _disable_auth(monkeypatch):
+    """Disable auth for API tests that are not testing authentication."""
+    monkeypatch.setenv("QUODEQ_AUTH_DISABLED", "1")
 
 
 class StubProvider(ActionProvider):

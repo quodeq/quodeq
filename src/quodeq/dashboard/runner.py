@@ -19,6 +19,13 @@ from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
 from quodeq.shared.paths import resolve_path
 from quodeq.shared.utils import ACTION_API_MODULE, DEFAULT_HOST
 
+
+def _get_pid_file() -> Path:
+    """Return a PID file path in a user-private runtime directory."""
+    run_dir = Path.home() / ".quodeq" / "run"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    return run_dir / "action_api.pid"
+
 _HEALTH_CHECK_TIMEOUT_S = 0.5
 _POLL_INTERVAL_S = 0.1
 _HEALTH_POLL_INTERVAL_S = 0.2
@@ -110,12 +117,18 @@ def _choose_ui_port(start: int, host: str = DEFAULT_HOST) -> int:
 
 
 def _kill_stale_action_api(host: str, port: int) -> None:
-    """Kill any lingering action API processes so the dashboard always loads fresh code."""
-    if sys.platform != "win32":
+    """Kill any lingering action API processes using PID file tracking."""
+    pid_file = _get_pid_file()
+    if pid_file.exists():
         try:
-            subprocess.run(["pkill", "-f", ACTION_API_MODULE], capture_output=True)
+            pid = int(pid_file.read_text().strip())
+            os.kill(pid, signal.SIGTERM)
+        except (ValueError, OSError):
+            pass
+        try:
+            pid_file.unlink(missing_ok=True)
         except OSError:
-            log_debug("pkill not available, skipping stale process cleanup")
+            pass
     deadline = time.monotonic() + 3
     while _is_port_open(host, port) and time.monotonic() < deadline:
         time.sleep(_POLL_INTERVAL_S)
@@ -127,11 +140,16 @@ def _spawn_action_api(port: int, static_dist: Path | None = None) -> subprocess.
     env.setdefault("QUODEQ_ACTION_API_HOST", DEFAULT_HOST)
     if static_dist:
         env["QUODEQ_STATIC_DIST"] = str(static_dist)
-    return subprocess.Popen(
+    proc = subprocess.Popen(
         [sys.executable, "-m", ACTION_API_MODULE],
         env=env,
         start_new_session=True,
     )
+    try:
+        _get_pid_file().write_text(str(proc.pid))
+    except (OSError, AttributeError):
+        pass
+    return proc
 
 
 def _wait_for_action_api(base_url: str, timeout_s: float = 10) -> None:

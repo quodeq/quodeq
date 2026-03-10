@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -53,6 +54,7 @@ def _create_mcp_config(jsonl_file: Path) -> Path:
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="mcp_findings_", delete=False,
     )
+    os.chmod(tmp.name, 0o600)
     json.dump(config, tmp)
     tmp.close()
     return Path(tmp.name)
@@ -126,7 +128,7 @@ def count_files_from_stream(stream_file: Path) -> int:
     return len(_count_files_from_stream(stream_file))
 
 
-_AI_TOOLS = "Bash,Glob,Grep,Read"
+_AI_TOOLS = "Glob,Grep,Read"
 _BASE_AI_ARGS = ("--print", "--output-format", "stream-json", "--verbose")
 
 
@@ -153,8 +155,8 @@ def _build_ai_cmd(
         args.extend(["--mcp-config", str(mcp_config_path)])
         args.extend(["--allowedTools", "mcp__findings__report_finding"])
         # MCP servers require permission approval; in --print mode there is no
-        # interactive prompt, so we must bypass permissions for the server to start.
-        args.extend(["--permission-mode", "bypassPermissions"])
+        # interactive prompt, so we must approve only the MCP server tool.
+        args.extend(["--permission-prompt-tool", "mcp__findings__report_finding"])
 
     if model:
         args.extend(["--model", model])
@@ -210,12 +212,23 @@ def _build_analysis_env() -> dict[str, str]:
     return env
 
 
+_SENSITIVE_PATTERNS = re.compile(
+    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
+    re.IGNORECASE,
+)
+
+
+def _sanitize_stderr(text: str) -> str:
+    """Remove potential secrets from stderr output before including in errors."""
+    return _SENSITIVE_PATTERNS.sub(r"\1=***", text)
+
+
 def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
     """Raise AnalysisError if the process exited with a non-zero code."""
     if process.returncode != 0:
         stderr_text = ""
         if stream_err.exists():
-            stderr_text = stream_err.read_text().strip()
+            stderr_text = _sanitize_stderr(stream_err.read_text().strip())
         raise AnalysisError(
             f"AI CLI exited with code {process.returncode}"
             + (f": {stderr_text}" if stderr_text else "")

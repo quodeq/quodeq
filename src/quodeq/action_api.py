@@ -2,14 +2,35 @@
 
 from __future__ import annotations
 
+import hmac
+import logging
+import os
+import time
+from collections import defaultdict
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
+import re
+
 from quodeq.provider.base import ActionProvider
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_evaluations_dir, get_static_dist
+
+_CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
+
+
+def _sanitize_url(url: str) -> str:
+    """Remove embedded credentials from a URL for safe logging."""
+    return _CREDENTIALS_RE.sub(r"\1***@", url)
+
+_logger = logging.getLogger(__name__)
+_ALLOWED_AI_CMDS = frozenset({"claude", "codex", "copilot"})
+_MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
+_RATE_LIMIT_WINDOW = 60  # seconds
+_RATE_LIMIT_MAX = 60  # max state-changing requests per window
+_rate_store: dict[str, list[float]] = defaultdict(list)
 
 def _default_provider() -> ActionProvider:
     """Create the default filesystem-based provider (lazy import)."""
@@ -22,7 +43,13 @@ def _error(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
 
 
 def _reports_dir() -> str:
-    return request.args.get("evaluations") or get_evaluations_dir()
+    raw = request.args.get("evaluations") or get_evaluations_dir()
+    resolved = Path(raw).resolve()
+    default_resolved = Path(get_evaluations_dir()).resolve()
+    if not resolved.is_relative_to(default_resolved) and not resolved.is_relative_to(Path.home()):
+        from flask import abort
+        abort(HTTPStatus.FORBIDDEN)
+    return str(resolved)
 
 
 def _build_project_zip(project_path: Path) -> "io.BytesIO":
@@ -30,9 +57,15 @@ def _build_project_zip(project_path: Path) -> "io.BytesIO":
     import io
     import zipfile
     buf = io.BytesIO()
+    total_size = 0
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
         for file_entry in project_path.rglob("*"):
+            if file_entry.is_symlink():
+                continue
             if file_entry.is_file():
+                total_size += file_entry.stat().st_size
+                if total_size > _MAX_ZIP_SIZE_BYTES:
+                    raise ValueError("Project exceeds maximum export size")
                 zf.write(file_entry, file_entry.relative_to(project_path.parent))
     buf.seek(0)
     return buf
@@ -54,6 +87,7 @@ def _register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         if not new_path:
             body, status = _error("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
+        _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
         ok = provider.update_project_path(_reports_dir(), project, new_path)
         if not ok:
             body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -68,12 +102,17 @@ def _register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         if not project_path.exists() or not project_path.is_dir():
             body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        buf = _build_project_zip(project_path)
+        try:
+            buf = _build_project_zip(project_path)
+        except ValueError:
+            body, status = _error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+            return jsonify(body), status
         return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its report data."""
+        _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
         ok = provider.delete_project(_reports_dir(), project)
         if not ok:
             return jsonify({"error": "Project not found"}), HTTPStatus.NOT_FOUND
@@ -98,8 +137,8 @@ def _register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         run = request.args.get("run", "latest")
         try:
             payload = provider.get_dashboard(_reports_dir(), project, run)
-        except FileNotFoundError as exc:
-            body, status = _error(str(exc), HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        except FileNotFoundError:
+            body, status = _error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(payload)
 
@@ -129,8 +168,8 @@ def _register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         """Return aggregated violation summary for a run."""
         try:
             payload = provider.get_violations(_reports_dir(), project, run_id)
-        except FileNotFoundError as exc:
-            body, status = _error(str(exc), HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        except FileNotFoundError:
+            body, status = _error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(payload)
 
@@ -151,6 +190,11 @@ def _register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> No
         if not repo:
             body, status = _error("Repository is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
+        ai_cmd = payload.get("aiCmd") or None
+        if ai_cmd and ai_cmd not in _ALLOWED_AI_CMDS:
+            body, status = _error("Invalid AI command", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+        _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
             from quodeq.provider.base import EvaluationOptions
             job = provider.start_evaluation(
@@ -160,12 +204,12 @@ def _register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> No
                     discipline=payload.get("discipline"),
                     dimensions=payload.get("dimensions") or "",
                     numerical=bool(payload.get("numerical")),
-                    ai_cmd=payload.get("aiCmd") or None,
+                    ai_cmd=ai_cmd,
                     ai_model=payload.get("aiModel") or None,
                 ),
             )
-        except FileNotFoundError as exc:
-            body, status = _error(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        except (FileNotFoundError, ValueError):
+            body, status = _error("Invalid repository", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         return jsonify(job), HTTPStatus.ACCEPTED
 
@@ -185,6 +229,7 @@ def _register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> No
     @app.delete("/api/evaluations/<job_id>")
     def cancel_evaluation(job_id: str) -> Response | tuple[Response, int]:
         """Cancel a running evaluation job."""
+        _logger.info("cancel_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
         ok = provider.cancel_evaluation(job_id)
         if not ok:
             body, status = _error("Job not found or not running", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -215,6 +260,11 @@ def _register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
     def browse() -> Response | tuple[Response, int]:
         """List directories at a given path for repository browsing."""
         path = request.args.get("path")
+        if path:
+            resolved = Path(path).resolve()
+            if not resolved.is_relative_to(Path.home()):
+                body, status = _error("Path must be within user home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN")
+                return jsonify(body), status
         payload = provider.browse_repo(path)
         if "error" in payload:
             browse_status = HTTPStatus.BAD_REQUEST if "directory" in payload["error"].lower() else HTTPStatus.NOT_FOUND
@@ -250,6 +300,45 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
     """Create and configure the Flask application with all API routes."""
     app = Flask(__name__)
     provider = provider or _default_provider()
+
+    @app.before_request
+    def _security_checks() -> Response | tuple[Response, int] | None:
+        # Auth: require Bearer token unless explicitly disabled
+        if request.path != "/api/health":
+            api_key = os.environ.get("QUODEQ_API_KEY")
+            if api_key is None and not os.environ.get("QUODEQ_AUTH_DISABLED"):
+                return jsonify({"error": "API key not configured", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
+            if api_key:
+                auth = request.headers.get("Authorization", "")
+                if not hmac.compare_digest(auth, f"Bearer {api_key}"):
+                    return jsonify({"error": "Unauthorized", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
+        # CSRF: verify Origin header on state-changing requests
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            origin = request.headers.get("Origin")
+            if origin:
+                allowed = {f"http://{request.host}", f"https://{request.host}"}
+                if origin not in allowed:
+                    return jsonify({"error": "Origin not allowed", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+        # Rate limiting on state-changing requests
+        if request.method not in ("GET", "HEAD", "OPTIONS"):
+            ip = request.remote_addr or "unknown"
+            now = time.monotonic()
+            timestamps = [t for t in _rate_store[ip] if now - t < _RATE_LIMIT_WINDOW]
+            if not timestamps:
+                _rate_store.pop(ip, None)
+            else:
+                _rate_store[ip] = timestamps
+            if len(timestamps) >= _RATE_LIMIT_MAX:
+                return jsonify({"error": "Too many requests", "code": "RATE_LIMITED"}), HTTPStatus.TOO_MANY_REQUESTS
+            _rate_store[ip].append(now)
+        return None
+
+    @app.after_request
+    def _add_security_headers(response: Response) -> Response:
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+        return response
 
     @app.get("/api/health")
     def health() -> Response:
