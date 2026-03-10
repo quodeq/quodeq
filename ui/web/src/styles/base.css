@@ -1189,17 +1189,17 @@ textarea:focus {
 }
 
 .settings-about-phrase-row {
-  justify-content: center;
-  padding-top: var(--space-6);
-  padding-bottom: var(--space-6);
+  justify-content: flex-end;
+  padding-top: var(--space-4);
+  padding-bottom: var(--space-4);
 }
 
 .settings-about-phrase {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.1em;
   text-transform: lowercase;
-  text-align: center;
+  text-align: right;
   font-style: italic;
 }
 
