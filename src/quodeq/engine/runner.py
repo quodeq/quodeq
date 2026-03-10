@@ -180,7 +180,6 @@ def _parse_dimension_evidence(
             source_file_count=config.source_file_count,
             files_read=files_read,
         ),
-        standards_dir=config.standards_dir,
     )
     ev.plugin_name = ctx.plugin_name
     return ev

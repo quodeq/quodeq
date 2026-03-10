@@ -30,6 +30,7 @@ def _evidence_line(**overrides) -> str:
     return json.dumps(obj)
 
 
+
 # ---------------------------------------------------------------------------
 # _parse_jsonl_line
 # ---------------------------------------------------------------------------
@@ -75,9 +76,10 @@ class TestParseJsonlLine:
         assert j.line == 0
         assert j.severity == "medium"
 
-    def test_cwe_parsed(self):
-        j = _parse_jsonl_line(_evidence_line(cwe=95))
-        assert j.cwe == 95
+    def test_req_parsed(self):
+        j = _parse_jsonl_line(_evidence_line(req="R-FT-1"))
+        assert j is not None
+        assert j.req == "R-FT-1"
 
 
 # ---------------------------------------------------------------------------
@@ -214,64 +216,41 @@ class TestParseJsonlToEvidence:
         assert v["severity"] == "high"
         assert v["reason"] == "eval is dangerous"
 
-    def test_cwe_and_title_from_standards_dir(self, tmp_path):
-        """CWE ID from JSONL is resolved to a name via compiled standards."""
-        compiled_dir = tmp_path / "standards" / "compiled"
-        compiled_dir.mkdir(parents=True)
-        (compiled_dir / "security.json").write_text(json.dumps({
-            "id": "security", "name": "Security", "sources": [],
-            "principles": [{"name": "Confidentiality", "cwes": [
-                {"id": 798, "name": "Use of Hard-coded Credentials", "refs": []},
-            ]}],
-        }))
-
+    def test_req_field_stored_in_violation(self, tmp_path):
+        """req field from JSONL is stored in violation dict."""
         jsonl = tmp_path / "evidence.jsonl"
         jsonl.write_text(json.dumps({
-            "p": "Confidentiality", "t": "violation", "d": "security",
-            "w": "hardcoded secret", "file": "src/config.py", "line": 5,
-            "severity": "critical", "reason": "API key in source", "cwe": 798,
+            "p": "Fault Tolerance", "t": "violation", "d": "reliability",
+            "w": "empty catch block", "file": "src/app.py", "line": 5,
+            "severity": "high", "reason": "exception swallowed", "req": "R-FT-1",
         }) + "\n")
 
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="python",
-                repository="test",
-                date_str="2026-03-09",
-                source_file_count=10,
-                files_read=5,
+                plugin_id="python", repository="test", date_str="2026-03-11",
+                source_file_count=10, files_read=5,
             ),
-            standards_dir=tmp_path / "standards",
         )
 
-        v = ev.principles["Confidentiality"].violations[0]
-        assert v["cwe"] == 798
-        assert v["title"] == "Use of Hard-coded Credentials"
-        assert v["reason"] == "Use of Hard-coded Credentials — API key in source"
+        v = ev.principles["Fault Tolerance"].violations[0]
+        assert v["req"] == "R-FT-1"
+        assert v["title"] == "empty catch block"
+        assert v["reason"] == "exception swallowed"
 
-    def test_cwe_without_standards_dir(self, tmp_path):
-        """CWE ID is still stored even without standards_dir; title falls back to w."""
+    def test_no_req_field_still_works(self, tmp_path):
+        """Findings without req field are still parsed."""
         jsonl = tmp_path / "evidence.jsonl"
-        jsonl.write_text(json.dumps({
-            "p": "Confidentiality", "t": "violation", "d": "security",
-            "w": "hardcoded secret", "file": "src/config.py", "line": 5,
-            "severity": "critical", "reason": "API key in source", "cwe": 798,
-        }) + "\n")
+        jsonl.write_text(_evidence_line() + "\n")
 
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="python",
-                repository="test",
-                date_str="2026-03-09",
-                source_file_count=10,
-                files_read=5,
+                plugin_id="typescript", repository="test", date_str="2026-03-11",
+                source_file_count=10, files_read=5,
             ),
         )
-
-        v = ev.principles["Confidentiality"].violations[0]
-        assert v["cwe"] == 798
-        assert v["title"] == "hardcoded secret"
+        assert len(ev.principles) == 1
 
     def test_malformed_lines_skipped(self, tmp_path):
         jsonl = tmp_path / "evidence.jsonl"

@@ -3,18 +3,9 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from functools import lru_cache
 from pathlib import Path
 
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
-
-
-@dataclass(frozen=True)
-class _JudgmentCWE:
-    """A judgment paired with its resolved CWE metadata."""
-    judgment: Judgment
-    cwe_name: str
-    cwe_id: int | None
 
 
 @dataclass
@@ -25,24 +16,6 @@ class EvidenceContext:
     date_str: str
     source_file_count: int
     files_read: int
-
-
-@lru_cache(maxsize=32)
-def _build_cwe_name_lookup(standards_dir: Path) -> dict[int, str]:
-    """Build CWE ID -> name from all compiled standards files."""
-    lookup: dict[int, str] = {}
-    compiled_dir = standards_dir / "compiled"
-    if not compiled_dir.exists():
-        return lookup
-    for f in compiled_dir.glob("*.json"):
-        data = json.loads(f.read_text())
-        for principle in data.get("principles", []):
-            for cwe in principle.get("cwes", []):
-                cid = cwe.get("id")
-                name = cwe.get("name", "")
-                if isinstance(cid, int) and name and cid not in lookup:
-                    lookup[cid] = name
-    return lookup
 
 
 def _parse_jsonl_line(line: str) -> Judgment | None:
@@ -70,55 +43,43 @@ def _parse_jsonl_line(line: str) -> Judgment | None:
         severity=obj.get("severity", "medium"),
         violation_type=obj.get("vt", ""),
         reason=obj.get("reason", ""),
-        cwe=obj.get("cwe"),
+        req=obj.get("req"),
         title=obj.get("w", ""),
     )
 
 
-def _judgment_to_dict(j: Judgment, cwe_name: str = "", cwe_id: int | None = None) -> dict:
+def _judgment_to_dict(j: Judgment) -> dict:
     """Convert a Judgment to the dict format used in PrincipleEvidence lists."""
     d: dict = {"file": j.file}
-    # Populate optional fields from the judgment.
     _optional = {"line": j.line, "snippet": j.snippet, "severity": j.severity, "violation_type": j.violation_type}
     d.update({k: v for k, v in _optional.items() if v})
-    if cwe_id:
-        d["cwe"] = cwe_id
-    effective_title = cwe_name or j.title
-    if effective_title:
-        d["title"] = effective_title
-    reason_parts = [p for p in (cwe_name, j.reason) if p]
-    if reason_parts:
-        d["reason"] = " — ".join(reason_parts)
+    if j.req:
+        d["req"] = j.req
+    if j.title:
+        d["title"] = j.title
+    if j.reason:
+        d["reason"] = j.reason
     return d
 
 
 @dataclass
 class _GroupedJudgments:
-    """Judgments grouped by principle into violations, compliance, and max severity."""
-    violations: dict[str, list[_JudgmentCWE]]
-    compliance: dict[str, list[_JudgmentCWE]]
+    violations: dict[str, list[Judgment]]
+    compliance: dict[str, list[Judgment]]
     severity: dict[str, str]
 
 
-def _group_judgments(
-    judgments: list[Judgment], cwe_name_lookup: dict[int, str],
-) -> _GroupedJudgments:
-    """Group judgments by principle into violations, compliance, and max severity."""
-    sc_violations: dict[str, list[_JudgmentCWE]] = {}
-    sc_compliance: dict[str, list[_JudgmentCWE]] = {}
+def _group_judgments(judgments: list[Judgment]) -> _GroupedJudgments:
+    sc_violations: dict[str, list[Judgment]] = {}
+    sc_compliance: dict[str, list[Judgment]] = {}
     sc_severity: dict[str, str] = {}
 
     for j in judgments:
         principle = j.practice_id
-        cwe_id = j.cwe
-        cwe_name = cwe_name_lookup.get(cwe_id, "") if cwe_id is not None else ""
-        entry = _JudgmentCWE(j, cwe_name, cwe_id)
-
         if j.verdict == "violation":
-            sc_violations.setdefault(principle, []).append(entry)
+            sc_violations.setdefault(principle, []).append(j)
         elif j.verdict == "compliance":
-            sc_compliance.setdefault(principle, []).append(entry)
-
+            sc_compliance.setdefault(principle, []).append(j)
         sev = j.severity or "medium"
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
@@ -129,16 +90,8 @@ def _group_judgments(
 def parse_jsonl_to_evidence(
     jsonl_file: Path,
     context: EvidenceContext,
-    *,
-    standards_dir: Path | None = None,
 ) -> Evidence:
-    """Parse extracted JSONL file into a complete Evidence object.
-
-    Findings are grouped by principle name (the p field the AI reports).
-    CWE names are resolved from compiled standards when available.
-    """
-    cwe_name_lookup = _build_cwe_name_lookup(standards_dir) if standards_dir else {}
-
+    """Parse extracted JSONL file into a complete Evidence object."""
     judgments: list[Judgment] = []
     if jsonl_file.exists():
         with open(jsonl_file) as _jf:
@@ -147,7 +100,7 @@ def parse_jsonl_to_evidence(
                 if j is not None:
                     judgments.append(j)
 
-    grouped = _group_judgments(judgments, cwe_name_lookup)
+    grouped = _group_judgments(judgments)
     all_principles = set(grouped.violations.keys()) | set(grouped.compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}
 
@@ -157,14 +110,14 @@ def parse_jsonl_to_evidence(
             display_name=sc,
             dimension=judgments[0].dimension if judgments else "",
             severity=grouped.severity.get(sc, "medium"),
-            violations=[_judgment_to_dict(e.judgment, e.cwe_name, e.cwe_id) for e in grouped.violations.get(sc, [])],
-            compliance=[_judgment_to_dict(e.judgment, e.cwe_name, e.cwe_id) for e in grouped.compliance.get(sc, [])],
+            violations=[_judgment_to_dict(j) for j in grouped.violations.get(sc, [])],
+            compliance=[_judgment_to_dict(j) for j in grouped.compliance.get(sc, [])],
         )
         pe.compute_metrics()
         principles[sc] = pe
 
-    files_read = context.files_read
     source_file_count = context.source_file_count
+    files_read = context.files_read
     coverage_pct = round(files_read / source_file_count * 100, 1) if source_file_count > 0 else 0.0
 
     return Evidence(
