@@ -55,6 +55,24 @@ def _parse_jsonl_findings(
     return violations, compliance
 
 
+def _count_files_in_stream(stream_path: Path) -> int:
+    """Count unique file paths read by the AI in a stream file."""
+    files: set[str] = set()
+    try:
+        with open(stream_path) as _sf:
+            for raw_line in _sf:
+                stripped = raw_line.strip()
+                if not stripped:
+                    continue
+                try:
+                    files.update(_extract_files_from_stream_event(json.loads(stripped)))
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        pass
+    return len(files)
+
+
 def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext) -> dict[str, Any] | None:
     """Parse live JSONL findings written by the MCP server."""
     try:
@@ -62,7 +80,7 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, ctx:
             violations, compliance = _parse_jsonl_findings(_f, ctx.dimension)
     except OSError:
         return None
-    files_read = count_files_from_stream(stream_path) if stream_path and stream_path.exists() else 0
+    files_read = _count_files_in_stream(stream_path) if stream_path and stream_path.exists() else 0
     return {
         "dimension": ctx.dimension,
         "runId": ctx.run_id,
