@@ -96,6 +96,9 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
     """Create and configure the Flask application with all API routes."""
     app = Flask(__name__)
     provider = provider or _default_provider()
+    # rate_store is process-local: limits are not shared across workers or
+    # restarts. For multi-process deployments, replace with a shared backend
+    # (e.g. Redis) and update _check_rate_limit accordingly.
     rate_store: OrderedDict[str, list[float]] = OrderedDict()
 
     @app.before_request

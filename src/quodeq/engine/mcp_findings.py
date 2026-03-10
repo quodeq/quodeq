@@ -9,6 +9,7 @@ import json
 import sys
 from typing import TextIO
 
+_FINDING_SCHEMA_VERSION = 1
 _JSONRPC_VERSION = "2.0"
 _MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
 _SERVER_NAME = "quodeq-findings"
@@ -96,7 +97,7 @@ def _handle_tools_call(request_id: object, params: dict, findings_fh: TextIO, co
             "isError": True,
         }), counter
 
-    finding = {k: v for k, v in args.items() if v is not None}
+    finding = {"schema_version": _FINDING_SCHEMA_VERSION, **{k: v for k, v in args.items() if v is not None}}
     findings_fh.write(json.dumps(finding) + "\n")
     findings_fh.flush()
     counter += 1

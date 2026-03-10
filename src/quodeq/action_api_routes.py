@@ -13,11 +13,11 @@ from typing import Any
 from flask import Flask, Response, after_this_request, jsonify, request, send_file, send_from_directory
 
 from quodeq.provider.base import ActionProvider
+from quodeq.provider.tooling_mixin import _ALLOWED_CLIENT_IDS as _ALLOWED_AI_CMDS
 from quodeq.shared.utils import get_evaluations_dir
 
 _CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
 _logger = logging.getLogger(__name__)
-_ALLOWED_AI_CMDS = frozenset({"claude", "codex", "copilot"})
 _MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
 
 

@@ -59,7 +59,15 @@ class Job:
 
 
 class JobManager:
-    """Thread-safe manager for spawning and tracking evaluation subprocesses."""
+    """Thread-safe manager for spawning and tracking evaluation subprocesses.
+
+    NOTE: Job state is stored in process memory (_jobs dict). This means job
+    history is lost on restart and cannot be shared across multiple processes or
+    workers. To support horizontal scaling, replace this class with an
+    implementation backed by a persistent store (e.g. database, Redis). The
+    interface (start_job / get_job / cancel_job / list_jobs) is intentionally
+    stable to allow substitution without changing callers.
+    """
 
     def __init__(self, spawn_impl: Callable[..., subprocess.Popen] | None = None) -> None:
         self._spawn = spawn_impl or subprocess.Popen

@@ -6,9 +6,31 @@ from pathlib import Path
 
 from quodeq.shared.logging import log_info
 
+_MIN_NPM_MAJOR = 8
+
+
+def _check_npm() -> None:
+    """Raise RuntimeError if npm is not found or is below the minimum version."""
+    try:
+        result = subprocess.run(
+            ["npm", "--version"], capture_output=True, text=True, check=True,
+        )
+    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        raise RuntimeError("npm not found; install Node.js before building the UI.") from exc
+    version_str = result.stdout.strip()
+    try:
+        major = int(version_str.split(".")[0])
+    except (ValueError, IndexError):
+        return  # unparseable version — let npm fail naturally
+    if major < _MIN_NPM_MAJOR:
+        raise RuntimeError(
+            f"npm {version_str} is below the minimum required version {_MIN_NPM_MAJOR}.x."
+        )
+
 
 def npm_build(path: Path) -> None:
     """Run npm install and build in the given directory."""
+    _check_npm()
     subprocess.run(["npm", "install"], cwd=str(path), check=True)
     subprocess.run(["npm", "run", "build"], cwd=str(path), check=True)
 

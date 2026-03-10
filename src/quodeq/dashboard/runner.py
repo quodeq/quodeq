@@ -223,7 +223,8 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
         _stop_children()
         sys.exit(0)
 
-    signal.signal(signal.SIGTSTP, _handle_tstp)
+    if hasattr(signal, "SIGTSTP"):
+        signal.signal(signal.SIGTSTP, _handle_tstp)
 
     try:
         if action_api_process:
