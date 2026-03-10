@@ -924,7 +924,7 @@ html[data-theme="horizon"]:root {
    ──────────────────────────────────────────────────────── */
 
 :root {
-  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-sans: "Plus Jakarta Sans", "Manrope", system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
   /* Type scale */
