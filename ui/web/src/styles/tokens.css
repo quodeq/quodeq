@@ -925,7 +925,7 @@ html[data-theme="horizon"]:root {
 
 :root {
   --font-sans: "Plus Jakarta Sans", "Manrope", system-ui, -apple-system, sans-serif;
-  --font-data: "Manrope", system-ui, -apple-system, sans-serif;
+  --font-data: "IBM Plex Mono", "SFMono-Regular", Consolas, monospace;
   --font-mono: "JetBrains Mono", "SFMono-Regular", Consolas, monospace;
 
   /* Type scale */
