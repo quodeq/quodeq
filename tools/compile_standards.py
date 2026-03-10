@@ -183,8 +183,10 @@ def _attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimensi
     wcag_lookup = {c["id"]: c for c in wcag_data.get("criteria", [])}
     for reqs in index.values():
         for req in reqs:
+            seen: set[str] = set()
             for wcag_id in req["_wcag_ids"]:
-                if wcag_id in wcag_lookup:
+                if wcag_id in wcag_lookup and wcag_id not in seen:
+                    seen.add(wcag_id)
                     c = wcag_lookup[wcag_id]
                     req["refs"].append({
                         "source": "wcag22",
@@ -217,7 +219,7 @@ def build_req_index(
 def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
     """Compile a single dimension into the requirement-centric output format."""
     iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    iso_data = json.loads(iso_file.read_text())
+    dim_name = json.loads(iso_file.read_text()).get("name", dimension.title())
 
     index = build_req_index(standards_dir, dimension, cwe_db)
 
@@ -245,7 +247,7 @@ def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
 
     return {
         "id": dimension,
-        "name": iso_data.get("name", dimension.title()),
+        "name": dim_name,
         "sources": sources,
         "principles": principles,
     }
@@ -264,6 +266,8 @@ def report_gaps(standards_dir: Path, dimension: str) -> list[str]:
             iso_cwes.update(req.get("cwe", []))
 
     cisq_file = standards_dir / "cisq" / f"{dimension}.json"
+    if not cisq_file.exists():
+        return []
     cisq_data = json.loads(cisq_file.read_text())
     cisq_lookup = {c["id"]: c["name"] for c in cisq_data.get("cwes", [])}
 
