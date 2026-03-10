@@ -34,7 +34,7 @@ body {
   min-height: 100vh;
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
-  transition: grid-template-columns var(--sidebar-transition);
+  transition: grid-template-columns 200ms ease;
 }
 
 /* Expand sidebar on hover */
