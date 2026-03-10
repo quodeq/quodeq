@@ -1,13 +1,13 @@
-<table>
-<tr>
-<td width="50%" align="center">
+<table width="100%" cellspacing="0" cellpadding="0" border="0" style="border: none;">
+<tr style="border: none;">
+<td width="50%" align="center" style="border: none;">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="res/quodeq-logo-dark.svg" />
     <img src="res/quodeq-logo.svg" alt="Quodeq" width="220" />
   </picture>
   <h1>quodeq</h1>
 </td>
-<td width="50%">
+<td width="50%" align="center" style="border: none;">
   <p>human aligned quode</p>
   <p>less drift, quode safe</p>
   <p>code with quore ♥️</p>
@@ -37,6 +37,18 @@ Evaluate any repository across six quality dimensions — **Security**, **Reliab
 uv sync
 ```
 
+### Run the Dashboard
+
+```bash
+uv run quodeq dashboard
+```
+
+This will:
+1. Install npm dependencies and build the web UI (first run only)
+2. Start the Python Action API on an available port (default 8001)
+3. Start the dashboard server on `http://localhost:4173`
+4. Open your browser automatically
+
 ### Run an Evaluation
 
 ```bash
@@ -58,18 +70,6 @@ uv run quodeq evaluate /path/to/project --evidence-only
 # Limit AI turns or duration per dimension
 uv run quodeq evaluate /path/to/project --max-turns 100 --max-duration 900
 ```
-
-### Run the Dashboard
-
-```bash
-uv run quodeq dashboard
-```
-
-This will:
-1. Install npm dependencies and build the web UI (first run only)
-2. Start the Python Action API on an available port (default 8001)
-3. Start the dashboard server on `http://localhost:4173`
-4. Open your browser automatically
 
 ### Configure AI Client
 
