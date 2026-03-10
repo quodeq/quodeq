@@ -19,19 +19,33 @@ from quodeq.config.paths import default_paths
 def build_parser() -> argparse.ArgumentParser:
     """Build and return the argument parser for the configure subcommand."""
     parser = argparse.ArgumentParser(prog="quodeq configure")
-    parser.add_argument("--ai-cli", nargs="?")
-    parser.add_argument("-d", dest="list_dimensions", action="store_true")
-    parser.add_argument("--generate-maps", nargs="?", const="")
-    parser.add_argument("--generate-dimensions", action="store_true")
-    parser.add_argument("--validate-evaluators")
-    parser.add_argument("--patch-evaluator", nargs=3)
-    parser.add_argument("--check-sources", nargs="?")
-    parser.add_argument("--add-discipline", nargs=2)
-    parser.add_argument("--list-gaps", nargs="?")
-    parser.add_argument("--fill-gap", nargs=2)
-    parser.add_argument("--parallel")
-    parser.add_argument("--sequential", action="store_true")
-    parser.add_argument("--data-version", default=None)
+    parser.add_argument("--ai-cli", nargs="?",
+                        help="AI CLI client to use for configuration tasks (e.g. claude, codex)")
+    parser.add_argument("-d", dest="list_dimensions", action="store_true",
+                        help="List all available quality dimensions")
+    parser.add_argument("--generate-maps", nargs="?", const="",
+                        help="Generate evaluator maps for a plugin (omit value to use default)")
+    parser.add_argument("--generate-dimensions", action="store_true",
+                        help="Generate the dimensions index from evaluator definitions")
+    parser.add_argument("--validate-evaluators",
+                        help="Validate evaluator files for the given plugin runtime")
+    parser.add_argument("--patch-evaluator", nargs=3,
+                        metavar=("RUNTIME", "DIMENSION", "PATCH"),
+                        help="Apply a JSON patch to an evaluator for the given runtime and dimension")
+    parser.add_argument("--check-sources", nargs="?",
+                        help="Check data sources for a plugin runtime (omit value to check all)")
+    parser.add_argument("--add-discipline", nargs=2, metavar=("RUNTIME", "DISCIPLINE"),
+                        help="Add a new discipline to a plugin runtime")
+    parser.add_argument("--list-gaps", nargs="?",
+                        help="List coverage gaps for a plugin runtime (omit value to list all)")
+    parser.add_argument("--fill-gap", nargs=2, metavar=("RUNTIME", "PRINCIPLE"),
+                        help="Generate an evaluator to fill a coverage gap for the given principle")
+    parser.add_argument("--parallel",
+                        help="Number of parallel workers to use for generation tasks")
+    parser.add_argument("--sequential", action="store_true",
+                        help="Run generation tasks sequentially instead of in parallel")
+    parser.add_argument("--data-version", default=None,
+                        help="Pin the data version used for generation (default: latest)")
     # Knowledge refresh
     parser.add_argument("--refresh-practices", metavar="RUNTIME",
                         help="Refresh practices.json for a plugin runtime from GitHub cursor-rules")

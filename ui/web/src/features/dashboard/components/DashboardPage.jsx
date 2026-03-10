@@ -244,6 +244,9 @@ function AccumulatedOverviewPanel({
                   key={item.dimension}
                   className={`qd-card${isStale ? ' qd-card-stale' : ''}`}
                   onClick={() => onDimensionClick(item)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDimensionClick(item); } }}
                 >
                   <div className="qd-card-header">
                     <span className="qd-card-name">{item.dimension}</span>
@@ -480,6 +483,9 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
                   key={item.dimension}
                   className="qd-card"
                   onClick={() => onDimensionClick(item, selectedRunId)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDimensionClick(item, selectedRunId); } }}
                 >
                   <div className="qd-card-header">
                     <span className="qd-card-name">{item.dimension}</span>
@@ -620,7 +626,7 @@ export default function DashboardPage({
   return (
     <div className="dashboard-page">
       {error && <p className="inline-error">{error}</p>}
-      {loading && <p className="loading">Loading dashboard...</p>}
+      {loading && <p className="loading" role="status" aria-live="polite">Loading dashboard...</p>}
 
       {!loading && dashboard && (
         <>

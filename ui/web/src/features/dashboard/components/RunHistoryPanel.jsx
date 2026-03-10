@@ -26,6 +26,16 @@ function scoreBarColor(score) {
   return cssVar('--color-grade-bottom-text');            // critical
 }
 
+function scoreTierLabel(score) {
+  const n = parseFloat(score);
+  if (isNaN(n)) return '';
+  if (n >= 9) return 'A';
+  if (n >= 7) return 'B';
+  if (n >= 5) return 'C';
+  if (n >= 3) return 'D';
+  return 'F';
+}
+
 // Mirrors angleFromDelta in TrendArrow — sqrt curve, max arc 55°
 function angleFromDelta(d) {
   const clamped = Math.max(-4, Math.min(4, d));
@@ -74,28 +84,37 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
     };
   });
 
-  // Custom label above each bar: rotated ↑ arrow + delta value
-  const renderTrendLabel = ({ x, y, width, index }) => {
+  // Custom label above each bar: rotated ↑ arrow + delta value; tier letter inside bar
+  const renderTrendLabel = ({ x, y, width, height, index }) => {
     const entry = data[index];
     const d = entry?.delta;
-    if (d === null || d === undefined) return null;
-    const dir = trendDir(d) ?? 'same';
-    const color = trendColor(dir);
-    const angle = Math.round(angleFromDelta(d));
+    const tier = scoreTierLabel(entry?.numericAverage);
     const cx = x + width / 2;
-    const arrowY = y - 14;
-    const deltaStr = d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1);
+    const hasDelta = d !== null && d !== undefined;
+    const dir = hasDelta ? (trendDir(d) ?? 'same') : null;
+    const color = hasDelta ? trendColor(dir) : null;
     return (
       <g>
-        <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={color}>
-          {deltaStr}
-        </text>
-        <text
-          x={cx} y={arrowY}
-          textAnchor="middle" dominantBaseline="central"
-          fontSize={11} fill={color}
-          transform={`rotate(${angle}, ${cx}, ${arrowY})`}
-        >↑</text>
+        {hasDelta && (
+          <>
+            <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={color}>
+              {d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1)}
+            </text>
+            <text
+              x={cx} y={y - 14}
+              textAnchor="middle" dominantBaseline="central"
+              fontSize={11} fill={color}
+              transform={`rotate(${Math.round(angleFromDelta(d))}, ${cx}, ${y - 14})`}
+            >↑</text>
+          </>
+        )}
+        {tier && height > 12 && (
+          <text
+            x={cx} y={y + Math.min(height / 2, 9)}
+            textAnchor="middle" dominantBaseline="central"
+            fontSize={9} fill="white" fillOpacity={0.85}
+          >{tier}</text>
+        )}
       </g>
     );
   };

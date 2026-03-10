@@ -6,10 +6,12 @@ export default function FolderBrowser({ onSelect, onClose }) {
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [navError, setNavError] = useState(null);
   const [selectedFolder, setSelectedFolder] = useState(null);
 
   async function navigate(path) {
     setLoading(true);
+    setNavError(null);
     try {
       const result = await browseDirectory(path || '');
       setData(result);
@@ -17,7 +19,7 @@ export default function FolderBrowser({ onSelect, onClose }) {
       setPathInput(result.current);
       setSelectedFolder(result.current);
     } catch (err) {
-      console.error('FolderBrowser: navigation error', err);
+      setNavError(err.message || 'Failed to load folder');
     } finally {
       setLoading(false);
     }
@@ -68,10 +70,11 @@ export default function FolderBrowser({ onSelect, onClose }) {
 
         <div className="folder-browser-list">
           {loading ? (
-            <p className="loading">Loading...</p>
+            <p className="loading" role="status" aria-live="polite">Loading...</p>
           ) : (
             <>
-              {data?.directories?.length === 0 && (
+              {navError && <p className="inline-error" role="alert">{navError}</p>}
+              {!navError && data?.directories?.length === 0 && (
                 <p className="empty-folder">No subfolders in this directory</p>
               )}
               {data?.directories?.length > 0 && (
@@ -81,8 +84,15 @@ export default function FolderBrowser({ onSelect, onClose }) {
                 <div
                   key={dir.path}
                   className={`folder-item ${dir.isGitRepo ? 'is-git-repo' : ''} ${selectedFolder === dir.path ? 'selected' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={selectedFolder === dir.path}
                   onClick={() => setSelectedFolder(dir.path)}
                   onDoubleClick={() => navigate(dir.path)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') navigate(dir.path);
+                    if (e.key === ' ') { e.preventDefault(); setSelectedFolder(dir.path); }
+                  }}
                 >
                   <span className="folder-icon">{dir.isGitRepo ? '📦' : '📁'}</span>
                   <span className="folder-name">{dir.name}</span>

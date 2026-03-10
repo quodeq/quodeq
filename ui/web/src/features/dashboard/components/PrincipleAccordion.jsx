@@ -7,12 +7,15 @@ import { gradeColorClass } from '../../../utils/formatters.js';
 
 export default function PrincipleAccordion({ principle, onViolationClick }) {
   const [open, setOpen] = useState(false);
+  const contentId = `pa-content-${(principle.name || '').replace(/[^a-zA-Z0-9]/g, '-')}`;
 
   return (
     <div className="principle-accordion">
       <button
         className="principle-accordion-header"
         onClick={() => setOpen(!open)}
+        aria-expanded={open}
+        aria-controls={contentId}
       >
         <span className={`accordion-chevron ${open ? 'open' : ''}`}>›</span>
         <span className="principle-name">{principle.name}</span>
@@ -20,7 +23,7 @@ export default function PrincipleAccordion({ principle, onViolationClick }) {
       </button>
 
       {open && (
-        <div className="principle-accordion-content">
+        <div id={contentId} className="principle-accordion-content">
           {principle.compliance?.length > 0 && (
             <div className="principle-section">
               <h4>Compliance Evidence</h4>
@@ -39,6 +42,9 @@ export default function PrincipleAccordion({ principle, onViolationClick }) {
                     key={i}
                     className={`violation-row${onViolationClick ? ' clickable' : ''}`}
                     onClick={onViolationClick ? () => onViolationClick(v, principle) : undefined}
+                    role={onViolationClick ? 'button' : undefined}
+                    tabIndex={onViolationClick ? 0 : undefined}
+                    onKeyDown={onViolationClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onViolationClick(v, principle); } } : undefined}
                   >
                     <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
                     <span className="violation-row-file">{v.file || '—'}</span>
