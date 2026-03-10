@@ -2404,8 +2404,8 @@
   flex-shrink: 0;
 }
 
-.projects-grade--a { color: var(--color-grade-top-text); }
-.projects-grade--b { color: var(--color-grade-high-text); }
+.projects-grade--a { color: color-mix(in srgb, var(--color-grade-top-text) 65%, black); }
+.projects-grade--b { color: color-mix(in srgb, var(--color-grade-high-text) 75%, black); }
 .projects-grade--c { color: var(--color-grade-mid-text); }
 .projects-grade--d { color: var(--color-grade-low-text); }
 .projects-grade--f { color: var(--color-grade-bottom-text); }
