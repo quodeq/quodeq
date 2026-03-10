@@ -2,42 +2,56 @@
   "id": "usability",
   "name": "Usability",
   "sources": [
-    "iso25010"
+    "iso25010",
+    "wcag22"
   ],
   "principles": [
     {
       "name": "Appropriateness Recognisability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 209,
-          "name": "Generation of Error Message Containing Sensitive Information",
+          "id": "U-APR-1",
+          "source": "iso25010",
+          "text": "All user-facing error messages MUST be human-readable (no stack traces exposed)",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-APR-1",
-              "title": "All user-facing error messages MUST be human-readable (no stack traces exposed)"
+              "source": "cwe",
+              "id": "209",
+              "name": "Generation of Error Message Containing Sensitive Information",
+              "url": "https://cwe.mitre.org/data/definitions/209.html"
             }
           ]
         },
         {
-          "id": 1053,
-          "name": "Missing Documentation for Design",
+          "id": "U-APR-2",
+          "source": "iso25010",
+          "text": "API responses MUST include machine-readable error codes alongside messages",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-APR-3",
-              "title": "README MUST describe the project purpose, setup steps, and usage examples"
+              "source": "cwe",
+              "id": "390",
+              "name": "Detection of Error Condition Without Action",
+              "url": "https://cwe.mitre.org/data/definitions/390.html"
             }
           ]
         },
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "U-APR-3",
+          "source": "iso25010",
+          "text": "README MUST describe the project purpose, setup steps, and usage examples",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-APR-2",
-              "title": "API responses MUST include machine-readable error codes alongside messages"
+              "source": "cwe",
+              "id": "1053",
+              "name": "Missing Documentation for Design",
+              "url": "https://cwe.mitre.org/data/definitions/1053.html"
             }
           ]
         }
@@ -45,36 +59,65 @@
     },
     {
       "name": "Learnability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 1053,
-          "name": "Missing Documentation for Design",
+          "id": "U-LRN-1",
+          "source": "iso25010",
+          "text": "CLI commands MUST provide --help output describing all flags",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-LRN-1",
-              "title": "CLI commands MUST provide --help output describing all flags"
-            },
-            {
-              "source": "iso25010",
-              "ref": "U-LRN-2",
-              "title": "Public API functions MUST include usage examples in docstrings"
+              "source": "cwe",
+              "id": "1053",
+              "name": "Missing Documentation for Design",
+              "url": "https://cwe.mitre.org/data/definitions/1053.html"
             }
           ]
         },
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "U-LRN-2",
+          "source": "iso25010",
+          "text": "Public API functions MUST include usage examples in docstrings",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-LRN-3",
-              "title": "Configuration options MUST have documented defaults and valid ranges"
-            },
+              "source": "cwe",
+              "id": "1053",
+              "name": "Missing Documentation for Design",
+              "url": "https://cwe.mitre.org/data/definitions/1053.html"
+            }
+          ]
+        },
+        {
+          "id": "U-LRN-3",
+          "source": "iso25010",
+          "text": "Configuration options MUST have documented defaults and valid ranges",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-LRN-4",
-              "title": "Error messages MUST suggest corrective actions when possible"
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            }
+          ]
+        },
+        {
+          "id": "U-LRN-4",
+          "source": "iso25010",
+          "text": "Error messages MUST suggest corrective actions when possible",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "755",
+              "name": "Improper Handling of Exceptional Conditions",
+              "url": "https://cwe.mitre.org/data/definitions/755.html"
             }
           ]
         }
@@ -82,31 +125,50 @@
     },
     {
       "name": "Operability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 252,
-          "name": "Unchecked Return Value",
+          "id": "U-OPR-1",
+          "source": "iso25010",
+          "text": "Long-running operations MUST provide progress indication or logging",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-OPR-3",
-              "title": "Exit codes MUST be non-zero for error conditions in CLI tools"
+              "source": "cwe",
+              "id": "778",
+              "name": "Insufficient Logging",
+              "url": "https://cwe.mitre.org/data/definitions/778.html"
             }
           ]
         },
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "U-OPR-2",
+          "source": "iso25010",
+          "text": "Destructive operations MUST require confirmation or use --force flags",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-OPR-1",
-              "title": "Long-running operations MUST provide progress indication or logging"
-            },
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            }
+          ]
+        },
+        {
+          "id": "U-OPR-3",
+          "source": "iso25010",
+          "text": "Exit codes MUST be non-zero for error conditions in CLI tools",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-OPR-2",
-              "title": "Destructive operations MUST require confirmation or use --force flags"
+              "source": "cwe",
+              "id": "252",
+              "name": "Unchecked Return Value",
+              "url": "https://cwe.mitre.org/data/definitions/252.html"
             }
           ]
         }
@@ -114,42 +176,65 @@
     },
     {
       "name": "User Error Protection",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 20,
-          "name": "Improper Input Validation",
+          "id": "U-UEP-1",
+          "source": "iso25010",
+          "text": "Input MUST be validated with clear error messages indicating what is wrong",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-UEP-1",
-              "title": "Input MUST be validated with clear error messages indicating what is wrong"
-            },
-            {
-              "source": "iso25010",
-              "ref": "U-UEP-3",
-              "title": "Ambiguous string formats (dates, numbers) MUST be rejected with format hints"
+              "source": "cwe",
+              "id": "20",
+              "name": "Improper Input Validation",
+              "url": "https://cwe.mitre.org/data/definitions/20.html"
             }
           ]
         },
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "U-UEP-2",
+          "source": "iso25010",
+          "text": "Dangerous defaults MUST NOT exist; fail-safe defaults are required",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-UEP-4",
-              "title": "Required fields MUST be enforced at the type level, not just at runtime"
+              "source": "cwe",
+              "id": "1188",
+              "name": "Initialization of a Resource with an Insecure Default",
+              "url": "https://cwe.mitre.org/data/definitions/1188.html"
             }
           ]
         },
         {
-          "id": 1188,
-          "name": "Initialization of a Resource with an Insecure Default",
+          "id": "U-UEP-3",
+          "source": "iso25010",
+          "text": "Ambiguous string formats (dates, numbers) MUST be rejected with format hints",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-UEP-2",
-              "title": "Dangerous defaults MUST NOT exist; fail-safe defaults are required"
+              "source": "cwe",
+              "id": "20",
+              "name": "Improper Input Validation",
+              "url": "https://cwe.mitre.org/data/definitions/20.html"
+            }
+          ]
+        },
+        {
+          "id": "U-UEP-4",
+          "source": "iso25010",
+          "text": "Required fields MUST be enforced at the type level, not just at runtime",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1173",
+              "name": "Improper Use of Validation Framework",
+              "url": "https://cwe.mitre.org/data/definitions/1173.html"
             }
           ]
         }
@@ -157,25 +242,50 @@
     },
     {
       "name": "User Interface Aesthetics",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "U-UIA-1",
+          "source": "iso25010",
+          "text": "Output format MUST be consistent across all commands (JSON or table, not mixed)",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-UIA-1",
-              "title": "Output format MUST be consistent across all commands (JSON or table, not mixed)"
-            },
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            }
+          ]
+        },
+        {
+          "id": "U-UIA-2",
+          "source": "iso25010",
+          "text": "Log messages MUST use consistent severity levels and structured format",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-UIA-2",
-              "title": "Log messages MUST use consistent severity levels and structured format"
-            },
+              "source": "cwe",
+              "id": "778",
+              "name": "Insufficient Logging",
+              "url": "https://cwe.mitre.org/data/definitions/778.html"
+            }
+          ]
+        },
+        {
+          "id": "U-UIA-3",
+          "source": "iso25010",
+          "text": "Terminal output MUST respect NO_COLOR and TERM environment variables",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-UIA-3",
-              "title": "Terminal output MUST respect NO_COLOR and TERM environment variables"
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
             }
           ]
         }
@@ -183,30 +293,113 @@
     },
     {
       "name": "Accessibility",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "U-ACC-1",
+          "source": "iso25010",
+          "text": "UI components MUST include ARIA labels or semantic HTML elements",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "U-ACC-1",
-              "title": "UI components MUST include ARIA labels or semantic HTML elements"
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
-              "source": "iso25010",
-              "ref": "U-ACC-2",
-              "title": "Colour MUST NOT be the sole means of conveying information"
+              "source": "wcag22",
+              "id": "4.1.2",
+              "name": "Name, Role, Value",
+              "url": "https://www.w3.org/TR/WCAG22/#name-role-value"
             },
             {
-              "source": "iso25010",
-              "ref": "U-ACC-3",
-              "title": "Interactive elements MUST be keyboard-navigable"
+              "source": "wcag22",
+              "id": "1.3.1",
+              "name": "Info and Relationships",
+              "url": "https://www.w3.org/TR/WCAG22/#info-and-relationships"
+            }
+          ]
+        },
+        {
+          "id": "U-ACC-2",
+          "source": "iso25010",
+          "text": "Colour MUST NOT be the sole means of conveying information",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
-              "source": "iso25010",
-              "ref": "U-ACC-4",
-              "title": "Images MUST include alt text descriptions"
+              "source": "wcag22",
+              "id": "1.4.1",
+              "name": "Use of Color",
+              "url": "https://www.w3.org/TR/WCAG22/#use-of-color"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.3.3",
+              "name": "Sensory Characteristics",
+              "url": "https://www.w3.org/TR/WCAG22/#sensory-characteristics"
+            }
+          ]
+        },
+        {
+          "id": "U-ACC-3",
+          "source": "iso25010",
+          "text": "Interactive elements MUST be keyboard-navigable",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.1.1",
+              "name": "Keyboard",
+              "url": "https://www.w3.org/TR/WCAG22/#keyboard"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.1.2",
+              "name": "No Keyboard Trap",
+              "url": "https://www.w3.org/TR/WCAG22/#no-keyboard-trap"
+            },
+            {
+              "source": "wcag22",
+              "id": "2.4.3",
+              "name": "Focus Order",
+              "url": "https://www.w3.org/TR/WCAG22/#focus-order"
+            }
+          ]
+        },
+        {
+          "id": "U-ACC-4",
+          "source": "iso25010",
+          "text": "Images MUST include alt text descriptions",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            },
+            {
+              "source": "wcag22",
+              "id": "1.1.1",
+              "name": "Non-text Content",
+              "url": "https://www.w3.org/TR/WCAG22/#non-text-content"
             }
           ]
         }

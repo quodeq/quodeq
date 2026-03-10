@@ -3,153 +3,245 @@
   "name": "Reliability",
   "sources": [
     "iso25010",
-    "cisq"
+    "cisq",
+    "cert"
   ],
   "principles": [
     {
       "name": "Maturity",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 456,
-          "name": "Missing Initialization of a Variable",
+          "id": "R-MAT-1",
+          "source": "iso25010",
+          "text": "All public functions MUST have corresponding test files",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-MAT-6",
-              "title": "Resources MUST be properly initialized before use"
+              "source": "cwe",
+              "id": "1173",
+              "name": "Improper Use of Validation Framework",
+              "url": "https://cwe.mitre.org/data/definitions/1173.html"
             }
           ]
         },
         {
-          "id": 477,
-          "name": "Use of Obsolete Function",
+          "id": "R-MAT-2",
+          "source": "iso25010",
+          "text": "Edge cases (empty input, boundary values) MUST be tested explicitly",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-MAT-4",
-              "title": "Deprecated APIs MUST NOT be used; use supported alternatives"
+              "source": "cwe",
+              "id": "754",
+              "name": "Improper Check for Unusual or Exceptional Conditions",
+              "url": "https://cwe.mitre.org/data/definitions/754.html"
             },
             {
               "source": "cisq",
-              "title": "Deprecated functions MUST be replaced with supported alternatives"
-            }
-          ]
-        },
-        {
-          "id": 662,
-          "name": "Improper Synchronization",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-7",
-              "title": "Concurrent access to shared resources MUST be properly synchronized"
-            }
-          ]
-        },
-        {
-          "id": 665,
-          "name": "Improper Initialization",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-6",
-              "title": "Resources MUST be properly initialized before use"
-            }
-          ]
-        },
-        {
-          "id": 682,
-          "name": "Incorrect Calculation",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-8",
-              "title": "Calculations and comparisons MUST be correct and avoid undefined behavior"
-            }
-          ]
-        },
-        {
-          "id": 758,
-          "name": "Reliance on Undefined, Unspecified, or Implementation-Defined Behavior",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-8",
-              "title": "Calculations and comparisons MUST be correct and avoid undefined behavior"
-            }
-          ]
-        },
-        {
-          "id": 820,
-          "name": "Missing Synchronization",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-7",
-              "title": "Concurrent access to shared resources MUST be properly synchronized"
-            }
-          ]
-        },
-        {
-          "id": 821,
-          "name": "Incorrect Synchronization",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-7",
-              "title": "Concurrent access to shared resources MUST be properly synchronized"
-            }
-          ]
-        },
-        {
-          "id": 833,
-          "name": "Deadlock",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-7",
-              "title": "Concurrent access to shared resources MUST be properly synchronized"
-            }
-          ]
-        },
-        {
-          "id": 908,
-          "name": "Use of Uninitialized Resource",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-6",
-              "title": "Resources MUST be properly initialized before use"
-            }
-          ]
-        },
-        {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-1",
-              "title": "All public functions MUST have corresponding test files"
+              "id": null,
+              "name": "Boundary and edge-case conditions MUST be checked explicitly",
+              "url": "https://www.it-cisq.org/coding-rules/"
             },
             {
-              "source": "iso25010",
-              "ref": "R-MAT-2",
-              "title": "Edge cases (empty input, boundary values) MUST be tested explicitly"
-            },
+              "source": "cert",
+              "id": "ERR05-J",
+              "name": "Do not let checked exceptions escape from a finally block",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR05-J.+Do+not+let+checked+exceptions+escape+from+a+finally+block"
+            }
+          ]
+        },
+        {
+          "id": "R-MAT-3",
+          "source": "iso25010",
+          "text": "Error paths MUST be tested, not only happy paths",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-MAT-3",
-              "title": "Error paths MUST be tested, not only happy paths"
-            },
-            {
-              "source": "iso25010",
-              "ref": "R-MAT-5",
-              "title": "Type annotations MUST be used on public function signatures"
+              "source": "cwe",
+              "id": "390",
+              "name": "Detection of Error Condition Without Action",
+              "url": "https://cwe.mitre.org/data/definitions/390.html"
             },
             {
               "source": "cisq",
-              "title": "Error handling behaviour MUST be documented for public APIs"
+              "id": null,
+              "name": "All detected error conditions MUST trigger handling logic",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "ERR00-J",
+              "name": "Do not suppress or ignore checked exceptions",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR00-J.+Do+not+suppress+or+ignore+checked+exceptions"
+            }
+          ]
+        },
+        {
+          "id": "R-MAT-4",
+          "source": "iso25010",
+          "text": "Deprecated APIs MUST NOT be used; use supported alternatives",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "477",
+              "name": "Use of Obsolete Function",
+              "url": "https://cwe.mitre.org/data/definitions/477.html"
+            },
+            {
+              "source": "cisq",
+              "id": null,
+              "name": "Deprecated functions MUST be replaced with supported alternatives",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            }
+          ]
+        },
+        {
+          "id": "R-MAT-5",
+          "source": "iso25010",
+          "text": "Type annotations MUST be used on public function signatures",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1076",
+              "name": "Insufficient Adherence to Expected Conventions",
+              "url": "https://cwe.mitre.org/data/definitions/1076.html"
+            }
+          ]
+        },
+        {
+          "id": "R-MAT-6",
+          "source": "iso25010",
+          "text": "Resources MUST be properly initialized before use",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "456",
+              "name": "Missing Initialization of a Variable",
+              "url": "https://cwe.mitre.org/data/definitions/456.html"
+            },
+            {
+              "source": "cwe",
+              "id": "665",
+              "name": "Improper Initialization",
+              "url": "https://cwe.mitre.org/data/definitions/665.html"
+            },
+            {
+              "source": "cwe",
+              "id": "908",
+              "name": "Use of Uninitialized Resource",
+              "url": "https://cwe.mitre.org/data/definitions/908.html"
+            }
+          ]
+        },
+        {
+          "id": "R-MAT-7",
+          "source": "iso25010",
+          "text": "Concurrent access to shared resources MUST be properly synchronized",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "362",
+              "name": "Concurrent Execution using Shared Resource with Improper Synchronization ('Race Condition')",
+              "url": "https://cwe.mitre.org/data/definitions/362.html"
+            },
+            {
+              "source": "cwe",
+              "id": "662",
+              "name": "Improper Synchronization",
+              "url": "https://cwe.mitre.org/data/definitions/662.html"
+            },
+            {
+              "source": "cwe",
+              "id": "764",
+              "name": "Multiple Locks of a Critical Resource",
+              "url": "https://cwe.mitre.org/data/definitions/764.html"
+            },
+            {
+              "source": "cwe",
+              "id": "820",
+              "name": "Missing Synchronization",
+              "url": "https://cwe.mitre.org/data/definitions/820.html"
+            },
+            {
+              "source": "cwe",
+              "id": "821",
+              "name": "Incorrect Synchronization",
+              "url": "https://cwe.mitre.org/data/definitions/821.html"
+            },
+            {
+              "source": "cwe",
+              "id": "833",
+              "name": "Deadlock",
+              "url": "https://cwe.mitre.org/data/definitions/833.html"
+            },
+            {
+              "source": "cert",
+              "id": "THI02-J",
+              "name": "Notify all waiting threads rather than a single thread",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/THI02-J.+Notify+all+waiting+threads+rather+than+a+single+thread"
+            },
+            {
+              "source": "cert",
+              "id": "CON35-C",
+              "name": "Avoid deadlock by locking in a predefined order",
+              "url": "https://wiki.sei.cmu.edu/confluence/pages/viewpage.action?pageId=87152261"
+            },
+            {
+              "source": "cert",
+              "id": "LCK07-J",
+              "name": "Avoid deadlock by requesting and releasing locks in the same order",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/LCK07-J.+Avoid+deadlock+by+requesting+and+releasing+locks+in+the+same+order"
+            },
+            {
+              "source": "cert",
+              "id": "LCK08-J",
+              "name": "Ensure actively held locks are released on exceptional conditions",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/LCK08-J.+Ensure+actively+held+locks+are+released+on+exceptional+conditions"
+            },
+            {
+              "source": "cert",
+              "id": "THI03-J",
+              "name": "Always invoke wait() and await() methods inside a loop",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/THI03-J.+Always+invoke+wait%28%29+and+await%28%29+methods+inside+a+loop"
+            },
+            {
+              "source": "cert",
+              "id": "CON36-C",
+              "name": "Wrap functions that can spuriously wake up in a loop",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/CON36-C.+Wrap+functions+that+can+spuriously+wake+up+in+a+loop"
+            }
+          ]
+        },
+        {
+          "id": "R-MAT-8",
+          "source": "iso25010",
+          "text": "Calculations and comparisons MUST be correct and avoid undefined behavior",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "682",
+              "name": "Incorrect Calculation",
+              "url": "https://cwe.mitre.org/data/definitions/682.html"
+            },
+            {
+              "source": "cwe",
+              "id": "758",
+              "name": "Reliance on Undefined, Unspecified, or Implementation-Defined Behavior",
+              "url": "https://cwe.mitre.org/data/definitions/758.html"
             }
           ]
         }
@@ -157,61 +249,104 @@
     },
     {
       "name": "Availability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 400,
-          "name": "Uncontrolled Resource Consumption",
+          "id": "R-AVL-1",
+          "source": "iso25010",
+          "text": "Health-check endpoints MUST be implemented for long-running services",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-AVL-2",
-              "title": "Circuit breakers MUST be used for external service calls"
-            },
-            {
-              "source": "iso25010",
-              "ref": "R-AVL-3",
-              "title": "Retry logic MUST use exponential backoff with jitter"
-            }
-          ]
-        },
-        {
-          "id": 404,
-          "name": "Improper Resource Shutdown or Release",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-AVL-5",
-              "title": "Graceful shutdown handlers MUST be implemented for server processes"
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
             },
             {
               "source": "cisq",
-              "title": "Resources MUST be shut down in the correct order during cleanup"
+              "id": null,
+              "name": "Error handling behaviour MUST be documented for public APIs",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "R-AVL-2",
+          "source": "iso25010",
+          "text": "Circuit breakers MUST be used for external service calls",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-AVL-1",
-              "title": "Health-check endpoints MUST be implemented for long-running services"
+              "source": "cwe",
+              "id": "400",
+              "name": "Uncontrolled Resource Consumption",
+              "url": "https://cwe.mitre.org/data/definitions/400.html"
+            }
+          ]
+        },
+        {
+          "id": "R-AVL-3",
+          "source": "iso25010",
+          "text": "Retry logic MUST use exponential backoff with jitter",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "400",
+              "name": "Uncontrolled Resource Consumption",
+              "url": "https://cwe.mitre.org/data/definitions/400.html"
+            }
+          ]
+        },
+        {
+          "id": "R-AVL-4",
+          "source": "iso25010",
+          "text": "Timeouts MUST be set on all external HTTP and database calls",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1088",
+              "name": "Synchronous Access of Remote Resource without Timeout",
+              "url": "https://cwe.mitre.org/data/definitions/1088.html"
+            }
+          ]
+        },
+        {
+          "id": "R-AVL-5",
+          "source": "iso25010",
+          "text": "Graceful shutdown handlers MUST be implemented for server processes",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "404",
+              "name": "Improper Resource Shutdown or Release",
+              "url": "https://cwe.mitre.org/data/definitions/404.html"
             },
             {
               "source": "cisq",
-              "title": "Error handling behaviour MUST be documented for public APIs"
-            }
-          ]
-        },
-        {
-          "id": 1088,
-          "name": "Synchronous Access of Remote Resource without Timeout",
-          "refs": [
+              "id": null,
+              "name": "Resources MUST be shut down in the correct order during cleanup",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
             {
-              "source": "iso25010",
-              "ref": "R-AVL-4",
-              "title": "Timeouts MUST be set on all external HTTP and database calls"
+              "source": "cert",
+              "id": "FIO42-C",
+              "name": "Close files when they are no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/FIO42-C.+Close+files+when+they+are+no+longer+needed"
+            },
+            {
+              "source": "cert",
+              "id": "MEM31-C",
+              "name": "Free dynamically allocated memory when no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/MEM31-C.+Free+dynamically+allocated+memory+when+no+longer+needed"
             }
           ]
         }
@@ -219,385 +354,452 @@
     },
     {
       "name": "Fault Tolerance",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 20,
-          "name": "Improper Input Validation",
+          "id": "R-FT-1",
+          "source": "iso25010",
+          "text": "Exceptions MUST be caught and handled; empty catch blocks are forbidden",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-4",
-              "title": "Input from external sources MUST be validated before processing"
-            }
-          ]
-        },
-        {
-          "id": 234,
-          "name": "Failure to Handle Missing Parameter",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-17",
-              "title": "Custom error pages MUST NOT reveal sensitive implementation details"
-            }
-          ]
-        },
-        {
-          "id": 248,
-          "name": "Uncaught Exception",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 252,
-          "name": "Unchecked Return Value",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-6",
-              "title": "Return values from fallible operations MUST be checked"
+              "source": "cwe",
+              "id": "390",
+              "name": "Detection of Error Condition Without Action",
+              "url": "https://cwe.mitre.org/data/definitions/390.html"
             },
             {
               "source": "cisq",
-              "title": "Return values from fallible operations MUST be checked"
+              "id": null,
+              "name": "All detected error conditions MUST trigger handling logic",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "ERR00-J",
+              "name": "Do not suppress or ignore checked exceptions",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR00-J.+Do+not+suppress+or+ignore+checked+exceptions"
             }
           ]
         },
         {
-          "id": 274,
-          "name": "Improper Handling of Insufficient Privileges",
+          "id": "R-FT-2",
+          "source": "iso25010",
+          "text": "Null/undefined dereferences MUST be guarded before use",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 280,
-          "name": "Improper Handling of Insufficient Permissions or Privileges ",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 369,
-          "name": "Divide By Zero",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 377,
-          "name": "Insecure Temporary File",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-13",
-              "title": "Temporary files MUST be created using secure APIs (mktemp) to prevent race conditions"
-            }
-          ]
-        },
-        {
-          "id": 390,
-          "name": "Detection of Error Condition Without Action",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-1",
-              "title": "Exceptions MUST be caught and handled; empty catch blocks are forbidden"
+              "source": "cwe",
+              "id": "476",
+              "name": "NULL Pointer Dereference",
+              "url": "https://cwe.mitre.org/data/definitions/476.html"
             },
             {
               "source": "cisq",
-              "title": "All detected error conditions MUST trigger handling logic"
+              "id": null,
+              "name": "Nullable references MUST be checked before dereferencing",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "ERR08-J",
+              "name": "Do not catch NullPointerException or any of its ancestors",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR08-J.+Do+not+catch+NullPointerException+or+any+of+its+ancestors"
             }
           ]
         },
         {
-          "id": 391,
-          "name": "Unchecked Error Condition",
+          "id": "R-FT-3",
+          "source": "iso25010",
+          "text": "Async operations MUST handle rejection/error paths explicitly",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 394,
-          "name": "Unexpected Status Code or Return Value",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 396,
-          "name": "Declaration of Catch for Generic Exception",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-7",
-              "title": "Catch blocks MUST target specific exception types, not generic Exception"
+              "source": "cwe",
+              "id": "755",
+              "name": "Improper Handling of Exceptional Conditions",
+              "url": "https://cwe.mitre.org/data/definitions/755.html"
             },
             {
               "source": "cisq",
-              "title": "Catch blocks MUST target specific exception types, not generic Exception"
+              "id": null,
+              "name": "Exceptional conditions MUST be caught and handled appropriately",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 397,
-          "name": "Declaration of Throws for Generic Exception",
+          "id": "R-FT-4",
+          "source": "iso25010",
+          "text": "Input from external sources MUST be validated before processing",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-8",
-              "title": "Throw declarations MUST specify concrete exception types"
+              "source": "cwe",
+              "id": "20",
+              "name": "Improper Input Validation",
+              "url": "https://cwe.mitre.org/data/definitions/20.html"
+            }
+          ]
+        },
+        {
+          "id": "R-FT-5",
+          "source": "iso25010",
+          "text": "Fallback values MUST be provided for optional configuration",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1188",
+              "name": "Initialization of a Resource with an Insecure Default",
+              "url": "https://cwe.mitre.org/data/definitions/1188.html"
+            }
+          ]
+        },
+        {
+          "id": "R-FT-6",
+          "source": "iso25010",
+          "text": "Return values from fallible operations MUST be checked",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "252",
+              "name": "Unchecked Return Value",
+              "url": "https://cwe.mitre.org/data/definitions/252.html"
             },
             {
               "source": "cisq",
-              "title": "Throw declarations MUST specify concrete exception types"
+              "id": null,
+              "name": "Return values from fallible operations MUST be checked",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 460,
-          "name": "Improper Cleanup on Thrown Exception",
+          "id": "R-FT-7",
+          "source": "iso25010",
+          "text": "Catch blocks MUST target specific exception types, not generic Exception",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 476,
-          "name": "NULL Pointer Dereference",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-2",
-              "title": "Null/undefined dereferences MUST be guarded before use"
+              "source": "cwe",
+              "id": "396",
+              "name": "Declaration of Catch for Generic Exception",
+              "url": "https://cwe.mitre.org/data/definitions/396.html"
             },
             {
               "source": "cisq",
-              "title": "Nullable references MUST be checked before dereferencing"
+              "id": null,
+              "name": "Catch blocks MUST target specific exception types, not generic Exception",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 478,
-          "name": "Missing Default Case in Multiple Condition Expression",
+          "id": "R-FT-8",
+          "source": "iso25010",
+          "text": "Throw declarations MUST specify concrete exception types",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-15",
-              "title": "Switch statements MUST include default cases and break statements"
-            }
-          ]
-        },
-        {
-          "id": 480,
-          "name": "Use of Incorrect Operator",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-16",
-              "title": "Incorrect operators and type conversions MUST be avoided"
-            }
-          ]
-        },
-        {
-          "id": 484,
-          "name": "Omitted Break Statement in Switch",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-15",
-              "title": "Switch statements MUST include default cases and break statements"
-            }
-          ]
-        },
-        {
-          "id": 550,
-          "name": "Server-generated Error Message Containing Sensitive Information",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 595,
-          "name": "Comparison of Object References Instead of Object Contents",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-16",
-              "title": "Incorrect operators and type conversions MUST be avoided"
-            }
-          ]
-        },
-        {
-          "id": 636,
-          "name": "Not Failing Securely ('Failing Open')",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 674,
-          "name": "Uncontrolled Recursion",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-11",
-              "title": "Recursive functions MUST have verifiable termination conditions"
+              "source": "cwe",
+              "id": "397",
+              "name": "Declaration of Throws for Generic Exception",
+              "url": "https://cwe.mitre.org/data/definitions/397.html"
             },
             {
               "source": "cisq",
-              "title": "Recursive functions MUST have verifiable termination conditions"
+              "id": null,
+              "name": "Throw declarations MUST specify concrete exception types",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "ERR07-J",
+              "name": "Do not throw RuntimeException, Exception, or Throwable",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR07-J.+Do+not+throw+RuntimeException%2C+Exception%2C+or+Throwable"
             }
           ]
         },
         {
-          "id": 681,
-          "name": "Incorrect Conversion between Numeric Types",
+          "id": "R-FT-9",
+          "source": "iso25010",
+          "text": "Boundary and edge-case conditions MUST be checked explicitly",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-16",
-              "title": "Incorrect operators and type conversions MUST be avoided"
-            }
-          ]
-        },
-        {
-          "id": 691,
-          "name": "Insufficient Control Flow Management",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-10",
-              "title": "Control flow MUST be structured and predictable; no unreachable statements"
+              "source": "cwe",
+              "id": "754",
+              "name": "Improper Check for Unusual or Exceptional Conditions",
+              "url": "https://cwe.mitre.org/data/definitions/754.html"
             },
             {
               "source": "cisq",
-              "title": "Control flow MUST be structured and predictable; no unreachable statements"
+              "id": null,
+              "name": "Boundary and edge-case conditions MUST be checked explicitly",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "ERR05-J",
+              "name": "Do not let checked exceptions escape from a finally block",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR05-J.+Do+not+let+checked+exceptions+escape+from+a+finally+block"
             }
           ]
         },
         {
-          "id": 703,
-          "name": "Improper Check or Handling of Exceptional Conditions",
+          "id": "R-FT-10",
+          "source": "iso25010",
+          "text": "Control flow MUST be structured and predictable; no unreachable statements",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-14",
-              "title": "Error conditions MUST be detected and handled, not silently ignored"
-            }
-          ]
-        },
-        {
-          "id": 704,
-          "name": "Incorrect Type Conversion or Cast",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-16",
-              "title": "Incorrect operators and type conversions MUST be avoided"
-            }
-          ]
-        },
-        {
-          "id": 754,
-          "name": "Improper Check for Unusual or Exceptional Conditions",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-9",
-              "title": "Boundary and edge-case conditions MUST be checked explicitly"
+              "source": "cwe",
+              "id": "691",
+              "name": "Insufficient Control Flow Management",
+              "url": "https://cwe.mitre.org/data/definitions/691.html"
             },
             {
               "source": "cisq",
-              "title": "Boundary and edge-case conditions MUST be checked explicitly"
+              "id": null,
+              "name": "Control flow MUST be structured and predictable; no unreachable statements",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 755,
-          "name": "Improper Handling of Exceptional Conditions",
+          "id": "R-FT-11",
+          "source": "iso25010",
+          "text": "Recursive functions MUST have verifiable termination conditions",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-3",
-              "title": "Async operations MUST handle rejection/error paths explicitly"
+              "source": "cwe",
+              "id": "674",
+              "name": "Uncontrolled Recursion",
+              "url": "https://cwe.mitre.org/data/definitions/674.html"
             },
             {
               "source": "cisq",
-              "title": "Exceptional conditions MUST be caught and handled appropriately"
+              "id": null,
+              "name": "Recursive functions MUST have verifiable termination conditions",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 756,
-          "name": "Missing Custom Error Page",
+          "id": "R-FT-12",
+          "source": "iso25010",
+          "text": "All loops MUST have reachable termination conditions",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-17",
-              "title": "Custom error pages MUST NOT reveal sensitive implementation details"
-            }
-          ]
-        },
-        {
-          "id": 835,
-          "name": "Loop with Unreachable Exit Condition ('Infinite Loop')",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "R-FT-12",
-              "title": "All loops MUST have reachable termination conditions"
+              "source": "cwe",
+              "id": "835",
+              "name": "Loop with Unreachable Exit Condition ('Infinite Loop')",
+              "url": "https://cwe.mitre.org/data/definitions/835.html"
             },
             {
               "source": "cisq",
-              "title": "All loops MUST have reachable termination conditions"
+              "id": null,
+              "name": "All loops MUST have reachable termination conditions",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1188,
-          "name": "Initialization of a Resource with an Insecure Default",
+          "id": "R-FT-13",
+          "source": "iso25010",
+          "text": "Temporary files MUST be created using secure APIs (mktemp) to prevent race conditions",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-FT-5",
-              "title": "Fallback values MUST be provided for optional configuration"
+              "source": "cwe",
+              "id": "377",
+              "name": "Insecure Temporary File",
+              "url": "https://cwe.mitre.org/data/definitions/377.html"
+            }
+          ]
+        },
+        {
+          "id": "R-FT-14",
+          "source": "iso25010",
+          "text": "Error conditions MUST be detected and handled, not silently ignored",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "248",
+              "name": "Uncaught Exception",
+              "url": "https://cwe.mitre.org/data/definitions/248.html"
+            },
+            {
+              "source": "cwe",
+              "id": "274",
+              "name": "Improper Handling of Insufficient Privileges",
+              "url": "https://cwe.mitre.org/data/definitions/274.html"
+            },
+            {
+              "source": "cwe",
+              "id": "280",
+              "name": "Improper Handling of Insufficient Permissions or Privileges ",
+              "url": "https://cwe.mitre.org/data/definitions/280.html"
+            },
+            {
+              "source": "cwe",
+              "id": "369",
+              "name": "Divide By Zero",
+              "url": "https://cwe.mitre.org/data/definitions/369.html"
+            },
+            {
+              "source": "cwe",
+              "id": "391",
+              "name": "Unchecked Error Condition",
+              "url": "https://cwe.mitre.org/data/definitions/391.html"
+            },
+            {
+              "source": "cwe",
+              "id": "394",
+              "name": "Unexpected Status Code or Return Value",
+              "url": "https://cwe.mitre.org/data/definitions/394.html"
+            },
+            {
+              "source": "cwe",
+              "id": "460",
+              "name": "Improper Cleanup on Thrown Exception",
+              "url": "https://cwe.mitre.org/data/definitions/460.html"
+            },
+            {
+              "source": "cwe",
+              "id": "544",
+              "name": "Missing Standardized Error Handling Mechanism",
+              "url": "https://cwe.mitre.org/data/definitions/544.html"
+            },
+            {
+              "source": "cwe",
+              "id": "550",
+              "name": "Server-generated Error Message Containing Sensitive Information",
+              "url": "https://cwe.mitre.org/data/definitions/550.html"
+            },
+            {
+              "source": "cwe",
+              "id": "636",
+              "name": "Not Failing Securely ('Failing Open')",
+              "url": "https://cwe.mitre.org/data/definitions/636.html"
+            },
+            {
+              "source": "cwe",
+              "id": "676",
+              "name": "Use of Potentially Dangerous Function",
+              "url": "https://cwe.mitre.org/data/definitions/676.html"
+            },
+            {
+              "source": "cwe",
+              "id": "703",
+              "name": "Improper Check or Handling of Exceptional Conditions",
+              "url": "https://cwe.mitre.org/data/definitions/703.html"
+            },
+            {
+              "source": "cert",
+              "id": "ERR05-J",
+              "name": "Do not let checked exceptions escape from a finally block",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR05-J.+Do+not+let+checked+exceptions+escape+from+a+finally+block"
+            },
+            {
+              "source": "cert",
+              "id": "ERR00-C",
+              "name": "Adopt and implement a consistent and comprehensive error-handling policy",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/ERR00-C.+Adopt+and+implement+a+consistent+and+comprehensive+error-handling+policy"
+            },
+            {
+              "source": "cert",
+              "id": "ERR07-C",
+              "name": "Prefer functions that support error checking over equivalent functions that don't",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/ERR07-C.+Prefer+functions+that+support+error+checking+over+equivalent+functions+that+don%27t"
+            }
+          ]
+        },
+        {
+          "id": "R-FT-15",
+          "source": "iso25010",
+          "text": "Switch statements MUST include default cases and break statements",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "478",
+              "name": "Missing Default Case in Multiple Condition Expression",
+              "url": "https://cwe.mitre.org/data/definitions/478.html"
+            },
+            {
+              "source": "cwe",
+              "id": "484",
+              "name": "Omitted Break Statement in Switch",
+              "url": "https://cwe.mitre.org/data/definitions/484.html"
+            }
+          ]
+        },
+        {
+          "id": "R-FT-16",
+          "source": "iso25010",
+          "text": "Incorrect operators and type conversions MUST be avoided",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "480",
+              "name": "Use of Incorrect Operator",
+              "url": "https://cwe.mitre.org/data/definitions/480.html"
+            },
+            {
+              "source": "cwe",
+              "id": "595",
+              "name": "Comparison of Object References Instead of Object Contents",
+              "url": "https://cwe.mitre.org/data/definitions/595.html"
+            },
+            {
+              "source": "cwe",
+              "id": "681",
+              "name": "Incorrect Conversion between Numeric Types",
+              "url": "https://cwe.mitre.org/data/definitions/681.html"
+            },
+            {
+              "source": "cwe",
+              "id": "704",
+              "name": "Incorrect Type Conversion or Cast",
+              "url": "https://cwe.mitre.org/data/definitions/704.html"
+            }
+          ]
+        },
+        {
+          "id": "R-FT-17",
+          "source": "iso25010",
+          "text": "Custom error pages MUST be configured to prevent default framework error pages from being served",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "756",
+              "name": "Missing Custom Error Page",
+              "url": "https://cwe.mitre.org/data/definitions/756.html"
             }
           ]
         }
@@ -605,70 +807,179 @@
     },
     {
       "name": "Recoverability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 459,
-          "name": "Incomplete Cleanup",
+          "id": "R-REC-1",
+          "source": "iso25010",
+          "text": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-REC-3",
-              "title": "Temporary files MUST be cleaned up in finally/defer blocks"
+              "source": "cwe",
+              "id": "772",
+              "name": "Missing Release of Resource after Effective Lifetime",
+              "url": "https://cwe.mitre.org/data/definitions/772.html"
             },
             {
               "source": "cisq",
-              "title": "Temporary resources MUST be cleaned up on all exit paths"
+              "id": null,
+              "name": "Resources MUST be released in finally/defer blocks",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "FIO42-C",
+              "name": "Close files when they are no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/FIO42-C.+Close+files+when+they+are+no+longer+needed"
+            },
+            {
+              "source": "cert",
+              "id": "MEM31-C",
+              "name": "Free dynamically allocated memory when no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/MEM31-C.+Free+dynamically+allocated+memory+when+no+longer+needed"
             }
           ]
         },
         {
-          "id": 672,
-          "name": "Operation on a Resource after Expiration or Release",
+          "id": "R-REC-2",
+          "source": "iso25010",
+          "text": "Database transactions MUST be rolled back on error",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-REC-6",
-              "title": "Resources MUST be properly released and cleaned up after use"
+              "source": "cwe",
+              "id": "772",
+              "name": "Missing Release of Resource after Effective Lifetime",
+              "url": "https://cwe.mitre.org/data/definitions/772.html"
+            },
+            {
+              "source": "cisq",
+              "id": null,
+              "name": "Resources MUST be released in finally/defer blocks",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "FIO42-C",
+              "name": "Close files when they are no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/FIO42-C.+Close+files+when+they+are+no+longer+needed"
+            },
+            {
+              "source": "cert",
+              "id": "MEM31-C",
+              "name": "Free dynamically allocated memory when no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/MEM31-C.+Free+dynamically+allocated+memory+when+no+longer+needed"
             }
           ]
         },
         {
-          "id": 755,
-          "name": "Improper Handling of Exceptional Conditions",
+          "id": "R-REC-3",
+          "source": "iso25010",
+          "text": "Temporary files MUST be cleaned up in finally/defer blocks",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-REC-5",
-              "title": "Error messages MUST include enough context for diagnosis (operation, input, state)"
+              "source": "cwe",
+              "id": "459",
+              "name": "Incomplete Cleanup",
+              "url": "https://cwe.mitre.org/data/definitions/459.html"
             },
             {
               "source": "cisq",
-              "title": "Exceptional conditions MUST be caught and handled appropriately"
+              "id": null,
+              "name": "Temporary resources MUST be cleaned up on all exit paths",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "ERR04-J",
+              "name": "Do not complete abruptly from a finally block",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR04-J.+Do+not+complete+abruptly+from+a+finally+block"
+            },
+            {
+              "source": "cert",
+              "id": "FIO42-C",
+              "name": "Close files when they are no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/FIO42-C.+Close+files+when+they+are+no+longer+needed"
+            },
+            {
+              "source": "cert",
+              "id": "MEM31-C",
+              "name": "Free dynamically allocated memory when no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/MEM31-C.+Free+dynamically+allocated+memory+when+no+longer+needed"
             }
           ]
         },
         {
-          "id": 772,
-          "name": "Missing Release of Resource after Effective Lifetime",
+          "id": "R-REC-4",
+          "source": "iso25010",
+          "text": "Persistent operations MUST be idempotent or use transaction guards",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "R-REC-1",
-              "title": "Resource handles (files, connections) MUST be closed in finally blocks or using RAII patterns"
-            },
-            {
-              "source": "iso25010",
-              "ref": "R-REC-2",
-              "title": "Database transactions MUST be rolled back on error"
-            },
-            {
-              "source": "iso25010",
-              "ref": "R-REC-4",
-              "title": "Persistent operations MUST be idempotent or use transaction guards"
+              "source": "cwe",
+              "id": "772",
+              "name": "Missing Release of Resource after Effective Lifetime",
+              "url": "https://cwe.mitre.org/data/definitions/772.html"
             },
             {
               "source": "cisq",
-              "title": "Resources MUST be released in finally/defer blocks"
+              "id": null,
+              "name": "Resources MUST be released in finally/defer blocks",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            },
+            {
+              "source": "cert",
+              "id": "FIO42-C",
+              "name": "Close files when they are no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/FIO42-C.+Close+files+when+they+are+no+longer+needed"
+            },
+            {
+              "source": "cert",
+              "id": "MEM31-C",
+              "name": "Free dynamically allocated memory when no longer needed",
+              "url": "https://wiki.sei.cmu.edu/confluence/display/c/MEM31-C.+Free+dynamically+allocated+memory+when+no+longer+needed"
+            }
+          ]
+        },
+        {
+          "id": "R-REC-5",
+          "source": "iso25010",
+          "text": "Error messages MUST include enough context for diagnosis (operation, input, state)",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "755",
+              "name": "Improper Handling of Exceptional Conditions",
+              "url": "https://cwe.mitre.org/data/definitions/755.html"
+            },
+            {
+              "source": "cisq",
+              "id": null,
+              "name": "Exceptional conditions MUST be caught and handled appropriately",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            }
+          ]
+        },
+        {
+          "id": "R-REC-6",
+          "source": "iso25010",
+          "text": "Resources MUST be properly released and cleaned up after use",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "672",
+              "name": "Operation on a Resource after Expiration or Release",
+              "url": "https://cwe.mitre.org/data/definitions/672.html"
             }
           ]
         }
