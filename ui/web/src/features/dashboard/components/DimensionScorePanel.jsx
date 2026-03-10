@@ -9,32 +9,20 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
+import { formatShortDate } from '../../../utils/formatters.js';
 
 function cssVar(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-const GRADE_VAR = {
-  exemplary:    '--color-grade-top-text',
-  good:         '--color-grade-high-text',
-  proficient:   '--color-grade-high-text',
-  adequate:     '--color-grade-mid-text',
-  developing:   '--color-grade-mid-text',
-  poor:         '--color-grade-low-text',
-  insufficient: '--color-grade-low-text',
-  critical:     '--color-grade-bottom-text',
-  a: '--color-grade-top-text',
-  b: '--color-grade-high-text',
-  c: '--color-grade-mid-text',
-  d: '--color-grade-low-text',
-  f: '--color-grade-bottom-text',
-};
-
-function gradeBarColor(grade) {
-  if (!grade) return cssVar('--color-accent');
-  const key = grade.trim().toLowerCase();
-  const varName = GRADE_VAR[key] ?? GRADE_VAR[key.charAt(0)];
-  return varName ? cssVar(varName) : cssVar('--color-accent');
+function scoreBarColor(score) {
+  const n = parseFloat(score);
+  if (isNaN(n)) return cssVar('--color-accent');
+  if (n >= 9) return cssVar('--color-grade-top-text');   // exemplary
+  if (n >= 7) return cssVar('--color-grade-high-text');  // good
+  if (n >= 5) return cssVar('--color-grade-mid-text');   // adequate
+  if (n >= 3) return cssVar('--color-grade-low-text');   // poor
+  return cssVar('--color-grade-bottom-text');            // critical
 }
 
 const TREND_ARROW = { up: '↑', 'soft-up': '↗', same: '→', 'soft-down': '↘', down: '↓' };
@@ -92,7 +80,7 @@ function DimensionTooltip({ active, payload }) {
 }
 
 
-export default function DimensionScorePanel({ dimensions = [], onBarClick }) {
+export default function DimensionScorePanel({ dimensions = [], onBarClick, runDate, runId }) {
   if (!dimensions || dimensions.length === 0) return null;
 
   const data = [...dimensions]
@@ -126,6 +114,12 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick }) {
     <section className="run-history-panel panel">
       <div className="run-history-header">
         <span className="run-history-title">Dimension Scores</span>
+        {(runDate || runId) && (
+          <span className="dim-panel-run-meta">
+            {runDate && <span className="dim-panel-run-date">{formatShortDate(runDate)}</span>}
+            {runId && <span className="dim-panel-run-id">{runId}</span>}
+          </span>
+        )}
       </div>
       <ResponsiveContainer width="100%" height={160}>
         <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
@@ -161,7 +155,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick }) {
             {data.map((entry, i) => (
               <Cell
                 key={entry.dimension ?? i}
-                fill={gradeBarColor(entry.overallGrade)}
+                fill={scoreBarColor(entry.numericScore)}
                 opacity={0.85}
               />
             ))}

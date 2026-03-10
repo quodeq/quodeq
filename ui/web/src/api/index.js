@@ -18,6 +18,10 @@ async function request(path, options = {}) {
   return payload;
 }
 
+export function getHealth() {
+  return request('/health');
+}
+
 export function listProjects() {
   return request('/projects');
 }

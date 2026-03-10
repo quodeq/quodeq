@@ -100,7 +100,12 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
     @app.get("/api/health")
     def health() -> Response:
         """Return a simple health-check response."""
-        return jsonify({"ok": True})
+        try:
+            from importlib.metadata import version as _pkg_version
+            v = _pkg_version("quodeq")
+        except Exception:
+            v = None
+        return jsonify({"ok": True, "version": v})
 
     register_project_list_routes(app, provider)
     register_project_data_routes(app, provider)

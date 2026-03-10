@@ -33,6 +33,22 @@ export function splitScore(score) {
 }
 
 /**
+ * Map a numeric score (0–10) to a CSS grade class.
+ *
+ * @param {number|string|null|undefined} score
+ * @returns {string}
+ */
+export function scoreColorClass(score) {
+  const n = parseFloat(score);
+  if (isNaN(n)) return 'grade-none';
+  if (n >= 9) return 'grade-top';    // exemplary
+  if (n >= 7) return 'grade-high';   // good
+  if (n >= 5) return 'grade-mid';    // adequate
+  if (n >= 3) return 'grade-low';    // poor
+  return 'grade-bottom';             // critical
+}
+
+/**
  * Map a grade word or letter to a CSS class.
  * Tries the full lower-cased word first, then the first character.
  *
@@ -45,6 +61,20 @@ export function gradeColorClass(grade) {
   if (GRADE_TIERS[lower]) return GRADE_TIERS[lower];
   const first = lower.charAt(0);
   return GRADE_TIERS[first] || 'grade-none';
+}
+
+/**
+ * Format a date string as "20 Feb" (day + abbreviated month, no year).
+ * Falls back to the original string if it cannot be parsed as a date.
+ *
+ * @param {string|null|undefined} dateStr
+ * @returns {string}
+ */
+export function formatShortDate(dateStr) {
+  if (!dateStr) return dateStr;
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
 }
 
 /**

@@ -27,13 +27,18 @@ export default function EvaluationForm({ onStart, disabled }) {
   function toggleDim(id) {
     setSelectedDims((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
+  }
+
+  function selectAll() {
+    setSelectedDims(new Set(allDimensions.map((d) => d.id)));
+  }
+
+  function clearAll() {
+    setSelectedDims(new Set());
   }
 
   function handleSubmit(e) {
@@ -52,7 +57,13 @@ export default function EvaluationForm({ onStart, disabled }) {
     setFolderBrowserOpen(false);
   }
 
-  const canSubmit = !disabled && !!repo;
+  // When repo is cleared, also reset dims to all so next repo entry starts fresh
+  function handleRepoClear() {
+    setRepo('');
+    setSelectedDims(new Set());
+  }
+
+  const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
 
   return (
     <>
@@ -71,7 +82,7 @@ export default function EvaluationForm({ onStart, disabled }) {
               <button
                 type="button"
                 className="input-clear-btn"
-                onClick={() => setRepo('')}
+                onClick={handleRepoClear}
                 title="Clear"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -95,7 +106,13 @@ export default function EvaluationForm({ onStart, disabled }) {
 
         {repo && allDimensions.length > 0 && (
           <div className="form-group">
-            <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
+            <div className="dimension-label-row">
+              <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
+              <div className="dimension-chip-actions">
+                <button type="button" className="dim-action-btn" onClick={selectAll}>All</button>
+                <button type="button" className="dim-action-btn" onClick={clearAll}>Clear</button>
+              </div>
+            </div>
             <div className="dimension-grid">
               {allDimensions.map((dim) => (
                 <button
@@ -109,11 +126,6 @@ export default function EvaluationForm({ onStart, disabled }) {
                 </button>
               ))}
             </div>
-            <p className="form-hint">
-              {selectedDims.size === 0
-                ? 'All dimensions will be evaluated.'
-                : `${selectedDims.size} of ${allDimensions.length} selected.`}
-            </p>
           </div>
         )}
 

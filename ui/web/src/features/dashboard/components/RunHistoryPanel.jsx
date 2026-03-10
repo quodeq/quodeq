@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { formatShortDate } from '../../../utils/formatters.js';
 import {
   ComposedChart,
   Bar,
@@ -15,59 +16,43 @@ function cssVar(name, fallback) {
   return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 }
 
-const GRADE_VAR = {
-  exemplary:    '--color-grade-top-text',
-  good:         '--color-grade-high-text',
-  proficient:   '--color-grade-high-text',
-  adequate:     '--color-grade-mid-text',
-  developing:   '--color-grade-mid-text',
-  poor:         '--color-grade-low-text',
-  insufficient: '--color-grade-low-text',
-  critical:     '--color-grade-bottom-text',
-  a: '--color-grade-top-text',
-  b: '--color-grade-high-text',
-  c: '--color-grade-mid-text',
-  d: '--color-grade-low-text',
-  f: '--color-grade-bottom-text',
-};
-
-function gradeBarColor(grade) {
-  if (!grade) return cssVar('--color-accent');
-  const key = grade.trim().toLowerCase();
-  const varName = GRADE_VAR[key] ?? GRADE_VAR[key.charAt(0)];
-  return varName ? cssVar(varName) : cssVar('--color-accent');
+function scoreBarColor(score) {
+  const n = parseFloat(score);
+  if (isNaN(n)) return cssVar('--color-accent');
+  if (n >= 9) return cssVar('--color-grade-top-text');   // exemplary
+  if (n >= 7) return cssVar('--color-grade-high-text');  // good
+  if (n >= 5) return cssVar('--color-grade-mid-text');   // adequate
+  if (n >= 3) return cssVar('--color-grade-low-text');   // poor
+  return cssVar('--color-grade-bottom-text');            // critical
 }
 
-// Trend direction — mirrors the logic in TrendBadge
-const TREND_ARROW = { up: '↑', 'soft-up': '↗', same: '→', 'soft-down': '↘', down: '↓' };
-const TREND_COLOR = {
-  up:         cssVar('--color-trend-up'),
-  'soft-up':  cssVar('--color-trend-soft-up'),
-  same:       cssVar('--color-text-muted'),
-  'soft-down':cssVar('--color-trend-soft-down'),
-  down:       cssVar('--color-trend-down'),
-};
+// Mirrors angleFromDelta in TrendArrow — sqrt curve, max arc 55°
+function angleFromDelta(d) {
+  const clamped = Math.max(-4, Math.min(4, d));
+  return 90 - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / 4) * 55;
+}
 
+// Trend direction — mirrors TrendBadge thresholds
 function trendDir(delta) {
   if (delta === null || delta === undefined) return null;
-  if (delta > 1)   return 'up';
-  if (delta > 0.5) return 'soft-up';
-  if (delta < -1)  return 'down';
-  if (delta < -0.5) return 'soft-down';
+  if (delta > 1)    return 'up';
+  if (delta > 0.1)  return 'soft-up';
+  if (delta < -1)   return 'down';
+  if (delta < -0.1) return 'soft-down';
   return 'same';
 }
 
-function RunHistoryTooltip({ active, payload }) {
-  if (!active || !payload?.length) return null;
-  const d = payload[0].payload;
-  return (
-    <div className="run-history-tooltip">
-      <span className="rht-date">{d.dateLabel}</span>
-      <span className="rht-score">{d.numericAverage.toFixed(1)} / 10</span>
-      <span className="rht-grade">{d.overallGrade}</span>
-    </div>
-  );
+function trendColor(dir) {
+  const map = {
+    'up':         '--color-trend-up',
+    'soft-up':    '--color-trend-soft-up',
+    'same':       '--color-text-muted',
+    'soft-down':  '--color-trend-soft-down',
+    'down':       '--color-trend-down',
+  };
+  return cssVar(map[dir] ?? '--color-text-muted');
 }
+
 
 export default function RunHistoryPanel({ trend = [], selectedRunId = null, selectedRunScore, onBarClick }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
@@ -89,21 +74,28 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
     };
   });
 
-  // Custom label above each bar: trend arrow + delta value below it
+  // Custom label above each bar: rotated ↑ arrow + delta value
   const renderTrendLabel = ({ x, y, width, index }) => {
     const entry = data[index];
-    const dir = trendDir(entry?.delta);
-    if (!dir) return null;
+    const d = entry?.delta;
+    if (d === null || d === undefined) return null;
+    const dir = trendDir(d) ?? 'same';
+    const color = trendColor(dir);
+    const angle = Math.round(angleFromDelta(d));
     const cx = x + width / 2;
-    const deltaStr = entry.delta > 0 ? `+${entry.delta.toFixed(1)}` : entry.delta.toFixed(1);
+    const arrowY = y - 14;
+    const deltaStr = d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1);
     return (
       <g>
-        <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={TREND_COLOR[dir]}>
+        <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={color}>
           {deltaStr}
         </text>
-        <text x={cx} y={y - 14} textAnchor="middle" fontSize={11} fill={TREND_COLOR[dir]}>
-          {TREND_ARROW[dir]}
-        </text>
+        <text
+          x={cx} y={arrowY}
+          textAnchor="middle" dominantBaseline="central"
+          fontSize={11} fill={color}
+          transform={`rotate(${angle}, ${cx}, ${arrowY})`}
+        >↑</text>
       </g>
     );
   };
@@ -118,6 +110,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
           <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
           <XAxis
             dataKey="dateLabel"
+            tickFormatter={formatShortDate}
             tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             axisLine={false}
             tickLine={false}
@@ -129,7 +122,23 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             axisLine={false}
             tickLine={false}
           />
-          <Tooltip content={RunHistoryTooltip} cursor={false} isAnimationActive={false} offset={20} />
+          <Tooltip
+            cursor={false}
+            isAnimationActive={false}
+            offset={20}
+            content={({ active }) => {
+              if (!active || hoveredIndex === null) return null;
+              const entry = data[hoveredIndex];
+              if (!entry) return null;
+              return (
+                <div className="run-history-tooltip">
+                  <span className="rht-date">{entry.dateLabel}</span>
+                  <span className="rht-score">{entry.numericAverage.toFixed(1)} / 10</span>
+                  <span className="rht-grade">{entry.overallGrade}</span>
+                </div>
+              );
+            }}
+          />
           <ReferenceLine y={2.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <ReferenceLine y={5}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
           <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
@@ -147,7 +156,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             {data.map((entry, i) => (
               <Cell
                 key={entry.runId ?? i}
-                fill={gradeBarColor(entry.overallGrade)}
+                fill={scoreBarColor(entry.numericAverage)}
                 opacity={entry.runId === selectedRunId ? 1 : 0.55}
                 stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
                 strokeWidth={hoveredIndex === i ? 1.5 : 0}

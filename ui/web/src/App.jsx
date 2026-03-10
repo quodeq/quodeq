@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { listProjects, getAiClients } from './api/index.js';
+import { listProjects, getAiClients, getHealth } from './api/index.js';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import RunNavigator from './features/dashboard/components/RunNavigator.jsx';
@@ -14,42 +14,44 @@ import PrincipleDetailPage from './features/explorer/components/PrincipleDetailP
 import EvalPrincipleDetailPage from './features/explorer/components/EvalPrincipleDetailPage.jsx';
 import { formatRunId } from './utils/formatters.js';
 import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
+import SettingsAside from './features/settings/components/SettingsAside.jsx';
 
 
 // ---------------------------------------------------------------------------
 // Icons
 // ---------------------------------------------------------------------------
 const ICON_OVERVIEW = (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-    <rect x="3" y="3" width="7" height="7" rx="1" />
-    <rect x="14" y="3" width="7" height="7" rx="1" />
-    <rect x="3" y="14" width="7" height="7" rx="1" />
-    <rect x="14" y="14" width="7" height="7" rx="1" />
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="13" width="4" height="8" />
+    <rect x="10" y="8" width="4" height="13" />
+    <rect x="17" y="3" width="4" height="18" />
   </svg>
 );
 
 const ICON_EVALUATE = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="11" cy="11" r="7" />
-    <line x1="16.5" y1="16.5" x2="22" y2="22" />
+    <line x1="16.5" y1="16.5" x2="21" y2="21" />
+    <line x1="8" y1="11" x2="14" y2="11" />
+    <line x1="11" y1="8" x2="11" y2="14" />
   </svg>
 );
 
 const ICON_PROJECTS = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3" y="3"  width="4" height="4" rx="0.5" />
-    <rect x="3" y="10" width="4" height="4" rx="0.5" />
-    <rect x="3" y="17" width="4" height="4" rx="0.5" />
-    <line x1="9" y1="5"  x2="21" y2="5"  />
-    <line x1="9" y1="12" x2="21" y2="12" />
-    <line x1="9" y1="19" x2="21" y2="19" />
+    <polyline points="3,4 5.5,6 3,8" />
+    <line x1="9" y1="6" x2="21" y2="6" />
+    <polyline points="3,11 5.5,13 3,15" />
+    <line x1="9" y1="13" x2="21" y2="13" />
+    <polyline points="3,18 5.5,20 3,22" />
+    <line x1="9" y1="20" x2="21" y2="20" />
   </svg>
 );
 
 const ICON_SETTINGS = (
   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="12" r="3" />
-    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+    <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
   </svg>
 );
 
@@ -299,6 +301,24 @@ export default function App() {
   // -------------------------------------------------------------------------
   const [aiCmd, setAiCmd] = useState(localStorage.getItem('cc-ai-cmd') || '');
   const [availableClients, setAvailableClients] = useState(null);
+  const [appVersion, setAppVersion] = useState(null);
+  const [settingsPhrase, setSettingsPhrase] = useState('');
+
+  const _SETTINGS_PHRASES = [
+    'quode with cuore ♥',
+    'human aligned quode',
+    'quode safe',
+    'navigate your quode to excellence',
+    'code quality compass',
+  ];
+
+  useEffect(() => {
+    if (activePage.page !== 'settings') return;
+    setSettingsPhrase(_SETTINGS_PHRASES[Math.floor(Math.random() * _SETTINGS_PHRASES.length)]);
+    if (appVersion === null) {
+      getHealth().then((d) => setAppVersion(d.version || null)).catch(() => {});
+    }
+  }, [activePage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (activePage.page !== 'settings' || availableClients !== null) return;
@@ -444,7 +464,9 @@ export default function App() {
                   <div className="eval-icon-static">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="11" cy="11" r="7" />
-                      <line x1="16.5" y1="16.5" x2="22" y2="22" />
+                      <line x1="16.5" y1="16.5" x2="21" y2="21" />
+                      <line x1="8" y1="11" x2="14" y2="11" />
+                      <line x1="11" y1="8" x2="11" y2="14" />
                     </svg>
                   </div>
                   {/* Animated layer — visible when running */}
@@ -454,7 +476,9 @@ export default function App() {
                     <span className="eval-file-chip" style={{animationDelay: '1.1s'}} />
                     <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                       <circle cx="11" cy="11" r="7" />
-                      <line x1="16.5" y1="16.5" x2="22" y2="22" />
+                      <line x1="16.5" y1="16.5" x2="21" y2="21" />
+                      <line x1="8" y1="11" x2="14" y2="11" />
+                      <line x1="11" y1="8" x2="11" y2="14" />
                     </svg>
                   </div>
                 </div>
@@ -534,9 +558,9 @@ export default function App() {
             <div className="settings-header">
               <div className="settings-header-content">
                 <div className="settings-page-icon">
-                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="3" />
-                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                    <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
                   </svg>
                 </div>
                 <div>
@@ -546,6 +570,7 @@ export default function App() {
               </div>
             </div>
 
+            <div className="settings-layout">
             <div className="settings-body">
               <section className="panel settings-section">
                 <div className="panel-header">
@@ -561,8 +586,6 @@ export default function App() {
                       { value: 'system',      label: 'System' },
                       { value: 'light',       label: 'Light' },
                       { value: 'dark',        label: 'Dark' },
-                      { value: 'media-light', label: 'Media Lt' },
-                      { value: 'media-dark',  label: 'Media Dk' },
                       { value: 'ember',       label: 'Ember' },
                       { value: 'forest',      label: 'Forest' },
                       { value: 'midnight',    label: 'Midnight' },
@@ -644,6 +667,33 @@ export default function App() {
                   </div>
                 )}
               </section>
+              <section className="panel settings-section">
+                <div className="panel-header">
+                  <h2 className="settings-section-title">About</h2>
+                </div>
+                <div className="settings-about-rows">
+                  <div className="settings-about-row">
+                    <span className="settings-about-key">Version</span>
+                    <span className="settings-about-value">{appVersion ?? '—'}</span>
+                  </div>
+                  <div className="settings-about-row">
+                    <span className="settings-about-key">Website</span>
+                    <a className="settings-about-link" href="https://quodeq.ai" target="_blank" rel="noopener noreferrer">quodeq.ai</a>
+                  </div>
+                  <div className="settings-about-row">
+                    <span className="settings-about-key">Repository</span>
+                    <a className="settings-about-link" href="https://github.com/quodeq/quodeq" target="_blank" rel="noopener noreferrer">github.com/quodeq/quodeq</a>
+                  </div>
+                </div>
+                {settingsPhrase && (
+                  <div className="settings-row settings-row--last settings-about-phrase-row">
+                    <span className="settings-about-phrase">{settingsPhrase}</span>
+                  </div>
+                )}
+              </section>
+            </div>
+
+            <SettingsAside />
             </div>
           </div>
         );
@@ -693,7 +743,7 @@ export default function App() {
               </g>
             </svg>
           </div>
-          <span className="sidebar-brand-text">Quodeq</span>
+          <span className="sidebar-brand-text">quodeq</span>
         </div>
 
         <nav className="sidebar-nav">
