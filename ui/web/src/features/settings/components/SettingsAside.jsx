@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const PHRASES = [
-  'point to any local folder or remote git repo to start an evaluation',
+  'evaluate local folders or remote git repositories — no cloning needed for remote',
   'target a subfolder to focus analysis on a specific module or service',
   'run evaluations over time and track quality trends across runs',
   'each finding includes a fix plan — a concrete path to resolve the issue',
