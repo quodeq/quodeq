@@ -118,7 +118,8 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
         ok = provider.delete_project(_reports_dir(), project)
         if not ok:
-            return jsonify({"error": "Project not found"}), HTTPStatus.NOT_FOUND
+            body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
         return jsonify({"deleted": project})
 
     @app.get("/api/projects/<project>/info")

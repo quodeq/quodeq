@@ -178,7 +178,13 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
                 <div
                   className={`project-card panel${isSelected ? ' project-card--selected' : ''}${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}
                 >
-                  <div className="project-card-main" onClick={() => onSelect?.(id)}>
+                  <div
+                    className="project-card-main"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => onSelect?.(id)}
+                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
+                  >
                     <div className="project-card-top">
                       <span className="project-card-name">{p.displayName || name}</span>
                       <GradeChip grade={grade} score={score} />
@@ -245,7 +251,13 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
                           <div
                             className={`project-card project-card--child panel${isChildSelected ? ' project-card--selected' : ''}`}
                           >
-                            <div className="project-card-main" onClick={() => onSelect?.(childId)}>
+                            <div
+                              className="project-card-main"
+                              role="button"
+                              tabIndex={0}
+                              onClick={() => onSelect?.(childId)}
+                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(childId); } }}
+                            >
                               <div className="project-card-top">
                                 <span className="project-card-name">{child.displayName || childName}</span>
                                 <GradeChip grade={cGrade} score={cScore} />

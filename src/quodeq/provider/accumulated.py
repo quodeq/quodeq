@@ -52,6 +52,16 @@ def _read_all_run_data(
             if not is_first_run and dim_name not in prev_run_latest_map:
                 prev_run_latest_map[dim_name] = dim
 
+        # Early exit: once every known dimension has both a prev_occurrence entry
+        # and a prev_run_latest entry, further runs cannot contribute new data.
+        if (
+            not is_first_run
+            and latest_by_dimension
+            and latest_by_dimension.keys() <= prev_occurrence.keys()
+            and latest_by_dimension.keys() <= prev_run_latest_map.keys()
+        ):
+            break
+
     return latest_by_dimension, prev_occurrence, list(prev_run_latest_map.values())
 
 

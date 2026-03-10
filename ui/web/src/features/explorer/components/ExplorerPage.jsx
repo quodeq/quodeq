@@ -76,7 +76,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
     return map;
   }, [evalData]);
 
-  if (loading) return <div className="loading">Loading…</div>;
+  if (loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (error) return <div className="inline-error">{error}</div>;
   if (!evalData) return <div className="empty-state"><h2>No data found</h2></div>;
 
@@ -169,6 +169,9 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
                 key={pg.principle}
                 className="exec-summary-row exec-summary-row--clickable"
                 onClick={() => onNavigate && onNavigate('evalprinciple', { evalPrincipal: buildEvalPrincipal(pg.principle) })}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigate && onNavigate('evalprinciple', { evalPrincipal: buildEvalPrincipal(pg.principle) }); } }}
               >
                 <span className="exec-summary-principle">{pg.principle}</span>
                 {pg.score && (

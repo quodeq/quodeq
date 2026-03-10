@@ -108,7 +108,7 @@ class PromptContext:
     standards_dir: Path | None = None
 
 
-@lru_cache(maxsize=None)
+@lru_cache(maxsize=128)
 def _template_hash(template: str) -> str:
     """Return a short hash of the template string, computed once per unique template."""
     return hashlib.sha256(template.encode()).hexdigest()[:12]

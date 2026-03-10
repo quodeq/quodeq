@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterable
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
@@ -27,7 +27,7 @@ def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
 
 
 def _parse_jsonl_findings(
-    lines: list[str], dimension: str,
+    lines: Iterable[str], dimension: str,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Parse raw JSONL lines into deduplicated violation and compliance lists."""
     violations: list[dict[str, Any]] = []
@@ -58,10 +58,10 @@ def _parse_jsonl_findings(
 def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext) -> dict[str, Any] | None:
     """Parse live JSONL findings written by the MCP server."""
     try:
-        lines = jsonl_path.read_text().splitlines()
+        with open(jsonl_path) as _f:
+            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension)
     except OSError:
         return None
-    violations, compliance = _parse_jsonl_findings(lines, ctx.dimension)
     files_read = count_files_from_stream(stream_path) if stream_path and stream_path.exists() else 0
     return {
         "dimension": ctx.dimension,
@@ -164,28 +164,28 @@ def _extract_files_from_stream_event(event: dict) -> set[str]:
 
 def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a live-stream event log file."""
-    try:
-        content = stream_path.read_text()
-    except OSError:
-        return None
     violations: list[dict[str, Any]] = []
     compliance: list[dict[str, Any]] = []
     seen: set[str] = set()
     files_read: set[str] = set()
-    for raw_line in content.splitlines():
-        stripped = raw_line.strip()
-        if not stripped:
-            continue
-        try:
-            event = json.loads(stripped)
-        except json.JSONDecodeError:
-            continue
-        extractor = TEXT_EXTRACTORS.get(event.get("type"))
-        texts = extractor(event) if extractor else []
-        new_v, new_c = _parse_entries_from_texts(texts, ctx.dimension, seen)
-        violations.extend(new_v)
-        compliance.extend(new_c)
-        files_read.update(_extract_files_from_stream_event(event))
+    try:
+        with open(stream_path) as _stream:
+            for raw_line in _stream:
+                stripped = raw_line.strip()
+                if not stripped:
+                    continue
+                try:
+                    event = json.loads(stripped)
+                except json.JSONDecodeError:
+                    continue
+                extractor = TEXT_EXTRACTORS.get(event.get("type"))
+                texts = extractor(event) if extractor else []
+                new_v, new_c = _parse_entries_from_texts(texts, ctx.dimension, seen)
+                violations.extend(new_v)
+                compliance.extend(new_c)
+                files_read.update(_extract_files_from_stream_event(event))
+    except OSError:
+        return None
 
     return {
         "dimension": ctx.dimension,

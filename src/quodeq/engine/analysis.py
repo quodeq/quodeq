@@ -66,7 +66,8 @@ def _count_jsonl_lines(jsonl_file: Path) -> int:
     try:
         if not jsonl_file.exists():
             return 0
-        return sum(1 for line in jsonl_file.read_text().splitlines() if line.strip())
+        with open(jsonl_file) as f:
+            return sum(1 for line in f if line.strip())
     except OSError:
         return 0
 
@@ -199,9 +200,11 @@ def _run_with_heartbeat(
     timed_out = False
     _stream_offset = 0
     _seen_files: set[str] = set()
+    _jsonl_offset = 0
+    _jsonl_count = 0
 
     def _read_stream_incremental() -> dict:
-        nonlocal _stream_offset
+        nonlocal _stream_offset, _jsonl_offset, _jsonl_count
         try:
             with open(stream_file, "rb") as f:
                 f.seek(_stream_offset)
@@ -213,8 +216,19 @@ def _run_with_heartbeat(
                     _seen_files.update(_extract_files_from_event(data))
         except (OSError, ValueError) as exc:
             log_debug(f"Failed to read stream {stream_file}: {exc}")
-        evidence_count = _count_jsonl_lines(config.jsonl_file) if config.jsonl_file is not None else 0
-        return {"files_read": len(_seen_files), "evidence": evidence_count}
+        if config.jsonl_file is not None and config.jsonl_file.exists():
+            try:
+                with open(config.jsonl_file, "rb") as jf:
+                    jf.seek(_jsonl_offset)
+                    new_bytes_j = jf.read()
+                    _jsonl_offset += len(new_bytes_j)
+                _jsonl_count += sum(
+                    1 for line in new_bytes_j.decode("utf-8", errors="replace").splitlines()
+                    if line.strip()
+                )
+            except OSError:
+                pass
+        return {"files_read": len(_seen_files), "evidence": _jsonl_count}
 
     while process.poll() is None:
         try:

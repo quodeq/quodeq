@@ -7,12 +7,17 @@ import os
 import sys
 
 
-BLUE = "\033[0;34m"
-GREEN = "\033[0;32m"
-YELLOW = "\033[1;33m"
-GREY = "\033[0;90m"
-RED = "\033[0;31m"
-NC = "\033[0m"
+_USE_COLOR = (
+    not os.environ.get("NO_COLOR")
+    and os.environ.get("TERM") != "dumb"
+)
+
+BLUE   = "\033[0;34m" if _USE_COLOR else ""
+GREEN  = "\033[0;32m" if _USE_COLOR else ""
+YELLOW = "\033[1;33m" if _USE_COLOR else ""
+GREY   = "\033[0;90m" if _USE_COLOR else ""
+RED    = "\033[0;31m" if _USE_COLOR else ""
+NC     = "\033[0m"    if _USE_COLOR else ""
 
 _LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
 logging.addLevelName(_LOG_SUCCESS, "SUCCESS")

@@ -64,7 +64,7 @@ export function useDashboard({ selectedProject, selectedRun }) {
         if (active) setAccumulated(data);
       })
       .catch((err) => {
-        console.error('useDashboard: accumulated fetch failed', err);
+        if (active) setError(err.message || 'Failed to load accumulated data');
       });
 
     return () => {

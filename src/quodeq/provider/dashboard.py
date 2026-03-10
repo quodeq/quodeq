@@ -1,6 +1,7 @@
 """Dashboard and accumulated-view logic, split from action_provider_fs."""
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
@@ -17,6 +18,12 @@ from quodeq.provider.accumulated import numeric_average
 
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
+
+# Module-level LRU cache shared across requests; evicts least-recently-used
+# entries once the limit is reached, capping memory while providing cross-
+# request caching for hot-path dimension reads (P-TIM-6).
+_RUN_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
+_RUN_DIM_CACHE_MAX = 256
 
 
 @dataclass
@@ -166,13 +173,23 @@ def _build_accumulated_trend(
 def _make_run_dimension_fetcher(
     reports_root: Path, project: str,
 ) -> Callable[[str], list[dict[str, Any]]]:
-    """Return a cached callable that fetches dimension data for a run."""
-    cache: dict[str, list[dict[str, Any]]] = {}
+    """Return a callable that fetches dimension data for a run.
 
+    Results are stored in the module-level _RUN_DIM_CACHE (LRU, bounded at
+    _RUN_DIM_CACHE_MAX entries) so repeated calls within and across requests
+    avoid redundant file reads.
+    """
     def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
-        if run_id not in cache:
-            cache[run_id] = read_run_data(reports_root, project, run_id)
-        return cache[run_id]
+        key = (reports_root, project, run_id)
+        if key in _RUN_DIM_CACHE:
+            _RUN_DIM_CACHE.move_to_end(key)
+            return _RUN_DIM_CACHE[key]
+        data = read_run_data(reports_root, project, run_id)
+        _RUN_DIM_CACHE[key] = data
+        _RUN_DIM_CACHE.move_to_end(key)
+        if len(_RUN_DIM_CACHE) > _RUN_DIM_CACHE_MAX:
+            _RUN_DIM_CACHE.popitem(last=False)  # evict oldest
+        return data
 
     return get_run_dimensions
 

@@ -13,15 +13,24 @@ from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
 def build_parser() -> argparse.ArgumentParser:
     """Create the argument parser for the dashboard command."""
     parser = argparse.ArgumentParser(prog="quodeq dashboard")
-    parser.add_argument("--port", type=int, default=get_dashboard_port())
-    parser.add_argument("--evaluations", default="evaluations")
-    parser.add_argument("--static-dist", default="ui/web/dist")
-    parser.add_argument("--repo-root", default=".")
-    parser.add_argument("--api-host", default=None)
-    parser.add_argument("--api-port", type=int, default=None)
-    parser.add_argument("--no-build", action="store_true")
-    parser.add_argument("--reinstall", action="store_true")
-    parser.add_argument("--open", default="true")
+    parser.add_argument("--port", type=int, default=get_dashboard_port(),
+                        help="Port to run the dashboard server on (default: %(default)s)")
+    parser.add_argument("--evaluations", default="evaluations",
+                        help="Directory containing evaluation reports (default: %(default)s)")
+    parser.add_argument("--static-dist", default="ui/web/dist",
+                        help="Path to the pre-built UI static files (default: %(default)s)")
+    parser.add_argument("--repo-root", default=".",
+                        help="Root directory of the repository being evaluated (default: %(default)s)")
+    parser.add_argument("--api-host", default=None,
+                        help="Hostname of an external API server to proxy to (overrides built-in server)")
+    parser.add_argument("--api-port", type=int, default=None,
+                        help="Port of the external API server (used with --api-host)")
+    parser.add_argument("--no-build", action="store_true",
+                        help="Skip rebuilding the UI before starting the server")
+    parser.add_argument("--reinstall", action="store_true",
+                        help="Force reinstallation of UI dependencies before building")
+    parser.add_argument("--open", default="true",
+                        help="Open the dashboard in a browser after starting (default: %(default)s)")
     return parser
 
 

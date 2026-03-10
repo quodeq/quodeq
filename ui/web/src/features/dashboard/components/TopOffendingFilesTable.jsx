@@ -17,6 +17,9 @@ const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onF
             key={idx}
             className={`offending-file-row${onFileClick ? ' offending-file-row--clickable' : ''}`}
             onClick={onFileClick ? () => onFileClick(f) : undefined}
+            role={onFileClick ? 'button' : undefined}
+            tabIndex={onFileClick ? 0 : undefined}
+            onKeyDown={onFileClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onFileClick(f); } } : undefined}
             title={f.file}
           >
             <div className="offending-file-info">
