@@ -201,7 +201,7 @@ def _wait_for_process(proc: subprocess.Popen) -> None:
         try:
             proc.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
         except subprocess.TimeoutExpired:
-            log_debug("Process still running, continuing to wait...")
+            pass
 
 
 def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | None, config: DashboardConfig) -> None:

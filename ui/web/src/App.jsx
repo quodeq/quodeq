@@ -691,7 +691,7 @@ export default function App() {
               </g>
             </svg>
           </div>
-          <span className="sidebar-brand-text">Quodeq</span>
+          <span className="sidebar-brand-text">quodeq</span>
         </div>
 
         <nav className="sidebar-nav">

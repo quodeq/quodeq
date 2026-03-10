@@ -19,16 +19,13 @@ export default function EvaluationForm({ onStart, disabled }) {
             }
           }
         }
-        const dims = [...seen.values()];
-        setAllDimensions(dims);
-        setSelectedDims(new Set(dims.map((d) => d.id)));
+        setAllDimensions([...seen.values()]);
       })
       .catch(() => setAllDimensions([]));
   }, []);
 
   function toggleDim(id) {
     setSelectedDims((prev) => {
-      if (prev.has(id) && prev.size === 1) return prev;
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -60,6 +57,12 @@ export default function EvaluationForm({ onStart, disabled }) {
     setFolderBrowserOpen(false);
   }
 
+  // When repo is cleared, also reset dims to all so next repo entry starts fresh
+  function handleRepoClear() {
+    setRepo('');
+    setSelectedDims(new Set());
+  }
+
   const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
 
   return (
@@ -79,7 +82,7 @@ export default function EvaluationForm({ onStart, disabled }) {
               <button
                 type="button"
                 className="input-clear-btn"
-                onClick={() => setRepo('')}
+                onClick={handleRepoClear}
                 title="Clear"
               >
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
@@ -123,13 +126,6 @@ export default function EvaluationForm({ onStart, disabled }) {
                 </button>
               ))}
             </div>
-            <p className="form-hint">
-              {selectedDims.size === 0
-                ? 'Select at least one dimension.'
-                : selectedDims.size === allDimensions.length
-                  ? 'All dimensions selected.'
-                  : `${selectedDims.size} of ${allDimensions.length} selected.`}
-            </p>
           </div>
         )}
 

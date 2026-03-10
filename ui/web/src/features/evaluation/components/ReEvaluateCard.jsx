@@ -25,9 +25,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
             }
           }
         }
-        const dims = [...seen.values()];
-        setAllDimensions(dims);
-        setSelectedDims(new Set(dims.map((d) => d.id)));
+        setAllDimensions([...seen.values()]);
       })
       .catch(() => setAllDimensions([]));
   }, []);
@@ -36,7 +34,6 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
 
   function toggleDim(id) {
     setSelectedDims((prev) => {
-      if (prev.has(id) && prev.size === 1) return prev;
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -96,13 +93,6 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
                 </button>
               ))}
             </div>
-            <p className="form-hint">
-              {selectedDims.size === 0
-                ? 'Select at least one dimension.'
-                : selectedDims.size === allDimensions.length
-                  ? 'All dimensions selected.'
-                  : `${selectedDims.size} of ${allDimensions.length} selected.`}
-            </p>
           </div>
         )}
 

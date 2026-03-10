@@ -939,6 +939,13 @@
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 18%, transparent);
 }
 
+.dimension-chip-btn.selected:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-accent-soft) 85%, var(--color-accent));
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-accent) 28%, transparent);
+}
+
 /* Improve submit button */
 .evaluate-submit-btn {
   margin-top: 8px;
