@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from quodeq.action_api import create_app
-from quodeq.action_provider import ActionProvider, EvaluationOptions
+from quodeq.provider.base import ActionProvider, EvaluationOptions
 
 
 class StubProvider(ActionProvider):

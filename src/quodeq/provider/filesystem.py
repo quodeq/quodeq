@@ -3,29 +3,23 @@
 from __future__ import annotations
 
 import json
-import os
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.action_provider import ActionProvider
-from quodeq.action_provider_jobs import JobManager
-from quodeq._fs_evaluation_mixin import FsEvaluationMixin
-from quodeq._fs_tooling_mixin import FsToolingMixin
-from quodeq._fs_violations import parse_violations_from_evidence, parse_violations_from_jsonl, parse_violations_from_stream
-from quodeq.action_provider_fs_accumulated import compute_accumulated
-from quodeq.action_provider_fs_dashboard import build_dashboard
+from quodeq.provider.base import ActionProvider
+from quodeq.provider.jobs import JobManager
+from quodeq.provider.evaluation_mixin import FsEvaluationMixin
+from quodeq.provider.tooling_mixin import FsToolingMixin
+from quodeq.provider.violations import aggregate_violations, resolve_dimension_eval
+from quodeq.provider.accumulated import compute_accumulated
+from quodeq.provider.dashboard import build_dashboard
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
     list_runs,
-    parse_eval_from_json,
-    parse_eval_markdown,
     read_run_data,
     safe_read_dir,
     summarize_dimensions,
 )
-
-
-_MAX_VIOLATION_FILES = 20
 
 
 def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
@@ -54,27 +48,44 @@ def _read_latest_run_summary(
         return None, None, None
 
 
+def _or_none(value: Any) -> Any:
+    """Return *value* if truthy, else None (coerce empty strings to None)."""
+    return value or None
+
+
+def _check_path_exists(path: str | None, location: str | None) -> bool | None:
+    """Return whether a local path exists, or None if not applicable."""
+    if location == "local" and path:
+        return Path(path).exists()
+    return None
+
+
+def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str, Any]:
+    """Extract and normalize optional metadata fields from repository info."""
+    return {
+        "name": info.get("name") or entry_name,
+        "parent": _or_none(info.get("parent")),
+        "displayName": _or_none(info.get("displayName")),
+        "discipline": _or_none(info.get("discipline")),
+        "path": _or_none(info.get("path")),
+        "location": _or_none(info.get("location")),
+    }
+
+
 def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, Any]:
     """Build a single project dict from its directory and run list."""
     info = _read_repo_info(reports_root, entry_name)
-    path = info.get("path") or None
-    location = info.get("location") or None
+    meta = _extract_project_metadata(info, entry_name)
     latest_grade, latest_score, files_count = _read_latest_run_summary(
         reports_root, entry_name, runs[0].run_id,
     )
-    path_exists = Path(path).exists() if location == "local" and path else None
     return {
         "id": entry_name,
-        "name": info.get("name") or entry_name,
+        **meta,
         "runsCount": len(runs),
         "latestRunId": runs[0].run_id,
         "latestDate": runs[0].date_iso,
-        "parent": info.get("parent") or None,
-        "displayName": info.get("displayName") or None,
-        "discipline": info.get("discipline") or None,
-        "path": path,
-        "location": location,
-        "pathExists": path_exists,
+        "pathExists": _check_path_exists(meta["path"], meta["location"]),
         "filesCount": files_count,
         "latestGrade": latest_grade,
         "latestScore": latest_score,
@@ -116,16 +127,24 @@ def _read_discipline_from_eval(eval_path: Path) -> str | None:
         return None
 
 
+def _find_discipline_in_run(evidence_dir: Path) -> str | None:
+    """Search a single run's evidence directory for a discipline string."""
+    for ev in safe_read_dir(evidence_dir):
+        if ev.name.endswith("_evidence.json"):
+            found = _read_discipline_from_eval(Path(ev.path))
+            if found:
+                return found
+    return None
+
+
 def _infer_discipline(reports_root: Path, project: str) -> str | None:
     """Infer discipline from the most recent evidence file."""
     for run in sorted(safe_read_dir(reports_root / project), key=lambda e: e.name, reverse=True):
         if not run.is_dir():
             continue
-        for ev in safe_read_dir(reports_root / project / run.name / "evidence"):
-            if ev.name.endswith("_evidence.json"):
-                found = _read_discipline_from_eval(Path(ev.path))
-                if found:
-                    return found
+        found = _find_discipline_in_run(reports_root / project / run.name / "evidence")
+        if found:
+            return found
     return None
 
 
@@ -141,37 +160,6 @@ def _list_available_dimensions_for_discipline(discipline: str) -> list[str]:
         return []
     except (OSError, json.JSONDecodeError, KeyError, TypeError):
         return []
-
-
-def _resolve_dimension_eval(
-    base: Path, project: str, run_id: str, dimension: str,
-) -> dict[str, Any] | None:
-    """Try successive file formats to load evaluation data for a dimension."""
-    eval_path = base / "evaluation" / f"{dimension}.json"
-    if eval_path.exists():
-        return parse_eval_from_json(eval_path, project, run_id, dimension)
-
-    markdown_path = base / "evaluation" / f"{dimension}_eval.md"
-    if markdown_path.exists():
-        try:
-            content = markdown_path.read_text()
-        except OSError:
-            return None
-        return parse_eval_markdown(content, project, run_id, dimension)
-
-    evidence_path = base / "evidence" / f"{dimension}_evidence.json"
-    if evidence_path.exists():
-        return parse_violations_from_evidence(evidence_path, project, run_id, dimension)
-
-    jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
-    stream_path = base / "evidence" / f"{dimension}_live.stream"
-    if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
-        return parse_violations_from_jsonl(jsonl_path, stream_path, project, run_id, dimension)
-
-    if stream_path.exists():
-        return parse_violations_from_stream(stream_path, project, run_id, dimension)
-
-    return None
 
 
 class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider):
@@ -258,7 +246,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
         """Return parsed evaluation data for a single dimension in a run."""
         base = Path(reports_dir) / project / run_id
-        result = _resolve_dimension_eval(base, project, run_id, dimension)
+        result = resolve_dimension_eval(base, project, run_id, dimension)
         if result is not None:
             return result
         # Run exists but dimension hasn't started yet
@@ -269,36 +257,4 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> dict[str, Any]:
         """Return aggregated violation counts and top files for a run."""
         dashboard = self.get_dashboard(reports_dir, project, run_id)
-        summary = {
-            "total": 0,
-            "critical": 0,
-            "major": 0,
-            "minor": 0,
-            "byFile": {},
-        }
-        for dim in dashboard.get("dimensions", []) or []:
-            summary["total"] += dim.get("totals", {}).get("violationCount", 0)
-            severity = dim.get("totals", {}).get("severity", {})
-            summary["critical"] += severity.get("critical", 0)
-            summary["major"] += severity.get("major", 0)
-            summary["minor"] += severity.get("minor", 0)
-
-            for violation in dim.get("violations", []) or []:
-                file_path = violation.get("file")
-                if not file_path:
-                    continue
-                entry = summary["byFile"].setdefault(
-                    file_path, {"path": file_path, "count": 0, "critical": 0, "major": 0, "minor": 0}
-                )
-                entry["count"] += 1
-                sev = violation.get("severity", "minor")
-                if sev in entry:
-                    entry[sev] += 1
-
-        files = sorted(summary["byFile"].values(), key=lambda item: item["count"], reverse=True)[:_MAX_VIOLATION_FILES]
-        summary["files"] = files
-        summary.pop("byFile", None)
-        return summary
-
-    # browse_repo, get_ai_clients, get_client_models -> FsToolingMixin
-    # start_evaluation, get_evaluation_status, cancel_evaluation -> FsEvaluationMixin
+        return aggregate_violations(dashboard)

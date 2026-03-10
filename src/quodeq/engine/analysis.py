@@ -11,10 +11,18 @@ import os
 import subprocess
 import sys
 import tempfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
-from quodeq.utils import get_ai_cmd, get_ai_model
+from quodeq.shared.logging import log_debug
+from quodeq.shared.utils import get_ai_cmd, get_ai_model
+
+HeartbeatCallback = Callable[[int, dict], None]
+
+
+_DEFAULT_MAX_TURNS = 200
+_DEFAULT_MAX_DURATION = 1800  # 30 minutes
 
 
 @dataclass(frozen=True)
@@ -23,14 +31,12 @@ class AnalysisConfig:
     jsonl_file: Path | None = None
     analysis_budget: str | None = None
     heartbeat_interval: int = 10
-    heartbeat_callback: object | None = None
+    heartbeat_callback: HeartbeatCallback | None = None
     ai_cmd: str | None = None
     ai_model: str | None = None
+    max_turns: int | None = _DEFAULT_MAX_TURNS
+    max_duration: int | None = _DEFAULT_MAX_DURATION
 
-
-# ---------------------------------------------------------------------------
-# MCP config for real-time findings
-# ---------------------------------------------------------------------------
 
 def _create_mcp_config(jsonl_file: Path) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
@@ -52,12 +58,6 @@ def _create_mcp_config(jsonl_file: Path) -> Path:
     return Path(tmp.name)
 
 
-# ---------------------------------------------------------------------------
-# AI CLI subprocess
-# ---------------------------------------------------------------------------
-
-
-
 def _count_jsonl_lines(jsonl_file: Path) -> int:
     """Count evidence lines in the JSONL file written by the MCP server."""
     try:
@@ -68,27 +68,36 @@ def _count_jsonl_lines(jsonl_file: Path) -> int:
         return 0
 
 
-def _extract_files_from_assistant_event(data: dict) -> set[str]:
-    """Extract file paths from Read/Grep tool_use blocks in an assistant event."""
+def _extract_files_from_blocks(blocks: list) -> set[str]:
+    """Extract file paths from Read/Grep tool_use blocks."""
     files: set[str] = set()
-    for block in data.get("message", {}).get("content", []):
-        if block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
-            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
-            if fp:
-                files.add(fp)
-    return files
-
-
-def _extract_files_from_item_completed_event(data: dict) -> set[str]:
-    """Extract file paths from Read/Grep tool_use blocks in an item.completed event."""
-    files: set[str] = set()
-    item = data.get("item", {})
-    for block in item.get("content", []):
+    for block in blocks:
         if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
             fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
             if fp:
                 files.add(fp)
     return files
+
+
+def _parse_stream_event(line: str) -> dict | None:
+    """Parse a single stream event line, returning None for empty or invalid lines."""
+    stripped = line.strip()
+    if not stripped:
+        return None
+    try:
+        return json.loads(stripped)
+    except json.JSONDecodeError:
+        return None
+
+
+def _extract_files_from_event(data: dict) -> set[str]:
+    """Dispatch to the appropriate file extractor based on event type."""
+    etype = data.get("type", "")
+    if etype == "assistant":
+        return _extract_files_from_blocks(data.get("message", {}).get("content", []))
+    if etype == "item.completed":
+        return _extract_files_from_blocks(data.get("item", {}).get("content", []))
+    return set()
 
 
 def _count_files_from_stream(stream_file: Path) -> set[str]:
@@ -97,30 +106,18 @@ def _count_files_from_stream(stream_file: Path) -> set[str]:
     try:
         with open(stream_file) as f:
             for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    data = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                etype = data.get("type", "")
-                if etype == "assistant":
-                    files.update(_extract_files_from_assistant_event(data))
-                elif etype == "item.completed":
-                    files.update(_extract_files_from_item_completed_event(data))
-    except (OSError, ValueError):
-        pass
+                data = _parse_stream_event(line)
+                if data is not None:
+                    files.update(_extract_files_from_event(data))
+    except (OSError, ValueError) as exc:
+        log_debug(f"Failed to count files from stream {stream_file}: {exc}")
     return files
 
 
 def _count_stream_progress(stream_file: Path, jsonl_file: Path | None = None) -> dict:
     """Count files read (from stream) and evidence found (from JSONL or stream)."""
     files = _count_files_from_stream(stream_file)
-    if jsonl_file is not None:
-        evidence_count = _count_jsonl_lines(jsonl_file)
-    else:
-        evidence_count = 0
+    evidence_count = _count_jsonl_lines(jsonl_file) if jsonl_file is not None else 0
     return {"files_read": len(files), "evidence": evidence_count}
 
 
@@ -129,31 +126,30 @@ def count_files_from_stream(stream_file: Path) -> int:
     return len(_count_files_from_stream(stream_file))
 
 
+_AI_TOOLS = "Bash,Glob,Grep,Read"
+_BASE_AI_ARGS = ("--print", "--output-format", "stream-json", "--verbose")
+
+
 class AnalysisError(RuntimeError):
     """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""
 
 
 def _build_ai_cmd(
     prompt: str,
-    *,
-    ai_cmd: str | None = None,
-    ai_model: str | None = None,
-    jsonl_file: Path | None = None,
-    analysis_budget: str | None = None,
+    config: AnalysisConfig,
 ) -> tuple[list[str], Path | None]:
     """Build the AI CLI command line and optional MCP config path.
 
     Returns (args_list, mcp_config_path_or_None).
     """
-    cmd = ai_cmd or get_ai_cmd()
-    model = ai_model or get_ai_model()
-    tools = "Bash,Glob,Grep,Read"
+    cmd = config.ai_cmd or get_ai_cmd()
+    model = config.ai_model or get_ai_model()
 
-    args = [cmd, "--print", "--output-format", "stream-json", "--verbose", "--tools", tools]
+    args = [cmd, *_BASE_AI_ARGS, "--tools", _AI_TOOLS]
 
     mcp_config_path: Path | None = None
-    if jsonl_file is not None:
-        mcp_config_path = _create_mcp_config(jsonl_file)
+    if config.jsonl_file is not None:
+        mcp_config_path = _create_mcp_config(config.jsonl_file)
         args.extend(["--mcp-config", str(mcp_config_path)])
         args.extend(["--allowedTools", "mcp__findings__report_finding"])
         # MCP servers require permission approval; in --print mode there is no
@@ -162,8 +158,10 @@ def _build_ai_cmd(
 
     if model:
         args.extend(["--model", model])
-    if analysis_budget:
-        args.extend(["--max-budget-usd", str(analysis_budget)])
+    if config.analysis_budget:
+        args.extend(["--max-budget-usd", str(config.analysis_budget)])
+    if config.max_turns is not None:
+        args.extend(["--max-turns", str(config.max_turns)])
     args.extend(["-p", prompt])
 
     return args, mcp_config_path
@@ -171,21 +169,36 @@ def _build_ai_cmd(
 
 def _run_with_heartbeat(
     process: subprocess.Popen,
-    heartbeat_interval: int,
-    heartbeat_callback: object | None,
+    config: AnalysisConfig,
     stream_file: Path,
-    jsonl_file: Path | None,
-) -> None:
-    """Wait for process to finish, emitting heartbeat callbacks at intervals."""
+) -> bool:
+    """Wait for process to finish, emitting heartbeat callbacks at intervals.
+
+    Terminates the process if *max_duration* seconds elapse.
+    Returns True if the process was terminated due to timeout.
+    """
+    from quodeq.shared.logging import log_warning
+
     elapsed = 0
+    max_dur = config.max_duration
+    timed_out = False
     while process.poll() is None:
         try:
-            process.wait(timeout=heartbeat_interval)
+            process.wait(timeout=config.heartbeat_interval)
         except subprocess.TimeoutExpired:
-            elapsed += heartbeat_interval
-            if heartbeat_callback:
-                progress = _count_stream_progress(stream_file, jsonl_file)
-                heartbeat_callback(elapsed, progress)
+            elapsed += config.heartbeat_interval
+            if config.heartbeat_callback:
+                progress = _count_stream_progress(stream_file, config.jsonl_file)
+                config.heartbeat_callback(elapsed, progress)
+            if max_dur is not None and elapsed >= max_dur:
+                log_warning(f"Analysis exceeded max duration ({max_dur}s) — terminating")
+                process.terminate()
+                try:
+                    process.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                timed_out = True
+    return timed_out
 
 
 def _build_analysis_env() -> dict[str, str]:
@@ -224,10 +237,7 @@ def run_analysis(
         AnalysisError: If the subprocess exits with a non-zero code.
     """
     cfg = config or AnalysisConfig()
-    args, mcp_config_path = _build_ai_cmd(
-        prompt, ai_cmd=cfg.ai_cmd, ai_model=cfg.ai_model,
-        jsonl_file=cfg.jsonl_file, analysis_budget=cfg.analysis_budget,
-    )
+    args, mcp_config_path = _build_ai_cmd(prompt, cfg)
     env = _build_analysis_env()
     stream_err = Path(str(stream_file) + ".err")
 
@@ -237,11 +247,13 @@ def run_analysis(
                 args, cwd=str(work_dir), env=env,
                 stdout=out, stderr=err, stdin=subprocess.DEVNULL,
             )
-            _run_with_heartbeat(process, cfg.heartbeat_interval, cfg.heartbeat_callback, stream_file, cfg.jsonl_file)
+            timed_out = _run_with_heartbeat(process, cfg, stream_file)
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
 
-    _check_process_result(process, stream_err)
-
-
+    # When terminated by timeout, the evidence collected so far is still valid
+    # (MCP server writes findings to JSONL in real time). Skip the error check
+    # so the pipeline can score whatever was gathered before the cutoff.
+    if not timed_out:
+        _check_process_result(process, stream_err)

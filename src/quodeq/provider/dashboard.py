@@ -75,6 +75,20 @@ def _record_stale_entry(entry: dict, stale_dim_map: dict[str, dict[str, Any]]) -
         }
 
 
+def _track_stale_grade(
+    entry: dict, non_na_count: dict[str, int],
+    stale_previous_by_dimension: dict[str, dict[str, Any]],
+) -> None:
+    """Track grade counts for stale entries to identify the second valid score."""
+    grade = entry["grade"]
+    if not grade or str(grade).upper() in _SKIP_GRADES:
+        return
+    dim_name = entry["dim_name"]
+    non_na_count[dim_name] = non_na_count.get(dim_name, 0) + 1
+    if non_na_count[dim_name] == 2 and dim_name not in stale_previous_by_dimension:
+        stale_previous_by_dimension[dim_name] = entry["dim"]
+
+
 def _collect_stale_dimensions(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
     get_run_dimensions: Callable[[str], list[dict[str, Any]]],
@@ -87,12 +101,7 @@ def _collect_stale_dimensions(
     for older_idx in range(selected_index + 1, len(runs)):
         for entry in _find_stale_from_run(runs[older_idx], selected_dim_names, get_run_dimensions):
             _record_stale_entry(entry, stale_dim_map)
-            grade = entry["grade"]
-            if grade and str(grade).upper() not in _SKIP_GRADES:
-                dim_name = entry["dim_name"]
-                non_na_count[dim_name] = non_na_count.get(dim_name, 0) + 1
-                if non_na_count[dim_name] == 2 and dim_name not in stale_previous_by_dimension:
-                    stale_previous_by_dimension[dim_name] = entry["dim"]
+            _track_stale_grade(entry, non_na_count, stale_previous_by_dimension)
 
     for newer_idx in range(selected_index):
         for entry in _find_stale_from_run(runs[newer_idx], selected_dim_names, get_run_dimensions):
@@ -155,6 +164,20 @@ def _build_accumulated_trend(
     return trend
 
 
+def _make_run_dimension_fetcher(
+    reports_root: Path, project: str,
+) -> Callable[[str], list[dict[str, Any]]]:
+    """Return a cached callable that fetches dimension data for a run."""
+    cache: dict[str, list[dict[str, Any]]] = {}
+
+    def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
+        if run_id not in cache:
+            cache[run_id] = read_run_data(reports_root, project, run_id)
+        return cache[run_id]
+
+    return get_run_dimensions
+
+
 def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
     """Build a full dashboard response for *project* at *run*."""
     reports_root = Path(reports_dir)
@@ -171,13 +194,7 @@ def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
     selected_dim_names = {d.get("dimension") for d in selected_dimensions}
     selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), 0)
 
-    run_data_cache: dict[str, list[dict[str, Any]]] = {}
-    def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
-        """Return dimension data for a run, using a cache to avoid re-reads."""
-        if run_id not in run_data_cache:
-            run_data_cache[run_id] = read_run_data(reports_root, project, run_id)
-        return run_data_cache[run_id]
-
+    get_run_dimensions = _make_run_dimension_fetcher(reports_root, project)
     previous_by_dimension = _collect_previous_scores(runs, selected_index, selected_dim_names, get_run_dimensions)
     stale_dimensions, stale_previous_by_dimension = (
         _collect_stale_dimensions(runs, selected_index, selected_dim_names, get_run_dimensions)
@@ -199,5 +216,3 @@ def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
         "stalePreviousByDimension": stale_previous_by_dimension,
         "staleDimensions": stale_dimensions,
     }
-
-

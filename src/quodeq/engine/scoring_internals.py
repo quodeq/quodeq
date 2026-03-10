@@ -74,7 +74,7 @@ SCALE_TIER_NAMES: dict[int, str] = {
 }
 
 
-def _scale_multiplier(source_file_count: int) -> int:
+def scale_multiplier(source_file_count: int) -> int:
     """Return the size-based scaling multiplier for a project."""
     for threshold, multiplier in _SCALE_TIERS:
         if source_file_count >= threshold:

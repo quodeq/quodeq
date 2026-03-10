@@ -1,5 +1,7 @@
 """Command-line interface for the ``quodeq configure`` subcommand."""
 
+from __future__ import annotations
+
 import argparse
 
 from quodeq.config.actions import check_sources

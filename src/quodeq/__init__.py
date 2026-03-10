@@ -1,6 +1,6 @@
 """Quodeq package entry point."""
 
-from quodeq.action_provider import ActionProvider
+from quodeq.provider.base import ActionProvider
 
 
 def main() -> None:

@@ -1,5 +1,4 @@
-"""Parsers for extracting violation and compliance data from evidence files and streams."""
-
+"""Low-level parsers for extracting violations from JSONL, evidence JSON, and stream files."""
 from __future__ import annotations
 
 import json
@@ -8,30 +7,30 @@ from typing import Any
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
 from quodeq.engine.analysis import count_files_from_stream
+from quodeq.provider.violation_context import ViolationContext, build_finding_base
 
 
 def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
     """Build a normalized finding dict from a raw JSON object."""
-    return {
-        "principle": obj["p"],
-        "dimension": obj.get("d", dimension),
-        "file": obj.get("file"),
-        "line": obj.get("line"),
-        "title": obj.get("w"),
-        "reason": obj.get("reason"),
-        "snippet": obj.get("snippet"),
-        "severity": obj.get("severity") or "minor",
-        "cwe": obj.get("cwe"),
-        "violationType": obj.get("vt"),
-    }
+    entry = build_finding_base(
+        principle=obj["p"],
+        file=obj.get("file"),
+        line=obj.get("line"),
+        title=obj.get("w"),
+        reason=obj.get("reason"),
+        snippet=obj.get("snippet"),
+        severity=obj.get("severity"),
+        cwe=obj.get("cwe"),
+    )
+    entry["dimension"] = obj.get("d", dimension)
+    entry["violationType"] = obj.get("vt")
+    return entry
 
 
-def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
-    """Parse live JSONL findings written by the MCP server."""
-    try:
-        lines = jsonl_path.read_text().splitlines()
-    except OSError:
-        return None
+def _parse_jsonl_findings(
+    lines: list[str], dimension: str,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Parse raw JSONL lines into deduplicated violation and compliance lists."""
     violations: list[dict[str, Any]] = []
     compliance: list[dict[str, Any]] = []
     seen: set[tuple] = set()
@@ -54,11 +53,21 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, proj
             violations.append(entry)
         else:
             compliance.append(entry)
+    return violations, compliance
+
+
+def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext) -> dict[str, Any] | None:
+    """Parse live JSONL findings written by the MCP server."""
+    try:
+        lines = jsonl_path.read_text().splitlines()
+    except OSError:
+        return None
+    violations, compliance = _parse_jsonl_findings(lines, ctx.dimension)
     files_read = count_files_from_stream(stream_path) if stream_path and stream_path.exists() else 0
     return {
-        "dimension": dimension,
-        "runId": run_id,
-        "project": project,
+        "dimension": ctx.dimension,
+        "runId": ctx.run_id,
+        "project": ctx.project,
         "violations": violations,
         "compliance": compliance,
         "partial": True,
@@ -70,31 +79,39 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, proj
     }
 
 
-def parse_violations_from_evidence(evidence_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+def _build_violation_from_principle(violation: dict, label: str) -> dict[str, Any]:
+    """Build a normalized violation dict from a principle's violation entry."""
+    from quodeq.provider.violation_context import format_file_line
+    return build_finding_base(
+        principle=label,
+        file=format_file_line(violation.get("file"), violation.get("line")),
+        line=violation.get("line"),
+        title=violation.get("title"),
+        reason=violation.get("reason"),
+        snippet=violation.get("snippet"),
+        severity=violation.get("severity"),
+        cwe=violation.get("cwe"),
+    )
+
+
+def _extract_violations_from_principles(principles: dict) -> list[dict[str, Any]]:
+    """Walk all principles and collect normalized violation dicts."""
+    violations: list[dict[str, Any]] = []
+    for raw_key, pdata in principles.items():
+        label = pdata.get("display_name") or raw_key
+        for violation in pdata.get("violations") or []:
+            violations.append(_build_violation_from_principle(violation, label))
+    return violations
+
+
+def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a completed evidence JSON file."""
     try:
         data = json.loads(evidence_path.read_text())
     except (OSError, json.JSONDecodeError):
         return None
-    violations = []
-    for raw_key, pdata in (data.get("principles") or {}).items():
-        label = pdata.get("display_name") or raw_key
-        for violation in pdata.get("violations") or []:
-            file_path = violation.get("file")
-            line = violation.get("line")
-            v = {
-                "principle": label,
-                "file": f"{file_path}:{line}" if file_path and line else file_path,
-                "line": line,
-                "title": violation.get("title"),
-                "reason": violation.get("reason"),
-                "snippet": violation.get("snippet"),
-                "severity": violation.get("severity") or "minor",
-            }
-            if violation.get("cwe"):
-                v["cwe"] = violation["cwe"]
-            violations.append(v)
-    return {"dimension": dimension, "runId": run_id, "project": project, "violations": violations, "partial": True}
+    violations = _extract_violations_from_principles(data.get("principles") or {})
+    return {"dimension": ctx.dimension, "runId": ctx.run_id, "project": ctx.project, "violations": violations, "partial": True}
 
 
 def _parse_entries_from_texts(
@@ -129,7 +146,7 @@ def _parse_entries_from_texts(
     return violations, compliance
 
 
-def parse_violations_from_stream(stream_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a live-stream event log file."""
     try:
         content = stream_path.read_text()
@@ -148,15 +165,15 @@ def parse_violations_from_stream(stream_path: Path, project: str, run_id: str, d
             continue
         extractor = TEXT_EXTRACTORS.get(event.get("type"))
         texts = extractor(event) if extractor else []
-        new_v, new_c = _parse_entries_from_texts(texts, dimension, seen)
+        new_v, new_c = _parse_entries_from_texts(texts, ctx.dimension, seen)
         violations.extend(new_v)
         compliance.extend(new_c)
 
     files_read = count_files_from_stream(stream_path)
     return {
-        "dimension": dimension,
-        "runId": run_id,
-        "project": project,
+        "dimension": ctx.dimension,
+        "runId": ctx.run_id,
+        "project": ctx.project,
         "violations": violations,
         "compliance": compliance,
         "partial": True,

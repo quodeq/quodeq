@@ -7,6 +7,22 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import build_totals
+from quodeq.provider.violation_context import build_finding_base, format_file_line
+
+
+def _build_finding(item: dict, *, include_severity: bool) -> dict[str, Any]:
+    """Build a normalized finding dict from a violation or compliance item."""
+    return build_finding_base(
+        principle=item.get("principle"),
+        file=item.get("file"),
+        line=item.get("line"),
+        title=item.get("title"),
+        reason=item.get("reason"),
+        snippet=item.get("snippet"),
+        severity=item.get("severity"),
+        cwe=item.get("cwe"),
+        include_severity=include_severity,
+    )
 
 
 def parse_report_json(json_path: Path) -> dict[str, Any] | None:
@@ -18,31 +34,8 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
     except json.JSONDecodeError:
         return None
 
-    violations = [
-        {
-            "principle": v.get("principle"),
-            "file": v.get("file"),
-            "line": v.get("line"),
-            "title": v.get("title"),
-            "reason": v.get("reason"),
-            "severity": v.get("severity", "minor"),
-            "snippet": v.get("snippet"),
-            **({"cwe": v["cwe"]} if v.get("cwe") else {}),
-        }
-        for v in data.get("violations", [])
-    ]
-    compliance = [
-        {
-            "principle": c.get("principle"),
-            "file": c.get("file"),
-            "line": c.get("line"),
-            "title": c.get("title"),
-            "reason": c.get("reason"),
-            "snippet": c.get("snippet"),
-            **({"cwe": c["cwe"]} if c.get("cwe") else {}),
-        }
-        for c in data.get("compliance", [])
-    ]
+    violations = [_build_finding(v, include_severity=True) for v in data.get("violations", [])]
+    compliance = [_build_finding(c, include_severity=False) for c in data.get("compliance", [])]
 
     return {
         "dimension": data.get("dimension"),
@@ -90,36 +83,57 @@ def _empty_principle(key: str) -> dict:
     }
 
 
-def _build_principle_map(data: dict[str, Any]) -> dict[str, Any]:
-    """Build a mapping from principle name to its aggregated violations/compliance."""
-    principle_map: dict[str, Any] = {}
-    for p in data.get("principles", []):
+def _seed_principles(principles: list[dict], principle_map: dict[str, Any]) -> None:
+    """Populate principle_map with scored entries from the principles list."""
+    for p in principles:
         name = p.get("name", "")
         entry = _empty_principle(name)
         entry["score"] = p.get("score")
         entry["grade"] = p.get("grade")
         principle_map[name] = entry
-    for v in data.get("violations", []):
+
+
+def _collect_violations(violations: list[dict], principle_map: dict[str, Any]) -> None:
+    """Append normalized violation dicts to the appropriate principle entries."""
+    for v in violations:
         key = v.get("principle", "")
         if key not in principle_map:
             principle_map[key] = _empty_principle(key)
-        f = v.get("file")
-        line = v.get("line")
-        vd = {
+        vd: dict[str, Any] = {
             "code": v.get("snippet", ""),
             "severity": v.get("severity", "minor"),
-            "file": f"{f}:{line}" if f and line else f,
+            "file": format_file_line(v.get("file"), v.get("line")),
             "title": v.get("title", ""),
             "reason": v.get("reason", ""),
         }
         if v.get("cwe"):
             vd["cwe"] = v["cwe"]
         principle_map[key]["violations"].append(vd)
-    for c in data.get("compliance", []):
+
+
+def _collect_compliance(compliance: list[dict], principle_map: dict[str, Any]) -> None:
+    """Append normalized compliance dicts to the appropriate principle entries."""
+    for c in compliance:
         key = c.get("principle", "")
         if key not in principle_map:
             principle_map[key] = _empty_principle(key)
-        principle_map[key]["compliance"].append(c.get("snippet") or c.get("reason") or "")
+        cd: dict[str, Any] = {
+            "code": c.get("snippet", ""),
+            "file": c.get("file"),
+            "title": c.get("title", ""),
+            "reason": c.get("reason", ""),
+        }
+        if c.get("cwe"):
+            cd["cwe"] = c["cwe"]
+        principle_map[key]["compliance"].append(cd)
+
+
+def _build_principle_map(data: dict[str, Any]) -> dict[str, Any]:
+    """Build a mapping from principle name to its aggregated violations/compliance."""
+    principle_map: dict[str, Any] = {}
+    _seed_principles(data.get("principles", []), principle_map)
+    _collect_violations(data.get("violations", []), principle_map)
+    _collect_compliance(data.get("compliance", []), principle_map)
     return principle_map
 
 

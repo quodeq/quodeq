@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import subprocess
 
-from quodeq.utils import get_ai_cmd
+from quodeq.shared.utils import get_ai_cmd
 
 _AI_CLI_TIMEOUT_S = 300
 

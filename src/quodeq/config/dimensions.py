@@ -1,5 +1,7 @@
 """Quality dimension codes and display helpers."""
 
+from __future__ import annotations
+
 DIMENSION_CODES = [
     ("aff", "affordability"),
     ("avl", "availability"),

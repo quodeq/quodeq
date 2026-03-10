@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import os
-
 from quodeq.config.paths import ConfigPaths
-from quodeq.logging import log_error, log_info, log_success
+from quodeq.shared.logging import log_error, log_info, log_success
+from quodeq.shared.utils import get_ai_provider
 
 PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
@@ -20,7 +19,7 @@ def get_current_provider(paths: ConfigPaths) -> str:
         for line in paths.env_file.read_text().splitlines():
             if line.strip().startswith("export AI_PROVIDER="):
                 return line.split("=", 1)[1].strip()
-    return os.environ.get("AI_PROVIDER", "claude")
+    return get_ai_provider()
 
 
 def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_value: str) -> None:

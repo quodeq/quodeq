@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from quodeq.paths import is_subpath, resolve_path
+from quodeq.shared.paths import is_subpath, resolve_path
 
 
 def test_resolve_path_returns_absolute(tmp_path: Path):

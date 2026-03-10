@@ -124,25 +124,26 @@ class JobManager:
         with self._lock:
             return [job.to_dict() for job in self._jobs.values()]
 
+    @staticmethod
+    def _apply_marker(job: Job, line: str) -> None:
+        """Parse a structured JSON marker and update job state."""
+        try:
+            marker = json.loads(line)
+        except json.JSONDecodeError:
+            return
+        phase = marker.get("_cc")
+        if phase == "setup":
+            job.phase = "setup"
+            job.dimensions = marker.get("dimensions")
+        elif phase in ("analyzing", "scoring"):
+            job.current_dimension = marker.get("dimension")
+            job.phase = phase
+
     def _append_log(self, job: Job, line: str) -> None:
         if not line:
             return
-        # Parse structured markers — update state but don't show in console
         if line.startswith(_CC_MARKER_PREFIX):
-            try:
-                marker = json.loads(line)
-                phase = marker.get("_cc")
-                if phase == "setup":
-                    job.phase = "setup"
-                    job.dimensions = marker.get("dimensions")
-                elif phase == "analyzing":
-                    job.current_dimension = marker.get("dimension")
-                    job.phase = "analyzing"
-                elif phase == "scoring":
-                    job.current_dimension = marker.get("dimension")
-                    job.phase = "scoring"
-            except json.JSONDecodeError:
-                pass  # Malformed marker line — skip silently; not a user-visible log
+            self._apply_marker(job, line)
             return
         job.logs.append(line)
         if len(job.logs) > MAX_LOG_LINES:

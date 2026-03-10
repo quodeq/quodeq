@@ -1,5 +1,7 @@
 """Utilities for parsing and computing coverage percentages."""
 
+from __future__ import annotations
+
 
 def parse_coverage_percent(value: str) -> int:
     """Parse a percentage string (e.g. '85%') into an integer."""

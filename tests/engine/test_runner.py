@@ -7,7 +7,8 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.engine.runner import run, run_full, RunConfig, _merge_evidence
+from quodeq.engine._runner_report import run_full
+from quodeq.engine.runner import run, RunConfig, _merge_evidence
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
 
 

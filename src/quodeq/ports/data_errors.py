@@ -1,5 +1,7 @@
 """Domain-specific exception hierarchy for data access errors."""
 
+from __future__ import annotations
+
 
 class DataError(Exception):
     """Base exception for all data access errors."""

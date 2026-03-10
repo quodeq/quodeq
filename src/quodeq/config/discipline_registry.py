@@ -75,16 +75,23 @@ def _dispatch_field(
     """Apply one key=value pair to the accumulator kwargs / files / contains lists."""
     if key in _SIMPLE_FIELDS:
         kwargs[key] = value
-    elif key in _FILE_KEYS:
+        return
+    if key in _FILE_KEYS:
         _set_indexed(files, _FILE_KEYS[key], value)
-    elif key in _CONTAINS_KEYS:
+        return
+    if key in _CONTAINS_KEYS:
         _set_indexed(contains, _CONTAINS_KEYS[key], _strip_quotes(value))
-    elif key in _CSV_FIELDS:
+        return
+    if key in _CSV_FIELDS:
         kwargs[key] = _parse_csv(value)
-    elif key == "detect_priority":
-        kwargs["detect_priority"] = _parse_priority(value)
-    elif key == "detect_fallback":
-        kwargs["detect_fallback"] = value.lower() == "true"
+        return
+    _SPECIAL_HANDLERS = {
+        "detect_priority": lambda v: _parse_priority(v),
+        "detect_fallback": lambda v: v.lower() == "true",
+    }
+    handler = _SPECIAL_HANDLERS.get(key)
+    if handler is not None:
+        kwargs[key] = handler(value)
 
 
 def _pad_and_finalize(files: list[str | None], contains: list[str | None], kwargs: dict) -> None:
@@ -152,25 +159,31 @@ class DisciplineRegistry:
         except OSError:
             return False
 
-    def _matches_rule(self, repo: Path, rule: DisciplineRule) -> bool:
+    def _check_prerequisites(self, repo: Path, rule: DisciplineRule) -> bool:
+        """Return False if any directory/glob/required-file prerequisite is unmet."""
         if rule.detect_dir and not (repo / rule.detect_dir).exists():
             return False
         if rule.detect_glob and not any(repo.glob(rule.detect_glob)):
             return False
         if rule.detect_requires_file and not any(repo.glob(rule.detect_requires_file)):
             return False
+        return True
 
+    def _any_detect_file_matches(self, repo: Path, rule: DisciplineRule) -> bool:
+        """Return True if any detect_file matches (with optional content check)."""
         for i, file_name in enumerate(rule.detect_files):
             path = repo / file_name
             if not path.exists():
                 continue
             needle = rule.detect_contains[i] if i < len(rule.detect_contains) else ""
-            if needle:
-                if self._file_contains(path, needle):
-                    return True
-            else:
+            if not needle or self._file_contains(path, needle):
                 return True
         return False
+
+    def _matches_rule(self, repo: Path, rule: DisciplineRule) -> bool:
+        if not self._check_prerequisites(repo, rule):
+            return False
+        return self._any_detect_file_matches(repo, rule)
 
     def detect_matches(self, repo: Path) -> list[str]:
         """Return the names of all disciplines whose rules match the given repo."""

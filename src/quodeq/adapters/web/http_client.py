@@ -1,5 +1,7 @@
 """Minimal HTTP client for JSON API communication."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass
 from http import HTTPStatus
 import json

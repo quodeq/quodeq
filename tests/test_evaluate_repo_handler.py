@@ -2,8 +2,8 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.util.repo_handler import prepare_repository
-from quodeq.utils import is_repo_url
+from quodeq.shared.repo_handler import prepare_repository
+from quodeq.shared.utils import is_repo_url
 
 
 def test_is_repo_url():

@@ -5,11 +5,13 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
-from quodeq.action_provider import EvaluationOptions
-from quodeq.utils import is_repo_url, project_name_from_repo
+from quodeq.provider.base import EvaluationOptions
+from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
-from typing import Any
+if TYPE_CHECKING:
+    from quodeq.provider.jobs import JobManager
 
 
 def _build_evaluate_cmd(
@@ -34,15 +36,20 @@ def _build_evaluate_cmd(
 
 def _register_project(repo: str, discipline: str | None, reports_dir: str) -> None:
     """Resolve and register the project UUID before evaluation starts."""
-    from quodeq.util.project_resolver import resolve_project_uuid
+    from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = project_name_from_repo(repo)
     location = "online" if is_repo_url(repo) else "local"
-    resolve_project_uuid(Path(reports_dir), project_name, repo_resolved, discipline, location=location)
+    resolve_project_uuid(Path(reports_dir), ProjectIdentity(project_name, repo_resolved, discipline, location))
 
 
 class FsEvaluationMixin:
-    """Mixin for evaluation start/status/cancel methods."""
+    """Mixin for evaluation start/status/cancel methods.
+
+    Requires the host class to provide a ``_jobs`` attribute (a ``JobManager``).
+    """
+
+    _jobs: JobManager
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
         """Start an asynchronous evaluation subprocess for a repository."""

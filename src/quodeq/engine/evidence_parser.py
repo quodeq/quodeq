@@ -68,24 +68,15 @@ def _parse_jsonl_line(line: str) -> Judgment | None:
 def _judgment_to_dict(j: Judgment, cwe_name: str = "", cwe_id: int | None = None) -> dict:
     """Convert a Judgment to the dict format used in PrincipleEvidence lists."""
     d: dict = {"file": j.file}
-    if j.line:
-        d["line"] = j.line
-    if j.snippet:
-        d["snippet"] = j.snippet
-    if j.severity:
-        d["severity"] = j.severity
-    if j.violation_type:
-        d["violation_type"] = j.violation_type
+    # Populate optional fields from the judgment.
+    _optional = {"line": j.line, "snippet": j.snippet, "severity": j.severity, "violation_type": j.violation_type}
+    d.update({k: v for k, v in _optional.items() if v})
     if cwe_id:
         d["cwe"] = cwe_id
     effective_title = cwe_name or j.title
     if effective_title:
         d["title"] = effective_title
-    reason_parts = []
-    if cwe_name:
-        reason_parts.append(cwe_name)
-    if j.reason:
-        reason_parts.append(j.reason)
+    reason_parts = [p for p in (cwe_name, j.reason) if p]
     if reason_parts:
         d["reason"] = " — ".join(reason_parts)
     return d

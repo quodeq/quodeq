@@ -1,5 +1,7 @@
 """Colored logging helpers for the Quodeq application."""
 
+from __future__ import annotations
+
 import logging
 import os
 import sys
@@ -57,9 +59,14 @@ _logger.addHandler(_StderrHandler())
 _logger.propagate = False
 _logger.setLevel(logging.DEBUG)
 
-_env_level = os.environ.get("LOG_LEVEL", "").upper()
-if _env_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
-    _logger.setLevel(getattr(logging, _env_level))
+def _apply_env_log_level(level: str | None = None) -> None:
+    """Apply *level* (or LOG_LEVEL env var) to the logger. Injectable for testing."""
+    env_level = (level or os.environ.get("LOG_LEVEL", "")).upper()
+    if env_level in ("DEBUG", "INFO", "WARNING", "ERROR"):
+        _logger.setLevel(getattr(logging, env_level))
+
+
+_apply_env_log_level()
 
 
 def log_info(message: str) -> None:

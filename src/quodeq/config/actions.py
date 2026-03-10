@@ -5,13 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date
 
-from quodeq.ai_cli import run_ai_cli
+from quodeq.shared.ai_cli import run_ai_cli
 from quodeq.config.dimensions import DIMENSION_NAMES
-from quodeq.config.evaluators import build_evaluator_prompt
+from quodeq.config.evaluators import EvaluatorContext, build_evaluator_prompt
+from quodeq.config.prompt_templates import render_template
 from quodeq.config.sources import has_required_sources_table
 
 from quodeq.config.paths import ConfigPaths
-from quodeq.logging import log_error
+from quodeq.shared.logging import log_error
 
 
 @dataclass(frozen=True)
@@ -40,12 +41,14 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
         output_path = paths.evaluators_dir / discipline / f"{dimension}.json"
         prompt = build_evaluator_prompt(
             template_path=paths.prompts_dir / "dimension-mapper.md",
-            discipline=discipline,
-            dimension=dimension,
-            practices_dir=paths.practices_dir / discipline,
-            dimensions_dir=paths.dimensions_dir,
-            output_path=output_path,
-            date_value=date.today().isoformat(),
+            context=EvaluatorContext(
+                discipline=discipline,
+                dimension=dimension,
+                practices_dir=paths.practices_dir / discipline,
+                dimensions_dir=paths.dimensions_dir,
+                output_path=output_path,
+                date_value=date.today().isoformat(),
+            ),
         )
         stdout, err = run_ai_cli(prompt)
         if err:
@@ -56,9 +59,11 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
 def run_generate_dimensions(paths: ConfigPaths) -> None:
     """Generate dimension definitions via the AI CLI and save the output."""
     template = (paths.prompts_dir / "dimensions-generator.md").read_text()
-    prompt = template.replace("{{DIMENSIONS}}", ", ".join(DIMENSION_NAMES))
-    prompt = prompt.replace("{{OUTPUT_DIR}}", str(paths.dimensions_dir))
-    prompt = prompt.replace("{{DATE}}", date.today().isoformat())
+    prompt = render_template(template, {
+        "DIMENSIONS": ", ".join(DIMENSION_NAMES),
+        "OUTPUT_DIR": str(paths.dimensions_dir),
+        "DATE": date.today().isoformat(),
+    })
     stdout, err = run_ai_cli(prompt)
     if err:
         raise RuntimeError(err)

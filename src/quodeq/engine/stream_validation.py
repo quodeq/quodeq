@@ -4,6 +4,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.shared.logging import log_debug
+
 
 def get_mcp_status(stream_file: Path) -> str | None:
     """Return MCP server status from the stream init event, or None if unavailable."""
@@ -19,8 +21,8 @@ def get_mcp_status(stream_file: Path) -> str | None:
             for srv in d.get("mcp_servers", []):
                 if srv.get("name") == "findings":
                     return srv.get("status")
-    except (json.JSONDecodeError, OSError):
-        pass
+    except (json.JSONDecodeError, OSError) as exc:
+        log_debug(f"Failed to read MCP status from {stream_file}: {exc}")
     return None
 
 
@@ -35,6 +37,6 @@ def is_stream_valid(stream_file: Path) -> bool:
                 d = json.loads(line.strip())
                 if d.get("type") == "result" and d.get("is_error"):
                     return False
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as exc:
+                log_debug(f"Skipping malformed stream line in {stream_file}: {exc}")
     return True

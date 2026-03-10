@@ -1,7 +1,9 @@
 """Validation and lookup helpers for discipline definitions."""
 
+from __future__ import annotations
+
 from quodeq.config.paths import ConfigPaths
-from quodeq.logging import log_error
+from quodeq.shared.logging import log_error
 
 
 def validate_new_discipline(name: str, language: str, category: str) -> int:

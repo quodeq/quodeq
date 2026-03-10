@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
+from quodeq.shared.logging import log_debug
 
 
 def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
@@ -27,8 +28,8 @@ def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
                 if obj.get("p") and obj.get("t") in ("violation", "compliance"):
                     out.write(line + "\n")
                     count += 1
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as exc:
+                log_debug(f"Skipping malformed JSONL line: {exc}")
     return count, lines
 
 

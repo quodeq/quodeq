@@ -13,11 +13,11 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser import safe_read_dir
-from quodeq.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION
+from quodeq.shared.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, get_anthropic_api_key
 
 _CLI_MODEL_TIMEOUT_S = 8
 _ANTHROPIC_API_TIMEOUT_S = 8
-_AI_DEFAULTS_PATH = Path(__file__).resolve().parent / "config" / "ai_defaults.json"
+_AI_DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "config" / "ai_defaults.json"
 
 
 def _load_fallback_claude_models() -> list[str]:
@@ -120,8 +120,7 @@ class FsToolingMixin:
         return fetcher(client_id)
 
     def _get_claude_models(self, _client_id: str = "claude", api_key: str | None = None) -> dict[str, list[str]]:
-        # API key is intentionally read from env at call time (not cached) for security.
-        key = api_key or os.environ.get("ANTHROPIC_API_KEY")
+        key = api_key or get_anthropic_api_key()
         if key:
             models = _fetch_anthropic_models(key)
             if models:

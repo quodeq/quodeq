@@ -16,7 +16,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Callable, TypedDict
 
-from quodeq.engine.analysis import AnalysisConfig, count_files_from_stream, run_analysis
+from quodeq.engine.analysis import AnalysisConfig, HeartbeatCallback, count_files_from_stream, run_analysis
 from quodeq.engine.stream_parser import extract_evidence_from_stream
 from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
@@ -24,15 +24,18 @@ from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_eviden
 
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
+from quodeq.shared.logging import log_info, log_success, log_warning
 
 
 @dataclass
 class AnalysisOptions:
     """Optional runtime settings for an evaluation run."""
     analysis_budget: str | None = None
-    heartbeat_callback: object | None = None
+    heartbeat_callback: HeartbeatCallback | None = None
     template_path: Path | None = None
     dimensions: list[str] | None = None
+    max_turns: int | None = None
+    max_duration: int | None = None
 
 
 @dataclass
@@ -74,66 +77,82 @@ def _make_heartbeat(dim_name: str, idx: int, total: int, src_count: int) -> Call
         files = progress.get("files_read", 0)
         evidence = progress.get("evidence", 0)
         pct_str = f" ({min(round(files / src_count * 100), 100)}%)" if src_count > 0 else ""
-        print(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {files} files{pct_str} | {evidence} findings", flush=True)
+        log_info(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {files} files{pct_str} | {evidence} findings")
     return _cb
 
 
-def _cleanup_stream(stream_file: Path) -> None:
+def cleanup_stream(stream_file: Path) -> None:
     """Remove stream and stderr files after successful evidence extraction."""
     stream_file.unlink(missing_ok=True)
     err_file = Path(str(stream_file) + ".err")
     err_file.unlink(missing_ok=True)
 
 
+@dataclass(frozen=True)
+class _PluginContext:
+    """Pre-loaded plugin data reused across dimensions."""
+    dimensions_data: dict
+    analysis_md: str
+    date_str: str
+    template: str
+    plugin_name: str
+    total: int
+
+
 def _build_dimension_prompt(
-    config: RunConfig, dim_id: str, dimensions_data: dict,
-    analysis_md: str, date_str: str, template: str,
+    config: RunConfig, dim_id: str, ctx: _PluginContext,
 ) -> str:
     """Build the analysis prompt for a single dimension."""
     return build_analysis_prompt(
-        template,
+        ctx.template,
         PromptContext(
             plugin_id=config.plugin_id,
             repo_name=str(config.src),
-            date_str=date_str,
+            date_str=ctx.date_str,
             dimension=dim_id,
             source_file_count=config.source_file_count,
-            dimensions_data=dimensions_data,
-            analysis_md=analysis_md,
+            dimensions_data=ctx.dimensions_data,
+            analysis_md=ctx.analysis_md,
             standards_dir=config.standards_dir,
         ),
     )
 
 
 def _run_dimension_analysis(
-    config: RunConfig, dim_id: str, prompt: str, evidence_dir: Path,
-    idx: int, total: int,
+    config: RunConfig, dim_id: str, prompt: str,
+    idx: int, ctx: _PluginContext,
 ) -> tuple[Path, Path]:
     """Run the AI analysis subprocess for a single dimension.
 
     Returns (stream_file, jsonl_file).
     """
+    evidence_dir = config.work_dir or config.src
     stream_file = evidence_dir / f"{dim_id}_live.stream"
     jsonl_file = evidence_dir / f"{dim_id}_evidence.jsonl"
 
-    heartbeat = config.options.heartbeat_callback or _make_heartbeat(dim_id, idx, total, config.source_file_count)
+    heartbeat = config.options.heartbeat_callback or _make_heartbeat(dim_id, idx, ctx.total, config.source_file_count)
 
+    ac_kwargs: dict = dict(
+        jsonl_file=jsonl_file,
+        analysis_budget=config.options.analysis_budget,
+        heartbeat_callback=heartbeat,
+    )
+    if config.options.max_turns is not None:
+        ac_kwargs["max_turns"] = config.options.max_turns
+    if config.options.max_duration is not None:
+        ac_kwargs["max_duration"] = config.options.max_duration
     run_analysis(
         work_dir=config.src,
         prompt=prompt,
         stream_file=stream_file,
-        config=AnalysisConfig(
-            jsonl_file=jsonl_file,
-            analysis_budget=config.options.analysis_budget,
-            heartbeat_callback=heartbeat,
-        ),
+        config=AnalysisConfig(**ac_kwargs),
     )
     return stream_file, jsonl_file
 
 
 def _parse_dimension_evidence(
     config: RunConfig, dim_id: str, stream_file: Path, jsonl_file: Path,
-    date_str: str, plugin_name: str,
+    ctx: _PluginContext,
 ) -> Evidence | None:
     """Extract and parse evidence from stream/JSONL files for a single dimension.
 
@@ -147,7 +166,7 @@ def _parse_dimension_evidence(
     mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
     mcp_status = get_mcp_status(stream_file)
     if mcp_status and mcp_status != "connected":
-        print(f"  MCP findings server {mcp_status} — falling back to stream extraction", flush=True)
+        log_warning(f"MCP findings server {mcp_status} — falling back to stream extraction")
     if mcp_produced:
         files_read = count_files_from_stream(stream_file)
     else:
@@ -158,57 +177,60 @@ def _parse_dimension_evidence(
         EvidenceContext(
             plugin_id=config.plugin_id,
             repository=str(config.src),
-            date_str=date_str,
+            date_str=ctx.date_str,
             source_file_count=config.source_file_count,
             files_read=files_read,
         ),
         standards_dir=config.standards_dir,
     )
-    ev.plugin_name = plugin_name
+    ev.plugin_name = ctx.plugin_name
     return ev
 
 
-def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
-    """Run AI analysis for each dimension and return per-dimension Evidence."""
+def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
+    """Load plugin data and resolve which dimensions to analyze."""
     plugin_dir = config.evaluators_dir / config.plugin_id
     if not plugin_dir.exists():
         raise ValueError(f"Plugin directory not found: {plugin_dir}")
 
     full = load_plugin_full(plugin_dir)
-    template = load_template(config.options.template_path)
-    date_str = datetime.now().isoformat(timespec="seconds")
-
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
-    analysis_md = analysis_file.read_text() if analysis_file.exists() else ""
+    all_dims_raw = [d["id"] for d in full["dimensions"].get("applies", [])]
+    dimensions = [d for d in all_dims_raw if d in config.options.dimensions] if config.options.dimensions else all_dims_raw
 
-    all_dims = [d["id"] for d in full["dimensions"].get("applies", [])]
-    if config.options.dimensions:
-        dimensions = [d for d in all_dims if d in config.options.dimensions]
-    else:
-        dimensions = all_dims
-    work_dir = config.work_dir or config.src
+    ctx = _PluginContext(
+        dimensions_data=full["dimensions"],
+        analysis_md=analysis_file.read_text() if analysis_file.exists() else "",
+        date_str=datetime.now().isoformat(timespec="seconds"),
+        template=load_template(config.options.template_path),
+        plugin_name=full["plugin"].get("name", config.plugin_id),
+        total=len(dimensions),
+    )
+    return dimensions, ctx
 
+
+def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
+    """Run AI analysis for each dimension and return per-dimension Evidence."""
+    dimensions, ctx = _load_plugin_context(config)
     result: dict[str, Evidence] = {}
-    total = len(dimensions)
-    plugin_name = full["plugin"].get("name", config.plugin_id)
     _emit_marker("setup", dimensions=dimensions)
 
     for idx, dimension in enumerate(dimensions, 1):
         _emit_marker("analyzing", dimension=dimension)
-        print(f"→ [{idx}/{total}] Analyzing {dimension}", flush=True)
+        log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
-        prompt = _build_dimension_prompt(config, dimension, full["dimensions"], analysis_md, date_str, template)
-        stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, work_dir, idx, total)
+        prompt = _build_dimension_prompt(config, dimension, ctx)
+        stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
 
-        ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, date_str, plugin_name)
+        ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
         if ev is None:
-            print(f"  [{idx}/{total}] {dimension} — no valid stream, skipping", flush=True)
+            log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid stream, skipping")
             continue
 
         _emit_marker("scoring", dimension=dimension)
         violations = sum(len(pe.violations) for pe in ev.principles.values())
         compliances = sum(len(pe.compliance) for pe in ev.principles.values())
-        print(f"✓ [{idx}/{total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c", flush=True)
+        log_success(f"[{idx}/{ctx.total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")
         result[dimension] = ev
 
     return result
@@ -261,30 +283,3 @@ def _merge_evidence(evidence_list: list[Evidence], config: RunConfig) -> Evidenc
     if evidence_list:
         merged.plugin_name = evidence_list[0].plugin_name
     return merged
-
-
-def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> dict:
-    """Full pipeline: run per-dimension → score each → write per-dimension reports.
-
-    Returns dict of {dimension: overall_score_str}.
-    """
-    from quodeq.engine.scoring import score_evidence
-    from quodeq.engine.report import write_dimension_report
-
-    work_dir = config.work_dir or config.src
-    per_dim_evidence = run_per_dimension(config)
-    results: dict[str, str] = {}
-
-    for dimension, evidence in per_dim_evidence.items():
-        scores = score_evidence(evidence, mode=mode)
-        write_dimension_report(evidence, scores, dimension, output_dir)
-        # Clean up stream now that the eval JSON exists
-        _cleanup_stream(work_dir / f"{dimension}_live.stream")
-        overall = scores.get("overall", {})
-        if mode == "numerical":
-            val = overall.get("weighted_score")
-            results[dimension] = f"{val}/10" if val is not None else "N/A"
-        else:
-            results[dimension] = overall.get("weighted_grade", "N/A")
-
-    return results

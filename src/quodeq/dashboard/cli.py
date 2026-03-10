@@ -1,15 +1,19 @@
 """Dashboard CLI — argument parsing and entry point for the dashboard server."""
+
+from __future__ import annotations
+
 import argparse
 import sys
 from pathlib import Path
 
+from quodeq.shared.utils import get_dashboard_port
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
 
 
 def build_parser() -> argparse.ArgumentParser:
     """Create the argument parser for the dashboard command."""
     parser = argparse.ArgumentParser(prog="quodeq dashboard")
-    parser.add_argument("--port", type=int, default=4173)
+    parser.add_argument("--port", type=int, default=get_dashboard_port())
     parser.add_argument("--evaluations", default="evaluations")
     parser.add_argument("--static-dist", default="ui/web/dist")
     parser.add_argument("--repo-root", default=".")

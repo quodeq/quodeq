@@ -14,11 +14,15 @@ import urllib.error
 import urllib.request
 import webbrowser
 
-from quodeq.logging import log_info, log_success, log_warning
-from quodeq.paths import resolve_path
-from quodeq.utils import ACTION_API_MODULE
+from quodeq.dashboard._build import maybe_build_ui
+from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
+from quodeq.shared.paths import resolve_path
+from quodeq.shared.utils import ACTION_API_MODULE, DEFAULT_HOST
 
 _HEALTH_CHECK_TIMEOUT_S = 0.5
+_POLL_INTERVAL_S = 0.1
+_HEALTH_POLL_INTERVAL_S = 0.2
+_PROCESS_WAIT_TIMEOUT_S = 5
 
 
 @dataclass(frozen=True)
@@ -92,36 +96,13 @@ def validate_paths(config: DashboardConfig) -> None:
         raise FileNotFoundError("Static dist missing index.html. Run without --no-build to build.")
 
 
-def _npm_build(path: Path) -> None:
-    subprocess.run(["npm", "install"], cwd=str(path), check=True)
-    subprocess.run(["npm", "run", "build"], cwd=str(path), check=True)
-
-
-def _sources_newer_than_dist(web_root: Path, dist_index: Path) -> bool:
-    """Return True if any tracked source file is newer than dist/index.html."""
-    if not dist_index.exists():
-        return True
-    dist_mtime = dist_index.stat().st_mtime
-    watch_dirs = [web_root / "src", web_root / "public"]
-    watch_files = [web_root / "package.json", web_root / "vite.config.js"]
-    for watch_file in watch_files:
-        if watch_file.exists() and watch_file.stat().st_mtime > dist_mtime:
-            return True
-    for watch_dir in watch_dirs:
-        if not watch_dir.exists():
-            continue
-        for watch_file in watch_dir.rglob("*"):
-            if watch_file.is_file() and watch_file.stat().st_mtime > dist_mtime:
-                return True
-    return False
-
 
 def _is_port_open(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
         return sock.connect_ex((host, port)) == 0
 
 
-def _choose_ui_port(start: int, host: str = "127.0.0.1") -> int:
+def _choose_ui_port(start: int, host: str = DEFAULT_HOST) -> int:
     port = start
     while _is_port_open(host, port):
         port += 1
@@ -134,16 +115,16 @@ def _kill_stale_action_api(host: str, port: int) -> None:
         try:
             subprocess.run(["pkill", "-f", ACTION_API_MODULE], capture_output=True)
         except OSError:
-            pass
+            log_debug("pkill not available, skipping stale process cleanup")
     deadline = time.monotonic() + 3
     while _is_port_open(host, port) and time.monotonic() < deadline:
-        time.sleep(0.1)
+        time.sleep(_POLL_INTERVAL_S)
 
 
 def _spawn_action_api(port: int, static_dist: Path | None = None) -> subprocess.Popen:
     env = os.environ.copy()
     env["QUODEQ_ACTION_API_PORT"] = str(port)
-    env.setdefault("QUODEQ_ACTION_API_HOST", "127.0.0.1")
+    env.setdefault("QUODEQ_ACTION_API_HOST", DEFAULT_HOST)
     if static_dist:
         env["QUODEQ_STATIC_DIST"] = str(static_dist)
     return subprocess.Popen(
@@ -155,17 +136,10 @@ def _spawn_action_api(port: int, static_dist: Path | None = None) -> subprocess.
 
 def _wait_for_action_api(base_url: str, timeout_s: float = 10) -> None:
     deadline = time.monotonic() + timeout_s
-    url = f"{base_url}/api/health"
     while time.monotonic() < deadline:
-        try:
-            with urllib.request.urlopen(url, timeout=1) as response:
-                if response.status == 200:
-                    payload = json.loads(response.read().decode("utf-8"))
-                    if payload.get("ok") is True:
-                        return None
-        except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
-            pass
-        time.sleep(0.2)
+        if _action_api_healthy(base_url):
+            return None
+        time.sleep(_HEALTH_POLL_INTERVAL_S)
     raise TimeoutError(f"Action API did not become ready within {timeout_s} seconds.")
 
 
@@ -181,33 +155,8 @@ def _action_api_healthy(base_url: str) -> bool:
         return False
 
 
-def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None) -> tuple[str, subprocess.Popen | None]:
-    port = start_port
-    for _ in range(max_tries):
-        base_url = f"http://{host}:{port}"
-        if _is_port_open(host, port):
-            if _action_api_healthy(base_url):
-                return base_url, None
-            port += 1
-            continue
-        process = _spawn_action_api(port, static_dist=static_dist)
-        try:
-            _wait_for_action_api(base_url)
-        except (subprocess.TimeoutExpired, OSError, TimeoutError):
-            if process.poll() is None:
-                process.terminate()
-                process.wait()
-            raise
-        return base_url, process
-    raise RuntimeError("Unable to find a free port for Action API.")
-
-
-def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = None) -> tuple[str, subprocess.Popen | None]:
-    base_url = f"http://{host}:{port}"
-    if _is_port_open(host, port):
-        if _action_api_healthy(base_url):
-            return base_url, None
-        raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
+def _spawn_and_wait(port: int, base_url: str, static_dist: Path | None = None) -> tuple[str, subprocess.Popen]:
+    """Spawn the action API on *port* and wait for it to become healthy."""
     process = _spawn_action_api(port, static_dist=static_dist)
     try:
         _wait_for_action_api(base_url)
@@ -219,16 +168,27 @@ def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = N
     return base_url, process
 
 
-def _maybe_build_ui(config: DashboardConfig, static_dist: Path, repo_root: Path) -> None:
-    """Run npm build if sources are newer than the dist."""
-    if config.no_build:
-        return
-    dist_index = static_dist / "index.html"
-    if config.reinstall or _sources_newer_than_dist(repo_root / "ui/web", dist_index):
-        log_info("Building web UI (ui/web)...")
-        _npm_build(repo_root / "ui/web")
-    else:
-        log_info("Web UI is up to date, skipping build.")
+def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None) -> tuple[str, subprocess.Popen | None]:
+    port = start_port
+    for _ in range(max_tries):
+        base_url = f"http://{host}:{port}"
+        if _is_port_open(host, port):
+            if _action_api_healthy(base_url):
+                return base_url, None
+            port += 1
+            continue
+        return _spawn_and_wait(port, base_url, static_dist)
+    raise RuntimeError("Unable to find a free port for Action API.")
+
+
+def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = None) -> tuple[str, subprocess.Popen | None]:
+    base_url = f"http://{host}:{port}"
+    if _is_port_open(host, port):
+        if _action_api_healthy(base_url):
+            return base_url, None
+        raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
+    return _spawn_and_wait(port, base_url, static_dist)
+
 
 
 def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
@@ -244,7 +204,7 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     if chosen_port != config.port:
         log_warning(f"Port {config.port} is in use. Using {chosen_port} instead.")
 
-    _maybe_build_ui(config, static_dist, repo_root)
+    maybe_build_ui(config.no_build, config.reinstall, static_dist, repo_root)
 
     return DashboardConfig(
         server=ServerConfig(
@@ -261,6 +221,15 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     )
 
 
+def _wait_for_process(proc: subprocess.Popen) -> None:
+    """Block until *proc* terminates, polling every 5 seconds."""
+    while proc.poll() is None:
+        try:
+            proc.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            log_debug("Process still running, continuing to wait...")
+
+
 def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | None, config: DashboardConfig) -> None:
     """Open browser, register signal handlers, and block until exit."""
     log_success(f"Dashboard running at {action_api_url}")
@@ -272,7 +241,7 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
         if action_api_process and action_api_process.poll() is None:
             action_api_process.terminate()
             try:
-                action_api_process.wait(timeout=5)
+                action_api_process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
             except subprocess.TimeoutExpired:
                 action_api_process.kill()
 
@@ -284,11 +253,7 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
 
     try:
         if action_api_process:
-            while action_api_process.poll() is None:
-                try:
-                    action_api_process.wait(timeout=5)
-                except subprocess.TimeoutExpired:
-                    pass
+            _wait_for_process(action_api_process)
         else:
             signal.pause()
     except KeyboardInterrupt:
@@ -307,7 +272,7 @@ def run_dashboard(config: DashboardConfig) -> int:
     log_info(f"Static:  {config.static_dist}")
     log_info(f"Port:    {config.port}")
 
-    action_api_host = config.api_host or "127.0.0.1"
+    action_api_host = config.api_host or DEFAULT_HOST
     action_api_port = config.api_port or config.port
     static_dist = config.static_dist
     if config.api_forced:

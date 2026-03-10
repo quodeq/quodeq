@@ -2,17 +2,18 @@
 
 from __future__ import annotations
 
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from quodeq.action_provider import ActionProvider
-from quodeq.utils import get_action_api_host, get_action_api_port, get_evaluations_dir, get_static_dist
+from quodeq.provider.base import ActionProvider
+from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_evaluations_dir, get_static_dist
 
 def _default_provider() -> ActionProvider:
     """Create the default filesystem-based provider (lazy import)."""
-    from quodeq.action_provider_fs import FilesystemActionProvider
+    from quodeq.provider.filesystem import FilesystemActionProvider
     return FilesystemActionProvider()
 
 
@@ -51,11 +52,11 @@ def _register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         data = request.get_json(silent=True) or {}
         new_path = data.get("path", "").strip()
         if not new_path:
-            body, status = _error("Path is required", 400, "INVALID_INPUT")
+            body, status = _error("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         ok = provider.update_project_path(_reports_dir(), project, new_path)
         if not ok:
-            body, status = _error("Project not found", 404, "NOT_FOUND")
+            body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify({"updated": project, "path": new_path})
 
@@ -65,7 +66,7 @@ def _register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         from flask import send_file
         project_path = Path(_reports_dir()) / project
         if not project_path.exists() or not project_path.is_dir():
-            body, status = _error("Project not found", 404, "NOT_FOUND")
+            body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         buf = _build_project_zip(project_path)
         return send_file(buf, mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")
@@ -75,7 +76,7 @@ def _register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         """Delete a project and all its report data."""
         ok = provider.delete_project(_reports_dir(), project)
         if not ok:
-            return jsonify({"error": "Project not found"}), 404
+            return jsonify({"error": "Project not found"}), HTTPStatus.NOT_FOUND
         return jsonify({"deleted": project})
 
     @app.get("/api/projects/<project>/info")
@@ -83,7 +84,7 @@ def _register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         """Return metadata and available dimensions for a project."""
         info = provider.get_project_info(_reports_dir(), project)
         if not info:
-            body, status = _error("Project info not found", 404, "NOT_FOUND")
+            body, status = _error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(info)
 
@@ -98,7 +99,7 @@ def _register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         try:
             payload = provider.get_dashboard(_reports_dir(), project, run)
         except FileNotFoundError as exc:
-            body, status = _error(str(exc), 404, "NOT_FOUND")
+            body, status = _error(str(exc), HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(payload)
 
@@ -108,7 +109,7 @@ def _register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         as_of = request.args.get("asOf")
         payload = provider.get_accumulated(_reports_dir(), project, as_of)
         if payload is None:
-            body, status = _error("Project not found", 404, "NOT_FOUND")
+            body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(payload)
 
@@ -117,10 +118,10 @@ def _register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         """Return evaluation details for a single dimension in a run."""
         payload = provider.get_dimension_eval(_reports_dir(), project, run_id, dimension)
         if payload is None:
-            body, status = _error("Eval file not found", 404, "NOT_FOUND")
+            body, status = _error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         if payload.get("waiting"):
-            return jsonify(payload), 202
+            return jsonify(payload), HTTPStatus.ACCEPTED
         return jsonify(payload)
 
     @app.get("/api/projects/<project>/runs/<run_id>/violations")
@@ -129,13 +130,13 @@ def _register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         try:
             payload = provider.get_violations(_reports_dir(), project, run_id)
         except FileNotFoundError as exc:
-            body, status = _error(str(exc), 404, "NOT_FOUND")
+            body, status = _error(str(exc), HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(payload)
 
 
-def _register_evaluation_routes(app: Flask, provider: ActionProvider) -> None:
-    """Register /api/evaluations/* routes."""
+def _register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> None:
+    """Register evaluation listing and creation routes."""
 
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
@@ -148,10 +149,10 @@ def _register_evaluation_routes(app: Flask, provider: ActionProvider) -> None:
         payload = request.get_json(silent=True) or {}
         repo = payload.get("repo")
         if not repo:
-            body, status = _error("Repository is required", 400, "INVALID_INPUT")
+            body, status = _error("Repository is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         try:
-            from quodeq.action_provider import EvaluationOptions
+            from quodeq.provider.base import EvaluationOptions
             job = provider.start_evaluation(
                 repo=repo,
                 reports_dir=_reports_dir(),
@@ -164,16 +165,20 @@ def _register_evaluation_routes(app: Flask, provider: ActionProvider) -> None:
                 ),
             )
         except FileNotFoundError as exc:
-            body, status = _error(str(exc), 400, "INVALID_INPUT")
+            body, status = _error(str(exc), HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
-        return jsonify(job), 202
+        return jsonify(job), HTTPStatus.ACCEPTED
+
+
+def _register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
+    """Register single-evaluation status and cancel routes."""
 
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
         """Return current status of an evaluation job."""
         job = provider.get_evaluation_status(job_id)
         if not job:
-            body, status = _error("Job not found", 404, "NOT_FOUND")
+            body, status = _error("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(job)
 
@@ -182,7 +187,7 @@ def _register_evaluation_routes(app: Flask, provider: ActionProvider) -> None:
         """Cancel a running evaluation job."""
         ok = provider.cancel_evaluation(job_id)
         if not ok:
-            body, status = _error("Job not found or not running", 404, "NOT_FOUND")
+            body, status = _error("Job not found or not running", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify({"ok": True})
 
@@ -203,33 +208,8 @@ def _register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/plugins")
     def plugins() -> Response:
         """Return installed evaluator plugins with their dimensions."""
-        import json as _json
-        from quodeq.config.paths import default_paths
-        evaluators_root = default_paths().evaluators_dir
-        result: list[dict[str, Any]] = []
-        if evaluators_root.is_dir():
-            for child in sorted(evaluators_root.iterdir()):
-                if not child.is_dir() or child.name.startswith("_"):
-                    continue
-                plugin_file = child / "plugin.json"
-                dims_file = child / "dimensions.json"
-                if not plugin_file.exists():
-                    continue
-                try:
-                    plugin_data = _json.loads(plugin_file.read_text())
-                    dims_data = _json.loads(dims_file.read_text()) if dims_file.exists() else {"applies": []}
-                    result.append({
-                        "id": plugin_data.get("id", child.name),
-                        "name": plugin_data.get("name", child.name),
-                        "extensions": plugin_data.get("detects", {}).get("extensions", []),
-                        "dimensions": [
-                            {"id": d["id"], "weight": d.get("weight", 1), "iso_25010": d.get("iso_25010")}
-                            for d in dims_data.get("applies", [])
-                        ],
-                    })
-                except (KeyError, ValueError):
-                    continue
-        return jsonify(result)
+        from quodeq.provider.plugin_discovery import discover_plugins
+        return jsonify(discover_plugins())
 
     @app.get("/api/browse")
     def browse() -> Response | tuple[Response, int]:
@@ -237,7 +217,8 @@ def _register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         path = request.args.get("path")
         payload = provider.browse_repo(path)
         if "error" in payload:
-            body, status = _error(payload["error"], 400 if "directory" in payload["error"].lower() else 404, "INVALID_INPUT")
+            browse_status = HTTPStatus.BAD_REQUEST if "directory" in payload["error"].lower() else HTTPStatus.NOT_FOUND
+            body, status = _error(payload["error"], browse_status, "INVALID_INPUT")
             return jsonify(body), status
         return jsonify(payload)
 
@@ -261,7 +242,7 @@ def _register_static_routes(app: Flask, static_dist: str | None) -> None:
         if (dist / path).is_file():
             return send_from_directory(str(dist), path)
         if path.startswith('api/'):
-            return jsonify({"error": "Not found"}), 404
+            return jsonify({"error": "Not found"}), HTTPStatus.NOT_FOUND
         return send_from_directory(str(dist), 'index.html')
 
 
@@ -277,7 +258,8 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
 
     _register_project_list_routes(app, provider)
     _register_project_data_routes(app, provider)
-    _register_evaluation_routes(app, provider)
+    _register_evaluation_list_routes(app, provider)
+    _register_evaluation_item_routes(app, provider)
     _register_discovery_routes(app, provider)
     _register_static_routes(app, static_dist)
     return app

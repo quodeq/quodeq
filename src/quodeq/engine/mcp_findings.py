@@ -6,7 +6,6 @@ No external dependencies.
 from __future__ import annotations
 
 import json
-import os
 import sys
 
 _JSONRPC_VERSION = "2.0"
@@ -109,10 +108,31 @@ def _handle_unknown_method(req_id: object, method: str) -> None:
                "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
 
 
+def _dispatch(msg: dict, findings_file: str, counter: int) -> int:
+    """Route a single JSON-RPC message and return the updated counter."""
+    method = msg.get("method", "")
+    req_id = msg.get("id")
+
+    if method in ("notifications/initialized", "notifications/cancelled"):
+        return counter
+    if method == "initialize":
+        _send(_handle_initialize(req_id, msg))
+    elif method == "tools/list":
+        _send(_handle_tools_list(req_id))
+    elif method == "tools/call":
+        response, counter = _handle_tools_call(req_id, msg.get("params", {}), findings_file, counter)
+        _send(response)
+    elif method == "ping":
+        _send(_ok(req_id, {}))
+    else:
+        _handle_unknown_method(req_id, method)
+    return counter
+
+
 def main() -> None:
     """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
-    # Accept findings path as CLI arg (preferred) or env var (fallback).
-    findings_file = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("FINDINGS_FILE")
+    from quodeq.shared.utils import get_findings_file
+    findings_file = sys.argv[1] if len(sys.argv) > 1 else get_findings_file()
     if not findings_file:
         sys.stderr.write("Usage: mcp_findings.py <findings_file>  (or set FINDINGS_FILE env)\n")
         sys.exit(1)
@@ -122,24 +142,7 @@ def main() -> None:
         msg = _read_message()
         if msg is None:
             break
-
-        method = msg.get("method", "")
-        req_id = msg.get("id")
-
-        if method in ("notifications/initialized", "notifications/cancelled"):
-            continue
-        if method == "initialize":
-            _send(_handle_initialize(req_id, msg))
-        elif method == "tools/list":
-            _send(_handle_tools_list(req_id))
-        elif method == "tools/call":
-            params = msg.get("params", {})
-            response, counter = _handle_tools_call(req_id, params, findings_file, counter)
-            _send(response)
-        elif method == "ping":
-            _send(_ok(req_id, {}))
-        else:
-            _handle_unknown_method(req_id, method)
+        counter = _dispatch(msg, findings_file, counter)
 
 
 if __name__ == "__main__":

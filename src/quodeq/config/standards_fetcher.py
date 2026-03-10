@@ -2,19 +2,11 @@
 from __future__ import annotations
 
 import json
-import os
 import urllib.request
 from datetime import date
 from pathlib import Path
 
-_DEFAULT_ASVS_URL = (
-    "https://raw.githubusercontent.com/OWASP/ASVS/v4.0.3/4.0/docs_en/"
-    "OWASP%20Application%20Security%20Verification%20Standard%204.0.3-en.json"
-)
-
-
-def _get_asvs_url() -> str:
-    return os.environ.get("QUODEQ_ASVS_URL", _DEFAULT_ASVS_URL)
+from quodeq.shared.utils import get_asvs_url, show_diff
 
 
 def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
@@ -22,7 +14,7 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
 
     Returns the number of requirements fetched.
     """
-    with urllib.request.urlopen(_get_asvs_url()) as r:
+    with urllib.request.urlopen(get_asvs_url()) as r:
         raw = json.loads(r.read())
 
     requirements = _parse_asvs_l1(raw)
@@ -35,7 +27,7 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
 
     out_path = standards_dir / "asvs" / "level1.json"
     if dry_run:
-        _show_diff(out_path, json.dumps(output, indent=2))
+        show_diff(out_path, json.dumps(output, indent=2))
     else:
         out_path.parent.mkdir(parents=True, exist_ok=True)
         out_path.write_text(json.dumps(output, indent=2))
@@ -66,13 +58,3 @@ def _extract_l1_from_chapter(chapter: dict) -> list[dict]:
     return items
 
 
-def _show_diff(path: Path, new_content: str) -> None:
-    import difflib
-    old_lines = path.read_text().splitlines(keepends=True) if path.exists() else []
-    new_lines = new_content.splitlines(keepends=True)
-    diff = difflib.unified_diff(old_lines, new_lines, fromfile=str(path), tofile="<new>")
-    text = "".join(diff)
-    if text:
-        print(text)
-    else:
-        print(f"[no changes] {path}")

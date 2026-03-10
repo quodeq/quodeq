@@ -9,9 +9,9 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from quodeq.adapters.fs.report_parser.grades import summarize_dimensions
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
-from quodeq.utils import is_repo_url
+from quodeq.shared.logging import log_debug
+from quodeq.shared.utils import is_repo_url
 
 
 @dataclass(frozen=True)
@@ -62,8 +62,8 @@ def _find_date_in_dir(directory: Path, suffix: str) -> tuple[str | None, str] | 
                 result = _normalize_date(str(raw))
                 if result:
                     return result
-        except (json.JSONDecodeError, OSError):
-            pass
+        except (json.JSONDecodeError, OSError) as exc:
+            log_debug(f"Failed to read date from {entry.path}: {exc}")
     return None
 
 
@@ -104,12 +104,12 @@ def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | 
     }
 
 
-def _load_evaluations(evaluation_dir: Path) -> list[dict[str, Any]]:
-    """Load parsed evaluation dicts from a run's evaluation directory."""
+def _load_markdown_backed_evals(
+    entries: list[os.DirEntry[str]], evaluation_dir: Path,
+) -> tuple[list[dict[str, Any]], set[str]]:
+    """Load evaluations for dimensions that have a companion _eval.md file."""
     evaluations: list[dict[str, Any]] = []
-    seen_dimensions: set[str] = set()
-    entries = safe_read_dir(evaluation_dir)
-
+    seen: set[str] = set()
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith("_eval.md"):
             continue
@@ -118,19 +118,32 @@ def _load_evaluations(evaluation_dir: Path) -> list[dict[str, Any]]:
         parsed = parse_report_json(json_path) if json_path.exists() else None
         if parsed:
             evaluations.append(parsed)
-            seen_dimensions.add(dimension)
+            seen.add(dimension)
+    return evaluations, seen
 
+
+def _load_json_only_evals(
+    entries: list[os.DirEntry[str]], seen: set[str],
+) -> list[dict[str, Any]]:
+    """Load evaluations from JSON files not already covered by markdown-backed pass."""
+    evaluations: list[dict[str, Any]] = []
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith(".json"):
             continue
         dimension = entry.name[:-5]
-        if dimension in seen_dimensions:
+        if dimension in seen:
             continue
         parsed = parse_report_json(Path(entry.path))
         if parsed:
             evaluations.append(parsed)
-            seen_dimensions.add(dimension)
+    return evaluations
 
+
+def _load_evaluations(evaluation_dir: Path) -> list[dict[str, Any]]:
+    """Load parsed evaluation dicts from a run's evaluation directory."""
+    entries = safe_read_dir(evaluation_dir)
+    evaluations, seen = _load_markdown_backed_evals(entries, evaluation_dir)
+    evaluations.extend(_load_json_only_evals(entries, seen))
     return evaluations
 
 

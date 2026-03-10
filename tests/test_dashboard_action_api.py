@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from quodeq.dashboard import runner
+from quodeq.dashboard import _build, runner
 
 
 def test_spawn_action_api_sets_env(monkeypatch):
@@ -62,7 +62,7 @@ def test_force_action_api_host_port(monkeypatch):
         return f"http://{host}:{port}", FakeProcess()
 
     monkeypatch.setattr(runner, "_ensure_action_api_forced", fake_ensure)
-    monkeypatch.setattr(runner, "_npm_build", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(_build, "npm_build", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(runner, "validate_paths", lambda *_args, **_kwargs: None)
 
     config = runner.DashboardConfig(

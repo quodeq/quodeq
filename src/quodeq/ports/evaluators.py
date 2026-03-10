@@ -1,5 +1,7 @@
 """Port interface for accessing evaluator definitions."""
 
+from __future__ import annotations
+
 from typing import Protocol
 
 

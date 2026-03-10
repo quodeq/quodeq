@@ -1,7 +1,6 @@
 """Refresh pipeline for AI analysis guidance and engineering practices from GitHub."""
 from __future__ import annotations
 
-import difflib
 import json
 import os
 import urllib.error
@@ -10,17 +9,18 @@ import urllib.parse
 from functools import lru_cache
 from pathlib import Path
 
-from quodeq.ai_cli import run_ai_cli
+from quodeq.shared.ai_cli import run_ai_cli
+from quodeq.config.prompt_templates import render_template
+from quodeq.shared.logging import log_error, log_info, log_success, log_warning
+from quodeq.shared.utils import get_github_search_url, show_diff
 
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
-_DEFAULT_GITHUB_SEARCH_URL = "https://api.github.com/search/repositories"
+_REFRESH_TEMPLATES_DIR = Path(__file__).parent / "refresh_templates"
 _FETCH_TIMEOUT_S = 15
-
-
-def _get_github_search_url() -> str:
-    """Return the GitHub search URL, reading from the environment at call time."""
-    return os.environ.get("QUODEQ_GITHUB_SEARCH_URL", _DEFAULT_GITHUB_SEARCH_URL)
+_CONTENT_SAMPLE_LIMIT = 4000
+_LINTER_DOCS_LIMIT = 6000
+_EXISTING_CONTENT_LIMIT = 2000
 
 
 @lru_cache(maxsize=1)
@@ -45,36 +45,36 @@ def refresh_practices(
 
     repos = _fetch_cursor_rules_repos(runtime, min_stars)
     if not repos:
-        print(f"No cursor-rules repos found for runtime={runtime!r} with min_stars={min_stars}")
+        log_warning(f"No cursor-rules repos found for runtime={runtime!r} with min_stars={min_stars}")
         return 1
 
     content_samples = _fetch_repo_content(repos[:3])
     if not content_samples:
-        print("Could not fetch content from any repo")
+        log_error("Could not fetch content from any repo")
         return 1
 
     prompt = _build_practices_prompt(runtime, content_samples, out_path)
     stdout, err = run_ai_cli(prompt)
     if err:
-        print(f"LLM error: {err}")
+        log_error(f"LLM error: {err}")
         return 1
 
     try:
         payload = json.loads(stdout)
     except (json.JSONDecodeError, TypeError) as exc:
-        print(f"LLM returned invalid JSON: {exc}")
+        log_error(f"LLM returned invalid JSON: {exc}")
         return 1
 
     new_content = json.dumps(payload, indent=2)
     if dry_run:
         count = len(payload.get("practices", []))
-        print(f"[dry-run] Would write {count} practices to {out_path}")
-        _show_diff(out_path, new_content)
+        log_info(f"[dry-run] Would write {count} practices to {out_path}")
+        show_diff(out_path, new_content)
         return 0
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(new_content)
-    print(f"Written {len(payload.get('practices', []))} practices to {out_path}")
+    log_success(f"Written {len(payload.get('practices', []))} practices to {out_path}")
     return 0
 
 
@@ -93,29 +93,29 @@ def refresh_analysis(
     linter_sources = _get_linter_sources()
     source_url = linter_sources.get(runtime)
     if not source_url:
-        print(f"No linter source configured for runtime={runtime!r}")
-        print(f"Supported runtimes: {', '.join(sorted(linter_sources))}")
+        log_warning(f"No linter source configured for runtime={runtime!r}")
+        log_info(f"Supported runtimes: {', '.join(sorted(linter_sources))}")
         return 1
 
     linter_docs = _fetch_url(source_url)
     if not linter_docs:
-        print(f"Could not fetch linter docs from {source_url}")
+        log_error(f"Could not fetch linter docs from {source_url}")
         return 1
 
     prompt = _build_analysis_prompt(runtime, linter_docs, out_path)
     stdout, err = run_ai_cli(prompt)
     if err:
-        print(f"LLM error: {err}")
+        log_error(f"LLM error: {err}")
         return 1
 
     if dry_run:
-        print(f"[dry-run] Would write analysis.md to {out_path}")
-        _show_diff(out_path, stdout)
+        log_info(f"[dry-run] Would write analysis.md to {out_path}")
+        show_diff(out_path, stdout)
         return 0
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
     out_path.write_text(stdout)
-    print(f"Written analysis.md to {out_path}")
+    log_success(f"Written analysis.md to {out_path}")
     return 0
 
 
@@ -130,7 +130,7 @@ def _fetch_cursor_rules_repos(runtime: str, min_stars: int) -> list[dict]:
         "order": "desc",
         "per_page": "10",
     })
-    url = f"{_get_github_search_url()}?{query}"
+    url = f"{get_github_search_url()}?{query}"
     raw = _fetch_url(url, headers={"Accept": "application/vnd.github+json"})
     if not raw:
         return []
@@ -157,7 +157,7 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
             content = _fetch_url(url)
             if content:
                 header = f"# Source: {repo['name']} ({repo['stars']} stars)\n\n"
-                samples.append(header + content[:4000])
+                samples.append(header + content[:_CONTENT_SAMPLE_LIMIT])
                 break
     return samples
 
@@ -174,71 +174,22 @@ def _fetch_url(url: str, headers: dict | None = None) -> str | None:
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:
     combined = "\n\n---\n\n".join(content_samples)
     existing = out_path.read_text() if out_path.exists() else "none"
-    return f"""You are curating engineering practices for the {runtime} runtime.
-
-Below are cursor-rules files from highly-starred GitHub repositories. Extract the most
-impactful violations — code patterns that real teams actually get wrong.
-
-For each violation produce a JSON object with these exact fields:
-- id: string like "ts-NNN"
-- title: short imperative title
-- cwe: integer CWE ID (use the closest match, e.g. 95 for eval, 798 for secrets)
-- dimension: one of maintainability | reliability | security | performance
-- severity: one of low | medium | high | critical
-- bad: minimal bad code snippet (1-3 lines)
-- good: corrected snippet (1-3 lines)
-- explanation: 1-2 sentences on why it matters
-
-Return ONLY valid JSON in this shape (no markdown fences):
-{{
-  "runtime": "{runtime}",
-  "version": "1.0.0",
-  "source": "curated from GitHub cursor-rules repos",
-  "practices": [ ... ]
-}}
-
-Existing practices (do not duplicate):
-{existing}
-
---- SOURCE MATERIAL ---
-{combined}
-"""
+    template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text()
+    return render_template(template, {
+        "RUNTIME": runtime,
+        "EXISTING": existing,
+        "COMBINED": combined,
+    })
 
 
 def _build_analysis_prompt(runtime: str, linter_docs: str, out_path: Path) -> str:
     existing = out_path.read_text() if out_path.exists() else "none"
-    return f"""You are writing an analysis guidance document for the {runtime} runtime.
-
-The document teaches a code analysis LLM:
-1. Where to look in a {runtime} codebase (which files, which patterns)
-2. What to ask the LLM judge when reviewing findings
-3. Common false positives to ignore
-
-Use the linter documentation below as your source of truth for rule names and severity.
-
-Output ONLY valid markdown (no JSON). Use these sections:
-# {runtime.title()} Codebase Analysis Guidance
-## Where to look first
-### Security hotspots
-### Maintainability signals
-### Reliability signals
-### Performance signals
-## What to ask the LLM
-## Common false positives
-
-Existing document (update in place, preserve what's accurate):
-{existing[:2000] if existing != "none" else "none"}
-
---- LINTER DOCS ---
-{linter_docs[:6000]}
-"""
+    template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text()
+    return render_template(template, {
+        "RUNTIME": runtime,
+        "RUNTIME_TITLE": runtime.title(),
+        "EXISTING": existing[:_EXISTING_CONTENT_LIMIT] if existing != "none" else "none",
+        "LINTER_DOCS": linter_docs[:_LINTER_DOCS_LIMIT],
+    })
 
 
-def _show_diff(path: Path, new_content: str) -> None:
-    old_lines = path.read_text().splitlines(keepends=True) if path.exists() else []
-    new_lines = new_content.splitlines(keepends=True)
-    diff = list(difflib.unified_diff(old_lines, new_lines, fromfile=str(path), tofile="<new>"))
-    if diff:
-        print("".join(diff))
-    else:
-        print(f"[no changes] {path}")

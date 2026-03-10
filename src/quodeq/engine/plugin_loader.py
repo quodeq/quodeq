@@ -2,26 +2,31 @@
 from __future__ import annotations
 import json
 from pathlib import Path
+from typing import Iterator
 
 from quodeq.engine.schema_validator import (
     validate_plugin,
     validate_dimensions,
 )
-from quodeq.utils import read_json
+from quodeq.shared.utils import read_json
+
+
+def scan_plugin_dirs(evaluators_dir: Path) -> Iterator[Path]:
+    """Yield valid plugin directories (non-underscore dirs with plugin.json)."""
+    if not evaluators_dir.exists():
+        return
+    for path in sorted(evaluators_dir.iterdir()):
+        if path.is_dir() and not path.name.startswith("_") and (path / "plugin.json").exists():
+            yield path
 
 
 def discover_plugins(evaluators_dir: Path) -> list[dict]:
-    """Discover all valid plugins in evaluators_dir.
-    Ignores directories starting with '_'.
-    """
+    """Discover all valid plugins in evaluators_dir."""
     plugins = []
-    if not evaluators_dir.exists():
-        return plugins
-    for path in sorted(evaluators_dir.iterdir()):
-        if path.is_dir() and not path.name.startswith("_"):
-            plugin = _try_load(path)
-            if plugin:
-                plugins.append(plugin)
+    for path in scan_plugin_dirs(evaluators_dir):
+        plugin = _try_load(path)
+        if plugin:
+            plugins.append(plugin)
     return plugins
 
 

@@ -1,5 +1,7 @@
 """Filesystem-backed repository for evaluator configuration files."""
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 

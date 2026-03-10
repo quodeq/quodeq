@@ -1,5 +1,7 @@
 """Hybrid repository that tries the web adapter first, falling back to filesystem."""
 
+from __future__ import annotations
+
 from quodeq.adapters.hybrid._hybrid_call import hybrid_call
 from quodeq.ports.evaluators import EvaluatorsRepository
 

@@ -6,13 +6,7 @@ import json
 from dataclasses import dataclass
 from pathlib import Path
 
-
-def _sub(template: str, **kwargs: str) -> str:
-    """Replace {{KEY}} placeholders in a template string."""
-    result = template
-    for key, value in kwargs.items():
-        result = result.replace(f"{{{{{key}}}}}", value)
-    return result
+from quodeq.config.prompt_templates import render_template
 
 
 def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
@@ -124,15 +118,17 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
         if compiled_dir.exists():
             standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
 
-    return _sub(
+    return render_template(
         template,
-        DISCIPLINE=context.plugin_id,
-        REPO_NAME=context.repo_name,
-        DATE=context.date_str,
-        DIMENSION=context.dimension,
-        SOURCE_FILE_COUNT=str(context.source_file_count),
-        STANDARDS_CHECKLIST=standards_checklist,
-        ANALYSIS_GUIDANCE=context.analysis_md or "_No additional guidance._",
-        DIMENSIONS=dimensions_text,
-        PROMPT_HASH=prompt_hash,
+        {
+            "DISCIPLINE": context.plugin_id,
+            "REPO_NAME": context.repo_name,
+            "DATE": context.date_str,
+            "DIMENSION": context.dimension,
+            "SOURCE_FILE_COUNT": str(context.source_file_count),
+            "STANDARDS_CHECKLIST": standards_checklist,
+            "ANALYSIS_GUIDANCE": context.analysis_md or "_No additional guidance._",
+            "DIMENSIONS": dimensions_text,
+            "PROMPT_HASH": prompt_hash,
+        },
     )

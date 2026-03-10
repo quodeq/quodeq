@@ -1,7 +1,9 @@
 """Validation checks for evaluator configuration files."""
 
+from __future__ import annotations
+
 from quodeq.config.paths import ConfigPaths
-from quodeq.logging import log_error
+from quodeq.shared.logging import log_error
 
 
 def validate_evaluators(discipline: str, paths: ConfigPaths) -> int:

@@ -6,7 +6,7 @@ from quodeq.engine.evidence import DEFAULT_WEIGHT, Evidence
 from quodeq.engine.scoring_internals import (
     GRADE_LADDER,
     SCALE_TIER_NAMES,
-    _scale_multiplier,
+    scale_multiplier,
     build_deductions,
     confidence_interval_for,
     count_grade_drops,
@@ -165,7 +165,7 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     """
     source_file_count = evidence.get("source_file_count", 0)
     files_read = evidence.get("files_read", 0)
-    scale_mult = _scale_multiplier(source_file_count)
+    scale_mult = scale_multiplier(source_file_count)
 
     per_principle = _score_all_principles(
         evidence.get("principles", {}), mode, scale_mult, files_read,

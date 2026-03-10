@@ -37,6 +37,20 @@ def _read_all_run_data(
     return all_run_data, latest_by_dimension
 
 
+def _find_previous_run(
+    dim_name: str, from_run: str, runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
+) -> dict[str, Any] | None:
+    """Find the previous run containing *dim_name* after *from_run*."""
+    from_idx = runs.index(from_run) if from_run in runs else -1
+    if from_idx < 0:
+        return None
+    for rid in runs[from_idx + 1:]:
+        found = next((x for x in all_run_data.get(rid, []) if x.get("dimension") == dim_name), None)
+        if found:
+            return {"runId": rid, "dimension": found}
+    return None
+
+
 def _compute_accumulated_trends(
     all_dimensions: list[dict[str, Any]], runs: list[str], all_run_data: dict[str, list[dict[str, Any]]]
 ) -> list[dict[str, Any]]:
@@ -44,16 +58,7 @@ def _compute_accumulated_trends(
     result = []
     for dim in all_dimensions:
         from_run = dim.get("fromRunId")
-        dim_name = dim.get("dimension")
-        previous = None
-        if from_run:
-            from_idx = runs.index(from_run) if from_run in runs else -1
-            if from_idx >= 0:
-                for rid in runs[from_idx + 1:]:
-                    found = next((x for x in all_run_data.get(rid, []) if x.get("dimension") == dim_name), None)
-                    if found:
-                        previous = {"runId": rid, "dimension": found}
-                        break
+        previous = _find_previous_run(dim.get("dimension"), from_run, runs, all_run_data) if from_run else None
         trend = calculate_trend(dim.get("overallScore"), previous.get("dimension", {}).get("overallScore") if previous else None)
         result.append(
             {

@@ -49,13 +49,13 @@ def _create_project(reports_dir: Path, identity: ProjectIdentity) -> str:
     return project_uuid
 
 
-def resolve_project_uuid(reports_dir: Path, project_name: str, repo_path: str, discipline: str | None, location: str = "local") -> str:
-    """Find or create a UUID project directory matching project_name + repo_path."""
-    resolved = repo_path if location == "online" else str(Path(repo_path).resolve())
-    identity = ProjectIdentity(project_name, resolved, discipline, location)
+def resolve_project_uuid(reports_dir: Path, identity: ProjectIdentity) -> str:
+    """Find or create a UUID project directory matching identity."""
+    resolved_path = identity.repo_path if identity.location == "online" else str(Path(identity.repo_path).resolve())
+    resolved = ProjectIdentity(identity.project_name, resolved_path, identity.discipline, identity.location)
     if not reports_dir.exists():
         reports_dir.mkdir(parents=True, exist_ok=True)
-    existing = _find_existing_project(reports_dir, identity)
+    existing = _find_existing_project(reports_dir, resolved)
     if existing:
         return existing
-    return _create_project(reports_dir, identity)
+    return _create_project(reports_dir, resolved)

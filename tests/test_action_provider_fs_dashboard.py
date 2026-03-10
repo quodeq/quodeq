@@ -7,7 +7,7 @@ from typing import Any
 
 import pytest
 
-from quodeq.action_provider_fs_dashboard import (
+from quodeq.provider.dashboard import (
     _collect_previous_scores,
     _collect_stale_dimensions,
     _enrich_dimensions_with_trend,
