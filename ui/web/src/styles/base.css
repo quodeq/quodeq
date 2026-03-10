@@ -1004,13 +1004,21 @@ textarea:focus {
 
 .sa-phrase-wrap {
   margin: 0;
-  min-height: 3em;
+  height: 4.5em;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   color: var(--color-text-muted);
-  font-size: clamp(0.75rem, 1vw, 0.82rem);
-  letter-spacing: 0.04em;
+  font-size: clamp(0.82rem, 1.1vw, 0.95rem);
+  letter-spacing: 0.02em;
   text-align: center;
-  line-height: 1.55;
-  max-width: 28ch;
+  line-height: 1.6;
+  max-width: 30ch;
+}
+
+.sa-phrase-wrap b {
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
 }
 
 .sa-phrase {

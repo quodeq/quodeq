@@ -1,14 +1,14 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const PHRASES = [
-  'evaluate local folders or remote git repositories — no cloning needed for remote',
-  'target a subfolder to focus analysis on a specific module or service',
-  'run evaluations over time and track quality trends across runs',
-  'each finding includes a fix plan — a concrete path to resolve the issue',
-  'violations explain what went wrong, why it matters, and how to fix it',
-  'findings are mapped to CWE — the industry standard for software weaknesses',
-  'dimensions follow ISO 25010, the international standard for software quality',
-  'quality covers reliability, security, maintainability, performance, and more',
+  'evaluate <b>local folders</b> or <b>remote git repositories</b> — no cloning needed',
+  'target a <b>subfolder</b> to focus analysis on a specific module or service',
+  'run evaluations over time and <b>track quality trends</b> across runs',
+  'each finding includes a <b>fix plan</b> — a concrete path to resolve the issue',
+  'violations explain <b>what went wrong</b>, why it matters, and <b>how to fix it</b>',
+  'findings are mapped to <b>CWE</b> — the industry standard for software weaknesses',
+  'dimensions follow <b>ISO 25010</b>, the international standard for software quality',
+  'quality covers <b>reliability</b>, <b>security</b>, <b>maintainability</b>, <b>performance</b>, and more',
 ];
 
 const AUTO_ADVANCE_MS = 5000;
@@ -145,9 +145,10 @@ export default function SettingsAside() {
         <span className="sa-wordmark">quodeq</span>
 
         <p className="sa-phrase-wrap">
-          <span className={changing ? 'sa-phrase sa-phrase--changing' : 'sa-phrase'}>
-            {PHRASES[index]}
-          </span>
+          <span
+            className={changing ? 'sa-phrase sa-phrase--changing' : 'sa-phrase'}
+            dangerouslySetInnerHTML={{ __html: PHRASES[index] }}
+          />
         </p>
       </div>
     </div>
