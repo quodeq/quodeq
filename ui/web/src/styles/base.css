@@ -938,6 +938,12 @@ textarea:focus {
   position: relative;
   width: min(80%, 280px);
   padding: 0 3rem;
+  opacity: 0.22;
+  transition: opacity 300ms ease;
+}
+
+.sa-logo-shell:hover {
+  opacity: 0.65;
 }
 
 .sa-logo {
@@ -1000,6 +1006,12 @@ textarea:focus {
   letter-spacing: 0.06em;
   color: var(--color-text);
   margin-top: 0.25rem;
+  opacity: 0.22;
+  transition: opacity 300ms ease;
+}
+
+.sa-brand:hover .sa-wordmark {
+  opacity: 0.65;
 }
 
 .sa-phrase-wrap {
