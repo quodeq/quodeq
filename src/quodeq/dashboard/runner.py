@@ -113,6 +113,8 @@ def _choose_ui_port(start: int, host: str = DEFAULT_HOST) -> int:
     port = start
     while _is_port_open(host, port):
         port += 1
+        if port > 65535:
+            raise RuntimeError("No free port available.")
     return port
 
 
@@ -147,8 +149,8 @@ def _spawn_action_api(port: int, static_dist: Path | None = None) -> subprocess.
     )
     try:
         _get_pid_file().write_text(str(proc.pid))
-    except (OSError, AttributeError):
-        pass
+    except (OSError, AttributeError) as exc:
+        log_warning(f"Could not write PID file: {exc}")
     return proc
 
 

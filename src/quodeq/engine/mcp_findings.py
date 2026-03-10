@@ -44,7 +44,11 @@ def _read_message() -> dict | None:
         line = raw.strip()
         if not line:
             continue
-        return json.loads(line)
+        try:
+            return json.loads(line)
+        except json.JSONDecodeError:
+            sys.stderr.write(f"Skipping malformed JSON: {line[:200]}\n")
+            continue
     return None
 
 

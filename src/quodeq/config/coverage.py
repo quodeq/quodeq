@@ -12,5 +12,8 @@ def coverage_percent(value: str) -> int:
     """Convert a percentage string or fraction (e.g. '3/4') to an integer percent."""
     if "/" in value:
         num, denom = value.split("/", 1)
-        return int(round((int(num) / int(denom)) * 100))
+        d = int(denom)
+        if d == 0:
+            return 0
+        return int(round((int(num) / d) * 100))
     return parse_coverage_percent(value)

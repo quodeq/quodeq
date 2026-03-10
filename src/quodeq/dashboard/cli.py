@@ -54,4 +54,8 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
 def main(argv: list[str] | None = None) -> int:
     """Entry point for the dashboard command."""
     config = parse_args(argv)
-    return run_dashboard(config)
+    try:
+        return run_dashboard(config)
+    except (RuntimeError, FileNotFoundError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1

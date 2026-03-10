@@ -19,7 +19,7 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
     Returns the number of requirements fetched.
     When QUODEQ_ASVS_SHA256 is set, validates the download against the expected hash.
     """
-    with urllib.request.urlopen(get_asvs_url()) as r:
+    with urllib.request.urlopen(get_asvs_url(), timeout=30) as r:
         content = r.read()
 
     actual_hash = hashlib.sha256(content).hexdigest()

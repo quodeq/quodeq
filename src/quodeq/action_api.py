@@ -30,6 +30,7 @@ _ALLOWED_AI_CMDS = frozenset({"claude", "codex", "copilot"})
 _MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
 _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 60  # max state-changing requests per window
+_RATE_STORE_MAX_IPS = 10_000  # max tracked IPs to prevent unbounded memory growth
 _rate_store: dict[str, list[float]] = defaultdict(list)
 
 def _default_provider() -> ActionProvider:
@@ -323,6 +324,13 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
         if request.method not in ("GET", "HEAD", "OPTIONS"):
             ip = request.remote_addr or "unknown"
             now = time.monotonic()
+            # Evict stale IPs if store exceeds max size (CWE-400)
+            if len(_rate_store) > _RATE_STORE_MAX_IPS:
+                stale = [k for k, v in _rate_store.items() if all(now - t >= _RATE_LIMIT_WINDOW for t in v)]
+                for k in stale:
+                    del _rate_store[k]
+                if len(_rate_store) > _RATE_STORE_MAX_IPS:
+                    _rate_store.clear()
             timestamps = [t for t in _rate_store[ip] if now - t < _RATE_LIMIT_WINDOW]
             if not timestamps:
                 _rate_store.pop(ip, None)
