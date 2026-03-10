@@ -896,12 +896,129 @@ textarea:focus {
   color: var(--color-text-muted);
 }
 
+.settings-layout {
+  display: flex;
+  flex-direction: row;
+  flex: 1;
+  min-height: 0;
+}
+
 .settings-body {
   padding: var(--space-8);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
+  width: 100%;
   max-width: 760px;
+  flex-shrink: 0;
+}
+
+.settings-aside {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-8);
+  border-left: 1px solid var(--color-border);
+}
+
+@media (max-width: 900px) {
+  .settings-aside { display: none; }
+}
+
+/* ── Settings aside brand panel ── */
+.sa-brand {
+  display: grid;
+  justify-items: center;
+  gap: 0.5rem;
+  width: min(100%, 360px);
+}
+
+.sa-logo-shell {
+  position: relative;
+  width: min(80%, 280px);
+  padding: 0 3rem;
+}
+
+.sa-logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+  user-select: none;
+}
+
+.sa-hit {
+  position: absolute;
+  top: 18%;
+  z-index: 2;
+  width: 23%;
+  height: 52%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sa-hit--left  { left: 0; }
+.sa-hit--right { right: 0; }
+
+.sa-chevron {
+  fill: var(--logo-chevron);
+  cursor: pointer;
+  transition: fill 180ms ease, filter 180ms ease;
+}
+.sa-chevron:hover,
+.sa-chevron--auto,
+.sa-chevron--press {
+  fill: var(--logo-chevron-hover);
+  filter: drop-shadow(0 0 5px color-mix(in srgb, var(--logo-chevron-hover) 40%, transparent));
+}
+
+.sa-needle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.sa-needle--wobble {
+  animation: sa-needle-wobble 720ms ease-out;
+}
+@keyframes sa-needle-wobble {
+  0%   { transform: rotate(0deg); }
+  8%   { transform: rotate(-0.7deg); }
+  18%  { transform: rotate(2.6deg); }
+  32%  { transform: rotate(-1.9deg); }
+  46%  { transform: rotate(1.25deg); }
+  60%  { transform: rotate(-0.8deg); }
+  74%  { transform: rotate(0.48deg); }
+  88%  { transform: rotate(-0.22deg); }
+  100% { transform: rotate(0deg); }
+}
+
+.sa-wordmark {
+  font-size: clamp(1.5rem, 2.5vw, 2.4rem);
+  font-weight: var(--weight-bold);
+  letter-spacing: 0.06em;
+  color: var(--color-text);
+  margin-top: 0.25rem;
+}
+
+.sa-phrase-wrap {
+  margin: 0;
+  min-height: 1.8em;
+  color: var(--color-text-muted);
+  font-size: clamp(0.72rem, 1vw, 0.85rem);
+  letter-spacing: 0.16em;
+  text-transform: lowercase;
+  text-align: center;
+}
+
+.sa-phrase {
+  display: inline-block;
+  transition: opacity 220ms ease, transform 220ms ease;
+}
+.sa-phrase--changing {
+  opacity: 0;
+  transform: translateY(6px);
 }
 
 /* Card: zero out .panel's default padding; rows carry their own */

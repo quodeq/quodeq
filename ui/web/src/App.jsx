@@ -14,6 +14,7 @@ import PrincipleDetailPage from './features/explorer/components/PrincipleDetailP
 import EvalPrincipleDetailPage from './features/explorer/components/EvalPrincipleDetailPage.jsx';
 import { formatRunId } from './utils/formatters.js';
 import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
+import SettingsAside from './features/settings/components/SettingsAside.jsx';
 
 
 // ---------------------------------------------------------------------------
@@ -551,6 +552,7 @@ export default function App() {
               </div>
             </div>
 
+            <div className="settings-layout">
             <div className="settings-body">
               <section className="panel settings-section">
                 <div className="panel-header">
@@ -647,6 +649,9 @@ export default function App() {
                   </div>
                 )}
               </section>
+            </div>
+
+            <SettingsAside />
             </div>
           </div>
         );
