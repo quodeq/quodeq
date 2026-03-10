@@ -1,15 +1,17 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const PHRASES = [
-  'code quality compass',
-  'quoming soon',
-  'human aligned quode',
-  'less drift, quode safe',
-  'code with quore ♥',
-  'bearing quode with you',
+  'point to any local folder or remote git repo to start an evaluation',
+  'target a subfolder to focus analysis on a specific module or service',
+  'run evaluations over time and track quality trends across runs',
+  'each finding includes a fix plan — a concrete path to resolve the issue',
+  'violations explain what went wrong, why it matters, and how to fix it',
+  'findings are mapped to CWE — the industry standard for software weaknesses',
+  'dimensions follow ISO 25010, the international standard for software quality',
+  'quality covers reliability, security, maintainability, performance, and more',
 ];
 
-const AUTO_ADVANCE_MS = 2500;
+const AUTO_ADVANCE_MS = 5000;
 const TRANSITION_MS = 180;
 
 export default function SettingsAside() {

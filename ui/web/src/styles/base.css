@@ -1004,12 +1004,13 @@ textarea:focus {
 
 .sa-phrase-wrap {
   margin: 0;
-  min-height: 1.8em;
+  min-height: 3em;
   color: var(--color-text-muted);
-  font-size: clamp(0.72rem, 1vw, 0.85rem);
-  letter-spacing: 0.16em;
-  text-transform: lowercase;
+  font-size: clamp(0.75rem, 1vw, 0.82rem);
+  letter-spacing: 0.04em;
   text-align: center;
+  line-height: 1.55;
+  max-width: 28ch;
 }
 
 .sa-phrase {
