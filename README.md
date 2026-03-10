@@ -3,11 +3,14 @@
   <img src="res/quodeq-logo.svg" alt="Quodeq" width="220" align="left" />
 </picture>
 
-### quodeq
+# quodeq
 
 *human aligned quode*
+
 *less drift, quode safe*
+
 *code with quore* ♥️
+
 *bearing quode with you*
 
 <br clear="all" />
