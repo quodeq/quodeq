@@ -514,6 +514,13 @@ html[data-theme="light"]:root {
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+
+  /* Logo — force light values regardless of system theme */
+  --logo-q:              var(--primitive-crimson-500);
+  --logo-chevron:        var(--primitive-brand-900);
+  --logo-chevron-hover:  var(--primitive-crimson-500);
+  --logo-needle:         var(--primitive-crimson-300);
+  --logo-needle-dark:    var(--primitive-crimson-700);
 }
 
 /* ── Ember — warm dark, logo-derived ────────────────────── */
