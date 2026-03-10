@@ -1,7 +1,6 @@
 """Dashboard runner — builds the UI, starts the action API, and serves the dashboard."""
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 import json
 import os
@@ -15,6 +14,7 @@ import urllib.request
 import webbrowser
 
 from quodeq.dashboard._build import maybe_build_ui
+from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
 from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
 from quodeq.shared.paths import resolve_path
 from quodeq.shared.utils import ACTION_API_MODULE, DEFAULT_HOST
@@ -26,67 +26,13 @@ def _get_pid_file() -> Path:
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir / "action_api.pid"
 
+
 _HEALTH_CHECK_TIMEOUT_S = 0.5
 _POLL_INTERVAL_S = 0.1
 _HEALTH_POLL_INTERVAL_S = 0.2
 _PROCESS_WAIT_TIMEOUT_S = 5
-
-
-@dataclass(frozen=True)
-class ServerConfig:
-    """Network and API server settings."""
-    port: int
-    api_host: str | None = None
-    api_port: int | None = None
-    api_forced: bool = False
-
-
-@dataclass(frozen=True)
-class BuildConfig:
-    """UI build and browser options."""
-    open_browser: bool
-    no_build: bool
-    reinstall: bool
-
-
-@dataclass(frozen=True)
-class DashboardConfig:
-    """Immutable configuration for the dashboard server (ports, paths, build options)."""
-    server: ServerConfig
-    build: BuildConfig
-    reports_dir: Path
-    static_dist: Path
-    repo_root: Path
-    reports_defaulted: bool = False
-
-    # Convenience accessors for backward compatibility
-    @property
-    def port(self) -> int:
-        return self.server.port
-
-    @property
-    def open_browser(self) -> bool:
-        return self.build.open_browser
-
-    @property
-    def no_build(self) -> bool:
-        return self.build.no_build
-
-    @property
-    def reinstall(self) -> bool:
-        return self.build.reinstall
-
-    @property
-    def api_host(self) -> str | None:
-        return self.server.api_host
-
-    @property
-    def api_port(self) -> int | None:
-        return self.server.api_port
-
-    @property
-    def api_forced(self) -> bool:
-        return self.server.api_forced
+_MAX_PORT = 65535
+_STALE_KILL_DEADLINE_S = 3
 
 
 def validate_paths(config: DashboardConfig) -> None:
@@ -113,7 +59,7 @@ def _choose_ui_port(start: int, host: str = DEFAULT_HOST) -> int:
     port = start
     while _is_port_open(host, port):
         port += 1
-        if port > 65535:
+        if port > _MAX_PORT:
             raise RuntimeError("No free port available.")
     return port
 
@@ -125,13 +71,13 @@ def _kill_stale_action_api(host: str, port: int) -> None:
         try:
             pid = int(pid_file.read_text().strip())
             os.kill(pid, signal.SIGTERM)
-        except (ValueError, OSError):
-            pass
+        except (ValueError, OSError) as exc:
+            log_debug(f"Could not kill stale action API (pid file): {exc}")
         try:
             pid_file.unlink(missing_ok=True)
         except OSError:
             pass
-    deadline = time.monotonic() + 3
+    deadline = time.monotonic() + _STALE_KILL_DEADLINE_S
     while _is_port_open(host, port) and time.monotonic() < deadline:
         time.sleep(_POLL_INTERVAL_S)
 

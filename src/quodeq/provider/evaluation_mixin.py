@@ -3,17 +3,13 @@
 from __future__ import annotations
 
 import os
-import re
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quodeq.provider.base import EvaluationOptions
-from quodeq.shared.utils import is_repo_url, project_name_from_repo
-
-_REPO_URL_RE = re.compile(
-    r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?|git@[\w.\-]+:[\w.\-/]+(\.git)?)$"
-)
+from quodeq.shared.repo_handler import is_valid_repo_url
+from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
 
 if TYPE_CHECKING:
     from quodeq.provider.jobs import JobManager
@@ -59,7 +55,7 @@ class FsEvaluationMixin:
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
         """Start an asynchronous evaluation subprocess for a repository."""
         if is_repo_url(repo):
-            if not _REPO_URL_RE.match(repo):
+            if not is_valid_repo_url(repo):
                 raise ValueError(f"Invalid repository URL format: {repo}")
         else:
             repo_path = Path(repo)
@@ -70,10 +66,10 @@ class FsEvaluationMixin:
         _register_project(repo, options.discipline, reports_dir)
 
         env = {**os.environ, "PYTHONUNBUFFERED": "1"}
-        if options.ai_cmd:
-            env["AI_CMD"] = options.ai_cmd
-        if options.ai_model:
-            env["AI_MODEL"] = options.ai_model
+        env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
+        ai_model = options.ai_model or get_ai_model()
+        if ai_model:
+            env["AI_MODEL"] = ai_model
 
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
         return self._jobs.start_job(cmd, cwd=cwd, env=env)

@@ -15,6 +15,7 @@ dependencies = [
 [dependency-groups]
 dev = [
     "pytest==9.0.2",
+    "pytest-cov>=6.0",
 ]
 
 [project.scripts]
@@ -28,6 +29,12 @@ warn_unused_configs = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+[tool.coverage.run]
+source = ["quodeq"]
+
+[tool.coverage.report]
+fail_under = 60
 
 [build-system]
 requires = ["uv_build>=0.10.6,<0.11.0"]

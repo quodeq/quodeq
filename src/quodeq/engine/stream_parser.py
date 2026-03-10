@@ -15,8 +15,8 @@ def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
     """
     count = 0
     lines = 0
-    for line in text.splitlines():
-        line = line.strip()
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
         if not line:
             continue
         lines += 1
@@ -78,8 +78,8 @@ def extract_evidence_from_stream(stream_file: Path, jsonl_file: Path) -> int:
     files_read: set = set()
 
     with open(stream_file) as f, open(jsonl_file, "w") as out:
-        for line in f:
-            line = line.strip()
+        for raw_line in f:
+            line = raw_line.strip()
             if not line:
                 continue
             try:

@@ -14,12 +14,13 @@ import sys
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-from typing import Callable, TypedDict
+from typing import Any, Callable, TypedDict
 
 from quodeq.engine.analysis import AnalysisConfig, HeartbeatCallback, count_files_from_stream, run_analysis
 from quodeq.engine.stream_parser import extract_evidence_from_stream
 from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid
-from quodeq.engine.evidence import Evidence, PrincipleEvidence
+from quodeq.engine.evidence import Evidence
+from quodeq.engine._merge import merge_evidence
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
 
 from quodeq.engine.plugin_loader import load_plugin_full
@@ -132,7 +133,7 @@ def _run_dimension_analysis(
 
     heartbeat = config.options.heartbeat_callback or _make_heartbeat(dim_id, idx, ctx.total, config.source_file_count)
 
-    ac_kwargs: dict = dict(
+    ac_kwargs: dict[str, Any] = dict(
         jsonl_file=jsonl_file,
         analysis_budget=config.options.analysis_budget,
         heartbeat_callback=heartbeat,
@@ -213,6 +214,28 @@ class EvaluationError(RuntimeError):
     """Raised when an evaluation completes but produces no usable findings."""
 
 
+def _process_single_dimension(
+    config: RunConfig, dimension: str, idx: int, ctx: _PluginContext,
+) -> Evidence | None:
+    """Analyze a single dimension: build prompt, run AI, parse evidence."""
+    _emit_marker("analyzing", dimension=dimension)
+    log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
+
+    prompt = _build_dimension_prompt(config, dimension, ctx)
+    stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
+
+    ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
+    if ev is None:
+        log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid stream, skipping")
+        return None
+
+    _emit_marker("scoring", dimension=dimension)
+    violations = sum(len(pe.violations) for pe in ev.principles.values())
+    compliances = sum(len(pe.compliance) for pe in ev.principles.values())
+    log_success(f"[{idx}/{ctx.total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")
+    return ev
+
+
 def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
     dimensions, ctx = _load_plugin_context(config)
@@ -221,28 +244,12 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     skipped_count = 0
 
     for idx, dimension in enumerate(dimensions, 1):
-        _emit_marker("analyzing", dimension=dimension)
-        log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
-
-        prompt = _build_dimension_prompt(config, dimension, ctx)
-        stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
-
-        ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
+        ev = _process_single_dimension(config, dimension, idx, ctx)
         if ev is None:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid stream, skipping")
             skipped_count += 1
             continue
-
-        _emit_marker("scoring", dimension=dimension)
-        violations = sum(len(pe.violations) for pe in ev.principles.values())
-        compliances = sum(len(pe.compliance) for pe in ev.principles.values())
-        log_success(f"[{idx}/{ctx.total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")
         result[dimension] = ev
 
-    # Guard: an evaluation that ran on a real project but produced zero findings
-    # across all dimensions is almost certainly broken (e.g. tools blocked,
-    # permissions misconfigured). Only trigger when there were source files to
-    # analyze and at least one dimension had a valid stream (result is non-empty).
     if result and config.source_file_count > 0:
         total_findings = sum(
             sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
@@ -260,7 +267,12 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
 
 def run(config: RunConfig) -> Evidence:
     """Orchestrate: load plugin → per-dimension AI analysis → merged Evidence."""
-    return _merge_evidence(list(_run_dimensions(config).values()), config)
+    return merge_evidence(
+        list(_run_dimensions(config).values()),
+        source_file_count=config.source_file_count,
+        src=str(config.src),
+        plugin_id=config.plugin_id,
+    )
 
 
 def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
@@ -268,40 +280,3 @@ def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
     return _run_dimensions(config)
 
 
-def _merge_evidence(evidence_list: list[Evidence], config: RunConfig) -> Evidence:
-    """Merge per-dimension Evidence objects into a single Evidence."""
-    merged_principles: dict[str, PrincipleEvidence] = {}
-    total_files_read = 0
-    total_dismissed = 0
-
-    for ev in evidence_list:
-        total_files_read = max(total_files_read, ev.files_read)
-        total_dismissed += ev.dismissed_count
-        for pid, pe in ev.principles.items():
-            if pid in merged_principles:
-                existing = merged_principles[pid]
-                existing.violations.extend(pe.violations)
-                existing.compliance.extend(pe.compliance)
-                existing.compute_metrics()
-            else:
-                merged_principles[pid] = pe
-
-    coverage_pct = (
-        round(total_files_read / config.source_file_count * 100, 1)
-        if config.source_file_count > 0
-        else 0.0
-    )
-
-    merged = Evidence(
-        repository=str(config.src),
-        plugin_id=config.plugin_id,
-        date=evidence_list[0].date if evidence_list else "",
-        source_file_count=config.source_file_count,
-        files_read=total_files_read,
-        coverage_pct=coverage_pct,
-        principles=merged_principles,
-        dismissed_count=total_dismissed,
-    )
-    if evidence_list:
-        merged.plugin_name = evidence_list[0].plugin_name
-    return merged

@@ -12,7 +12,7 @@ from pathlib import Path
 from quodeq.shared.ai_cli import run_ai_cli
 from quodeq.config.prompt_templates import render_template
 from quodeq.shared.logging import log_error, log_info, log_success, log_warning
-from quodeq.shared.utils import get_github_search_url, show_diff
+from quodeq.shared.utils import get_github_raw_base_url, get_github_search_url, show_diff
 
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
@@ -151,7 +151,7 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
     for repo in repos:
         for filename in (".cursorrules", "cursor-rules.md", ".cursor/rules/main.mdc"):
             url = (
-                f"https://raw.githubusercontent.com/{repo['name']}"
+                f"{get_github_raw_base_url()}/{repo['name']}"
                 f"/{repo['default_branch']}/{filename}"
             )
             content = _fetch_url(url)

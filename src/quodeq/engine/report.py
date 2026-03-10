@@ -6,15 +6,7 @@ import re
 from pathlib import Path
 
 from quodeq.engine.evidence import Evidence
-
-
-# Score thresholds — exclusive lower bounds for each grade tier.
-_GRADE_THRESHOLDS = (
-    (3, "Critical"),
-    (5, "Poor"),
-    (7, "Adequate"),
-    (9, "Good"),
-)
+from quodeq.engine.scoring_internals import score_to_grade_label
 
 
 def grade_from_score(score: str | None) -> str | None:
@@ -26,12 +18,7 @@ def grade_from_score(score: str | None) -> str | None:
     if not hit:
         return None
 
-    numeric = float(hit.group(1))
-
-    for threshold, label in _GRADE_THRESHOLDS:
-        if numeric < threshold:
-            return label
-    return "Exemplary"
+    return score_to_grade_label(float(hit.group(1)))
 
 
 def _build_score_lookup(per_principle_scores: dict) -> dict:

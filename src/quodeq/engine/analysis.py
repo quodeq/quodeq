@@ -24,6 +24,7 @@ HeartbeatCallback = Callable[[int, dict], None]
 
 _DEFAULT_MAX_TURNS = 200
 _DEFAULT_MAX_DURATION = 1800  # 30 minutes
+_TERMINATE_TIMEOUT_S = 10
 
 
 @dataclass(frozen=True)
@@ -169,6 +170,15 @@ def _build_ai_cmd(
     return args, mcp_config_path
 
 
+def _terminate_process(process: subprocess.Popen) -> None:
+    """Send SIGTERM and escalate to SIGKILL if the process doesn't exit."""
+    process.terminate()
+    try:
+        process.wait(timeout=_TERMINATE_TIMEOUT_S)
+    except subprocess.TimeoutExpired:
+        process.kill()
+
+
 def _run_with_heartbeat(
     process: subprocess.Popen,
     config: AnalysisConfig,
@@ -194,11 +204,7 @@ def _run_with_heartbeat(
                 config.heartbeat_callback(elapsed, progress)
             if max_dur is not None and elapsed >= max_dur:
                 log_warning(f"Analysis exceeded max duration ({max_dur}s) — terminating")
-                process.terminate()
-                try:
-                    process.wait(timeout=10)
-                except subprocess.TimeoutExpired:
-                    process.kill()
+                _terminate_process(process)
                 timed_out = True
     return timed_out
 

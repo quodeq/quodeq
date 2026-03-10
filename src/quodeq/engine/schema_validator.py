@@ -49,7 +49,7 @@ def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
     return errors
 
 
-def _validate(data, schema_file: str) -> list[str]:
+def _validate(data: dict, schema_file: str) -> list[str]:
     schema = _load_schema(schema_file)
     validator = jsonschema.Draft202012Validator(schema)
     return [e.message for e in validator.iter_errors(data)]

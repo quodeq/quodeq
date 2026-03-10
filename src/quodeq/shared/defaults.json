@@ -7,5 +7,6 @@
   "dashboard_port": 4173,
   "default_host": "127.0.0.1",
   "asvs_url": "https://raw.githubusercontent.com/OWASP/ASVS/v4.0.3/4.0/docs_en/OWASP%20Application%20Security%20Verification%20Standard%204.0.3-en.json",
-  "github_search_url": "https://api.github.com/search/repositories"
+  "github_search_url": "https://api.github.com/search/repositories",
+  "github_raw_base_url": "https://raw.githubusercontent.com"
 }

@@ -8,7 +8,8 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.engine._runner_report import run_full
-from quodeq.engine.runner import run, RunConfig, EvaluationError, _merge_evidence
+from quodeq.engine.runner import run, RunConfig, EvaluationError
+from quodeq.engine._merge import merge_evidence
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
 
 
@@ -198,13 +199,13 @@ class TestRun:
 
 
 # ---------------------------------------------------------------------------
-# _merge_evidence
+# merge_evidence
 # ---------------------------------------------------------------------------
 
 class TestMergeEvidence:
     def test_merge_empty(self, tmp_path):
         config = RunConfig(src=tmp_path, plugin_id="ts", evaluators_dir=tmp_path)
-        merged = _merge_evidence([], config)
+        merged = merge_evidence([], config.source_file_count, str(config.src), config.plugin_id)
         assert merged.principles == {}
         assert merged.files_read == 0
 
@@ -221,7 +222,7 @@ class TestMergeEvidence:
             principles={"ts-001": pe},
         )
         config = RunConfig(src=tmp_path, plugin_id="ts", evaluators_dir=tmp_path, source_file_count=10)
-        merged = _merge_evidence([ev], config)
+        merged = merge_evidence([ev], config.source_file_count, str(config.src), config.plugin_id)
         assert "ts-001" in merged.principles
         assert merged.files_read == 5
 
@@ -251,7 +252,7 @@ class TestMergeEvidence:
         )
 
         config = RunConfig(src=tmp_path, plugin_id="ts", evaluators_dir=tmp_path, source_file_count=10)
-        merged = _merge_evidence([ev1, ev2], config)
+        merged = merge_evidence([ev1, ev2], config.source_file_count, str(config.src), config.plugin_id)
         assert "ts-001" in merged.principles
         assert "ts-002" in merged.principles
         assert merged.files_read == 8  # max
@@ -282,7 +283,7 @@ class TestMergeEvidence:
         )
 
         config = RunConfig(src=tmp_path, plugin_id="ts", evaluators_dir=tmp_path, source_file_count=10)
-        merged = _merge_evidence([ev1, ev2], config)
+        merged = merge_evidence([ev1, ev2], config.source_file_count, str(config.src), config.plugin_id)
         pe = merged.principles["ts-001"]
         assert len(pe.violations) == 2
         assert len(pe.compliance) == 1

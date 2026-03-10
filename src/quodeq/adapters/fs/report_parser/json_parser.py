@@ -7,12 +7,12 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import build_totals
-from quodeq.provider.violation_context import build_finding_base, format_file_line
+from quodeq.provider.violation_context import FindingSpec, build_finding_base, format_file_line
 
 
 def _build_finding(item: dict, *, include_severity: bool) -> dict[str, Any]:
     """Build a normalized finding dict from a violation or compliance item."""
-    return build_finding_base(
+    return build_finding_base(FindingSpec(
         principle=item.get("principle"),
         file=item.get("file"),
         line=item.get("line"),
@@ -22,7 +22,7 @@ def _build_finding(item: dict, *, include_severity: bool) -> dict[str, Any]:
         severity=item.get("severity"),
         cwe=item.get("cwe"),
         include_severity=include_severity,
-    )
+    ))
 
 
 def parse_report_json(json_path: Path) -> dict[str, Any] | None:

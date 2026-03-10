@@ -13,35 +13,38 @@ class ViolationContext:
     dimension: str
 
 
-def build_finding_base(
-    *,
-    principle: str | None,
-    file: str | None = None,
-    line: int | str | None = None,
-    title: str | None = None,
-    reason: str | None = None,
-    snippet: str | None = None,
-    severity: str | None = None,
-    cwe: int | str | None = None,
-    include_severity: bool = True,
-) -> dict[str, Any]:
+@dataclass(frozen=True)
+class FindingSpec:
+    """Input fields for building a normalized finding dict."""
+    principle: str | None
+    file: str | None = None
+    line: int | str | None = None
+    title: str | None = None
+    reason: str | None = None
+    snippet: str | None = None
+    severity: str | None = None
+    cwe: int | str | None = None
+    include_severity: bool = True
+
+
+def build_finding_base(spec: FindingSpec) -> dict[str, Any]:
     """Build the core fields shared by all finding/violation normalizers.
 
     Used by both ``violations_parsing`` (JSONL/stream) and ``json_parser``
     (evaluation JSON) to avoid duplicating the same field assembly (CWE-1041).
     """
     entry: dict[str, Any] = {
-        "principle": principle,
-        "file": file,
-        "line": line,
-        "title": title,
-        "reason": reason,
-        "snippet": snippet,
+        "principle": spec.principle,
+        "file": spec.file,
+        "line": spec.line,
+        "title": spec.title,
+        "reason": spec.reason,
+        "snippet": spec.snippet,
     }
-    if include_severity:
-        entry["severity"] = severity or "minor"
-    if cwe:
-        entry["cwe"] = cwe
+    if spec.include_severity:
+        entry["severity"] = spec.severity or "minor"
+    if spec.cwe:
+        entry["cwe"] = spec.cwe
     return entry
 
 

@@ -7,12 +7,12 @@ from typing import Any
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
 from quodeq.engine.analysis import count_files_from_stream
-from quodeq.provider.violation_context import ViolationContext, build_finding_base
+from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base
 
 
 def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
     """Build a normalized finding dict from a raw JSON object."""
-    entry = build_finding_base(
+    entry = build_finding_base(FindingSpec(
         principle=obj["p"],
         file=obj.get("file"),
         line=obj.get("line"),
@@ -21,7 +21,7 @@ def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
         snippet=obj.get("snippet"),
         severity=obj.get("severity"),
         cwe=obj.get("cwe"),
-    )
+    ))
     entry["dimension"] = obj.get("d", dimension)
     entry["violationType"] = obj.get("vt")
     return entry
@@ -34,8 +34,8 @@ def _parse_jsonl_findings(
     violations: list[dict[str, Any]] = []
     compliance: list[dict[str, Any]] = []
     seen: set[tuple] = set()
-    for raw in lines:
-        raw = raw.strip()
+    for raw_line in lines:
+        raw = raw_line.strip()
         if not raw:
             continue
         try:
@@ -82,7 +82,7 @@ def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, ctx:
 def _build_violation_from_principle(violation: dict, label: str) -> dict[str, Any]:
     """Build a normalized violation dict from a principle's violation entry."""
     from quodeq.provider.violation_context import format_file_line
-    return build_finding_base(
+    return build_finding_base(FindingSpec(
         principle=label,
         file=format_file_line(violation.get("file"), violation.get("line")),
         line=violation.get("line"),
@@ -91,7 +91,7 @@ def _build_violation_from_principle(violation: dict, label: str) -> dict[str, An
         snippet=violation.get("snippet"),
         severity=violation.get("severity"),
         cwe=violation.get("cwe"),
-    )
+    ))
 
 
 def _extract_violations_from_principles(principles: dict) -> list[dict[str, Any]]:

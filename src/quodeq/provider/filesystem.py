@@ -11,6 +11,7 @@ from quodeq.provider.jobs import JobManager
 from quodeq.provider.evaluation_mixin import FsEvaluationMixin
 from quodeq.provider.tooling_mixin import FsToolingMixin
 from quodeq.provider.violations import aggregate_violations, resolve_dimension_eval
+from quodeq.config.paths import default_paths
 from quodeq.provider.accumulated import compute_accumulated
 from quodeq.provider.dashboard import build_dashboard
 from quodeq.adapters.fs.report_parser import (
@@ -151,7 +152,6 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
 def _list_available_dimensions_for_discipline(discipline: str) -> list[str]:
     """Resolve available dimensions for a plugin via its dimensions.json."""
     try:
-        from quodeq.config.paths import default_paths
         plugin_dir = default_paths().evaluators_dir / discipline
         dims_file = plugin_dir / "dimensions.json"
         if dims_file.exists():

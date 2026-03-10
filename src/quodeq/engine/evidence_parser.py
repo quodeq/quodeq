@@ -8,6 +8,14 @@ from pathlib import Path
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
 
 
+@dataclass(frozen=True)
+class _JudgmentCWE:
+    """A judgment paired with its resolved CWE metadata."""
+    judgment: Judgment
+    cwe_name: str
+    cwe_id: int | None
+
+
 @dataclass
 class EvidenceContext:
     """Metadata needed to construct an Evidence object from parsed JSONL."""
@@ -82,33 +90,38 @@ def _judgment_to_dict(j: Judgment, cwe_name: str = "", cwe_id: int | None = None
     return d
 
 
+@dataclass
+class _GroupedJudgments:
+    """Judgments grouped by principle into violations, compliance, and max severity."""
+    violations: dict[str, list[_JudgmentCWE]]
+    compliance: dict[str, list[_JudgmentCWE]]
+    severity: dict[str, str]
+
+
 def _group_judgments(
     judgments: list[Judgment], cwe_name_lookup: dict[int, str],
-) -> tuple[
-    dict[str, list[tuple[Judgment, str, int | None]]],
-    dict[str, list[tuple[Judgment, str, int | None]]],
-    dict[str, str],
-]:
+) -> _GroupedJudgments:
     """Group judgments by principle into violations, compliance, and max severity."""
-    sc_violations: dict[str, list[tuple[Judgment, str, int | None]]] = {}
-    sc_compliance: dict[str, list[tuple[Judgment, str, int | None]]] = {}
+    sc_violations: dict[str, list[_JudgmentCWE]] = {}
+    sc_compliance: dict[str, list[_JudgmentCWE]] = {}
     sc_severity: dict[str, str] = {}
 
     for j in judgments:
         principle = j.practice_id
         cwe_id = j.cwe
         cwe_name = cwe_name_lookup.get(cwe_id, "") if cwe_id is not None else ""
+        entry = _JudgmentCWE(j, cwe_name, cwe_id)
 
         if j.verdict == "violation":
-            sc_violations.setdefault(principle, []).append((j, cwe_name, cwe_id))
+            sc_violations.setdefault(principle, []).append(entry)
         elif j.verdict == "compliance":
-            sc_compliance.setdefault(principle, []).append((j, cwe_name, cwe_id))
+            sc_compliance.setdefault(principle, []).append(entry)
 
         sev = j.severity or "medium"
         if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
             sc_severity[principle] = sev
 
-    return sc_violations, sc_compliance, sc_severity
+    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity)
 
 
 def parse_jsonl_to_evidence(
@@ -131,8 +144,8 @@ def parse_jsonl_to_evidence(
         if j is not None:
             judgments.append(j)
 
-    sc_violations, sc_compliance, sc_severity = _group_judgments(judgments, cwe_name_lookup)
-    all_principles = set(sc_violations.keys()) | set(sc_compliance.keys())
+    grouped = _group_judgments(judgments, cwe_name_lookup)
+    all_principles = set(grouped.violations.keys()) | set(grouped.compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}
 
     for sc in sorted(all_principles):
@@ -140,9 +153,9 @@ def parse_jsonl_to_evidence(
             practice_id=sc,
             display_name=sc,
             dimension=judgments[0].dimension if judgments else "",
-            severity=sc_severity.get(sc, "medium"),
-            violations=[_judgment_to_dict(j, name, cid) for j, name, cid in sc_violations.get(sc, [])],
-            compliance=[_judgment_to_dict(j, name, cid) for j, name, cid in sc_compliance.get(sc, [])],
+            severity=grouped.severity.get(sc, "medium"),
+            violations=[_judgment_to_dict(e.judgment, e.cwe_name, e.cwe_id) for e in grouped.violations.get(sc, [])],
+            compliance=[_judgment_to_dict(e.judgment, e.cwe_name, e.cwe_id) for e in grouped.compliance.get(sc, [])],
         )
         pe.compute_metrics()
         principles[sc] = pe

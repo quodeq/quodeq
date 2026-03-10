@@ -5,9 +5,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from quodeq.engine.scoring_internals import GRADE_LADDER
 
 NUMERIC_GRADE_ORDER = ["Critical", "Poor", "Adequate", "Good", "Exemplary"]
-TEXT_GRADE_ORDER = ["Insufficient", "Developing", "Proficient", "Exemplary"]
+TEXT_GRADE_ORDER = GRADE_LADDER
 SEVERITIES = {"critical", "major", "minor", "unknown"}
 
 

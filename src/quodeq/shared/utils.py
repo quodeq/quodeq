@@ -48,27 +48,21 @@ class Config:
         return cls(_data=json.loads(path.read_text()))
 
 
-# Load network/service defaults from external config file (CWE-1051).
-_config = Config.from_file(_DEFAULTS_PATH)
-
 # Derived constants (not URLs, safe to keep inline).
 ACTION_API_MODULE = "quodeq.action_api"
 
+
+def _get_config() -> Config:
+    """Return the lazily-loaded singleton Config instance."""
+    if not hasattr(_get_config, "_instance"):
+        _get_config._instance = Config.from_file(_DEFAULTS_PATH)
+    return _get_config._instance
+
+
 # Public accessors for defaults used as constants by other modules.
-ANTHROPIC_API_URL: str = _config["anthropic_api_url"]
-ANTHROPIC_API_VERSION: str = _config["anthropic_api_version"]
-DEFAULT_HOST: str = _config["default_host"]
-
-
-def configure(**overrides: Any) -> None:
-    """Inject configuration overrides (useful for testing and deployment).
-
-    Call before any ``get_*`` function to replace defaults loaded from
-    ``defaults.json``.  Example::
-
-        configure(ai_cmd_default="my-cli", action_api_port=9000)
-    """
-    _config.update(**overrides)
+ANTHROPIC_API_URL: str = Config.from_file(_DEFAULTS_PATH)["anthropic_api_url"]
+ANTHROPIC_API_VERSION: str = Config.from_file(_DEFAULTS_PATH)["anthropic_api_version"]
+DEFAULT_HOST: str = Config.from_file(_DEFAULTS_PATH)["default_host"]
 
 
 def is_repo_url(repo_input: str) -> bool:
@@ -90,12 +84,12 @@ def read_json(path: Path) -> dict:
 
 def get_ai_provider() -> str:
     """Return the AI provider from environment or default."""
-    return os.environ.get("AI_PROVIDER", _config["ai_provider_default"])
+    return os.environ.get("AI_PROVIDER", _get_config()["ai_provider_default"])
 
 
 def get_ai_cmd() -> str:
     """Return the AI CLI command from environment or default."""
-    return os.environ.get("AI_CMD", _config["ai_cmd_default"])
+    return os.environ.get("AI_CMD", _get_config()["ai_cmd_default"])
 
 
 def get_ai_model() -> str | None:
@@ -114,12 +108,12 @@ def get_action_api_port() -> int:
             logging.getLogger(__name__).warning(
                 "Invalid QUODEQ_ACTION_API_PORT=%r, using default", raw,
             )
-    return _config["action_api_port"]
+    return _get_config()["action_api_port"]
 
 
 def get_action_api_host() -> str:
     """Return the action API host from environment or default."""
-    return os.environ.get("QUODEQ_ACTION_API_HOST", _config["default_host"])
+    return os.environ.get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
 
 
 def get_dashboard_port() -> int:
@@ -133,7 +127,7 @@ def get_dashboard_port() -> int:
             logging.getLogger(__name__).warning(
                 "Invalid QUODEQ_DASHBOARD_PORT=%r, using default", raw,
             )
-    return _config["dashboard_port"]
+    return _get_config()["dashboard_port"]
 
 
 def get_static_dist() -> str | None:
@@ -153,12 +147,17 @@ def get_anthropic_api_key() -> str | None:
 
 def get_asvs_url() -> str:
     """Return the OWASP ASVS JSON URL from environment or default."""
-    return os.environ.get("QUODEQ_ASVS_URL", _config["asvs_url"])
+    return os.environ.get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
 
 
 def get_github_search_url() -> str:
     """Return the GitHub repository search URL from environment or default."""
-    return os.environ.get("QUODEQ_GITHUB_SEARCH_URL", _config["github_search_url"])
+    return os.environ.get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
+
+
+def get_github_raw_base_url() -> str:
+    """Return the GitHub raw content base URL from environment or default."""
+    return os.environ.get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
 
 
 def get_findings_file() -> str | None:

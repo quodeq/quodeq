@@ -50,7 +50,7 @@ class TestReadJson:
 
 class TestConfigure:
     def test_overrides_defaults(self):
-        with utils._config.override(ai_cmd_default="my-cli"):
+        with utils._get_config().override(ai_cmd_default="my-cli"):
             assert utils.get_ai_cmd() == "my-cli"
 
     def test_get_ai_cmd_env_override(self, monkeypatch):

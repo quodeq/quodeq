@@ -14,6 +14,11 @@ _REPO_URL_RE = re.compile(
 )
 
 
+def is_valid_repo_url(url: str) -> bool:
+    """Return True if *url* matches the expected git repository URL format."""
+    return _REPO_URL_RE.match(url) is not None
+
+
 def prepare_repository(repo_input: str) -> str:
     """Clone a remote repository to a temporary directory and return its path.
 

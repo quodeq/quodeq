@@ -12,7 +12,6 @@ _MEDIUM_CONFIDENCE_THRESHOLD = 5  # minimum total instances for "medium" confide
 class Judgment:
     """One LLM judgment per finding."""
     practice_id: str
-    finding_rule: str = ""
     file: str = ""
     line: int = 0
     snippet: str = ""

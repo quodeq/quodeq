@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+from collections.abc import Callable
 
 from quodeq.config.actions import check_sources
 from quodeq.config.actions import run_generate_dimensions
@@ -54,7 +55,7 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
     paths = default_paths(version=args.data_version)
 
-    _HANDLERS: list[tuple[str, callable]] = [
+    _HANDLERS: list[tuple[str, Callable]] = [
         ("generate_maps",       lambda v: run_generate_evaluators(v, paths) or 0),
         ("generate_dimensions", lambda _: (run_generate_dimensions(paths), 0)[1]),
         ("check_sources",       lambda v: check_sources(v, paths)),

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
 from typing import Iterable
 
 
@@ -44,6 +45,10 @@ _SIMPLE_FIELDS = {
     "language", "category", "detect_glob", "detect_dir", "detect_requires_file",
 }
 _CSV_FIELDS = {"detect_excludes", "suggested_topics"}
+_SPECIAL_HANDLERS: dict[str, Callable[[str], int | bool]] = {
+    "detect_priority": lambda v: _parse_priority(v),
+    "detect_fallback": lambda v: v.lower() == "true",
+}
 
 
 def _parse_csv(value: str) -> list[str]:
@@ -85,10 +90,6 @@ def _dispatch_field(
     if key in _CSV_FIELDS:
         kwargs[key] = _parse_csv(value)
         return
-    _SPECIAL_HANDLERS = {
-        "detect_priority": lambda v: _parse_priority(v),
-        "detect_fallback": lambda v: v.lower() == "true",
-    }
     handler = _SPECIAL_HANDLERS.get(key)
     if handler is not None:
         kwargs[key] = handler(value)

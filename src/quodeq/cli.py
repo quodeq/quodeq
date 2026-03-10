@@ -24,6 +24,40 @@ from quodeq.shared.repo_handler import prepare_repository
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
 
 
+def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
+    """Register arguments for the evaluate subcommand."""
+    parser.add_argument("repo", help="Path or URL to the repository")
+    parser.add_argument(
+        "-p", "--plugin", default=None, help="Plugin ID (overrides auto-detection)"
+    )
+    parser.add_argument(
+        "-o", "--output", default="evaluations", help="Reports output directory"
+    )
+    parser.add_argument(
+        "-m", "--mode", default="numerical",
+        choices=["numerical", "grades"], help="Scoring mode",
+    )
+    parser.add_argument(
+        "--no-prescan", action="store_true", help="Skip source-file counting"
+    )
+    parser.add_argument(
+        "-d", "--dimensions", default=None,
+        help="Comma-separated dimensions to evaluate (default: all from plugin)",
+    )
+    parser.add_argument(
+        "--evidence-only", action="store_true",
+        help="Produce evidence JSON only (skip scoring)",
+    )
+    parser.add_argument(
+        "--max-turns", type=int, default=None,
+        help="Max AI conversation turns per dimension (default: 200)",
+    )
+    parser.add_argument(
+        "--max-duration", type=int, default=None,
+        help="Max seconds per dimension before terminating (default: 1800)",
+    )
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(prog="quodeq")
@@ -35,40 +69,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate_parser = subparsers.add_parser(
         "evaluate", help="Run evaluation (auto-detects plugin)"
     )
-    evaluate_parser.add_argument("repo", help="Path or URL to the repository")
-    evaluate_parser.add_argument(
-        "-p", "--plugin", default=None, help="Plugin ID (overrides auto-detection)"
-    )
-    evaluate_parser.add_argument(
-        "-o", "--output", default="evaluations", help="Reports output directory"
-    )
-    evaluate_parser.add_argument(
-        "-m",
-        "--mode",
-        default="numerical",
-        choices=["numerical", "grades"],
-        help="Scoring mode",
-    )
-    evaluate_parser.add_argument(
-        "--no-prescan", action="store_true", help="Skip source-file counting"
-    )
-    evaluate_parser.add_argument(
-        "-d", "--dimensions", default=None,
-        help="Comma-separated dimensions to evaluate (default: all from plugin)",
-    )
-    evaluate_parser.add_argument(
-        "--evidence-only",
-        action="store_true",
-        help="Produce evidence JSON only (skip scoring)",
-    )
-    evaluate_parser.add_argument(
-        "--max-turns", type=int, default=None,
-        help="Max AI conversation turns per dimension (default: 200)",
-    )
-    evaluate_parser.add_argument(
-        "--max-duration", type=int, default=None,
-        help="Max seconds per dimension before terminating (default: 1800)",
-    )
+    _add_evaluate_args(evaluate_parser)
     evaluate_parser.set_defaults(handler_command="evaluate")
 
     configure_parser = subparsers.add_parser(
