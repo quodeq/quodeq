@@ -135,6 +135,24 @@ _BASE_AI_ARGS: tuple[str, ...] = tuple(
     os.environ.get("QUODEQ_AI_BASE_ARGS", "--print --output-format stream-json --verbose").split()
 )
 
+# Provider-keyed configuration: extend this dict to add support for a new AI
+# provider without modifying _build_ai_cmd or _build_analysis_env.
+_PROVIDER_CONFIGS: dict[str, dict] = {
+    "claude": {
+        # Extra CLI flags added when an MCP config is present.
+        "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
+        # Env vars set when not already present in the subprocess environment.
+        "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
+        # Env vars removed from the subprocess environment.
+        "env_remove": ["CLAUDECODE"],
+    },
+    "codex": {
+        "mcp_permission_args": [],
+        "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
+        "env_remove": [],
+    },
+}
+
 
 class AnalysisError(RuntimeError):
     """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""
@@ -153,6 +171,7 @@ def _build_ai_cmd(
 
     args = [cmd, *_BASE_AI_ARGS, "--tools", _AI_TOOLS]
 
+    provider_cfg = _PROVIDER_CONFIGS.get(cmd, {})
     mcp_config_path: Path | None = None
     if config.jsonl_file is not None:
         mcp_config_path = _create_mcp_config(config.jsonl_file)
@@ -160,7 +179,7 @@ def _build_ai_cmd(
         args.extend(["--allowedTools", "mcp__findings__report_finding"])
         # MCP servers require permission approval; in --print mode there is no
         # interactive prompt, so we must bypass permissions for the server to start.
-        args.extend(["--permission-mode", "bypassPermissions"])
+        args.extend(provider_cfg.get("mcp_permission_args", ["--permission-mode", "bypassPermissions"]))
 
     if model:
         args.extend(["--model", model])
@@ -245,12 +264,15 @@ def _run_with_heartbeat(
     return timed_out
 
 
-def _build_analysis_env() -> dict[str, str]:
+def _build_analysis_env(ai_cmd: str | None = None) -> dict[str, str]:
     """Build the subprocess environment for the AI CLI."""
     env = os.environ.copy()
-    if "CODEX_SANDBOX" not in env:
-        env["CODEX_SANDBOX"] = "read-only"
-    env.pop("CLAUDECODE", None)
+    provider_cfg = _PROVIDER_CONFIGS.get(ai_cmd or "", {})
+    for key, val in provider_cfg.get("env_set_if_missing", {}).items():
+        if key not in env:
+            env[key] = val
+    for key in provider_cfg.get("env_remove", []):
+        env.pop(key, None)
     return env
 
 
@@ -293,7 +315,7 @@ def run_analysis(
     """
     cfg = config or AnalysisConfig()
     args, mcp_config_path = _build_ai_cmd(prompt, cfg)
-    env = _build_analysis_env()
+    env = _build_analysis_env(cfg.ai_cmd or get_ai_cmd())
     stream_err = Path(str(stream_file) + ".err")
 
     try:

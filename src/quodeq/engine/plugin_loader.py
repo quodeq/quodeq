@@ -11,6 +11,33 @@ from quodeq.engine.schema_validator import (
 from quodeq.shared.utils import read_json
 
 
+def _check_engine_version(plugin_data: dict, plugin_dir: Path) -> None:
+    """Warn if the plugin's engine_version constraint is not satisfied.
+
+    Uses ``packaging.specifiers`` when available; silently skips the check if
+    the library is absent or the constraint cannot be parsed.
+    """
+    constraint = plugin_data.get("engine_version")
+    if not constraint:
+        return
+    try:
+        from importlib.metadata import version as _pkg_version
+        from packaging.specifiers import SpecifierSet
+        from packaging.version import Version
+        engine_ver = Version(_pkg_version("quodeq"))
+        if engine_ver not in SpecifierSet(constraint, prereleases=True):
+            import warnings
+            warnings.warn(
+                f"Plugin '{plugin_data.get('id', plugin_dir.name)}' requires "
+                f"quodeq {constraint} but {engine_ver} is installed. "
+                "The plugin may not work correctly.",
+                UserWarning,
+                stacklevel=3,
+            )
+    except Exception:
+        pass  # version check is best-effort; never block loading
+
+
 def scan_plugin_dirs(evaluators_dir: Path) -> Iterator[Path]:
     """Yield valid plugin directories (non-underscore dirs with plugin.json)."""
     if not evaluators_dir.exists():
@@ -45,6 +72,7 @@ def load_plugin_full(plugin_dir: Path) -> dict:
     errors = validate_plugin(plugin_data)
     if errors:
         raise ValueError(f"plugin.json: {'; '.join(errors)}")
+    _check_engine_version(plugin_data, plugin_dir)
 
     dims_data = read_json(plugin_dir / "dimensions.json")
     errors = validate_dimensions(dims_data)

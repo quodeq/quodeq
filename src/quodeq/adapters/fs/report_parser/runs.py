@@ -43,7 +43,7 @@ def _normalize_date(raw: str) -> tuple[str, str] | None:
         try:
             parsed = datetime.strptime(raw, fmt)
             sortable = parsed.isoformat(timespec='seconds') if "T" in fmt else parsed.date().isoformat()
-            label = parsed.strftime("%b %d, %Y")
+            label = f"{parsed.year}-{parsed.month:02d}-{parsed.day:02d}"
             return sortable, label
         except ValueError:
             continue

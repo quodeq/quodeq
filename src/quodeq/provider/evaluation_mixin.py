@@ -72,6 +72,10 @@ class FsEvaluationMixin:
             env["AI_MODEL"] = ai_model
 
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
+        # NOTE: evaluations are dispatched as local subprocesses. There is no
+        # job queue or work-distribution layer here. Horizontal scaling would
+        # require an abstraction (e.g. task queue, remote worker) above this
+        # call site; the JobManager interface is designed to support that swap.
         return self._jobs.start_job(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str) -> dict[str, Any] | None:

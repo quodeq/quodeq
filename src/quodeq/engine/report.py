@@ -109,6 +109,7 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
 
     raw_meta = evidence.get("meta", {})
     return {
+        "schema_version": 1,
         "dimension": dimension,
         "project": evidence.get("repository", ""),
         # runId is always empty here; write_report_json fills it in from the path

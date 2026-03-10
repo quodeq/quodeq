@@ -2,15 +2,27 @@
 from __future__ import annotations
 
 import json
-from functools import lru_cache
+import time
 from typing import Any
 
 from quodeq.engine.plugin_loader import scan_plugin_dirs
 
+_PLUGIN_CACHE_TTL = 60  # seconds; allows runtime plugin changes to propagate
+_plugin_cache: list[dict[str, Any]] | None = None
+_plugin_cache_ts: float = 0.0
 
-@lru_cache(maxsize=1)
+
 def discover_plugins() -> list[dict[str, Any]]:
-    """Scan the evaluators directory and return plugin metadata."""
+    """Scan the evaluators directory and return plugin metadata.
+
+    Results are cached for _PLUGIN_CACHE_TTL seconds so that plugins installed
+    at runtime (without a process restart) are picked up on the next request
+    after the TTL expires.
+    """
+    global _plugin_cache, _plugin_cache_ts
+    now = time.monotonic()
+    if _plugin_cache is not None and now - _plugin_cache_ts < _PLUGIN_CACHE_TTL:
+        return _plugin_cache
     from quodeq.config.paths import default_paths
     evaluators_root = default_paths().evaluators_dir
     result: list[dict[str, Any]] = []
@@ -30,4 +42,6 @@ def discover_plugins() -> list[dict[str, Any]]:
             })
         except (KeyError, ValueError):
             continue
+    _plugin_cache = result
+    _plugin_cache_ts = now
     return result
