@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -39,9 +39,11 @@ def _normalize_date(raw: str) -> tuple[str, str] | None:
     or compact date (20260301).  The first element is the full string
     (including time when available) so that same-day runs sort correctly.
     """
-    for fmt in ("%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
         try:
             parsed = datetime.strptime(raw, fmt)
+            if parsed.tzinfo is not None:
+                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
             sortable = parsed.isoformat(timespec='seconds') if "T" in fmt else parsed.date().isoformat()
             label = f"{parsed.year}-{parsed.month:02d}-{parsed.day:02d}"
             return sortable, label
