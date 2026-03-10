@@ -524,7 +524,7 @@ textarea:focus {
 }
 
 .violation-file {
-  font-family: var(--font-mono);
+  font-family: var(--font-data);
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   background: var(--color-surface-alt);
@@ -676,7 +676,7 @@ textarea:focus {
   background: var(--color-surface);
   color: var(--color-text-muted);
   font-weight: var(--weight-medium);
-  font-family: var(--font-mono);
+  font-family: var(--font-data);
   white-space: nowrap;
 }
 
@@ -1175,7 +1175,7 @@ textarea:focus {
 .settings-about-value {
   font-size: var(--text-xs);
   color: var(--color-text);
-  font-family: var(--font-mono);
+  font-family: var(--font-data);
 }
 
 .settings-about-link {
