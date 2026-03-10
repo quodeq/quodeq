@@ -14,3 +14,4 @@ reports/
 src/tmp/
 .idea/
 CLAUDE.md
+.quodeq.env

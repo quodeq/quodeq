@@ -200,12 +200,19 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         """Update the local filesystem path stored in a project's metadata."""
-        info_path = Path(reports_dir) / project / "repository_info.json"
+        resolved_path = Path(new_path).resolve()
+        if not resolved_path.is_absolute() or not resolved_path.is_dir():
+            return False
+        reports_root = Path(reports_dir).resolve()
+        info_path = (reports_root / project).resolve()
+        if not info_path.is_relative_to(reports_root):
+            return False
+        info_path = info_path / "repository_info.json"
         if not info_path.exists():
             return False
         try:
             info = json.loads(info_path.read_text())
-            info["path"] = new_path
+            info["path"] = str(resolved_path)
             info["location"] = "local"
             info_path.write_text(json.dumps(info, indent=2))
             return True
@@ -215,7 +222,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     def delete_project(self, reports_dir: str, project: str) -> bool:
         """Remove a project directory and all its report data."""
         import shutil
-        project_path = Path(reports_dir) / project
+        reports_root = Path(reports_dir).resolve()
+        project_path = (reports_root / project).resolve()
+        if not project_path.is_relative_to(reports_root):
+            return False
         if not project_path.exists() or not project_path.is_dir():
             return False
         shutil.rmtree(project_path)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_info, log_success
 from quodeq.shared.utils import get_ai_provider
@@ -30,6 +32,7 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
     if api_key_value:
         lines.append(f"export {api_key_var}={api_key_value}")
     paths.env_file.write_text("\n".join(lines) + "\n")
+    os.chmod(paths.env_file, 0o600)
 
 
 def _ensure_gitignore(paths: ConfigPaths) -> None:

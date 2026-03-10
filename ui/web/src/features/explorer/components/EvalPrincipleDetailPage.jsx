@@ -128,6 +128,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
         const reason = v.reason || v.findings;
         if (reason) lines.push('', `**Why it's a violation:** ${reason}`);
+        if (v.cwe) lines.push('', `**Reference:** CWE-${v.cwe}`);
         const code = v.code || v.snippet;
         if (code) {
           lines.push('', '**Affected code:**');
@@ -159,6 +160,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
     if (code) lines.push('', '## Affected Code', '```', code, '```');
     const reason = v.reason || v.findings;
     if (reason) lines.push('', "## Why It's a Violation", reason);
+    if (v.cwe) lines.push('', `**Reference:** CWE-${v.cwe}`);
     lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
     if (loc) lines.push(`Apply it to \`${loc}\`.`);
     lines.push(PLAN_TEST_INSTRUCTION_SINGLE);

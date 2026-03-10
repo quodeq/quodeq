@@ -47,6 +47,9 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
         return None
 
 
+_ALLOWED_CLIENT_IDS = frozenset({"claude", "codex", "copilot"})
+
+
 class FsToolingMixin:
     """Mixin for browse_repo and AI client discovery methods."""
 
@@ -95,6 +98,8 @@ class FsToolingMixin:
         return {"clients": [c for c in candidates if shutil.which(c["id"])]}
 
     def _get_cli_models(self, client_id: str) -> dict[str, list[str]]:
+        if client_id not in _ALLOWED_CLIENT_IDS:
+            return {"models": []}
         if not shutil.which(client_id):
             return {"models": []}
         try:

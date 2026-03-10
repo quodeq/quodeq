@@ -3,12 +3,17 @@
 from __future__ import annotations
 
 import os
+import re
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quodeq.provider.base import EvaluationOptions
 from quodeq.shared.utils import is_repo_url, project_name_from_repo
+
+_REPO_URL_RE = re.compile(
+    r"^(https?://[\w.\-]+/[\w.\-/]+\.git|git@[\w.\-]+:[\w.\-/]+\.git)$"
+)
 
 if TYPE_CHECKING:
     from quodeq.provider.jobs import JobManager
@@ -53,9 +58,13 @@ class FsEvaluationMixin:
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
         """Start an asynchronous evaluation subprocess for a repository."""
-        repo_path = Path(repo)
-        if not is_repo_url(repo) and not repo_path.exists():
-            raise FileNotFoundError(f"Repository not found: {repo}")
+        if is_repo_url(repo):
+            if not _REPO_URL_RE.match(repo):
+                raise ValueError(f"Invalid repository URL format: {repo}")
+        else:
+            repo_path = Path(repo)
+            if not repo_path.resolve().is_dir():
+                raise FileNotFoundError(f"Repository not found: {repo}")
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir)
@@ -66,7 +75,7 @@ class FsEvaluationMixin:
         if options.ai_model:
             env["AI_MODEL"] = options.ai_model
 
-        cwd = str(Path.cwd()) if is_repo_url(repo) else str(repo_path.resolve())
+        cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
         return self._jobs.start_job(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str) -> dict[str, Any] | None:

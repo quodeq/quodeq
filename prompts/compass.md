@@ -22,14 +22,14 @@ For EVERY finding (violation or compliance), call the `report_finding` tool with
 - `d` — dimension being evaluated
 - `w` — short description of what you found
 
-**Optional but recommended:**
+**Include with every finding:**
 - `file` — file path relative to repo root
 - `line` — line number
 - `snippet` — the relevant code (keep under 200 chars)
 - `severity` — `critical`, `major`, or `minor`
-- `vt` — violation type (e.g. "hardcoded-secret", "missing-error-handler")
 - `reason` — brief explanation of why this is a violation or compliance
-- `cwe` — CWE ID number if applicable (e.g. 79, 89)
+- `cwe` — CWE ID number from the standards checklist below (e.g. 79, 89). **Always include this** when the finding maps to a CWE in the checklist.
+- `vt` — violation type (e.g. "hardcoded-secret", "missing-error-handler")
 
 ## Severity Definitions
 
