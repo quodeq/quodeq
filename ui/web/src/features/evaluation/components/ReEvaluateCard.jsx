@@ -25,7 +25,9 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
             }
           }
         }
-        setAllDimensions([...seen.values()]);
+        const dims = [...seen.values()];
+        setAllDimensions(dims);
+        setSelectedDims(new Set(dims.map((d) => d.id)));
       })
       .catch(() => setAllDimensions([]));
   }, []);
@@ -34,14 +36,20 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
 
   function toggleDim(id) {
     setSelectedDims((prev) => {
+      if (prev.has(id) && prev.size === 1) return prev;
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
+  }
+
+  function selectAll() {
+    setSelectedDims(new Set(allDimensions.map((d) => d.id)));
+  }
+
+  function clearAll() {
+    setSelectedDims(new Set());
   }
 
   function handleStart() {
@@ -51,6 +59,8 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
     }
     onStart(payload);
   }
+
+  const canStart = !disabled && selectedDims.size > 0;
 
   return (
     <div className="panel evaluate-panel">
@@ -66,7 +76,13 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
 
         {allDimensions.length > 0 && (
           <div className="form-group">
-            <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
+            <div className="dimension-label-row">
+              <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
+              <div className="dimension-chip-actions">
+                <button type="button" className="dim-action-btn" onClick={selectAll}>All</button>
+                <button type="button" className="dim-action-btn" onClick={clearAll}>Clear</button>
+              </div>
+            </div>
             <div className="dimension-grid">
               {allDimensions.map((dim) => (
                 <button
@@ -82,8 +98,10 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
             </div>
             <p className="form-hint">
               {selectedDims.size === 0
-                ? 'All dimensions will be evaluated.'
-                : `${selectedDims.size} of ${allDimensions.length} selected.`}
+                ? 'Select at least one dimension.'
+                : selectedDims.size === allDimensions.length
+                  ? 'All dimensions selected.'
+                  : `${selectedDims.size} of ${allDimensions.length} selected.`}
             </p>
           </div>
         )}
@@ -91,7 +109,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         <button
           type="button"
           className="evaluate-submit-btn"
-          disabled={disabled}
+          disabled={!canStart}
           onClick={handleStart}
         >
           {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}

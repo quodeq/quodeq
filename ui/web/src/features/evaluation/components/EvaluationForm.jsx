@@ -19,19 +19,19 @@ export default function EvaluationForm({ onStart, disabled }) {
             }
           }
         }
-        setAllDimensions([...seen.values()]);
+        const dims = [...seen.values()];
+        setAllDimensions(dims);
+        setSelectedDims(new Set(dims.map((d) => d.id)));
       })
       .catch(() => setAllDimensions([]));
   }, []);
 
   function toggleDim(id) {
     setSelectedDims((prev) => {
+      if (prev.has(id) && prev.size === 1) return prev;
       const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   }
@@ -125,8 +125,10 @@ export default function EvaluationForm({ onStart, disabled }) {
             </div>
             <p className="form-hint">
               {selectedDims.size === 0
-                ? 'Select at least one dimension to evaluate.'
-                : `${selectedDims.size} of ${allDimensions.length} selected.`}
+                ? 'Select at least one dimension.'
+                : selectedDims.size === allDimensions.length
+                  ? 'All dimensions selected.'
+                  : `${selectedDims.size} of ${allDimensions.length} selected.`}
             </p>
           </div>
         )}

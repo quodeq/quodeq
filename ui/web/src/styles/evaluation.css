@@ -896,7 +896,7 @@
 /* Dimension grid */
 .dimension-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  grid-template-columns: repeat(6, 1fr);
   gap: 6px;
   padding: 12px;
   background: var(--color-surface-alt);
