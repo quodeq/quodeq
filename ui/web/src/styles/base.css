@@ -1150,14 +1150,36 @@ textarea:focus {
   white-space: nowrap;
 }
 
-.settings-about-value {
-  font-size: var(--text-sm);
+.settings-about-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-about-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  padding: 5px 0;
+}
+
+.settings-about-key {
+  font-size: var(--text-xs);
   color: var(--color-text-muted);
+  width: 72px;
+  flex-shrink: 0;
+}
+
+.settings-about-value {
+  font-size: var(--text-xs);
+  color: var(--color-text);
   font-family: var(--font-mono);
 }
 
 .settings-about-link {
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
   color: var(--color-accent);
   text-decoration: none;
 }

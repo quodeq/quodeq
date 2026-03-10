@@ -671,23 +671,19 @@ export default function App() {
                 <div className="panel-header">
                   <h2 className="settings-section-title">About</h2>
                 </div>
-                <div className="settings-row">
-                  <div className="settings-row-label">
-                    <span className="settings-label">Version</span>
+                <div className="settings-about-rows">
+                  <div className="settings-about-row">
+                    <span className="settings-about-key">Version</span>
+                    <span className="settings-about-value">{appVersion ?? '—'}</span>
                   </div>
-                  <span className="settings-about-value">{appVersion ?? '—'}</span>
-                </div>
-                <div className="settings-row">
-                  <div className="settings-row-label">
-                    <span className="settings-label">Website</span>
+                  <div className="settings-about-row">
+                    <span className="settings-about-key">Website</span>
+                    <a className="settings-about-link" href="https://quodeq.ai" target="_blank" rel="noopener noreferrer">quodeq.ai</a>
                   </div>
-                  <a className="settings-about-link" href="https://quodeq.ai" target="_blank" rel="noopener noreferrer">quodeq.ai</a>
-                </div>
-                <div className="settings-row">
-                  <div className="settings-row-label">
-                    <span className="settings-label">Repository</span>
+                  <div className="settings-about-row">
+                    <span className="settings-about-key">Repository</span>
+                    <a className="settings-about-link" href="https://github.com/quodeq/quodeq" target="_blank" rel="noopener noreferrer">github.com/quodeq/quodeq</a>
                   </div>
-                  <a className="settings-about-link" href="https://github.com/quodeq/quodeq" target="_blank" rel="noopener noreferrer">github.com/quodeq/quodeq</a>
                 </div>
                 {settingsPhrase && (
                   <div className="settings-row settings-row--last settings-about-phrase-row">
