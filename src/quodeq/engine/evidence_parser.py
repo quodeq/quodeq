@@ -140,11 +140,12 @@ def parse_jsonl_to_evidence(
     cwe_name_lookup = _build_cwe_name_lookup(standards_dir) if standards_dir else {}
 
     judgments: list[Judgment] = []
-    content = jsonl_file.read_text() if jsonl_file.exists() else ""
-    for line in content.splitlines():
-        j = _parse_jsonl_line(line)
-        if j is not None:
-            judgments.append(j)
+    if jsonl_file.exists():
+        with open(jsonl_file) as _jf:
+            for line in _jf:
+                j = _parse_jsonl_line(line)
+                if j is not None:
+                    judgments.append(j)
 
     grouped = _group_judgments(judgments, cwe_name_lookup)
     all_principles = set(grouped.violations.keys()) | set(grouped.compliance.keys())

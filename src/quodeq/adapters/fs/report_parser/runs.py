@@ -227,7 +227,8 @@ def _get_previous_run_for_dimension(
 
     for run_info in all_runs[current_idx + 1:]:
         dims = _fetch(run_info.run_id)
-        dim = next((d for d in dims if d.get("dimension") == dimension), None)
+        dims_by_name = {d.get("dimension"): d for d in dims if d.get("dimension")}
+        dim = dims_by_name.get(dimension)
         if dim:
             return {"runId": run_info.run_id, "dimension": dim}
     return None

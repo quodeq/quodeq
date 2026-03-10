@@ -19,6 +19,11 @@ from quodeq.provider.accumulated import numeric_average
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 
+# Maximum number of historical runs scanned for trend, previous scores, and
+# stale dimensions. The full run list is still returned in availableRuns (metadata
+# only, no disk reads) so users can navigate to older runs directly.
+_MAX_HISTORY_RUNS = 100
+
 # Module-level LRU cache shared across requests; evicts least-recently-used
 # entries once the limit is reached, capping memory while providing cross-
 # request caching for hot-path dimension reads (P-TIM-6).
@@ -212,13 +217,16 @@ def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
     if selected_index is None:
         raise RuntimeError(f"Run {selected_run.run_id!r} disappeared from the run list unexpectedly.")
 
+    # Cap runs scanned for history. Always include the selected run so
+    # selected_index remains a valid index into history_runs.
+    history_runs = runs[:max(_MAX_HISTORY_RUNS, selected_index + 1)]
     get_run_dimensions = _make_run_dimension_fetcher(reports_root, project)
-    previous_by_dimension = _collect_previous_scores(runs, selected_index, selected_dim_names, get_run_dimensions)
+    previous_by_dimension = _collect_previous_scores(history_runs, selected_index, selected_dim_names, get_run_dimensions)
     stale_dimensions, stale_previous_by_dimension = (
-        _collect_stale_dimensions(runs, selected_index, selected_dim_names, get_run_dimensions)
+        _collect_stale_dimensions(history_runs, selected_index, selected_dim_names, get_run_dimensions)
     )
     dimensions_with_trend = _enrich_dimensions_with_trend(selected_dimensions, previous_by_dimension)
-    trend = _build_accumulated_trend(runs, get_run_dimensions)
+    trend = _build_accumulated_trend(history_runs, get_run_dimensions)
 
     return {
         "project": project,
