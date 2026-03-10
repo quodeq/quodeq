@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
 const PHRASES = [
-  'evaluate <b>local folders</b> or <b>remote git repositories</b> — no cloning needed',
+  'evaluate <b>local folders</b> or <b>remote git repositories</b>, no cloning needed',
   'target a <b>subfolder</b> to focus analysis on a specific module or service',
   'run evaluations over time and <b>track quality trends</b> across runs',
   'each finding includes a <b>fix plan</b> — a concrete path to resolve the issue',
