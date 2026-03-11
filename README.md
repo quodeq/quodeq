@@ -9,8 +9,8 @@
 
 <p align="center">
   <em>human aligned quode</em><br>
-  <em>less drift, quode safe</em><br>
-  <em>code with quore</em> ♥️<br>
+  <em>quode safe</em><br>
+  <em>code with quore</em><br>
   <em>bearing quode with you</em>
 </p>
 
