@@ -263,8 +263,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
         """Return parsed evaluation data for a single dimension in a run."""
+        from quodeq.config.paths import default_paths
         base = Path(reports_dir) / project / run_id
-        result = resolve_dimension_eval(base, project, run_id, dimension)
+        compiled_dir = default_paths().standards_dir / "compiled"
+        result = resolve_dimension_eval(base, project, run_id, dimension, compiled_dir=compiled_dir if compiled_dir.exists() else None)
         if result is not None:
             return result
         # Run exists but dimension hasn't started yet

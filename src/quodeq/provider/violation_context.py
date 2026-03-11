@@ -24,6 +24,8 @@ class FindingSpec:
     snippet: str | None = None
     severity: str | None = None
     cwe: int | str | None = None
+    req: str | None = None
+    req_url: str | None = None
     include_severity: bool = True
 
 
@@ -45,6 +47,10 @@ def build_finding_base(spec: FindingSpec) -> dict[str, Any]:
         entry["severity"] = spec.severity or "minor"
     if spec.cwe:
         entry["cwe"] = spec.cwe
+    if spec.req:
+        entry["req"] = spec.req
+    if spec.req_url:
+        entry["req_url"] = spec.req_url
     return entry
 
 

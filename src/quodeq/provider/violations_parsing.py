@@ -6,11 +6,13 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
+from quodeq.engine.evidence_parser import _build_req_url_lookup
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 
 
-def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
+def _build_finding_entry(obj: dict, dimension: str, req_url_lookup: dict[str, str] | None = None) -> dict[str, Any]:
     """Build a normalized finding dict from a raw JSON object."""
+    req = obj.get("req")
     entry = build_finding_base(FindingSpec(
         principle=obj["p"],
         file=obj.get("file"),
@@ -20,6 +22,8 @@ def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
         snippet=obj.get("snippet"),
         severity=obj.get("severity"),
         cwe=obj.get("cwe"),
+        req=req,
+        req_url=req_url_lookup.get(req) if req and req_url_lookup else None,
     ))
     entry["dimension"] = obj.get("d", dimension)
     entry["violationType"] = obj.get("vt")
@@ -27,7 +31,7 @@ def _build_finding_entry(obj: dict, dimension: str) -> dict[str, Any]:
 
 
 def _parse_jsonl_findings(
-    lines: Iterable[str], dimension: str,
+    lines: Iterable[str], dimension: str, req_url_lookup: dict[str, str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Parse raw JSONL lines into deduplicated violation and compliance lists."""
     violations: list[dict[str, Any]] = []
@@ -47,7 +51,7 @@ def _parse_jsonl_findings(
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
-        entry = _build_finding_entry(obj, dimension)
+        entry = _build_finding_entry(obj, dimension, req_url_lookup)
         if obj["t"] == "violation":
             violations.append(entry)
         else:
@@ -73,11 +77,15 @@ def _count_files_in_stream(stream_path: Path) -> int:
     return len(files)
 
 
-def parse_violations_from_jsonl(jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext) -> dict[str, Any] | None:
+def parse_violations_from_jsonl(
+    jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
+    compiled_dir: Path | None = None,
+) -> dict[str, Any] | None:
     """Parse live JSONL findings written by the MCP server."""
+    req_url_lookup = _build_req_url_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
     try:
         with open(jsonl_path) as _f:
-            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension)
+            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_url_lookup)
     except OSError:
         return None
     files_read = _count_files_in_stream(stream_path) if stream_path and stream_path.exists() else 0
