@@ -266,7 +266,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             </div>
                           )}
                           {(v.code || v.snippet) && (
-                            <pre className="vlive-snippet">{v.code || v.snippet}</pre>
+                            <pre className="vlive-snippet">{(v.code || v.snippet).replace(/\\n/g, '\n')}</pre>
                           )}
                         </div>
                       </>
@@ -322,7 +322,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           </div>
                         )}
                         {(c.code || c.snippet) && (
-                          <pre className="vlive-snippet">{c.code || c.snippet}</pre>
+                          <pre className="vlive-snippet">{(c.code || c.snippet).replace(/\\n/g, '\n')}</pre>
                         )}
                       </div>
                     </>

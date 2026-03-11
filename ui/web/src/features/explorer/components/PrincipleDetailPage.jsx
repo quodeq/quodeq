@@ -150,7 +150,7 @@ function ViolationCard({ v, principleName, index }) {
             </>}
           </div>
         )}
-        {v.snippet && <pre className="vlive-snippet">{v.snippet}</pre>}
+        {v.snippet && <pre className="vlive-snippet">{v.snippet.replace(/\\n/g, '\n')}</pre>}
       </div>
     </div>
   );
