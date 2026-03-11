@@ -128,7 +128,8 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
         const reason = v.reason || v.findings;
         if (reason) lines.push('', `**Why it's a violation:** ${reason}`);
-        if (v.cwe) lines.push('', `**Reference:** CWE-${v.cwe}`);
+        if (v.req_refs?.length > 0) lines.push('', `**References:** ${v.req_refs.map(r => `${r.label} (${r.url})`).join(', ')}`);
+        else if (v.req) lines.push('', `**Requirement:** ${v.req}`);
         const code = v.code || v.snippet;
         if (code) {
           lines.push('', '**Affected code:**');
@@ -160,7 +161,8 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
     if (code) lines.push('', '## Affected Code', '```', code, '```');
     const reason = v.reason || v.findings;
     if (reason) lines.push('', "## Why It's a Violation", reason);
-    if (v.cwe) lines.push('', `**Reference:** CWE-${v.cwe}`);
+    if (v.req_refs?.length > 0) lines.push('', `**References:** ${v.req_refs.map(r => `${r.label} (${r.url})`).join(', ')}`);
+    else if (v.req) lines.push('', `**Requirement:** ${v.req}`);
     lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
     if (loc) lines.push(`Apply it to \`${loc}\`.`);
     lines.push(PLAN_TEST_INSTRUCTION_SINGLE);
@@ -249,7 +251,12 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             <div className="vlive-detail-section">
                               <div className="vlive-detail-section-header">
                                 {v.title && <span className="vlive-detail-section-label">Reason</span>}
-                                {v.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${v.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{v.cwe}</a>}
+                                {v.req_refs?.length > 0
+                                  ? <span className="cwe-link-group">{v.req_refs.map((ref, i) => (
+                                      <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+                                    ))}</span>
+                                  : v.req && <span className="cwe-link">{v.req}</span>
+                                }
                               </div>
                               {v.title && <p className="vlive-detail-title">{v.title}</p>}
                               {(v.reason || v.findings) && <>
@@ -259,7 +266,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             </div>
                           )}
                           {(v.code || v.snippet) && (
-                            <pre className="vlive-snippet">{v.code || v.snippet}</pre>
+                            <pre className="vlive-snippet">{(v.code || v.snippet).replace(/\\n/g, '\n')}</pre>
                           )}
                         </div>
                       </>
@@ -300,7 +307,12 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           <div className="vlive-detail-section">
                             <div className="vlive-detail-section-header">
                               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-                              {c.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${c.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{c.cwe}</a>}
+                              {c.req_refs?.length > 0
+                                ? <span className="cwe-link-group">{c.req_refs.map((ref, i) => (
+                                    <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+                                  ))}</span>
+                                : c.req && <span className="cwe-link">{c.req}</span>
+                              }
                             </div>
                             {c.title && <p className="vlive-detail-title">{c.title}</p>}
                             {c.reason && <>
@@ -310,7 +322,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           </div>
                         )}
                         {(c.code || c.snippet) && (
-                          <pre className="vlive-snippet">{c.code || c.snippet}</pre>
+                          <pre className="vlive-snippet">{(c.code || c.snippet).replace(/\\n/g, '\n')}</pre>
                         )}
                       </div>
                     </>

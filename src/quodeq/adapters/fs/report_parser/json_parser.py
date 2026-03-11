@@ -108,6 +108,10 @@ def _collect_violations(violations: list[dict], principle_map: dict[str, Any]) -
         }
         if v.get("cwe"):
             vd["cwe"] = v["cwe"]
+        if v.get("req"):
+            vd["req"] = v["req"]
+        if v.get("req_refs"):
+            vd["req_refs"] = v["req_refs"]
         principle_map[key]["violations"].append(vd)
 
 
@@ -125,6 +129,10 @@ def _collect_compliance(compliance: list[dict], principle_map: dict[str, Any]) -
         }
         if c.get("cwe"):
             cd["cwe"] = c["cwe"]
+        if c.get("req"):
+            cd["req"] = c["req"]
+        if c.get("req_refs"):
+            cd["req_refs"] = c["req_refs"]
         principle_map[key]["compliance"].append(cd)
 
 

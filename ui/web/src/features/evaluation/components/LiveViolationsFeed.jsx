@@ -75,7 +75,12 @@ function ViolationLiveRow({ violation, index }) {
             <div className="vlive-detail-section">
               <div className="vlive-detail-section-header">
                 <span className="vlive-detail-section-label">Reason</span>
-                {v.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${v.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{v.cwe}</a>}
+                {v.req_refs?.length > 0
+                  ? <span className="cwe-link-group">{v.req_refs.map((ref, i) => (
+                      <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+                    ))}</span>
+                  : v.req && <span className="cwe-link">{v.req}</span>
+                }
               </div>
               {v.title && <p className="vlive-detail-title">{v.title}</p>}
               {v.reason && <>
@@ -84,7 +89,7 @@ function ViolationLiveRow({ violation, index }) {
               </>}
             </div>
           )}
-          {v.snippet && <pre className="vlive-snippet">{v.snippet}</pre>}
+          {v.snippet && <pre className="vlive-snippet">{v.snippet.replace(/\\n/g, '\n')}</pre>}
         </div>
       )}
     </div>

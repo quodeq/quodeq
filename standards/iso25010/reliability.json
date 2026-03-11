@@ -11,21 +11,21 @@
           "id": "R-MAT-1",
           "text": "All public functions MUST have corresponding test files",
           "cwe": [
-            1059
+            1173
           ]
         },
         {
           "id": "R-MAT-2",
           "text": "Edge cases (empty input, boundary values) MUST be tested explicitly",
           "cwe": [
-            1059
+            754
           ]
         },
         {
           "id": "R-MAT-3",
           "text": "Error paths MUST be tested, not only happy paths",
           "cwe": [
-            1059
+            390
           ]
         },
         {
@@ -39,7 +39,7 @@
           "id": "R-MAT-5",
           "text": "Type annotations MUST be used on public function signatures",
           "cwe": [
-            1059
+            1076
           ]
         },
         {
@@ -55,10 +55,16 @@
           "id": "R-MAT-7",
           "text": "Concurrent access to shared resources MUST be properly synchronized",
           "cwe": [
+            362,
             662,
+            764,
             820,
             821,
             833
+          ],
+          "cert": [
+            "THI03-J",
+            "CON36-C"
           ]
         },
         {
@@ -126,6 +132,9 @@
           "text": "Null/undefined dereferences MUST be guarded before use",
           "cwe": [
             476
+          ],
+          "cert": [
+            "ERR08-J"
           ]
         },
         {
@@ -216,8 +225,10 @@
             391,
             394,
             460,
+            544,
             550,
             636,
+            676,
             703
           ]
         },
@@ -241,9 +252,8 @@
         },
         {
           "id": "R-FT-17",
-          "text": "Custom error pages MUST NOT reveal sensitive implementation details",
+          "text": "Custom error pages MUST be configured to prevent default framework error pages from being served",
           "cwe": [
-            234,
             756
           ]
         }

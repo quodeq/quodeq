@@ -50,13 +50,6 @@
           ]
         },
         {
-          "id": "P-TIM-7",
-          "text": "String building in loops MUST use builder/join patterns instead of concatenation",
-          "cwe": [
-            1046
-          ]
-        },
-        {
           "id": "P-TIM-8",
           "text": "Queries on large tables MUST use indexes and MUST NOT perform full table scans",
           "cwe": [
@@ -93,7 +86,7 @@
           "id": "P-RES-2",
           "text": "Database connections MUST use connection pooling",
           "cwe": [
-            400
+            1072
           ]
         },
         {

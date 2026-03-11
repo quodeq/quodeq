@@ -17,6 +17,7 @@ _MAX_VIOLATION_FILES = 20
 
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
+    compiled_dir: Path | None = None,
 ) -> dict[str, Any] | None:
     """Try successive file formats to load evaluation data for a dimension."""
 
@@ -41,7 +42,7 @@ def resolve_dimension_eval(
     jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
     stream_path = base / "evidence" / f"{dimension}_live.stream"
     if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
-        return parse_violations_from_jsonl(jsonl_path, stream_path, ctx)
+        return parse_violations_from_jsonl(jsonl_path, stream_path, ctx, compiled_dir=compiled_dir)
 
     if stream_path.exists():
         return parse_violations_from_stream(stream_path, ctx)

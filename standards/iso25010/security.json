@@ -460,7 +460,7 @@
           "id": "S-NRP-7",
           "text": "Third-party component versions MUST be tracked and kept free of known vulnerabilities per OWASP Top Ten guidance",
           "cwe": [
-            1026
+            1104
           ]
         },
         {

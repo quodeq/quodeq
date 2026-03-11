@@ -1,0 +1,117 @@
+{
+  "source": "WCAG 2.2",
+  "version": "2.2",
+  "level": "A",
+  "fetched": "2026-03-10",
+  "url": "https://www.w3.org/TR/WCAG22/",
+  "criteria": [
+    {
+      "id": "1.1.1",
+      "name": "Non-text Content",
+      "level": "A",
+      "principle": "Perceivable",
+      "guideline": "1.1 Text Alternatives",
+      "text": "All non-text content that is presented to the user has a text alternative that serves the equivalent purpose.",
+      "url": "https://www.w3.org/TR/WCAG22/#non-text-content"
+    },
+    {
+      "id": "1.3.1",
+      "name": "Info and Relationships",
+      "level": "A",
+      "principle": "Perceivable",
+      "guideline": "1.3 Adaptable",
+      "text": "Information, structure, and relationships conveyed through presentation can be programmatically determined or are available in text.",
+      "url": "https://www.w3.org/TR/WCAG22/#info-and-relationships"
+    },
+    {
+      "id": "1.3.3",
+      "name": "Sensory Characteristics",
+      "level": "A",
+      "principle": "Perceivable",
+      "guideline": "1.3 Adaptable",
+      "text": "Instructions provided for understanding and operating content do not rely solely on sensory characteristics of components such as shape, color, size, visual location, orientation, or sound.",
+      "url": "https://www.w3.org/TR/WCAG22/#sensory-characteristics"
+    },
+    {
+      "id": "1.4.1",
+      "name": "Use of Color",
+      "level": "A",
+      "principle": "Perceivable",
+      "guideline": "1.4 Distinguishable",
+      "text": "Color is not used as the only visual means of conveying information, indicating an action, prompting a response, or distinguishing a visual element.",
+      "url": "https://www.w3.org/TR/WCAG22/#use-of-color"
+    },
+    {
+      "id": "2.1.1",
+      "name": "Keyboard",
+      "level": "A",
+      "principle": "Operable",
+      "guideline": "2.1 Keyboard Accessible",
+      "text": "All functionality of the content is operable through a keyboard interface without requiring specific timings for individual keystrokes.",
+      "url": "https://www.w3.org/TR/WCAG22/#keyboard"
+    },
+    {
+      "id": "2.1.2",
+      "name": "No Keyboard Trap",
+      "level": "A",
+      "principle": "Operable",
+      "guideline": "2.1 Keyboard Accessible",
+      "text": "If keyboard focus can be moved to a component using a keyboard interface, then focus can be moved away from that component using only a keyboard interface.",
+      "url": "https://www.w3.org/TR/WCAG22/#no-keyboard-trap"
+    },
+    {
+      "id": "2.4.3",
+      "name": "Focus Order",
+      "level": "A",
+      "principle": "Operable",
+      "guideline": "2.4 Navigable",
+      "text": "If a Web page can be navigated sequentially and the navigation sequences affect meaning or operation, focusable components receive focus in an order that preserves meaning and operability.",
+      "url": "https://www.w3.org/TR/WCAG22/#focus-order"
+    },
+    {
+      "id": "2.4.7",
+      "name": "Focus Visible",
+      "level": "AA",
+      "principle": "Operable",
+      "guideline": "2.4 Navigable",
+      "text": "Any keyboard operable user interface has a mode of operation where the keyboard focus indicator is visible.",
+      "url": "https://www.w3.org/TR/WCAG22/#focus-visible"
+    },
+    {
+      "id": "3.3.1",
+      "name": "Error Identification",
+      "level": "A",
+      "principle": "Understandable",
+      "guideline": "3.3 Input Assistance",
+      "text": "If an input error is automatically detected, the item that is in error is identified and the error is described to the user in text.",
+      "url": "https://www.w3.org/TR/WCAG22/#error-identification"
+    },
+    {
+      "id": "3.3.2",
+      "name": "Labels or Instructions",
+      "level": "A",
+      "principle": "Understandable",
+      "guideline": "3.3 Input Assistance",
+      "text": "Labels or instructions are provided when content requires user input.",
+      "url": "https://www.w3.org/TR/WCAG22/#labels-or-instructions"
+    },
+    {
+      "id": "4.1.2",
+      "name": "Name, Role, Value",
+      "level": "A",
+      "principle": "Robust",
+      "guideline": "4.1 Compatible",
+      "text": "For all user interface components, the name and role can be programmatically determined; states, properties, and values that can be set by the user can be programmatically set; and notification of changes to these items is available to user agents, including assistive technologies.",
+      "url": "https://www.w3.org/TR/WCAG22/#name-role-value"
+    },
+    {
+      "id": "4.1.3",
+      "name": "Status Messages",
+      "level": "AA",
+      "principle": "Robust",
+      "guideline": "4.1 Compatible",
+      "text": "In content implemented using markup languages, status messages can be programmatically determined through role or properties such that they can be presented to the user by assistive technologies without receiving focus.",
+      "url": "https://www.w3.org/TR/WCAG22/#status-messages"
+    }
+  ]
+}

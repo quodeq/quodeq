@@ -19,7 +19,8 @@ class Judgment:
     severity: str = "medium"
     reason: str = ""
     dimension: str = ""
-    cwe: int | None = None
+    req: str | None = None
+    req_refs: list[dict] | None = None
     violation_type: str = ""
     title: str = ""
 

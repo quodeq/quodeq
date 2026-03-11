@@ -7,36 +7,65 @@
   "principles": [
     {
       "name": "Adaptability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 1061,
-          "name": "Insufficient Encapsulation",
+          "id": "F-ADP-1",
+          "source": "iso25010",
+          "text": "Configuration MUST be externalised (env vars or config files); no hardcoded env-specific values",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-ADP-3",
-              "title": "Platform-specific code MUST be isolated behind abstraction layers"
+              "source": "cwe",
+              "id": "1188",
+              "name": "Initialization of a Resource with an Insecure Default",
+              "url": "https://cwe.mitre.org/data/definitions/1188.html"
             }
           ]
         },
         {
-          "id": 1188,
-          "name": "Initialization of a Resource with an Insecure Default",
+          "id": "F-ADP-2",
+          "source": "iso25010",
+          "text": "Feature toggles MUST be used for environment-specific behaviour",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-ADP-1",
-              "title": "Configuration MUST be externalised (env vars or config files); no hardcoded env-specific values"
-            },
+              "source": "cwe",
+              "id": "1188",
+              "name": "Initialization of a Resource with an Insecure Default",
+              "url": "https://cwe.mitre.org/data/definitions/1188.html"
+            }
+          ]
+        },
+        {
+          "id": "F-ADP-3",
+          "source": "iso25010",
+          "text": "Platform-specific code MUST be isolated behind abstraction layers",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-ADP-2",
-              "title": "Feature toggles MUST be used for environment-specific behaviour"
-            },
+              "source": "cwe",
+              "id": "1061",
+              "name": "Insufficient Encapsulation",
+              "url": "https://cwe.mitre.org/data/definitions/1061.html"
+            }
+          ]
+        },
+        {
+          "id": "F-ADP-4",
+          "source": "iso25010",
+          "text": "Locale and timezone MUST NOT be hardcoded; use runtime configuration",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-ADP-4",
-              "title": "Locale and timezone MUST NOT be hardcoded; use runtime configuration"
+              "source": "cwe",
+              "id": "1188",
+              "name": "Initialization of a Resource with an Insecure Default",
+              "url": "https://cwe.mitre.org/data/definitions/1188.html"
             }
           ]
         }
@@ -44,42 +73,65 @@
     },
     {
       "name": "Scalability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 1057,
-          "name": "Data Access Operations Outside of Expected Data Manager Component",
+          "id": "F-SCL-1",
+          "source": "iso25010",
+          "text": "Stateless request handling MUST be preferred; session state MUST be externalised",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-SCL-1",
-              "title": "Stateless request handling MUST be preferred; session state MUST be externalised"
+              "source": "cwe",
+              "id": "1057",
+              "name": "Data Access Operations Outside of Expected Data Manager Component",
+              "url": "https://cwe.mitre.org/data/definitions/1057.html"
             }
           ]
         },
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "F-SCL-2",
+          "source": "iso25010",
+          "text": "File-based storage MUST be replaceable with distributed alternatives",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-SCL-3",
-              "title": "Database schemas MUST support migration tooling for non-destructive evolution"
+              "source": "cwe",
+              "id": "1061",
+              "name": "Insufficient Encapsulation",
+              "url": "https://cwe.mitre.org/data/definitions/1061.html"
             }
           ]
         },
         {
-          "id": 1061,
-          "name": "Insufficient Encapsulation",
+          "id": "F-SCL-3",
+          "source": "iso25010",
+          "text": "Database schemas MUST support migration tooling for non-destructive evolution",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-SCL-2",
-              "title": "File-based storage MUST be replaceable with distributed alternatives"
-            },
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            }
+          ]
+        },
+        {
+          "id": "F-SCL-4",
+          "source": "iso25010",
+          "text": "Work dispatching MUST support horizontal scaling (queue-based or partitioned)",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-SCL-4",
-              "title": "Work dispatching MUST support horizontal scaling (queue-based or partitioned)"
+              "source": "cwe",
+              "id": "1061",
+              "name": "Insufficient Encapsulation",
+              "url": "https://cwe.mitre.org/data/definitions/1061.html"
             }
           ]
         }
@@ -87,36 +139,65 @@
     },
     {
       "name": "Installability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "F-INS-1",
+          "source": "iso25010",
+          "text": "Dependencies MUST be declared in a lockfile with exact versions",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-INS-2",
-              "title": "Build and run instructions MUST be documented and reproducible"
-            },
-            {
-              "source": "iso25010",
-              "ref": "F-INS-3",
-              "title": "System-level dependencies MUST be declared explicitly (not assumed)"
+              "source": "cwe",
+              "id": "1104",
+              "name": "Use of Unmaintained Third Party Components",
+              "url": "https://cwe.mitre.org/data/definitions/1104.html"
             }
           ]
         },
         {
-          "id": 1104,
-          "name": "Use of Unmaintained Third Party Components",
+          "id": "F-INS-2",
+          "source": "iso25010",
+          "text": "Build and run instructions MUST be documented and reproducible",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-INS-1",
-              "title": "Dependencies MUST be declared in a lockfile with exact versions"
-            },
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            }
+          ]
+        },
+        {
+          "id": "F-INS-3",
+          "source": "iso25010",
+          "text": "System-level dependencies MUST be declared explicitly (not assumed)",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-INS-4",
-              "title": "Container images MUST use specific base image tags, not :latest"
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            }
+          ]
+        },
+        {
+          "id": "F-INS-4",
+          "source": "iso25010",
+          "text": "Container images MUST use specific base image tags, not :latest",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1104",
+              "name": "Use of Unmaintained Third Party Components",
+              "url": "https://cwe.mitre.org/data/definitions/1104.html"
             }
           ]
         }
@@ -124,36 +205,65 @@
     },
     {
       "name": "Replaceability",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 1059,
-          "name": "Insufficient Technical Documentation",
+          "id": "F-RPL-1",
+          "source": "iso25010",
+          "text": "Components MUST be replaceable without modifying callers (dependency inversion)",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-RPL-2",
-              "title": "Public interfaces MUST be versioned; breaking changes require a major version bump"
-            },
-            {
-              "source": "iso25010",
-              "ref": "F-RPL-4",
-              "title": "Data formats MUST be versioned for backward-compatible deserialization"
+              "source": "cwe",
+              "id": "1061",
+              "name": "Insufficient Encapsulation",
+              "url": "https://cwe.mitre.org/data/definitions/1061.html"
             }
           ]
         },
         {
-          "id": 1061,
-          "name": "Insufficient Encapsulation",
+          "id": "F-RPL-2",
+          "source": "iso25010",
+          "text": "Public interfaces MUST be versioned; breaking changes require a major version bump",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-RPL-1",
-              "title": "Components MUST be replaceable without modifying callers (dependency inversion)"
-            },
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
+            }
+          ]
+        },
+        {
+          "id": "F-RPL-3",
+          "source": "iso25010",
+          "text": "External service integrations MUST use adapter/wrapper patterns",
+          "severity": null,
+          "scope": null,
+          "refs": [
             {
-              "source": "iso25010",
-              "ref": "F-RPL-3",
-              "title": "External service integrations MUST use adapter/wrapper patterns"
+              "source": "cwe",
+              "id": "1061",
+              "name": "Insufficient Encapsulation",
+              "url": "https://cwe.mitre.org/data/definitions/1061.html"
+            }
+          ]
+        },
+        {
+          "id": "F-RPL-4",
+          "source": "iso25010",
+          "text": "Data formats MUST be versioned for backward-compatible deserialization",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1059",
+              "name": "Insufficient Technical Documentation",
+              "url": "https://cwe.mitre.org/data/definitions/1059.html"
             }
           ]
         }

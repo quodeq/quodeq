@@ -34,7 +34,8 @@ TOOL_SCHEMA = {
         "severity": {"type": "string", "enum": ["critical", "major", "minor"], "description": "Severity level"},
         "vt": {"type": "string", "description": "Violation type identifier"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
-        "cwe": {"type": "integer", "description": "CWE ID if applicable"},
+        "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'R-FT-1', 'S-CON-3')"},
+        "refs": {"type": "array", "items": {"type": "string"}, "description": "Specific standard references applicable to this finding (e.g. ['CWE-391', 'ERR05-J', 'CISQ-ASCRM'])"},
     },
     "required": ["p", "t", "d", "w"],
 }

@@ -11,7 +11,7 @@ from quodeq.config.prompt_templates import render_template
 
 
 def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
-    """Render compiled standards as a compact CWE checklist organized by principle."""
+    """Render compiled standards as a requirements checklist organized by principle."""
     compiled_file = compiled_dir / f"{dimension}.json"
     if not compiled_file.exists():
         return "_No compiled standards for this dimension._"
@@ -19,41 +19,18 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
     data = json.loads(compiled_file.read_text())
     lines = []
     for principle in data.get("principles", []):
-        cwes = principle.get("cwes", [])
-        if not cwes:
+        reqs = principle.get("requirements", [])
+        if not reqs:
             continue
-        lines.append(f"### {principle['name']} ({len(cwes)} CWEs)")
-        for cwe in cwes:
-            lines.append(f"- CWE-{cwe['id']}: {cwe['name']}")
+        lines.append(f"### {principle['name']}")
+        for req in reqs:
+            lines.append(f"- **{req['id']}**: {req['text']}")
         lines.append("")
     return "\n".join(lines)
 
 
-def _load_iso_requirements(standards_dir: Path, dimension: str) -> list[str]:
-    """Load ISO 25010 sub-characteristic requirements for a dimension.
-
-    Returns a list of formatted lines, or an empty list if the file is absent or invalid.
-    """
-    std_file = standards_dir / "iso25010" / f"{dimension}.json"
-    if not std_file.exists():
-        return []
-    try:
-        std = json.loads(std_file.read_text())
-        sub_chars = std.get("sub_characteristics", [])
-        if not sub_chars or not isinstance(sub_chars[0], dict):
-            return []
-        lines = ["\n**Requirements:**"]
-        for sc in sub_chars:
-            lines.append(f"\n#### {sc['name']}")
-            for req in sc.get("requirements", []):
-                lines.append(f"- **{req['id']}**: {req['text']}")
-        return lines
-    except (json.JSONDecodeError, KeyError):
-        return []
-
-
-def render_dimensions(dimensions_data: dict, dimension: str, standards_dir: Path | None = None) -> str:
-    """Format dimension info with ISO 25010 requirements for prompt inclusion."""
+def render_dimensions(dimensions_data: dict, dimension: str) -> str:
+    """Format dimension info for prompt inclusion."""
     applies = dimensions_data.get("applies", [])
     dim_entry = next((d for d in applies if d["id"] == dimension), None)
 
@@ -72,9 +49,6 @@ def render_dimensions(dimensions_data: dict, dimension: str, standards_dir: Path
     source = dim_entry.get("source")
     if source:
         lines.append(f"**Source:** {source}")
-
-    if standards_dir and iso:
-        lines.extend(_load_iso_requirements(standards_dir, dimension))
 
     return "\n".join(lines)
 
@@ -116,7 +90,7 @@ def _template_hash(template: str) -> str:
 
 def build_analysis_prompt(template: str, context: PromptContext) -> str:
     """Build a complete per-dimension analysis prompt from the template."""
-    dimensions_text = render_dimensions(context.dimensions_data, context.dimension, context.standards_dir)
+    dimensions_text = render_dimensions(context.dimensions_data, context.dimension)
     prompt_hash = _template_hash(template)
 
     standards_checklist = "_No compiled standards available._"

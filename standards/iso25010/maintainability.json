@@ -32,13 +32,6 @@
           "id": "M-MOD-4",
           "text": "Functions MUST have ≤5 parameters; use an options object for more",
           "cwe": [
-            1121
-          ]
-        },
-        {
-          "id": "M-MOD-5",
-          "text": "Functions MUST have ≤5 parameters",
-          "cwe": [
             1064
           ]
         },
@@ -437,11 +430,10 @@
         },
         {
           "id": "M-TST-9",
-          "text": "Database indices MUST NOT be excessive and queries MUST use efficient access patterns",
+          "text": "Test setup and teardown MUST clean up all side effects including database state and file system changes",
           "cwe": [
-            1072,
-            1089,
-            1094
+            459,
+            772
           ]
         }
       ]

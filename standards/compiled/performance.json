@@ -8,120 +8,188 @@
   "principles": [
     {
       "name": "Time Behaviour",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 1046,
-          "name": "Creation of Immutable Text Using String Concatenation",
+          "id": "P-TIM-1",
+          "source": "iso25010",
+          "text": "Database queries inside loops are forbidden (N+1 problem)",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-TIM-7",
-              "title": "String building in loops MUST use builder/join patterns instead of concatenation"
+              "source": "cwe",
+              "id": "1084",
+              "name": "Invokable Control Element with Excessive File or Data Access Operations",
+              "url": "https://cwe.mitre.org/data/definitions/1084.html"
             },
             {
               "source": "cisq",
-              "title": "String building in loops MUST use builder/join patterns instead of concatenation"
+              "id": null,
+              "name": "Data access operations MUST be batched; no queries inside loops",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1049,
-          "name": "Excessive Data Query Operations in a Large Data Table",
+          "id": "P-TIM-2",
+          "source": "iso25010",
+          "text": "Sequential awaits on independent async calls MUST be parallelised",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-TIM-8",
-              "title": "Queries on large tables MUST use indexes and MUST NOT perform full table scans"
+              "source": "cwe",
+              "id": "1088",
+              "name": "Synchronous Access of Remote Resource without Timeout",
+              "url": "https://cwe.mitre.org/data/definitions/1088.html"
             },
             {
               "source": "cisq",
-              "title": "Queries on large tables MUST use indexes and MUST NOT perform full table scans"
+              "id": null,
+              "name": "Remote resource access MUST use timeouts and async patterns where available",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1067,
-          "name": "Excessive Execution of Sequential Searches of Data Resource",
+          "id": "P-TIM-3",
+          "source": "iso25010",
+          "text": "Synchronous blocking I/O MUST NOT be used in async contexts",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-TIM-9",
-              "title": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search"
+              "source": "cwe",
+              "id": "1088",
+              "name": "Synchronous Access of Remote Resource without Timeout",
+              "url": "https://cwe.mitre.org/data/definitions/1088.html"
             },
             {
               "source": "cisq",
-              "title": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search"
+              "id": null,
+              "name": "Remote resource access MUST use timeouts and async patterns where available",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1084,
-          "name": "Invokable Control Element with Excessive File or Data Access Operations",
+          "id": "P-TIM-4",
+          "source": "iso25010",
+          "text": "String concatenation in loops MUST use a builder or join pattern",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-TIM-1",
-              "title": "Database queries inside loops are forbidden (N+1 problem)"
-            },
-            {
-              "source": "iso25010",
-              "ref": "P-TIM-4",
-              "title": "String concatenation in loops MUST use a builder or join pattern"
-            },
-            {
-              "source": "iso25010",
-              "ref": "P-TIM-6",
-              "title": "Hot-path code MUST NOT perform redundant computation; cache or memoize results"
+              "source": "cwe",
+              "id": "1084",
+              "name": "Invokable Control Element with Excessive File or Data Access Operations",
+              "url": "https://cwe.mitre.org/data/definitions/1084.html"
             },
             {
               "source": "cisq",
-              "title": "Data access operations MUST be batched; no queries inside loops"
+              "id": null,
+              "name": "Data access operations MUST be batched; no queries inside loops",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1088,
-          "name": "Synchronous Access of Remote Resource without Timeout",
+          "id": "P-TIM-5",
+          "source": "iso25010",
+          "text": "Regular expressions MUST NOT use catastrophic backtracking patterns",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-TIM-2",
-              "title": "Sequential awaits on independent async calls MUST be parallelised"
-            },
-            {
-              "source": "iso25010",
-              "ref": "P-TIM-3",
-              "title": "Synchronous blocking I/O MUST NOT be used in async contexts"
+              "source": "cwe",
+              "id": "1333",
+              "name": "Inefficient Regular Expression Complexity",
+              "url": "https://cwe.mitre.org/data/definitions/1333.html"
             },
             {
               "source": "cisq",
-              "title": "Remote resource access MUST use timeouts and async patterns where available"
+              "id": null,
+              "name": "Regular expressions MUST NOT use patterns susceptible to catastrophic backtracking",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1176,
-          "name": "Inefficient CPU Computation",
+          "id": "P-TIM-6",
+          "source": "iso25010",
+          "text": "Hot-path code MUST NOT perform redundant computation; cache or memoize results",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-TIM-10",
-              "title": "CPU computation MUST NOT be unnecessarily inefficient"
+              "source": "cwe",
+              "id": "1084",
+              "name": "Invokable Control Element with Excessive File or Data Access Operations",
+              "url": "https://cwe.mitre.org/data/definitions/1084.html"
+            },
+            {
+              "source": "cisq",
+              "id": null,
+              "name": "Data access operations MUST be batched; no queries inside loops",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1333,
-          "name": "Inefficient Regular Expression Complexity",
+          "id": "P-TIM-8",
+          "source": "iso25010",
+          "text": "Queries on large tables MUST use indexes and MUST NOT perform full table scans",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-TIM-5",
-              "title": "Regular expressions MUST NOT use catastrophic backtracking patterns"
+              "source": "cwe",
+              "id": "1049",
+              "name": "Excessive Data Query Operations in a Large Data Table",
+              "url": "https://cwe.mitre.org/data/definitions/1049.html"
             },
             {
               "source": "cisq",
-              "title": "Regular expressions MUST NOT use patterns susceptible to catastrophic backtracking"
+              "id": null,
+              "name": "Queries on large tables MUST use indexes and MUST NOT perform full table scans",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            }
+          ]
+        },
+        {
+          "id": "P-TIM-9",
+          "source": "iso25010",
+          "text": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1067",
+              "name": "Excessive Execution of Sequential Searches of Data Resource",
+              "url": "https://cwe.mitre.org/data/definitions/1067.html"
+            },
+            {
+              "source": "cisq",
+              "id": null,
+              "name": "Repeated lookups MUST use indexed structures (maps, sets) instead of linear search",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            }
+          ]
+        },
+        {
+          "id": "P-TIM-10",
+          "source": "iso25010",
+          "text": "CPU computation MUST NOT be unnecessarily inefficient",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1176",
+              "name": "Inefficient CPU Computation",
+              "url": "https://cwe.mitre.org/data/definitions/1176.html"
             }
           ]
         }
@@ -129,116 +197,197 @@
     },
     {
       "name": "Resource Utilisation",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 400,
-          "name": "Uncontrolled Resource Consumption",
+          "id": "P-RES-1",
+          "source": "iso25010",
+          "text": "Unbounded result sets MUST be paginated or limited",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-RES-1",
-              "title": "Unbounded result sets MUST be paginated or limited"
-            },
-            {
-              "source": "iso25010",
-              "ref": "P-RES-2",
-              "title": "Database connections MUST use connection pooling"
-            },
-            {
-              "source": "iso25010",
-              "ref": "P-RES-3",
-              "title": "Large collections MUST use lazy iteration (generators, streams) instead of full materialization"
-            },
-            {
-              "source": "iso25010",
-              "ref": "P-RES-4",
-              "title": "Caches MUST have eviction policies; unbounded caches are forbidden"
+              "source": "cwe",
+              "id": "400",
+              "name": "Uncontrolled Resource Consumption",
+              "url": "https://cwe.mitre.org/data/definitions/400.html"
             },
             {
               "source": "cisq",
-              "title": "Resource consumption MUST be bounded with limits and timeouts"
+              "id": null,
+              "name": "Resource consumption MUST be bounded with limits and timeouts",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 405,
-          "name": "Asymmetric Resource Consumption (Amplification)",
+          "id": "P-RES-2",
+          "source": "iso25010",
+          "text": "Database connections MUST use connection pooling",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-RES-6",
-              "title": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption"
+              "source": "cwe",
+              "id": "1072",
+              "name": "Data Resource Access without Use of Connection Pooling",
+              "url": "https://cwe.mitre.org/data/definitions/1072.html"
+            }
+          ]
+        },
+        {
+          "id": "P-RES-3",
+          "source": "iso25010",
+          "text": "Large collections MUST use lazy iteration (generators, streams) instead of full materialization",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "400",
+              "name": "Uncontrolled Resource Consumption",
+              "url": "https://cwe.mitre.org/data/definitions/400.html"
             },
             {
               "source": "cisq",
-              "title": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption"
+              "id": null,
+              "name": "Resource consumption MUST be bounded with limits and timeouts",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 770,
-          "name": "Allocation of Resources Without Limits or Throttling",
+          "id": "P-RES-4",
+          "source": "iso25010",
+          "text": "Caches MUST have eviction policies; unbounded caches are forbidden",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-RES-7",
-              "title": "Resource allocation MUST be throttled with configurable limits"
+              "source": "cwe",
+              "id": "400",
+              "name": "Uncontrolled Resource Consumption",
+              "url": "https://cwe.mitre.org/data/definitions/400.html"
             },
             {
               "source": "cisq",
-              "title": "Resource allocation MUST be throttled with configurable limits"
+              "id": null,
+              "name": "Resource consumption MUST be bounded with limits and timeouts",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 772,
-          "name": "Missing Release of Resource after Effective Lifetime",
+          "id": "P-RES-5",
+          "source": "iso25010",
+          "text": "File and network handles MUST be released promptly after use",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-RES-5",
-              "title": "File and network handles MUST be released promptly after use"
+              "source": "cwe",
+              "id": "772",
+              "name": "Missing Release of Resource after Effective Lifetime",
+              "url": "https://cwe.mitre.org/data/definitions/772.html"
             },
             {
               "source": "cisq",
-              "title": "Resources MUST be released promptly after use"
+              "id": null,
+              "name": "Resources MUST be released promptly after use",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 789,
-          "name": "Memory Allocation with Excessive Size Value",
+          "id": "P-RES-6",
+          "source": "iso25010",
+          "text": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-RES-10",
-              "title": "Memory allocation MUST NOT use excessively large size values from untrusted input"
-            }
-          ]
-        },
-        {
-          "id": 1050,
-          "name": "Excessive Platform Resource Consumption within a Loop",
-          "refs": [
-            {
-              "source": "iso25010",
-              "ref": "P-RES-8",
-              "title": "Resource allocation inside loops MUST be minimised; pre-allocate where possible"
+              "source": "cwe",
+              "id": "405",
+              "name": "Asymmetric Resource Consumption (Amplification)",
+              "url": "https://cwe.mitre.org/data/definitions/405.html"
             },
             {
               "source": "cisq",
-              "title": "Resource allocation inside loops MUST be minimised; pre-allocate where possible"
+              "id": null,
+              "name": "Operations MUST NOT allow small inputs to trigger disproportionate resource consumption",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1057,
-          "name": "Data Access Operations Outside of Expected Data Manager Component",
+          "id": "P-RES-7",
+          "source": "iso25010",
+          "text": "Resource allocation MUST be throttled with configurable limits",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-RES-9",
-              "title": "Mutable default arguments MUST NOT be used; create fresh instances per call"
+              "source": "cwe",
+              "id": "770",
+              "name": "Allocation of Resources Without Limits or Throttling",
+              "url": "https://cwe.mitre.org/data/definitions/770.html"
+            },
+            {
+              "source": "cisq",
+              "id": null,
+              "name": "Resource allocation MUST be throttled with configurable limits",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            }
+          ]
+        },
+        {
+          "id": "P-RES-8",
+          "source": "iso25010",
+          "text": "Resource allocation inside loops MUST be minimised; pre-allocate where possible",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1050",
+              "name": "Excessive Platform Resource Consumption within a Loop",
+              "url": "https://cwe.mitre.org/data/definitions/1050.html"
+            },
+            {
+              "source": "cisq",
+              "id": null,
+              "name": "Resource allocation inside loops MUST be minimised; pre-allocate where possible",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            }
+          ]
+        },
+        {
+          "id": "P-RES-9",
+          "source": "iso25010",
+          "text": "Mutable default arguments MUST NOT be used; create fresh instances per call",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "1057",
+              "name": "Data Access Operations Outside of Expected Data Manager Component",
+              "url": "https://cwe.mitre.org/data/definitions/1057.html"
+            }
+          ]
+        },
+        {
+          "id": "P-RES-10",
+          "source": "iso25010",
+          "text": "Memory allocation MUST NOT use excessively large size values from untrusted input",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "789",
+              "name": "Memory Allocation with Excessive Size Value",
+              "url": "https://cwe.mitre.org/data/definitions/789.html"
             }
           ]
         }
@@ -246,69 +395,110 @@
     },
     {
       "name": "Capacity",
-      "cwes": [
+      "source": "iso25010",
+      "requirements": [
         {
-          "id": 400,
-          "name": "Uncontrolled Resource Consumption",
+          "id": "P-CAP-1",
+          "source": "iso25010",
+          "text": "Batch operations MUST be preferred over individual operations for bulk data",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-CAP-3",
-              "title": "Memory-intensive operations MUST use streaming instead of loading entire datasets"
-            },
-            {
-              "source": "iso25010",
-              "ref": "P-CAP-4",
-              "title": "Thread/coroutine pools MUST have bounded sizes with configurable limits"
+              "source": "cwe",
+              "id": "1084",
+              "name": "Invokable Control Element with Excessive File or Data Access Operations",
+              "url": "https://cwe.mitre.org/data/definitions/1084.html"
             },
             {
               "source": "cisq",
-              "title": "Resource consumption MUST be bounded with limits and timeouts"
+              "id": null,
+              "name": "Data access operations MUST be batched; no queries inside loops",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 674,
-          "name": "Uncontrolled Recursion",
+          "id": "P-CAP-2",
+          "source": "iso25010",
+          "text": "Background tasks MUST be offloaded from request-handling threads",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-CAP-5",
-              "title": "Recursive algorithms MUST have depth limits or use iterative alternatives"
+              "source": "cwe",
+              "id": "1088",
+              "name": "Synchronous Access of Remote Resource without Timeout",
+              "url": "https://cwe.mitre.org/data/definitions/1088.html"
             },
             {
               "source": "cisq",
-              "title": "Recursive algorithms MUST have depth limits to prevent stack overflow"
+              "id": null,
+              "name": "Remote resource access MUST use timeouts and async patterns where available",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1084,
-          "name": "Invokable Control Element with Excessive File or Data Access Operations",
+          "id": "P-CAP-3",
+          "source": "iso25010",
+          "text": "Memory-intensive operations MUST use streaming instead of loading entire datasets",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-CAP-1",
-              "title": "Batch operations MUST be preferred over individual operations for bulk data"
+              "source": "cwe",
+              "id": "400",
+              "name": "Uncontrolled Resource Consumption",
+              "url": "https://cwe.mitre.org/data/definitions/400.html"
             },
             {
               "source": "cisq",
-              "title": "Data access operations MUST be batched; no queries inside loops"
+              "id": null,
+              "name": "Resource consumption MUST be bounded with limits and timeouts",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         },
         {
-          "id": 1088,
-          "name": "Synchronous Access of Remote Resource without Timeout",
+          "id": "P-CAP-4",
+          "source": "iso25010",
+          "text": "Thread/coroutine pools MUST have bounded sizes with configurable limits",
+          "severity": null,
+          "scope": null,
           "refs": [
             {
-              "source": "iso25010",
-              "ref": "P-CAP-2",
-              "title": "Background tasks MUST be offloaded from request-handling threads"
+              "source": "cwe",
+              "id": "400",
+              "name": "Uncontrolled Resource Consumption",
+              "url": "https://cwe.mitre.org/data/definitions/400.html"
             },
             {
               "source": "cisq",
-              "title": "Remote resource access MUST use timeouts and async patterns where available"
+              "id": null,
+              "name": "Resource consumption MUST be bounded with limits and timeouts",
+              "url": "https://www.it-cisq.org/coding-rules/"
+            }
+          ]
+        },
+        {
+          "id": "P-CAP-5",
+          "source": "iso25010",
+          "text": "Recursive algorithms MUST have depth limits or use iterative alternatives",
+          "severity": null,
+          "scope": null,
+          "refs": [
+            {
+              "source": "cwe",
+              "id": "674",
+              "name": "Uncontrolled Recursion",
+              "url": "https://cwe.mitre.org/data/definitions/674.html"
+            },
+            {
+              "source": "cisq",
+              "id": null,
+              "name": "Recursive algorithms MUST have depth limits to prevent stack overflow",
+              "url": "https://www.it-cisq.org/coding-rules/"
             }
           ]
         }
