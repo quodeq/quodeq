@@ -23,28 +23,27 @@ def _ref_label(ref: dict) -> str:
     return source.upper() if source else "REF"
 
 
-def _build_req_url_lookup(compiled_dir: Path, dimension: str) -> dict[str, tuple[str, str]]:
-    """Return {req_id: (first_ref_url, display_label)} for requirements with a URL.
-
-    Returns an empty dict if the file is missing or unreadable.
-    """
+def _build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
+    """Return {req_id: [{label, url}, ...]} for all refs of each requirement."""
     try:
         dim_file = compiled_dir / f"{dimension}.json"
         data = json.loads(dim_file.read_text())
     except Exception:
         return {}
 
-    lookup: dict[str, tuple[str, str]] = {}
+    lookup: dict[str, list[dict]] = {}
     for principle in data.get("principles", []):
         for req in principle.get("requirements", []):
             req_id = req.get("id")
             if not req_id:
                 continue
+            refs = []
             for ref in req.get("refs", []):
                 url = ref.get("url")
                 if url:
-                    lookup[req_id] = (url, _ref_label(ref))
-                    break  # take the first ref with a URL
+                    refs.append({"label": _ref_label(ref), "url": url})
+            if refs:
+                lookup[req_id] = refs
     return lookup
 
 
@@ -95,10 +94,8 @@ def _judgment_to_dict(j: Judgment) -> dict:
     d.update({k: v for k, v in _optional.items() if v})
     if j.req:
         d["req"] = j.req
-    if j.req_url:
-        d["req_url"] = j.req_url
-    if j.req_label:
-        d["req_label"] = j.req_label
+    if j.req_refs:
+        d["req_refs"] = j.req_refs
     if j.title:
         d["title"] = j.title
     if j.reason:
@@ -138,18 +135,18 @@ def parse_jsonl_to_evidence(
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
     judgments: list[Judgment] = []
-    req_url_cache: dict[str, dict[str, tuple[str, str]]] = {}  # dimension -> {req_id: (url, label)}
+    req_refs_cache: dict[str, dict[str, list[dict]]] = {}
     if jsonl_file.exists():
         with open(jsonl_file) as _jf:
             for line in _jf:
                 j = _parse_jsonl_line(line)
                 if j is not None:
                     if compiled_dir and j.req and j.dimension:
-                        if j.dimension not in req_url_cache:
-                            req_url_cache[j.dimension] = _build_req_url_lookup(compiled_dir, j.dimension)
-                        entry = req_url_cache[j.dimension].get(j.req)
-                        if entry:
-                            j.req_url, j.req_label = entry
+                        if j.dimension not in req_refs_cache:
+                            req_refs_cache[j.dimension] = _build_req_refs_lookup(compiled_dir, j.dimension)
+                        refs = req_refs_cache[j.dimension].get(j.req)
+                        if refs:
+                            j.req_refs = refs
                     judgments.append(j)
 
     grouped = _group_judgments(judgments)
