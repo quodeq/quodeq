@@ -174,12 +174,18 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
                 onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNavigate && onNavigate('evalprinciple', { evalPrincipal: buildEvalPrincipal(pg.principle) }); } }}
               >
                 <span className="exec-summary-principle">{pg.principle}</span>
-                {pg.score && (
-                  <span className="exec-summary-score">
-                    {pg.score.replace('/10', '')}<span className="exec-summary-score-denom">/10</span>
-                  </span>
+                {pg.grade === 'Insufficient' ? (
+                  <span className="exec-summary-insufficient">Not enough evidence</span>
+                ) : (
+                  <>
+                    {pg.score && (
+                      <span className="exec-summary-score">
+                        {pg.score.replace('/10', '')}<span className="exec-summary-score-denom">/10</span>
+                      </span>
+                    )}
+                    <span className={`chip small ${gradeColorClass(pg.grade)}`}>{pg.grade || '—'}</span>
+                  </>
                 )}
-                <span className={`chip small ${gradeColorClass(pg.grade)}`}>{pg.grade || '—'}</span>
                 <span className="exec-summary-chevron">›</span>
               </li>
             ))}

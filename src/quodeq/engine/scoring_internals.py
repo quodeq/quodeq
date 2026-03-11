@@ -5,31 +5,6 @@ from __future__ import annotations
 # Constants and lookup tables
 # ---------------------------------------------------------------------------
 
-# Each entry is (minimum_compliance_pct_exclusive, score).
-# Walk the list top-to-bottom; the first threshold the compliance % exceeds
-# wins. Last row acts as a catch-all for the 0 % case.
-_SCORE_BANDS: list[tuple[float, int]] = [
-    (70.0, 10),
-    (55.0, 9),
-    (45.0, 8),
-    (38.0, 7),
-    (30.0, 6),
-    (25.0, 5),
-    (18.0, 4),
-    (12.0, 3),
-    (5.0, 2),
-    (1.0, 1),
-    (0.0, 0),
-]
-
-# Same idea for non-numerical grades. Compliance must be *strictly above*
-# the threshold to earn that grade.
-_GRADE_BANDS: list[tuple[float, str]] = [
-    (72.0, "Exemplary"),
-    (48.0, "Proficient"),
-    (20.0, "Developing"),
-]
-
 # Canonical ordering from worst to best — used to convert grades to integers
 # for arithmetic and to clamp drop operations.
 GRADE_LADDER: list[str] = [
@@ -45,9 +20,23 @@ _CRITICAL_DROP_TABLE: list[tuple[int, int]] = [(12, 3), (4, 2), (1, 1)]
 _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 
 # Per-type deduction constants for numerical mode.
-_CRITICAL_PENALTY = 1.0   # per distinct critical violation type, cap 3 types
-_MAJOR_PENALTY = 0.5      # per distinct major violation type, cap 5 types
-_MINOR_PENALTY = 0.1      # per distinct minor violation type
+_CRITICAL_PENALTY = 2.0   # per distinct critical violation type, cap 3 types
+_MAJOR_PENALTY = 1.0      # per distinct major violation type, cap 5 types
+_MINOR_PENALTY = 0.25     # per distinct minor violation type
+
+# Ratio-based dampening table: (min_compliance_to_violation_ratio, multiplier).
+# Checked top-to-bottom; first matching row wins.
+# Asymmetric: max discount 15%, max penalty 30%.
+# Uses raw distinct type counts (no severity weighting) to avoid bias from
+# compliance findings that lack proper severity fields.
+_RATIO_DAMPENING_TABLE: list[tuple[float, float]] = [
+    (3.0, 0.85),   # strong compliance evidence
+    (2.0, 0.90),   # good compliance
+    (1.0, 0.95),   # balanced
+    (0.5, 1.00),   # neutral
+    (0.0, 1.15),   # weak compliance (ratio > 0 but < 0.5)
+    (-1.0, 1.30),  # no compliance at all (sentinel, always matches)
+]
 
 # ---------------------------------------------------------------------------
 # Project-size scaling
@@ -80,26 +69,6 @@ def scale_multiplier(source_file_count: int) -> int:
         if source_file_count >= threshold:
             return multiplier
     return 1
-
-
-# ---------------------------------------------------------------------------
-# Band lookups
-# ---------------------------------------------------------------------------
-
-def score_for_compliance(compliance_pct: float) -> int:
-    """Map a compliance percentage to a 0–10 base score via threshold bands."""
-    for min_pct, pts in _SCORE_BANDS:
-        if compliance_pct > min_pct:
-            return pts
-    return 0
-
-
-def grade_for_compliance(compliance_pct: float) -> str:
-    """Map a compliance percentage to a grade word via threshold bands."""
-    for min_pct, label in _GRADE_BANDS:
-        if compliance_pct > min_pct:
-            return label
-    return "Insufficient"
 
 
 # ---------------------------------------------------------------------------
@@ -150,6 +119,60 @@ def evidence_has_taxonomy(violations: list[dict]) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Compliance counting & dampening
+# ---------------------------------------------------------------------------
+
+def tally_compliance_types_by_taxonomy(compliance: list[dict]) -> dict[str, int]:
+    """Count distinct compliance types per severity using the 'vt' field."""
+    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
+    for item in compliance:
+        vt_tag = item.get("vt")
+        if not vt_tag:
+            continue
+        sev = item.get("severity", "minor")
+        buckets.setdefault(sev, set()).add(vt_tag)
+    return {sev: len(seen) for sev, seen in buckets.items()}
+
+
+def tally_compliance_types_by_reason(compliance: list[dict]) -> dict[str, int]:
+    """Count distinct compliance types per severity using (severity, reason) pairs."""
+    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
+    for item in compliance:
+        sev = item.get("severity", "minor")
+        reason = item.get("reason", "unknown")
+        buckets.setdefault(sev, set()).add(reason)
+    return {sev: len(seen) for sev, seen in buckets.items()}
+
+
+def compliance_dampening(
+    compliance_type_counts: dict[str, int],
+    violation_type_counts: dict[str, int],
+) -> float:
+    """Compute the dampening multiplier from the compliance-to-violation ratio.
+
+    Uses raw distinct type counts (sum across all severities, no weighting)
+    to avoid bias from compliance findings that lack severity fields.
+
+    Asymmetric: max discount 15% (0.85×), max penalty 30% (1.30×).
+    No compliance at all gets the full 1.30× penalty.
+    """
+    total_compliance = sum(compliance_type_counts.values())
+    total_violations = sum(violation_type_counts.values())
+
+    if total_violations == 0:
+        return 1.0  # no violations → dampening is irrelevant
+
+    if total_compliance == 0:
+        return 1.30  # no compliance at all → max penalty
+
+    ratio = total_compliance / total_violations
+    for threshold, multiplier in _RATIO_DAMPENING_TABLE:
+        if ratio >= threshold:
+            return multiplier
+    return 1.30
+
+
+# ---------------------------------------------------------------------------
 # Deduction / drop computation
 # ---------------------------------------------------------------------------
 
@@ -157,10 +180,10 @@ def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: in
     """Compute point deductions for numerical mode.
 
     Rules:
-    - Each distinct critical violation type removes 1.0 point; types are capped
+    - Each distinct critical violation type removes 2.0 points; types are capped
       at 3*scale before computing the deduction.
-    - Each distinct major violation type removes 0.5 points; capped at 5*scale.
-    - Each distinct minor violation type removes 0.1 points; capped at 2*scale.
+    - Each distinct major violation type removes 1.0 point; capped at 5*scale.
+    - Minor violation types are NOT capped — every distinct type deducts 0.25.
     - If the raw critical count reaches 3*scale, the score is hard-capped at 3.
     - If the raw major count reaches 5*scale, the score is hard-capped at 5.
     - Both caps may apply simultaneously (take min).
@@ -171,15 +194,13 @@ def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: in
 
     critical_type_cap = 3 * scale_multiplier
     major_type_cap = 5 * scale_multiplier
-    minor_type_cap = 2 * scale_multiplier
 
     effective_critical = min(n_critical, critical_type_cap)
     effective_major = min(n_major, major_type_cap)
-    effective_minor = min(n_minor, minor_type_cap)
 
     critical_deduction = effective_critical * _CRITICAL_PENALTY
     major_deduction = effective_major * _MAJOR_PENALTY
-    minor_deduction = effective_minor * _MINOR_PENALTY
+    minor_deduction = n_minor * _MINOR_PENALTY
 
     cap_from_critical = 3 if n_critical >= critical_type_cap else 10
     cap_from_major = 5 if n_major >= major_type_cap else 10

@@ -25,7 +25,7 @@ def _make_evidence() -> Evidence:
             "compliant": 1,
             "violating": 1,
             "compliance_percentage": 50.0,
-            "confidence_level": "low",
+            "confidence_level": "medium",
             "is_balanced": True,
         },
     )
