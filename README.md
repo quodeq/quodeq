@@ -12,9 +12,10 @@
   <em>quode safe</em><br>
   <em>code with quore</em><br>
   <em>bearing quode with you</em>
+  <em>To excellence and beyond</em>
+  <em>To excellence and beyond</em>
+  <em>AI-driven quality analysis</em>
 </p>
-
-<p align="center"><i>Navigate your codebase to excellence — AI-driven quality analysis powered by ISO 25010.</i></p>
 
 ---
 
