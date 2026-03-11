@@ -37,6 +37,7 @@ class AnalysisOptions:
     dimensions: list[str] | None = None
     max_turns: int | None = None
     max_duration: int | None = None
+    n_subagents: int = 1
 
 
 @dataclass
@@ -190,6 +191,98 @@ def _parse_dimension_evidence(
     return ev
 
 
+def _process_dimension_with_subagents(
+    config: RunConfig, dim_id: str, idx: int, ctx: _PluginContext,
+) -> Evidence | None:
+    """Run dimension analysis using N parallel subagents.
+
+    1. List source files for the queue
+    2. Build subagent prompt (subagent.md template)
+    3. Launch SubagentPool
+    4. Merge JSONL outputs
+    5. Parse merged evidence
+    """
+    from quodeq.engine.file_queue import FileQueue
+    from quodeq.engine.plugin_loader import load_plugin
+    from quodeq.engine.plugin_detector import list_source_files
+    from quodeq.engine.subagent_pool import SubagentPool
+
+    evidence_dir = config.work_dir or config.src
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+
+    # 1. List source files
+    plugin_dir = config.evaluators_dir / config.plugin_id
+    plugin_data = load_plugin(plugin_dir)
+    extensions = set(plugin_data.get("detects", {}).get("extensions", []))
+    files = list_source_files(config.src, extensions) if extensions else []
+    if not files:
+        log_warning(f"[{idx}/{ctx.total}] {dim_id} — no source files for subagent queue")
+        return None
+
+    # 2. Create queue
+    queue_path = evidence_dir / f"{dim_id}_queue.json"
+    FileQueue(queue_path, files)
+    log_info(f"  [{idx}/{ctx.total}] {dim_id} — {len(files)} files queued for {config.options.n_subagents} subagents")
+
+    # 3. Build subagent prompt
+    subagent_template = load_template(template_name="subagent.md")
+    prompt = build_analysis_prompt(
+        subagent_template,
+        PromptContext(
+            plugin_id=config.plugin_id,
+            repo_name=str(config.src),
+            date_str=ctx.date_str,
+            dimension=dim_id,
+            source_file_count=config.source_file_count,
+            dimensions_data=ctx.dimensions_data,
+            analysis_md=ctx.analysis_md,
+            standards_dir=config.standards_dir,
+        ),
+    )
+
+    # 4. Launch pool
+    base_ac = AnalysisConfig(
+        analysis_budget=config.options.analysis_budget,
+        compiled_dir=compiled_dir,
+        max_turns=config.options.max_turns,
+        max_duration=config.options.max_duration,
+    )
+    pool = SubagentPool(
+        n_agents=config.options.n_subagents,
+        work_dir=config.src,
+        prompt=prompt,
+        evidence_dir=evidence_dir,
+        queue_path=queue_path,
+        dimension=dim_id,
+        config=base_ac,
+    )
+    results = pool.run()
+
+    # 5. Merge and parse
+    merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
+    SubagentPool.merge_jsonl(results, merged_jsonl)
+
+    # Count files read across all agent streams
+    total_files_read = 0
+    for r in results:
+        if r.stream_file.exists():
+            total_files_read += count_files_from_stream(r.stream_file)
+
+    ev = parse_jsonl_to_evidence(
+        merged_jsonl,
+        EvidenceContext(
+            plugin_id=config.plugin_id,
+            repository=str(config.src),
+            date_str=ctx.date_str,
+            source_file_count=config.source_file_count,
+            files_read=total_files_read,
+        ),
+        compiled_dir=compiled_dir,
+    )
+    ev.plugin_name = ctx.plugin_name
+    return ev
+
+
 def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
     """Load plugin data and resolve which dimensions to analyze."""
     plugin_dir = config.evaluators_dir / config.plugin_id
@@ -223,12 +316,15 @@ def _process_single_dimension(
     _emit_marker("analyzing", dimension=dimension)
     log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
-    prompt = _build_dimension_prompt(config, dimension, ctx)
-    stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
+    if config.options.n_subagents > 1:
+        ev = _process_dimension_with_subagents(config, dimension, idx, ctx)
+    else:
+        prompt = _build_dimension_prompt(config, dimension, ctx)
+        stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
+        ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
 
-    ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
     if ev is None:
-        log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid stream, skipping")
+        log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
         return None
 
     _emit_marker("scoring", dimension=dimension)

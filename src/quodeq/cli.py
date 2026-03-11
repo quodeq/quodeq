@@ -56,6 +56,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "--max-duration", type=int, default=None,
         help="Max seconds per dimension before terminating (default: 1800)",
     )
+    parser.add_argument(
+        "--n-subagents", type=int, default=1,
+        help="Number of parallel subagents per dimension (default: 1 = single agent)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -193,6 +197,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
             dimensions=dimensions_filter,
             max_turns=args.max_turns,
             max_duration=args.max_duration,
+            n_subagents=args.n_subagents,
         ),
     )
 
