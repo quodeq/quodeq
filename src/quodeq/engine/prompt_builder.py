@@ -53,20 +53,26 @@ def render_dimensions(dimensions_data: dict, dimension: str) -> str:
     return "\n".join(lines)
 
 
-def load_template(template_path: Path | None = None, *, prompts_dir: Path | None = None) -> str:
-    """Load the compass.md prompt template.
+def load_template(
+    template_path: Path | None = None,
+    *,
+    prompts_dir: Path | None = None,
+    template_name: str = "compass.md",
+) -> str:
+    """Load a prompt template.
 
     Args:
         template_path: Explicit path to a template file (takes priority).
         prompts_dir: Directory containing prompt templates; used to locate
-            ``compass.md`` when *template_path* is not given.
+            *template_name* when *template_path* is not given.
+        template_name: Template filename to load (default ``compass.md``).
     """
     if template_path:
         return template_path.read_text()
     if prompts_dir is None:
         from quodeq.config.paths import default_paths
         prompts_dir = default_paths().prompts_dir
-    return (prompts_dir / "compass.md").read_text()
+    return (prompts_dir / template_name).read_text()
 
 
 @dataclass
