@@ -112,6 +112,10 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         req=obj.get("req"),
         title=obj.get("w", ""),
     )
+    # Pre-resolved req_refs from MCP server enrichment take priority
+    pre_resolved = obj.get("req_refs")
+    if isinstance(pre_resolved, list) and pre_resolved:
+        j.req_refs = pre_resolved
     return j, obj.get("refs")
 
 
@@ -170,14 +174,16 @@ def parse_jsonl_to_evidence(
                 result = _parse_jsonl_line(line)
                 if result is not None:
                     j, llm_refs = result
-                    all_req_refs = None
-                    if compiled_dir and j.req and j.dimension:
-                        if j.dimension not in req_refs_cache:
-                            req_refs_cache[j.dimension] = _build_req_refs_lookup(compiled_dir, j.dimension)
-                        all_req_refs = req_refs_cache[j.dimension].get(j.req)
-                    resolved = _resolve_llm_refs(llm_refs, all_req_refs)
-                    if resolved:
-                        j.req_refs = resolved
+                    # Skip lookup when MCP server already enriched req_refs
+                    if not j.req_refs:
+                        all_req_refs = None
+                        if compiled_dir and j.req and j.dimension:
+                            if j.dimension not in req_refs_cache:
+                                req_refs_cache[j.dimension] = _build_req_refs_lookup(compiled_dir, j.dimension)
+                            all_req_refs = req_refs_cache[j.dimension].get(j.req)
+                        resolved = _resolve_llm_refs(llm_refs, all_req_refs)
+                        if resolved:
+                            j.req_refs = resolved
                     judgments.append(j)
 
     grouped = _group_judgments(judgments)

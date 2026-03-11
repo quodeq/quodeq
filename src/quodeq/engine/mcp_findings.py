@@ -1,4 +1,4 @@
-"""Minimal MCP tool server: receives findings via tool calls, writes JSONL.
+"""MCP tool server: receives findings via tool calls, deduplicates, enriches, writes JSONL.
 
 Protocol: JSON-RPC 2.0 over stdio, newline-delimited JSON (no Content-Length).
 No external dependencies.
@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from typing import TextIO
 
 _FINDING_SCHEMA_VERSION = 1
@@ -35,10 +36,75 @@ TOOL_SCHEMA = {
         "vt": {"type": "string", "description": "Violation type identifier"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
         "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'R-FT-1', 'S-CON-3')"},
-        "refs": {"type": "array", "items": {"type": "string"}, "description": "Specific standard references applicable to this finding (e.g. ['CWE-391', 'ERR05-J', 'CISQ-ASCRM'])"},
     },
     "required": ["p", "t", "d", "w"],
 }
+
+
+class FindingsRouter:
+    """Deduplicates and enriches findings before writing to JSONL.
+
+    - Dedup by (principle, file, line, type) — skips duplicate findings
+    - Enriches req_refs from compiled standards — LLM doesn't need to pick refs
+    - Returns feedback to the LLM so it can move on from duplicates
+    """
+
+    def __init__(self, output_fh: TextIO, compiled_refs: dict[str, list[dict]] | None = None):
+        self._fh = output_fh
+        self._refs = compiled_refs or {}
+        self._seen: set[tuple] = set()
+        self.counter = 0
+
+    def receive(self, args: dict) -> tuple[str, bool]:
+        """Process a finding. Returns (message, is_duplicate)."""
+        key = (args.get("p"), args.get("file"), args.get("line"), args.get("t"))
+        if key in self._seen:
+            return "Duplicate finding, already captured. Move on.", True
+        self._seen.add(key)
+
+        finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
+        finding.update({k: v for k, v in args.items() if v is not None})
+
+        # Enrich with compiled standard refs — server-side, zero LLM tokens
+        req = args.get("req")
+        if req and req in self._refs:
+            finding["req_refs"] = self._refs[req]
+
+        self._fh.write(json.dumps(finding) + "\n")
+        self._fh.flush()
+        self.counter += 1
+        return f"Finding #{self.counter} recorded.", False
+
+
+def _load_compiled_refs(compiled_dir: str | None, dimension: str | None) -> dict[str, list[dict]]:
+    """Load {req_id: [{label, url}, ...]} from compiled standards."""
+    if not compiled_dir or not dimension:
+        return {}
+    try:
+        data = json.loads((Path(compiled_dir) / f"{dimension}.json").read_text())
+    except Exception:
+        return {}
+    lookup: dict[str, list[dict]] = {}
+    for principle in data.get("principles", []):
+        for req in principle.get("requirements", []):
+            req_id = req.get("id")
+            if not req_id:
+                continue
+            refs = [{"label": _ref_label(r), "url": r["url"]} for r in req.get("refs", []) if r.get("url")]
+            if refs:
+                lookup[req_id] = refs
+    return lookup
+
+
+def _ref_label(ref: dict) -> str:
+    """Build a display label for a ref."""
+    source = ref.get("source", "")
+    ref_id = ref.get("id")
+    if source == "cwe" and ref_id:
+        return f"CWE-{ref_id}"
+    if ref_id:
+        return ref_id
+    return source.upper() if source else "REF"
 
 
 def _read_message() -> dict | None:
@@ -84,11 +150,8 @@ def _handle_tools_list(request_id: object) -> dict:
     }]})
 
 
-def _handle_tools_call(request_id: object, params: dict, findings_fh: TextIO, counter: int) -> tuple[dict, int]:
-    """Handle the 'tools/call' JSON-RPC method.
-
-    Returns (response_dict, updated_counter).
-    """
+def _handle_tools_call(request_id: object, params: dict, router: FindingsRouter) -> dict:
+    """Handle the 'tools/call' JSON-RPC method."""
     name = params.get("name")
     args = params.get("arguments", {})
 
@@ -96,16 +159,12 @@ def _handle_tools_call(request_id: object, params: dict, findings_fh: TextIO, co
         return _ok(request_id, {
             "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
             "isError": True,
-        }), counter
+        })
 
-    finding = {"schema_version": _FINDING_SCHEMA_VERSION, **{k: v for k, v in args.items() if v is not None}}
-    findings_fh.write(json.dumps(finding) + "\n")
-    findings_fh.flush()
-    counter += 1
-
+    message, _is_dup = router.receive(args)
     return _ok(request_id, {
-        "content": [{"type": "text", "text": f"Finding #{counter} recorded."}],
-    }), counter
+        "content": [{"type": "text", "text": message}],
+    })
 
 
 def _handle_unknown_method(req_id: object, method: str) -> None:
@@ -115,42 +174,68 @@ def _handle_unknown_method(req_id: object, method: str) -> None:
                "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
 
 
-def _dispatch(msg: dict, findings_fh: TextIO, counter: int) -> int:
-    """Route a single JSON-RPC message and return the updated counter."""
+def _dispatch(msg: dict, router: FindingsRouter) -> None:
+    """Route a single JSON-RPC message."""
     method = msg.get("method", "")
     req_id = msg.get("id")
 
     if method in ("notifications/initialized", "notifications/cancelled"):
-        return counter
+        return
     if method == "initialize":
         _send(_handle_initialize(req_id, msg))
     elif method == "tools/list":
         _send(_handle_tools_list(req_id))
     elif method == "tools/call":
-        response, counter = _handle_tools_call(req_id, msg.get("params", {}), findings_fh, counter)
-        _send(response)
+        _send(_handle_tools_call(req_id, msg.get("params", {}), router))
     elif method == "ping":
         _send(_ok(req_id, {}))
     else:
         _handle_unknown_method(req_id, method)
-    return counter
+
+
+def _parse_args() -> tuple[str, str | None, str | None]:
+    """Parse CLI arguments: findings_file [--compiled-dir DIR] [--dimension DIM]."""
+    from quodeq.shared.utils import get_findings_file
+
+    findings_file = None
+    compiled_dir = None
+    dimension = None
+    args = sys.argv[1:]
+    i = 0
+    while i < len(args):
+        if args[i] == "--compiled-dir" and i + 1 < len(args):
+            compiled_dir = args[i + 1]
+            i += 2
+        elif args[i] == "--dimension" and i + 1 < len(args):
+            dimension = args[i + 1]
+            i += 2
+        elif not args[i].startswith("--"):
+            findings_file = args[i]
+            i += 1
+        else:
+            i += 1
+
+    if not findings_file:
+        findings_file = get_findings_file()
+    return findings_file or "", compiled_dir, dimension
 
 
 def main() -> None:
     """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
-    from quodeq.shared.utils import get_findings_file
-    findings_file = sys.argv[1] if len(sys.argv) > 1 else get_findings_file()
+    findings_file, compiled_dir, dimension = _parse_args()
     if not findings_file:
-        sys.stderr.write("Usage: mcp_findings.py <findings_file>  (or set FINDINGS_FILE env)\n")
+        sys.stderr.write("Usage: mcp_findings.py <findings_file> [--compiled-dir DIR --dimension DIM]\n")
         sys.exit(1)
 
-    counter = 0
+    compiled_refs = _load_compiled_refs(compiled_dir, dimension)
+
     with open(findings_file, "a") as findings_fh:
+        router = FindingsRouter(findings_fh, compiled_refs)
         while True:
             msg = _read_message()
             if msg is None:
                 break
-            counter = _dispatch(msg, findings_fh, counter)
+            _dispatch(msg, router)
 
 
 if __name__ == "__main__":

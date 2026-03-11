@@ -38,17 +38,23 @@ class AnalysisConfig:
     ai_model: str | None = None
     max_turns: int | None = _DEFAULT_MAX_TURNS
     max_duration: int | None = _DEFAULT_MAX_DURATION
+    compiled_dir: Path | None = None
+    dimension: str | None = None
 
 
-def _create_mcp_config(jsonl_file: Path) -> Path:
+def _create_mcp_config(
+    jsonl_file: Path, compiled_dir: Path | None = None, dimension: str | None = None,
+) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
     mcp_script = str(Path(__file__).resolve().parent / "mcp_findings.py")
-    jsonl_path = str(jsonl_file.resolve())
+    mcp_args = [mcp_script, str(jsonl_file.resolve())]
+    if compiled_dir and dimension:
+        mcp_args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
     config = {
         "mcpServers": {
             "findings": {
                 "command": sys.executable,
-                "args": [mcp_script, jsonl_path],
+                "args": mcp_args,
             }
         }
     }
@@ -174,7 +180,7 @@ def _build_ai_cmd(
     provider_cfg = _PROVIDER_CONFIGS.get(cmd, {})
     mcp_config_path: Path | None = None
     if config.jsonl_file is not None:
-        mcp_config_path = _create_mcp_config(config.jsonl_file)
+        mcp_config_path = _create_mcp_config(config.jsonl_file, config.compiled_dir, config.dimension)
         args.extend(["--mcp-config", str(mcp_config_path)])
         args.extend(["--allowedTools", "mcp__findings__report_finding"])
         # MCP servers require permission approval; in --print mode there is no

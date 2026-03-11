@@ -45,30 +45,11 @@ For EVERY finding (violation or compliance), call the `report_finding` tool with
 
 ## CRITICAL: Report Findings Immediately
 
-**Call the `report_finding` tool immediately after confirming each finding.** Do NOT collect findings and report them all at the end. The system tracks your findings in real time.
+Call `report_finding` immediately after confirming each finding. Do NOT batch findings — the system tracks them in real time.
 
-**Expected pattern — follow this exactly:**
+Pattern: Grep → Read to confirm → `report_finding` → next pattern.
 
-1. Grep for a pattern → find matches
-2. Read the file to confirm → it's a real finding
-3. **Call `report_finding` NOW** (before your next Grep/Read)
-4. Move on to the next pattern
-
-**Example flow:**
-
-> *[Grep for hardcoded secrets]* → found match in config.py:12
-> *[Read config.py]* → confirmed, API key is hardcoded
-> *[Call `report_finding` with p="Confidentiality", t="violation", d="security", w="Hardcoded API key", file="config.py", line=12, severity="critical", vt="hardcoded-secret", reason="API key exposed in source code", req="S-CON-1"]*
-> *[Grep for SQL injection]* → found match in db.py:45
-> *[Read db.py]* → confirmed, string concatenation in query
-> *[Call `report_finding` with p="Confidentiality", t="violation", d="security", w="SQL injection via string concat", file="db.py", line=45, severity="critical", vt="sql-injection", reason="User input concatenated into SQL query", req="S-INT-2"]*
-
-**DO NOT do this (batching at the end):**
-> *[Grep...]* → *[Read...]* → *[Grep...]* → *[Read...]* → ... → *[report all findings at the end]*
-
-If you batch findings, the real-time monitoring system cannot show progress. Report each finding the moment you confirm it.
-
-Do NOT output findings as text. Always use the `report_finding` tool.
+If `report_finding` says "Duplicate", move on — the finding is already captured.
 
 ## Project Size Adaptation
 

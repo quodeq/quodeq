@@ -118,6 +118,37 @@ class TestToolsCall:
         written = json.loads(findings_file.read_text().strip())
         assert "file" not in written
 
+    def test_duplicate_finding_is_skipped(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        finding = {"p": "P1", "t": "violation", "d": "security", "w": "Issue", "file": "a.py", "line": 10}
+        responses = _run_server(
+            [
+                _make_request("tools/call", 1, {"name": "report_finding", "arguments": finding}),
+                _make_request("tools/call", 2, {"name": "report_finding", "arguments": finding}),
+            ],
+            str(findings_file),
+        )
+        assert "Finding #1" in responses[0]["result"]["content"][0]["text"]
+        assert "Duplicate" in responses[1]["result"]["content"][0]["text"]
+        lines = findings_file.read_text().strip().splitlines()
+        assert len(lines) == 1
+
+    def test_same_file_line_different_type_not_duplicate(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        v = {"p": "P1", "t": "violation", "d": "security", "w": "Bad", "file": "a.py", "line": 10}
+        c = {"p": "P1", "t": "compliance", "d": "security", "w": "Good", "file": "a.py", "line": 10}
+        responses = _run_server(
+            [
+                _make_request("tools/call", 1, {"name": "report_finding", "arguments": v}),
+                _make_request("tools/call", 2, {"name": "report_finding", "arguments": c}),
+            ],
+            str(findings_file),
+        )
+        assert "Finding #1" in responses[0]["result"]["content"][0]["text"]
+        assert "Finding #2" in responses[1]["result"]["content"][0]["text"]
+        lines = findings_file.read_text().strip().splitlines()
+        assert len(lines) == 2
+
 
 class TestNotifications:
     def test_notifications_are_silently_ignored(self, tmp_path: Path) -> None:
@@ -151,6 +182,79 @@ class TestUnknownMethod:
             findings_file,
         )
         assert responses[0]["error"]["code"] == -32601
+
+
+class TestFindingsRouter:
+    def test_enriches_req_refs_from_compiled(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        compiled_refs = {
+            "S-CON-1": [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}],
+        }
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh, compiled_refs)
+            msg, dup = router.receive({"p": "Confidentiality", "t": "violation", "d": "security", "w": "Hardcoded key", "req": "S-CON-1"})
+        assert not dup
+        assert "Finding #1" in msg
+        written = json.loads(findings_file.read_text().strip())
+        assert written["req_refs"] == [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}]
+
+    def test_no_enrichment_without_matching_req(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        compiled_refs = {"S-CON-1": [{"label": "CWE-798", "url": "https://example.com"}]}
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh, compiled_refs)
+            router.receive({"p": "P1", "t": "violation", "d": "perf", "w": "Slow", "req": "UNKNOWN-1"})
+        written = json.loads(findings_file.read_text().strip())
+        assert "req_refs" not in written
+
+    def test_no_enrichment_without_compiled_refs(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh)
+            router.receive({"p": "P1", "t": "violation", "d": "perf", "w": "Slow", "req": "S-CON-1"})
+        written = json.loads(findings_file.read_text().strip())
+        assert "req_refs" not in written
+
+
+class TestLoadCompiledRefs:
+    def test_loads_refs_from_compiled_json(self, tmp_path: Path) -> None:
+        compiled_dir = tmp_path / "compiled"
+        compiled_dir.mkdir()
+        data = {"principles": [{"requirements": [
+            {"id": "R-FT-1", "refs": [
+                {"source": "cwe", "id": "391", "url": "https://cwe.mitre.org/data/definitions/391.html"},
+            ]},
+            {"id": "R-FT-2", "refs": [
+                {"source": "cert", "id": "ERR08-J", "url": "https://example.com/ERR08-J"},
+            ]},
+        ]}]}
+        (compiled_dir / "reliability.json").write_text(json.dumps(data))
+        result = mcp_findings._load_compiled_refs(str(compiled_dir), "reliability")
+        assert "R-FT-1" in result
+        assert result["R-FT-1"][0]["label"] == "CWE-391"
+        assert "R-FT-2" in result
+        assert result["R-FT-2"][0]["label"] == "ERR08-J"
+
+    def test_skips_refs_without_url(self, tmp_path: Path) -> None:
+        compiled_dir = tmp_path / "compiled"
+        compiled_dir.mkdir()
+        data = {"principles": [{"requirements": [
+            {"id": "R-1", "refs": [
+                {"source": "internal", "id": "M-ANA-1"},  # no url
+                {"source": "cwe", "id": "123", "url": "https://cwe.mitre.org/data/definitions/123.html"},
+            ]},
+        ]}]}
+        (compiled_dir / "maintainability.json").write_text(json.dumps(data))
+        result = mcp_findings._load_compiled_refs(str(compiled_dir), "maintainability")
+        assert len(result["R-1"]) == 1
+        assert result["R-1"][0]["label"] == "CWE-123"
+
+    def test_returns_empty_for_missing_file(self, tmp_path: Path) -> None:
+        result = mcp_findings._load_compiled_refs(str(tmp_path / "missing"), "security")
+        assert result == {}
+
+    def test_returns_empty_without_args(self) -> None:
+        assert mcp_findings._load_compiled_refs(None, None) == {}
 
 
 class TestMainEntryPoint:
