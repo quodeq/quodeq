@@ -633,108 +633,217 @@ After Phase 3: Static findings are validated before scoring. False positives fil
 
 ---
 
-## Phase 4: Incremental Analysis (Cache Layer)
+## Phase 4: Pre-Analysis Enrichment Interfaces
 
-**Goal:** Skip unchanged files on re-runs. Massive speedup for CI/CD.
+**Goal:** Define interfaces for signals that feed the Router. Each is a separate concern, each ships when ready. The Router consumes whatever is available — graceful degradation.
 
-### 4.1 Finding Cache (`src/quodeq/engine/finding_cache.py`)
+### 4.1 Enrichment Interface (`src/quodeq/engine/enrichment/base.py`)
+
+All pre-analysis signals implement this:
 
 ```python
-class FindingCache:
-    """Content-addressed cache for file-level findings.
+class FileEnrichment(ABC):
+    """Interface for pre-analysis file enrichment.
 
-    Key: sha256(file_content + standards_version + semgrep_rules_hash)
-    Value: list of findings for that file
-
-    Storage: JSON file in .quodeq/cache/findings/
+    Enrichments add metadata to files before they enter the queue.
+    The Router uses this metadata for prioritization and routing decisions.
+    All enrichments are optional — the pipeline works without any.
     """
 
-    def get(self, file_path: Path, standards_version: str) -> list[dict] | None:
-        """Return cached findings or None if stale/missing."""
+    @abstractmethod
+    def name(self) -> str:
+        """Enrichment identifier (e.g. 'git_diff', 'dep_graph', 'cache')."""
 
-    def put(self, file_path: Path, standards_version: str, findings: list[dict]):
-        """Cache findings for a file."""
+    @abstractmethod
+    def enrich(self, files: list[dict], repo_path: Path) -> list[dict]:
+        """Add metadata to each file dict.
 
-    def invalidate_changed(self, repo_path: Path, since_commit: str):
-        """Invalidate cache entries for files changed since commit."""
+        Input:  [{path: str, ...}, ...]
+        Output: [{path: str, ..., <enrichment fields>}, ...]
+
+        Must not remove files or change existing fields.
+        Must be fast (< 5s for the whole repo).
+        """
 ```
 
-### 4.2 Git-Aware Diff
+### 4.2 Git Diff Enrichment (`src/quodeq/engine/enrichment/git_diff.py`)
 
 ```python
-def get_changed_files(repo_path: Path, since: str = "HEAD~1") -> set[str]:
-    """Return files changed since a commit/tag."""
+class GitDiffEnrichment(FileEnrichment):
+    """Marks files as changed/unchanged since a reference point.
+
+    Adds to each file:
+      - changed: bool (modified since reference commit)
+      - last_modified: str (ISO date of last commit touching this file)
+      - change_frequency: int (commits in last 90 days)
+    """
+
+    def __init__(self, since: str = "HEAD~1"):
+        self.since = since
 ```
 
-### 4.3 Integration
+**Not implemented yet.** Stub returns all files as `changed: True` (safe default — analyze everything).
+
+### 4.3 Dependency Graph Enrichment (`src/quodeq/engine/enrichment/dep_graph.py`)
 
 ```python
-# In the runner:
-cached_findings = cache.get_all_valid(repo_path, standards_version)
-changed_files = get_changed_files(repo_path, since=last_run_commit)
-files_to_analyze = [f for f in all_files if f in changed_files or f not in cached_findings]
-# Only queue files_to_analyze for subagents
-# Merge cached + fresh findings
+class DepGraphEnrichment(FileEnrichment):
+    """Builds import graph and adds centrality metrics.
+
+    Adds to each file:
+      - fan_in: int (number of files that import this one)
+      - fan_out: int (number of files this one imports)
+      - is_circular: bool (part of a circular dependency)
+      - layer: str | None (presentation/domain/data if detectable)
+    """
+```
+
+**Not implemented yet.** Stub returns files unchanged (no graph metadata).
+
+Future: uses tree-sitter or regex per language to parse imports. Can also generate **standalone findings** (circular deps, god modules) written directly to JSONL without LLM involvement.
+
+### 4.4 Finding Cache Enrichment (`src/quodeq/engine/enrichment/cache.py`)
+
+```python
+class CacheEnrichment(FileEnrichment):
+    """Marks files with cached findings from previous runs.
+
+    Adds to each file:
+      - cached: bool (valid cache entry exists)
+      - cached_findings: list[dict] (findings from previous run)
+
+    Cache key: sha256(file_content + standards_version + rules_hash)
+    """
+```
+
+**Not implemented yet.** Stub returns all files as `cached: False`.
+
+### 4.5 Enrichment Registry
+
+```python
+class EnrichmentRegistry:
+    """Runs all registered enrichments in sequence.
+
+    Each enrichment adds fields; none remove files.
+    Order doesn't matter — enrichments are independent.
+    """
+
+    def enrich_all(self, files: list[dict], repo_path: Path) -> list[dict]:
+        for enrichment in self._enrichments:
+            try:
+                files = enrichment.enrich(files, repo_path)
+            except Exception:
+                pass  # Graceful: enrichment failure doesn't block pipeline
+        return files
+```
+
+### 4.6 Router Uses Enrichment Metadata
+
+The Router (in MCP server / subagent pool) consumes whatever metadata exists:
+
+```python
+def _prioritize_files(files: list[dict], static_findings: dict) -> list[dict]:
+    """Sort files by analysis priority using all available enrichment signals.
+
+    Priority formula (higher = analyze first):
+      + changed recently (git_diff)          → strong signal
+      + high fan_in (dep_graph)              → central module
+      + many static findings                 → more to investigate
+      + not cached (cache)                   → needs fresh analysis
+      + file is large                        → more likely to have issues
+
+    If enrichment data is missing, that signal is neutral (not penalized).
+    """
+```
+
+### 4.7 File Structure
+
+```
+src/quodeq/engine/enrichment/
+  __init__.py
+  base.py              # FileEnrichment ABC
+  registry.py          # EnrichmentRegistry
+  git_diff.py          # GitDiffEnrichment (stub → implement later)
+  dep_graph.py         # DepGraphEnrichment (stub → implement later)
+  cache.py             # CacheEnrichment (stub → implement later)
 ```
 
 ### Deliverable
 
-After Phase 4: Re-runs on a repo with 10% changed files complete in ~1 min instead of ~10 min. CI/CD integration becomes practical.
+After Phase 4: All enrichment interfaces defined. Stubs return safe defaults. The Router and queue prioritization work with whatever data is available. Implementing any enrichment later is **one file** — no changes to runner, subagents, or scoring.
 
 ---
 
-## Phase 5: Cross-File Analysis
+## Phase 5: Enrichment Implementations (Incremental)
 
-**Goal:** Catch issues that span multiple files.
+**Goal:** Implement enrichments one by one, driven by data and need.
 
-### 5.1 Dependency Graph Builder
+### 5.1 Git Diff (first — highest impact for CI/CD)
 
 ```python
-def build_import_graph(repo_path: Path, language: str) -> dict:
-    """Build file-level dependency graph from imports.
-
-    Returns: {file: {imports: [files], imported_by: [files], fan_in: int}}
-    Uses tree-sitter or regex per language.
-    """
+def enrich(self, files, repo_path):
+    changed = _git_diff_files(repo_path, self.since)
+    for f in files:
+        f["changed"] = f["path"] in changed
+        f["last_modified"] = _git_last_modified(repo_path, f["path"])
+    return files
 ```
 
-Detects:
-- Circular dependencies (graph cycles)
-- God modules (high fan-in)
-- Orphan modules (zero fan-in, zero fan-out)
-- Layer violations (presentation → data bypassing domain)
+Router impact: unchanged + cached files → skip LLM entirely. Re-runs drop from ~10 min to ~1 min.
 
-### 5.2 Architecture Subagent
+### 5.2 Dependency Graph (second — enables architectural findings)
 
-A specialized subagent that receives the dependency graph + high-level summaries instead of individual files:
-
+```python
+def enrich(self, files, repo_path):
+    graph = _build_import_graph(repo_path, self.language)
+    for f in files:
+        node = graph.get(f["path"], {})
+        f["fan_in"] = node.get("fan_in", 0)
+        f["is_circular"] = node.get("is_circular", False)
+    # Also emit direct findings for graph-level issues:
+    self._emit_circular_deps(graph, self.output_jsonl)
+    return files
 ```
-Prompt: "Here is the module dependency graph for this project.
-         Identify architectural violations: circular deps, god modules,
-         layer violations, missing abstractions."
+
+Plus: an **Architecture Subagent** that receives the dep graph summary:
+```
+"Here is the module dependency graph. Identify architectural violations:
+ circular deps, god modules, layer violations, missing abstractions."
 ```
 
-This is a single subagent, short context, high-value findings.
+Single subagent, short context, high-value findings.
+
+### 5.3 Finding Cache (third — optimizes repeat runs)
+
+Content-addressed: `sha256(file_content + standards_version + rules_hash)`. Invalidation is automatic — changed content = different hash = cache miss.
 
 ### Deliverable
 
-After Phase 5: Cross-file architectural issues detected. Fills the biggest blind spot.
+Each implementation is a standalone PR. The pipeline already consumes the data via the enrichment interface — no plumbing changes needed.
 
 ---
 
 ## Implementation Order & Milestones
 
-| Phase | Effort | Impact | Ships independently |
-|---|---|---|---|
-| **Phase 1**: SARIF layer | 3-4 days | +100% coverage, 0 extra tokens | Yes |
-| **Phase 2**: Subagents | 4-5 days | 3x files, 4x fewer tokens | Yes |
-| **Phase 3**: Validator | 2-3 days | fewer false positives, smart routing | Yes |
-| **Phase 4**: Cache | 2-3 days | 10x faster re-runs | Yes |
-| **Phase 5**: Cross-file | 3-4 days | architectural findings | Yes |
+| Phase | What | Effort | Impact | Ships independently |
+|---|---|---|---|---|
+| **Phase 1** | Static analysis interface + Semgrep | 3-4 days | +100% file coverage, 0 tokens | Yes |
+| **Phase 2** | Subagent pool + MCP control plane | 4-5 days | 3x files, 4x fewer tokens | Yes |
+| **Phase 3** | Haiku validator | 2-3 days | fewer false positives, smart routing | Yes |
+| **Phase 4** | Enrichment interfaces (stubs) | 1-2 days | Architecture ready for all signals | Yes |
+| **Phase 5a** | Git diff enrichment | 1-2 days | 10x faster re-runs (CI/CD) | Yes |
+| **Phase 5b** | Dependency graph enrichment | 2-3 days | Architectural findings | Yes |
+| **Phase 5c** | Finding cache enrichment | 1-2 days | Skip unchanged files | Yes |
 
-**Total: ~15-19 days for the full architecture.**
+**Total: ~15-22 days for the full architecture.**
 
-Each phase is a PR. Each is independently valuable. No phase depends on a later phase.
+Phase 4 is fast (just interfaces + stubs). Phase 5a-c are independent of each other — build whichever is needed first.
+
+Each phase is a PR. Each is independently valuable. The pattern is always the same:
+1. Define the interface
+2. Implement the stub (safe defaults)
+3. Wire into runner/router
+4. Implement for real when needed
 
 ---
 
