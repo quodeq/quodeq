@@ -8,18 +8,15 @@
 <h2 align="center">quodeq</h2>
 
 <p align="center">
+  <em>quality code compass</em><br>
   <em>human aligned quode</em><br>
-  <em>quode safe</em><br>
-  <em>code with quore</em><br>
-  <em>bearing quode with you</em>
-  <em>To excellence and beyond</em>
-  <em>To excellence and beyond</em>
-  <em>AI-driven quality analysis</em>
 </p>
 
 ---
 
-Evaluate any repository across six quality dimensions — **Security**, **Reliability**, **Maintainability**, **Performance**, **Flexibility**, and **Usability** — using LLM-driven judgments mapped to CWE classifications. Get actionable insights, not just metrics.
+**AI-powered code quality analysis across every dimension that matters.**
+
+Get actionable insights, not just metrics.
 
 ## Prerequisites
 
@@ -67,9 +64,6 @@ uv run quodeq evaluate /path/to/project -p typescript
 
 # Evidence only (skip scoring)
 uv run quodeq evaluate /path/to/project --evidence-only
-
-# Limit AI turns or duration per dimension
-uv run quodeq evaluate /path/to/project --max-turns 100 --max-duration 900
 ```
 
 ### Configure AI Client
@@ -119,57 +113,6 @@ uv run quodeq configure
 | `mobile_ios` | Swift (iOS) |
 
 Each plugin defines which dimensions apply and includes language-specific standards, knowledge bases, and prompt templates under `evaluators/<plugin>/`.
-
-## API Endpoints
-
-The Action API serves the dashboard and can be used for programmatic access.
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/api/projects` | List all evaluated projects |
-| `GET` | `/api/projects/:project/info` | Project metadata and available dimensions |
-| `GET` | `/api/projects/:project/dashboard` | Dashboard data for latest run |
-| `GET` | `/api/projects/:project/accumulated` | Accumulated scores across runs |
-| `GET` | `/api/projects/:project/export` | Export project data |
-| `GET` | `/api/projects/:project/runs/:run/dimensions/:dim/eval` | Dimension evaluation detail |
-| `GET` | `/api/projects/:project/runs/:run/violations` | Run violations summary |
-| `PATCH` | `/api/projects/:project/path` | Update project local path |
-| `DELETE` | `/api/projects/:project` | Delete project and all data |
-| `GET` | `/api/evaluations` | List running evaluations |
-| `POST` | `/api/evaluations` | Start a new evaluation |
-| `GET` | `/api/evaluations/:jobId` | Evaluation job status |
-| `DELETE` | `/api/evaluations/:jobId` | Cancel a running evaluation |
-| `GET` | `/api/plugins` | List available plugins and dimensions |
-| `GET` | `/api/ai-clients` | List available AI clients |
-| `GET` | `/api/ai-clients/:id/models` | List models for an AI client |
-| `GET` | `/api/browse` | Browse local filesystem |
-| `GET` | `/api/health` | Health check |
-
-## Development
-
-### Dashboard (dev mode)
-
-Start the Action API:
-
-```bash
-uv run python -m quodeq.action_api
-```
-
-Then in another terminal:
-
-```bash
-cd ui/web
-npm install
-npm run dev
-```
-
-Open `http://localhost:5173`.
-
-### Run Tests
-
-```bash
-uv run pytest
-```
 
 ## Project Structure
 
