@@ -73,7 +73,7 @@ def _resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | Non
             # Prefix match: "CISQ-ASCRM-CWE-396" matches known label "CISQ"
             matched = next((r for k, r in by_label.items() if label.upper().startswith(k.upper())), None)
             if matched:
-                result.append({"label": label, "url": matched["url"]})
+                result.append(matched)
             else:
                 result.append({"label": label})
     return result or None
