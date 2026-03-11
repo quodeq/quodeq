@@ -128,8 +128,8 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
         const reason = v.reason || v.findings;
         if (reason) lines.push('', `**Why it's a violation:** ${reason}`);
-        if (v.req_refs?.length > 0) lines.push('', `**References:** ${v.req_refs.map(r => `${r.label} (${r.url})`).join(', ')}`);
-        else if (v.req) lines.push('', `**Requirement:** ${v.req}`);
+        const linkedRefs = (v.req_refs || []).filter(r => r.url);
+        if (linkedRefs.length > 0) lines.push('', `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
         const code = v.code || v.snippet;
         if (code) {
           lines.push('', '**Affected code:**');
@@ -257,11 +257,10 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             <div className="vlive-detail-section">
                               <div className="vlive-detail-section-header">
                                 {v.title && <span className="vlive-detail-section-label">Reason</span>}
-                                {v.req_refs?.length > 0
-                                  ? <span className="cwe-link-group">{v.req_refs.map((ref, i) => (
-                                      <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                                    ))}</span>
-                                  : v.req && <span className="cwe-link">{v.req}</span>
+                                {v.req_refs?.filter(r => r.url)?.length > 0 &&
+                                  <span className="cwe-link-group">{v.req_refs.filter(r => r.url).map((ref, i) => (
+                                    <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+                                  ))}</span>
                                 }
                               </div>
                               {v.title && <p className="vlive-detail-title">{v.title}</p>}
@@ -313,11 +312,10 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           <div className="vlive-detail-section">
                             <div className="vlive-detail-section-header">
                               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-                              {c.req_refs?.length > 0
-                                ? <span className="cwe-link-group">{c.req_refs.map((ref, i) => (
-                                    <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                                  ))}</span>
-                                : c.req && <span className="cwe-link">{c.req}</span>
+                              {c.req_refs?.filter(r => r.url)?.length > 0 &&
+                                <span className="cwe-link-group">{c.req_refs.filter(r => r.url).map((ref, i) => (
+                                  <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+                                ))}</span>
                               }
                             </div>
                             {c.title && <p className="vlive-detail-title">{c.title}</p>}
