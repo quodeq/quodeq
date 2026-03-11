@@ -544,6 +544,13 @@
   color: var(--color-text-subtle);
 }
 
+.exec-summary-insufficient {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-style: italic;
+  margin-left: auto;
+}
+
 .exec-summary-chevron {
   color: var(--color-text-subtle);
   font-size: 1rem;

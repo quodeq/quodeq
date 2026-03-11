@@ -60,12 +60,17 @@ def _build_principle_rows(
     for raw_key, pdata in evidence.get("principles", {}).items():
         label = pdata.get("display_name", raw_key)
         matched = lookup.get(label, {})
+        grade = matched.get("grade")
         raw_final = matched.get("final_score")
-        formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
+        # Insufficient principles have no meaningful score — suppress "0.0/10".
+        if grade == "Insufficient":
+            formatted_score = None
+        else:
+            formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
         row: dict = {
             "name": label,
             "score": formatted_score,
-            "grade": matched.get("grade") or grade_from_score(formatted_score),
+            "grade": grade or grade_from_score(formatted_score),
         }
         if matched.get("confidence_interval") is not None:
             row["confidence_interval"] = matched["confidence_interval"]

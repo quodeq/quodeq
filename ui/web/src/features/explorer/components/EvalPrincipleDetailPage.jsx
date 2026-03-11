@@ -175,13 +175,19 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         <h3 className="file-detail-title">{principle}</h3>
         <div className="file-detail-stats-row">
           <div className="file-detail-stats">
-            {score && (
+            {grade === 'Insufficient' ? (
+              <span className="exec-summary-insufficient">Not enough evidence</span>
+            ) : (
               <>
-                <span className="file-detail-stat"><strong>{score}</strong></span>
-                <span className="file-detail-stat-sep">·</span>
+                {score && (
+                  <>
+                    <span className="file-detail-stat"><strong>{score}</strong></span>
+                    <span className="file-detail-stat-sep">·</span>
+                  </>
+                )}
+                <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
               </>
             )}
-            <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
             {violations.length > 0 && (
               <>
                 <span className="file-detail-stat-sep">·</span>
