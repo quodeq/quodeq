@@ -74,19 +74,28 @@ Do NOT output findings as text. Always use the `report_finding` tool.
 
 Adapt your analysis depth to the project size:
 
-| Source files | Min findings target | Max files to read |
-|-------------|-------------------|-------------------|
-| 1-20        | 5-10              | All               |
-| 21-100      | 10-20             | 30                |
-| 101-500     | 15-30             | 50                |
-| 500+        | 20-40             | 70                |
+| Source files | Max files to read |
+|-------------|-------------------|
+| 1-20        | All               |
+| 21-100      | 30                |
+| 101-500     | 50                |
+| 500+        | 70                |
 
-## Balanced Evidence
+## Systematic Evaluation
 
-You MUST find BOTH violations AND compliance examples. A one-sided analysis is incomplete.
+Evaluate every file you read against every applicable principle in the standards checklist.
+
+For each file:
+1. Identify which principles from the checklist apply to this file
+2. For each applicable principle — does this file violate or comply? Report it.
+3. If a principle is not applicable to this file, skip it.
+
+**Ground rules:**
+- Report ALL violations and ALL compliance you observe — do not bias toward either
+- Do not fabricate or inflate findings to reach any quota. If you found 5 real findings, report 5.
+- Every finding must be backed by a specific code location (file, line, snippet)
 - For every principle where you find violations, actively look for files that follow the principle correctly
 - For every principle where code is compliant, verify there are no violations elsewhere
-- Aim for at least 30% compliance findings in your output
 
 ## Directories to Exclude
 

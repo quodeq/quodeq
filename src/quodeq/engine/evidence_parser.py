@@ -8,8 +8,23 @@ from pathlib import Path
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
 
 
-def _build_req_url_lookup(compiled_dir: Path, dimension: str) -> dict[str, str]:
-    """Return {req_id: first_ref_url} for all requirements with a URL in the compiled JSON.
+def _ref_label(ref: dict) -> str:
+    """Build a display label for a ref (e.g. 'CWE-396', 'ERR08-J', 'WCAG 1.1.1')."""
+    source = ref.get("source", "")
+    ref_id = ref.get("id")
+    if source == "cwe" and ref_id:
+        return f"CWE-{ref_id}"
+    if source == "wcag22" and ref_id:
+        return f"WCAG {ref_id}"
+    if source == "asvs" and ref_id:
+        return f"ASVS {ref_id}"
+    if ref_id:
+        return ref_id
+    return source.upper() if source else "REF"
+
+
+def _build_req_url_lookup(compiled_dir: Path, dimension: str) -> dict[str, tuple[str, str]]:
+    """Return {req_id: (first_ref_url, display_label)} for requirements with a URL.
 
     Returns an empty dict if the file is missing or unreadable.
     """
@@ -19,7 +34,7 @@ def _build_req_url_lookup(compiled_dir: Path, dimension: str) -> dict[str, str]:
     except Exception:
         return {}
 
-    lookup: dict[str, str] = {}
+    lookup: dict[str, tuple[str, str]] = {}
     for principle in data.get("principles", []):
         for req in principle.get("requirements", []):
             req_id = req.get("id")
@@ -28,7 +43,7 @@ def _build_req_url_lookup(compiled_dir: Path, dimension: str) -> dict[str, str]:
             for ref in req.get("refs", []):
                 url = ref.get("url")
                 if url:
-                    lookup[req_id] = url
+                    lookup[req_id] = (url, _ref_label(ref))
                     break  # take the first ref with a URL
     return lookup
 
@@ -82,6 +97,8 @@ def _judgment_to_dict(j: Judgment) -> dict:
         d["req"] = j.req
     if j.req_url:
         d["req_url"] = j.req_url
+    if j.req_label:
+        d["req_label"] = j.req_label
     if j.title:
         d["title"] = j.title
     if j.reason:
@@ -121,7 +138,7 @@ def parse_jsonl_to_evidence(
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
     judgments: list[Judgment] = []
-    req_url_cache: dict[str, dict[str, str]] = {}  # dimension -> {req_id: url}
+    req_url_cache: dict[str, dict[str, tuple[str, str]]] = {}  # dimension -> {req_id: (url, label)}
     if jsonl_file.exists():
         with open(jsonl_file) as _jf:
             for line in _jf:
@@ -130,7 +147,9 @@ def parse_jsonl_to_evidence(
                     if compiled_dir and j.req and j.dimension:
                         if j.dimension not in req_url_cache:
                             req_url_cache[j.dimension] = _build_req_url_lookup(compiled_dir, j.dimension)
-                        j.req_url = req_url_cache[j.dimension].get(j.req)
+                        entry = req_url_cache[j.dimension].get(j.req)
+                        if entry:
+                            j.req_url, j.req_label = entry
                     judgments.append(j)
 
     grouped = _group_judgments(judgments)

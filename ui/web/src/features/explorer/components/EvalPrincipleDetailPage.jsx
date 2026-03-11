@@ -249,7 +249,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             <div className="vlive-detail-section">
                               <div className="vlive-detail-section-header">
                                 {v.title && <span className="vlive-detail-section-label">Reason</span>}
-                                {v.req && <a className="cwe-link" href={v.req_url || '#'} target="_blank" rel="noopener noreferrer">{v.req}</a>}
+                                {v.req && <a className="cwe-link" href={v.req_url || '#'} target="_blank" rel="noopener noreferrer">{v.req_label || v.req}</a>}
                               </div>
                               {v.title && <p className="vlive-detail-title">{v.title}</p>}
                               {(v.reason || v.findings) && <>

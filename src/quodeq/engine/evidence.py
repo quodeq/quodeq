@@ -21,6 +21,7 @@ class Judgment:
     dimension: str = ""
     req: str | None = None
     req_url: str | None = None
+    req_label: str | None = None
     violation_type: str = ""
     title: str = ""
 

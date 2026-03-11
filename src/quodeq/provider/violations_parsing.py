@@ -13,6 +13,7 @@ from quodeq.provider.violation_context import FindingSpec, ViolationContext, bui
 def _build_finding_entry(obj: dict, dimension: str, req_url_lookup: dict[str, str] | None = None) -> dict[str, Any]:
     """Build a normalized finding dict from a raw JSON object."""
     req = obj.get("req")
+    req_entry = req_url_lookup.get(req) if req and req_url_lookup else None
     entry = build_finding_base(FindingSpec(
         principle=obj["p"],
         file=obj.get("file"),
@@ -23,7 +24,8 @@ def _build_finding_entry(obj: dict, dimension: str, req_url_lookup: dict[str, st
         severity=obj.get("severity"),
         cwe=obj.get("cwe"),
         req=req,
-        req_url=req_url_lookup.get(req) if req and req_url_lookup else None,
+        req_url=req_entry[0] if req_entry else None,
+        req_label=req_entry[1] if req_entry else None,
     ))
     entry["dimension"] = obj.get("d", dimension)
     entry["violationType"] = obj.get("vt")

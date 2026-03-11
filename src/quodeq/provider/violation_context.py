@@ -26,6 +26,7 @@ class FindingSpec:
     cwe: int | str | None = None
     req: str | None = None
     req_url: str | None = None
+    req_label: str | None = None
     include_severity: bool = True
 
 
@@ -51,6 +52,8 @@ def build_finding_base(spec: FindingSpec) -> dict[str, Any]:
         entry["req"] = spec.req
     if spec.req_url:
         entry["req_url"] = spec.req_url
+    if spec.req_label:
+        entry["req_label"] = spec.req_label
     return entry
 
 
