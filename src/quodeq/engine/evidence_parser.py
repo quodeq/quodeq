@@ -58,7 +58,12 @@ class EvidenceContext:
 
 
 def _resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | None) -> list[dict] | None:
-    """Filter req_refs to only those the LLM selected, building URLs for unknown labels."""
+    """Filter req_refs to only those the LLM selected, building URLs for unknown labels.
+
+    Only refs that carry a ``url`` are kept.  If nothing with a URL remains
+    after filtering, *all_req_refs* is returned so the caller always gets
+    the compiled CWE/CISQ references.
+    """
     if not llm_refs:
         return all_req_refs
     by_label = {r["label"]: r for r in (all_req_refs or [])}
@@ -74,9 +79,9 @@ def _resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | Non
             matched = next((r for k, r in by_label.items() if label.upper().startswith(k.upper())), None)
             if matched:
                 result.append(matched)
-            else:
-                result.append({"label": label})
-    return result or None
+    # Only keep refs that have a URL — drop bare labels without links
+    result = [r for r in result if r.get("url")]
+    return result if result else all_req_refs
 
 
 def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
