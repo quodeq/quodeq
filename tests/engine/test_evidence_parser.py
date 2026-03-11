@@ -37,17 +37,20 @@ def _evidence_line(**overrides) -> str:
 
 class TestParseJsonlLine:
     def test_valid_violation(self):
-        j = _parse_jsonl_line(_evidence_line())
-        assert j is not None
+        result = _parse_jsonl_line(_evidence_line())
+        assert result is not None
+        j, llm_refs = result
         assert j.practice_id == "ts-001"
         assert j.verdict == "violation"
         assert j.file == "src/app.ts"
         assert j.line == 10
         assert j.severity == "high"
+        assert llm_refs is None
 
     def test_valid_compliance(self):
-        j = _parse_jsonl_line(_evidence_line(t="compliance"))
-        assert j is not None
+        result = _parse_jsonl_line(_evidence_line(t="compliance"))
+        assert result is not None
+        j, _ = result
         assert j.verdict == "compliance"
 
     def test_missing_practice_id(self):
@@ -59,8 +62,7 @@ class TestParseJsonlLine:
         assert _parse_jsonl_line(line) is None
 
     def test_invalid_verdict(self):
-        j = _parse_jsonl_line(_evidence_line(t="dismissed"))
-        assert j is None
+        assert _parse_jsonl_line(_evidence_line(t="dismissed")) is None
 
     def test_empty_line(self):
         assert _parse_jsonl_line("") is None
@@ -71,15 +73,23 @@ class TestParseJsonlLine:
 
     def test_defaults(self):
         line = json.dumps({"p": "ts-001", "t": "violation"})
-        j = _parse_jsonl_line(line)
+        result = _parse_jsonl_line(line)
+        j, _ = result
         assert j.file == ""
         assert j.line == 0
         assert j.severity == "medium"
 
     def test_req_parsed(self):
-        j = _parse_jsonl_line(_evidence_line(req="R-FT-1"))
-        assert j is not None
+        result = _parse_jsonl_line(_evidence_line(req="R-FT-1"))
+        assert result is not None
+        j, _ = result
         assert j.req == "R-FT-1"
+
+    def test_refs_parsed(self):
+        result = _parse_jsonl_line(_evidence_line(refs=["CWE-391", "ERR05-J"]))
+        assert result is not None
+        j, llm_refs = result
+        assert llm_refs == ["CWE-391", "ERR05-J"]
 
 
 # ---------------------------------------------------------------------------

@@ -57,8 +57,25 @@ class EvidenceContext:
     files_read: int
 
 
-def _parse_jsonl_line(line: str) -> Judgment | None:
-    """Parse a single JSONL evidence line into a Judgment."""
+def _resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | None) -> list[dict] | None:
+    """Filter req_refs to only those the LLM selected, building URLs for unknown labels."""
+    if not llm_refs:
+        return all_req_refs
+    by_label = {r["label"]: r for r in (all_req_refs or [])}
+    result = []
+    for label in llm_refs:
+        if label in by_label:
+            result.append(by_label[label])
+        elif label.upper().startswith("CWE-"):
+            cwe_id = label.split("-", 1)[1]
+            result.append({"label": label.upper(), "url": f"https://cwe.mitre.org/data/definitions/{cwe_id}.html"})
+        else:
+            result.append({"label": label})
+    return result or None
+
+
+def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
+    """Parse a single JSONL evidence line into a Judgment and optional LLM ref selection."""
     line = line.strip()
     if not line:
         return None
@@ -72,7 +89,7 @@ def _parse_jsonl_line(line: str) -> Judgment | None:
     if not practice_id or verdict not in ("violation", "compliance"):
         return None
 
-    return Judgment(
+    j = Judgment(
         practice_id=practice_id,
         verdict=verdict,
         dimension=obj.get("d", ""),
@@ -85,6 +102,7 @@ def _parse_jsonl_line(line: str) -> Judgment | None:
         req=obj.get("req"),
         title=obj.get("w", ""),
     )
+    return j, obj.get("refs")
 
 
 def _judgment_to_dict(j: Judgment) -> dict:
@@ -139,14 +157,17 @@ def parse_jsonl_to_evidence(
     if jsonl_file.exists():
         with open(jsonl_file) as _jf:
             for line in _jf:
-                j = _parse_jsonl_line(line)
-                if j is not None:
+                result = _parse_jsonl_line(line)
+                if result is not None:
+                    j, llm_refs = result
+                    all_req_refs = None
                     if compiled_dir and j.req and j.dimension:
                         if j.dimension not in req_refs_cache:
                             req_refs_cache[j.dimension] = _build_req_refs_lookup(compiled_dir, j.dimension)
-                        refs = req_refs_cache[j.dimension].get(j.req)
-                        if refs:
-                            j.req_refs = refs
+                        all_req_refs = req_refs_cache[j.dimension].get(j.req)
+                    resolved = _resolve_llm_refs(llm_refs, all_req_refs)
+                    if resolved:
+                        j.req_refs = resolved
                     judgments.append(j)
 
     grouped = _group_judgments(judgments)

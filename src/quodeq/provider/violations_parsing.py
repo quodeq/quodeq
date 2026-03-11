@@ -6,14 +6,15 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
-from quodeq.engine.evidence_parser import _build_req_refs_lookup
+from quodeq.engine.evidence_parser import _build_req_refs_lookup, _resolve_llm_refs
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 
 
 def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None) -> dict[str, Any]:
     """Build a normalized finding dict from a raw JSON object."""
     req = obj.get("req")
-    req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
+    all_req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
+    req_refs = _resolve_llm_refs(obj.get("refs"), all_req_refs)
     entry = build_finding_base(FindingSpec(
         principle=obj["p"],
         file=obj.get("file"),
