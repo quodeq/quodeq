@@ -251,12 +251,10 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             <div className="vlive-detail-section">
                               <div className="vlive-detail-section-header">
                                 {v.title && <span className="vlive-detail-section-label">Reason</span>}
-                                {v.req_refs?.length > 0
-                                  ? v.req_refs.map((ref, i) => (
-                                      <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                                    ))
-                                  : v.req && <span className="cwe-link">{v.req}</span>
-                                }
+                                {v.req_refs?.length > 0 && v.req_refs.map((ref, i) => (
+                                  <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+                                ))}
+                                {v.req && <span className="cwe-link" style={{ marginLeft: 'auto' }}>{v.req}</span>}
                               </div>
                               {v.title && <p className="vlive-detail-title">{v.title}</p>}
                               {(v.reason || v.findings) && <>
@@ -307,12 +305,10 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           <div className="vlive-detail-section">
                             <div className="vlive-detail-section-header">
                               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-                              {c.req_refs?.length > 0
-                                ? c.req_refs.map((ref, i) => (
-                                    <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                                  ))
-                                : c.req && <span className="cwe-link">{c.req}</span>
-                              }
+                              {c.req_refs?.length > 0 && c.req_refs.map((ref, i) => (
+                                <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+                              ))}
+                              {c.req && <span className="cwe-link" style={{ marginLeft: 'auto' }}>{c.req}</span>}
                             </div>
                             {c.title && <p className="vlive-detail-title">{c.title}</p>}
                             {c.reason && <>
