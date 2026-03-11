@@ -10,6 +10,8 @@ import sys
 from pathlib import Path
 from typing import TextIO
 
+from quodeq.engine.file_queue import FileQueue
+
 _FINDING_SCHEMA_VERSION = 1
 _JSONRPC_VERSION = "2.0"
 _MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
@@ -17,12 +19,12 @@ _SERVER_NAME = "quodeq-findings"
 _SERVER_VERSION = "1.0.0"
 _JSONRPC_METHOD_NOT_FOUND = -32601
 
-TOOL_NAME = "report_finding"
-TOOL_DESC = (
+REPORT_FINDING_NAME = "report_finding"
+REPORT_FINDING_DESC = (
     "Report a code quality finding (violation or compliance). "
     "Call this for EVERY finding you discover, immediately after confirming it."
 )
-TOOL_SCHEMA = {
+REPORT_FINDING_SCHEMA = {
     "type": "object",
     "properties": {
         "p": {"type": "string", "description": "Principle name from the standards checklist"},
@@ -39,6 +41,26 @@ TOOL_SCHEMA = {
     },
     "required": ["p", "t", "d", "w"],
 }
+
+GET_NEXT_FILES_NAME = "get_next_files"
+GET_NEXT_FILES_DESC = (
+    "Get your next batch of files to analyse from the queue. "
+    "Call this to receive file paths, then Read each one and report findings. "
+    "When this returns an empty list, you are done."
+)
+GET_NEXT_FILES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "count": {
+            "type": "integer",
+            "description": "Number of files to retrieve (default 5)",
+        },
+    },
+}
+
+# Kept for backward compatibility with imports
+TOOL_NAME = REPORT_FINDING_NAME
+TOOL_SCHEMA = REPORT_FINDING_SCHEMA
 
 
 class FindingsRouter:
@@ -141,29 +163,59 @@ def _handle_initialize(request_id: object, msg: dict) -> dict:
     })
 
 
-def _handle_tools_list(request_id: object) -> dict:
+def _handle_tools_list(request_id: object, *, has_queue: bool = False) -> dict:
     """Handle the 'tools/list' JSON-RPC method."""
-    return _ok(request_id, {"tools": [{
-        "name": TOOL_NAME,
-        "description": TOOL_DESC,
-        "inputSchema": TOOL_SCHEMA,
-    }]})
+    tools = [{
+        "name": REPORT_FINDING_NAME,
+        "description": REPORT_FINDING_DESC,
+        "inputSchema": REPORT_FINDING_SCHEMA,
+    }]
+    if has_queue:
+        tools.append({
+            "name": GET_NEXT_FILES_NAME,
+            "description": GET_NEXT_FILES_DESC,
+            "inputSchema": GET_NEXT_FILES_SCHEMA,
+        })
+    return _ok(request_id, {"tools": tools})
 
 
-def _handle_tools_call(request_id: object, params: dict, router: FindingsRouter) -> dict:
+def _handle_tools_call(
+    request_id: object, params: dict,
+    router: FindingsRouter, queue: FileQueue | None = None,
+    agent_id: str = "",
+) -> dict:
     """Handle the 'tools/call' JSON-RPC method."""
     name = params.get("name")
     args = params.get("arguments", {})
 
-    if name != TOOL_NAME:
+    if name == REPORT_FINDING_NAME:
+        message, _is_dup = router.receive(args)
         return _ok(request_id, {
-            "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
-            "isError": True,
+            "content": [{"type": "text", "text": message}],
         })
 
-    message, _is_dup = router.receive(args)
+    if name == GET_NEXT_FILES_NAME:
+        if queue is None:
+            return _ok(request_id, {
+                "content": [{"type": "text", "text": "No file queue configured."}],
+                "isError": True,
+            })
+        count = args.get("count", 5)
+        if not isinstance(count, int) or count < 1:
+            count = 5
+        files = queue.take(count, agent_id=agent_id)
+        if not files:
+            return _ok(request_id, {
+                "content": [{"type": "text", "text": "Queue empty — no more files. You are done."}],
+            })
+        file_list = "\n".join(files)
+        return _ok(request_id, {
+            "content": [{"type": "text", "text": f"{len(files)} files to analyse:\n{file_list}"}],
+        })
+
     return _ok(request_id, {
-        "content": [{"type": "text", "text": message}],
+        "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
+        "isError": True,
     })
 
 
@@ -174,7 +226,10 @@ def _handle_unknown_method(req_id: object, method: str) -> None:
                "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
 
 
-def _dispatch(msg: dict, router: FindingsRouter) -> None:
+def _dispatch(
+    msg: dict, router: FindingsRouter,
+    queue: FileQueue | None = None, agent_id: str = "",
+) -> None:
     """Route a single JSON-RPC message."""
     method = msg.get("method", "")
     req_id = msg.get("id")
@@ -184,58 +239,74 @@ def _dispatch(msg: dict, router: FindingsRouter) -> None:
     if method == "initialize":
         _send(_handle_initialize(req_id, msg))
     elif method == "tools/list":
-        _send(_handle_tools_list(req_id))
+        _send(_handle_tools_list(req_id, has_queue=queue is not None))
     elif method == "tools/call":
-        _send(_handle_tools_call(req_id, msg.get("params", {}), router))
+        _send(_handle_tools_call(req_id, msg.get("params", {}), router, queue, agent_id))
     elif method == "ping":
         _send(_ok(req_id, {}))
     else:
         _handle_unknown_method(req_id, method)
 
 
-def _parse_args() -> tuple[str, str | None, str | None]:
-    """Parse CLI arguments: findings_file [--compiled-dir DIR] [--dimension DIM]."""
+class _ServerArgs:
+    """Parsed CLI arguments for the MCP server."""
+    findings_file: str = ""
+    compiled_dir: str | None = None
+    dimension: str | None = None
+    queue_path: str | None = None
+    agent_id: str = ""
+
+
+def _parse_args() -> _ServerArgs:
+    """Parse CLI arguments for the MCP findings server."""
     from quodeq.shared.utils import get_findings_file
 
-    findings_file = None
-    compiled_dir = None
-    dimension = None
+    result = _ServerArgs()
     args = sys.argv[1:]
+    _FLAG_MAP = {
+        "--compiled-dir": "compiled_dir",
+        "--dimension": "dimension",
+        "--queue": "queue_path",
+        "--agent-id": "agent_id",
+    }
     i = 0
     while i < len(args):
-        if args[i] == "--compiled-dir" and i + 1 < len(args):
-            compiled_dir = args[i + 1]
-            i += 2
-        elif args[i] == "--dimension" and i + 1 < len(args):
-            dimension = args[i + 1]
+        if args[i] in _FLAG_MAP and i + 1 < len(args):
+            setattr(result, _FLAG_MAP[args[i]], args[i + 1])
             i += 2
         elif not args[i].startswith("--"):
-            findings_file = args[i]
+            result.findings_file = args[i]
             i += 1
         else:
             i += 1
 
-    if not findings_file:
-        findings_file = get_findings_file()
-    return findings_file or "", compiled_dir, dimension
+    if not result.findings_file:
+        result.findings_file = get_findings_file() or ""
+    return result
 
 
 def main() -> None:
     """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
-    findings_file, compiled_dir, dimension = _parse_args()
-    if not findings_file:
-        sys.stderr.write("Usage: mcp_findings.py <findings_file> [--compiled-dir DIR --dimension DIM]\n")
+    sa = _parse_args()
+    if not sa.findings_file:
+        sys.stderr.write(
+            "Usage: mcp_findings.py <findings_file> [--compiled-dir DIR --dimension DIM]"
+            " [--queue PATH --agent-id ID]\n"
+        )
         sys.exit(1)
 
-    compiled_refs = _load_compiled_refs(compiled_dir, dimension)
+    compiled_refs = _load_compiled_refs(sa.compiled_dir, sa.dimension)
+    queue: FileQueue | None = None
+    if sa.queue_path:
+        queue = FileQueue(Path(sa.queue_path))
 
-    with open(findings_file, "a") as findings_fh:
+    with open(sa.findings_file, "a") as findings_fh:
         router = FindingsRouter(findings_fh, compiled_refs)
         while True:
             msg = _read_message()
             if msg is None:
                 break
-            _dispatch(msg, router)
+            _dispatch(msg, router, queue, sa.agent_id)
 
 
 if __name__ == "__main__":
