@@ -71,10 +71,16 @@ class SubagentPool:
         self._dimension = dimension
         self._base_config = config or AnalysisConfig()
 
+    def _shared_jsonl_path(self) -> Path:
+        """The shared JSONL path all agents write to (same path the UI expects)."""
+        return self._evidence_dir / f"{self._dimension}_evidence.jsonl"
+
     def _build_agent_config(self, idx: int) -> tuple[AnalysisConfig, Path, Path]:
         """Build per-agent AnalysisConfig, JSONL path, and stream path."""
         agent_id = f"agent-{idx}"
-        jsonl_file = self._evidence_dir / f"{self._dimension}_{agent_id}.jsonl"
+        # All agents append to the same JSONL — the UI reads this file live.
+        # Append-mode writes of short lines are atomic on POSIX.
+        jsonl_file = self._shared_jsonl_path()
         stream_file = self._evidence_dir / f"{self._dimension}_{agent_id}.stream"
 
         ac = AnalysisConfig(
@@ -116,17 +122,15 @@ class SubagentPool:
             )
 
     def _count_total_findings(self) -> int:
-        """Count total findings across all agent JSONL files."""
-        total = 0
-        for i in range(self._n):
-            jsonl = self._evidence_dir / f"{self._dimension}_agent-{i}.jsonl"
-            try:
-                if jsonl.exists():
-                    with open(jsonl) as f:
-                        total += sum(1 for line in f if line.strip())
-            except OSError:
-                pass
-        return total
+        """Count findings in the shared JSONL file."""
+        jsonl = self._shared_jsonl_path()
+        try:
+            if jsonl.exists():
+                with open(jsonl) as f:
+                    return sum(1 for line in f if line.strip())
+        except OSError:
+            pass
+        return 0
 
     def _heartbeat_loop(self, stop: threading.Event, finished: dict[str, bool]) -> None:
         """Emit periodic progress lines until stopped."""
@@ -177,6 +181,37 @@ class SubagentPool:
         succeeded = sum(1 for r in results if r.success)
         log_info(f"Subagent pool done: {succeeded}/{self._n} succeeded")
         return results
+
+    @staticmethod
+    def deduplicate_jsonl(jsonl_path: Path) -> int:
+        """Deduplicate a shared JSONL file in-place by (p, file, line, t).
+
+        Returns the number of unique findings kept.
+        """
+        if not jsonl_path.exists():
+            return 0
+        seen: set[tuple] = set()
+        unique_lines: list[str] = []
+        with open(jsonl_path) as f:
+            for line in f:
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                try:
+                    obj = json.loads(stripped)
+                except json.JSONDecodeError:
+                    continue
+                key = (obj.get("p"), obj.get("file"), obj.get("line"), obj.get("t"))
+                if key in seen:
+                    continue
+                seen.add(key)
+                unique_lines.append(stripped)
+        with open(jsonl_path, "w") as f:
+            for line in unique_lines:
+                f.write(line + "\n")
+        removed = len(unique_lines) - len(seen)  # always 0, but for clarity
+        log_info(f"Deduplicated {jsonl_path.name}: {len(unique_lines)} unique findings")
+        return len(unique_lines)
 
     @staticmethod
     def merge_jsonl(results: list[SubagentResult], output: Path) -> Path:

@@ -76,7 +76,7 @@ class TestSubagentPool:
         assert ac.agent_id == "agent-0"
         assert ac.dimension == "security"
         assert ac.compiled_dir == tmp_path / "compiled"
-        assert "agent-0" in str(jsonl)
+        assert "evidence.jsonl" in str(jsonl)  # shared JSONL
         assert "agent-0" in str(stream)
 
     def test_failed_agent_does_not_stop_others(self, tmp_path: Path) -> None:

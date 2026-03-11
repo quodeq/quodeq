@@ -37,7 +37,7 @@ class AnalysisOptions:
     dimensions: list[str] | None = None
     max_turns: int | None = None
     max_duration: int | None = None
-    n_subagents: int = 5
+    n_subagents: int = 1
 
 
 @dataclass
@@ -264,9 +264,9 @@ def _process_dimension_with_subagents(
     )
     results = pool.run()
 
-    # 5. Merge and parse
+    # 5. Deduplicate shared JSONL (agents may produce cross-agent dupes)
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
-    SubagentPool.merge_jsonl(results, merged_jsonl)
+    SubagentPool.deduplicate_jsonl(merged_jsonl)
 
     # Count files read across all agent streams
     total_files_read = 0
