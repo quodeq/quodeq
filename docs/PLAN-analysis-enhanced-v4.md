@@ -110,23 +110,130 @@ The MCP server is NOT a dumb pipe. It is the **control plane** between the LLM a
 
 ---
 
-## Phase 1: SARIF Integration Layer
+## Phase 1: Static Analysis Interface + SARIF Layer
 
-**Goal:** Run Semgrep, convert output to quodeq JSONL, feed into existing scoring.
+**Goal:** Define a tool-agnostic static analysis interface. First implementation: Semgrep. Future: Detekt (Kotlin), ESLint (TS), Android Lint, etc. All output SARIF → convert to quodeq JSONL.
 
-### 1.1 Semgrep Rule Set (`standards/semgrep/`)
+### 1.1 Static Analyzer Interface (`src/quodeq/engine/static_analysis/base.py`)
 
-Create per-dimension rule files with metadata mapping to requirement IDs:
+Tool-agnostic contract. Every static analyzer implements this:
+
+```python
+from abc import ABC, abstractmethod
+
+class StaticAnalyzer(ABC):
+    """Interface for static analysis tools.
+
+    Each implementation wraps a specific tool (Semgrep, Detekt, ESLint, etc.)
+    and produces SARIF output. The SARIF converter is shared — implementations
+    only need to run the tool and return the SARIF path.
+    """
+
+    @abstractmethod
+    def name(self) -> str:
+        """Tool identifier (e.g. 'semgrep', 'detekt', 'eslint')."""
+
+    @abstractmethod
+    def supports(self, language: str) -> bool:
+        """Whether this analyzer supports the given language."""
+
+    @abstractmethod
+    def run(self, repo_path: Path, dimension: str, output_dir: Path) -> Path | None:
+        """Run the tool on the repo. Returns path to SARIF file, or None if tool unavailable.
+
+        Implementations should:
+        1. Check if the tool is installed (return None if not)
+        2. Run with dimension-specific rules/config
+        3. Write SARIF output to output_dir
+        4. Return SARIF path
+        """
+
+    def is_available(self) -> bool:
+        """Check if the tool binary exists on the system."""
+        return shutil.which(self.name()) is not None
+```
+
+### 1.2 Analyzer Registry (`src/quodeq/engine/static_analysis/registry.py`)
+
+Discovers and selects analyzers per language:
+
+```python
+class AnalyzerRegistry:
+    """Registry of available static analyzers.
+
+    Selects the best available tool(s) for a given language.
+    Falls back gracefully — if no tool is installed, Tier 0 is skipped.
+    """
+
+    _analyzers: list[StaticAnalyzer]
+
+    def register(self, analyzer: StaticAnalyzer): ...
+
+    def for_language(self, language: str) -> list[StaticAnalyzer]:
+        """Return all available analyzers for this language, in priority order."""
+
+    def run_all(self, language: str, repo_path: Path, dimension: str,
+                output_dir: Path) -> list[Path]:
+        """Run all applicable analyzers. Returns list of SARIF paths."""
+```
+
+Priority per language (future):
+| Language | Priority 1 (platform-specific) | Priority 2 (generic) |
+|---|---|---|
+| Kotlin/Android | Detekt, Android Lint | Semgrep |
+| Java | PMD | Semgrep |
+| TypeScript | ESLint/Biome | Semgrep |
+| Python | Ruff, pylint | Semgrep |
+| Swift/iOS | SwiftLint | Semgrep |
+| Bash | ShellCheck | Semgrep |
+
+Semgrep is the **universal fallback** — works for all languages but with shallower rules. Platform-specific tools go deeper (cyclomatic complexity, framework-aware checks, etc.).
+
+### 1.3 Semgrep Implementation (`src/quodeq/engine/static_analysis/semgrep.py`)
+
+First concrete implementation:
+
+```python
+class SemgrepAnalyzer(StaticAnalyzer):
+    """Semgrep-based static analysis. Universal fallback for all languages."""
+
+    def __init__(self, rules_dir: Path):
+        self.rules_dir = rules_dir  # standards/semgrep/
+
+    def name(self) -> str:
+        return "semgrep"
+
+    def supports(self, language: str) -> bool:
+        return True  # Semgrep supports 30+ languages
+
+    def run(self, repo_path: Path, dimension: str, output_dir: Path) -> Path | None:
+        rules_file = self.rules_dir / f"{dimension}.yaml"
+        if not rules_file.exists():
+            return None
+        sarif_path = output_dir / f"{dimension}_semgrep.sarif"
+        subprocess.run([
+            "semgrep", "scan",
+            "--config", str(rules_file),
+            "--sarif-output", str(sarif_path),
+            "--quiet",
+            str(repo_path),
+        ], check=False)
+        return sarif_path if sarif_path.exists() else None
+```
+
+### 1.4 Semgrep Rule Set (`standards/semgrep/`)
+
+Per-dimension rule files. Each rule carries metadata mapping to requirement IDs:
 
 ```
 standards/semgrep/
-  maintainability.yaml   # M-ANA-*, M-MOD-*, M-MDF-*, M-TST-*
-  security.yaml          # S-CON-*, S-INT-*, S-NR-*
-  reliability.yaml       # R-FT-*, R-AV-*, R-RC-*
-  performance.yaml       # P-TB-*, P-RE-*, P-CE-*
+  maintainability.yaml   # M-ANA-*, M-MOD-*, M-MDF-*
+  security.yaml          # S-CON-*, S-INT-*
+  reliability.yaml       # R-FT-*, R-AV-*
+  performance.yaml       # P-TB-*, P-RE-*
 ```
 
-Each rule carries metadata:
+Example rule:
 ```yaml
 rules:
   - id: quodeq.M-ANA-10
@@ -141,94 +248,117 @@ rules:
       cwe: ["CWE-476"]
 ```
 
-**What Semgrep can catch (per research):**
+**What Semgrep can catch (~30-50 rules per language):**
 - `!!` non-null assertions → M-ANA-10
 - TODO/FIXME/HACK markers → M-ANA-13
 - Hardcoded IPs, URLs, ports → M-MDF-1, S-CON-*
-- Empty catch blocks → M-ANA-10, R-FT-*
-- Deprecated API usage
+- Empty catch blocks → R-FT-*
 - Hardcoded secrets/credentials → S-CON-*
-- Missing annotations
-- Unsafe casts
+- Unsafe casts, missing annotations
 
-**What needs shell/AST tooling (not Semgrep):**
-- File > 300 lines → `wc -l` (M-ANA-1)
-- Function > 50 lines → tree-sitter or detekt
-- Cyclomatic complexity → detekt (M-MOD-1)
-- Long parameter lists → detekt
-- Nesting depth
+**What platform-specific tools add (future implementations):**
+- Cyclomatic complexity → Detekt (M-MOD-1)
+- File/function length → Detekt (M-ANA-1, M-ANA-2)
+- Long parameter lists → Detekt
+- Framework-specific checks → Android Lint, ESLint
+- Nesting depth, coupling metrics
 
-**What only LLM can judge:**
-- Architecture, design patterns
+**What only LLM can judge (always Tier 2):**
+- Architecture and design patterns
 - Documentation quality/accuracy
-- Variable naming appropriateness
-- Cross-file consistency
 - "Is this the right abstraction?"
+- Cross-file consistency
+- Context-dependent quality
 
-### 1.2 SARIF-to-JSONL Converter (`src/quodeq/engine/sarif_converter.py`)
+### 1.5 SARIF-to-JSONL Converter (`src/quodeq/engine/static_analysis/sarif_converter.py`)
+
+**Shared across all tools** — any analyzer that outputs SARIF gets free conversion:
 
 ```python
 def convert_sarif_to_jsonl(sarif_path: Path, output_path: Path, dimension: str) -> int:
     """Convert SARIF results to quodeq JSONL format.
 
     Returns count of findings written.
-    Maps: ruleId → req (via rule metadata), level → severity,
-          locations → file+line, message → reason.
+    Works with any SARIF-producing tool (Semgrep, Detekt, ESLint, etc.).
+    Rule metadata (req, principle) extracted from SARIF properties bag.
     """
 ```
 
 Mapping:
 | SARIF field | JSONL field |
 |---|---|
-| `result.ruleId` | `req` (strip `quodeq.` prefix) |
+| `result.ruleId` | `req` (strip tool prefix) |
 | `result.level` error/warning/note | `severity` critical/major/minor |
 | `result.message.text` | `reason` |
 | `result.locations[0]...uri` | `file` |
 | `result.locations[0]...startLine` | `line` |
-| `rule.metadata.principle` | `p` |
-| `rule.metadata.dimension` | `d` |
+| `rule.properties.principle` | `p` |
+| `rule.properties.dimension` | `d` |
 | hardcoded | `t` = "violation" |
 
-### 1.3 Static Pre-Check Runner (`src/quodeq/engine/static_checks.py`)
+### 1.6 Static Pre-Check Runner (`src/quodeq/engine/static_analysis/checks.py`)
 
-Orchestrates non-Semgrep deterministic checks:
+Non-SARIF deterministic checks (pure Python, no external tools):
 
 ```python
-def run_static_checks(repo_path: Path, dimension: str, output_path: Path) -> int:
-    """Run deterministic checks that don't need Semgrep.
+def run_builtin_checks(repo_path: Path, dimension: str, output_path: Path,
+                       language: str) -> int:
+    """Run deterministic checks that don't need external tools.
 
-    - File line counts (wc -l equivalent)
-    - @Suppress annotation counting
-    - Import/dependency counting
+    - File line counts (M-ANA-1: > 300 lines)
+    - @Suppress/@SuppressWarnings counting (M-ANA-8)
+    - Import counting
 
-    Writes findings to the same JSONL format.
+    Writes findings directly to quodeq JSONL format.
     Returns count of findings.
     """
 ```
 
-### 1.4 Integration Point in Runner
-
-New function in `runner.py`:
+### 1.7 Integration Point in Runner
 
 ```python
-def _run_static_analysis(repo_path: Path, dimension: str, evidence_dir: Path,
-                         semgrep_rules_dir: Path) -> Path:
-    """Run Tier 0: static analysis → JSONL.
+def _run_static_analysis(repo_path: Path, dimension: str, language: str,
+                         evidence_dir: Path) -> Path:
+    """Run Tier 0: all available static analyzers → JSONL.
 
-    1. Run Semgrep with dimension-specific rules → SARIF
-    2. Run deterministic checks → JSONL
-    3. Convert SARIF → JSONL
-    4. Merge into single {dimension}_static.jsonl
+    1. Run builtin checks → JSONL
+    2. Query AnalyzerRegistry for available tools
+    3. Run each tool → SARIF
+    4. Convert all SARIF → JSONL
+    5. Merge into single {dimension}_static.jsonl
 
     Returns path to static JSONL.
+    Graceful: if no tools available, returns empty JSONL (Tier 2 handles everything).
     """
 ```
 
-Called BEFORE `_run_dimension_analysis()`. The static JSONL is later merged with LLM JSONL.
+### 1.8 File Structure
+
+```
+src/quodeq/engine/static_analysis/
+  __init__.py
+  base.py              # StaticAnalyzer ABC
+  registry.py          # AnalyzerRegistry
+  sarif_converter.py   # SARIF → JSONL (shared)
+  checks.py            # Builtin Python checks (no external tools)
+  semgrep.py           # SemgrepAnalyzer (first implementation)
+  # Future:
+  # detekt.py          # DetektAnalyzer (Kotlin/Android)
+  # eslint.py          # ESLintAnalyzer (TypeScript/JavaScript)
+  # android_lint.py    # AndroidLintAnalyzer
+  # ruff.py            # RuffAnalyzer (Python)
+  # shellcheck.py      # ShellCheckAnalyzer (Bash)
+
+standards/semgrep/
+  maintainability.yaml
+  security.yaml
+  reliability.yaml
+  performance.yaml
+```
 
 ### Deliverable
 
-After Phase 1: `quodeq evaluate` runs Semgrep first, then LLM. Both produce JSONL. Merged and scored identically. Static findings are free, 100% coverage, instant.
+After Phase 1: `quodeq evaluate` runs all available static analyzers first, then LLM. Interface is stable — adding Detekt or ESLint later is one new file implementing `StaticAnalyzer`. SARIF converter is shared. Builtin checks require zero external tools.
 
 ---
 
