@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "engine_version": ">=2.0.0",
   "detects": {
-    "extensions": [".ts", ".tsx"],
+    "extensions": [".ts", ".tsx", ".js", ".jsx"],
     "config_files": ["tsconfig.json", "package.json"]
   },
   "cross_cutting": ["solid", "clean_architecture"]

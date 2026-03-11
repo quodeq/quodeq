@@ -11,6 +11,8 @@ The pool merges all JSONL files at the end, deduplicating by (p, file, line, t).
 from __future__ import annotations
 
 import json
+import threading
+import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,6 +20,8 @@ from pathlib import Path
 from quodeq.engine.analysis import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.engine.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
+
+_HEARTBEAT_INTERVAL = 10
 
 _SUBAGENT_MAX_TURNS = 40
 _SUBAGENT_MAX_DURATION = 600  # 10 minutes per agent
@@ -111,6 +115,37 @@ class SubagentPool:
                 stream_file=stream_file, success=False, error=str(exc),
             )
 
+    def _count_total_findings(self) -> int:
+        """Count total findings across all agent JSONL files."""
+        total = 0
+        for i in range(self._n):
+            jsonl = self._evidence_dir / f"{self._dimension}_agent-{i}.jsonl"
+            try:
+                if jsonl.exists():
+                    with open(jsonl) as f:
+                        total += sum(1 for line in f if line.strip())
+            except OSError:
+                pass
+        return total
+
+    def _heartbeat_loop(self, stop: threading.Event, finished: dict[str, bool]) -> None:
+        """Emit periodic progress lines until stopped."""
+        start = time.monotonic()
+        while not stop.wait(_HEARTBEAT_INTERVAL):
+            elapsed = int(time.monotonic() - start)
+            mins, secs = divmod(elapsed, 60)
+            findings = self._count_total_findings()
+            queue = FileQueue(self._queue_path)
+            remaining = queue.remaining()
+            taken = len(queue.all_taken_files())
+            done = sum(1 for v in finished.values() if v)
+            log_info(
+                f"  [{self._dimension}] {mins}m{secs:02d}s | "
+                f"{done}/{self._n} agents done | "
+                f"{taken} files taken ({remaining} left) | "
+                f"{findings} findings"
+            )
+
     def run(self) -> list[SubagentResult]:
         """Launch all agents in parallel. Blocks until all complete.
 
@@ -118,14 +153,26 @@ class SubagentPool:
         """
         log_info(f"Launching {self._n} subagents for {self._dimension}")
         results: list[SubagentResult] = []
+        finished: dict[str, bool] = {f"agent-{i}": False for i in range(self._n)}
 
-        with ThreadPoolExecutor(max_workers=self._n) as pool:
-            futures = {pool.submit(self._run_single, i): i for i in range(self._n)}
-            for future in as_completed(futures):
-                result = future.result()
-                if result.success:
-                    log_success(f"  {result.agent_id} finished")
-                results.append(result)
+        stop = threading.Event()
+        heartbeat = threading.Thread(
+            target=self._heartbeat_loop, args=(stop, finished), daemon=True,
+        )
+        heartbeat.start()
+
+        try:
+            with ThreadPoolExecutor(max_workers=self._n) as pool:
+                futures = {pool.submit(self._run_single, i): i for i in range(self._n)}
+                for future in as_completed(futures):
+                    result = future.result()
+                    finished[result.agent_id] = True
+                    if result.success:
+                        log_success(f"  {result.agent_id} finished")
+                    results.append(result)
+        finally:
+            stop.set()
+            heartbeat.join(timeout=2)
 
         succeeded = sum(1 for r in results if r.success)
         log_info(f"Subagent pool done: {succeeded}/{self._n} succeeded")

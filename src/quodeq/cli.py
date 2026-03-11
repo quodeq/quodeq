@@ -57,8 +57,8 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         help="Max seconds per dimension before terminating (default: 1800)",
     )
     parser.add_argument(
-        "--n-subagents", type=int, default=1,
-        help="Number of parallel subagents per dimension (default: 1 = single agent)",
+        "--n-subagents", type=int, default=5,
+        help="Number of parallel subagents per dimension (default: 5)",
     )
 
 

@@ -37,7 +37,7 @@ class AnalysisOptions:
     dimensions: list[str] | None = None
     max_turns: int | None = None
     max_duration: int | None = None
-    n_subagents: int = 1
+    n_subagents: int = 5
 
 
 @dataclass
@@ -216,8 +216,14 @@ def _process_dimension_with_subagents(
     extensions = set(plugin_data.get("detects", {}).get("extensions", []))
     files = list_source_files(config.src, extensions) if extensions else []
     if not files:
-        log_warning(f"[{idx}/{ctx.total}] {dim_id} — no source files for subagent queue")
-        return None
+        log_warning(
+            f"[{idx}/{ctx.total}] {dim_id} — no source files for subagent queue"
+            f" (src={config.src}, plugin={config.plugin_id}, extensions={extensions})"
+        )
+        # Fall back to single-agent path which uses its own search strategy
+        prompt = _build_dimension_prompt(config, dim_id, ctx)
+        stream_file, jsonl_file = _run_dimension_analysis(config, dim_id, prompt, idx, ctx)
+        return _parse_dimension_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
     # 2. Create queue
     queue_path = evidence_dir / f"{dim_id}_queue.json"
