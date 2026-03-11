@@ -15,6 +15,7 @@ import sys
 import time
 import urllib.request
 import urllib.error
+from datetime import date
 from pathlib import Path
 
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
@@ -54,8 +55,7 @@ def fetch_cwe_info(cwe_id: int) -> dict | None:
                 }
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            # Might be a Category, not a Weakness
-            return _fetch_category_info(cwe_id)
+            return _fetch_category_info(cwe_id) or _fetch_view_info(cwe_id)
         print(f"  HTTP {e.code} for CWE-{cwe_id}", file=sys.stderr)
     except Exception as e:
         print(f"  Error for CWE-{cwe_id}: {e}", file=sys.stderr)
@@ -85,6 +85,48 @@ def _fetch_category_info(cwe_id: int) -> dict | None:
     return None
 
 
+def _fetch_view_info(cwe_id: int) -> dict | None:
+    """Try fetching as a view if category lookup also returned 404."""
+    url = f"https://cwe-api.mitre.org/api/v1/cwe/view/{cwe_id}"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            data = json.loads(resp.read())
+            if "Views" in data and data["Views"]:
+                v = data["Views"][0]
+                return {
+                    "id": cwe_id,
+                    "name": v.get("Name", ""),
+                    "abstraction": "View",
+                    "status": v.get("Status", ""),
+                    "mapping_usage": "Prohibited",
+                    "mapping_rationale": "Views are not weaknesses",
+                }
+    except Exception:
+        pass
+    return None
+
+
+# Prohibited CWEs that are true empty categories (no weakness semantics)
+_TRUE_CATEGORIES = {16, 310, 320, 1002, 1035}
+_DEPRECATED = {391}
+
+
+def _compute_llm_mapping_usage(cwe_id: int, mapping_usage: str, abstraction: str) -> str:
+    """Derive llm_mapping_usage from MITRE metadata."""
+    if mapping_usage in ("Allowed", "Allowed-with-Review"):
+        return "Allowed"
+    if mapping_usage == "Discouraged":
+        return "Discouraged" if abstraction == "Pillar" else "Allowed-with-Review"
+    if mapping_usage == "Prohibited":
+        if cwe_id in _TRUE_CATEGORIES or abstraction in ("Category", "View"):
+            return "Prohibited"
+        if cwe_id in _DEPRECATED:
+            return "Discouraged"
+        return "Allowed"  # structural/quality metrics — LLM can reason about these
+    return "Allowed-with-Review"
+
+
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--problems", action="store_true", help="Show only PROHIBITED/DISCOURAGED")
@@ -98,6 +140,10 @@ def main() -> None:
         info = fetch_cwe_info(cwe_id)
         if info:
             info["dimensions"] = cwe_dims[cwe_id]
+            info["fetched_date"] = str(date.today())
+            info["llm_mapping_usage"] = _compute_llm_mapping_usage(
+                info["id"], info["mapping_usage"], info["abstraction"]
+            )
             results.append(info)
         if i % 20 == 0:
             print(f"  Fetched {i}/{len(cwe_dims)}...", file=sys.stderr)
@@ -144,7 +190,7 @@ def main() -> None:
             print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} — {r['name']}")
 
     # Write full results to JSON for further processing
-    output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe_audit.json"
+    output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe" / "audit.json"
     output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
     print(f"\nFull results written to {output_path}")
 

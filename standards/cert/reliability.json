@@ -1,0 +1,178 @@
+{
+  "source": "SEI CERT Coding Standards",
+  "version": "2016",
+  "url": "https://wiki.sei.cmu.edu/confluence/display/seccode",
+  "fetched": "2026-03-10",
+  "note": "All rules verified against the live wiki. 'verified: true' means name and CWE confirmed. Rules without CWE in the wiki have an empty cwe array with a note.",
+  "rules": [
+    {
+      "id": "ERR00-J",
+      "name": "Do not suppress or ignore checked exceptions",
+      "language": "java",
+      "category": "error-handling",
+      "text": "Catch blocks MUST either recover from the exception, rethrow it, or throw a context-appropriate exception. Empty catch blocks are forbidden.",
+      "cwe": [390],
+      "maps_to": "Fault Tolerance",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR00-J.+Do+not+suppress+or+ignore+checked+exceptions"
+    },
+    {
+      "id": "ERR04-J",
+      "name": "Do not complete abruptly from a finally block",
+      "language": "java",
+      "category": "error-handling",
+      "text": "Finally blocks MUST NOT exit abruptly via return, break, continue, or by throwing exceptions, as this discards pending exceptions.",
+      "cwe": [459, 584],
+      "maps_to": "Recoverability",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR04-J.+Do+not+complete+abruptly+from+a+finally+block"
+    },
+    {
+      "id": "ERR05-J",
+      "name": "Do not let checked exceptions escape from a finally block",
+      "language": "java",
+      "category": "error-handling",
+      "text": "Finally blocks MUST handle or rethrow checked exceptions; escaping checked exceptions suppress the original exception.",
+      "cwe": [248, 460, 584, 705, 754],
+      "maps_to": "Recoverability",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR05-J.+Do+not+let+checked+exceptions+escape+from+a+finally+block"
+    },
+    {
+      "id": "ERR07-J",
+      "name": "Do not throw RuntimeException, Exception, or Throwable",
+      "language": "java",
+      "category": "error-handling",
+      "text": "Code MUST throw specific exception types, not generic RuntimeException, Exception, or Throwable.",
+      "cwe": [397],
+      "maps_to": "Fault Tolerance",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR07-J.+Do+not+throw+RuntimeException%2C+Exception%2C+or+Throwable"
+    },
+    {
+      "id": "ERR08-J",
+      "name": "Do not catch NullPointerException or any of its ancestors",
+      "language": "java",
+      "category": "error-handling",
+      "text": "Code MUST NOT rely on catching NullPointerException — null checks MUST be performed explicitly.",
+      "cwe": [],
+      "note": "No formal CWE mapping table on the live wiki page.",
+      "maps_to": "Fault Tolerance",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/ERR08-J.+Do+not+catch+NullPointerException+or+any+of+its+ancestors"
+    },
+    {
+      "id": "ERR00-C",
+      "name": "Adopt and implement a consistent and comprehensive error-handling policy",
+      "language": "c",
+      "category": "error-handling",
+      "text": "All functions that return an error indicator MUST have their return values checked and handled.",
+      "cwe": [391, 544],
+      "maps_to": "Fault Tolerance",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/c/ERR00-C.+Adopt+and+implement+a+consistent+and+comprehensive+error-handling+policy"
+    },
+    {
+      "id": "ERR07-C",
+      "name": "Prefer functions that support error checking over equivalent functions that don't",
+      "language": "c",
+      "category": "error-handling",
+      "text": "Functions that provide error detection MUST be preferred over those that silently fail.",
+      "cwe": [676],
+      "note": "Live wiki lists 8 CWEs (20, 79, 89, 91, 94, 114, 601, 676). CWE-676 is the primary semantic match.",
+      "maps_to": "Fault Tolerance",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/c/ERR07-C.+Prefer+functions+that+support+error+checking+over+equivalent+functions+that+don%27t"
+    },
+    {
+      "id": "LCK07-J",
+      "name": "Avoid deadlock by requesting and releasing locks in the same order",
+      "language": "java",
+      "category": "concurrency",
+      "text": "Multiple locks MUST always be acquired in a consistent predefined order to prevent circular wait conditions.",
+      "cwe": [833],
+      "maps_to": "Maturity",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/LCK07-J.+Avoid+deadlock+by+requesting+and+releasing+locks+in+the+same+order"
+    },
+    {
+      "id": "LCK08-J",
+      "name": "Ensure actively held locks are released on exceptional conditions",
+      "language": "java",
+      "category": "concurrency",
+      "text": "Locks MUST be released in finally blocks to guarantee release even when exceptions occur.",
+      "cwe": [833],
+      "maps_to": "Recoverability",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/LCK08-J.+Ensure+actively+held+locks+are+released+on+exceptional+conditions"
+    },
+    {
+      "id": "THI02-J",
+      "name": "Notify all waiting threads rather than a single thread",
+      "language": "java",
+      "category": "concurrency",
+      "text": "notifyAll() MUST be used instead of notify() when multiple threads may be waiting on the same condition.",
+      "cwe": [362],
+      "maps_to": "Maturity",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/THI02-J.+Notify+all+waiting+threads+rather+than+a+single+thread"
+    },
+    {
+      "id": "THI03-J",
+      "name": "Always invoke wait() and await() methods inside a loop",
+      "language": "java",
+      "category": "concurrency",
+      "text": "wait() and await() MUST be called inside a loop that re-checks the condition to handle spurious wakeups.",
+      "cwe": [],
+      "note": "No CWE mapping listed on the live wiki page.",
+      "maps_to": "Maturity",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/java/THI03-J.+Always+invoke+wait%28%29+and+await%28%29+methods+inside+a+loop"
+    },
+    {
+      "id": "CON35-C",
+      "name": "Avoid deadlock by locking in a predefined order",
+      "language": "c",
+      "category": "concurrency",
+      "text": "Mutexes MUST always be acquired in a consistent predefined order across all threads.",
+      "cwe": [764],
+      "maps_to": "Maturity",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/pages/viewpage.action?pageId=87152261"
+    },
+    {
+      "id": "CON36-C",
+      "name": "Wrap functions that can spuriously wake up in a loop",
+      "language": "c",
+      "category": "concurrency",
+      "text": "Condition variable waits MUST be wrapped in a loop that re-checks the predicate after wakeup.",
+      "cwe": [],
+      "note": "No CWE mapping listed on the live wiki page.",
+      "maps_to": "Maturity",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/c/CON36-C.+Wrap+functions+that+can+spuriously+wake+up+in+a+loop"
+    },
+    {
+      "id": "FIO42-C",
+      "name": "Close files when they are no longer needed",
+      "language": "c",
+      "category": "resource-management",
+      "text": "File handles MUST be closed promptly after use; resource leaks degrade availability.",
+      "cwe": [404, 459, 771, 772, 773, 775, 403],
+      "maps_to": "Recoverability",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/c/FIO42-C.+Close+files+when+they+are+no+longer+needed"
+    },
+    {
+      "id": "MEM31-C",
+      "name": "Free dynamically allocated memory when no longer needed",
+      "language": "c",
+      "category": "resource-management",
+      "text": "Dynamically allocated memory MUST be freed when no longer needed to prevent resource exhaustion.",
+      "cwe": [401, 404, 459, 771, 772],
+      "maps_to": "Recoverability",
+      "verified": true,
+      "source_url": "https://wiki.sei.cmu.edu/confluence/display/c/MEM31-C.+Free+dynamically+allocated+memory+when+no+longer+needed"
+    }
+  ]
+}

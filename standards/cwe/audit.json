@@ -8,7 +8,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 16,
@@ -19,7 +21,9 @@
     "mapping_rationale": "Categories are not weaknesses",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Prohibited"
   },
   {
     "id": 20,
@@ -33,7 +37,9 @@
       "security",
       "usability",
       "usability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 22,
@@ -44,7 +50,9 @@
     "mapping_rationale": "This CWE entry might have children that would be more appropriate.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 73,
@@ -55,7 +63,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 74,
@@ -66,7 +76,9 @@
     "mapping_rationale": "CWE-74 is high-level and often misused when lower-level weaknesses are more appropriate.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 76,
@@ -77,7 +89,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 77,
@@ -88,7 +102,9 @@
     "mapping_rationale": "CWE-77 is often misused when OS command injection (CWE-78) was intended instead [REF-1287].",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 78,
@@ -99,7 +115,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 79,
@@ -110,7 +128,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 80,
@@ -121,7 +141,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 83,
@@ -132,7 +154,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 86,
@@ -143,7 +167,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 88,
@@ -154,7 +180,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 89,
@@ -165,7 +193,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 90,
@@ -176,7 +206,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 91,
@@ -187,7 +219,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 93,
@@ -198,7 +232,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 94,
@@ -209,7 +245,9 @@
     "mapping_rationale": "This entry is frequently misused for vulnerabilities with a technical impact of \"code execution,\" which does not by itself indicate a root cause weakness, since dozens of weaknesses can enable code execution.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 95,
@@ -220,7 +258,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 96,
@@ -231,7 +271,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 97,
@@ -242,7 +284,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 98,
@@ -253,7 +297,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 99,
@@ -264,7 +310,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 112,
@@ -275,7 +323,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 113,
@@ -286,7 +336,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 114,
@@ -297,7 +349,9 @@
     "mapping_rationale": "This CWE entry is a Class, but it does not have Base-level children. Also, it combines multiple weaknesses that are related to the same behavior (process invocation). As a result, it might be Deprecated.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 115,
@@ -308,7 +362,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 116,
@@ -319,7 +375,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 117,
@@ -330,7 +388,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 129,
@@ -341,7 +401,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 134,
@@ -352,7 +414,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 138,
@@ -363,7 +427,9 @@
     "mapping_rationale": "This CWE entry is a level-1 Class (i.e., a child of a Pillar). It might have lower-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 147,
@@ -374,7 +440,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 159,
@@ -385,7 +453,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 173,
@@ -396,7 +466,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 176,
@@ -407,7 +479,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 183,
@@ -418,7 +492,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 200,
@@ -429,7 +505,9 @@
     "mapping_rationale": "CWE-200 is commonly misused to represent the loss of confidentiality in a vulnerability, but confidentiality loss is a technical impact - not a root cause error. As of CWE 4.9, over 400 CWE entries can lead to a loss of confidentiality. Other options are often available. [REF-1287].",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 201,
@@ -440,7 +518,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 209,
@@ -452,7 +532,9 @@
     "dimensions": [
       "security",
       "usability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 210,
@@ -463,7 +545,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 212,
@@ -474,7 +558,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 215,
@@ -485,7 +571,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 219,
@@ -496,7 +584,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 221,
@@ -507,7 +597,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 223,
@@ -518,18 +610,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
-  },
-  {
-    "id": 234,
-    "name": "Failure to Handle Missing Parameter",
-    "abstraction": "Variant",
-    "status": "Incomplete",
-    "mapping_usage": "Discouraged",
-    "mapping_rationale": "This CWE entry could be deprecated in a future version of CWE.",
-    "dimensions": [
-      "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 235,
@@ -540,7 +623,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 248,
@@ -551,7 +636,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 252,
@@ -563,7 +650,9 @@
     "dimensions": [
       "reliability",
       "usability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 256,
@@ -574,7 +663,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 258,
@@ -585,7 +676,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 259,
@@ -596,7 +689,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 260,
@@ -607,7 +702,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 261,
@@ -618,7 +715,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 263,
@@ -629,7 +728,9 @@
     "mapping_rationale": "This CWE entry is closely related to the absence of a practice (password expiration) that is no longer widely supported as an effective protection mechanism. In addition, it might be deprecated in the future.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 266,
@@ -640,7 +741,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 269,
@@ -651,7 +754,9 @@
     "mapping_rationale": "CWE-269 is commonly misused. It can be conflated with \"privilege escalation,\" which is a technical impact that is listed in many low-information vulnerability reports [REF-1287]. It is not useful for trend analysis.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 274,
@@ -662,7 +767,9 @@
     "mapping_rationale": "This CWE entry could be deprecated in a future version of CWE.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 276,
@@ -673,7 +780,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 280,
@@ -684,7 +793,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 281,
@@ -695,7 +806,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 282,
@@ -706,7 +819,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 283,
@@ -717,7 +832,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 284,
@@ -728,7 +845,9 @@
     "mapping_rationale": "CWE-284 is extremely high-level, a Pillar. Its name, \"Improper Access Control,\" is often misused in low-information vulnerability reports [REF-1287] or by active use of the OWASP Top Ten, such as \"A01:2021-Broken Access Control\". It is not useful for trend analysis.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Discouraged"
   },
   {
     "id": 285,
@@ -739,7 +858,9 @@
     "mapping_rationale": "CWE-285 is high-level and lower-level CWEs can frequently be used instead. It is a level-1 Class (i.e., a child of a Pillar).",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 286,
@@ -750,7 +871,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 287,
@@ -761,7 +884,9 @@
     "mapping_rationale": "This CWE entry might be misused when lower-level CWE entries are likely to be applicable. It is a level-1 Class (i.e., a child of a Pillar).",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 288,
@@ -772,7 +897,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 289,
@@ -783,7 +910,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 290,
@@ -794,7 +923,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 291,
@@ -805,7 +936,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 293,
@@ -816,7 +949,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 294,
@@ -827,7 +962,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 295,
@@ -838,7 +975,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 296,
@@ -849,7 +988,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 297,
@@ -860,7 +1001,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 298,
@@ -871,7 +1014,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 299,
@@ -882,7 +1027,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 300,
@@ -893,7 +1040,9 @@
     "mapping_rationale": "CWE-300 is commonly misused for vulnerabilities in which the prerequisites for exploitation require the adversary to be in a privileged \"in-the-middle\" position.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 302,
@@ -904,7 +1053,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 303,
@@ -915,7 +1066,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 304,
@@ -926,7 +1079,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 305,
@@ -937,7 +1092,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 306,
@@ -948,7 +1105,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 307,
@@ -959,7 +1118,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 308,
@@ -970,7 +1131,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 309,
@@ -981,7 +1144,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 310,
@@ -992,7 +1157,9 @@
     "mapping_rationale": "Categories are not weaknesses",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Prohibited"
   },
   {
     "id": 311,
@@ -1003,7 +1170,9 @@
     "mapping_rationale": "CWE-311 is high-level with more precise children available. It is a level-1 Class (i.e., a child of a Pillar).",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 312,
@@ -1014,7 +1183,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 313,
@@ -1025,7 +1196,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 315,
@@ -1036,7 +1209,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 316,
@@ -1047,7 +1222,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 319,
@@ -1058,7 +1235,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 320,
@@ -1069,7 +1248,9 @@
     "mapping_rationale": "Categories are not weaknesses",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Prohibited"
   },
   {
     "id": 321,
@@ -1080,7 +1261,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 322,
@@ -1091,7 +1274,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 323,
@@ -1102,7 +1287,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 324,
@@ -1113,7 +1300,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 325,
@@ -1124,7 +1313,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 326,
@@ -1135,7 +1326,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 327,
@@ -1146,7 +1339,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 328,
@@ -1157,7 +1352,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 329,
@@ -1168,7 +1365,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 330,
@@ -1179,7 +1378,9 @@
     "mapping_rationale": "This CWE entry is a level-1 Class (i.e., a child of a Pillar). It might have lower-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 331,
@@ -1190,7 +1391,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 332,
@@ -1201,7 +1404,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 334,
@@ -1212,7 +1417,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 335,
@@ -1223,7 +1430,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 336,
@@ -1234,7 +1443,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 337,
@@ -1245,7 +1456,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 338,
@@ -1256,7 +1469,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 340,
@@ -1267,7 +1482,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 342,
@@ -1278,7 +1495,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 345,
@@ -1289,7 +1508,9 @@
     "mapping_rationale": "This CWE entry is a level-1 Class (i.e., a child of a Pillar). It might have lower-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 346,
@@ -1300,7 +1521,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 347,
@@ -1311,7 +1534,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 350,
@@ -1322,7 +1547,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 352,
@@ -1333,7 +1560,9 @@
     "mapping_rationale": "This is a well-known Composite of multiple weaknesses that must all occur simultaneously, although it is attack-oriented in nature.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 353,
@@ -1344,7 +1573,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 359,
@@ -1355,7 +1586,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 362,
@@ -1365,8 +1598,11 @@
     "mapping_usage": "Allowed-with-Review",
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
+      "reliability",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 369,
@@ -1377,7 +1613,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 377,
@@ -1388,7 +1626,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 379,
@@ -1399,7 +1639,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 382,
@@ -1410,7 +1652,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 384,
@@ -1421,7 +1665,9 @@
     "mapping_rationale": "This is a well-known Composite of multiple weaknesses that must all occur simultaneously, although it is attack-oriented in nature.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 390,
@@ -1431,8 +1677,12 @@
     "mapping_usage": "Allowed",
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
-      "reliability"
-    ]
+      "reliability",
+      "reliability",
+      "usability"
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 391,
@@ -1443,7 +1693,9 @@
     "mapping_rationale": "This entry is slated for deprecation; it has multiple widespread interpretations by CWE analysts. It combines information from three different taxonomies, but each taxonomy is talking about a slightly different issue.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Discouraged"
   },
   {
     "id": 394,
@@ -1454,7 +1706,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 396,
@@ -1465,7 +1719,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 397,
@@ -1476,7 +1732,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 400,
@@ -1491,11 +1749,12 @@
       "performance",
       "performance",
       "performance",
-      "performance",
       "reliability",
       "reliability",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 402,
@@ -1506,7 +1765,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 404,
@@ -1517,7 +1778,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 405,
@@ -1528,7 +1791,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 407,
@@ -1539,7 +1804,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 419,
@@ -1550,7 +1817,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 425,
@@ -1561,7 +1830,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 426,
@@ -1572,7 +1843,9 @@
     "mapping_rationale": "This CWE entry is often confused with another closely-related entry about search paths.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 427,
@@ -1583,7 +1856,9 @@
     "mapping_rationale": "This CWE entry is often confused with another closely-related entry about search paths.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 434,
@@ -1594,7 +1869,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 436,
@@ -1605,7 +1882,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 441,
@@ -1616,7 +1895,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 444,
@@ -1627,7 +1908,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 447,
@@ -1638,7 +1921,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 451,
@@ -1649,7 +1934,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 454,
@@ -1660,7 +1947,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 456,
@@ -1671,7 +1960,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 459,
@@ -1681,8 +1972,11 @@
     "mapping_usage": "Allowed",
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
+      "maintainability",
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 460,
@@ -1693,7 +1987,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 470,
@@ -1704,7 +2000,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 472,
@@ -1715,7 +2013,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 474,
@@ -1726,7 +2026,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 475,
@@ -1737,7 +2039,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 476,
@@ -1748,7 +2052,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 477,
@@ -1761,7 +2067,9 @@
       "maintainability",
       "reliability",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 478,
@@ -1772,7 +2080,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 480,
@@ -1783,7 +2093,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 483,
@@ -1794,7 +2106,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 484,
@@ -1805,7 +2119,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 489,
@@ -1816,7 +2132,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 494,
@@ -1827,7 +2145,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 497,
@@ -1838,7 +2158,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 501,
@@ -1849,7 +2171,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 502,
@@ -1860,7 +2184,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 506,
@@ -1871,7 +2197,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 509,
@@ -1882,7 +2210,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 521,
@@ -1893,7 +2223,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 522,
@@ -1904,7 +2236,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 523,
@@ -1915,7 +2249,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 525,
@@ -1926,7 +2262,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 526,
@@ -1937,7 +2275,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 532,
@@ -1948,7 +2288,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 538,
@@ -1959,7 +2301,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 539,
@@ -1970,7 +2314,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 540,
@@ -1981,7 +2327,22 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
+  },
+  {
+    "id": 544,
+    "name": "Missing Standardized Error Handling Mechanism",
+    "abstraction": "Base",
+    "status": "Draft",
+    "mapping_usage": "Allowed",
+    "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
+    "dimensions": [
+      "reliability"
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 546,
@@ -1992,7 +2353,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 547,
@@ -2003,7 +2366,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 548,
@@ -2014,7 +2379,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 550,
@@ -2026,7 +2393,9 @@
     "dimensions": [
       "reliability",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 552,
@@ -2037,7 +2406,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 561,
@@ -2048,7 +2419,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 563,
@@ -2059,7 +2432,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 564,
@@ -2070,7 +2445,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 565,
@@ -2081,7 +2458,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 566,
@@ -2092,7 +2471,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 570,
@@ -2103,7 +2484,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 571,
@@ -2114,7 +2497,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 595,
@@ -2125,7 +2510,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 598,
@@ -2136,7 +2523,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 601,
@@ -2147,7 +2536,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 602,
@@ -2158,7 +2549,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 606,
@@ -2169,7 +2562,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 610,
@@ -2180,7 +2575,9 @@
     "mapping_rationale": "This CWE entry is a level-1 Class (i.e., a child of a Pillar). It might have lower-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 611,
@@ -2191,7 +2588,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 613,
@@ -2202,7 +2601,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 614,
@@ -2213,7 +2614,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 615,
@@ -2224,7 +2627,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 620,
@@ -2235,7 +2640,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 628,
@@ -2246,7 +2653,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 636,
@@ -2257,7 +2666,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 639,
@@ -2268,7 +2679,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 640,
@@ -2279,7 +2692,9 @@
     "mapping_rationale": "This entry appears to be frequently misused for any weakness related to password changes, even though the name focuses on \"Password Recovery\" for a \"forgotten\" password.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 641,
@@ -2290,7 +2705,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 642,
@@ -2301,7 +2718,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 643,
@@ -2312,7 +2731,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 644,
@@ -2323,7 +2744,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 646,
@@ -2334,7 +2757,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 650,
@@ -2345,7 +2770,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 652,
@@ -2356,7 +2783,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 653,
@@ -2367,7 +2796,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 656,
@@ -2378,7 +2809,9 @@
     "mapping_rationale": "This CWE entry is a Class, but it does not have Base-level children.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 657,
@@ -2389,7 +2822,9 @@
     "mapping_rationale": "This CWE entry is a level-1 Class (i.e., a child of a Pillar). It might have lower-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 662,
@@ -2400,7 +2835,9 @@
     "mapping_rationale": "This CWE entry is a level-1 Class (i.e., a child of a Pillar). It might have lower-level children that would be more appropriate",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 665,
@@ -2411,7 +2848,9 @@
     "mapping_rationale": "This CWE entry is a level-1 Class (i.e., a child of a Pillar). It might have lower-level children that would be more appropriate",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 668,
@@ -2422,7 +2861,9 @@
     "mapping_rationale": "CWE-668 is high-level and is often misused as a catch-all when lower-level CWE IDs might be applicable. It is sometimes used for low-information vulnerability reports [REF-1287]. It is a level-1 Class (i.e., a child of a Pillar). It is not useful for trend analysis.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 672,
@@ -2433,7 +2874,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 674,
@@ -2445,7 +2888,9 @@
     "dimensions": [
       "performance",
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 676,
@@ -2456,8 +2901,11 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability",
+      "reliability",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 681,
@@ -2468,7 +2916,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 682,
@@ -2479,7 +2929,9 @@
     "mapping_rationale": "This CWE entry is extremely high-level, a Pillar. In many cases, lower-level children or descendants are more appropriate. However, sometimes this weakness is forced to be used due to the lack of in-depth weakness research. See Research Gaps.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Discouraged"
   },
   {
     "id": 691,
@@ -2490,7 +2942,9 @@
     "mapping_rationale": "This CWE entry is extremely high-level, a Pillar. However, classification research is limited for weaknesses of this type, so there can be gaps or organizational difficulties within CWE that force use of this weakness, even at such a high level of abstraction.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Discouraged"
   },
   {
     "id": 693,
@@ -2501,7 +2955,9 @@
     "mapping_rationale": "This CWE entry is extremely high-level, a Pillar.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Discouraged"
   },
   {
     "id": 703,
@@ -2512,7 +2968,9 @@
     "mapping_rationale": "This CWE entry is extremely high-level, a Pillar.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Discouraged"
   },
   {
     "id": 704,
@@ -2523,7 +2981,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 710,
@@ -2534,7 +2994,9 @@
     "mapping_rationale": "This CWE entry is extremely high-level, a Pillar.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Discouraged"
   },
   {
     "id": 732,
@@ -2545,7 +3007,9 @@
     "mapping_rationale": "While the name itself indicates an assignment of permissions for resources, this is often misused for vulnerabilities in which \"permissions\" are not checked, which is an \"authorization\" weakness (CWE-285 or descendants) within CWE's model [REF-1287].",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 749,
@@ -2556,7 +3020,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 754,
@@ -2566,8 +3032,11 @@
     "mapping_usage": "Allowed-with-Review",
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
+      "reliability",
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 755,
@@ -2578,8 +3047,11 @@
     "mapping_rationale": "This CWE entry is a level-1 Class (i.e., a child of a Pillar). It might have lower-level children that would be more appropriate",
     "dimensions": [
       "reliability",
-      "reliability"
-    ]
+      "reliability",
+      "usability"
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed-with-Review"
   },
   {
     "id": 756,
@@ -2591,7 +3063,9 @@
     "dimensions": [
       "reliability",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 757,
@@ -2602,7 +3076,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 758,
@@ -2613,7 +3089,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 759,
@@ -2624,7 +3102,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 760,
@@ -2635,7 +3115,22 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
+  },
+  {
+    "id": 764,
+    "name": "Multiple Locks of a Critical Resource",
+    "abstraction": "Base",
+    "status": "Incomplete",
+    "mapping_usage": "Allowed",
+    "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
+    "dimensions": [
+      "reliability"
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 766,
@@ -2646,7 +3141,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 770,
@@ -2658,7 +3155,9 @@
     "dimensions": [
       "performance",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 772,
@@ -2668,11 +3167,14 @@
     "mapping_usage": "Allowed",
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
+      "maintainability",
       "performance",
       "reliability",
       "reliability",
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 776,
@@ -2683,7 +3185,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 778,
@@ -2695,8 +3199,12 @@
     "dimensions": [
       "security",
       "security",
-      "security"
-    ]
+      "security",
+      "usability",
+      "usability"
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 780,
@@ -2707,7 +3215,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 783,
@@ -2718,7 +3228,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 784,
@@ -2729,7 +3241,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 789,
@@ -2740,7 +3254,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 798,
@@ -2751,7 +3267,9 @@
     "mapping_rationale": "While this entry is at a Base level of abstraction, it has lower-level children that cover specific kinds of credentials.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 799,
@@ -2762,7 +3280,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 807,
@@ -2773,7 +3293,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 820,
@@ -2784,7 +3306,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 821,
@@ -2795,7 +3319,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 829,
@@ -2806,7 +3332,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 830,
@@ -2817,7 +3345,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 833,
@@ -2828,7 +3358,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 835,
@@ -2839,7 +3371,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 841,
@@ -2850,7 +3384,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 862,
@@ -2861,7 +3397,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 863,
@@ -2872,7 +3410,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 908,
@@ -2883,7 +3423,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "reliability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 915,
@@ -2894,7 +3436,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 916,
@@ -2905,7 +3449,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 917,
@@ -2916,7 +3462,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 918,
@@ -2927,7 +3475,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 922,
@@ -2938,7 +3488,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 940,
@@ -2949,7 +3501,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 941,
@@ -2960,7 +3514,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 942,
@@ -2971,7 +3527,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1002,
@@ -2982,7 +3540,9 @@
     "mapping_rationale": "Categories are not weaknesses",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Prohibited"
   },
   {
     "id": 1004,
@@ -2993,7 +3553,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1021,
@@ -3004,7 +3566,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1022,
@@ -3015,7 +3579,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1035,
@@ -3026,7 +3592,9 @@
     "mapping_rationale": "Categories are not weaknesses",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Prohibited"
   },
   {
     "id": 1041,
@@ -3037,7 +3605,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1042,
@@ -3048,7 +3618,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1043,
@@ -3059,7 +3631,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1045,
@@ -3070,18 +3644,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
-  },
-  {
-    "id": 1046,
-    "name": "Creation of Immutable Text Using String Concatenation",
-    "abstraction": "Base",
-    "status": "Incomplete",
-    "mapping_usage": "Allowed",
-    "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
-    "dimensions": [
-      "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1047,
@@ -3092,7 +3657,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1048,
@@ -3103,7 +3670,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1049,
@@ -3114,7 +3683,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1050,
@@ -3125,7 +3696,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1051,
@@ -3136,7 +3709,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1052,
@@ -3147,7 +3722,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1053,
@@ -3161,7 +3738,9 @@
       "usability",
       "usability",
       "usability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1054,
@@ -3172,7 +3751,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1055,
@@ -3183,7 +3764,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1056,
@@ -3194,7 +3777,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1057,
@@ -3207,7 +3792,9 @@
       "flexibility",
       "maintainability",
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1058,
@@ -3218,7 +3805,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1059,
@@ -3240,15 +3829,6 @@
       "maintainability",
       "maintainability",
       "reliability",
-      "reliability",
-      "reliability",
-      "reliability",
-      "reliability",
-      "usability",
-      "usability",
-      "usability",
-      "usability",
-      "usability",
       "usability",
       "usability",
       "usability",
@@ -3257,7 +3837,9 @@
       "usability",
       "usability",
       "usability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1060,
@@ -3268,7 +3850,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1061,
@@ -3286,7 +3870,9 @@
       "maintainability",
       "maintainability",
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1062,
@@ -3297,7 +3883,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1063,
@@ -3308,7 +3896,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1064,
@@ -3319,7 +3909,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1066,
@@ -3330,7 +3922,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1067,
@@ -3341,7 +3935,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1068,
@@ -3352,7 +3948,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1069,
@@ -3363,7 +3961,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1070,
@@ -3374,7 +3974,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1071,
@@ -3385,7 +3987,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1072,
@@ -3395,8 +3999,10 @@
     "mapping_usage": "Prohibited",
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
-      "maintainability"
-    ]
+      "performance"
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1073,
@@ -3407,7 +4013,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1074,
@@ -3418,7 +4026,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1075,
@@ -3429,7 +4039,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1076,
@@ -3439,8 +4051,11 @@
     "mapping_usage": "Prohibited",
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
-      "maintainability"
-    ]
+      "maintainability",
+      "reliability"
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1078,
@@ -3451,7 +4066,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1079,
@@ -3462,7 +4079,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1080,
@@ -3475,7 +4094,9 @@
       "maintainability",
       "maintainability",
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1082,
@@ -3486,7 +4107,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1084,
@@ -3501,7 +4124,9 @@
       "performance",
       "performance",
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1085,
@@ -3512,7 +4137,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1086,
@@ -3523,7 +4150,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1087,
@@ -3534,7 +4163,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1088,
@@ -3548,18 +4179,9 @@
       "performance",
       "performance",
       "reliability"
-    ]
-  },
-  {
-    "id": 1089,
-    "name": "Large Data Table with Excessive Number of Indices",
-    "abstraction": "Base",
-    "status": "Incomplete",
-    "mapping_usage": "Allowed",
-    "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
-    "dimensions": [
-      "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1090,
@@ -3570,7 +4192,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1092,
@@ -3581,7 +4205,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1093,
@@ -3592,18 +4218,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "maintainability"
-    ]
-  },
-  {
-    "id": 1094,
-    "name": "Excessive Index Range Scan for a Data Resource",
-    "abstraction": "Base",
-    "status": "Incomplete",
-    "mapping_usage": "Prohibited",
-    "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
-    "dimensions": [
-      "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1095,
@@ -3614,7 +4231,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1096,
@@ -3625,7 +4244,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1097,
@@ -3636,7 +4257,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1098,
@@ -3647,7 +4270,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1099,
@@ -3658,7 +4283,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1100,
@@ -3669,7 +4296,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1101,
@@ -3680,7 +4309,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1102,
@@ -3691,7 +4322,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1103,
@@ -3702,7 +4335,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1104,
@@ -3714,8 +4349,11 @@
     "dimensions": [
       "flexibility",
       "flexibility",
+      "security",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1105,
@@ -3726,7 +4364,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1106,
@@ -3737,7 +4377,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1107,
@@ -3748,7 +4390,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1108,
@@ -3759,7 +4403,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1109,
@@ -3770,7 +4416,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1110,
@@ -3781,7 +4429,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1111,
@@ -3792,7 +4442,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1112,
@@ -3803,7 +4455,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1113,
@@ -3814,7 +4468,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1114,
@@ -3825,7 +4481,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1115,
@@ -3836,7 +4494,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1116,
@@ -3847,7 +4507,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1117,
@@ -3858,7 +4520,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1118,
@@ -3869,7 +4533,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1119,
@@ -3880,7 +4546,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1120,
@@ -3891,7 +4559,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1121,
@@ -3903,9 +4573,10 @@
     "dimensions": [
       "maintainability",
       "maintainability",
-      "maintainability",
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1122,
@@ -3916,7 +4587,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1123,
@@ -3927,7 +4600,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1124,
@@ -3938,7 +4613,9 @@
     "mapping_rationale": "This entry is primarily a quality issue with no direct security implications.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1125,
@@ -3950,7 +4627,9 @@
     "dimensions": [
       "maintainability",
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1126,
@@ -3961,7 +4640,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1127,
@@ -3972,7 +4653,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1164,
@@ -3983,7 +4666,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1173,
@@ -3993,8 +4678,12 @@
     "mapping_usage": "Allowed",
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
-      "maintainability"
-    ]
+      "maintainability",
+      "reliability",
+      "usability"
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1176,
@@ -4005,7 +4694,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1177,
@@ -4016,7 +4707,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "maintainability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1188,
@@ -4033,7 +4726,9 @@
       "reliability",
       "security",
       "usability"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1240,
@@ -4044,7 +4739,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1241,
@@ -4055,7 +4752,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1275,
@@ -4066,7 +4765,9 @@
     "mapping_rationale": "This CWE entry is at the Variant level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1329,
@@ -4077,7 +4778,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1333,
@@ -4088,7 +4791,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "performance"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1357,
@@ -4099,7 +4804,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1390,
@@ -4110,7 +4817,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1391,
@@ -4121,7 +4830,9 @@
     "mapping_rationale": "This CWE entry is a Class and might have Base-level children that would be more appropriate",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1392,
@@ -4132,7 +4843,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1393,
@@ -4143,7 +4856,9 @@
     "mapping_rationale": "This CWE entry is at the Base level of abstraction, which is a preferred level of abstraction for mapping to the root causes of vulnerabilities.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   },
   {
     "id": 1395,
@@ -4154,6 +4869,8 @@
     "mapping_rationale": "This CWE entry is a Class, but it does not have Base-level children.",
     "dimensions": [
       "security"
-    ]
+    ],
+    "fetched_date": "2026-03-10",
+    "llm_mapping_usage": "Allowed"
   }
 ]
