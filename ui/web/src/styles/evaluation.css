@@ -1642,6 +1642,7 @@
 }
 
 .cwe-link {
+  margin-left: auto;
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
   color: var(--color-accent);

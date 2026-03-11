@@ -138,10 +138,12 @@ function ViolationCard({ v, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               <span className="vlive-detail-section-label">Reason</span>
-              {v.req_refs?.length > 0 && v.req_refs.map((ref, i) => (
-                <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-              ))}
-              {v.req && <span className="cwe-link" style={{ marginLeft: 'auto' }}>{v.req}</span>}
+              {v.req_refs?.length > 0
+                ? v.req_refs.map((ref, i) => (
+                    <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+                  ))
+                : v.req && <span className="cwe-link">{v.req}</span>
+              }
             </div>
             {v.title && <p className="vlive-detail-title">{v.title}</p>}
             {v.reason && <>
