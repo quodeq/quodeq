@@ -4,7 +4,7 @@ Branch: `experimental/analysis-enhanced-v4`
 
 ## Vision
 
-Three-tier analysis pipeline that maximizes coverage while minimizing token spend and wall-clock time. Static analysis handles the deterministic, LLM handles the judgment.
+Three-tier analysis pipeline that maximizes coverage while minimizing token spend and wall-clock time. Static analysis handles the deterministic, LLM handles the judgment. **All intelligence lives in Python** — the MCP server is the control plane (routing, deduplication, enrichment). The LLM is a judgment engine that writes findings and receives work.
 
 ```
           Tier 0              Tier 1                Tier 2
@@ -18,21 +18,95 @@ Three-tier analysis pipeline that maximizes coverage while minimizing token spen
       │  100% files│     │  $0.03        │     │  $3-5            │
       └───────────┘     └──────────────┘     └──────────────────┘
                                                       │
+                                                      │ MCP (stdio)
+                                                      ▼
+                                            ┌──────────────────┐
+                                            │  MCP Server (Py)  │
+                                            │  ┌─────────────┐ │
+                                            │  │ Router       │ │
+                                            │  │ - dedup vs   │ │
+                                            │  │   static     │ │
+                                            │  │ - enrich     │ │
+                                            │  │   req_refs   │ │
+                                            │  │ - validate   │ │
+                                            │  │   format     │ │
+                                            │  └──────┬──────┘ │
+                                            │  ┌──────▼──────┐ │
+                                            │  │ Queue        │ │
+                                            │  │ - prioritized│ │
+                                            │  │ - file-locked│ │
+                                            │  │ - shared     │ │
+                                            │  └──────┬──────┘ │
+                                            │  ┌──────▼──────┐ │
+                                            │  │ Writer       │ │
+                                            │  │ → JSONL      │ │
+                                            │  └─────────────┘ │
+                                            └──────────────────┘
+                                                      │
                                                ┌──────▼──────┐
-                                               │ Merge +     │
-                                               │ Deduplicate │
                                                │ Score +     │
                                                │ Report      │
+                                               │ (unchanged) │
                                                └─────────────┘
 ```
 
+## Core Architecture: MCP as Control Plane
+
+The MCP server is NOT a dumb pipe. It is the **control plane** between the LLM and the data layer. The LLM calls two tools; all routing, dedup, enrichment, and writing happens in Python:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  LLM (Claude CLI subagent)                               │
+│                                                          │
+│  reads files → judges → calls report_finding()           │
+│  calls get_next_files()                                  │
+│                                                          │
+│  Knows NOTHING about routing, tiers, dedup, caching      │
+└──────────────────┬───────────────────────────────────────┘
+                   │ MCP (stdio JSON-RPC) — just transport
+                   ▼
+┌─────────────────────────────────────────────────────────┐
+│  MCP Server (Python process)                             │
+│                                                          │
+│  Tools exposed:                                          │
+│    report_finding(args) ──→ router.receive(finding)      │
+│    get_next_files(count) ──→ queue.take(count)           │
+│                                                          │
+│  Router (FindingsRouter):                                │
+│    1. Dedup against static findings (by file+line+req)   │
+│    2. Dedup against already-seen LLM findings            │
+│    3. Enrich req_refs from compiled standards             │
+│    4. Validate format (required fields present)           │
+│    5. Write to JSONL                                      │
+│    6. Return feedback to LLM:                             │
+│       - "Finding #N recorded."                            │
+│       - "Already captured by static analysis. Skip."      │
+│       - "Missing required field: severity"                │
+│                                                          │
+│  Queue (FileQueue):                                      │
+│    - Shared across all subagent MCP servers               │
+│    - File-locked for cross-process safety                 │
+│    - Returns [] when empty → agent terminates             │
+└──────────────────┬───────────────────────────────────────┘
+                   │
+                   ▼
+             findings.jsonl
+```
+
+**Why this matters:**
+- LLM tokens are expensive. Don't waste them on dedup logic or ref resolution.
+- Feedback to the LLM ("already captured") saves turns — the agent moves on instead of re-reporting.
+- Enrichment (req_refs) happens once in Python, not in the prompt.
+- The queue is a Python data structure, not an LLM concept.
+
 ## Principles
 
-1. **Externalize evidence immediately** — findings go to JSONL via MCP, not conversation history
-2. **Kill context growth** — subagents are short-lived; they write data and die
-3. **Deterministic first** — static tools catch patterns; LLM catches judgment calls
-4. **Same scoring pipeline** — tiers produce identical JSONL; downstream is unchanged
-5. **Incremental adoption** — each phase is independently valuable and shippable
+1. **Python is the brain, LLM is the judge** — routing, dedup, enrichment, queue management all in Python
+2. **Externalize evidence immediately** — findings go to JSONL via MCP, not conversation history
+3. **Kill context growth** — subagents are short-lived; they write data and die
+4. **Deterministic first** — static tools catch patterns; LLM catches judgment calls
+5. **Same scoring pipeline** — tiers produce identical JSONL; downstream is unchanged
+6. **Incremental adoption** — each phase is independently valuable and shippable
 
 ---
 
@@ -187,11 +261,15 @@ class FileQueue:
         """Files still in queue."""
 ```
 
-### 2.2 Queue MCP Tool
+### 2.2 Enhanced MCP Server (`src/quodeq/engine/mcp_findings.py`)
 
-Extend `mcp_findings.py` with a second tool:
+The MCP server becomes the **control plane** with two tools and internal routing:
 
 ```python
+# Two tools exposed to the LLM:
+
+REPORT_FINDING_SCHEMA = { ... }  # existing, unchanged
+
 GET_NEXT_FILES_SCHEMA = {
     "type": "object",
     "properties": {
@@ -201,15 +279,50 @@ GET_NEXT_FILES_SCHEMA = {
 }
 ```
 
-The MCP server reads from the shared `FileQueue`. When queue is empty, returns `{"files": [], "done": true}`.
+Internal router (invisible to LLM):
 
-Each subagent's prompt instructs:
+```python
+class FindingsRouter:
+    """Receives findings from LLM, deduplicates, enriches, writes.
+
+    The LLM never sees this logic — it just calls report_finding()
+    and gets feedback.
+    """
+
+    def __init__(self, static_findings: set, compiled_refs: dict, output: Path):
+        self.seen = static_findings   # pre-loaded from Tier 0
+        self.refs = compiled_refs     # pre-loaded from compiled standards
+        self.fh = open(output, "a")
+        self.counter = 0
+
+    def receive(self, finding: dict) -> str:
+        """Process a finding from the LLM.
+
+        1. Dedup against static findings + already seen
+        2. Enrich with req_refs from compiled standards
+        3. Validate required fields
+        4. Write to JSONL
+        5. Return feedback to LLM
+        """
+        key = (finding.get("p"), finding.get("file"), finding.get("line"))
+        if key in self.seen:
+            return "Already captured by static analysis. Skip."
+        self.seen.add(key)
+
+        # Enrich refs — LLM doesn't need to know about this
+        req = finding.get("req")
+        if req and req in self.refs:
+            finding["req_refs"] = self.refs[req]
+
+        self.fh.write(json.dumps(finding) + "\n")
+        self.fh.flush()
+        self.counter += 1
+        return f"Finding #{self.counter} recorded."
 ```
-1. Call get_next_files() to receive your next batch
-2. Read and analyze each file against the standards
-3. Call report_finding() for each finding
-4. Repeat until get_next_files() returns done=true
-```
+
+**Key: the "Already captured" feedback saves the LLM tokens.** It doesn't waste turns elaborating on something Semgrep already found.
+
+The MCP server reads from the shared `FileQueue`. When queue is empty, returns `{"files": [], "done": true}` → the agent's prompt tells it to stop.
 
 ### 2.3 Subagent Spawner (`src/quodeq/engine/subagent_pool.py`)
 
@@ -219,16 +332,28 @@ class SubagentPool:
 
     Each subagent:
     - Gets the same analysis prompt + standards
-    - Has its own MCP server (with get_next_files + report_finding)
+    - Has its own MCP server instance (own process, shared queue)
+    - MCP server handles dedup + enrichment (Python-side)
     - Writes to its own JSONL file
     - Dies when queue is empty or max_turns reached
+
+    The queue is shared across all MCP server processes via
+    file locking. Each MCP server reads from the same queue file.
     """
 
-    def __init__(self, n_agents: int, queue: FileQueue, config: AnalysisConfig):
+    def __init__(self, n_agents: int, queue: FileQueue,
+                 static_findings: set, compiled_refs: dict,
+                 config: AnalysisConfig):
         ...
 
     def run(self) -> list[Path]:
-        """Launch all subagents, wait for completion.
+        """Launch all subagents in parallel, wait for completion.
+
+        Each agent gets:
+        - Claude CLI subprocess
+        - MCP server subprocess (with FindingsRouter + FileQueue access)
+        - Own JSONL output file
+        - Own stream file
 
         Returns list of JSONL paths (one per agent).
         """
@@ -239,7 +364,7 @@ class SubagentPool:
 
 ### 2.4 Subagent Prompt Template (`prompts/subagent.md`)
 
-Shorter than `compass.md` — no search strategy instructions needed:
+Shorter than `compass.md` — no search strategy, no grep-first instructions. The agent receives files from the queue, not from exploration:
 
 ```markdown
 # {{DIMENSION}} Analysis — Quodeq Subagent
@@ -249,22 +374,21 @@ You are analyzing **{{REPO_NAME}}** for the **{{DIMENSION}}** quality dimension.
 ## Your workflow
 
 1. Call `get_next_files()` to receive files to analyze
-2. Read each file
+2. Read each file using the Read tool
 3. Evaluate against the standards checklist below
-4. Call `report_finding()` for each violation or compliance
-5. Repeat from step 1 until no more files
+4. Call `report_finding()` for each violation or compliance you find
+5. Repeat from step 1 until get_next_files() returns done
+
+**Important:**
+- If report_finding says "Already captured", move on — don't re-report
+- Focus on issues that require judgment: architecture, design, context
+- Report both violations AND compliance (balanced evaluation)
 
 ## Standards Checklist
 {{STANDARDS_CHECKLIST}}
-
-## Already known (from static analysis)
-{{STATIC_FINDINGS_SUMMARY}}
-
-Focus on issues that require human judgment: architecture, design,
-context-dependent quality. The static findings above are already captured.
 ```
 
-Key difference: includes `{{STATIC_FINDINGS_SUMMARY}}` so subagents don't duplicate static analysis findings.
+Note: NO `{{STATIC_FINDINGS_SUMMARY}}` needed in the prompt anymore. The MCP router handles dedup server-side. The LLM doesn't need to know what static analysis found — it just gets "Already captured" feedback if it tries to re-report. This keeps the prompt small and saves tokens.
 
 ### 2.5 Modified Runner Flow
 
@@ -272,23 +396,29 @@ Key difference: includes `{{STATIC_FINDINGS_SUMMARY}}` so subagents don't duplic
 def _run_dimension_analysis_v4(self, ...):
     """Enhanced analysis: static → queue → subagents → merge."""
 
-    # Tier 0: Static analysis
+    # Tier 0: Static analysis (Phase 1)
     static_jsonl = _run_static_analysis(repo_path, dimension, evidence_dir, semgrep_rules)
+    static_keys = _extract_finding_keys(static_jsonl)  # {(principle, file, line), ...}
+
+    # Load compiled refs for MCP router enrichment
+    compiled_refs = _build_req_refs_lookup(compiled_dir, dimension)
 
     # Build file queue (prioritized)
     all_files = _prescan_source_files(repo_path, plugin)
     queue = FileQueue(queue_path, _prioritize_files(all_files, static_jsonl))
 
-    # Tier 2: Subagent pool
+    # Tier 2: Subagent pool — each MCP server gets the router
     pool = SubagentPool(
         n_agents=config.options.n_subagents or 5,
         queue=queue,
+        static_findings=static_keys,
+        compiled_refs=compiled_refs,
         config=analysis_config,
     )
     agent_jsonls = pool.run()
 
-    # Merge all JSONL (static + all subagents)
-    merged = pool.merge_jsonl([static_jsonl] + agent_jsonls, final_jsonl_path)
+    # Merge all JSONL (static + all subagents, already deduped by router)
+    merged = _merge_jsonl_files([static_jsonl] + agent_jsonls, final_jsonl_path)
 
     # Parse as before — unchanged
     return parse_jsonl_to_evidence(merged, context, compiled_dir)
@@ -296,7 +426,7 @@ def _run_dimension_analysis_v4(self, ...):
 
 ### Deliverable
 
-After Phase 2: Analysis runs 5 subagents in parallel, each pulling files from a shared queue. Wall-clock ~10 min, covers ~150 files, uses ~6M tokens instead of ~24M.
+After Phase 2: Analysis runs 5 subagents in parallel, each pulling files from a shared queue. The MCP server deduplicates against static findings and enriches refs — all in Python, zero LLM tokens spent on that logic. Wall-clock ~10 min, covers ~150 files, uses ~6M tokens instead of ~24M.
 
 ---
 
@@ -497,12 +627,15 @@ New fields in `AnalysisOptions` / CLI args:
 
 | Risk | Mitigation |
 |---|---|
-| Semgrep rule quality varies by language | Start with Kotlin (GA support), expand incrementally |
-| Queue contention with file locking | Use atomic file operations; fallback to pre-assigned batches |
-| API rate limits with 5 parallel agents | Make N configurable; start conservative; add backoff |
-| Subagent prompt too short → shallow analysis | Include static findings as context; tune turns per agent |
-| Deduplication edge cases | Dedup by (principle, file, line, type) — already exists |
-| Cache invalidation correctness | Content-hash based, not timestamp; standards version in key |
+| Semgrep rule quality varies by language | Start with Kotlin (GA support), expand incrementally. ~30-50 practical rules per language, not all 227 requirements. |
+| Queue contention with file locking | Use atomic file operations (fcntl); fallback to pre-assigned batches if locking fails |
+| API rate limits with 5 parallel agents | Make N configurable; start conservative (3); add exponential backoff |
+| Subagent ignores get_next_files loop | Prompt engineering + max_turns cap as safety net; monitor stream for compliance |
+| Deduplication semantic overlap | MCP router dedup by (principle, file, line); accept some overlap in differently-framed findings |
+| Compliance findings drop with static-heavy pipeline | Subagent prompt explicitly asks for balanced violation+compliance; scoring adjusts |
+| MCP router adds latency per finding | Router logic is <1ms Python; negligible vs ~10s LLM turn time |
+| Cache invalidation correctness | Content-hash based, not timestamp; standards version + rules hash in key |
+| Three tiers = three failure modes | Each tier has fallback: static fails → skip to LLM; validator fails → pass raw findings; subagent dies → remaining files stay in queue |
 
 ---
 
