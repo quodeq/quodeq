@@ -70,7 +70,12 @@ def _resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | Non
             cwe_id = label.split("-", 1)[1]
             result.append({"label": label.upper(), "url": f"https://cwe.mitre.org/data/definitions/{cwe_id}.html"})
         else:
-            result.append({"label": label})
+            # Prefix match: "CISQ-ASCRM-CWE-396" matches known label "CISQ"
+            matched = next((r for k, r in by_label.items() if label.upper().startswith(k.upper())), None)
+            if matched:
+                result.append({"label": label, "url": matched["url"]})
+            else:
+                result.append({"label": label})
     return result or None
 
 
