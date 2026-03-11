@@ -136,7 +136,7 @@ function ViolationCard({ v, principleName, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              {v.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${v.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{v.cwe}</a>}
+              {v.req && <a className="cwe-link" href={v.req_url || '#'} target="_blank" rel="noopener noreferrer">{v.req}</a>}
             </div>
             {v.title && <p className="vlive-detail-title">{v.title}</p>}
             {v.reason && <>

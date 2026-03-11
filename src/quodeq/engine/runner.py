@@ -171,6 +171,7 @@ def _parse_dimension_evidence(
     else:
         files_read = extract_evidence_from_stream(stream_file, jsonl_file)
 
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     ev = parse_jsonl_to_evidence(
         jsonl_file,
         EvidenceContext(
@@ -180,6 +181,7 @@ def _parse_dimension_evidence(
             source_file_count=config.source_file_count,
             files_read=files_read,
         ),
+        compiled_dir=compiled_dir,
     )
     ev.plugin_name = ctx.plugin_name
     return ev

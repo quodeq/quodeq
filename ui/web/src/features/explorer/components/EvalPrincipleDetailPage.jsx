@@ -249,7 +249,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             <div className="vlive-detail-section">
                               <div className="vlive-detail-section-header">
                                 {v.title && <span className="vlive-detail-section-label">Reason</span>}
-                                {v.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${v.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{v.cwe}</a>}
+                                {v.req && <a className="cwe-link" href={v.req_url || '#'} target="_blank" rel="noopener noreferrer">{v.req}</a>}
                               </div>
                               {v.title && <p className="vlive-detail-title">{v.title}</p>}
                               {(v.reason || v.findings) && <>
@@ -300,7 +300,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           <div className="vlive-detail-section">
                             <div className="vlive-detail-section-header">
                               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-                              {c.cwe && <a className="cwe-link" href={`https://cwe.mitre.org/data/definitions/${c.cwe}.html`} target="_blank" rel="noopener noreferrer">CWE-{c.cwe}</a>}
+                              {c.req && <a className="cwe-link" href={c.req_url || '#'} target="_blank" rel="noopener noreferrer">{c.req}</a>}
                             </div>
                             {c.title && <p className="vlive-detail-title">{c.title}</p>}
                             {c.reason && <>

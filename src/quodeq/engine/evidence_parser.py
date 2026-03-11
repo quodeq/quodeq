@@ -8,6 +8,31 @@ from pathlib import Path
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
 
 
+def _build_req_url_lookup(compiled_dir: Path, dimension: str) -> dict[str, str]:
+    """Return {req_id: first_ref_url} for all requirements with a URL in the compiled JSON.
+
+    Returns an empty dict if the file is missing or unreadable.
+    """
+    try:
+        dim_file = compiled_dir / f"{dimension}.json"
+        data = json.loads(dim_file.read_text())
+    except Exception:
+        return {}
+
+    lookup: dict[str, str] = {}
+    for principle in data.get("principles", []):
+        for req in principle.get("requirements", []):
+            req_id = req.get("id")
+            if not req_id:
+                continue
+            for ref in req.get("refs", []):
+                url = ref.get("url")
+                if url:
+                    lookup[req_id] = url
+                    break  # take the first ref with a URL
+    return lookup
+
+
 @dataclass
 class EvidenceContext:
     """Metadata needed to construct an Evidence object from parsed JSONL."""
@@ -55,6 +80,8 @@ def _judgment_to_dict(j: Judgment) -> dict:
     d.update({k: v for k, v in _optional.items() if v})
     if j.req:
         d["req"] = j.req
+    if j.req_url:
+        d["req_url"] = j.req_url
     if j.title:
         d["title"] = j.title
     if j.reason:
@@ -90,14 +117,20 @@ def _group_judgments(judgments: list[Judgment]) -> _GroupedJudgments:
 def parse_jsonl_to_evidence(
     jsonl_file: Path,
     context: EvidenceContext,
+    compiled_dir: Path | None = None,
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
     judgments: list[Judgment] = []
+    req_url_cache: dict[str, dict[str, str]] = {}  # dimension -> {req_id: url}
     if jsonl_file.exists():
         with open(jsonl_file) as _jf:
             for line in _jf:
                 j = _parse_jsonl_line(line)
                 if j is not None:
+                    if compiled_dir and j.req and j.dimension:
+                        if j.dimension not in req_url_cache:
+                            req_url_cache[j.dimension] = _build_req_url_lookup(compiled_dir, j.dimension)
+                        j.req_url = req_url_cache[j.dimension].get(j.req)
                     judgments.append(j)
 
     grouped = _group_judgments(judgments)

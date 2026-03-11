@@ -31,8 +31,8 @@ def _build_score_lookup(per_principle_scores: dict) -> dict:
     return lookup
 
 
-_VIOLATION_FIELDS = ("file", "line", "title", "reason", "snippet", "severity", "req")
-_COMPLIANCE_FIELDS = ("file", "line", "title", "reason", "snippet", "req")
+_VIOLATION_FIELDS = ("file", "line", "title", "reason", "snippet", "severity", "req", "req_url")
+_COMPLIANCE_FIELDS = ("file", "line", "title", "reason", "snippet", "req", "req_url")
 
 
 def _flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[dict]:
