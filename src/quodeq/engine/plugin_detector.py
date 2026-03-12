@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from collections import Counter
 from pathlib import Path
 
@@ -13,18 +14,19 @@ _SKIP_DIRS = frozenset({
 })
 
 
-def _is_excluded(path: Path) -> bool:
-    """Check if any path component is in the skip list."""
-    return bool(_SKIP_DIRS.intersection(path.parts))
+def _walk_source_files(src: Path, extensions: set[str]):
+    """Yield (relative_path, suffix) for source files, pruning skip dirs."""
+    for dirpath, dirnames, filenames in os.walk(src):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for fname in filenames:
+            suffix = os.path.splitext(fname)[1]
+            if suffix in extensions:
+                yield os.path.relpath(os.path.join(dirpath, fname), src), suffix
 
 
 def count_source_files(src: Path, extensions: set[str]) -> int:
     """Count files under *src* whose suffix is in *extensions*."""
-    total = 0
-    for p in src.rglob("*"):
-        if p.is_file() and p.suffix in extensions:
-            total += 1
-    return total
+    return sum(1 for _ in _walk_source_files(src, extensions))
 
 
 def list_source_files(src: Path, extensions: set[str]) -> list[str]:
@@ -32,10 +34,7 @@ def list_source_files(src: Path, extensions: set[str]) -> list[str]:
 
     Excludes vendored/generated directories.
     """
-    files: list[str] = []
-    for p in src.rglob("*"):
-        if p.is_file() and p.suffix in extensions and not _is_excluded(p.relative_to(src)):
-            files.append(str(p.relative_to(src)))
+    files = [rel for rel, _ in _walk_source_files(src, extensions)]
     files.sort()
     return files
 
@@ -60,9 +59,13 @@ def _detect_by_extension_count(plugins: list[dict], src: Path) -> str | None:
     Performs a single rglob traversal to collect suffix counts, then scores each
     plugin in O(1) per extension — O(n) total regardless of plugin count.
     """
-    suffix_counts: Counter[str] = Counter(
-        p.suffix for p in src.rglob("*") if p.is_file() and p.suffix
-    )
+    suffix_counts: Counter[str] = Counter()
+    for dirpath, dirnames, filenames in os.walk(src):
+        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        for fname in filenames:
+            ext = os.path.splitext(fname)[1]
+            if ext:
+                suffix_counts[ext] += 1
     if not suffix_counts:
         return None
     best_id: str | None = None

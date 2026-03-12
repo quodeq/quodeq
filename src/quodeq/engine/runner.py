@@ -246,12 +246,13 @@ def _process_dimension_with_subagents(
         ),
     )
 
-    # 4. Launch pool
+    # 4. Launch pool — subagents default to Haiku for speed
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
         max_turns=config.options.max_turns,
         max_duration=config.options.max_duration,
+        ai_model="claude-haiku-4-5",
     )
     pool = SubagentPool(
         n_agents=config.options.n_subagents,

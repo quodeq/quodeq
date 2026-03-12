@@ -23,8 +23,7 @@ from quodeq.shared.logging import log_info, log_success, log_warning
 
 _HEARTBEAT_INTERVAL = 10
 
-_SUBAGENT_MAX_TURNS = 40
-_SUBAGENT_MAX_DURATION = 600  # 10 minutes per agent
+_DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
 
 
 @dataclass
@@ -90,8 +89,8 @@ class SubagentPool:
             heartbeat_callback=self._base_config.heartbeat_callback,
             ai_cmd=self._base_config.ai_cmd,
             ai_model=self._base_config.ai_model,
-            max_turns=self._base_config.max_turns or _SUBAGENT_MAX_TURNS,
-            max_duration=self._base_config.max_duration or _SUBAGENT_MAX_DURATION,
+            max_turns=self._base_config.max_turns,
+            max_duration=None,
             compiled_dir=self._base_config.compiled_dir,
             dimension=self._dimension,
             queue_path=self._queue_path,
@@ -151,13 +150,19 @@ class SubagentPool:
             )
 
     def run(self) -> list[SubagentResult]:
-        """Launch all agents in parallel. Blocks until all complete.
+        """Launch agents in parallel, respawning when slots free up and queue has files.
+
+        Stops spawning new agents once the pool-level max_duration is reached;
+        already-running agents are allowed to finish naturally.
 
         Returns list of SubagentResult (one per agent, including failures).
         """
+        max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
         log_info(f"Launching {self._n} subagents for {self._dimension}")
         results: list[SubagentResult] = []
-        finished: dict[str, bool] = {f"agent-{i}": False for i in range(self._n)}
+        finished: dict[str, bool] = {}
+        next_idx = 0
+        pool_start = time.monotonic()
 
         stop = threading.Event()
         heartbeat = threading.Thread(
@@ -167,19 +172,52 @@ class SubagentPool:
 
         try:
             with ThreadPoolExecutor(max_workers=self._n) as pool:
-                futures = {pool.submit(self._run_single, i): i for i in range(self._n)}
-                for future in as_completed(futures):
-                    result = future.result()
-                    finished[result.agent_id] = True
-                    if result.success:
-                        log_success(f"  {result.agent_id} finished")
-                    results.append(result)
+                # Launch initial batch
+                futures: dict = {}
+                for _ in range(self._n):
+                    finished[f"agent-{next_idx}"] = False
+                    futures[pool.submit(self._run_single, next_idx)] = next_idx
+                    next_idx += 1
+
+                while futures:
+                    # Wait for the next agent to complete
+                    done_futures = {f for f in futures if f.done()}
+                    if not done_futures:
+                        # Brief sleep to avoid busy-waiting
+                        time.sleep(0.5)
+                        continue
+
+                    for future in done_futures:
+                        result = future.result()
+                        finished[result.agent_id] = True
+                        if result.success:
+                            log_success(f"  {result.agent_id} finished")
+                        results.append(result)
+                        del futures[future]
+
+                        # Respawn if queue still has files and time budget remains
+                        elapsed = time.monotonic() - pool_start
+                        if elapsed >= max_duration:
+                            queue = FileQueue(self._queue_path)
+                            remaining = queue.remaining()
+                            if remaining > 0:
+                                log_warning(
+                                    f"  Pool time limit ({max_duration}s) reached — "
+                                    f"{remaining} files left, not spawning new agents"
+                                )
+                            continue
+                        queue = FileQueue(self._queue_path)
+                        if queue.remaining() > 0:
+                            log_info(f"  {queue.remaining()} files left — spawning agent-{next_idx}")
+                            finished[f"agent-{next_idx}"] = False
+                            futures[pool.submit(self._run_single, next_idx)] = next_idx
+                            next_idx += 1
         finally:
             stop.set()
             heartbeat.join(timeout=2)
 
         succeeded = sum(1 for r in results if r.success)
-        log_info(f"Subagent pool done: {succeeded}/{self._n} succeeded")
+        log_info(f"Subagent pool done: {succeeded}/{next_idx} agents ran, {succeeded} succeeded")
         return results
 
     @staticmethod

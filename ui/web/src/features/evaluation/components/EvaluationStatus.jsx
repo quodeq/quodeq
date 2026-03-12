@@ -11,6 +11,7 @@ function statusTitle(status) {
   if (status === 'running') return 'Evaluation in Progress';
   if (status === 'done') return 'Evaluation Complete';
   if (status === 'failed') return 'Evaluation Failed';
+  if (status === 'lost') return 'Evaluation Lost';
   return 'Evaluation Cancelled';
 }
 
@@ -50,6 +51,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
   const isRunning = job.status === 'running';
   const isDone = job.status === 'done';
   const isFailed = job.status === 'failed';
+  const isLost = job.status === 'lost';
   const projectName = deriveProjectName(job.repo);
 
   return (
@@ -100,6 +102,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
       >
         {isRunning && <span className="eval-status-phase">{phaseLabel(job)}</span>}
         {isFailed && <span className="eval-status-phase eval-status-phase--error">{lastRelevantLog(job.logs) || 'Analysis failed'}</span>}
+        {isLost && <span className="eval-status-phase eval-status-phase--error">Server restarted — job tracking lost</span>}
         {isRunning && job.dimensions?.length > 0 && (
           <span className="eval-status-dims">
             {job.dimensions.map(d => (
