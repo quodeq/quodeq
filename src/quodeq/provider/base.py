@@ -14,6 +14,7 @@ class EvaluationOptions:
     numerical: bool = False
     ai_cmd: str | None = None
     ai_model: str | None = None
+    subagent_model: str | None = None
 
 
 class ProjectActions(Protocol):

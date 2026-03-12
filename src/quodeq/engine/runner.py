@@ -10,6 +10,7 @@ Merge per-dimension Evidence into a single Evidence object.
 from __future__ import annotations
 
 import json
+import os
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -38,6 +39,7 @@ class AnalysisOptions:
     max_turns: int | None = None
     max_duration: int | None = None
     n_subagents: int = 1
+    subagent_model: str | None = None
 
 
 @dataclass
@@ -246,13 +248,14 @@ def _process_dimension_with_subagents(
         ),
     )
 
-    # 4. Launch pool — subagents default to Haiku for speed
+    # 4. Launch pool — subagent model comes from options (default: Haiku for speed)
+    subagent_model = config.options.subagent_model or os.environ.get("SUBAGENT_MODEL") or "claude-haiku-4-5"
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
         max_turns=config.options.max_turns,
         max_duration=config.options.max_duration,
-        ai_model="claude-haiku-4-5",
+        ai_model=subagent_model,
     )
     pool = SubagentPool(
         n_agents=config.options.n_subagents,

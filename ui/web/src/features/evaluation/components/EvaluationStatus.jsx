@@ -66,6 +66,16 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
               Cancel
             </button>
           )}
+          {!isRunning && isDone && (
+            <button type="button" className="job-header-view-btn" onClick={() => onDismiss('view')}>
+              View Results
+            </button>
+          )}
+          {!isRunning && (
+            <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>
+              {isDone ? 'Dismiss' : 'Close'}
+            </button>
+          )}
           <span className={`job-status-badge ${job.status}`}>{job.status}</span>
         </div>
       </div>
@@ -127,18 +137,6 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         </div>
       )}
 
-      {!isRunning && (
-        <div className="job-actions">
-          {isDone && (
-            <button className="view-results-btn" onClick={() => onDismiss('view')}>
-              View Results
-            </button>
-          )}
-          <button className="job-close-btn" onClick={() => onDismiss('close')}>
-            {isDone ? 'Dismiss' : 'Close'}
-          </button>
-        </div>
-      )}
 
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>

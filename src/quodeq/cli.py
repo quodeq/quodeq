@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import uuid
 from pathlib import Path
@@ -198,6 +199,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
             max_turns=args.max_turns,
             max_duration=args.max_duration,
             n_subagents=args.n_subagents,
+            subagent_model=os.environ.get("SUBAGENT_MODEL") or None,
         ),
     )
 

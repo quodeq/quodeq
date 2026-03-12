@@ -70,6 +70,8 @@ class FsEvaluationMixin:
         ai_model = options.ai_model or get_ai_model()
         if ai_model:
             env["AI_MODEL"] = ai_model
+        if options.subagent_model:
+            env["SUBAGENT_MODEL"] = options.subagent_model
 
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
         # NOTE: evaluations are dispatched as local subprocesses. There is no

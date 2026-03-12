@@ -210,6 +210,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
                     numerical=bool(payload.get("numerical")),
                     ai_cmd=ai_cmd,
                     ai_model=payload.get("aiModel") or None,
+                    subagent_model=payload.get("subagentModel") or None,
                 ),
             )
         except (FileNotFoundError, ValueError):
