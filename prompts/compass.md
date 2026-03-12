@@ -17,7 +17,7 @@ Analyse the codebase for the **{{DIMENSION}}** quality dimension. Use the tools 
 For EVERY finding (violation or compliance), call the `report_finding` tool with these parameters:
 
 **Required:**
-- `p` — principle name from the standards checklist below (e.g. `Confidentiality`, `Modularity`)
+- `p` — the **section header** (### heading) from the standards checklist, i.e. the ISO 25010 sub-characteristic name. Examples: `Modularity`, `Analyzability`, `Confidentiality`, `Fault Tolerance`. **NEVER** put a requirement ID (like M-ANA-1) here.
 - `t` — `violation` or `compliance`
 - `d` — dimension being evaluated
 - `w` — short description of what you found
@@ -28,7 +28,7 @@ For EVERY finding (violation or compliance), call the `report_finding` tool with
 - `snippet` — the relevant code (keep under 200 chars)
 - `severity` — `critical`, `major`, or `minor`
 - `reason` — brief explanation of why this is a violation or compliance
-- `req` — Requirement ID from the standards checklist below (e.g. "R-FT-1", "S-CON-3"). **Always include this** when the finding maps to a requirement in the checklist.
+- `req` — the **bold requirement ID** from the checklist (e.g. `M-ANA-1`, `S-CON-3`, `R-FT-1`). Always include this.
 - `vt` — violation type (e.g. "hardcoded-secret", "missing-error-handler")
 
 ## Severity Definitions
@@ -88,7 +88,10 @@ Skip these directories (they contain generated, vendored, or non-source content)
 
 ## Standards Checklist
 
-This is the comprehensive requirements checklist for this dimension, organized by ISO 25010 principle. Use the **principle name** as the `p` field in your JSONL output.
+This checklist is organized by ISO 25010 sub-characteristic (the `###` headings). Each heading contains numbered requirements (the **bold IDs**).
+
+- `p` field = the **### heading name** (e.g. `Modularity`, `Analyzability`) — NEVER a requirement ID
+- `req` field = the **bold requirement ID** (e.g. `M-MOD-1`, `M-ANA-2`)
 
 {{STANDARDS_CHECKLIST}}
 

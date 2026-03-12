@@ -27,7 +27,7 @@ REPORT_FINDING_DESC = (
 REPORT_FINDING_SCHEMA = {
     "type": "object",
     "properties": {
-        "p": {"type": "string", "description": "Principle name from the standards checklist"},
+        "p": {"type": "string", "description": "Sub-characteristic name (the ### heading from the checklist, e.g. 'Modularity', 'Analyzability'). NEVER a requirement ID."},
         "t": {"type": "string", "enum": ["violation", "compliance"], "description": "Finding type"},
         "d": {"type": "string", "description": "Dimension being evaluated"},
         "w": {"type": "string", "description": "Short description of the finding"},
