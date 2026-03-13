@@ -185,7 +185,10 @@ def _fetch_url(url: str, headers: dict | None = None) -> str | None:
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:
     combined = "\n\n---\n\n".join(content_samples)
     existing = out_path.read_text() if out_path.exists() else "none"
-    template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text()
+    try:
+        template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read practices template: {exc}") from exc
     return render_template(template, {
         "RUNTIME": runtime,
         "EXISTING": existing,
@@ -195,7 +198,10 @@ def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: 
 
 def _build_analysis_prompt(runtime: str, linter_docs: str, out_path: Path) -> str:
     existing = out_path.read_text() if out_path.exists() else "none"
-    template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text()
+    try:
+        template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read analysis template: {exc}") from exc
     return render_template(template, {
         "RUNTIME": runtime,
         "RUNTIME_TITLE": runtime.title(),

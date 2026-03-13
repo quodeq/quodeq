@@ -69,8 +69,11 @@ def _extract_l1_from_chapter(chapter: dict) -> list[dict]:
     for section in chapter.get("Items", []):
         for req in section.get("Items", []):
             if req.get("L1", {}).get("Required"):
+                shortcode = req.get("Shortcode")
+                if not shortcode:
+                    continue
                 items.append({
-                    "id": req["Shortcode"],
+                    "id": shortcode,
                     "level": 1,
                     "text": req["Description"],
                     "cwe": req.get("CWE", []),

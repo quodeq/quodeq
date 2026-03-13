@@ -16,7 +16,10 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
     if not compiled_file.exists():
         return "_No compiled standards for this dimension._"
 
-    data = json.loads(compiled_file.read_text())
+    try:
+        data = json.loads(compiled_file.read_text())
+    except (OSError, json.JSONDecodeError):
+        return "_Could not read compiled standards._"
     lines = []
     for principle in data.get("principles", []):
         reqs = principle.get("requirements", [])
@@ -68,11 +71,18 @@ def load_template(
         template_name: Template filename to load (default ``compass.md``).
     """
     if template_path:
-        return template_path.read_text()
+        try:
+            return template_path.read_text()
+        except (OSError, UnicodeDecodeError) as exc:
+            raise FileNotFoundError(f"Cannot read template {template_path}: {exc}") from exc
     if prompts_dir is None:
         from quodeq.config.paths import default_paths
         prompts_dir = default_paths().prompts_dir
-    return (prompts_dir / template_name).read_text()
+    path = prompts_dir / template_name
+    try:
+        return path.read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read template {path}: {exc}") from exc
 
 
 @dataclass

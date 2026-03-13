@@ -27,7 +27,11 @@ def get_discipline_language(name: str, paths: ConfigPaths) -> str | None:
     if not conf.exists():
         return None
     current = None
-    for line in conf.read_text().splitlines():
+    try:
+        conf_lines = conf.read_text().splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    for line in conf_lines:
         line = line.strip()
         if not line:
             continue

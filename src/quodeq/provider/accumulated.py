@@ -1,6 +1,7 @@
 """Accumulated (cross-run) view logic for the filesystem action provider."""
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
@@ -17,6 +18,7 @@ from quodeq.adapters.fs.report_parser import (
 # Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
 _ACC_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
 _ACC_DIM_CACHE_MAX = 256
+_ACC_DIM_LOCK = threading.Lock()
 
 
 def _make_acc_dimension_fetcher(
@@ -25,14 +27,16 @@ def _make_acc_dimension_fetcher(
     """Return a cached fetcher for run dimension data (LRU, bounded at _ACC_DIM_CACHE_MAX)."""
     def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
         key = (reports_root, project, run_id)
-        if key in _ACC_DIM_CACHE:
-            _ACC_DIM_CACHE.move_to_end(key)
-            return _ACC_DIM_CACHE[key]
+        with _ACC_DIM_LOCK:
+            if key in _ACC_DIM_CACHE:
+                _ACC_DIM_CACHE.move_to_end(key)
+                return _ACC_DIM_CACHE[key]
         data = read_run_data(reports_root, project, run_id)
-        _ACC_DIM_CACHE[key] = data
-        _ACC_DIM_CACHE.move_to_end(key)
-        if len(_ACC_DIM_CACHE) > _ACC_DIM_CACHE_MAX:
-            _ACC_DIM_CACHE.popitem(last=False)
+        with _ACC_DIM_LOCK:
+            _ACC_DIM_CACHE[key] = data
+            _ACC_DIM_CACHE.move_to_end(key)
+            if len(_ACC_DIM_CACHE) > _ACC_DIM_CACHE_MAX:
+                _ACC_DIM_CACHE.popitem(last=False)
         return data
     return get_run_dimensions
 

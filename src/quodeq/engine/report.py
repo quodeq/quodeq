@@ -166,8 +166,11 @@ def write_reports(evidence: Evidence, scores: dict, output_dir: Path) -> None:
     dashboard_report = build_dashboard_report(evidence, scores)
 
     dim = evidence.plugin_id
-    (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
-    (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))
+    try:
+        (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
+        (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))
+    except OSError as exc:
+        raise OSError(f"Failed to write report files to {output_dir}: {exc}") from exc
 
 
 def write_dimension_report(evidence: Evidence, scores: dict, dimension: str, output_dir: Path) -> None:

@@ -26,4 +26,7 @@ class FilesystemEvaluatorsRepository:
         path = self._root / "evaluators" / discipline / f"{dimension}.json"
         if not path.exists():
             raise NotFoundError(f"Evaluator not found: {path}")
-        return json.loads(path.read_text())
+        try:
+            return json.loads(path.read_text())
+        except json.JSONDecodeError as exc:
+            raise NotFoundError(f"Invalid JSON in evaluator file {path}: {exc}") from exc

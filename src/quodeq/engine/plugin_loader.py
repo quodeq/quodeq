@@ -34,7 +34,7 @@ def _check_engine_version(plugin_data: dict, plugin_dir: Path) -> None:
                 UserWarning,
                 stacklevel=3,
             )
-    except Exception:
+    except (ImportError, ValueError, TypeError):
         pass  # version check is best-effort; never block loading
 
 

@@ -72,12 +72,19 @@ def migrate_entry(entry: dict) -> bool:
 
 def migrate_file(path: Path, apply: bool) -> tuple[int, int]:
     """Migrate a single evaluation JSON. Returns (violations_updated, compliance_updated)."""
-    data = json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        print(f"  SKIP  cannot read {path}: {exc}")
+        return 0, 0
     v_count = sum(1 for entry in data.get("violations", []) if migrate_entry(entry))
     c_count = sum(1 for entry in data.get("compliance", []) if migrate_entry(entry))
 
     if apply and (v_count or c_count):
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        try:
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        except OSError as exc:
+            print(f"  ERROR writing {path}: {exc}")
 
     return v_count, c_count
 

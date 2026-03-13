@@ -8,3 +8,4 @@ def test_action_api_health():
     assert response.status_code == 200
     data = response.get_json()
     assert data["ok"] is True
+    assert "version" in data

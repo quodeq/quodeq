@@ -57,7 +57,7 @@ def fetch_cwe_info(cwe_id: int) -> dict | None:
         if e.code == 404:
             return _fetch_category_info(cwe_id) or _fetch_view_info(cwe_id)
         print(f"  HTTP {e.code} for CWE-{cwe_id}", file=sys.stderr)
-    except Exception as e:
+    except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
         print(f"  Error for CWE-{cwe_id}: {e}", file=sys.stderr)
     return None
 
@@ -80,7 +80,7 @@ def _fetch_category_info(cwe_id: int) -> dict | None:
                     "mapping_usage": mapping_notes.get("Usage", "Prohibited"),
                     "mapping_rationale": "Categories are not weaknesses",
                 }
-    except Exception:
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError, UnicodeDecodeError):
         pass
     return None
 
@@ -102,7 +102,7 @@ def _fetch_view_info(cwe_id: int) -> dict | None:
                     "mapping_usage": "Prohibited",
                     "mapping_rationale": "Views are not weaknesses",
                 }
-    except Exception:
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError, UnicodeDecodeError):
         pass
     return None
 

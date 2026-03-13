@@ -244,7 +244,10 @@ def count_grade_drops(violation_type_counts: dict[str, int], scale_multiplier: i
 
 def drop_grade(grade: str, drops: int) -> str:
     """Reduce a grade by the requested number of levels, flooring at Insufficient."""
-    position = GRADE_LADDER.index(grade)
+    try:
+        position = GRADE_LADDER.index(grade)
+    except ValueError:
+        return GRADE_LADDER[0]
     new_position = max(0, position - drops)
     return GRADE_LADDER[new_position]
 

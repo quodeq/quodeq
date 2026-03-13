@@ -236,7 +236,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return False
         if not project_path.exists() or not project_path.is_dir():
             return False
-        shutil.rmtree(project_path)
+        try:
+            shutil.rmtree(project_path)
+        except OSError:
+            return False
         return True
 
     def get_project_info(self, reports_dir: str, project: str) -> dict[str, Any] | None:

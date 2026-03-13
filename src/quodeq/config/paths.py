@@ -53,5 +53,8 @@ def default_paths(version: str | None = None) -> ConfigPaths:
         if _looks_like_project_root(root):
             return ConfigPaths.from_root(root, version=version)
 
-    root = module_path.parents[3]
+    if len(module_path.parents) > 3:
+        root = module_path.parents[3]
+    else:
+        root = module_path.parent
     return ConfigPaths.from_root(root, version=version)

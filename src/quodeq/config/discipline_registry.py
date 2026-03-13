@@ -135,7 +135,11 @@ class DisciplineRegistry:
         """Parse an INI-style disciplines.conf file into a registry."""
         sections: dict[str, list[tuple[str, str]]] = {}
         current_name: str | None = None
-        for raw in path.read_text().splitlines():
+        try:
+            lines = path.read_text().splitlines()
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ValueError(f"Cannot read disciplines config {path}: {exc}") from exc
+        for raw in lines:
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
@@ -209,6 +213,8 @@ class DisciplineRegistry:
         """Select the discipline with the lowest (highest-priority) detect_priority value."""
         rules = [self.disciplines[name] for name in matches if name in self.disciplines]
         if not rules:
+            if not matches:
+                raise ValueError("No matches to choose from")
             return matches[0]
         rules.sort(key=lambda rule: rule.detect_priority)
         return rules[0].name

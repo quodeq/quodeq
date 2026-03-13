@@ -71,9 +71,11 @@ def _create_mcp_config(
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="mcp_findings_", delete=False,
     )
-    os.chmod(tmp.name, 0o600)
-    json.dump(config, tmp)
-    tmp.close()
+    try:
+        os.chmod(tmp.name, 0o600)
+        json.dump(config, tmp)
+    finally:
+        tmp.close()
     return Path(tmp.name)
 
 

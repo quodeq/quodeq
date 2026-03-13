@@ -28,7 +28,7 @@ def _build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list
     try:
         dim_file = compiled_dir / f"{dimension}.json"
         data = json.loads(dim_file.read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
 
     lookup: dict[str, list[dict]] = {}

@@ -25,7 +25,10 @@ def build_evaluator_prompt(
     context: EvaluatorContext,
 ) -> str:
     """Render an evaluator prompt by substituting context values into a template."""
-    template = template_path.read_text()
+    try:
+        template = template_path.read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read template {template_path}: {exc}") from exc
     return render_template(
         template,
         {

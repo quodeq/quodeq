@@ -26,4 +26,7 @@ class FilesystemEvaluationsRepository:
         path = self._root / "evaluations" / f"{report_id}.json"
         if not path.exists():
             raise NotFoundError(f"Report not found: {path}")
-        return json.loads(path.read_text())
+        try:
+            return json.loads(path.read_text())
+        except json.JSONDecodeError as exc:
+            raise NotFoundError(f"Invalid JSON in report file {path}: {exc}") from exc

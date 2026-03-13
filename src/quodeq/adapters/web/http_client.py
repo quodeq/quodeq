@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from http import HTTPStatus
 import json
+import socket
 from urllib import request
+from urllib.error import URLError
 
 from quodeq.ports.data_errors import AuthError, NotFoundError, ServerError
 
@@ -41,5 +43,12 @@ class HttpClient:
                 payload = json.loads(resp.read().decode("utf-8"))
                 return HttpResponse(resp.status, payload)
         except request.HTTPError as exc:
-            payload = json.loads(exc.read().decode("utf-8")) if exc.fp else {"error": "http error"}
+            try:
+                payload = json.loads(exc.read().decode("utf-8")) if exc.fp else {"error": "http error"}
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                payload = {"error": "http error"}
             return HttpResponse(exc.code, payload)
+        except (URLError, socket.timeout, OSError) as exc:
+            return HttpResponse(502, {"error": f"network error: {exc}"})
+        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+            return HttpResponse(502, {"error": f"invalid response: {exc}"})

@@ -26,4 +26,7 @@ class FilesystemDimensionsRepository:
         path = self._root / "dimensions" / f"{name}.json"
         if not path.exists():
             raise NotFoundError(f"Dimension not found: {path}")
-        return json.loads(path.read_text())
+        try:
+            return json.loads(path.read_text())
+        except json.JSONDecodeError as exc:
+            raise NotFoundError(f"Invalid JSON in dimension file {path}: {exc}") from exc

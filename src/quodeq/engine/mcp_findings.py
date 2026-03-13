@@ -104,7 +104,7 @@ def _load_compiled_refs(compiled_dir: str | None, dimension: str | None) -> dict
         return {}
     try:
         data = json.loads((Path(compiled_dir) / f"{dimension}.json").read_text())
-    except Exception:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return {}
     lookup: dict[str, list[dict]] = {}
     for principle in data.get("principles", []):
