@@ -5,7 +5,9 @@ from pathlib import Path
 from quodeq.engine.plugin_loader import load_plugin
 from quodeq.engine.schema_validator import validate_plugin_dir
 
-PLUGIN_DIR = Path(__file__).parent.parent.parent / "evaluators" / "mobile_ios"
+from quodeq.config.paths import default_paths
+
+PLUGIN_DIR = default_paths().evaluators_dir / "mobile_ios"
 
 
 def test_plugin_loads():

@@ -13,12 +13,16 @@ from quodeq.engine.subagent_pool import SubagentPool, SubagentResult
 
 
 def _fake_run_analysis(work_dir, prompt, stream_file, config):
-    """Mock run_analysis that writes some findings to the JSONL file."""
+    """Mock run_analysis that writes some findings and drains the queue."""
     stream_file.parent.mkdir(parents=True, exist_ok=True)
     stream_file.write_text("")  # empty stream
+    # Drain the queue so the pool doesn't respawn agents indefinitely
+    if config.queue_path:
+        queue = FileQueue(config.queue_path)
+        queue.take(queue.remaining(), agent_id=config.agent_id)
     if config.jsonl_file:
         agent_id = config.agent_id or "unknown"
-        with open(config.jsonl_file, "w") as f:
+        with open(config.jsonl_file, "a") as f:
             f.write(json.dumps({
                 "schema_version": 1,
                 "p": "Modularity", "t": "violation", "d": "maintainability",
@@ -30,6 +34,9 @@ def _failing_run_analysis(work_dir, prompt, stream_file, config):
     """Mock run_analysis that raises AnalysisError."""
     stream_file.parent.mkdir(parents=True, exist_ok=True)
     stream_file.write_text("")
+    if config.queue_path:
+        queue = FileQueue(config.queue_path)
+        queue.take(queue.remaining(), agent_id=config.agent_id)
     if config.jsonl_file:
         config.jsonl_file.write_text("")
     raise AnalysisError("CLI crashed")

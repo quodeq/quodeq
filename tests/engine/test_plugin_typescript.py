@@ -1,7 +1,7 @@
-from pathlib import Path
+from quodeq.config.paths import default_paths
 from quodeq.engine.plugin_loader import load_plugin
 
-PLUGIN_DIR = Path(__file__).parent.parent.parent / "evaluators" / "typescript"
+PLUGIN_DIR = default_paths().evaluators_dir / "typescript"
 
 
 def test_plugin_loads():

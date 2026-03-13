@@ -8,7 +8,9 @@ import pytest
 from quodeq.engine.plugin_loader import load_plugin, load_plugin_full
 from quodeq.engine.schema_validator import validate_plugin_dir
 
-PLUGIN_DIR = Path(__file__).parent.parent.parent / "evaluators" / "bash"
+from quodeq.config.paths import default_paths
+
+PLUGIN_DIR = default_paths().evaluators_dir / "bash"
 
 
 def test_plugin_loads():

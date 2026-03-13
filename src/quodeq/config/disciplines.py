@@ -23,7 +23,7 @@ def validate_new_discipline(name: str, language: str, category: str) -> int:
 
 def get_discipline_language(name: str, paths: ConfigPaths) -> str | None:
     """Look up the programming language configured for a discipline."""
-    conf = paths.root / "config" / "disciplines.conf"
+    conf = paths.evaluators_dir.parent / "config" / "disciplines.conf"
     if not conf.exists():
         return None
     current = None

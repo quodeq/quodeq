@@ -3,14 +3,32 @@ name = "quodeq"
 version = "0.3.0"
 description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
+license = "MIT"
 authors = [
     { name = "Victor Purcallas Marchesi", email = "vpurcallas@gmail.com" }
 ]
 requires-python = ">=3.12"
+keywords = ["code-quality", "ai", "evaluation", "iso-25010", "static-analysis"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
 dependencies = [
     "jsonschema==4.26.0",
     "flask==3.1.3",
 ]
+
+[project.urls]
+Homepage = "https://github.com/quodeq/quodeq"
+Repository = "https://github.com/quodeq/quodeq"
+Issues = "https://github.com/quodeq/quodeq/issues"
 
 [dependency-groups]
 dev = [
@@ -39,3 +57,7 @@ fail_under = 60
 [build-system]
 requires = ["uv_build>=0.10.6,<0.11.0"]
 build-backend = "uv_build"
+
+[tool.uv-build]
+# Include web UI source in the sdist (for building from source)
+source-include = ["ui/web/"]

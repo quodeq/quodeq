@@ -33,6 +33,19 @@ Evaluate any repository across six quality dimensions — **Security**, **Reliab
 ### Install
 
 ```bash
+# From PyPI
+pip install quodeq
+
+# Or with uv
+uv pip install quodeq
+
+# Or with Homebrew
+brew install quodeq/tap/quodeq
+```
+
+### Install from source (development)
+
+```bash
 uv sync
 ```
 
@@ -180,13 +193,15 @@ quodeq/
     adapters/                # Report parsers, filesystem and web adapters
     config/                  # CLI configuration, knowledge refresh, standards
     dashboard/               # Dashboard server and UI build
+    data/                    # Bundled data (evaluators, standards, prompts)
+      evaluators/            # Language plugins (typescript, python, kotlin, java, bash, ios)
+      standards/             # ISO 25010, ASVS, CISQ standards with compiled CWE mappings
+      prompts/               # LLM prompt templates
     ports/                   # Abstract interfaces (Protocol-based)
     provider/                # Action provider (filesystem-backed implementation)
     shared/                  # Utilities, logging, paths, defaults
-  evaluators/                # Language plugins (typescript, python, kotlin, java, bash, ios)
-  standards/                 # ISO 25010, ASVS, CISQ standards with compiled CWE mappings
-  prompts/                   # LLM prompt templates
-  ui/web/                    # React + Vite dashboard
+    static/                  # Pre-built dashboard UI (generated at build time)
+  ui/web/                    # React + Vite dashboard (source)
   evaluations/               # Evaluation output (generated)
   tools/                     # Standards compiler, migration scripts
   tests/                     # Test suite (mirrors src/ structure)
