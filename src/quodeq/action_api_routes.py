@@ -55,7 +55,7 @@ def _build_project_zip(project_path: Path) -> Path:
                     if total_size > _MAX_ZIP_SIZE_BYTES:
                         raise ValueError("Project exceeds maximum export size")
                     zf.write(file_entry, file_entry.relative_to(project_path.parent))
-    except BaseException:
+    except Exception:
         os.unlink(tmp_path)
         raise
     return Path(tmp_path)

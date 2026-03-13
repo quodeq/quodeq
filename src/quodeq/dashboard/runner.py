@@ -61,6 +61,7 @@ def validate_paths(config: DashboardConfig) -> None:
 
 def _is_port_open(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.settimeout(2)
         return sock.connect_ex((host, port)) == 0
 
 

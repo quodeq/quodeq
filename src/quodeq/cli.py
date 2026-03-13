@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import subprocess
 import sys
 import uuid
 from pathlib import Path
@@ -92,7 +93,7 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
     if is_repo_url(repo_path):
         try:
             repo_path = prepare_repository(repo_path)
-        except Exception as exc:
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as exc:
             print(f"Failed to clone repository: {exc}", file=sys.stderr)
             return None
     src = Path(repo_path).resolve()

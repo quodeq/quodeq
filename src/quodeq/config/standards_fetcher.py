@@ -19,8 +19,21 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
     Returns the number of requirements fetched.
     When QUODEQ_ASVS_SHA256 is set, validates the download against the expected hash.
     """
-    with urllib.request.urlopen(get_asvs_url(), timeout=30) as r:
-        content = r.read()
+    import time
+    import random
+    _max_retries = 3
+    last_exc: Exception | None = None
+    for _attempt in range(_max_retries):
+        try:
+            with urllib.request.urlopen(get_asvs_url(), timeout=30) as r:
+                content = r.read()
+            break
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            last_exc = exc
+            if _attempt < _max_retries - 1:
+                time.sleep(0.5 * (2 ** _attempt) + random.uniform(0, 0.3))
+    else:
+        raise ConnectionError(f"Failed to fetch ASVS after {_max_retries} attempts: {last_exc}") from last_exc
 
     actual_hash = hashlib.sha256(content).hexdigest()
     expected_hash = os.environ.get(_ASVS_SHA256_ENV)

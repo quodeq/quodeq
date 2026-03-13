@@ -354,7 +354,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     for idx, dimension in enumerate(dimensions, 1):
         try:
             ev = _process_single_dimension(config, dimension, idx, ctx)
-        except Exception as exc:
+        except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} — failed: {exc}")
             skipped_count += 1
             continue

@@ -1,8 +1,11 @@
 """Plugin loader — discovers and validates evaluator plugin directories."""
 from __future__ import annotations
 import json
+import logging
 from pathlib import Path
 from typing import Iterator
+
+_logger = logging.getLogger(__name__)
 
 from quodeq.engine.schema_validator import (
     validate_plugin,
@@ -93,8 +96,10 @@ def _try_load(plugin_dir: Path) -> dict | None:
         data = read_json(plugin_file)
         errors = validate_plugin(data)
         if errors:
+            _logger.warning("Plugin %s has validation errors: %s", plugin_dir.name, "; ".join(errors))
             return None
         data["_path"] = str(plugin_dir)
         return data
-    except (json.JSONDecodeError, KeyError):
+    except (json.JSONDecodeError, KeyError, OSError) as exc:
+        _logger.warning("Failed to load plugin %s: %s", plugin_dir.name, exc)
         return None

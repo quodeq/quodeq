@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from typing import Any
 
@@ -10,6 +11,7 @@ from quodeq.engine.plugin_loader import scan_plugin_dirs
 _PLUGIN_CACHE_TTL = 60  # seconds; allows runtime plugin changes to propagate
 _plugin_cache: list[dict[str, Any]] | None = None
 _plugin_cache_ts: float = 0.0
+_plugin_cache_lock = threading.Lock()
 
 
 def discover_plugins() -> list[dict[str, Any]]:
@@ -21,8 +23,9 @@ def discover_plugins() -> list[dict[str, Any]]:
     """
     global _plugin_cache, _plugin_cache_ts
     now = time.monotonic()
-    if _plugin_cache is not None and now - _plugin_cache_ts < _PLUGIN_CACHE_TTL:
-        return _plugin_cache
+    with _plugin_cache_lock:
+        if _plugin_cache is not None and now - _plugin_cache_ts < _PLUGIN_CACHE_TTL:
+            return _plugin_cache
     from quodeq.config.paths import default_paths
     evaluators_root = default_paths().evaluators_dir
     result: list[dict[str, Any]] = []
@@ -42,6 +45,7 @@ def discover_plugins() -> list[dict[str, Any]]:
             })
         except (KeyError, ValueError, OSError, json.JSONDecodeError, UnicodeDecodeError):
             continue
-    _plugin_cache = result
-    _plugin_cache_ts = now
+    with _plugin_cache_lock:
+        _plugin_cache = result
+        _plugin_cache_ts = now
     return result

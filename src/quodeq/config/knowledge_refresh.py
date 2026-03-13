@@ -173,21 +173,27 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
     return [results[repo["name"]] for repo in repos if repo["name"] in results]
 
 
+import threading as _threading
+
 _fetch_failures: int = 0
 _FETCH_CIRCUIT_THRESHOLD = 5
+_fetch_lock = _threading.Lock()
 
 
 def _fetch_url(url: str, headers: dict | None = None) -> str | None:
     global _fetch_failures
-    if _fetch_failures >= _FETCH_CIRCUIT_THRESHOLD:
-        return None
+    with _fetch_lock:
+        if _fetch_failures >= _FETCH_CIRCUIT_THRESHOLD:
+            return None
     try:
         req = urllib.request.Request(url, headers=headers or {})
         with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT_S) as r:
-            _fetch_failures = 0
+            with _fetch_lock:
+                _fetch_failures = 0
             return r.read().decode("utf-8", errors="replace")
     except (urllib.error.URLError, OSError, ValueError):
-        _fetch_failures += 1
+        with _fetch_lock:
+            _fetch_failures += 1
         return None
 
 

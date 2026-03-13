@@ -269,8 +269,8 @@ def _run_with_heartbeat(
                     1 for line in new_bytes_j.decode("utf-8", errors="replace").splitlines()
                     if line.strip()
                 )
-            except OSError:
-                pass
+            except OSError as exc:
+                log_debug(f"Failed to read JSONL {config.jsonl_file}: {exc}")
         return {"files_read": len(_seen_files), "evidence": _jsonl_count}
 
     while process.poll() is None:

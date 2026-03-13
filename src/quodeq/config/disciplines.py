@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from quodeq.config.paths import ConfigPaths
-from quodeq.shared.logging import log_error
+from quodeq.shared.logging import log_error, log_warning
 
 VALID_CATEGORIES = frozenset({"backend", "frontend", "mobile", "infra"})
 
@@ -29,7 +29,8 @@ def get_discipline_language(name: str, paths: ConfigPaths) -> str | None:
     current = None
     try:
         conf_lines = conf.read_text().splitlines()
-    except (OSError, UnicodeDecodeError):
+    except (OSError, UnicodeDecodeError) as exc:
+        log_warning(f"Could not read disciplines config {conf}: {exc}")
         return None
     for line in conf_lines:
         line = line.strip()

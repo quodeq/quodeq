@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 from typing import Iterable
+
+_logger = logging.getLogger(__name__)
 
 
 _DEFAULT_DETECT_PRIORITY = 99  # lowest priority — used as fallback catch-all
@@ -166,7 +169,8 @@ class DisciplineRegistry:
     def _file_contains(self, path: Path, needle: str) -> bool:
         try:
             return needle in path.read_text(errors="ignore")
-        except OSError:
+        except OSError as exc:
+            _logger.debug("Could not read %s for content check: %s", path, exc)
             return False
 
     def _check_prerequisites(self, repo: Path, rule: DisciplineRule) -> bool:

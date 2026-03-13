@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,8 +51,21 @@ def _load_index(reports_dir: Path) -> dict[str, str]:
 
 
 def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
-    """Write the project index file."""
-    (reports_dir / _INDEX_FILE).write_text(json.dumps(index, indent=2))
+    """Write the project index file atomically."""
+    import tempfile
+    index_path = reports_dir / _INDEX_FILE
+    try:
+        fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w") as f:
+                json.dump(index, f, indent=2)
+            os.replace(tmp, index_path)
+        except BaseException:
+            os.unlink(tmp)
+            raise
+    except OSError as exc:
+        import logging
+        logging.getLogger(__name__).warning("Could not save project index: %s", exc)
 
 
 def _find_existing_project(reports_dir: Path, identity: ProjectIdentity) -> str | None:
@@ -98,7 +112,11 @@ def _create_project(reports_dir: Path, identity: ProjectIdentity) -> str:
         "location": identity.location,
         "path": identity.repo_path,
     }
-    (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
+    try:
+        (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
+    except OSError as exc:
+        import logging
+        logging.getLogger(__name__).warning("Could not write repository_info.json: %s", exc)
     index = _load_index(reports_dir)
     index[_index_key(identity)] = project_uuid
     _save_index(reports_dir, index)

@@ -149,7 +149,7 @@ class SubagentPool:
                     f"{taken} files taken ({remaining} left) | "
                     f"{findings} findings"
                 )
-            except Exception as exc:
+            except (OSError, ValueError, RuntimeError) as exc:
                 log_warning(f"Heartbeat error: {exc}")
 
     def run(self) -> list[SubagentResult]:

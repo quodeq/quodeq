@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import random
+import threading
+import time
 from dataclasses import dataclass
 from http import HTTPStatus
 import json
@@ -12,6 +15,10 @@ from urllib.error import URLError
 from quodeq.ports.data_errors import AuthError, NotFoundError, ServerError
 
 _HTTP_TIMEOUT_S = 10
+_MAX_RETRIES = 3
+_RETRY_BASE_DELAY_S = 0.5
+_CIRCUIT_BREAKER_THRESHOLD = 5
+_CIRCUIT_BREAKER_RESET_S = 60
 
 
 @dataclass(frozen=True)
@@ -33,10 +40,61 @@ def check_response_status(response: HttpResponse) -> None:
 
 
 class HttpClient:
-    """Simple HTTP client that performs GET requests and returns parsed JSON."""
+    """Simple HTTP client that performs GET requests and returns parsed JSON.
+
+    Includes retry with exponential backoff and a thread-safe circuit breaker
+    that trips after repeated network failures.
+    """
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._failure_count = 0
+        self._circuit_opened_at: float | None = None
+
+    def _is_circuit_open(self) -> bool:
+        with self._lock:
+            if self._failure_count < _CIRCUIT_BREAKER_THRESHOLD:
+                return False
+            if self._circuit_opened_at and (time.monotonic() - self._circuit_opened_at) > _CIRCUIT_BREAKER_RESET_S:
+                self._failure_count = 0
+                self._circuit_opened_at = None
+                return False
+            return True
+
+    def _record_success(self) -> None:
+        with self._lock:
+            self._failure_count = 0
+            self._circuit_opened_at = None
+
+    def _record_failure(self) -> None:
+        with self._lock:
+            self._failure_count += 1
+            if self._failure_count >= _CIRCUIT_BREAKER_THRESHOLD and self._circuit_opened_at is None:
+                self._circuit_opened_at = time.monotonic()
 
     def get_json(self, url: str, headers: dict[str, str]) -> HttpResponse:
-        """Send a GET request to the URL and return the parsed JSON response."""
+        """Send a GET request with retry + circuit breaker and return parsed JSON."""
+        if self._is_circuit_open():
+            return HttpResponse(503, {"error": "circuit breaker open — too many recent failures"})
+
+        last_response: HttpResponse | None = None
+        for attempt in range(_MAX_RETRIES):
+            result = self._attempt_get(url, headers)
+            last_response = result
+            if result.status < 500:
+                self._record_success()
+                return result
+            # Retry on 5xx / network errors with exponential backoff + jitter
+            if attempt < _MAX_RETRIES - 1:
+                delay = _RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, 0.3)
+                time.sleep(delay)
+
+        self._record_failure()
+        assert last_response is not None
+        return last_response
+
+    def _attempt_get(self, url: str, headers: dict[str, str]) -> HttpResponse:
+        """Perform a single GET attempt."""
         req = request.Request(url, headers=headers)
         try:
             with request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:

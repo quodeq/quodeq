@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
 from quodeq.config.prompt_templates import render_template
+
+_logger = logging.getLogger(__name__)
 
 
 def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
@@ -18,7 +21,8 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
 
     try:
         data = json.loads(compiled_file.read_text())
-    except (OSError, json.JSONDecodeError):
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.warning("Could not read compiled standards %s: %s", compiled_file, exc)
         return "_Could not read compiled standards._"
     lines = []
     for principle in data.get("principles", []):

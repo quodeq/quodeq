@@ -61,7 +61,10 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
 
 def run_generate_dimensions(paths: ConfigPaths) -> None:
     """Generate dimension definitions via the AI CLI and save the output."""
-    template = (paths.prompts_dir / "dimensions-generator.md").read_text()
+    try:
+        template = (paths.prompts_dir / "dimensions-generator.md").read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RuntimeError(f"Failed to read dimensions template: {exc}") from exc
     prompt = render_template(template, {
         "DIMENSIONS": ", ".join(DIMENSION_NAMES),
         "OUTPUT_DIR": str(paths.dimensions_dir),
