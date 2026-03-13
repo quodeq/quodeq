@@ -23,7 +23,11 @@ def _build_cwe_name_lookup(compiled_dir: Path) -> dict[int, str]:
     """Build CWE ID -> name from all compiled standards files."""
     lookup: dict[int, str] = {}
     for f in compiled_dir.glob("*.json"):
-        data = json.loads(f.read_text())
+        try:
+            data = json.loads(f.read_text())
+        except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            print(f"  SKIP  cannot read {f}: {exc}")
+            continue
         for principle in data.get("principles", []):
             for cwe in principle.get("cwes", []):
                 cid = cwe.get("id")
@@ -50,12 +54,19 @@ def _patch_entries(entries: list[dict], cwe_names: dict[int, str]) -> int:
 
 
 def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[int, int]:
-    data = json.loads(path.read_text())
+    try:
+        data = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        print(f"  SKIP  cannot read {path}: {exc}")
+        return 0, 0
     v_count = _patch_entries(data.get("violations", []), cwe_names)
     c_count = _patch_entries(data.get("compliance", []), cwe_names)
 
     if apply and (v_count or c_count):
-        path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        try:
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        except OSError as exc:
+            print(f"  ERROR writing {path}: {exc}")
 
     return v_count, c_count
 

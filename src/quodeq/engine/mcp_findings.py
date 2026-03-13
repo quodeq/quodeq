@@ -300,13 +300,17 @@ def main() -> None:
     if sa.queue_path:
         queue = FileQueue(Path(sa.queue_path))
 
-    with open(sa.findings_file, "a") as findings_fh:
-        router = FindingsRouter(findings_fh, compiled_refs)
-        while True:
-            msg = _read_message()
-            if msg is None:
-                break
-            _dispatch(msg, router, queue, sa.agent_id)
+    try:
+        with open(sa.findings_file, "a") as findings_fh:
+            router = FindingsRouter(findings_fh, compiled_refs)
+            while True:
+                msg = _read_message()
+                if msg is None:
+                    break
+                _dispatch(msg, router, queue, sa.agent_id)
+    except OSError as exc:
+        sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

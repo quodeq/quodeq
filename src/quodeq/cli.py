@@ -90,7 +90,11 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
     """Resolve the repo argument to a local path (cloning if needed)."""
     repo_path = args.repo
     if is_repo_url(repo_path):
-        repo_path = prepare_repository(repo_path)
+        try:
+            repo_path = prepare_repository(repo_path)
+        except Exception as exc:
+            print(f"Failed to clone repository: {exc}", file=sys.stderr)
+            return None
     src = Path(repo_path).resolve()
     if not src.exists():
         print(f"Repository path does not exist: {src}", file=sys.stderr)

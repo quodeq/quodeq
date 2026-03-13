@@ -43,7 +43,7 @@ def _capture_popen_args(tmp_path: Path, ai_model: str | None) -> list[str]:
                 stream_file=stream_file,
                 config=config,
             )
-        except Exception:
+        except (OSError, RuntimeError, ValueError, TypeError):
             pass  # We only care about what Popen received
 
     assert mock_popen.called, "Popen was never called"

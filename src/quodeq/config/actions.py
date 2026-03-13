@@ -52,8 +52,11 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
         )
         stdout, err = run_ai_cli(prompt)
         if err:
-            raise RuntimeError(err)
-        output_path.write_text(stdout)
+            raise RuntimeError(f"Evaluator generation failed for {dimension} → {output_path}: {err}")
+        try:
+            output_path.write_text(stdout)
+        except OSError as exc:
+            raise RuntimeError(f"Failed to write evaluator {output_path}: {exc}") from exc
 
 
 def run_generate_dimensions(paths: ConfigPaths) -> None:

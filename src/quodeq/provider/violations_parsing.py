@@ -74,8 +74,9 @@ def _count_files_in_stream(stream_path: Path) -> int:
                     files.update(_extract_files_from_stream_event(json.loads(stripped)))
                 except json.JSONDecodeError:
                     continue
-    except OSError:
-        pass
+    except OSError as exc:
+        import logging
+        logging.getLogger(__name__).warning("Failed to read stream file %s: %s", stream_path, exc)
     return len(files)
 
 

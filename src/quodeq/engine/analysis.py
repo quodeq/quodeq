@@ -316,7 +316,10 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
     if process.returncode != 0:
         stderr_text = ""
         if stream_err.exists():
-            stderr_text = _sanitize_stderr(stream_err.read_text().strip())
+            try:
+                stderr_text = _sanitize_stderr(stream_err.read_text().strip())
+            except (OSError, UnicodeDecodeError):
+                stderr_text = "(stderr unreadable)"
         raise AnalysisError(
             f"AI CLI exited with code {process.returncode}"
             + (f": {stderr_text}" if stderr_text else "")

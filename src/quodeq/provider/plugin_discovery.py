@@ -40,7 +40,7 @@ def discover_plugins() -> list[dict[str, Any]]:
                     for d in dims_data.get("applies", [])
                 ],
             })
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, OSError, json.JSONDecodeError, UnicodeDecodeError):
             continue
     _plugin_cache = result
     _plugin_cache_ts = now

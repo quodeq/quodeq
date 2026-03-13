@@ -36,7 +36,10 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
             actual_hash,
         )
 
-    raw = json.loads(content)
+    try:
+        raw = json.loads(content)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ValueError(f"ASVS response is not valid JSON: {exc}") from exc
 
     requirements = _parse_asvs_l1(raw)
     output = {
@@ -75,9 +78,9 @@ def _extract_l1_from_chapter(chapter: dict) -> list[dict]:
                 items.append({
                     "id": shortcode,
                     "level": 1,
-                    "text": req["Description"],
+                    "text": req.get("Description", ""),
                     "cwe": req.get("CWE", []),
-                    "section": chapter["ShortName"],
+                    "section": chapter.get("ShortName", ""),
                 })
     return items
 

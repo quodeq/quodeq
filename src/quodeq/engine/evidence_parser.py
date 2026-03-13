@@ -168,8 +168,12 @@ def parse_jsonl_to_evidence(
     """Parse extracted JSONL file into a complete Evidence object."""
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
-    if jsonl_file.exists():
-        with open(jsonl_file) as _jf:
+    try:
+        jf_open = open(jsonl_file) if jsonl_file.exists() else None
+    except OSError:
+        jf_open = None
+    if jf_open is not None:
+        with jf_open as _jf:
             for line in _jf:
                 result = _parse_jsonl_line(line)
                 if result is not None:

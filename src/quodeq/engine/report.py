@@ -179,4 +179,7 @@ def write_dimension_report(evidence: Evidence, scores: dict, dimension: str, out
 
     report = build_dashboard_report(evidence, scores)
     report["dimension"] = dimension
-    (output_dir / f"{dimension}.json").write_text(json.dumps(report, indent=2))
+    try:
+        (output_dir / f"{dimension}.json").write_text(json.dumps(report, indent=2))
+    except OSError as exc:
+        raise OSError(f"Failed to write dimension report {dimension} to {output_dir}: {exc}") from exc

@@ -301,7 +301,7 @@ def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
 
     full = load_plugin_full(plugin_dir)
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
-    all_dims_raw = [d["id"] for d in full["dimensions"].get("applies", [])]
+    all_dims_raw = [d.get("id") for d in full["dimensions"].get("applies", []) if d.get("id")]
     dimensions = [d for d in all_dims_raw if d in config.options.dimensions] if config.options.dimensions else all_dims_raw
 
     ctx = _PluginContext(
@@ -352,7 +352,12 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     skipped_count = 0
 
     for idx, dimension in enumerate(dimensions, 1):
-        ev = _process_single_dimension(config, dimension, idx, ctx)
+        try:
+            ev = _process_single_dimension(config, dimension, idx, ctx)
+        except Exception as exc:
+            log_warning(f"[{idx}/{ctx.total}] {dimension} — failed: {exc}")
+            skipped_count += 1
+            continue
         if ev is None:
             skipped_count += 1
             continue

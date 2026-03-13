@@ -135,19 +135,22 @@ class SubagentPool:
         """Emit periodic progress lines until stopped."""
         start = time.monotonic()
         while not stop.wait(_HEARTBEAT_INTERVAL):
-            elapsed = int(time.monotonic() - start)
-            mins, secs = divmod(elapsed, 60)
-            findings = self._count_total_findings()
-            queue = FileQueue(self._queue_path)
-            remaining = queue.remaining()
-            taken = len(queue.all_taken_files())
-            done = sum(1 for v in finished.values() if v)
-            log_info(
-                f"  [{self._dimension}] {mins}m{secs:02d}s | "
-                f"{done}/{self._n} agents done | "
-                f"{taken} files taken ({remaining} left) | "
-                f"{findings} findings"
-            )
+            try:
+                elapsed = int(time.monotonic() - start)
+                mins, secs = divmod(elapsed, 60)
+                findings = self._count_total_findings()
+                queue = FileQueue(self._queue_path)
+                remaining = queue.remaining()
+                taken = len(queue.all_taken_files())
+                done = sum(1 for v in finished.values() if v)
+                log_info(
+                    f"  [{self._dimension}] {mins}m{secs:02d}s | "
+                    f"{done}/{self._n} agents done | "
+                    f"{taken} files taken ({remaining} left) | "
+                    f"{findings} findings"
+                )
+            except Exception as exc:
+                log_warning(f"Heartbeat error: {exc}")
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, respawning when slots free up and queue has files.
@@ -247,7 +250,6 @@ class SubagentPool:
         with open(jsonl_path, "w") as f:
             for line in unique_lines:
                 f.write(line + "\n")
-        removed = len(unique_lines) - len(seen)  # always 0, but for clarity
         log_info(f"Deduplicated {jsonl_path.name}: {len(unique_lines)} unique findings")
         return len(unique_lines)
 

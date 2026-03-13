@@ -129,7 +129,16 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
 
 def main() -> None:
     """Start the Flask development server using environment configuration."""
+    import signal
+
     app = create_app(static_dist=get_static_dist())
+
+    def _handle_shutdown(signum: int, frame: object) -> None:
+        raise SystemExit(0)
+
+    signal.signal(signal.SIGTERM, _handle_shutdown)
+    signal.signal(signal.SIGINT, _handle_shutdown)
+
     app.run(host=get_action_api_host(), port=get_action_api_port())
 
 

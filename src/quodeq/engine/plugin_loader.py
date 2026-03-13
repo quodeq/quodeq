@@ -35,7 +35,7 @@ def _check_engine_version(plugin_data: dict, plugin_dir: Path) -> None:
                 stacklevel=3,
             )
     except (ImportError, ValueError, TypeError):
-        pass  # version check is best-effort; never block loading
+        pass  # version check is best-effort; never block plugin loading
 
 
 def scan_plugin_dirs(evaluators_dir: Path) -> Iterator[Path]:

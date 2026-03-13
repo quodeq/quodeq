@@ -3,12 +3,13 @@
 from __future__ import annotations
 
 from quodeq.adapters.hybrid._hybrid_call import hybrid_call
+from quodeq.ports.dimensions import DimensionsRepository
 
 
 class HybridDimensionsRepository:
     """Dimension repository that delegates to web then falls back to filesystem."""
 
-    def __init__(self, web, fs) -> None:
+    def __init__(self, web: DimensionsRepository, fs: DimensionsRepository) -> None:
         self._web = web
         self._fs = fs
 

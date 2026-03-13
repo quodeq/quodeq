@@ -16,7 +16,10 @@ def load_dimension(dimension_id: str, standards_dir: Path | None = None) -> dict
     """Load an ISO 25010 dimension definition by its identifier."""
     resolved = _resolve_standards_dir(standards_dir)
     path = resolved / "iso25010" / f"{dimension_id}.json"
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text())
+    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot load dimension '{dimension_id}' from {path}: {exc}") from exc
 
 
 def load_asvs_l1(standards_dir: Path | None = None) -> dict:

@@ -5,7 +5,10 @@ import json
 from pathlib import Path
 
 _DEFAULT_PLUGIN_VERSION = "1.0.0"
-_MIN_ENGINE_VERSION = ">=2.0.0"
+def _min_engine_version() -> str:
+    """Derive the engine_version constraint from the installed quodeq version."""
+    from quodeq import __version__
+    return f"=={__version__}" if __version__ else "==0.3.0"
 _DEFAULT_DIMENSION_WEIGHT = 1.0
 _SECURITY_DIMENSION_WEIGHT = 1.2
 _PERFORMANCE_DIMENSION_WEIGHT = 0.8
@@ -50,7 +53,7 @@ def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:
         "id": runtime,
         "name": preset["display_name"],
         "version": _DEFAULT_PLUGIN_VERSION,
-        "engine_version": _MIN_ENGINE_VERSION,
+        "engine_version": _min_engine_version(),
         "detects": {
             "extensions": preset["extensions"],
             "config_files": preset["config_files"],
@@ -87,22 +90,27 @@ def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
     preset = RUNTIME_PRESETS[runtime]
     plugin_dir.mkdir(parents=True)
 
-    _write_plugin_json(plugin_dir, runtime, preset)
-    _write_dimensions_json(plugin_dir)
+    try:
+        _write_plugin_json(plugin_dir, runtime, preset)
+        _write_dimensions_json(plugin_dir)
 
-    knowledge_dir = plugin_dir / "knowledge"
-    knowledge_dir.mkdir()
-    (knowledge_dir / "analysis.md").write_text(
-        f"# {preset['display_name']} Codebase Analysis Guidance\n\n"
-        f"## Where to look first\n\n"
-        f"### Security hotspots\n"
-        f"- Hardcoded secrets and credentials\n\n"
-        f"### Maintainability signals\n"
-        f"- File size and complexity\n\n"
-        f"### Reliability signals\n"
-        f"- Error handling patterns\n\n"
-        f"### Performance signals\n"
-        f"- Resource management\n"
-    )
+        knowledge_dir = plugin_dir / "knowledge"
+        knowledge_dir.mkdir()
+        (knowledge_dir / "analysis.md").write_text(
+            f"# {preset['display_name']} Codebase Analysis Guidance\n\n"
+            f"## Where to look first\n\n"
+            f"### Security hotspots\n"
+            f"- Hardcoded secrets and credentials\n\n"
+            f"### Maintainability signals\n"
+            f"- File size and complexity\n\n"
+            f"### Reliability signals\n"
+            f"- Error handling patterns\n\n"
+            f"### Performance signals\n"
+            f"- Resource management\n"
+        )
+    except OSError:
+        import shutil
+        shutil.rmtree(plugin_dir, ignore_errors=True)
+        raise
 
     return plugin_dir
