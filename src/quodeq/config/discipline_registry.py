@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
 from typing import Iterable
+
+_logger = logging.getLogger(__name__)
 
 
 _DEFAULT_DETECT_PRIORITY = 99  # lowest priority — used as fallback catch-all
@@ -135,7 +138,11 @@ class DisciplineRegistry:
         """Parse an INI-style disciplines.conf file into a registry."""
         sections: dict[str, list[tuple[str, str]]] = {}
         current_name: str | None = None
-        for raw in path.read_text().splitlines():
+        try:
+            lines = path.read_text().splitlines()
+        except (OSError, UnicodeDecodeError) as exc:
+            raise ValueError(f"Cannot read disciplines config {path}: {exc}") from exc
+        for raw in lines:
             line = raw.strip()
             if not line or line.startswith("#"):
                 continue
@@ -162,7 +169,8 @@ class DisciplineRegistry:
     def _file_contains(self, path: Path, needle: str) -> bool:
         try:
             return needle in path.read_text(errors="ignore")
-        except OSError:
+        except OSError as exc:
+            _logger.debug("Could not read %s for content check: %s", path, exc)
             return False
 
     def _check_prerequisites(self, repo: Path, rule: DisciplineRule) -> bool:
@@ -209,6 +217,8 @@ class DisciplineRegistry:
         """Select the discipline with the lowest (highest-priority) detect_priority value."""
         rules = [self.disciplines[name] for name in matches if name in self.disciplines]
         if not rules:
+            if not matches:
+                raise ValueError("No matches to choose from")
             return matches[0]
         rules.sort(key=lambda rule: rule.detect_priority)
         return rules[0].name

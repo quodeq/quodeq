@@ -206,7 +206,10 @@ def build_req_index(
     Returns: {"Fault Tolerance": [{"id": "R-FT-1", "source": "iso25010", "text": "...", "refs": [...]}]}
     """
     iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    iso_data = json.loads(iso_file.read_text())
+    try:
+        iso_data = json.loads(iso_file.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
     index = _build_req_index(iso_data)
     _attach_cwe_refs(index, cwe_db)
     _attach_cisq_refs(index, standards_dir, dimension)

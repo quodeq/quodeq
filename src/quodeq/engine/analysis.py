@@ -38,26 +38,44 @@ class AnalysisConfig:
     ai_model: str | None = None
     max_turns: int | None = _DEFAULT_MAX_TURNS
     max_duration: int | None = _DEFAULT_MAX_DURATION
+    compiled_dir: Path | None = None
+    dimension: str | None = None
+    queue_path: Path | None = None
+    agent_id: str = ""
 
 
-def _create_mcp_config(jsonl_file: Path) -> Path:
+def _create_mcp_config(
+    jsonl_file: Path,
+    compiled_dir: Path | None = None,
+    dimension: str | None = None,
+    queue_path: Path | None = None,
+    agent_id: str = "",
+) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
     mcp_script = str(Path(__file__).resolve().parent / "mcp_findings.py")
-    jsonl_path = str(jsonl_file.resolve())
+    mcp_args = [mcp_script, str(jsonl_file.resolve())]
+    if compiled_dir and dimension:
+        mcp_args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
+    if queue_path:
+        mcp_args.extend(["--queue", str(queue_path.resolve())])
+    if agent_id:
+        mcp_args.extend(["--agent-id", agent_id])
     config = {
         "mcpServers": {
             "findings": {
                 "command": sys.executable,
-                "args": [mcp_script, jsonl_path],
+                "args": mcp_args,
             }
         }
     }
     tmp = tempfile.NamedTemporaryFile(
         mode="w", suffix=".json", prefix="mcp_findings_", delete=False,
     )
-    os.chmod(tmp.name, 0o600)
-    json.dump(config, tmp)
-    tmp.close()
+    try:
+        os.chmod(tmp.name, 0o600)
+        json.dump(config, tmp)
+    finally:
+        tmp.close()
     return Path(tmp.name)
 
 
@@ -130,7 +148,7 @@ def count_files_from_stream(stream_file: Path) -> int:
     return len(_count_files_from_stream(stream_file))
 
 
-_AI_TOOLS: str = os.environ.get("QUODEQ_AI_TOOLS", "Bash,Glob,Grep,Read")
+_AI_TOOLS: str = os.environ.get("QUODEQ_AI_TOOLS", "Glob,Grep,Read")
 _BASE_AI_ARGS: tuple[str, ...] = tuple(
     os.environ.get("QUODEQ_AI_BASE_ARGS", "--print --output-format stream-json --verbose").split()
 )
@@ -174,9 +192,15 @@ def _build_ai_cmd(
     provider_cfg = _PROVIDER_CONFIGS.get(cmd, {})
     mcp_config_path: Path | None = None
     if config.jsonl_file is not None:
-        mcp_config_path = _create_mcp_config(config.jsonl_file)
+        mcp_config_path = _create_mcp_config(
+            config.jsonl_file, config.compiled_dir, config.dimension,
+            config.queue_path, config.agent_id,
+        )
         args.extend(["--mcp-config", str(mcp_config_path)])
-        args.extend(["--allowedTools", "mcp__findings__report_finding"])
+        allowed = "mcp__findings__report_finding"
+        if config.queue_path:
+            allowed += ",mcp__findings__get_next_files"
+        args.extend(["--allowedTools", allowed])
         # MCP servers require permission approval; in --print mode there is no
         # interactive prompt, so we must bypass permissions for the server to start.
         args.extend(provider_cfg.get("mcp_permission_args", ["--permission-mode", "bypassPermissions"]))
@@ -245,8 +269,8 @@ def _run_with_heartbeat(
                     1 for line in new_bytes_j.decode("utf-8", errors="replace").splitlines()
                     if line.strip()
                 )
-            except OSError:
-                pass
+            except OSError as exc:
+                log_debug(f"Failed to read JSONL {config.jsonl_file}: {exc}")
         return {"files_read": len(_seen_files), "evidence": _jsonl_count}
 
     while process.poll() is None:
@@ -292,7 +316,10 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
     if process.returncode != 0:
         stderr_text = ""
         if stream_err.exists():
-            stderr_text = _sanitize_stderr(stream_err.read_text().strip())
+            try:
+                stderr_text = _sanitize_stderr(stream_err.read_text().strip())
+            except (OSError, UnicodeDecodeError):
+                stderr_text = "(stderr unreadable)"
         raise AnalysisError(
             f"AI CLI exited with code {process.returncode}"
             + (f": {stderr_text}" if stderr_text else "")

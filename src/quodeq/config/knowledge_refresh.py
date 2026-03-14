@@ -173,19 +173,37 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
     return [results[repo["name"]] for repo in repos if repo["name"] in results]
 
 
+import threading as _threading
+
+_fetch_failures: int = 0
+_FETCH_CIRCUIT_THRESHOLD = 5
+_fetch_lock = _threading.Lock()
+
+
 def _fetch_url(url: str, headers: dict | None = None) -> str | None:
+    global _fetch_failures
+    with _fetch_lock:
+        if _fetch_failures >= _FETCH_CIRCUIT_THRESHOLD:
+            return None
     try:
         req = urllib.request.Request(url, headers=headers or {})
         with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT_S) as r:
+            with _fetch_lock:
+                _fetch_failures = 0
             return r.read().decode("utf-8", errors="replace")
     except (urllib.error.URLError, OSError, ValueError):
+        with _fetch_lock:
+            _fetch_failures += 1
         return None
 
 
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:
     combined = "\n\n---\n\n".join(content_samples)
     existing = out_path.read_text() if out_path.exists() else "none"
-    template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text()
+    try:
+        template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read practices template: {exc}") from exc
     return render_template(template, {
         "RUNTIME": runtime,
         "EXISTING": existing,
@@ -195,7 +213,10 @@ def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: 
 
 def _build_analysis_prompt(runtime: str, linter_docs: str, out_path: Path) -> str:
     existing = out_path.read_text() if out_path.exists() else "none"
-    template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text()
+    try:
+        template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read analysis template: {exc}") from exc
     return render_template(template, {
         "RUNTIME": runtime,
         "RUNTIME_TITLE": runtime.title(),

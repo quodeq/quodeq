@@ -29,9 +29,7 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
     """Parse a dimension evaluation JSON file into a normalized report dict."""
     try:
         data = json.loads(json_path.read_text())
-    except OSError:
-        return None
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
 
     violations = [_build_finding(v, include_severity=True) for v in data.get("violations", [])]
@@ -57,9 +55,7 @@ def parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
     dimension = evidence_path.name.replace("_evidence.json", "")
     try:
         data = json.loads(evidence_path.read_text())
-    except OSError:
-        data = {}
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         data = {}
     return {
         "dimension": dimension,
@@ -149,9 +145,7 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
     """Parse a JSON evaluation file into a detailed report with principle breakdowns."""
     try:
         data = json.loads(json_path.read_text())
-    except OSError:
-        return None
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
 
     principle_grades = [

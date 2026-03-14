@@ -118,6 +118,37 @@ class TestToolsCall:
         written = json.loads(findings_file.read_text().strip())
         assert "file" not in written
 
+    def test_duplicate_finding_is_skipped(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        finding = {"p": "P1", "t": "violation", "d": "security", "w": "Issue", "file": "a.py", "line": 10}
+        responses = _run_server(
+            [
+                _make_request("tools/call", 1, {"name": "report_finding", "arguments": finding}),
+                _make_request("tools/call", 2, {"name": "report_finding", "arguments": finding}),
+            ],
+            str(findings_file),
+        )
+        assert "Finding #1" in responses[0]["result"]["content"][0]["text"]
+        assert "Duplicate" in responses[1]["result"]["content"][0]["text"]
+        lines = findings_file.read_text().strip().splitlines()
+        assert len(lines) == 1
+
+    def test_same_file_line_different_type_not_duplicate(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        v = {"p": "P1", "t": "violation", "d": "security", "w": "Bad", "file": "a.py", "line": 10}
+        c = {"p": "P1", "t": "compliance", "d": "security", "w": "Good", "file": "a.py", "line": 10}
+        responses = _run_server(
+            [
+                _make_request("tools/call", 1, {"name": "report_finding", "arguments": v}),
+                _make_request("tools/call", 2, {"name": "report_finding", "arguments": c}),
+            ],
+            str(findings_file),
+        )
+        assert "Finding #1" in responses[0]["result"]["content"][0]["text"]
+        assert "Finding #2" in responses[1]["result"]["content"][0]["text"]
+        lines = findings_file.read_text().strip().splitlines()
+        assert len(lines) == 2
+
 
 class TestNotifications:
     def test_notifications_are_silently_ignored(self, tmp_path: Path) -> None:
@@ -151,6 +182,179 @@ class TestUnknownMethod:
             findings_file,
         )
         assert responses[0]["error"]["code"] == -32601
+
+
+class TestFindingsRouter:
+    def test_enriches_req_refs_from_compiled(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        compiled_refs = {
+            "S-CON-1": [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}],
+        }
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh, compiled_refs)
+            msg, dup = router.receive({"p": "Confidentiality", "t": "violation", "d": "security", "w": "Hardcoded key", "req": "S-CON-1"})
+        assert not dup
+        assert "Finding #1" in msg
+        written = json.loads(findings_file.read_text().strip())
+        assert written["req_refs"] == [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}]
+
+    def test_no_enrichment_without_matching_req(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        compiled_refs = {"S-CON-1": [{"label": "CWE-798", "url": "https://example.com"}]}
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh, compiled_refs)
+            router.receive({"p": "P1", "t": "violation", "d": "perf", "w": "Slow", "req": "UNKNOWN-1"})
+        written = json.loads(findings_file.read_text().strip())
+        assert "req_refs" not in written
+
+    def test_no_enrichment_without_compiled_refs(self, tmp_path: Path) -> None:
+        findings_file = tmp_path / "findings.jsonl"
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh)
+            router.receive({"p": "P1", "t": "violation", "d": "perf", "w": "Slow", "req": "S-CON-1"})
+        written = json.loads(findings_file.read_text().strip())
+        assert "req_refs" not in written
+
+
+class TestLoadCompiledRefs:
+    def test_loads_refs_from_compiled_json(self, tmp_path: Path) -> None:
+        compiled_dir = tmp_path / "compiled"
+        compiled_dir.mkdir()
+        data = {"principles": [{"requirements": [
+            {"id": "R-FT-1", "refs": [
+                {"source": "cwe", "id": "391", "url": "https://cwe.mitre.org/data/definitions/391.html"},
+            ]},
+            {"id": "R-FT-2", "refs": [
+                {"source": "cert", "id": "ERR08-J", "url": "https://example.com/ERR08-J"},
+            ]},
+        ]}]}
+        (compiled_dir / "reliability.json").write_text(json.dumps(data))
+        result = mcp_findings._load_compiled_refs(str(compiled_dir), "reliability")
+        assert "R-FT-1" in result
+        assert result["R-FT-1"][0]["label"] == "CWE-391"
+        assert "R-FT-2" in result
+        assert result["R-FT-2"][0]["label"] == "ERR08-J"
+
+    def test_skips_refs_without_url(self, tmp_path: Path) -> None:
+        compiled_dir = tmp_path / "compiled"
+        compiled_dir.mkdir()
+        data = {"principles": [{"requirements": [
+            {"id": "R-1", "refs": [
+                {"source": "internal", "id": "M-ANA-1"},  # no url
+                {"source": "cwe", "id": "123", "url": "https://cwe.mitre.org/data/definitions/123.html"},
+            ]},
+        ]}]}
+        (compiled_dir / "maintainability.json").write_text(json.dumps(data))
+        result = mcp_findings._load_compiled_refs(str(compiled_dir), "maintainability")
+        assert len(result["R-1"]) == 1
+        assert result["R-1"][0]["label"] == "CWE-123"
+
+    def test_returns_empty_for_missing_file(self, tmp_path: Path) -> None:
+        result = mcp_findings._load_compiled_refs(str(tmp_path / "missing"), "security")
+        assert result == {}
+
+    def test_returns_empty_without_args(self) -> None:
+        assert mcp_findings._load_compiled_refs(None, None) == {}
+
+
+def _run_server_with_queue(
+    input_lines: list[str], findings_file: str,
+    queue_path: str, agent_id: str = "test-agent",
+) -> list[dict]:
+    """Run the MCP server with --queue and --agent-id flags."""
+    stdin_text = "\n".join(input_lines) + "\n"
+    stdout_buf = StringIO()
+    argv = [
+        "mcp_findings.py", findings_file,
+        "--queue", queue_path,
+        "--agent-id", agent_id,
+    ]
+    with patch.object(sys, "stdin", StringIO(stdin_text)), \
+         patch.object(sys, "stdout", stdout_buf), \
+         patch.object(sys, "argv", argv):
+        mcp_findings.main()
+    output = stdout_buf.getvalue().strip()
+    return [json.loads(line) for line in output.splitlines() if line.strip()]
+
+
+class TestGetNextFiles:
+    def test_tools_list_includes_get_next_files(self, tmp_path: Path) -> None:
+        from quodeq.engine.file_queue import FileQueue
+        qp = tmp_path / "queue.json"
+        FileQueue(qp, ["a.py", "b.py"])
+        responses = _run_server_with_queue(
+            [_make_request("tools/list", 1)],
+            str(tmp_path / "findings.jsonl"),
+            str(qp),
+        )
+        tools = responses[0]["result"]["tools"]
+        names = [t["name"] for t in tools]
+        assert "report_finding" in names
+        assert "get_next_files" in names
+
+    def test_tools_list_without_queue_has_no_get_next_files(self, tmp_path: Path) -> None:
+        responses = _run_server(
+            [_make_request("tools/list", 1)],
+            str(tmp_path / "findings.jsonl"),
+        )
+        tools = responses[0]["result"]["tools"]
+        names = [t["name"] for t in tools]
+        assert "report_finding" in names
+        assert "get_next_files" not in names
+
+    def test_get_next_files_returns_batch(self, tmp_path: Path) -> None:
+        from quodeq.engine.file_queue import FileQueue
+        files = ["src/a.py", "src/b.py", "src/c.py"]
+        qp = tmp_path / "queue.json"
+        FileQueue(qp, files)
+        responses = _run_server_with_queue(
+            [_make_request("tools/call", 1, {"name": "get_next_files", "arguments": {"count": 2}})],
+            str(tmp_path / "findings.jsonl"),
+            str(qp),
+        )
+        text = responses[0]["result"]["content"][0]["text"]
+        assert "2 files" in text
+        assert "src/a.py" in text
+        assert "src/b.py" in text
+
+    def test_get_next_files_drains_queue(self, tmp_path: Path) -> None:
+        from quodeq.engine.file_queue import FileQueue
+        qp = tmp_path / "queue.json"
+        FileQueue(qp, ["a.py", "b.py"])
+        responses = _run_server_with_queue(
+            [
+                _make_request("tools/call", 1, {"name": "get_next_files", "arguments": {"count": 10}}),
+                _make_request("tools/call", 2, {"name": "get_next_files", "arguments": {}}),
+            ],
+            str(tmp_path / "findings.jsonl"),
+            str(qp),
+        )
+        assert "2 files" in responses[0]["result"]["content"][0]["text"]
+        assert "done" in responses[1]["result"]["content"][0]["text"].lower()
+
+    def test_get_next_files_records_agent_id(self, tmp_path: Path) -> None:
+        from quodeq.engine.file_queue import FileQueue
+        qp = tmp_path / "queue.json"
+        FileQueue(qp, ["a.py"])
+        _run_server_with_queue(
+            [_make_request("tools/call", 1, {"name": "get_next_files", "arguments": {}})],
+            str(tmp_path / "findings.jsonl"),
+            str(qp),
+            agent_id="agent-42",
+        )
+        q = FileQueue(qp)
+        log = q.taken_log()
+        assert len(log) == 1
+        assert log[0]["agent"] == "agent-42"
+
+    def test_get_next_files_without_queue_returns_error(self, tmp_path: Path) -> None:
+        responses = _run_server(
+            [_make_request("tools/call", 1, {"name": "get_next_files", "arguments": {}})],
+            str(tmp_path / "findings.jsonl"),
+        )
+        result = responses[0]["result"]
+        assert result["isError"] is True
+        assert "No file queue" in result["content"][0]["text"]
 
 
 class TestMainEntryPoint:

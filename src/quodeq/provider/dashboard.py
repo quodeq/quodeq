@@ -1,6 +1,7 @@
 """Dashboard and accumulated-view logic, split from action_provider_fs."""
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -29,6 +30,7 @@ _MAX_HISTORY_RUNS = 100
 # request caching for hot-path dimension reads (P-TIM-6).
 _RUN_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
 _RUN_DIM_CACHE_MAX = 256
+_RUN_DIM_LOCK = threading.Lock()
 
 
 @dataclass
@@ -186,14 +188,16 @@ def _make_run_dimension_fetcher(
     """
     def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
         key = (reports_root, project, run_id)
-        if key in _RUN_DIM_CACHE:
-            _RUN_DIM_CACHE.move_to_end(key)
-            return _RUN_DIM_CACHE[key]
+        with _RUN_DIM_LOCK:
+            if key in _RUN_DIM_CACHE:
+                _RUN_DIM_CACHE.move_to_end(key)
+                return _RUN_DIM_CACHE[key]
         data = read_run_data(reports_root, project, run_id)
-        _RUN_DIM_CACHE[key] = data
-        _RUN_DIM_CACHE.move_to_end(key)
-        if len(_RUN_DIM_CACHE) > _RUN_DIM_CACHE_MAX:
-            _RUN_DIM_CACHE.popitem(last=False)  # evict oldest
+        with _RUN_DIM_LOCK:
+            _RUN_DIM_CACHE[key] = data
+            _RUN_DIM_CACHE.move_to_end(key)
+            if len(_RUN_DIM_CACHE) > _RUN_DIM_CACHE_MAX:
+                _RUN_DIM_CACHE.popitem(last=False)  # evict oldest
         return data
 
     return get_run_dimensions

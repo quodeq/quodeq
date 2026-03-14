@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
 from quodeq.config.prompt_templates import render_template
+
+_logger = logging.getLogger(__name__)
 
 
 def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
@@ -16,7 +19,11 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
     if not compiled_file.exists():
         return "_No compiled standards for this dimension._"
 
-    data = json.loads(compiled_file.read_text())
+    try:
+        data = json.loads(compiled_file.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.warning("Could not read compiled standards %s: %s", compiled_file, exc)
+        return "_Could not read compiled standards._"
     lines = []
     for principle in data.get("principles", []):
         reqs = principle.get("requirements", [])
@@ -53,20 +60,33 @@ def render_dimensions(dimensions_data: dict, dimension: str) -> str:
     return "\n".join(lines)
 
 
-def load_template(template_path: Path | None = None, *, prompts_dir: Path | None = None) -> str:
-    """Load the compass.md prompt template.
+def load_template(
+    template_path: Path | None = None,
+    *,
+    prompts_dir: Path | None = None,
+    template_name: str = "compass.md",
+) -> str:
+    """Load a prompt template.
 
     Args:
         template_path: Explicit path to a template file (takes priority).
         prompts_dir: Directory containing prompt templates; used to locate
-            ``compass.md`` when *template_path* is not given.
+            *template_name* when *template_path* is not given.
+        template_name: Template filename to load (default ``compass.md``).
     """
     if template_path:
-        return template_path.read_text()
+        try:
+            return template_path.read_text()
+        except (OSError, UnicodeDecodeError) as exc:
+            raise FileNotFoundError(f"Cannot read template {template_path}: {exc}") from exc
     if prompts_dir is None:
         from quodeq.config.paths import default_paths
         prompts_dir = default_paths().prompts_dir
-    return (prompts_dir / "compass.md").read_text()
+    path = prompts_dir / template_name
+    try:
+        return path.read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read template {path}: {exc}") from exc
 
 
 @dataclass

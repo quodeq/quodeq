@@ -91,6 +91,22 @@ class TestParseJsonlLine:
         j, llm_refs = result
         assert llm_refs == ["CWE-391", "ERR05-J"]
 
+    def test_pre_resolved_req_refs_set_on_judgment(self):
+        """req_refs from MCP enrichment are set directly on Judgment."""
+        refs = [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}]
+        result = _parse_jsonl_line(_evidence_line(req_refs=refs))
+        assert result is not None
+        j, llm_refs = result
+        assert j.req_refs == refs
+        assert llm_refs is None  # no LLM refs field
+
+    def test_pre_resolved_req_refs_empty_list_ignored(self):
+        """Empty req_refs list should not override downstream resolution."""
+        result = _parse_jsonl_line(_evidence_line(req_refs=[]))
+        assert result is not None
+        j, _ = result
+        assert j.req_refs is None  # not set
+
 
 # ---------------------------------------------------------------------------
 # parse_jsonl_to_evidence
@@ -295,6 +311,28 @@ class TestParseJsonlToEvidence:
         )
 
         assert ev.coverage_pct == 0.0
+
+    def test_pre_resolved_req_refs_used_without_compiled_dir(self, tmp_path):
+        """When MCP server enriched req_refs, parser uses them without compiled_dir."""
+        refs = [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}]
+        jsonl = tmp_path / "evidence.jsonl"
+        jsonl.write_text(json.dumps({
+            "p": "Confidentiality", "t": "violation", "d": "security",
+            "w": "Hardcoded key", "file": "src/config.py", "line": 12,
+            "severity": "critical", "req": "S-CON-1", "req_refs": refs,
+        }) + "\n")
+
+        ev = parse_jsonl_to_evidence(
+            jsonl,
+            EvidenceContext(
+                plugin_id="python", repository="test", date_str="2026-03-11",
+                source_file_count=10, files_read=5,
+            ),
+            compiled_dir=None,  # no compiled dir — refs come from JSONL
+        )
+
+        v = ev.principles["Confidentiality"].violations[0]
+        assert v["req_refs"] == refs
 
     def test_v1_evidence_dict_shape(self, tmp_path):
         """Ensure the Evidence object can convert to V1 shape."""

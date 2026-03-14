@@ -61,9 +61,14 @@ def maybe_build_ui(no_build: bool, reinstall: bool, static_dist: Path, repo_root
     """Run npm build if sources are newer than the dist."""
     if no_build:
         return
+    # Skip build when serving pre-built bundled assets (pip install)
+    web_source = repo_root / "ui" / "web"
+    if not web_source.is_dir():
+        log_info("Using bundled static assets (no ui/web source found).")
+        return
     dist_index = static_dist / "index.html"
-    if reinstall or sources_newer_than_dist(repo_root / "ui/web", dist_index):
+    if reinstall or sources_newer_than_dist(web_source, dist_index):
         log_info("Building web UI (ui/web)...")
-        npm_build(repo_root / "ui/web")
+        npm_build(web_source)
     else:
         log_info("Web UI is up to date, skipping build.")

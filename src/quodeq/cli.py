@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import subprocess
 import sys
 import uuid
 from pathlib import Path
@@ -21,7 +23,7 @@ from quodeq.engine._runner_report import run_full
 from quodeq.engine.runner import AnalysisOptions, RunConfig, run
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import prepare_repository
-from quodeq.shared.utils import is_repo_url, project_name_from_repo
+from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo
 
 
 def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
@@ -31,7 +33,7 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "-p", "--plugin", default=None, help="Plugin ID (overrides auto-detection)"
     )
     parser.add_argument(
-        "-o", "--output", default="evaluations", help="Reports output directory"
+        "-o", "--output", default=get_evaluations_dir(), help="Reports output directory"
     )
     parser.add_argument(
         "-m", "--mode", default="numerical",
@@ -55,6 +57,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument(
         "--max-duration", type=int, default=None,
         help="Max seconds per dimension before terminating (default: 1800)",
+    )
+    parser.add_argument(
+        "--n-subagents", type=int, default=5,
+        help="Number of parallel subagents per dimension (default: 5)",
     )
 
 
@@ -85,7 +91,11 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
     """Resolve the repo argument to a local path (cloning if needed)."""
     repo_path = args.repo
     if is_repo_url(repo_path):
-        repo_path = prepare_repository(repo_path)
+        try:
+            repo_path = prepare_repository(repo_path)
+        except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as exc:
+            print(f"Failed to clone repository: {exc}", file=sys.stderr)
+            return None
     src = Path(repo_path).resolve()
     if not src.exists():
         print(f"Repository path does not exist: {src}", file=sys.stderr)
@@ -193,6 +203,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
             dimensions=dimensions_filter,
             max_turns=args.max_turns,
             max_duration=args.max_duration,
+            n_subagents=args.n_subagents,
+            subagent_model=os.environ.get("SUBAGENT_MODEL") or None,
         ),
     )
 

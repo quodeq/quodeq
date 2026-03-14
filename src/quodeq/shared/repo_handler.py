@@ -30,6 +30,13 @@ def prepare_repository(repo_input: str) -> str:
     tmp_dir = tempfile.mkdtemp()
     dest = Path(tmp_dir) / repo_name
     env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
-    subprocess.run(["git", "clone", repo_input, str(dest)], check=True, env=env)
+    try:
+        subprocess.run(
+            ["git", "clone", repo_input, str(dest)],
+            check=True, env=env, timeout=300,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        shutil.rmtree(tmp_dir, ignore_errors=True)
+        raise
     atexit.register(shutil.rmtree, tmp_dir, True)
     return str(dest.resolve())

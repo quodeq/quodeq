@@ -6,8 +6,16 @@ import argparse
 import sys
 from pathlib import Path
 
-from quodeq.shared.utils import get_dashboard_port
+from quodeq.shared.utils import get_dashboard_port, get_evaluations_dir, get_static_dist
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
+
+
+def _default_static_dist() -> str:
+    """Return the best default for --static-dist (bundled or development)."""
+    bundled = get_static_dist()
+    if bundled:
+        return bundled
+    return "ui/web/dist"
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -15,9 +23,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="quodeq dashboard")
     parser.add_argument("--port", type=int, default=get_dashboard_port(),
                         help="Port to run the dashboard server on (default: %(default)s)")
-    parser.add_argument("--evaluations", default="evaluations",
+    parser.add_argument("--evaluations", default=get_evaluations_dir(),
                         help="Directory containing evaluation reports (default: %(default)s)")
-    parser.add_argument("--static-dist", default="ui/web/dist",
+    parser.add_argument("--static-dist", default=_default_static_dist(),
                         help="Path to the pre-built UI static files (default: %(default)s)")
     parser.add_argument("--repo-root", default=".",
                         help="Root directory of the repository being evaluated (default: %(default)s)")

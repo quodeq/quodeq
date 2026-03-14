@@ -64,7 +64,7 @@ def _find_date_in_dir(directory: Path, suffix: str) -> tuple[str | None, str] | 
                 result = _normalize_date(str(raw))
                 if result:
                     return result
-        except (json.JSONDecodeError, OSError) as exc:
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
             log_debug(f"Failed to read date from {entry.path}: {exc}")
     return None
 
@@ -102,7 +102,7 @@ def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | 
         "name": resolved.name,
         "discipline": discipline,
         "location": "local",
-        "path": str(resolved),
+        "path": resolved.name,
     }
 
 

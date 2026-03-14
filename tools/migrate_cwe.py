@@ -25,7 +25,12 @@ from pathlib import Path
 def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
     """Parse a JSONL evidence file into a (principle, file, line) -> cwe_id map."""
     lookup: dict[tuple[str, str, int], int] = {}
-    for raw in jsonl_path.read_text().splitlines():
+    try:
+        lines = jsonl_path.read_text().splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        print(f"  SKIP  cannot read {jsonl_path}: {exc}")
+        return lookup
+    for raw in lines:
         raw = raw.strip()
         if not raw:
             continue
@@ -67,12 +72,19 @@ def migrate_file(eval_path: Path, apply: bool) -> tuple[int, int] | None:
     if not lookup:
         return None
 
-    data = json.loads(eval_path.read_text())
+    try:
+        data = json.loads(eval_path.read_text())
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        print(f"  SKIP  cannot read {eval_path}: {exc}")
+        return None
     v_count = _patch_entries(data.get("violations", []), lookup)
     c_count = _patch_entries(data.get("compliance", []), lookup)
 
     if apply and (v_count or c_count):
-        eval_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        try:
+            eval_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        except OSError as exc:
+            print(f"  ERROR writing {eval_path}: {exc}")
 
     return v_count, c_count
 

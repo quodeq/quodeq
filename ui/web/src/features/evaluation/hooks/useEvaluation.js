@@ -107,6 +107,8 @@ export function useEvaluation() {
           startDimensionPolling(updated.outputProject, updated.outputRunId);
         }
       } catch (err) {
+        // Job no longer tracked (e.g. server restarted) — mark as lost
+        setJob((prev) => prev ? { ...prev, status: 'lost' } : prev);
         setJobError(err.message);
         stopPolling();
         stopDimensionPolling();

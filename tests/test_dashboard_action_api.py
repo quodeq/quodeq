@@ -56,7 +56,7 @@ def test_force_action_api_host_port(monkeypatch):
         def terminate(self):
             pass
 
-    def fake_ensure(host, port, static_dist=None):
+    def fake_ensure(host, port, static_dist=None, evaluations_dir=None):
         captured["host"] = host
         captured["port"] = port
         return f"http://{host}:{port}", FakeProcess()

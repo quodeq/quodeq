@@ -55,7 +55,7 @@ def _build_project_zip(project_path: Path) -> Path:
                     if total_size > _MAX_ZIP_SIZE_BYTES:
                         raise ValueError("Project exceeds maximum export size")
                     zf.write(file_entry, file_entry.relative_to(project_path.parent))
-    except ValueError:
+    except Exception:
         os.unlink(tmp_path)
         raise
     return Path(tmp_path)
@@ -63,7 +63,10 @@ def _build_project_zip(project_path: Path) -> Path:
 
 def _export_project_zip(project: str, reports_dir: str) -> Response | tuple[Response, int]:
     """Build and return a zip archive download response for a project directory."""
-    project_path = Path(reports_dir) / project
+    project_path = (Path(reports_dir) / project).resolve()
+    if not project_path.is_relative_to(Path(reports_dir).resolve()):
+        body, status = _error("Invalid project name", HTTPStatus.BAD_REQUEST, "BAD_REQUEST")
+        return jsonify(body), status
     if not project_path.exists() or not project_path.is_dir():
         body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status
@@ -210,6 +213,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
                     numerical=bool(payload.get("numerical")),
                     ai_cmd=ai_cmd,
                     ai_model=payload.get("aiModel") or None,
+                    subagent_model=payload.get("subagentModel") or None,
                 ),
             )
         except (FileNotFoundError, ValueError):

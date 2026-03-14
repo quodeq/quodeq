@@ -45,7 +45,7 @@ class Job:
         return {
             "jobId": self.job_id,
             "status": self.status,
-            "command": " ".join(self.command),
+            "command": self.command[0] if self.command else "",
             "startedAt": self.started_at,
             "endedAt": self.ended_at,
             "exitCode": self.exit_code,
@@ -87,14 +87,22 @@ class JobManager:
             exit_code=None,
         )
 
-        process = self._spawn(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            cwd=cwd,
-            env=env,
-        )
+        try:
+            process = self._spawn(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=cwd,
+                env=env,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            job.status = "failed"
+            job.ended_at = datetime.now(timezone.utc).isoformat()
+            job.exit_code = -1
+            with self._lock:
+                self._jobs[job_id] = job
+            return job.to_dict()
 
         with self._lock:
             self._jobs[job_id] = job

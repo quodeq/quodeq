@@ -7,6 +7,8 @@ import { useEvaluation } from './features/evaluation/hooks/useEvaluation.js';
 import EvaluationForm from './features/evaluation/components/EvaluationForm.jsx';
 import EvaluationStatus from './features/evaluation/components/EvaluationStatus.jsx';
 import ReEvaluateCard from './features/evaluation/components/ReEvaluateCard.jsx';
+import PowerSelector from './features/evaluation/components/PowerSelector.jsx';
+import { LEVELS, STORAGE_KEY as POWER_KEY } from './features/evaluation/components/powerLevels.js';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
@@ -343,6 +345,9 @@ export default function App() {
   // Evaluation
   // -------------------------------------------------------------------------
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
+  const [analysisPower, setAnalysisPower] = useState(() => {
+    try { return Number(localStorage.getItem(POWER_KEY)) || 2; } catch { return 2; }
+  });
 
   // Auto-navigate to evaluate screen when a running job is discovered (e.g. from another tab)
   const prevJobRef = useRef(null);
@@ -354,7 +359,8 @@ export default function App() {
   }, [job]);
 
   function handleStartEvaluation(payload) {
-    startEvaluation({ ...payload, aiCmd: aiCmd || undefined });
+    const subagentModel = LEVELS.find(l => l.level === analysisPower)?.model;
+    startEvaluation({ ...payload, aiCmd: aiCmd || undefined, subagentModel });
   }
 
   function handleEvalDismiss(action) {
@@ -487,6 +493,7 @@ export default function App() {
                   <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
                 </div>
               </div>
+              <PowerSelector value={analysisPower} onChange={setAnalysisPower} />
             </header>
 
             <div className="evaluate-content">

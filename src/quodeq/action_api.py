@@ -115,12 +115,8 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
     @app.get("/api/health")
     def health() -> Response:
         """Return a simple health-check response."""
-        try:
-            from importlib.metadata import version as _pkg_version
-            v = _pkg_version("quodeq")
-        except Exception:
-            v = None
-        return jsonify({"ok": True, "version": v})
+        from quodeq import __version__
+        return jsonify({"ok": True, "version": __version__})
 
     register_project_list_routes(app, provider)
     register_project_data_routes(app, provider)
@@ -133,8 +129,18 @@ def create_app(provider: ActionProvider | None = None, static_dist: str | None =
 
 def main() -> None:
     """Start the Flask development server using environment configuration."""
+    import signal
+
     app = create_app(static_dist=get_static_dist())
-    app.run(host=get_action_api_host(), port=get_action_api_port())
+
+    def _handle_shutdown(signum: int, frame: object) -> None:
+        raise SystemExit(0)
+
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _handle_shutdown)
+    signal.signal(signal.SIGINT, _handle_shutdown)
+
+    app.run(host=get_action_api_host(), port=get_action_api_port(), debug=False)
 
 
 if __name__ == "__main__":

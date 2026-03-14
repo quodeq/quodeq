@@ -4,6 +4,8 @@
 node_modules/
 ui/web/node_modules/
 ui/web/dist/
+src/quodeq/static/
+dist/
 __pycache__/
 *.pyc
 .venv/

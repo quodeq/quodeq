@@ -19,8 +19,21 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
     Returns the number of requirements fetched.
     When QUODEQ_ASVS_SHA256 is set, validates the download against the expected hash.
     """
-    with urllib.request.urlopen(get_asvs_url(), timeout=30) as r:
-        content = r.read()
+    import time
+    import random
+    _max_retries = 3
+    last_exc: Exception | None = None
+    for _attempt in range(_max_retries):
+        try:
+            with urllib.request.urlopen(get_asvs_url(), timeout=30) as r:
+                content = r.read()
+            break
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            last_exc = exc
+            if _attempt < _max_retries - 1:
+                time.sleep(0.5 * (2 ** _attempt) + random.uniform(0, 0.3))
+    else:
+        raise ConnectionError(f"Failed to fetch ASVS after {_max_retries} attempts: {last_exc}") from last_exc
 
     actual_hash = hashlib.sha256(content).hexdigest()
     expected_hash = os.environ.get(_ASVS_SHA256_ENV)
@@ -29,14 +42,23 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
             f"ASVS integrity check failed: expected {expected_hash}, got {actual_hash}"
         )
     if not expected_hash:
-        import logging
-        logging.getLogger(__name__).warning(
-            "ASVS downloaded without integrity verification (set %s=%s to pin)",
-            _ASVS_SHA256_ENV,
-            actual_hash,
-        )
+        if os.environ.get("QUODEQ_ASVS_SKIP_INTEGRITY") == "1":
+            import logging
+            logging.getLogger(__name__).warning(
+                "ASVS integrity verification skipped (pin with %s=%s)",
+                _ASVS_SHA256_ENV,
+                actual_hash,
+            )
+        else:
+            raise ValueError(
+                f"ASVS integrity verification required: set {_ASVS_SHA256_ENV}={actual_hash} "
+                f"to pin this download, or set QUODEQ_ASVS_SKIP_INTEGRITY=1 to bypass"
+            )
 
-    raw = json.loads(content)
+    try:
+        raw = json.loads(content)
+    except (json.JSONDecodeError, UnicodeDecodeError) as exc:
+        raise ValueError(f"ASVS response is not valid JSON: {exc}") from exc
 
     requirements = _parse_asvs_l1(raw)
     output = {
@@ -69,12 +91,15 @@ def _extract_l1_from_chapter(chapter: dict) -> list[dict]:
     for section in chapter.get("Items", []):
         for req in section.get("Items", []):
             if req.get("L1", {}).get("Required"):
+                shortcode = req.get("Shortcode")
+                if not shortcode:
+                    continue
                 items.append({
-                    "id": req["Shortcode"],
+                    "id": shortcode,
                     "level": 1,
-                    "text": req["Description"],
+                    "text": req.get("Description", ""),
                     "cwe": req.get("CWE", []),
-                    "section": chapter["ShortName"],
+                    "section": chapter.get("ShortName", ""),
                 })
     return items
 

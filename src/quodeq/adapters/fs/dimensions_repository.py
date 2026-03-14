@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 from quodeq.ports.data_errors import NotFoundError
+from quodeq.shared.validation import validate_path_segment
 
 
 class FilesystemDimensionsRepository:
@@ -23,7 +24,11 @@ class FilesystemDimensionsRepository:
 
     def get_dimension(self, name: str) -> dict:
         """Load and return a single dimension definition by name."""
+        validate_path_segment(name)
         path = self._root / "dimensions" / f"{name}.json"
         if not path.exists():
-            raise NotFoundError(f"Dimension not found: {path}")
-        return json.loads(path.read_text())
+            raise NotFoundError(f"Dimension not found: {name}")
+        try:
+            return json.loads(path.read_text())
+        except json.JSONDecodeError as exc:
+            raise NotFoundError(f"Invalid JSON in dimension file: {name}") from exc
