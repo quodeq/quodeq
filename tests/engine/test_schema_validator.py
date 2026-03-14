@@ -19,7 +19,7 @@ def _valid_plugin():
         "id": "typescript",
         "name": "TypeScript / Node.js",
         "version": "1.0.0",
-        "engine_version": "==0.3.0",
+        "engine_version": "==0.4.0",
         "detects": {
             "extensions": [".ts", ".tsx"],
             "config_files": ["tsconfig.json"],

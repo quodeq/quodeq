@@ -8,7 +8,7 @@ _DEFAULT_PLUGIN_VERSION = "1.0.0"
 def _min_engine_version() -> str:
     """Derive the engine_version constraint from the installed quodeq version."""
     from quodeq import __version__
-    return f"=={__version__}" if __version__ else "==0.3.0"
+    return f"=={__version__}" if __version__ else "==0.4.0"
 _DEFAULT_DIMENSION_WEIGHT = 1.0
 _SECURITY_DIMENSION_WEIGHT = 1.2
 _PERFORMANCE_DIMENSION_WEIGHT = 0.8

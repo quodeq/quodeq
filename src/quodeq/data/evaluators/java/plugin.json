@@ -2,7 +2,7 @@
   "id": "java",
   "name": "Java / JVM",
   "version": "1.0.0",
-  "engine_version": "==0.3.0",
+  "engine_version": "==0.4.0",
   "detects": {
     "extensions": [".java"],
     "config_files": ["pom.xml", "build.gradle"]
