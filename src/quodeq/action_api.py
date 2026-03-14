@@ -136,7 +136,8 @@ def main() -> None:
     def _handle_shutdown(signum: int, frame: object) -> None:
         raise SystemExit(0)
 
-    signal.signal(signal.SIGTERM, _handle_shutdown)
+    if hasattr(signal, "SIGTERM"):
+        signal.signal(signal.SIGTERM, _handle_shutdown)
     signal.signal(signal.SIGINT, _handle_shutdown)
 
     app.run(host=get_action_api_host(), port=get_action_api_port(), debug=False)

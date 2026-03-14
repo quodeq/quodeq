@@ -80,7 +80,7 @@ def _kill_stale_action_api(host: str, port: int) -> None:
     if pid_file.exists():
         try:
             pid = int(pid_file.read_text().strip())
-            os.kill(pid, signal.SIGTERM)
+            os.kill(pid, signal.SIGTERM if sys.platform != "win32" else signal.CTRL_BREAK_EVENT)
         except (ValueError, OSError) as exc:
             log_debug(f"Could not kill stale action API (pid file): {exc}")
         try:
@@ -99,10 +99,14 @@ def _spawn_action_api(port: int, static_dist: Path | None = None, evaluations_di
     if static_dist:
         env["QUODEQ_STATIC_DIST"] = str(static_dist)
     env["QUODEQ_EVALUATIONS_DIR"] = evaluations_dir or get_evaluations_dir()
+    popen_kwargs: dict = {"env": env}
+    if sys.platform == "win32":
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kwargs["start_new_session"] = True
     proc = subprocess.Popen(
         [sys.executable, "-m", ACTION_API_MODULE],
-        env=env,
-        start_new_session=True,
+        **popen_kwargs,
     )
     try:
         _get_pid_file().write_text(str(proc.pid))
@@ -237,7 +241,11 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
         if action_api_process:
             _wait_for_process(action_api_process)
         else:
-            signal.pause()
+            if sys.platform == "win32":
+                import threading
+                threading.Event().wait()
+            else:
+                signal.pause()
     except KeyboardInterrupt:
         pass
     finally:

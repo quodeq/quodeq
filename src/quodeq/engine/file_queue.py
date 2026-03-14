@@ -1,14 +1,14 @@
 """Cross-process file queue for distributing work across subagents.
 
 Backed by a JSON file with atomic writes (write-to-temp + rename).
-Cross-process safe via fcntl file locking on a separate lock file.
+Cross-process safe via file locking (fcntl on Unix, msvcrt on Windows).
 Maintains a take log so no file is silently lost.
 """
 from __future__ import annotations
 
-import fcntl
 import json
 import os
+import sys
 import tempfile
 import time
 from contextlib import contextmanager
@@ -123,10 +123,20 @@ class FileQueue:
         """
         fd = os.open(str(self._lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
         try:
-            fcntl.flock(fd, fcntl.LOCK_EX)
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_EX)
             yield
         finally:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            if sys.platform == "win32":
+                import msvcrt
+                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+            else:
+                import fcntl
+                fcntl.flock(fd, fcntl.LOCK_UN)
             os.close(fd)
 
     def _read_state(self) -> dict:
