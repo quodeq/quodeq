@@ -18,6 +18,7 @@ from quodeq.shared.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, get_an
 _CLI_MODEL_TIMEOUT_S = 8
 _CLI_OUTPUT_IGNORE_PREFIXES = {"#", "=", "-", "[", "("}
 _ANTHROPIC_API_TIMEOUT_S = 8
+_BROWSE_DIR_LIMIT = 500
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
 
@@ -96,12 +97,16 @@ class FsToolingMixin:
             )
 
         directories.sort(key=lambda item: item["name"])
+        truncated = len(directories) > _BROWSE_DIR_LIMIT
+        if truncated:
+            directories = directories[:_BROWSE_DIR_LIMIT]
         parent = target.parent if target.parent != target else None
         return {
             "current": str(target),
             "parent": str(parent) if parent else None,
             "directories": directories,
             "isGitRepo": (target / ".git").exists(),
+            "truncated": truncated,
         }
 
     _CLI_CANDIDATES = [

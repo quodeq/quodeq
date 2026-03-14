@@ -11,6 +11,7 @@ from quodeq.adapters.fs.report_parser.grades import build_totals
 from quodeq.provider.violation_context import FindingSpec, build_finding_base, format_file_line
 
 _logger = logging.getLogger(__name__)
+_SUPPORTED_SCHEMA_VERSIONS = frozenset({None, 1})
 
 
 def empty_severity_buckets() -> dict[str, list]:
@@ -41,8 +42,9 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
         _logger.warning("Failed to parse report %s: %s", json_path.name, exc)
         return None
 
-    if data.get("schema_version") is None:
-        _logger.debug("No schema_version in %s; future versions may require it for migration", json_path)
+    sv = data.get("schema_version")
+    if sv not in _SUPPORTED_SCHEMA_VERSIONS:
+        _logger.warning("Unsupported schema_version %s in %s; attempting best-effort parse", sv, json_path.name)
 
     violations = [_build_finding(v, include_severity=True) for v in data.get("violations", [])]
     compliance = [_build_finding(c, include_severity=False) for c in data.get("compliance", [])]

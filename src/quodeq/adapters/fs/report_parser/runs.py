@@ -1,7 +1,9 @@
 """Run discovery, date parsing, and report aggregation for filesystem reports.
 
-NOTE: Storage is filesystem-based. To support alternative backends (S3, database),
-introduce a RunStorage port/protocol and adapt callers.
+The ``RunStorage`` protocol defines the interface callers depend on.
+The module-level functions (``read_run_data``, ``list_runs``) provide the
+default filesystem implementation.  Alternative backends (S3, database)
+should implement ``RunStorage`` and be injected at the call site.
 """
 
 from __future__ import annotations
@@ -12,7 +14,7 @@ import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Protocol, runtime_checkable
 
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
 from quodeq.shared.logging import log_debug
@@ -27,6 +29,24 @@ class RunInfo:
     run_id: str
     date_iso: str | None
     date_label: str
+
+
+@runtime_checkable
+class RunStorage(Protocol):
+    """Interface for run data storage backends.
+
+    The default filesystem implementation is provided by the module-level
+    ``read_run_data`` and ``list_runs`` functions.  Alternative backends
+    (S3, database) should implement this protocol.
+    """
+
+    def read_run_data(self, project: str, run_id: str) -> list[dict[str, Any]]:
+        """Load all dimension evaluations and evidence for a single run."""
+        ...
+
+    def list_runs(self, project: str, *, limit: int = 0) -> list[RunInfo]:
+        """Return runs for a project, sorted newest-first by date."""
+        ...
 
 
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
@@ -191,8 +211,11 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[st
     return dimensions
 
 
-def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
-    """Return all runs for a project, sorted newest-first by date."""
+def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunInfo]:
+    """Return runs for a project, sorted newest-first by date.
+
+    When *limit* > 0 only the most recent *limit* runs are returned.
+    """
     validate_path_segment(project)
     project_dir = reports_root / project
     run_infos: list[RunInfo] = []
@@ -202,6 +225,8 @@ def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
         date_iso, date_label = _parse_run_date(reports_root, project, entry.name)
         run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label))
     run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)
+    if limit > 0:
+        return run_infos[:limit]
     return run_infos
 
 
@@ -232,21 +257,23 @@ def _get_previous_run_for_dimension(
     project_path = reports_root / project
     if not project_path.exists():
         return None
-    all_runs = cache.runs if cache is not None else list_runs(reports_root, project)
+    if cache is None:
+        all_runs = list_runs(reports_root, project)
+        _data_cache: dict[str, list[dict[str, Any]]] = {}
+
+        def _fetch(run_id: str) -> list[dict[str, Any]]:
+            if run_id not in _data_cache:
+                _data_cache[run_id] = read_run_data(reports_root, project, run_id)
+            return _data_cache[run_id]
+
+        cache = RunLookupCache(runs=all_runs, get_run_data=_fetch)
+    all_runs = cache.runs
     current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
     if current_idx < 0:
         return None
-    _data_cache: dict[str, list[dict[str, Any]]] = {}
-
-    def _fetch(run_id: str) -> list[dict[str, Any]]:
-        if cache is not None:
-            return cache.get_run_data(run_id)
-        if run_id not in _data_cache:
-            _data_cache[run_id] = read_run_data(reports_root, project, run_id)
-        return _data_cache[run_id]
 
     for run_info in all_runs[current_idx + 1:]:
-        dims = _fetch(run_info.run_id)
+        dims = cache.get_run_data(run_info.run_id)
         dims_by_name = {d.get("dimension"): d for d in dims if d.get("dimension")}
         dim = dims_by_name.get(dimension)
         if dim:

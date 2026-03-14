@@ -132,6 +132,7 @@ class DisciplineRegistry:
         self._sorted_disciplines: list[DisciplineRule] = sorted(
             self.disciplines.values(), key=lambda rule: rule.detect_priority
         )
+        self._file_cache: dict[Path, str] = {}
 
     @classmethod
     def from_file(cls, path: Path) -> "DisciplineRegistry":
@@ -168,7 +169,11 @@ class DisciplineRegistry:
 
     def _file_contains(self, path: Path, needle: str) -> bool:
         try:
-            return needle in path.read_text(errors="ignore")
+            content = self._file_cache.get(path)
+            if content is None:
+                content = path.read_text(errors="ignore")
+                self._file_cache[path] = content
+            return needle in content
         except OSError as exc:
             _logger.debug("Could not read %s for content check: %s", path, exc)
             return False
@@ -215,10 +220,10 @@ class DisciplineRegistry:
 
     def choose_highest_priority(self, matches: list[str]) -> str:
         """Select the discipline with the lowest (highest-priority) detect_priority value."""
-        rules = [self.disciplines[name] for name in matches if name in self.disciplines]
-        if not rules:
-            if not matches:
-                raise ValueError("No matches to choose from")
-            return matches[0]
-        rules.sort(key=lambda rule: rule.detect_priority)
-        return rules[0].name
+        if not matches:
+            raise ValueError("No matches to choose from")
+        match_set = set(matches)
+        for rule in self._sorted_disciplines:
+            if rule.name in match_set:
+                return rule.name
+        return matches[0]

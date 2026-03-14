@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date
 
@@ -31,32 +32,42 @@ def resolve_parallel(parallel: str | None, sequential: bool) -> int:
     return int(parallel)
 
 
+def _generate_single_evaluator(discipline: str, dimension: str, paths: ConfigPaths) -> None:
+    """Generate a single evaluator JSON file for one dimension."""
+    output_path = paths.evaluators_dir / discipline / f"{dimension}.json"
+    prompt = build_evaluator_prompt(
+        template_path=paths.prompts_dir / "dimension-mapper.md",
+        context=EvaluatorContext(
+            discipline=discipline,
+            dimension=dimension,
+            practices_dir=paths.practices_dir / discipline,
+            dimensions_dir=paths.dimensions_dir,
+            output_path=output_path,
+            date_value=date.today().isoformat(),
+        ),
+    )
+    stdout, err = run_ai_cli(prompt)
+    if err:
+        raise RuntimeError(f"Evaluator generation failed for {dimension} → {output_path}: {err}")
+    try:
+        output_path.write_text(stdout)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to write evaluator {output_path}: {exc}") from exc
+
+
 def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
     """Generate evaluator JSON files for every dimension of a discipline."""
     if not discipline:
         log_error("--generate-maps requires a dimension name")
         return 1
     dimensions = [p.stem for p in paths.dimensions_dir.glob("*.json")]
-    for dimension in dimensions:
-        output_path = paths.evaluators_dir / discipline / f"{dimension}.json"
-        prompt = build_evaluator_prompt(
-            template_path=paths.prompts_dir / "dimension-mapper.md",
-            context=EvaluatorContext(
-                discipline=discipline,
-                dimension=dimension,
-                practices_dir=paths.practices_dir / discipline,
-                dimensions_dir=paths.dimensions_dir,
-                output_path=output_path,
-                date_value=date.today().isoformat(),
-            ),
-        )
-        stdout, err = run_ai_cli(prompt)
-        if err:
-            raise RuntimeError(f"Evaluator generation failed for {dimension} → {output_path}: {err}")
-        try:
-            output_path.write_text(stdout)
-        except OSError as exc:
-            raise RuntimeError(f"Failed to write evaluator {output_path}: {exc}") from exc
+    with ThreadPoolExecutor() as pool:
+        futures = {
+            pool.submit(_generate_single_evaluator, discipline, dim, paths): dim
+            for dim in dimensions
+        }
+        for future in as_completed(futures):
+            future.result()  # propagates any RuntimeError
 
 
 def run_generate_dimensions(paths: ConfigPaths) -> None:

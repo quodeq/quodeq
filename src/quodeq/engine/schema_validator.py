@@ -19,6 +19,12 @@ def _load_schema(name: str) -> dict:
         raise ValueError(f"Cannot load schema {path}: {exc}") from exc
 
 
+@lru_cache(maxsize=32)
+def _get_validator(schema_file: str) -> jsonschema.Draft202012Validator:
+    schema = _load_schema(schema_file)
+    return jsonschema.Draft202012Validator(schema)
+
+
 def validate_plugin(data: dict) -> list[str]:
     """Validate plugin.json data. Returns list of error messages (empty = valid)."""
     return _validate(data, "plugin_schema.json")
@@ -60,6 +66,5 @@ def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
 
 
 def _validate(data: dict, schema_file: str) -> list[str]:
-    schema = _load_schema(schema_file)
-    validator = jsonschema.Draft202012Validator(schema)
+    validator = _get_validator(schema_file)
     return [e.message for e in validator.iter_errors(data)]

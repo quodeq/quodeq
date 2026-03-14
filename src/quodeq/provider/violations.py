@@ -1,6 +1,7 @@
 """Violation resolution and aggregation for the filesystem action provider."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,7 @@ from quodeq.provider.violations_parsing import (
     parse_violations_from_stream,
 )
 
-_MAX_VIOLATION_FILES = 20
+_MAX_VIOLATION_FILES = int(os.environ.get("QUODEQ_MAX_VIOLATION_FILES", "20"))
 
 
 def resolve_dimension_eval(

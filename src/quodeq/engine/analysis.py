@@ -105,7 +105,9 @@ def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
     """
     return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
 
-_PROVIDER_CONFIGS: dict[str, dict] = {
+_AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
+
+_PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
     "claude": {
         "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
         "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
@@ -117,6 +119,17 @@ _PROVIDER_CONFIGS: dict[str, dict] = {
         "env_remove": [],
     },
 }
+
+
+def _load_provider_configs() -> dict[str, dict]:
+    """Load AI provider configs from external JSON, falling back to built-in defaults."""
+    try:
+        return json.loads(_AI_PROVIDERS_PATH.read_text())
+    except (OSError, json.JSONDecodeError):
+        return _PROVIDER_CONFIGS_FALLBACK
+
+
+_PROVIDER_CONFIGS: dict[str, dict] = _load_provider_configs()
 
 
 class AnalysisError(RuntimeError):

@@ -3,6 +3,11 @@
 Backed by a JSON file with atomic writes (write-to-temp + rename).
 Cross-process safe via file locking (fcntl on Unix, msvcrt on Windows; both imported lazily).
 Maintains a take log so no file is silently lost.
+
+**Scaling note:** ``FileQueue`` relies on OS-level file locking, which
+requires a shared filesystem.  For multi-machine deployments, implement
+the ``WorkQueue`` protocol with a networked backend (e.g. Redis, SQS)
+and inject it at the orchestration layer.
 """
 from __future__ import annotations
 

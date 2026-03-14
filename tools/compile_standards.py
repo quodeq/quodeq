@@ -97,9 +97,18 @@ def build_req_index(
 def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
     """Compile a single dimension into the requirement-centric output format."""
     iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    dim_name = json.loads(iso_file.read_text()).get("name", dimension.title())
+    try:
+        iso_data = json.loads(iso_file.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
+    dim_name = iso_data.get("name", dimension.title())
 
-    index = build_req_index(standards_dir, dimension, cwe_db)
+    index = _build_req_index(iso_data)
+    attach_cwe_refs(index, cwe_db, _get_cwe_name)
+    attach_cisq_refs(index, standards_dir, dimension)
+    attach_asvs_refs(index, standards_dir, dimension)
+    attach_cert_refs(index, standards_dir, dimension)
+    attach_wcag_refs(index, standards_dir, dimension)
 
     sources = ["iso25010"]
     if dimension in CISQ_DIMENSIONS:

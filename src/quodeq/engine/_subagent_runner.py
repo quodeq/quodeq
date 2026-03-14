@@ -4,6 +4,7 @@ Extracted from runner.py to keep module size within maintainability limits.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable
@@ -25,7 +26,7 @@ class DimensionCallbacks:
     run_analysis: Callable[..., tuple[Path, Path]]
     parse_evidence: Callable[..., Evidence | None]
 
-_DEFAULT_SUBAGENT_MODEL = "claude-haiku-4-5"
+_DEFAULT_SUBAGENT_MODEL = os.environ.get("QUODEQ_SUBAGENT_MODEL", "claude-haiku-4-5")
 
 
 def _list_plugin_files(config: RunConfig, ctx_total: int, dim_id: str, idx: int) -> tuple[list[str], set[str]]:

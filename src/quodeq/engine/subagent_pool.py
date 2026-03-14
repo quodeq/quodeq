@@ -168,9 +168,9 @@ class SubagentPool:
                 elapsed = int(time.monotonic() - start)
                 mins, secs = divmod(elapsed, 60)
                 findings = self._count_total_findings()
-                queue = FileQueue(self._queue_path)
-                remaining = queue.remaining()
-                taken = len(queue.all_taken_files())
+                q = FileQueue(self._queue_path)
+                remaining = q.remaining()
+                taken = len(q.all_taken_files())
                 done = sum(1 for v in finished.values() if v)
                 log_info(
                     f"  [{self._dimension}] {mins}m{secs:02d}s | "
@@ -185,17 +185,17 @@ class SubagentPool:
         self, pool_start: float, max_duration: float,
     ) -> bool:
         """Return True if a new agent should be spawned (time and queue check)."""
+        q = FileQueue(self._queue_path)
+        remaining = q.remaining()
         elapsed = time.monotonic() - pool_start
         if elapsed >= max_duration:
-            queue = FileQueue(self._queue_path)
-            remaining = queue.remaining()
             if remaining > 0:
                 log_warning(
                     f"  Pool time limit ({max_duration}s) reached — "
                     f"{remaining} files left, not spawning new agents"
                 )
             return False
-        return FileQueue(self._queue_path).remaining() > 0
+        return remaining > 0
 
     def _collect_done(
         self, futures: dict[Future[SubagentResult], int], results: list[SubagentResult],
@@ -283,13 +283,14 @@ class SubagentPool:
 
         Returns the output path.
         """
-        all_lines: list[str] = []
-        for result in results:
-            if not result.jsonl_file.exists():
-                continue
-            with open(result.jsonl_file) as f:
-                all_lines.extend(f)
-        unique_lines = _dedup_jsonl_lines(all_lines)
+        def _iter_all_lines() -> Iterable[str]:
+            for result in results:
+                if not result.jsonl_file.exists():
+                    continue
+                with open(result.jsonl_file) as f:
+                    yield from f
+
+        unique_lines = _dedup_jsonl_lines(_iter_all_lines())
         with open(output, "w") as out:
             for line in unique_lines:
                 out.write(line + "\n")

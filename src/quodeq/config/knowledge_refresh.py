@@ -231,8 +231,15 @@ def _get_fetch_client() -> _FetchClient:
         return _fetch_client
 
 
-def _fetch_url(url: str, headers: dict | None = None) -> str | None:
-    return _get_fetch_client().fetch(url, headers)
+def set_fetch_client(client: _FetchClient) -> None:
+    """Replace the module-level fetch client (e.g. for testing or alternative HTTP backends)."""
+    global _fetch_client
+    with _fetch_client_lock:
+        _fetch_client = client
+
+
+def _fetch_url(url: str, headers: dict | None = None, *, client: _FetchClient | None = None) -> str | None:
+    return (client or _get_fetch_client()).fetch(url, headers)
 
 
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:

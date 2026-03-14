@@ -50,7 +50,13 @@ class RateLimitStore(Protocol):
 
 
 class InMemoryRateLimitStore:
-    """Process-local rate-limit store backed by an LRU OrderedDict."""
+    """Process-local rate-limit store backed by an LRU OrderedDict.
+
+    For multi-worker deployments, implement the ``RateLimitStore`` protocol
+    with a shared backend (e.g. Redis) and pass it to ``create_app`` via
+    the ``rate_limit_store`` parameter, or register a factory via
+    ``create_rate_limit_store``.
+    """
 
     def __init__(
         self,
@@ -92,6 +98,16 @@ class InMemoryRateLimitStore:
             self._store[ip] = timestamps
             self._store.move_to_end(ip)
         return len(timestamps) >= self._max_requests
+
+
+def create_rate_limit_store() -> RateLimitStore:
+    """Create the default rate-limit store.
+
+    Override this factory to plug in a shared backend for multi-worker
+    deployments (e.g. Redis).  The returned object must satisfy the
+    ``RateLimitStore`` protocol.
+    """
+    return InMemoryRateLimitStore()
 
 
 def _default_provider() -> ActionProvider:
@@ -150,7 +166,7 @@ def create_app(
     """
     app = Flask(__name__)
     provider = provider or _default_provider()
-    store = rate_limit_store or InMemoryRateLimitStore()
+    store = rate_limit_store or create_rate_limit_store()
     if api_key is None:
         api_key = os.environ.get("QUODEQ_API_KEY")
     if not api_key:

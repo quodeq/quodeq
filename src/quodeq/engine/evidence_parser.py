@@ -76,7 +76,9 @@ def resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | None
             result.append({"label": label.upper(), "url": f"https://cwe.mitre.org/data/definitions/{cwe_id}.html"})
         else:
             # Prefix match: "CISQ-ASCRM-CWE-396" matches known label "CISQ"
-            matched = next((r for k, r in by_label.items() if label.upper().startswith(k.upper())), None)
+            label_upper = label.upper()
+            upper_labels = {k.upper(): r for k, r in by_label.items()}
+            matched = next((r for k, r in upper_labels.items() if label_upper.startswith(k)), None)
             if matched:
                 result.append(matched)
     # Only keep refs that have a URL — drop bare labels without links
@@ -214,12 +216,13 @@ def parse_jsonl_to_evidence(
     grouped = _group_judgments(judgments)
     all_principles = set(grouped.violations.keys()) | set(grouped.compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}
+    dimension_name = judgments[0].dimension if judgments else ""
 
     for sc in sorted(all_principles):
         pe = PrincipleEvidence(
             practice_id=sc,
             display_name=sc,
-            dimension=judgments[0].dimension if judgments else "",
+            dimension=dimension_name,
             severity=grouped.severity.get(sc, "medium"),
             violations=[_judgment_to_dict(j) for j in grouped.violations.get(sc, [])],
             compliance=[_judgment_to_dict(j) for j in grouped.compliance.get(sc, [])],

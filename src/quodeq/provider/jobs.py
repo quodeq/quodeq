@@ -87,7 +87,13 @@ class JobStore(Protocol):
 
 
 class InMemoryJobStore:
-    """Process-local job store backed by a plain dict."""
+    """Process-local job store backed by a plain dict.
+
+    For multi-worker deployments, implement the ``JobStore`` protocol
+    with a persistent backend (e.g. database, Redis) and pass it to
+    ``JobManager`` via the ``job_store`` parameter, or override
+    ``create_job_store``.
+    """
 
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
@@ -105,6 +111,15 @@ class InMemoryJobStore:
         self._jobs.pop(job_id, None)
 
 
+def create_job_store() -> JobStore:
+    """Create the default job store.
+
+    Override this factory to plug in a persistent backend for multi-worker
+    deployments.  The returned object must satisfy the ``JobStore`` protocol.
+    """
+    return InMemoryJobStore()
+
+
 class JobManager:
     """Thread-safe manager for spawning and tracking evaluation subprocesses.
 
@@ -119,7 +134,7 @@ class JobManager:
         job_store: JobStore | None = None,
     ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
-        self._store: JobStore = job_store or InMemoryJobStore()
+        self._store: JobStore = job_store or create_job_store()
         self._processes: dict[str, Any] = {}
         self._lock = threading.Lock()
 
