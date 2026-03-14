@@ -56,16 +56,20 @@ def refresh_practices(
     """
     out_path = evaluators_dir / runtime / "knowledge" / "practices.json"
 
+    log_info(f"Fetching cursor-rules repos for {runtime}...")
     repos = _fetch_cursor_rules_repos(runtime, min_stars)
     if not repos:
         log_warning(f"No cursor-rules repos found for runtime={runtime!r} with min_stars={min_stars}")
         return 1
+    log_info(f"Found {len(repos)} repos (min {min_stars} stars)")
 
+    log_info("Fetching content samples from top repos...")
     content_samples = _fetch_repo_content(repos[:3])
     if not content_samples:
         log_error("Could not fetch content from any repo")
         return 1
 
+    log_info("Generating practices via AI...")
     prompt = _build_practices_prompt(runtime, content_samples, out_path)
     stdout, err = run_ai_cli(prompt)
     if err:

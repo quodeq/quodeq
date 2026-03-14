@@ -19,6 +19,8 @@ def get_valid_categories(categories: str | None = None) -> frozenset[str]:
     return frozenset(raw.split(","))
 
 
+# Populated from QUODEQ_DISCIPLINE_CATEGORIES env var (comma-separated).
+# Default: "backend,frontend,mobile,infra"
 VALID_CATEGORIES = get_valid_categories()
 
 

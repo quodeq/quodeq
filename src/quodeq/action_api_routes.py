@@ -251,5 +251,5 @@ def register_static_routes(app: Flask, static_dist: str | None) -> None:
         if (dist / path).is_file():
             return send_from_directory(str(dist), path)
         if path.startswith('api/'):
-            return jsonify({"error": "Not found"}), HTTPStatus.NOT_FOUND
+            return jsonify({"error": "Not found", "code": "NOT_FOUND"}), HTTPStatus.NOT_FOUND
         return send_from_directory(str(dist), 'index.html')

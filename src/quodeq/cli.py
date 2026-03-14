@@ -112,7 +112,7 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
             return None
     src = Path(repo_path).resolve()
     if not src.exists():
-        print(f"Repository path does not exist: {src}", file=sys.stderr)
+        print(f"Repository path does not exist: {src}. Verify the path is correct and accessible.", file=sys.stderr)
         return None
     return src
 
@@ -168,11 +168,15 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     """Execute the evidence/scoring pipeline and print results."""
     try:
         if args.evidence_only:
+            print("Starting evaluation...", file=sys.stderr)
             evidence = run(config)
             out_file = evidence_dir / f"{config.plugin_id}_evidence.json"
             out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2))
             print(f"Evidence written to {out_file}")
         else:
+            print("Starting evaluation...", file=sys.stderr)
+            print("Scoring evidence...", file=sys.stderr)
+            print("Generating report...", file=sys.stderr)
             scores = run_full(config, evaluation_dir, mode=args.mode)
             print(f"Reports written to {evaluation_dir}/")
             for dim, score in scores.items():
@@ -191,7 +195,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
 
     evaluators_dir = default_paths().evaluators_dir
     if not evaluators_dir.exists():
-        print(f"Evaluators directory not found: {evaluators_dir}", file=sys.stderr)
+        print(f"Evaluators directory not found: {evaluators_dir}. Run 'quodeq configure' to set up the configuration.", file=sys.stderr)
         return 1
 
     plugin_id = _resolve_plugin(args, src, evaluators_dir)
@@ -218,7 +222,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
             max_turns=args.max_turns if args.max_turns is not None else _env_int("QUODEQ_MAX_TURNS", None),
             max_duration=args.max_duration if args.max_duration is not None else _env_int("QUODEQ_MAX_DURATION", None),
             n_subagents=args.n_subagents,
-            # CLI boundary: env var read is intentional here
+            # SUBAGENT_MODEL env var: override the AI model used by subagent workers
+            # (e.g. "claude-sonnet-4-20250514"). Unset or empty = use default model.
             subagent_model=os.environ.get("SUBAGENT_MODEL") or None,
         ),
     )

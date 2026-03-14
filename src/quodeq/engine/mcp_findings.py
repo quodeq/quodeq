@@ -6,6 +6,7 @@ No external dependencies.
 from __future__ import annotations
 
 import json
+import logging
 import sys
 from pathlib import Path
 from typing import TextIO
@@ -110,7 +111,8 @@ def _load_compiled_refs(compiled_dir: str | None, dimension: str | None) -> dict
         return {}
     try:
         data = json.loads((Path(compiled_dir) / f"{dimension}.json").read_text())
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        logging.getLogger(__name__).warning("Failed to load compiled standards for %s: %s", dimension, exc)
         return {}
     lookup: dict[str, list[dict]] = {}
     for principle in data.get("principles", []):

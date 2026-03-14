@@ -11,6 +11,8 @@ from quodeq.engine.analysis_stream import extract_files_from_event
 from quodeq.engine.evidence_parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 
+_logger = logging.getLogger(__name__)
+
 
 def _build_violation_response(
     ctx: ViolationContext,
@@ -100,7 +102,7 @@ def _count_files_in_stream(stream_path: Path) -> int:
                 except json.JSONDecodeError:
                     continue
     except OSError as exc:
-        logging.getLogger(__name__).warning("Failed to read stream file %s: %s", stream_path, exc)
+        _logger.warning("Failed to read stream file %s: %s", stream_path, exc)
     return len(files)
 
 
@@ -113,7 +115,8 @@ def parse_violations_from_jsonl(
     try:
         with open(jsonl_path) as _f:
             violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup)
-    except OSError:
+    except OSError as exc:
+        _logger.warning("Failed to read findings file: %s", exc)
         return None
     files_read = _count_files_in_stream(stream_path) if stream_path and stream_path.exists() else 0
     return _build_violation_response(
@@ -216,7 +219,8 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
                 violations.extend(new_v)
                 compliance.extend(new_c)
                 files_read.update(_extract_files_from_stream_event(event))
-    except OSError:
+    except OSError as exc:
+        _logger.warning("Failed to read stream file: %s", exc)
         return None
 
     return _build_violation_response(

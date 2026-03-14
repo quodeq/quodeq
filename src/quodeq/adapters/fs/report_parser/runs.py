@@ -7,6 +7,7 @@ introduce a RunStorage port/protocol and adapt callers.
 from __future__ import annotations
 
 import json
+import logging
 import os
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -33,7 +34,8 @@ def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
     try:
         with os.scandir(path) as it:
             return list(it)
-    except OSError:
+    except OSError as exc:
+        logging.getLogger(__name__).debug("Could not list directory %s: %s", path.name, exc)
         return []
 
 

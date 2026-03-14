@@ -90,10 +90,19 @@ _DEFAULT_BASE_AI_ARGS = "--print --output-format stream-json --verbose"
 
 
 def _get_ai_tools(env: dict[str, str] | None = None) -> str:
+    """Return the comma-separated list of AI tools to enable.
+
+    Reads QUODEQ_AI_TOOLS from the environment (default: "Glob,Grep,Read").
+    """
     return (env or os.environ).get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
 
 
 def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Return base CLI arguments for the AI subprocess.
+
+    Reads QUODEQ_AI_BASE_ARGS from the environment
+    (default: "--print --output-format stream-json --verbose").
+    """
     return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
 
 _PROVIDER_CONFIGS: dict[str, dict] = {

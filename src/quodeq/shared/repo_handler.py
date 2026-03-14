@@ -30,7 +30,7 @@ def prepare_repository(repo_input: str) -> str:
     Raises ValueError if the URL does not match the expected git repository format.
     """
     if not _REPO_URL_RE.match(repo_input):
-        raise ValueError(f"Invalid repository URL format: {repo_input}")
+        raise ValueError(f"Invalid repository URL format: {repo_input}. Expected: https://github.com/user/repo or git@github.com:user/repo.git")
     repo_name = repo_input.split("/")[-1].replace(".git", "")
     tmp_dir = tempfile.mkdtemp()
     dest = Path(tmp_dir) / repo_name

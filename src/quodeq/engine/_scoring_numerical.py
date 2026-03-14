@@ -9,9 +9,10 @@ _CRITICAL_DROP_TABLE: list[tuple[int, int]] = [(12, 3), (4, 2), (1, 1)]
 _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 
 # Per-type deduction constants for numerical mode.
-_CRITICAL_PENALTY = float(os.environ.get("QUODEQ_CRITICAL_PENALTY", "2.0"))
-_MAJOR_PENALTY = float(os.environ.get("QUODEQ_MAJOR_PENALTY", "1.0"))
-_MINOR_PENALTY = float(os.environ.get("QUODEQ_MINOR_PENALTY", "0.25"))
+# Override via env vars; values must be > 0.
+_CRITICAL_PENALTY = float(os.environ.get("QUODEQ_CRITICAL_PENALTY", "2.0"))  # points per critical type (default: 2.0)
+_MAJOR_PENALTY = float(os.environ.get("QUODEQ_MAJOR_PENALTY", "1.0"))  # points per major type (default: 1.0)
+_MINOR_PENALTY = float(os.environ.get("QUODEQ_MINOR_PENALTY", "0.25"))  # points per minor type (default: 0.25)
 
 _CRITICAL_SCORE_CAP = 3
 _MAJOR_SCORE_CAP = 5

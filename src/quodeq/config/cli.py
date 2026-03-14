@@ -42,8 +42,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="List coverage gaps for a plugin runtime (omit value to list all)")
     parser.add_argument("--fill-gap", nargs=2, metavar=("RUNTIME", "PRINCIPLE"),
                         help="Generate an evaluator to fill a coverage gap for the given principle")
-    parser.add_argument("--parallel",
-                        help="Number of parallel workers to use for generation tasks")
+    parser.add_argument("--parallel", type=int,
+                        help="Number of parallel workers (default: %(default)s, range: 1-16)")
     parser.add_argument("--sequential", action="store_true",
                         help="Run generation tasks sequentially instead of in parallel")
     parser.add_argument("--data-version", default=None,

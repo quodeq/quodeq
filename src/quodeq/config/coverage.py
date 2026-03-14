@@ -8,6 +8,10 @@ def parse_coverage_percent(value: str) -> int:
     try:
         return int(value.strip().rstrip("%"))
     except ValueError:
+        import logging
+        logging.getLogger(__name__).warning(
+            "Invalid coverage format %r; expected '85%%' or '3/4'", value
+        )
         return 0
 
 
@@ -18,11 +22,19 @@ def coverage_percent(value: str) -> int:
         try:
             d = int(denom)
         except ValueError:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Invalid coverage format %r; expected '85%%' or '3/4'", value
+            )
             return 0
         if d == 0:
             return 0
         try:
             return int(round((int(num) / d) * 100))
         except ValueError:
+            import logging
+            logging.getLogger(__name__).warning(
+                "Invalid coverage format %r; expected '85%%' or '3/4'", value
+            )
             return 0
     return parse_coverage_percent(value)

@@ -42,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Skip rebuilding the UI before starting the server")
     parser.add_argument("--reinstall", action="store_true",
                         help="Force reinstallation of UI dependencies before building")
-    parser.add_argument("--open", default="true",
+    parser.add_argument("--open", action=argparse.BooleanOptionalAction, default=True,
                         help="Open the dashboard in a browser after starting (default: %(default)s)")
     return parser
 
@@ -62,7 +62,7 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
             api_forced=api_forced,
         ),
         build=BuildConfig(
-            open_browser=args.open.lower() != "false",
+            open_browser=bool(args.open),
             no_build=args.no_build,
             reinstall=args.reinstall,
         ),

@@ -42,12 +42,12 @@ def _is_private_address(hostname: str) -> bool:
         pass
     return False
 
-_HTTP_TIMEOUT_S = int(os.environ.get("QUODEQ_HTTP_TIMEOUT", "10"))
-_MAX_RETRIES = int(os.environ.get("QUODEQ_HTTP_MAX_RETRIES", "3"))
-_RETRY_BASE_DELAY_S = float(os.environ.get("QUODEQ_HTTP_RETRY_DELAY", "0.5"))
-_RETRY_JITTER_S = float(os.environ.get("QUODEQ_HTTP_RETRY_JITTER", "0.3"))
-_CIRCUIT_BREAKER_THRESHOLD = int(os.environ.get("QUODEQ_CB_THRESHOLD", "5"))
-_CIRCUIT_BREAKER_RESET_S = int(os.environ.get("QUODEQ_CB_RESET", "60"))
+_HTTP_TIMEOUT_S = int(os.environ.get("QUODEQ_HTTP_TIMEOUT", "10"))  # seconds, must be > 0
+_MAX_RETRIES = int(os.environ.get("QUODEQ_HTTP_MAX_RETRIES", "3"))  # must be >= 1
+_RETRY_BASE_DELAY_S = float(os.environ.get("QUODEQ_HTTP_RETRY_DELAY", "0.5"))  # seconds, must be >= 0
+_RETRY_JITTER_S = float(os.environ.get("QUODEQ_HTTP_RETRY_JITTER", "0.3"))  # seconds, must be >= 0
+_CIRCUIT_BREAKER_THRESHOLD = int(os.environ.get("QUODEQ_CB_THRESHOLD", "5"))  # failures before opening circuit, must be >= 1
+_CIRCUIT_BREAKER_RESET_S = int(os.environ.get("QUODEQ_CB_RESET", "60"))  # seconds before resetting circuit, must be > 0
 
 
 @dataclass(frozen=True)
@@ -138,7 +138,7 @@ class HttpClient:
             )
 
         if self._is_circuit_open():
-            return HttpResponse(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "circuit breaker open — too many recent failures"})
+            return HttpResponse(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "circuit breaker open — too many recent failures", "code": "CIRCUIT_OPEN"})
 
         last_response: HttpResponse | None = None
         for attempt in range(self._max_retries):
@@ -165,11 +165,11 @@ class HttpClient:
                 return HttpResponse(resp.status, payload)
         except request.HTTPError as exc:
             try:
-                payload = json.loads(exc.read().decode("utf-8")) if exc.fp else {"error": "http error"}
+                payload = json.loads(exc.read().decode("utf-8")) if exc.fp else {"error": "http error", "code": "HTTP_ERROR"}
             except (json.JSONDecodeError, UnicodeDecodeError):
-                payload = {"error": "http error"}
+                payload = {"error": "http error", "code": "HTTP_ERROR"}
             return HttpResponse(exc.code, payload)
         except (URLError, socket.timeout, OSError):
-            return HttpResponse(HTTPStatus.BAD_GATEWAY, {"error": "network error"})
+            return HttpResponse(HTTPStatus.BAD_GATEWAY, {"error": "network error", "code": "NETWORK_ERROR"})
         except (json.JSONDecodeError, UnicodeDecodeError):
-            return HttpResponse(HTTPStatus.BAD_GATEWAY, {"error": "invalid response"})
+            return HttpResponse(HTTPStatus.BAD_GATEWAY, {"error": "invalid response", "code": "INVALID_RESPONSE"})

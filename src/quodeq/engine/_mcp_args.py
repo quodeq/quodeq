@@ -38,6 +38,7 @@ def _parse_args(argv: list[str] | None = None) -> _ServerArgs:
             result.findings_file = args[i]
             i += 1
         else:
+            sys.stderr.write(f"Warning: unrecognised argument '{args[i]}'\n")
             i += 1
 
     if not result.findings_file:

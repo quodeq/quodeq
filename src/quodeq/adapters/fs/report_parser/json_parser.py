@@ -37,7 +37,8 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
     """Parse a dimension evaluation JSON file into a normalized report dict."""
     try:
         data = json.loads(json_path.read_text())
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        _logger.warning("Failed to parse report %s: %s", json_path.name, exc)
         return None
 
     if data.get("schema_version") is None:
@@ -141,7 +142,8 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
     """Parse a JSON evaluation file into a detailed report with principle breakdowns."""
     try:
         data = json.loads(json_path.read_text())
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        _logger.warning("Failed to parse evaluation %s: %s", json_path.name, exc)
         return None
 
     principle_grades = [
