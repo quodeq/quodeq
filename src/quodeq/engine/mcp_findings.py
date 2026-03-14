@@ -89,14 +89,54 @@ class FindingsRouter:
         finding.update({k: v for k, v in args.items() if v is not None})
 
         # Enrich with compiled standard refs — server-side, zero LLM tokens
+        # Pick one ref per source type (e.g. one CWE, one CISQ) using best text match
         req = args.get("req")
         if req and req in self._refs:
-            finding["req_refs"] = self._refs[req]
+            finding["req_refs"] = _select_best_refs(
+                self._refs[req], args.get("w", ""), args.get("reason", ""),
+            )
 
         self._fh.write(json.dumps(finding) + "\n")
         self._fh.flush()
         self.counter += 1
         return f"Finding #{self.counter} recorded.", False
+
+
+def _text_overlap(ref_name: str, description: str, reason: str) -> int:
+    """Score how well a ref name matches the finding text by counting shared words."""
+    stop = {"a", "an", "the", "of", "to", "in", "for", "is", "and", "or", "not", "with", "without"}
+    ref_words = set(ref_name.lower().split()) - stop
+    finding_words = (set(description.lower().split()) | set(reason.lower().split())) - stop
+    return len(ref_words & finding_words)
+
+
+def _select_best_refs(
+    all_refs: list[dict], description: str, reason: str,
+) -> list[dict]:
+    """Pick one ref per source type (CWE, CISQ, etc.), choosing the best text match.
+
+    When no words overlap at all, picks the broadest (first/lowest-ID) ref as a
+    safe default rather than an arbitrary specific one.
+    """
+    by_source: dict[str, list[dict]] = {}
+    for ref in all_refs:
+        label = ref.get("label", "")
+        source = label.split("-")[0] if "-" in label else label
+        by_source.setdefault(source, []).append(ref)
+
+    result: list[dict] = []
+    for source, refs in by_source.items():
+        if len(refs) == 1:
+            result.append(refs[0])
+        else:
+            scored = [(r, _text_overlap(r.get("name", ""), description, reason)) for r in refs]
+            max_score = max(s for _, s in scored)
+            if max_score == 0:
+                # No text match — pick the broadest (first listed, typically the parent)
+                result.append(refs[0])
+            else:
+                result.append(max(scored, key=lambda x: x[1])[0])
+    return result
 
 
 def _load_compiled_refs(compiled_dir: str | None, dimension: str | None) -> dict[str, list[dict]]:
@@ -113,7 +153,10 @@ def _load_compiled_refs(compiled_dir: str | None, dimension: str | None) -> dict
             req_id = req.get("id")
             if not req_id:
                 continue
-            refs = [{"label": _ref_label(r), "url": r["url"]} for r in req.get("refs", []) if r.get("url")]
+            refs = [
+                {"label": _ref_label(r), "url": r["url"], "name": r.get("name", "")}
+                for r in req.get("refs", []) if r.get("url")
+            ]
             if refs:
                 lookup[req_id] = refs
     return lookup
