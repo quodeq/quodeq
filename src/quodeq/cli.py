@@ -26,6 +26,20 @@ from quodeq.shared.repo_handler import prepare_repository
 from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo
 
 
+_DEFAULT_N_SUBAGENTS = 5
+
+
+def _env_int(var: str, default: int | None) -> int | None:
+    """Read an environment variable as an int, returning *default* if unset or invalid."""
+    raw = os.environ.get(var)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
 def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
     """Register arguments for the evaluate subcommand."""
     parser.add_argument("repo", help="Path or URL to the repository")
@@ -59,8 +73,8 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         help="Max seconds per dimension before terminating (default: 1800)",
     )
     parser.add_argument(
-        "--n-subagents", type=int, default=5,
-        help="Number of parallel subagents per dimension (default: 5)",
+        "--n-subagents", type=int, default=_DEFAULT_N_SUBAGENTS,
+        help="Number of parallel subagents per dimension (default: %(default)s)",
     )
 
 
@@ -201,9 +215,10 @@ def run_evaluate(args: argparse.Namespace) -> int:
         work_dir=evidence_dir,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
-            max_turns=args.max_turns,
-            max_duration=args.max_duration,
+            max_turns=args.max_turns if args.max_turns is not None else _env_int("QUODEQ_MAX_TURNS", None),
+            max_duration=args.max_duration if args.max_duration is not None else _env_int("QUODEQ_MAX_DURATION", None),
             n_subagents=args.n_subagents,
+            # CLI boundary: env var read is intentional here
             subagent_model=os.environ.get("SUBAGENT_MODEL") or None,
         ),
     )

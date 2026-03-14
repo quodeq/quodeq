@@ -9,7 +9,7 @@ import pytest
 
 from quodeq.engine.analysis import AnalysisConfig, AnalysisError
 from quodeq.engine.file_queue import FileQueue
-from quodeq.engine.subagent_pool import SubagentPool, SubagentResult
+from quodeq.engine.subagent_pool import PoolPaths, SubagentPool, SubagentResult
 
 
 def _fake_run_analysis(work_dir, prompt, stream_file, config):
@@ -49,10 +49,8 @@ class TestSubagentPool:
 
         pool = SubagentPool(
             n_agents=3,
-            work_dir=tmp_path,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             prompt="analyse files",
-            evidence_dir=tmp_path,
-            queue_path=queue_path,
             dimension="maintainability",
         )
 
@@ -70,10 +68,8 @@ class TestSubagentPool:
 
         pool = SubagentPool(
             n_agents=2,
-            work_dir=tmp_path,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             prompt="test",
-            evidence_dir=tmp_path,
-            queue_path=queue_path,
             dimension="security",
             config=AnalysisConfig(compiled_dir=tmp_path / "compiled"),
         )
@@ -102,10 +98,8 @@ class TestSubagentPool:
 
         pool = SubagentPool(
             n_agents=3,
-            work_dir=tmp_path,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             prompt="test",
-            evidence_dir=tmp_path,
-            queue_path=queue_path,
             dimension="maint",
         )
 
@@ -126,10 +120,8 @@ class TestSubagentPool:
 
         pool = SubagentPool(
             n_agents=0,
-            work_dir=tmp_path,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             prompt="test",
-            evidence_dir=tmp_path,
-            queue_path=queue_path,
             dimension="maint",
         )
 

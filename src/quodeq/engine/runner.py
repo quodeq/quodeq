@@ -189,12 +189,14 @@ def _process_dimension_with_subagents(
     config: RunConfig, dim_id: str, idx: int, ctx: _PluginContext,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents (delegates to _subagent_runner)."""
-    from quodeq.engine._subagent_runner import process_dimension_with_subagents
+    from quodeq.engine._subagent_runner import DimensionCallbacks, process_dimension_with_subagents
     return process_dimension_with_subagents(
         config, dim_id, idx, ctx,
-        build_prompt_fn=_build_dimension_prompt,
-        run_analysis_fn=_run_dimension_analysis,
-        parse_evidence_fn=_parse_dimension_evidence,
+        callbacks=DimensionCallbacks(
+            build_prompt=_build_dimension_prompt,
+            run_analysis=_run_dimension_analysis,
+            parse_evidence=_parse_dimension_evidence,
+        ),
     )
 
 

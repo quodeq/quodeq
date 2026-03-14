@@ -18,24 +18,26 @@ from typing import Protocol, runtime_checkable
 _QUEUE_VERSION = 1
 
 
+if sys.platform == "win32":
+    import msvcrt as _lock_mod
+else:
+    import fcntl as _lock_mod  # type: ignore[no-redef]
+
+
 def _lock_file(fd: int) -> None:
     """Acquire an exclusive lock on the file descriptor, dispatching by platform."""
     if sys.platform == "win32":
-        import msvcrt
-        msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+        _lock_mod.locking(fd, _lock_mod.LK_LOCK, 1)
     else:
-        import fcntl
-        fcntl.flock(fd, fcntl.LOCK_EX)
+        _lock_mod.flock(fd, _lock_mod.LOCK_EX)
 
 
 def _unlock_file(fd: int) -> None:
     """Release the lock on the file descriptor, dispatching by platform."""
     if sys.platform == "win32":
-        import msvcrt
-        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        _lock_mod.locking(fd, _lock_mod.LK_UNLCK, 1)
     else:
-        import fcntl
-        fcntl.flock(fd, fcntl.LOCK_UN)
+        _lock_mod.flock(fd, _lock_mod.LOCK_UN)
 
 
 @runtime_checkable

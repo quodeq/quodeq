@@ -14,6 +14,7 @@ from quodeq.adapters.fs.report_parser import (
     parse_numeric_score,
     read_run_data,
 )
+from quodeq.provider._cache import make_lru_dimension_fetcher
 
 # Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
 # Process-local cache; in multi-worker deployments, replace with a shared cache
@@ -26,21 +27,10 @@ _ACC_DIM_LOCK = threading.Lock()
 def _make_acc_dimension_fetcher(
     reports_root: Path, project: str,
 ) -> Callable[[str], list[dict[str, Any]]]:
-    """Return a cached fetcher for run dimension data (LRU, bounded at _ACC_DIM_CACHE_MAX)."""
-    def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
-        key = (reports_root, project, run_id)
-        with _ACC_DIM_LOCK:
-            if key in _ACC_DIM_CACHE:
-                _ACC_DIM_CACHE.move_to_end(key)
-                return _ACC_DIM_CACHE[key]
-        data = read_run_data(reports_root, project, run_id)
-        with _ACC_DIM_LOCK:
-            _ACC_DIM_CACHE[key] = data
-            _ACC_DIM_CACHE.move_to_end(key)
-            if len(_ACC_DIM_CACHE) > _ACC_DIM_CACHE_MAX:
-                _ACC_DIM_CACHE.popitem(last=False)
-        return data
-    return get_run_dimensions
+    """Return a cached fetcher for run dimension data (LRU, bounded)."""
+    return make_lru_dimension_fetcher(
+        reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _ACC_DIM_CACHE_MAX,
+    )
 
 
 def _read_all_run_data(

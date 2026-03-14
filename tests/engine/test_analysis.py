@@ -47,12 +47,7 @@ def _item_completed_event(text: str, reads: list[str] | None = None) -> str:
     })
 
 
-def _evidence_line(**overrides) -> str:
-    obj = {"p": "ts-001", "t": "violation", "d": "security", "w": "eval usage",
-           "file": "app.ts", "line": 10, "severity": "high", "vt": "violation",
-           "reason": "eval is dangerous"}
-    obj.update(overrides)
-    return json.dumps(obj)
+from tests.engine.conftest import _evidence_line
 
 
 # ---------------------------------------------------------------------------

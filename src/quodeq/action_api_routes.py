@@ -9,9 +9,10 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
+from quodeq.action_api_helpers import _error
 from quodeq.action_api_zip import export_project_zip
 from quodeq.provider.base import ActionProvider
-from quodeq.provider.tooling_mixin import _ALLOWED_CLIENT_IDS as _ALLOWED_AI_CMDS
+from quodeq.provider.tooling_mixin import _get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.shared.utils import get_evaluations_dir
 
 _CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
@@ -21,10 +22,6 @@ _logger = logging.getLogger(__name__)
 def _sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging."""
     return _CREDENTIALS_RE.sub(r"\1***@", url)
-
-
-def _error(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
-    return {"error": message, "code": code}, status
 
 
 def _reports_dir() -> str:
@@ -148,7 +145,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
             body, status = _error("Repository is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         ai_cmd = payload.get("aiCmd") or None
-        if ai_cmd and ai_cmd not in _ALLOWED_AI_CMDS:
+        if ai_cmd and ai_cmd not in _get_allowed_ai_cmds():
             body, status = _error("Invalid AI command", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)

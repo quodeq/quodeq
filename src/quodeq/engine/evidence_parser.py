@@ -135,6 +135,13 @@ def _judgment_to_dict(j: Judgment) -> dict:
     return d
 
 
+_SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+
+
+def _sev_rank(sev: str) -> int:
+    return _SEV_RANKS.get(sev, 1)
+
+
 @dataclass
 class _GroupedJudgments:
     violations: dict[str, list[Judgment]]
@@ -183,20 +190,17 @@ def _read_judgments(
     jsonl_file: Path, compiled_dir: Path | None,
 ) -> list[Judgment]:
     """Read JSONL lines and return enriched Judgment objects."""
+    if not jsonl_file.exists():
+        return []
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
-    try:
-        jf_open = open(jsonl_file) if jsonl_file.exists() else None
-    except OSError:
-        jf_open = None
-    if jf_open is not None:
-        with jf_open as _jf:
-            for line in _jf:
-                result = _parse_jsonl_line(line)
-                if result is not None:
-                    j, llm_refs = result
-                    _enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
-                    judgments.append(j)
+    with open(jsonl_file) as _jf:
+        for line in _jf:
+            result = _parse_jsonl_line(line)
+            if result is not None:
+                j, llm_refs = result
+                _enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
+                judgments.append(j)
     return judgments
 
 
@@ -237,10 +241,3 @@ def parse_jsonl_to_evidence(
         principles=principles,
         dismissed_count=0,
     )
-
-
-_SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-
-
-def _sev_rank(sev: str) -> int:
-    return _SEV_RANKS.get(sev, 1)

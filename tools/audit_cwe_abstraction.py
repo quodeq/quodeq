@@ -19,7 +19,7 @@ from datetime import date
 from pathlib import Path
 
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
-API_BASE = "https://cwe-api.mitre.org/api/v1/cwe/weakness"
+API_BASE = "https://cwe-api.mitre.org/api/v1/cwe"
 
 
 def get_all_cwes() -> dict[int, list[str]]:
@@ -37,7 +37,7 @@ def get_all_cwes() -> dict[int, list[str]]:
 
 def fetch_cwe_info(cwe_id: int) -> dict | None:
     """Fetch abstraction and mapping info from CWE API."""
-    url = f"{API_BASE}/{cwe_id}"
+    url = f"{API_BASE}/weakness/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -64,7 +64,7 @@ def fetch_cwe_info(cwe_id: int) -> dict | None:
 
 def _fetch_category_info(cwe_id: int) -> dict | None:
     """Try fetching as a category if weakness lookup returned 404."""
-    url = f"https://cwe-api.mitre.org/api/v1/cwe/category/{cwe_id}"
+    url = f"{API_BASE}/category/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -87,7 +87,7 @@ def _fetch_category_info(cwe_id: int) -> dict | None:
 
 def _fetch_view_info(cwe_id: int) -> dict | None:
     """Try fetching as a view if category lookup also returned 404."""
-    url = f"https://cwe-api.mitre.org/api/v1/cwe/view/{cwe_id}"
+    url = f"{API_BASE}/view/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -127,35 +127,14 @@ def _compute_llm_mapping_usage(cwe_id: int, mapping_usage: str, abstraction: str
     return "Allowed-with-Review"
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--problems", action="store_true", help="Show only PROHIBITED/DISCOURAGED")
-    args = parser.parse_args()
-
-    cwe_dims = get_all_cwes()
-    print(f"Total unique CWEs in ISO 25010 files: {len(cwe_dims)}\n")
-
-    results: list[dict] = []
-    for i, cwe_id in enumerate(sorted(cwe_dims.keys()), 1):
-        info = fetch_cwe_info(cwe_id)
-        if info:
-            info["dimensions"] = cwe_dims[cwe_id]
-            info["fetched_date"] = str(date.today())
-            info["llm_mapping_usage"] = _compute_llm_mapping_usage(
-                info["id"], info["mapping_usage"], info["abstraction"]
-            )
-            results.append(info)
-        if i % 20 == 0:
-            print(f"  Fetched {i}/{len(cwe_dims)}...", file=sys.stderr)
-        time.sleep(0.1)  # rate limit
-
-    # Categorize
+def _print_results(results: list[dict], *, problems_only: bool) -> None:
+    """Print categorized audit results to stdout and write JSON output."""
     prohibited = [r for r in results if r["mapping_usage"].lower() == "prohibited"]
     discouraged = [r for r in results if r["mapping_usage"].lower() == "discouraged"]
     allowed = [r for r in results if r["mapping_usage"].lower() in ("allowed", "allowed-with-review")]
     unknown = [r for r in results if r["mapping_usage"].lower() not in ("prohibited", "discouraged", "allowed", "allowed-with-review")]
 
-    if not args.problems:
+    if not problems_only:
         print(f"\n{'='*80}")
         print(f"SUMMARY")
         print(f"{'='*80}")
@@ -182,17 +161,41 @@ def main() -> None:
             print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] {r['name']}")
             print(f"           Dimensions: {', '.join(r['dimensions'])}")
 
-    if unknown and not args.problems:
+    if unknown and not problems_only:
         print(f"\n{'='*80}")
         print(f"UNKNOWN/OTHER ({len(unknown)})")
         print(f"{'='*80}")
         for r in unknown:
             print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} — {r['name']}")
 
-    # Write full results to JSON for further processing
     output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe" / "audit.json"
     output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
     print(f"\nFull results written to {output_path}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--problems", action="store_true", help="Show only PROHIBITED/DISCOURAGED")
+    args = parser.parse_args()
+
+    cwe_dims = get_all_cwes()
+    print(f"Total unique CWEs in ISO 25010 files: {len(cwe_dims)}\n")
+
+    results: list[dict] = []
+    for i, cwe_id in enumerate(sorted(cwe_dims.keys()), 1):
+        info = fetch_cwe_info(cwe_id)
+        if info:
+            info["dimensions"] = cwe_dims[cwe_id]
+            info["fetched_date"] = str(date.today())
+            info["llm_mapping_usage"] = _compute_llm_mapping_usage(
+                info["id"], info["mapping_usage"], info["abstraction"]
+            )
+            results.append(info)
+        if i % 20 == 0:
+            print(f"  Fetched {i}/{len(cwe_dims)}...", file=sys.stderr)
+        time.sleep(0.1)  # rate limit
+
+    _print_results(results, problems_only=args.problems)
 
 
 if __name__ == "__main__":

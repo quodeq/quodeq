@@ -11,6 +11,10 @@ from pathlib import Path
 from quodeq.shared.utils import get_asvs_url, show_diff
 
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
+_ASVS_SKIP_INTEGRITY_ENV = "QUODEQ_ASVS_SKIP_INTEGRITY"
+
+_RETRY_BASE_DELAY_S = 0.5
+_RETRY_JITTER_S = 0.3
 
 
 def _fetch_with_retry(url: str, timeout: int = 30, max_retries: int = 3) -> bytes:
@@ -30,26 +34,39 @@ def _fetch_with_retry(url: str, timeout: int = 30, max_retries: int = 3) -> byte
         except (urllib.error.URLError, OSError, TimeoutError) as exc:
             last_exc = exc
             if attempt < max_retries - 1:
-                time.sleep(0.5 * (2 ** attempt) + random.uniform(0, 0.3))
+                time.sleep(_RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, _RETRY_JITTER_S))
     raise ConnectionError(f"Failed to fetch after {max_retries} attempts: {last_exc}") from last_exc
 
 
-def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
+def fetch_asvs_l1(
+    standards_dir: Path,
+    *,
+    dry_run: bool = False,
+    expected_hash: str | None = None,
+    skip_integrity: bool | None = None,
+) -> int:
     """Fetch OWASP ASVS L1 requirements and write to standards_dir/asvs/level1.json.
 
     Returns the number of requirements fetched.
-    When QUODEQ_ASVS_SHA256 is set, validates the download against the expected hash.
+
+    Parameters *expected_hash* and *skip_integrity* default to ``None``, in
+    which case the values are read from the ``QUODEQ_ASVS_SHA256`` and
+    ``QUODEQ_ASVS_SKIP_INTEGRITY`` environment variables respectively.
+    Passing them explicitly avoids the need for env-var mutation in tests.
     """
     content = _fetch_with_retry(get_asvs_url())
 
     actual_hash = hashlib.sha256(content).hexdigest()
-    expected_hash = os.environ.get(_ASVS_SHA256_ENV)
+    if expected_hash is None:
+        expected_hash = os.environ.get(_ASVS_SHA256_ENV)
+    if skip_integrity is None:
+        skip_integrity = os.environ.get(_ASVS_SKIP_INTEGRITY_ENV) == "1"
     if expected_hash and actual_hash != expected_hash:
         raise ValueError(
             f"ASVS integrity check failed: expected {expected_hash}, got {actual_hash}"
         )
     if not expected_hash:
-        if os.environ.get("QUODEQ_ASVS_SKIP_INTEGRITY") == "1":
+        if skip_integrity:
             import logging
             logging.getLogger(__name__).warning(
                 "ASVS integrity verification skipped (pin with %s=%s)",
@@ -59,7 +76,7 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
         else:
             raise ValueError(
                 f"ASVS integrity verification required: set {_ASVS_SHA256_ENV}={actual_hash} "
-                f"to pin this download, or set QUODEQ_ASVS_SKIP_INTEGRITY=1 to bypass"
+                f"to pin this download, or set {_ASVS_SKIP_INTEGRITY_ENV}=1 to bypass"
             )
 
     try:

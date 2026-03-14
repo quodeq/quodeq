@@ -147,7 +147,7 @@ class TestApiRouteSubagentModel:
 
         return CapturingProvider()
 
-    def test_subagent_model_forwarded_from_payload(self) -> None:
+    def test_subagent_model_forwarded_from_payload(self, tmp_path: Path) -> None:
         from quodeq.action_api import create_app
 
         captured = {}
@@ -155,14 +155,13 @@ class TestApiRouteSubagentModel:
         client = app.test_client()
 
         response = client.post("/api/evaluations", json={
-            "repo": "/tmp",
+            "repo": str(tmp_path),
             "subagentModel": "claude-sonnet-4-6",
         })
-        assert response.status_code == 400 or captured.get("options") is not None
-        if "options" in captured:
-            assert captured["options"].subagent_model == "claude-sonnet-4-6"
+        assert captured.get("options") is not None
+        assert captured["options"].subagent_model == "claude-sonnet-4-6"
 
-    def test_subagent_model_none_when_not_provided(self) -> None:
+    def test_subagent_model_none_when_not_provided(self, tmp_path: Path) -> None:
         from quodeq.action_api import create_app
 
         captured = {}
@@ -170,11 +169,10 @@ class TestApiRouteSubagentModel:
         client = app.test_client()
 
         response = client.post("/api/evaluations", json={
-            "repo": "/tmp",
+            "repo": str(tmp_path),
         })
-        # May 400 due to repo validation, but if it reaches start_evaluation:
-        if "options" in captured:
-            assert captured["options"].subagent_model is None
+        assert captured.get("options") is not None
+        assert captured["options"].subagent_model is None
 
 
 # ---------------------------------------------------------------------------

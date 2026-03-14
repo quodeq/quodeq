@@ -99,7 +99,7 @@ class TestSubagentPoolModelPropagation:
 
     def test_pool_agents_inherit_model(self, tmp_path: Path) -> None:
         from quodeq.engine.file_queue import FileQueue
-        from quodeq.engine.subagent_pool import SubagentPool
+        from quodeq.engine.subagent_pool import PoolPaths, SubagentPool
 
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["a.py", "b.py"])
@@ -107,10 +107,8 @@ class TestSubagentPoolModelPropagation:
         base = AnalysisConfig(ai_model="claude-opus-4-6")
         pool = SubagentPool(
             n_agents=2,
-            work_dir=tmp_path,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             prompt="test",
-            evidence_dir=tmp_path,
-            queue_path=queue_path,
             dimension="security",
             config=base,
         )
@@ -123,7 +121,7 @@ class TestSubagentPoolModelPropagation:
 
     def test_pool_agents_inherit_haiku(self, tmp_path: Path) -> None:
         from quodeq.engine.file_queue import FileQueue
-        from quodeq.engine.subagent_pool import SubagentPool
+        from quodeq.engine.subagent_pool import PoolPaths, SubagentPool
 
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["x.py"])
@@ -131,10 +129,8 @@ class TestSubagentPoolModelPropagation:
         base = AnalysisConfig(ai_model="claude-haiku-4-5")
         pool = SubagentPool(
             n_agents=1,
-            work_dir=tmp_path,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             prompt="test",
-            evidence_dir=tmp_path,
-            queue_path=queue_path,
             dimension="perf",
             config=base,
         )

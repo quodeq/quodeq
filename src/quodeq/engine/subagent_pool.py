@@ -16,14 +16,47 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Iterable
 
 from quodeq.engine.analysis import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.engine.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 _HEARTBEAT_INTERVAL = 10
+_FUTURE_POLL_INTERVAL_S = 0.5
+
+
+def _dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:
+    """Deduplicate JSONL lines by ``(p, file, line, t)`` key.
+
+    Returns a list of stripped, unique JSON lines.
+    """
+    seen: set[tuple] = set()
+    unique: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            obj = json.loads(stripped)
+        except json.JSONDecodeError:
+            continue
+        key = (obj.get("p"), obj.get("file"), obj.get("line"), obj.get("t"))
+        if key in seen:
+            continue
+        seen.add(key)
+        unique.append(stripped)
+    return unique
 
 _DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
+
+
+@dataclass
+class PoolPaths:
+    """Grouped filesystem paths for the subagent pool."""
+    work_dir: Path
+    evidence_dir: Path
+    queue_path: Path
 
 
 @dataclass
@@ -43,10 +76,8 @@ class SubagentPool:
 
         pool = SubagentPool(
             n_agents=5,
-            work_dir=repo_path,
+            paths=PoolPaths(work_dir=repo_path, evidence_dir=evidence_dir, queue_path=queue_path),
             prompt=rendered_prompt,
-            evidence_dir=evidence_dir,
-            queue_path=queue_path,
             config=AnalysisConfig(...),
         )
         merged = pool.run()  # blocks until all agents finish
@@ -55,18 +86,16 @@ class SubagentPool:
     def __init__(
         self,
         n_agents: int,
-        work_dir: Path,
+        paths: PoolPaths,
         prompt: str,
-        evidence_dir: Path,
-        queue_path: Path,
         dimension: str,
         config: AnalysisConfig | None = None,
     ):
         self._n = max(1, n_agents)
-        self._work_dir = work_dir
+        self._work_dir = paths.work_dir
         self._prompt = prompt
-        self._evidence_dir = evidence_dir
-        self._queue_path = queue_path
+        self._evidence_dir = paths.evidence_dir
+        self._queue_path = paths.queue_path
         self._dimension = dimension
         self._base_config = config or AnalysisConfig()
 
@@ -215,7 +244,7 @@ class SubagentPool:
                 while futures:
                     done = self._collect_done(futures, results, finished)
                     if not done:
-                        time.sleep(0.5)
+                        time.sleep(_FUTURE_POLL_INTERVAL_S)
                         continue
                     for _ in done:
                         if self._should_respawn(pool_start, max_duration):
@@ -240,22 +269,8 @@ class SubagentPool:
         """
         if not jsonl_path.exists():
             return 0
-        seen: set[tuple] = set()
-        unique_lines: list[str] = []
         with open(jsonl_path) as f:
-            for line in f:
-                stripped = line.strip()
-                if not stripped:
-                    continue
-                try:
-                    obj = json.loads(stripped)
-                except json.JSONDecodeError:
-                    continue
-                key = (obj.get("p"), obj.get("file"), obj.get("line"), obj.get("t"))
-                if key in seen:
-                    continue
-                seen.add(key)
-                unique_lines.append(stripped)
+            unique_lines = _dedup_jsonl_lines(f)
         with open(jsonl_path, "w") as f:
             for line in unique_lines:
                 f.write(line + "\n")
@@ -268,26 +283,15 @@ class SubagentPool:
 
         Returns the output path.
         """
-        seen: set[tuple] = set()
-        count = 0
+        all_lines: list[str] = []
+        for result in results:
+            if not result.jsonl_file.exists():
+                continue
+            with open(result.jsonl_file) as f:
+                all_lines.extend(f)
+        unique_lines = _dedup_jsonl_lines(all_lines)
         with open(output, "w") as out:
-            for result in results:
-                if not result.jsonl_file.exists():
-                    continue
-                with open(result.jsonl_file) as f:
-                    for line in f:
-                        stripped = line.strip()
-                        if not stripped:
-                            continue
-                        try:
-                            obj = json.loads(stripped)
-                        except json.JSONDecodeError:
-                            continue
-                        key = (obj.get("p"), obj.get("file"), obj.get("line"), obj.get("t"))
-                        if key in seen:
-                            continue
-                        seen.add(key)
-                        out.write(stripped + "\n")
-                        count += 1
-        log_info(f"Merged {count} unique findings into {output.name}")
+            for line in unique_lines:
+                out.write(line + "\n")
+        log_info(f"Merged {len(unique_lines)} unique findings into {output.name}")
         return output

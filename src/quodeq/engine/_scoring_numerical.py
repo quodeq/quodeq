@@ -13,6 +13,10 @@ _CRITICAL_PENALTY = float(os.environ.get("QUODEQ_CRITICAL_PENALTY", "2.0"))
 _MAJOR_PENALTY = float(os.environ.get("QUODEQ_MAJOR_PENALTY", "1.0"))
 _MINOR_PENALTY = float(os.environ.get("QUODEQ_MINOR_PENALTY", "0.25"))
 
+_CRITICAL_SCORE_CAP = 3
+_MAJOR_SCORE_CAP = 5
+_MAX_SCORE = 10
+
 
 def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: int = 1) -> dict:
     """Compute point deductions for numerical mode.
@@ -30,8 +34,8 @@ def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: in
     n_major = violation_type_counts.get("major", 0)
     n_minor = violation_type_counts.get("minor", 0)
 
-    critical_type_cap = 3 * scale_multiplier
-    major_type_cap = 5 * scale_multiplier
+    critical_type_cap = _CRITICAL_SCORE_CAP * scale_multiplier
+    major_type_cap = _MAJOR_SCORE_CAP * scale_multiplier
 
     effective_critical = min(n_critical, critical_type_cap)
     effective_major = min(n_major, major_type_cap)
@@ -40,8 +44,8 @@ def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: in
     major_deduction = effective_major * _MAJOR_PENALTY
     minor_deduction = n_minor * _MINOR_PENALTY
 
-    cap_from_critical = 3 if n_critical >= critical_type_cap else 10
-    cap_from_major = 5 if n_major >= major_type_cap else 10
+    cap_from_critical = _CRITICAL_SCORE_CAP if n_critical >= critical_type_cap else _MAX_SCORE
+    cap_from_major = _MAJOR_SCORE_CAP if n_major >= major_type_cap else _MAX_SCORE
 
     return {
         "critical_type_count": n_critical,

@@ -111,6 +111,6 @@ class HttpClient:
                 payload = {"error": "http error"}
             return HttpResponse(exc.code, payload)
         except (URLError, socket.timeout, OSError):
-            return HttpResponse(502, {"error": "network error"})
+            return HttpResponse(HTTPStatus.BAD_GATEWAY, {"error": "network error"})
         except (json.JSONDecodeError, UnicodeDecodeError):
-            return HttpResponse(502, {"error": "invalid response"})
+            return HttpResponse(HTTPStatus.BAD_GATEWAY, {"error": "invalid response"})

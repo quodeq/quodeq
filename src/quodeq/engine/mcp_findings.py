@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import TextIO
 
 from quodeq.engine.file_queue import FileQueue
+from quodeq.engine._mcp_args import _ServerArgs, _parse_args
 
 _FINDING_SCHEMA_VERSION = 1
 _JSONRPC_VERSION = "2.0"
@@ -246,9 +247,6 @@ def _dispatch(
         _send(_ok(req_id, {}))
     else:
         _handle_unknown_method(req_id, method)
-
-
-from quodeq.engine._mcp_args import _ServerArgs, _parse_args  # noqa: F401
 
 
 def main() -> None:

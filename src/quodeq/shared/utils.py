@@ -107,18 +107,23 @@ def get_ai_model() -> str | None:
     return os.environ.get("AI_MODEL") or None
 
 
-def get_action_api_port() -> int:
-    """Return the action API port from environment or default."""
-    raw = os.environ.get("QUODEQ_ACTION_API_PORT")
+def _env_int(var: str, default: int) -> int:
+    """Read an environment variable as an int, warn and return *default* on failure."""
+    raw = os.environ.get(var)
     if raw is not None:
         try:
             return int(raw)
         except ValueError:
             import logging
             logging.getLogger(__name__).warning(
-                "Invalid QUODEQ_ACTION_API_PORT=%r, using default", raw,
+                "Invalid %s=%r, using default", var, raw,
             )
-    return _get_config()["action_api_port"]
+    return default
+
+
+def get_action_api_port() -> int:
+    """Return the action API port from environment or default."""
+    return _env_int("QUODEQ_ACTION_API_PORT", _get_config()["action_api_port"])
 
 
 def get_action_api_host() -> str:
@@ -128,16 +133,7 @@ def get_action_api_host() -> str:
 
 def get_dashboard_port() -> int:
     """Return the dashboard preview port from environment or default."""
-    raw = os.environ.get("QUODEQ_DASHBOARD_PORT")
-    if raw is not None:
-        try:
-            return int(raw)
-        except ValueError:
-            import logging
-            logging.getLogger(__name__).warning(
-                "Invalid QUODEQ_DASHBOARD_PORT=%r, using default", raw,
-            )
-    return _get_config()["dashboard_port"]
+    return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"])
 
 
 def get_static_dist() -> str | None:

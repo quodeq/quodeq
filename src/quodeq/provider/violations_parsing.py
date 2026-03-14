@@ -12,6 +12,29 @@ from quodeq.engine.evidence_parser import build_req_refs_lookup, resolve_llm_ref
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 
 
+def _build_violation_response(
+    ctx: ViolationContext,
+    violations: list[dict[str, Any]],
+    compliance: list[dict[str, Any]],
+    *,
+    partial: bool = False,
+    progress: dict[str, int] | None = None,
+    files_read: int = 0,
+) -> dict[str, Any]:
+    """Build the common response dict for violation/compliance parse results."""
+    result: dict[str, Any] = {
+        "dimension": ctx.dimension,
+        "runId": ctx.run_id,
+        "project": ctx.project,
+        "violations": violations,
+        "compliance": compliance,
+        "partial": partial,
+    }
+    if progress is not None:
+        result["progress"] = progress
+    return result
+
+
 def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None) -> dict[str, Any]:
     """Build a normalized finding dict from a raw JSON object."""
     req = obj.get("req")
@@ -93,19 +116,11 @@ def parse_violations_from_jsonl(
     except OSError:
         return None
     files_read = _count_files_in_stream(stream_path) if stream_path and stream_path.exists() else 0
-    return {
-        "dimension": ctx.dimension,
-        "runId": ctx.run_id,
-        "project": ctx.project,
-        "violations": violations,
-        "compliance": compliance,
-        "partial": True,
-        "progress": {
-            "filesRead": files_read,
-            "violations": len(violations),
-            "compliance": len(compliance),
-        },
-    }
+    return _build_violation_response(
+        ctx, violations, compliance,
+        partial=True,
+        progress={"filesRead": files_read, "violations": len(violations), "compliance": len(compliance)},
+    )
 
 
 def _build_violation_from_principle(violation: dict, label: str) -> dict[str, Any]:
@@ -139,7 +154,7 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
     except (OSError, json.JSONDecodeError):
         return None
     violations = _extract_violations_from_principles(data.get("principles") or {})
-    return {"dimension": ctx.dimension, "runId": ctx.run_id, "project": ctx.project, "violations": violations, "partial": True}
+    return _build_violation_response(ctx, violations, [], partial=True)
 
 
 def _parse_entries_from_texts(
@@ -204,16 +219,8 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
     except OSError:
         return None
 
-    return {
-        "dimension": ctx.dimension,
-        "runId": ctx.run_id,
-        "project": ctx.project,
-        "violations": violations,
-        "compliance": compliance,
-        "partial": True,
-        "progress": {
-            "filesRead": len(files_read),
-            "violations": len(violations),
-            "compliance": len(compliance),
-        },
-    }
+    return _build_violation_response(
+        ctx, violations, compliance,
+        partial=True,
+        progress={"filesRead": len(files_read), "violations": len(violations), "compliance": len(compliance)},
+    )

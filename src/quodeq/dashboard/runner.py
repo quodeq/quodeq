@@ -30,6 +30,9 @@ from quodeq.shared.paths import resolve_path
 from quodeq.shared.utils import ACTION_API_MODULE, DEFAULT_HOST, get_evaluations_dir
 
 
+_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
+
+
 def _get_pid_file() -> Path:
     """Return a PID file path in a user-private runtime directory."""
     run_dir = Path.home() / ".quodeq" / "run"
@@ -151,7 +154,7 @@ def _spawn_and_wait(port: int, base_url: str, static_dist: Path | None = None, e
 
 
 def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen | None]:
-    if host not in ("127.0.0.1", "localhost", "::1", "0.0.0.0"):
+    if host not in _LOCAL_HOSTS:
         import logging
         logging.getLogger(__name__).warning(
             "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,

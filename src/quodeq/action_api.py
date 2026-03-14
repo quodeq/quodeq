@@ -97,11 +97,10 @@ def _default_provider() -> ActionProvider:
     return FilesystemActionProvider()
 
 
-def _check_auth() -> Response | tuple[Response, int] | None:
-    """Verify API key authentication when QUODEQ_API_KEY is set."""
+def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
+    """Verify API key authentication when *api_key* is set."""
     if request.path == "/api/health":
         return None
-    api_key = os.environ.get("QUODEQ_API_KEY")
     if api_key:
         auth = request.headers.get("Authorization", "")
         if not hmac.compare_digest(auth, f"Bearer {api_key}"):
@@ -142,10 +141,11 @@ def create_app(
     app = Flask(__name__)
     provider = provider or _default_provider()
     store = rate_limit_store or InMemoryRateLimitStore()
+    api_key = os.environ.get("QUODEQ_API_KEY")
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
-        return _check_auth() or _check_csrf() or _check_rate_limit(store)
+        return _check_auth(api_key) or _check_csrf() or _check_rate_limit(store)
 
     @app.after_request
     def _add_security_headers(response: Response) -> Response:

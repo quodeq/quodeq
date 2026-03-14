@@ -220,16 +220,19 @@ def confidence_interval_for(
 # Numerical score → grade label
 # ---------------------------------------------------------------------------
 
+_GRADE_THRESHOLDS: list[tuple[int, str]] = [
+    (9, "Exemplary"),
+    (7, "Good"),
+    (5, "Adequate"),
+    (3, "Poor"),
+]
+
+
 def score_to_grade_label(score: float) -> str:
     """Convert a 0–10 numerical score to a descriptive grade label."""
-    if score >= 9:
-        return "Exemplary"
-    if score >= 7:
-        return "Good"
-    if score >= 5:
-        return "Adequate"
-    if score >= 3:
-        return "Poor"
+    for threshold, label in _GRADE_THRESHOLDS:
+        if score >= threshold:
+            return label
     return "Critical"
 
 

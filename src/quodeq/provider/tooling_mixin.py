@@ -49,11 +49,13 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
 
 
 _DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "copilot"})
-_ALLOWED_CLIENT_IDS = (
-    frozenset(os.environ["QUODEQ_AI_CLIENTS"].split(","))
-    if "QUODEQ_AI_CLIENTS" in os.environ
-    else _DEFAULT_CLIENT_IDS
-)
+
+
+def _get_allowed_client_ids() -> frozenset[str]:
+    """Return the set of allowed AI client IDs (lazy, reads env on each call)."""
+    if "QUODEQ_AI_CLIENTS" in os.environ:
+        return frozenset(os.environ["QUODEQ_AI_CLIENTS"].split(","))
+    return _DEFAULT_CLIENT_IDS
 
 
 class FsToolingMixin:
@@ -110,7 +112,7 @@ class FsToolingMixin:
         return {"clients": [c for c in candidates if shutil.which(c["id"])]}
 
     def _get_cli_models(self, client_id: str) -> dict[str, list[str]]:
-        if client_id not in _ALLOWED_CLIENT_IDS:
+        if client_id not in _get_allowed_client_ids():
             return {"models": []}
         if not shutil.which(client_id):
             return {"models": []}

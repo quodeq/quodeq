@@ -200,11 +200,19 @@ class _FetchClient:
             return None
 
 
-_fetch_client = _FetchClient()
+_fetch_client: _FetchClient | None = None
+
+
+def _get_fetch_client() -> _FetchClient:
+    """Return the module-level _FetchClient, creating it lazily on first use."""
+    global _fetch_client
+    if _fetch_client is None:
+        _fetch_client = _FetchClient()
+    return _fetch_client
 
 
 def _fetch_url(url: str, headers: dict | None = None) -> str | None:
-    return _fetch_client.fetch(url, headers)
+    return _get_fetch_client().fetch(url, headers)
 
 
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:

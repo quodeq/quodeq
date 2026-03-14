@@ -122,6 +122,7 @@ def main() -> None:
         print("DRY RUN — use --apply to write changes\n")
 
     grand_total = 0
+    # NOTE: this list is coupled with ALL_DIMENSIONS in tools/compile_standards.py
     for dimension in ["security", "reliability", "maintainability", "performance"]:
         print(f"\n{'='*60}")
         print(f"  {dimension.upper()}")

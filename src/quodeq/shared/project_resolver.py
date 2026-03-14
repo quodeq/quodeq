@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -52,7 +54,6 @@ def _load_index(reports_dir: Path) -> dict[str, str]:
 
 def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
     """Write the project index file atomically."""
-    import tempfile
     index_path = reports_dir / _INDEX_FILE
     try:
         fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
@@ -64,7 +65,6 @@ def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
             os.unlink(tmp)
             raise
     except OSError as exc:
-        import logging
         logging.getLogger(__name__).warning("Could not save project index: %s", exc)
 
 
@@ -115,7 +115,6 @@ def _create_project(reports_dir: Path, identity: ProjectIdentity) -> str:
     try:
         (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
     except OSError as exc:
-        import logging
         logging.getLogger(__name__).warning("Could not write repository_info.json: %s", exc)
     index = _load_index(reports_dir)
     index[_index_key(identity)] = project_uuid

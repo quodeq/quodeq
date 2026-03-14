@@ -1,0 +1,96 @@
+"""Tests for _parse_jsonl_line (JSONL line parsing)."""
+from __future__ import annotations
+
+import json
+
+from quodeq.engine.evidence_parser import _parse_jsonl_line
+
+
+def _evidence_line(**overrides) -> str:
+    obj = {
+        "p": "ts-001",
+        "t": "violation",
+        "d": "security",
+        "w": "eval usage",
+        "file": "src/app.ts",
+        "line": 10,
+        "snippet": "eval(userInput)",
+        "severity": "high",
+        "vt": "code-injection",
+        "reason": "eval is dangerous",
+    }
+    obj.update(overrides)
+    return json.dumps(obj)
+
+
+class TestParseJsonlLine:
+    def test_valid_violation(self):
+        result = _parse_jsonl_line(_evidence_line())
+        assert result is not None
+        j, llm_refs = result
+        assert j.practice_id == "ts-001"
+        assert j.verdict == "violation"
+        assert j.file == "src/app.ts"
+        assert j.line == 10
+        assert j.severity == "high"
+        assert llm_refs is None
+
+    def test_valid_compliance(self):
+        result = _parse_jsonl_line(_evidence_line(t="compliance"))
+        assert result is not None
+        j, _ = result
+        assert j.verdict == "compliance"
+
+    def test_missing_practice_id(self):
+        line = json.dumps({"t": "violation", "d": "security"})
+        assert _parse_jsonl_line(line) is None
+
+    def test_missing_verdict(self):
+        line = json.dumps({"p": "ts-001", "d": "security"})
+        assert _parse_jsonl_line(line) is None
+
+    def test_invalid_verdict(self):
+        assert _parse_jsonl_line(_evidence_line(t="dismissed")) is None
+
+    def test_empty_line(self):
+        assert _parse_jsonl_line("") is None
+        assert _parse_jsonl_line("   ") is None
+
+    def test_invalid_json(self):
+        assert _parse_jsonl_line("not json") is None
+
+    def test_defaults(self):
+        line = json.dumps({"p": "ts-001", "t": "violation"})
+        result = _parse_jsonl_line(line)
+        j, _ = result
+        assert j.file == ""
+        assert j.line == 0
+        assert j.severity == "medium"
+
+    def test_req_parsed(self):
+        result = _parse_jsonl_line(_evidence_line(req="R-FT-1"))
+        assert result is not None
+        j, _ = result
+        assert j.req == "R-FT-1"
+
+    def test_refs_parsed(self):
+        result = _parse_jsonl_line(_evidence_line(refs=["CWE-391", "ERR05-J"]))
+        assert result is not None
+        j, llm_refs = result
+        assert llm_refs == ["CWE-391", "ERR05-J"]
+
+    def test_pre_resolved_req_refs_set_on_judgment(self):
+        """req_refs from MCP enrichment are set directly on Judgment."""
+        refs = [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}]
+        result = _parse_jsonl_line(_evidence_line(req_refs=refs))
+        assert result is not None
+        j, llm_refs = result
+        assert j.req_refs == refs
+        assert llm_refs is None  # no LLM refs field
+
+    def test_pre_resolved_req_refs_empty_list_ignored(self):
+        """Empty req_refs list should not override downstream resolution."""
+        result = _parse_jsonl_line(_evidence_line(req_refs=[]))
+        assert result is not None
+        j, _ = result
+        assert j.req_refs is None  # not set

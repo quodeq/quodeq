@@ -4,14 +4,23 @@ Extracted from runner.py to keep module size within maintainability limits.
 """
 from __future__ import annotations
 
-import os
+from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 from quodeq.engine.analysis import AnalysisConfig, count_files_from_stream
 from quodeq.engine.evidence import Evidence
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_warning
+
+
+@dataclass
+class DimensionCallbacks:
+    """Grouped callbacks for single-agent dimension processing fallback."""
+    build_prompt: Callable
+    run_analysis: Callable
+    parse_evidence: Callable
 
 _DEFAULT_SUBAGENT_MODEL = "claude-haiku-4-5"
 
@@ -51,14 +60,10 @@ def _build_subagent_prompt(config, dim_id: str, ctx) -> str:
 
 def _launch_pool(config, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str):
     """Create and run a SubagentPool, returning its results."""
-    from quodeq.engine.subagent_pool import SubagentPool
+    from quodeq.engine.subagent_pool import PoolPaths, SubagentPool
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = (
-        config.options.subagent_model
-        or os.environ.get("SUBAGENT_MODEL")
-        or _DEFAULT_SUBAGENT_MODEL
-    )
+    subagent_model = config.options.subagent_model or _DEFAULT_SUBAGENT_MODEL
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -68,10 +73,8 @@ def _launch_pool(config, dim_id: str, evidence_dir: Path, queue_path: Path, prom
     )
     pool = SubagentPool(
         n_agents=config.options.n_subagents,
-        work_dir=config.src,
+        paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
         prompt=prompt,
-        evidence_dir=evidence_dir,
-        queue_path=queue_path,
         dimension=dim_id,
         config=base_ac,
     )
@@ -110,7 +113,7 @@ def _collect_evidence(config, dim_id: str, evidence_dir: Path, results, ctx) -> 
 
 def process_dimension_with_subagents(
     config, dim_id: str, idx: int, ctx,
-    build_prompt_fn, run_analysis_fn, parse_evidence_fn,
+    callbacks: DimensionCallbacks,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents.
 
@@ -128,9 +131,9 @@ def process_dimension_with_subagents(
             f"[{idx}/{ctx.total}] {dim_id} — no source files for subagent queue"
             f" (src={config.src}, plugin={config.plugin_id}, extensions={extensions})"
         )
-        prompt = build_prompt_fn(config, dim_id, ctx)
-        stream_file, jsonl_file = run_analysis_fn(config, dim_id, prompt, idx, ctx)
-        return parse_evidence_fn(config, dim_id, stream_file, jsonl_file, ctx)
+        prompt = callbacks.build_prompt(config, dim_id, ctx)
+        stream_file, jsonl_file = callbacks.run_analysis(config, dim_id, prompt, idx, ctx)
+        return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
     # 2. Create queue
     queue_path = evidence_dir / f"{dim_id}_queue.json"

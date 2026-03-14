@@ -9,11 +9,9 @@ from pathlib import Path
 
 from flask import Response, after_this_request, jsonify, send_file
 
+from quodeq.action_api_helpers import _error
+
 _MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
-
-
-def _error(message: str, status: int, code: str) -> tuple[dict, int]:
-    return {"error": message, "code": code}, status
 
 
 def _build_project_zip(project_path: Path) -> Path:

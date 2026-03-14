@@ -20,8 +20,8 @@ from quodeq.evaluate.lib.scoring import run_scoring
 from quodeq.evaluate.lib.report_json import write_report_json
 
 SCORING_MODE_BY_HASH = {
-    "6fee1ee3": "numerical",
-    "33f4ef56": "non-numerical",
+    "6fee1ee3": "numerical",      # scoring prompt v1 (numerical deductions)
+    "33f4ef56": "non-numerical",   # scoring prompt v2 (grade-ladder drops)
 }
 DEFAULT_SCORING_MODE = "numerical"
 
