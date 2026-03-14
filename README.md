@@ -38,6 +38,7 @@ uv sync
 
 - Python 3.12+
 - An AI CLI client (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code))
+- Node.js 18+ *(only when installing from source — pre-built UI is bundled in pip/brew installs)*
 
 ## Usage
 
