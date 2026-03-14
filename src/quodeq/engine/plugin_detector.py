@@ -59,13 +59,15 @@ def _detect_by_extension_count(plugins: list[dict], src: Path) -> str | None:
     Performs a single rglob traversal to collect suffix counts, then scores each
     plugin in O(1) per extension — O(n) total regardless of plugin count.
     """
+    # Collect all extensions present in the source tree — reuse _walk_source_files
+    # logic but we need all extensions, so we pass a permissive set. Instead,
+    # iterate directly to count every suffix.
+    all_exts: set[str] = set()
+    for data in plugins:
+        all_exts.update(data.get("detects", {}).get("extensions", []))
     suffix_counts: Counter[str] = Counter()
-    for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
-        for fname in filenames:
-            ext = os.path.splitext(fname)[1]
-            if ext:
-                suffix_counts[ext] += 1
+    for _rel, suffix in _walk_source_files(src, all_exts):
+        suffix_counts[suffix] += 1
     if not suffix_counts:
         return None
     best_id: str | None = None

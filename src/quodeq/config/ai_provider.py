@@ -15,11 +15,19 @@ PROVIDERS = {
 }
 
 
-def get_current_provider(paths: ConfigPaths, *, provider: str | None = None) -> str:
+def get_current_provider(
+    paths: ConfigPaths,
+    *,
+    provider: str | None = None,
+    default_provider: str | None = None,
+) -> str:
     """Return the currently configured AI provider name, defaulting to 'claude'.
 
     When *provider* is given it is returned directly, skipping file and env
     lookups.  This makes the function easily testable without env mutation.
+
+    *default_provider* overrides the env-based fallback when no config file
+    entry is found, making the function fully testable without env mutation.
     """
     if provider is not None:
         return provider
@@ -27,6 +35,8 @@ def get_current_provider(paths: ConfigPaths, *, provider: str | None = None) -> 
         for line in paths.env_file.read_text().splitlines():
             if line.strip().startswith("export AI_PROVIDER="):
                 return line.split("=", 1)[1].strip()
+    if default_provider is not None:
+        return default_provider
     return get_ai_provider()
 
 

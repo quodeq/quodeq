@@ -48,14 +48,7 @@ def _stream_event_with_evidence(*evidence_lines: str) -> str:
     return "\n".join(events) + "\n"
 
 
-def _evidence_line(**overrides) -> str:
-    obj = {
-        "p": "ts-001", "t": "violation", "d": "security",
-        "w": "eval usage", "file": "src/app.ts", "line": 10,
-        "severity": "high", "reason": "eval is dangerous",
-    }
-    obj.update(overrides)
-    return json.dumps(obj)
+from tests.engine.conftest import _evidence_line
 
 
 def _mock_run_analysis_factory(stream_content: str):

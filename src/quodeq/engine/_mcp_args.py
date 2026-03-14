@@ -13,12 +13,16 @@ class _ServerArgs:
     agent_id: str = ""
 
 
-def _parse_args() -> _ServerArgs:
-    """Parse CLI arguments for the MCP findings server."""
+def _parse_args(argv: list[str] | None = None) -> _ServerArgs:
+    """Parse CLI arguments for the MCP findings server.
+
+    *argv* overrides ``sys.argv[1:]`` when provided, making the parser
+    testable without monkeypatching sys.argv.
+    """
     from quodeq.shared.utils import get_findings_file
 
     result = _ServerArgs()
-    args = sys.argv[1:]
+    args = argv if argv is not None else sys.argv[1:]
     _FLAG_MAP = {
         "--compiled-dir": "compiled_dir",
         "--dimension": "dimension",

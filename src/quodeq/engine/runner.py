@@ -18,7 +18,6 @@ from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid
 from quodeq.engine.evidence import Evidence
 from quodeq.engine._merge import merge_evidence
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
-
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_success, log_warning
@@ -48,7 +47,6 @@ class RunConfig:
     source_file_count: int = 0
     work_dir: Path | None = None
     options: AnalysisOptions = field(default_factory=AnalysisOptions)
-
 
 CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
 

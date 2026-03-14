@@ -70,24 +70,31 @@ def scale_multiplier(source_file_count: int) -> int:
 # Violation-type counting
 # ---------------------------------------------------------------------------
 
+def _tally_types(items: list[dict], key_field: str, skip_empty: bool = False) -> dict[str, int]:
+    """Count distinct types per severity bucket.
+
+    *key_field* selects which dict key to group by (e.g. ``"vt"`` or ``"reason"``).
+    When *skip_empty* is ``True``, items whose *key_field* is falsy are ignored.
+    """
+    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
+    for item in items:
+        value = item.get(key_field)
+        if skip_empty and not value:
+            continue
+        if value is None:
+            value = "unknown"
+        sev = item.get("severity", "minor")
+        buckets.setdefault(sev, set()).add(value)
+    return {sev: len(seen) for sev, seen in buckets.items()}
+
+
 def tally_types_by_taxonomy(violations: list[dict]) -> dict[str, int]:
     """Count distinct violation types per severity using the 'vt' taxonomy field.
 
     Only violations that carry a non-empty 'vt' value contribute; each unique
     (severity, vt) combination is counted once.
     """
-    buckets: dict[str, set] = {
-        "critical": set(),
-        "major": set(),
-        "minor": set(),
-    }
-    for item in violations:
-        vt_tag = item.get("vt")
-        if not vt_tag:
-            continue
-        sev = item.get("severity", "minor")
-        buckets.setdefault(sev, set()).add(vt_tag)
-    return {sev: len(seen) for sev, seen in buckets.items()}
+    return _tally_types(violations, "vt", skip_empty=True)
 
 
 def tally_types_by_reason(violations: list[dict]) -> dict[str, int]:
@@ -96,16 +103,7 @@ def tally_types_by_reason(violations: list[dict]) -> dict[str, int]:
     Used when no 'vt' field is present in the evidence; each unique reason
     string within a severity bucket is treated as one violation type.
     """
-    buckets: dict[str, set] = {
-        "critical": set(),
-        "major": set(),
-        "minor": set(),
-    }
-    for item in violations:
-        sev = item.get("severity", "minor")
-        reason = item.get("reason", "unknown")
-        buckets.setdefault(sev, set()).add(reason)
-    return {sev: len(seen) for sev, seen in buckets.items()}
+    return _tally_types(violations, "reason")
 
 
 def evidence_has_taxonomy(violations: list[dict]) -> bool:
@@ -119,24 +117,12 @@ def evidence_has_taxonomy(violations: list[dict]) -> bool:
 
 def tally_compliance_types_by_taxonomy(compliance: list[dict]) -> dict[str, int]:
     """Count distinct compliance types per severity using the 'vt' field."""
-    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
-    for item in compliance:
-        vt_tag = item.get("vt")
-        if not vt_tag:
-            continue
-        sev = item.get("severity", "minor")
-        buckets.setdefault(sev, set()).add(vt_tag)
-    return {sev: len(seen) for sev, seen in buckets.items()}
+    return _tally_types(compliance, "vt", skip_empty=True)
 
 
 def tally_compliance_types_by_reason(compliance: list[dict]) -> dict[str, int]:
     """Count distinct compliance types per severity using (severity, reason) pairs."""
-    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
-    for item in compliance:
-        sev = item.get("severity", "minor")
-        reason = item.get("reason", "unknown")
-        buckets.setdefault(sev, set()).add(reason)
-    return {sev: len(seen) for sev, seen in buckets.items()}
+    return _tally_types(compliance, "reason")
 
 
 def compliance_dampening(
@@ -240,13 +226,17 @@ def score_to_grade_label(score: float) -> str:
 # Weight parsing
 # ---------------------------------------------------------------------------
 
+_WEIGHT_TRIPLE = "x3"
+_WEIGHT_DOUBLE = "x2"
+
+
 def weight_as_multiplier(weight_str: str) -> int:
     """Extract the integer multiplier from a weight label like 'High (x3)'.
 
     Recognises 'x3' → 3, 'x2' → 2, anything else → 1.
     """
-    if "x3" in weight_str:
+    if _WEIGHT_TRIPLE in weight_str:
         return 3
-    if "x2" in weight_str:
+    if _WEIGHT_DOUBLE in weight_str:
         return 2
     return 1

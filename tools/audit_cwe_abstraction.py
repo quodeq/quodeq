@@ -18,6 +18,9 @@ import urllib.error
 from datetime import date
 from pathlib import Path
 
+_PROGRESS_LOG_INTERVAL = 20
+_RATE_LIMIT_SLEEP_S = 0.1
+
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 API_BASE = "https://cwe-api.mitre.org/api/v1/cwe"
 
@@ -191,9 +194,9 @@ def main() -> None:
                 info["id"], info["mapping_usage"], info["abstraction"]
             )
             results.append(info)
-        if i % 20 == 0:
+        if i % _PROGRESS_LOG_INTERVAL == 0:
             print(f"  Fetched {i}/{len(cwe_dims)}...", file=sys.stderr)
-        time.sleep(0.1)  # rate limit
+        time.sleep(_RATE_LIMIT_SLEEP_S)
 
     _print_results(results, problems_only=args.problems)
 

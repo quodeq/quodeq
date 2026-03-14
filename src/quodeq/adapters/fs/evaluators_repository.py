@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
+from quodeq.adapters.fs._json_loader import load_json_file
 from quodeq.ports.data_errors import NotFoundError
 from quodeq.shared.validation import validate_path_segment
 
@@ -17,6 +17,7 @@ class FilesystemEvaluatorsRepository:
 
     def list_evaluators(self, discipline: str) -> list[str]:
         """Return sorted names of all evaluators for a discipline."""
+        validate_path_segment(discipline)
         evaluators_dir = self._root / "evaluators" / discipline
         if not evaluators_dir.exists():
             raise NotFoundError(f"Evaluators directory not found: {evaluators_dir}")
@@ -26,9 +27,4 @@ class FilesystemEvaluatorsRepository:
         """Load and return a single evaluator definition by discipline and dimension."""
         validate_path_segment(discipline, dimension)
         path = self._root / "evaluators" / discipline / f"{dimension}.json"
-        if not path.exists():
-            raise NotFoundError(f"Evaluator not found: {discipline}/{dimension}")
-        try:
-            return json.loads(path.read_text())
-        except json.JSONDecodeError as exc:
-            raise NotFoundError(f"Invalid JSON in evaluator file: {discipline}/{dimension}") from exc
+        return load_json_file(path, f"Evaluator not found: {discipline}/{dimension}")

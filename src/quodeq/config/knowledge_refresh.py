@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import threading
 import urllib.error
 import urllib.request
@@ -24,6 +25,15 @@ _CONTENT_SAMPLE_LIMIT = 4000
 _MAX_FETCH_WORKERS = 8
 _LINTER_DOCS_LIMIT = 6000
 _EXISTING_CONTENT_LIMIT = 2000
+_SAFE_NAME_RE = re.compile(r'^[\w./-]+$')
+
+
+def _validate_repo_field(value: str, field_name: str) -> bool:
+    """Return True if *value* matches a safe GitHub repo/branch name pattern."""
+    if not value or not _SAFE_NAME_RE.match(value):
+        log_warning(f"Rejected unsafe {field_name} value: {value!r}")
+        return False
+    return True
 
 
 @lru_cache(maxsize=1)
@@ -151,6 +161,10 @@ def _fetch_cursor_rules_repos(runtime: str, min_stars: int) -> list[dict]:
 
 def _fetch_repo_content(repos: list[dict]) -> list[str]:
     def _try_repo(repo: dict) -> str | None:
+        if not _validate_repo_field(repo['name'], 'repo name'):
+            return None
+        if not _validate_repo_field(repo['default_branch'], 'default_branch'):
+            return None
         for filename in (".cursorrules", "cursor-rules.md", ".cursor/rules/main.mdc"):
             url = (
                 f"{get_github_raw_base_url()}/{repo['name']}"
@@ -200,15 +214,17 @@ class _FetchClient:
             return None
 
 
+_fetch_client_lock = threading.Lock()
 _fetch_client: _FetchClient | None = None
 
 
 def _get_fetch_client() -> _FetchClient:
     """Return the module-level _FetchClient, creating it lazily on first use."""
     global _fetch_client
-    if _fetch_client is None:
-        _fetch_client = _FetchClient()
-    return _fetch_client
+    with _fetch_client_lock:
+        if _fetch_client is None:
+            _fetch_client = _FetchClient()
+        return _fetch_client
 
 
 def _fetch_url(url: str, headers: dict | None = None) -> str | None:

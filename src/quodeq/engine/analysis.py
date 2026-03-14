@@ -89,12 +89,12 @@ _DEFAULT_AI_TOOLS = "Glob,Grep,Read"
 _DEFAULT_BASE_AI_ARGS = "--print --output-format stream-json --verbose"
 
 
-def _get_ai_tools() -> str:
-    return os.environ.get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
+def _get_ai_tools(env: dict[str, str] | None = None) -> str:
+    return (env or os.environ).get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
 
 
-def _get_base_ai_args() -> tuple[str, ...]:
-    return tuple(os.environ.get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
+def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
+    return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
 
 _PROVIDER_CONFIGS: dict[str, dict] = {
     "claude": {

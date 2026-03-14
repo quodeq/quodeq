@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from quodeq.adapters.hybrid._hybrid_call import hybrid_call
 from quodeq.ports.dimensions import DimensionsRepository
 
@@ -17,6 +19,6 @@ class HybridDimensionsRepository:
         """Return all dimension names, preferring the web source."""
         return hybrid_call(self._web.list_dimensions, self._fs.list_dimensions)
 
-    def get_dimension(self, name: str) -> dict:
+    def get_dimension(self, name: str) -> dict[str, Any]:
         """Fetch a single dimension definition, preferring the web source."""
         return hybrid_call(self._web.get_dimension, self._fs.get_dimension, name)

@@ -16,6 +16,7 @@ from typing import Any, Callable
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import is_repo_url
+from quodeq.shared.validation import validate_path_segment
 
 
 @dataclass(frozen=True)
@@ -69,12 +70,13 @@ def _find_date_in_dir(directory: Path, suffix: str) -> tuple[str | None, str] | 
                 if result:
                     return result
         except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
-            log_debug(f"Failed to read date from {entry.path}: {exc}")
+            log_debug(f"Failed to read date from {entry.name}: {exc}")
     return None
 
 
 def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
     """Read the date from evidence or evaluation files in a run directory."""
+    validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
 
     result = _find_date_in_dir(run_dir / "evidence", "_evidence.json")
@@ -119,7 +121,7 @@ def _load_markdown_backed_evals(
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith("_eval.md"):
             continue
-        dimension = entry.name[:-8]
+        dimension = entry.name.removesuffix("_eval.md")
         json_path = evaluation_dir / f"{dimension}.json"
         parsed = parse_report_json(json_path) if json_path.exists() else None
         if parsed:
@@ -136,7 +138,7 @@ def _load_json_only_evals(
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith(".json"):
             continue
-        dimension = entry.name[:-5]
+        dimension = entry.name.removesuffix(".json")
         if dimension in seen:
             continue
         parsed = parse_report_json(Path(entry.path))
@@ -165,6 +167,7 @@ def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
 
 def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
     """Load all dimension evaluations and evidence for a single run."""
+    validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
     evaluations = _load_evaluations(run_dir / "evaluation")
     evidence_map = _load_evidence_map(run_dir / "evidence")
@@ -188,6 +191,7 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[st
 
 def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
     """Return all runs for a project, sorted newest-first by date."""
+    validate_path_segment(project)
     project_dir = reports_root / project
     run_infos: list[RunInfo] = []
     for entry in safe_read_dir(project_dir):
@@ -222,6 +226,7 @@ def _get_previous_run_for_dimension(
     callable) to share I/O across calls rather than repeating the directory
     scan and file reads for each dimension.
     """
+    validate_path_segment(project, current_run_id)
     project_path = reports_root / project
     if not project_path.exists():
         return None

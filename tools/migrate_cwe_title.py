@@ -54,6 +54,10 @@ def _patch_entries(entries: list[dict], cwe_names: dict[int, str]) -> int:
 
 
 def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[int, int]:
+    """Patch a single evaluation JSON file, filling empty titles from CWE names.
+
+    Returns (violations_patched, compliance_patched).
+    """
     try:
         data = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:

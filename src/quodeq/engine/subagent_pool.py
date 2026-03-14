@@ -13,7 +13,7 @@ from __future__ import annotations
 import json
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -198,9 +198,9 @@ class SubagentPool:
         return FileQueue(self._queue_path).remaining() > 0
 
     def _collect_done(
-        self, futures: dict, results: list[SubagentResult],
+        self, futures: dict[Future[SubagentResult], int], results: list[SubagentResult],
         finished: dict[str, bool],
-    ) -> set:
+    ) -> set[Future[SubagentResult]]:
         """Collect completed futures, updating results and finished map.
 
         Returns the set of completed futures.
@@ -235,7 +235,7 @@ class SubagentPool:
 
         try:
             with ThreadPoolExecutor(max_workers=self._n) as pool:
-                futures: dict = {}
+                futures: dict[Future[SubagentResult], int] = {}
                 for _ in range(self._n):
                     finished[f"agent-{next_idx}"] = False
                     futures[pool.submit(self._run_single, next_idx)] = next_idx

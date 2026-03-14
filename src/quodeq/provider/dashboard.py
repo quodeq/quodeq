@@ -180,15 +180,31 @@ def _build_accumulated_trend(
 
 
 def _make_run_dimension_fetcher(
-    reports_root: Path, project: str,
+    reports_root: Path,
+    project: str,
+    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
+    lock: threading.Lock | None = None,
+    max_size: int | None = None,
 ) -> Callable[[str], list[dict[str, Any]]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
     return make_lru_dimension_fetcher(
-        reports_root, project, _RUN_DIM_CACHE, _RUN_DIM_LOCK, _RUN_DIM_CACHE_MAX,
+        reports_root,
+        project,
+        cache if cache is not None else _RUN_DIM_CACHE,
+        lock if lock is not None else _RUN_DIM_LOCK,
+        max_size if max_size is not None else _RUN_DIM_CACHE_MAX,
     )
 
 
-def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
+def build_dashboard(
+    reports_dir: str,
+    project: str,
+    run: str,
+    *,
+    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
+    lock: threading.Lock | None = None,
+    max_cache_size: int | None = None,
+) -> dict[str, Any]:
     """Build a full dashboard response for *project* at *run*."""
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
@@ -209,7 +225,9 @@ def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
     # Cap runs scanned for history. Always include the selected run so
     # selected_index remains a valid index into history_runs.
     history_runs = runs[:max(_MAX_HISTORY_RUNS, selected_index + 1)]
-    get_run_dimensions = _make_run_dimension_fetcher(reports_root, project)
+    get_run_dimensions = _make_run_dimension_fetcher(
+        reports_root, project, cache=cache, lock=lock, max_size=max_cache_size,
+    )
     previous_by_dimension = _collect_previous_scores(history_runs, selected_index, selected_dim_names, get_run_dimensions)
     stale_dimensions, stale_previous_by_dimension = (
         _collect_stale_dimensions(history_runs, selected_index, selected_dim_names, get_run_dimensions)

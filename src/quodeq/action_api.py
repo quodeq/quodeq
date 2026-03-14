@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import hmac
+import logging
 import os
 import time
 from collections import OrderedDict
 from http import HTTPStatus
 from typing import Protocol, runtime_checkable
+
+_logger = logging.getLogger(__name__)
 
 from flask import Flask, Response, jsonify, request
 
@@ -113,10 +116,11 @@ def _check_csrf() -> Response | tuple[Response, int] | None:
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return None
     origin = request.headers.get("Origin")
-    if origin:
-        allowed = {f"http://{request.host}", f"https://{request.host}"}
-        if origin not in allowed:
-            return jsonify({"error": "Origin not allowed", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+    if not origin:
+        return jsonify({"error": "Origin header required", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+    allowed = {f"http://{request.host}", f"https://{request.host}"}
+    if origin not in allowed:
+        return jsonify({"error": "Origin not allowed", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
     return None
 
 
@@ -136,12 +140,24 @@ def create_app(
     provider: ActionProvider | None = None,
     static_dist: str | None = None,
     rate_limit_store: RateLimitStore | None = None,
+    api_key: str | None = None,
 ) -> Flask:
-    """Create and configure the Flask application with all API routes."""
+    """Create and configure the Flask application with all API routes.
+
+    *api_key* overrides the ``QUODEQ_API_KEY`` env-var lookup when provided,
+    making the app testable without environment mutation.  Pass an empty string
+    to explicitly disable authentication.
+    """
     app = Flask(__name__)
     provider = provider or _default_provider()
     store = rate_limit_store or InMemoryRateLimitStore()
-    api_key = os.environ.get("QUODEQ_API_KEY")
+    if api_key is None:
+        api_key = os.environ.get("QUODEQ_API_KEY")
+    if not api_key:
+        _logger.warning(
+            "QUODEQ_API_KEY is not set — API endpoints are unauthenticated. "
+            "Set QUODEQ_API_KEY for production use."
+        )
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:

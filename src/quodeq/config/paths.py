@@ -34,7 +34,7 @@ class ConfigPaths:
         return self.root / "config" / "disciplines.conf"
 
     @classmethod
-    def from_root(cls, root: Path, version: str | None = None) -> "ConfigPaths":
+    def from_root(cls, root: Path) -> "ConfigPaths":
         """Construct a ConfigPaths instance by deriving all paths from a root directory."""
         return cls(
             root=root,
@@ -60,7 +60,7 @@ def _looks_like_project_root(root: Path) -> bool:
     )
 
 
-def default_paths(version: str | None = None) -> ConfigPaths:
+def default_paths() -> ConfigPaths:
     """Return ConfigPaths from the bundled data directory, or the project root in dev."""
     # Prefer bundled data directory (works when installed as a package)
     if _DATA_DIR.is_dir() and _looks_like_project_root(_DATA_DIR):
@@ -70,10 +70,12 @@ def default_paths(version: str | None = None) -> ConfigPaths:
     module_path = Path(__file__).resolve()
     for root in module_path.parent.parents:
         if _looks_like_project_root(root):
-            return ConfigPaths.from_root(root, version=version)
+            return ConfigPaths.from_root(root)
 
-    if len(module_path.parents) > 3:
-        root = module_path.parents[3]
+    # Walk up from src/quodeq/config/paths.py to project root (3 levels: config -> quodeq -> src)
+    _FALLBACK_PARENT_DEPTH = 3
+    if len(module_path.parents) > _FALLBACK_PARENT_DEPTH:
+        root = module_path.parents[_FALLBACK_PARENT_DEPTH]
     else:
         root = module_path.parent
-    return ConfigPaths.from_root(root, version=version)
+    return ConfigPaths.from_root(root)

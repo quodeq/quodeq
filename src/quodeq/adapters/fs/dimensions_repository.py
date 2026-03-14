@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
+from quodeq.adapters.fs._json_loader import load_json_file
 from quodeq.ports.data_errors import NotFoundError
 from quodeq.shared.validation import validate_path_segment
 
@@ -26,9 +26,4 @@ class FilesystemDimensionsRepository:
         """Load and return a single dimension definition by name."""
         validate_path_segment(name)
         path = self._root / "dimensions" / f"{name}.json"
-        if not path.exists():
-            raise NotFoundError(f"Dimension not found: {name}")
-        try:
-            return json.loads(path.read_text())
-        except json.JSONDecodeError as exc:
-            raise NotFoundError(f"Invalid JSON in dimension file: {name}") from exc
+        return load_json_file(path, f"Dimension not found: {name}")

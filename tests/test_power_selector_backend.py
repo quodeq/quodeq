@@ -157,7 +157,7 @@ class TestApiRouteSubagentModel:
         response = client.post("/api/evaluations", json={
             "repo": str(tmp_path),
             "subagentModel": "claude-sonnet-4-6",
-        })
+        }, headers={"Origin": "http://localhost"})
         assert captured.get("options") is not None
         assert captured["options"].subagent_model == "claude-sonnet-4-6"
 
@@ -170,7 +170,7 @@ class TestApiRouteSubagentModel:
 
         response = client.post("/api/evaluations", json={
             "repo": str(tmp_path),
-        })
+        }, headers={"Origin": "http://localhost"})
         assert captured.get("options") is not None
         assert captured["options"].subagent_model is None
 

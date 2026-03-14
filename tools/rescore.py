@@ -19,9 +19,12 @@ sys.path.insert(0, str(repo_root / "src"))
 from quodeq.evaluate.lib.scoring import run_scoring
 from quodeq.evaluate.lib.report_json import write_report_json
 
+_SCORING_PROMPT_V1_HASH = "6fee1ee3"  # scoring prompt v1 (numerical deductions)
+_SCORING_PROMPT_V2_HASH = "33f4ef56"  # scoring prompt v2 (grade-ladder drops)
+
 SCORING_MODE_BY_HASH = {
-    "6fee1ee3": "numerical",      # scoring prompt v1 (numerical deductions)
-    "33f4ef56": "non-numerical",   # scoring prompt v2 (grade-ladder drops)
+    _SCORING_PROMPT_V1_HASH: "numerical",
+    _SCORING_PROMPT_V2_HASH: "non-numerical",
 }
 DEFAULT_SCORING_MODE = "numerical"
 
@@ -51,7 +54,7 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path) -> bool:
         print(f"  SKIP  cannot read mapping {mapping_path}: {exc}")
         return False
     mode = detect_mode_from_evidence(evidence)
-    scores = run_scoring(evidence, mapping, mode)
+    scores = run_scoring(evidence, mode)
 
     scores_path = evidence_path.with_name(f"{dimension}_scores.json")
     try:

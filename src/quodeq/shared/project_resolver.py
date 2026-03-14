@@ -124,7 +124,10 @@ def _create_project(reports_dir: Path, identity: ProjectIdentity) -> str:
 
 def resolve_project_uuid(reports_dir: Path, identity: ProjectIdentity) -> str:
     """Find or create a UUID project directory matching identity."""
-    resolved_path = identity.repo_path if identity.location == "online" else str(Path(identity.repo_path).resolve())
+    if identity.location == "online":
+        resolved_path = identity.repo_path
+    else:
+        resolved_path = str(Path(identity.repo_path).resolve())
     resolved = ProjectIdentity(identity.project_name, resolved_path, identity.discipline, identity.location)
     if not reports_dir.exists():
         reports_dir.mkdir(parents=True, exist_ok=True)

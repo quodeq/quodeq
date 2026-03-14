@@ -11,6 +11,7 @@ from pathlib import Path
 from quodeq.shared.utils import get_asvs_url, show_diff
 
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
+_ASVS_VERSION = "4.0.3"
 _ASVS_SKIP_INTEGRITY_ENV = "QUODEQ_ASVS_SKIP_INTEGRITY"
 
 _RETRY_BASE_DELAY_S = 0.5
@@ -38,29 +39,30 @@ def _fetch_with_retry(url: str, timeout: int = 30, max_retries: int = 3) -> byte
     raise ConnectionError(f"Failed to fetch after {max_retries} attempts: {last_exc}") from last_exc
 
 
-def fetch_asvs_l1(
-    standards_dir: Path,
-    *,
-    dry_run: bool = False,
+def _verify_integrity(
+    content: bytes,
     expected_hash: str | None = None,
     skip_integrity: bool | None = None,
-) -> int:
-    """Fetch OWASP ASVS L1 requirements and write to standards_dir/asvs/level1.json.
+) -> None:
+    """Verify SHA-256 integrity of downloaded ASVS content.
 
-    Returns the number of requirements fetched.
+    Reads defaults from environment variables when *expected_hash* or
+    *skip_integrity* are ``None``.
 
-    Parameters *expected_hash* and *skip_integrity* default to ``None``, in
-    which case the values are read from the ``QUODEQ_ASVS_SHA256`` and
-    ``QUODEQ_ASVS_SKIP_INTEGRITY`` environment variables respectively.
-    Passing them explicitly avoids the need for env-var mutation in tests.
+    Raises ``ValueError`` on mismatch or when verification is required but
+    no hash is configured.
     """
-    content = _fetch_with_retry(get_asvs_url())
-
     actual_hash = hashlib.sha256(content).hexdigest()
     if expected_hash is None:
         expected_hash = os.environ.get(_ASVS_SHA256_ENV)
     if skip_integrity is None:
-        skip_integrity = os.environ.get(_ASVS_SKIP_INTEGRITY_ENV) == "1"
+        skip_integrity = False
+    if os.environ.get(_ASVS_SKIP_INTEGRITY_ENV) == "1":
+        import logging
+        logging.getLogger(__name__).warning(
+            "%s is set but no longer honored; use the programmatic skip_integrity parameter instead",
+            _ASVS_SKIP_INTEGRITY_ENV,
+        )
     if expected_hash and actual_hash != expected_hash:
         raise ValueError(
             f"ASVS integrity check failed: expected {expected_hash}, got {actual_hash}"
@@ -76,17 +78,42 @@ def fetch_asvs_l1(
         else:
             raise ValueError(
                 f"ASVS integrity verification required: set {_ASVS_SHA256_ENV}={actual_hash} "
-                f"to pin this download, or set {_ASVS_SKIP_INTEGRITY_ENV}=1 to bypass"
+                f"to pin this download"
             )
 
+
+def _parse_asvs_content(content: bytes) -> list[dict]:
+    """Decode JSON content and extract L1 requirements."""
     try:
         raw = json.loads(content)
     except (json.JSONDecodeError, UnicodeDecodeError) as exc:
         raise ValueError(f"ASVS response is not valid JSON: {exc}") from exc
+    return _parse_asvs_l1(raw)
 
-    requirements = _parse_asvs_l1(raw)
+
+def fetch_asvs_l1(
+    standards_dir: Path,
+    *,
+    dry_run: bool = False,
+    expected_hash: str | None = None,
+    skip_integrity: bool | None = None,
+) -> int:
+    """Fetch OWASP ASVS L1 requirements and write to standards_dir/asvs/level1.json.
+
+    Returns the number of requirements fetched.
+
+    Parameter *expected_hash* defaults to ``None``, in which case the value
+    is read from the ``QUODEQ_ASVS_SHA256`` environment variable.
+    *skip_integrity* defaults to ``None`` (treated as ``False``); the
+    ``QUODEQ_ASVS_SKIP_INTEGRITY`` env var is no longer honored.
+    Pass *skip_integrity* explicitly for programmatic use (e.g. tests).
+    """
+    content = _fetch_with_retry(get_asvs_url())
+    _verify_integrity(content, expected_hash, skip_integrity)
+    requirements = _parse_asvs_content(content)
+
     output = {
-        "source": "OWASP ASVS 4.0.3",
+        "source": f"OWASP ASVS {_ASVS_VERSION}",
         "level": 1,
         "fetched": date.today().isoformat(),
         "requirements": requirements,

@@ -7,10 +7,17 @@ import os
 import sys
 
 
-_USE_COLOR = (
-    not os.environ.get("NO_COLOR")
-    and os.environ.get("TERM") != "dumb"
-)
+def _should_use_color(env: dict[str, str] | None = None) -> bool:
+    """Determine whether ANSI color codes should be emitted.
+
+    *env* overrides ``os.environ`` when provided, making the check
+    testable without environment mutation.
+    """
+    environ = env if env is not None else os.environ
+    return not environ.get("NO_COLOR") and environ.get("TERM") != "dumb"
+
+
+_USE_COLOR = _should_use_color()
 
 BLUE   = "\033[0;34m" if _USE_COLOR else ""
 GREEN  = "\033[0;32m" if _USE_COLOR else ""
@@ -62,7 +69,7 @@ class _StderrHandler(logging.StreamHandler):
 _logger = logging.getLogger("quodeq")
 _logger.addHandler(_StderrHandler())
 _logger.propagate = False
-_logger.setLevel(logging.DEBUG)
+_logger.setLevel(logging.INFO)
 
 def _apply_env_log_level(level: str | None = None) -> None:
     """Apply *level* (or LOG_LEVEL env var) to the logger. Injectable for testing."""

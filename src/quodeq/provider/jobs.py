@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import os
+from pathlib import Path
 import re
 import threading
 import uuid
@@ -45,7 +46,7 @@ class Job:
         return {
             "jobId": self.job_id,
             "status": self.status,
-            "command": self.command[0] if self.command else "",
+            "command": Path(self.command[0]).name if self.command else "",
             "startedAt": self.started_at,
             "endedAt": self.ended_at,
             "exitCode": self.exit_code,

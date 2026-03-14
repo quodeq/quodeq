@@ -140,8 +140,20 @@ def _compute_accumulated_scores(
     return avg_score, prev_avg_score
 
 
-def compute_accumulated(reports_dir: str, project: str, as_of: str | None) -> dict[str, Any] | None:
-    """Compute the accumulated (cross-run) view for *project*."""
+def compute_accumulated(
+    reports_dir: str,
+    project: str,
+    as_of: str | None,
+    *,
+    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
+    cache_lock: threading.Lock | None = None,
+    cache_max: int | None = None,
+) -> dict[str, Any] | None:
+    """Compute the accumulated (cross-run) view for *project*.
+
+    Optional *cache*, *cache_lock*, and *cache_max* override the module-level
+    LRU cache, making the function testable without global state mutation.
+    """
     reports_root = Path(reports_dir)
     project_path = reports_root / project
     if not project_path.exists():
@@ -155,7 +167,10 @@ def compute_accumulated(reports_dir: str, project: str, as_of: str | None) -> di
     if not runs:
         return None
 
-    get_run_data = _make_acc_dimension_fetcher(reports_root, project)
+    _cache = cache if cache is not None else _ACC_DIM_CACHE
+    _lock = cache_lock if cache_lock is not None else _ACC_DIM_LOCK
+    _max = cache_max if cache_max is not None else _ACC_DIM_CACHE_MAX
+    get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
     latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
         reports_root, project, all_run_infos, runs, get_run_data
     )

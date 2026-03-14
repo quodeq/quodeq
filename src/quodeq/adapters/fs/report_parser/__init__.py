@@ -10,6 +10,7 @@ from quodeq.adapters.fs.report_parser.grades import (
     summarize_dimensions,
 )
 from quodeq.adapters.fs.report_parser.json_parser import (
+    empty_severity_buckets,
     parse_eval_from_json,
     parse_evidence_file,
     parse_report_json,
@@ -36,6 +37,7 @@ __all__ = [
     "RunInfo",
     "build_repository_info",
     "build_totals",
+    "empty_severity_buckets",
     "calculate_trend",
     "clean_cell",
     "extract_exec_summary",

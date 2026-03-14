@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from quodeq.engine.analysis import AnalysisConfig, count_files_from_stream
 from quodeq.engine.evidence import Evidence
@@ -14,18 +14,21 @@ from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_eviden
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_warning
 
+if TYPE_CHECKING:
+    from quodeq.engine.runner import RunConfig
+
 
 @dataclass
 class DimensionCallbacks:
     """Grouped callbacks for single-agent dimension processing fallback."""
-    build_prompt: Callable
-    run_analysis: Callable
-    parse_evidence: Callable
+    build_prompt: Callable[..., str]
+    run_analysis: Callable[..., tuple[Path, Path]]
+    parse_evidence: Callable[..., Evidence | None]
 
 _DEFAULT_SUBAGENT_MODEL = "claude-haiku-4-5"
 
 
-def _list_plugin_files(config, ctx_total: int, dim_id: str, idx: int):
+def _list_plugin_files(config: RunConfig, ctx_total: int, dim_id: str, idx: int) -> tuple[list[str], set[str]]:
     """List source files for the subagent queue.
 
     Returns (files, extensions) or ([], extensions) if none found.
@@ -40,7 +43,7 @@ def _list_plugin_files(config, ctx_total: int, dim_id: str, idx: int):
     return files, extensions
 
 
-def _build_subagent_prompt(config, dim_id: str, ctx) -> str:
+def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
     """Build the prompt for subagent analysis using the subagent.md template."""
     subagent_template = load_template(template_name="subagent.md")
     return build_analysis_prompt(
@@ -58,7 +61,7 @@ def _build_subagent_prompt(config, dim_id: str, ctx) -> str:
     )
 
 
-def _launch_pool(config, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str):
+def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
     from quodeq.engine.subagent_pool import PoolPaths, SubagentPool
 
@@ -81,7 +84,7 @@ def _launch_pool(config, dim_id: str, evidence_dir: Path, queue_path: Path, prom
     return pool, pool.run()
 
 
-def _collect_evidence(config, dim_id: str, evidence_dir: Path, results, ctx) -> Evidence:
+def _collect_evidence(config: RunConfig, dim_id: str, evidence_dir: Path, results: list[Any], ctx: Any) -> Evidence:
     """Deduplicate JSONL, count files read, and parse into Evidence."""
     from quodeq.engine.subagent_pool import SubagentPool
     from quodeq.engine.runner import cleanup_stream
@@ -112,7 +115,7 @@ def _collect_evidence(config, dim_id: str, evidence_dir: Path, results, ctx) -> 
 
 
 def process_dimension_with_subagents(
-    config, dim_id: str, idx: int, ctx,
+    config: RunConfig, dim_id: str, idx: int, ctx: Any,
     callbacks: DimensionCallbacks,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents.

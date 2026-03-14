@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from io import StringIO
 from pathlib import Path
 
 import pytest
@@ -56,7 +57,6 @@ from tests.engine.conftest import _evidence_line
 
 class TestExtractJsonlFromText:
     def test_extracts_evidence_lines(self):
-        from io import StringIO
         out = StringIO()
         text = _evidence_line() + "\nsome non-json line\n" + _evidence_line(p="ts-002", t="compliance")
         count, lines = _extract_jsonl_from_text(text, out)
@@ -64,28 +64,24 @@ class TestExtractJsonlFromText:
         assert lines == 3
 
     def test_skips_markdown_fences(self):
-        from io import StringIO
         out = StringIO()
         text = "```json\n" + _evidence_line() + "\n```"
         count, _ = _extract_jsonl_from_text(text, out)
         assert count == 1  # evidence line extracted, fences skipped
 
     def test_skips_non_evidence_json(self):
-        from io import StringIO
         out = StringIO()
         text = json.dumps({"some": "object"})  # no "p" or "t" field
         count, _ = _extract_jsonl_from_text(text, out)
         assert count == 0
 
     def test_empty_text(self):
-        from io import StringIO
         out = StringIO()
         count, lines = _extract_jsonl_from_text("", out)
         assert count == 0
         assert lines == 0
 
     def test_ignores_invalid_verdict(self):
-        from io import StringIO
         out = StringIO()
         text = json.dumps({"p": "ts-001", "t": "dismissed"})
         count, _ = _extract_jsonl_from_text(text, out)

@@ -15,6 +15,11 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ensure tools/ is on sys.path so we can import sibling modules.
+_tools_dir = str(Path(__file__).resolve().parent)
+if _tools_dir not in sys.path:
+    sys.path.insert(0, _tools_dir)
+
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 
 # ---------------------------------------------------------------------------
@@ -25,17 +30,33 @@ STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010
 # ---------------------------------------------------------------------------
 
 _MAPPING_PATH = Path(__file__).resolve().parent / "enrich_standards_mapping.json"
-try:
-    MAPPING: dict = json.loads(_MAPPING_PATH.read_text())
-except (OSError, json.JSONDecodeError) as _exc:
-    raise SystemExit(f"Cannot load mapping file {_MAPPING_PATH}: {_exc}") from _exc
-
-# Prefix map: dimension → principle → id prefix
 _PREFIX_MAP_PATH = Path(__file__).resolve().parent / "enrich_standards_prefix_map.json"
-try:
-    _PREFIX_MAP: dict = json.loads(_PREFIX_MAP_PATH.read_text())
-except (OSError, json.JSONDecodeError) as _exc:
-    raise SystemExit(f"Cannot load prefix map {_PREFIX_MAP_PATH}: {_exc}") from _exc
+
+# Lazily loaded at first use (avoids file reads at import time).
+_MAPPING: dict | None = None
+_PREFIX_MAP: dict | None = None
+
+
+def _load_mapping() -> dict:
+    """Load and cache the enrichment mapping from disk."""
+    global _MAPPING  # noqa: PLW0603
+    if _MAPPING is None:
+        try:
+            _MAPPING = json.loads(_MAPPING_PATH.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Cannot load mapping file {_MAPPING_PATH}: {exc}") from exc
+    return _MAPPING
+
+
+def _load_prefix_map() -> dict:
+    """Load and cache the prefix map from disk."""
+    global _PREFIX_MAP  # noqa: PLW0603
+    if _PREFIX_MAP is None:
+        try:
+            _PREFIX_MAP = json.loads(_PREFIX_MAP_PATH.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            raise SystemExit(f"Cannot load prefix map {_PREFIX_MAP_PATH}: {exc}") from exc
+    return _PREFIX_MAP
 
 
 def _get_existing_cwes(data: dict) -> set[int]:
@@ -64,7 +85,8 @@ def _get_highest_id(reqs: list[dict], prefix: str) -> int:
 
 def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
     """Add missing CWEs to one ISO 25010 dimension file. Returns count added."""
-    if dimension not in MAPPING:
+    mapping = _load_mapping()
+    if dimension not in mapping:
         return 0
 
     filepath = STANDARDS_DIR / f"{dimension}.json"
@@ -74,18 +96,18 @@ def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
 
     data = json.loads(filepath.read_text())
     existing = _get_existing_cwes(data)
-    prefixes = _PREFIX_MAP.get(dimension, {})
+    prefixes = _load_prefix_map().get(dimension, {})
     total_added = 0
 
     for sc in data["sub_characteristics"]:
         sc_name = sc["name"]
-        if sc_name not in MAPPING[dimension]:
+        if sc_name not in mapping[dimension]:
             continue
 
         prefix = prefixes.get(sc_name, "X-XXX")
         highest = _get_highest_id(sc["requirements"], prefix)
 
-        for req_text, cwe_ids in MAPPING[dimension][sc_name]:
+        for req_text, cwe_ids in mapping[dimension][sc_name]:
             # Filter out CWEs that already exist
             new_cwes = [c for c in cwe_ids if c not in existing]
             if not new_cwes:
@@ -121,9 +143,10 @@ def main() -> None:
     if dry_run:
         print("DRY RUN — use --apply to write changes\n")
 
+    from compile_standards import ALL_DIMENSIONS
+
     grand_total = 0
-    # NOTE: this list is coupled with ALL_DIMENSIONS in tools/compile_standards.py
-    for dimension in ["security", "reliability", "maintainability", "performance"]:
+    for dimension in ALL_DIMENSIONS:
         print(f"\n{'='*60}")
         print(f"  {dimension.upper()}")
         print(f"{'='*60}")

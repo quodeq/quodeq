@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
+from quodeq.adapters.fs._json_loader import load_json_file
 from quodeq.ports.data_errors import NotFoundError
 from quodeq.shared.validation import validate_path_segment
 
@@ -26,9 +26,4 @@ class FilesystemEvaluationsRepository:
         """Load and return a single evaluation report by ID."""
         validate_path_segment(report_id)
         path = self._root / "evaluations" / f"{report_id}.json"
-        if not path.exists():
-            raise NotFoundError(f"Report not found: {report_id}")
-        try:
-            return json.loads(path.read_text())
-        except json.JSONDecodeError as exc:
-            raise NotFoundError(f"Invalid JSON in report file: {report_id}") from exc
+        return load_json_file(path, f"Report not found: {report_id}")

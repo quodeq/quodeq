@@ -187,13 +187,11 @@ def _score_all_principles(
     return per_principle
 
 
-def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
+def run_scoring(evidence: dict, mode: str) -> dict:
     """Compute per-principle scores and return the full result dictionary.
 
     Args:
         evidence: Parsed evidence JSON for a single evaluation dimension.
-        mapping:  Parsed mapping JSON (not used internally but kept for API
-                  compatibility with callers that pass it).
         mode:     'numerical' or 'non-numerical'.
 
     Returns:
@@ -285,4 +283,4 @@ def _weighted_overall(principles_scores: dict, mode: str) -> dict:
 def score_evidence(evidence: Evidence, mode: str = "numerical") -> dict:
     """Score Evidence using the scoring engine."""
     ev_dict = evidence.to_evidence_dict()
-    return run_scoring(ev_dict, mapping={}, mode=mode)
+    return run_scoring(ev_dict, mode=mode)

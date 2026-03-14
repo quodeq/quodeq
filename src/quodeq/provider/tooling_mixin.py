@@ -16,6 +16,7 @@ from quodeq.adapters.fs.report_parser import safe_read_dir
 from quodeq.shared.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, get_anthropic_api_key
 
 _CLI_MODEL_TIMEOUT_S = 8
+_CLI_OUTPUT_IGNORE_PREFIXES = {"#", "=", "-", "[", "("}
 _ANTHROPIC_API_TIMEOUT_S = 8
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
@@ -51,10 +52,15 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
 _DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "copilot"})
 
 
-def _get_allowed_client_ids() -> frozenset[str]:
-    """Return the set of allowed AI client IDs (lazy, reads env on each call)."""
-    if "QUODEQ_AI_CLIENTS" in os.environ:
-        return frozenset(os.environ["QUODEQ_AI_CLIENTS"].split(","))
+def _get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
+    """Return the set of allowed AI client IDs (lazy, reads env on each call).
+
+    *env* overrides ``os.environ`` when provided, making the function
+    testable without environment mutation.
+    """
+    environ = env if env is not None else os.environ
+    if "QUODEQ_AI_CLIENTS" in environ:
+        return frozenset(environ["QUODEQ_AI_CLIENTS"].split(","))
     return _DEFAULT_CLIENT_IDS
 
 
@@ -65,6 +71,8 @@ class FsToolingMixin:
         """List directories at the given path for repository browsing."""
         target = Path(path) if path else Path.home()
         target = target.resolve()
+        if not target.is_relative_to(Path.home()):
+            return {"error": "Path outside allowed boundary"}
         if not target.exists():
             return {"error": "Path not found", "path": str(target)}
         if not target.is_dir():
@@ -102,10 +110,15 @@ class FsToolingMixin:
         {"id": "copilot", "label": "Copilot"},
     ]
 
-    def get_ai_clients(self) -> dict[str, list[dict[str, str]]]:
-        """Return AI CLI clients that are installed on the system."""
-        if "QUODEQ_AI_CLIENTS" in os.environ:
-            ids = [c.strip() for c in os.environ["QUODEQ_AI_CLIENTS"].split(",") if c.strip()]
+    def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
+        """Return AI CLI clients that are installed on the system.
+
+        *env* overrides ``os.environ`` when provided, making the method
+        testable without environment mutation.
+        """
+        environ = env if env is not None else os.environ
+        if "QUODEQ_AI_CLIENTS" in environ:
+            ids = [c.strip() for c in environ["QUODEQ_AI_CLIENTS"].split(",") if c.strip()]
             candidates = [{"id": c, "label": c.capitalize()} for c in ids]
         else:
             candidates = self._CLI_CANDIDATES
@@ -129,7 +142,7 @@ class FsToolingMixin:
         models = []
         for line in output.splitlines():
             token = line.strip().split()[0] if line.strip() else ""
-            if token and token[0] not in ("#", "=", "-", "[", "("):
+            if token and token[0] not in _CLI_OUTPUT_IGNORE_PREFIXES:
                 models.append(token)
         return {"models": models}
 

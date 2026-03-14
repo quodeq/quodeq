@@ -13,7 +13,7 @@ from quodeq.provider.violation_context import FindingSpec, build_finding_base, f
 _logger = logging.getLogger(__name__)
 
 
-def _empty_severity_buckets() -> dict[str, list]:
+def empty_severity_buckets() -> dict[str, list]:
     """Return a fresh ``{critical: [], major: [], minor: []}`` dict."""
     return {"critical": [], "major": [], "minor": []}
 
@@ -172,6 +172,6 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
         "principles": list(principle_map.values()),
         "violations": data.get("violations", []),
         "compliance": data.get("compliance", []),
-        "priorityRemediation": _empty_severity_buckets(),
+        "priorityRemediation": empty_severity_buckets(),
         "rawContent": None,
     }

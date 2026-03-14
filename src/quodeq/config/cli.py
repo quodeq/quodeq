@@ -69,11 +69,11 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate configuration action."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    paths = default_paths(version=args.data_version)
+    paths = default_paths()
 
     handlers: list[tuple[str, Callable]] = [
         ("generate_maps",       lambda v: run_generate_evaluators(v, paths) or 0),
-        ("generate_dimensions", lambda _: (run_generate_dimensions(paths), 0)[1]),
+        ("generate_dimensions", lambda _: run_generate_dimensions(paths) or 0),
         ("check_sources",       lambda v: check_sources(v, paths)),
         ("list_dimensions",     lambda _: (print(render_dimension_table()), 0)[1]),
         ("refresh_practices",   lambda v: run_refresh_practices(v, paths,

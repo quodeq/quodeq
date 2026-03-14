@@ -18,17 +18,26 @@ from quodeq.shared.utils import get_evaluations_dir
 _CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
 _logger = logging.getLogger(__name__)
 
+# Error keyword returned by browse_repo when the path exists but is not a directory.
+_BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
+
 
 def _sanitize_url(url: str) -> str:
     """Remove embedded credentials from a URL for safe logging."""
     return _CREDENTIALS_RE.sub(r"\1***@", url)
 
 
-def _reports_dir() -> str:
-    raw = request.args.get("evaluations") or get_evaluations_dir()
+def _reports_dir(default_path: str | None = None) -> str:
+    """Resolve the reports directory from query params or *default_path*.
+
+    *default_path* overrides the env-based ``get_evaluations_dir()`` fallback,
+    making the helper testable without environment mutation.
+    """
+    fallback = default_path if default_path is not None else get_evaluations_dir()
+    raw = request.args.get("evaluations") or fallback
     resolved = Path(raw).resolve()
-    default_resolved = Path(get_evaluations_dir()).resolve()
-    if not resolved.is_relative_to(default_resolved) and not resolved.is_relative_to(Path.home()):
+    default_resolved = Path(fallback).resolve()
+    if not resolved.is_relative_to(default_resolved):
         from flask import abort
         abort(HTTPStatus.FORBIDDEN)
     return str(resolved)
@@ -217,7 +226,7 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         path = request.args.get("path")
         payload = provider.browse_repo(path)
         if "error" in payload:
-            browse_status = HTTPStatus.BAD_REQUEST if "directory" in payload["error"].lower() else HTTPStatus.NOT_FOUND
+            browse_status = HTTPStatus.BAD_REQUEST if _BROWSE_NOT_A_DIR_KEYWORD in payload["error"].lower() else HTTPStatus.NOT_FOUND
             body, status = _error(payload["error"], browse_status, "INVALID_INPUT")
             return jsonify(body), status
         return jsonify(payload)

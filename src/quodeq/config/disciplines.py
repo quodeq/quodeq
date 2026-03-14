@@ -7,9 +7,19 @@ import os
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_warning
 
-VALID_CATEGORIES = frozenset(
-    os.environ.get("QUODEQ_DISCIPLINE_CATEGORIES", "backend,frontend,mobile,infra").split(",")
-)
+def get_valid_categories(categories: str | None = None) -> frozenset[str]:
+    """Return the set of valid discipline categories.
+
+    *categories* overrides the env-var lookup when provided, making the
+    function testable without environment mutation.
+    """
+    raw = categories if categories is not None else os.environ.get(
+        "QUODEQ_DISCIPLINE_CATEGORIES", "backend,frontend,mobile,infra"
+    )
+    return frozenset(raw.split(","))
+
+
+VALID_CATEGORIES = get_valid_categories()
 
 
 def validate_new_discipline(name: str, language: str, category: str) -> int:
@@ -20,7 +30,7 @@ def validate_new_discipline(name: str, language: str, category: str) -> int:
         )
         return 1
     if category not in VALID_CATEGORIES:
-        log_error(f"Invalid category '{category}'. Must be: backend, frontend, mobile, or infra")
+        log_error(f"Invalid category '{category}'. Must be one of: {', '.join(sorted(VALID_CATEGORIES))}")
         return 1
     return 0
 
@@ -34,7 +44,7 @@ def get_discipline_language(name: str, paths: ConfigPaths) -> str | None:
     try:
         conf_lines = conf.read_text().splitlines()
     except (OSError, UnicodeDecodeError) as exc:
-        log_warning(f"Could not read disciplines config {conf}: {exc}")
+        log_warning(f"Could not read disciplines config {conf.name}: {exc}")
         return None
     for line in conf_lines:
         line = line.strip()

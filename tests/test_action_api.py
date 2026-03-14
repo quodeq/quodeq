@@ -75,7 +75,7 @@ def test_start_evaluation_requires_repo():
     app = create_app(StubProvider())
     client = app.test_client()
 
-    response = client.post("/api/evaluations", json={})
+    response = client.post("/api/evaluations", json={}, headers={"Origin": "http://localhost"})
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["code"] == "INVALID_INPUT"
@@ -95,7 +95,7 @@ def test_delete_nonexistent_project_returns_404():
     app = create_app(StubProvider())
     client = app.test_client()
 
-    response = client.delete("/api/projects/nonexistent")
+    response = client.delete("/api/projects/nonexistent", headers={"Origin": "http://localhost"})
     assert response.status_code == 404
     payload = response.get_json()
     assert payload["code"] == "NOT_FOUND"
