@@ -15,7 +15,8 @@ def _default_static_dist() -> str:
     bundled = get_static_dist()
     if bundled:
         return bundled
-    return "ui/web/dist"
+    # Fall back to ui/web/dist relative to the project root (3 levels up from this file)
+    return str(Path(__file__).resolve().parent.parent.parent.parent / "ui" / "web" / "dist")
 
 
 def build_parser() -> argparse.ArgumentParser:

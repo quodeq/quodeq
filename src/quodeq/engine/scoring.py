@@ -229,68 +229,62 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     }
 
 
-def _weighted_overall(principles_scores: dict, mode: str) -> dict:
-    """Compute a weighted overall score or grade from per-principle results.
+def _accumulate_weights(
+    principles_scores: dict, mode: str,
+) -> tuple[int, float, int, int]:
+    """Sum weighted values across scorable principles.
 
-    Each principle's weight string is parsed to an integer multiplier. In
-    numerical mode the weighted mean of final_score values is returned. In
-    non-numerical mode grades are converted to ladder indices, the weighted
-    mean is computed, and the result is rounded back to the nearest grade.
-
-    When more than half of the principles are Insufficient, the overall is
-    flagged as low confidence since it only reflects a minority of principles.
+    Returns (total_weight, total_value, total_count, insufficient_count).
     """
     total_count = len(principles_scores)
     insufficient_count = sum(
         1 for p in principles_scores.values() if p.get("grade") == "Insufficient"
     )
-
     total_weight = 0
     total_value = 0.0
-
     for pdata in principles_scores.values():
         if pdata.get("grade") == "Insufficient":
             continue
         multiplier = weight_as_multiplier(pdata.get("weight", DEFAULT_WEIGHT))
         total_weight += multiplier
-
         if mode == "numerical":
             total_value += pdata["final_score"] * multiplier
         else:
-            grade_index = GRADE_LADDER.index(pdata["grade"])
-            total_value += grade_index * multiplier
+            total_value += GRADE_LADDER.index(pdata["grade"]) * multiplier
+    return total_weight, total_value, total_count, insufficient_count
 
-    low_confidence = (
-        total_count > 0 and insufficient_count > total_count / 2
-    )
 
-    if total_weight == 0:
-        if mode == "numerical":
-            return {"weighted_score": 0.0, "grade": "Insufficient"}
-        return {"weighted_grade": "Insufficient"}
-
+def _build_overall_result(mode: str, total_weight: int, total_value: float) -> dict:
+    """Build the overall result dict from aggregated weights."""
     if mode == "numerical":
         mean_score = round(total_value / total_weight, 1)
-        result = {
+        return {
             "weighted_score": mean_score,
             "grade": score_to_grade_label(mean_score),
             "total_weight": total_weight,
         }
-    else:
-        mean_index = total_value / total_weight
-        ladder_pos = min(len(GRADE_LADDER) - 1, round(mean_index))
-        result = {
-            "weighted_grade": GRADE_LADDER[ladder_pos],
-            "total_weight": total_weight,
-        }
+    mean_index = total_value / total_weight
+    ladder_pos = min(len(GRADE_LADDER) - 1, round(mean_index))
+    return {"weighted_grade": GRADE_LADDER[ladder_pos], "total_weight": total_weight}
 
-    if low_confidence:
-        scored_count = total_count - insufficient_count
+
+def _weighted_overall(principles_scores: dict, mode: str) -> dict:
+    """Compute a weighted overall score or grade from per-principle results."""
+    tw, tv, total, insuff = _accumulate_weights(principles_scores, mode)
+
+    if tw == 0:
+        if mode == "numerical":
+            return {"weighted_score": 0.0, "grade": "Insufficient"}
+        return {"weighted_grade": "Insufficient"}
+
+    result = _build_overall_result(mode, tw, tv)
+
+    if total > 0 and insuff > total / 2:
+        scored = total - insuff
         result["confidence"] = "low"
         result["confidence_reason"] = (
-            f"Only {scored_count}/{total_count} principles had sufficient evidence"
+            f"Only {scored}/{total} principles had sufficient evidence"
         )
-
     return result
 
 

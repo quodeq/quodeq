@@ -23,7 +23,7 @@ def _ref_label(ref: dict) -> str:
     return source.upper() if source else "REF"
 
 
-def _build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
+def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
     """Return {req_id: [{label, url}, ...]} for all refs of each requirement."""
     try:
         dim_file = compiled_dir / f"{dimension}.json"
@@ -57,7 +57,7 @@ class EvidenceContext:
     files_read: int
 
 
-def _resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | None) -> list[dict] | None:
+def resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | None) -> list[dict] | None:
     """Filter req_refs to only those the LLM selected, building URLs for unknown labels.
 
     Only refs that carry a ``url`` are kept.  If nothing with a URL remains
@@ -160,12 +160,29 @@ def _group_judgments(judgments: list[Judgment]) -> _GroupedJudgments:
     return _GroupedJudgments(sc_violations, sc_compliance, sc_severity)
 
 
-def parse_jsonl_to_evidence(
-    jsonl_file: Path,
-    context: EvidenceContext,
-    compiled_dir: Path | None = None,
-) -> Evidence:
-    """Parse extracted JSONL file into a complete Evidence object."""
+def _enrich_judgment(
+    j: Judgment,
+    llm_refs: list[str] | None,
+    compiled_dir: Path | None,
+    req_refs_cache: dict[str, dict[str, list[dict]]],
+) -> None:
+    """Resolve and attach req_refs to a Judgment in-place."""
+    if j.req_refs:
+        return  # MCP server already enriched
+    all_req_refs = None
+    if compiled_dir and j.req and j.dimension:
+        if j.dimension not in req_refs_cache:
+            req_refs_cache[j.dimension] = build_req_refs_lookup(compiled_dir, j.dimension)
+        all_req_refs = req_refs_cache[j.dimension].get(j.req)
+    resolved = resolve_llm_refs(llm_refs, all_req_refs)
+    if resolved:
+        j.req_refs = resolved
+
+
+def _read_judgments(
+    jsonl_file: Path, compiled_dir: Path | None,
+) -> list[Judgment]:
+    """Read JSONL lines and return enriched Judgment objects."""
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
     try:
@@ -178,18 +195,18 @@ def parse_jsonl_to_evidence(
                 result = _parse_jsonl_line(line)
                 if result is not None:
                     j, llm_refs = result
-                    # Skip lookup when MCP server already enriched req_refs
-                    if not j.req_refs:
-                        all_req_refs = None
-                        if compiled_dir and j.req and j.dimension:
-                            if j.dimension not in req_refs_cache:
-                                req_refs_cache[j.dimension] = _build_req_refs_lookup(compiled_dir, j.dimension)
-                            all_req_refs = req_refs_cache[j.dimension].get(j.req)
-                        resolved = _resolve_llm_refs(llm_refs, all_req_refs)
-                        if resolved:
-                            j.req_refs = resolved
+                    _enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
                     judgments.append(j)
+    return judgments
 
+
+def parse_jsonl_to_evidence(
+    jsonl_file: Path,
+    context: EvidenceContext,
+    compiled_dir: Path | None = None,
+) -> Evidence:
+    """Parse extracted JSONL file into a complete Evidence object."""
+    judgments = _read_judgments(jsonl_file, compiled_dir)
     grouped = _group_judgments(judgments)
     all_principles = set(grouped.violations.keys()) | set(grouped.compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}

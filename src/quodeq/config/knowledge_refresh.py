@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import urllib.error
 import urllib.request
 import urllib.parse
@@ -173,28 +174,37 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
     return [results[repo["name"]] for repo in repos if repo["name"] in results]
 
 
-import threading as _threading
+class _FetchClient:
+    """Thread-safe HTTP fetcher with circuit breaker (trips after repeated failures)."""
 
-_fetch_failures: int = 0
-_FETCH_CIRCUIT_THRESHOLD = 5
-_fetch_lock = _threading.Lock()
+    _CIRCUIT_THRESHOLD = 5
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._failures = 0
+
+    def fetch(self, url: str, headers: dict | None = None) -> str | None:
+        """Fetch *url* and return body text, or None on failure."""
+        with self._lock:
+            if self._failures >= self._CIRCUIT_THRESHOLD:
+                return None
+        try:
+            req = urllib.request.Request(url, headers=headers or {})
+            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT_S) as r:
+                with self._lock:
+                    self._failures = 0
+                return r.read().decode("utf-8", errors="replace")
+        except (urllib.error.URLError, OSError, ValueError):
+            with self._lock:
+                self._failures += 1
+            return None
+
+
+_fetch_client = _FetchClient()
 
 
 def _fetch_url(url: str, headers: dict | None = None) -> str | None:
-    global _fetch_failures
-    with _fetch_lock:
-        if _fetch_failures >= _FETCH_CIRCUIT_THRESHOLD:
-            return None
-    try:
-        req = urllib.request.Request(url, headers=headers or {})
-        with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT_S) as r:
-            with _fetch_lock:
-                _fetch_failures = 0
-            return r.read().decode("utf-8", errors="replace")
-    except (urllib.error.URLError, OSError, ValueError):
-        with _fetch_lock:
-            _fetch_failures += 1
-        return None
+    return _fetch_client.fetch(url, headers)
 
 
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:

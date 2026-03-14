@@ -152,11 +152,42 @@ class SubagentPool:
             except (OSError, ValueError, RuntimeError) as exc:
                 log_warning(f"Heartbeat error: {exc}")
 
+    def _should_respawn(
+        self, pool_start: float, max_duration: float,
+    ) -> bool:
+        """Return True if a new agent should be spawned (time and queue check)."""
+        elapsed = time.monotonic() - pool_start
+        if elapsed >= max_duration:
+            queue = FileQueue(self._queue_path)
+            remaining = queue.remaining()
+            if remaining > 0:
+                log_warning(
+                    f"  Pool time limit ({max_duration}s) reached — "
+                    f"{remaining} files left, not spawning new agents"
+                )
+            return False
+        return FileQueue(self._queue_path).remaining() > 0
+
+    def _collect_done(
+        self, futures: dict, results: list[SubagentResult],
+        finished: dict[str, bool],
+    ) -> set:
+        """Collect completed futures, updating results and finished map.
+
+        Returns the set of completed futures.
+        """
+        done_futures = {f for f in futures if f.done()}
+        for future in done_futures:
+            result = future.result()
+            finished[result.agent_id] = True
+            if result.success:
+                log_success(f"  {result.agent_id} finished")
+            results.append(result)
+            del futures[future]
+        return done_futures
+
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, respawning when slots free up and queue has files.
-
-        Stops spawning new agents once the pool-level max_duration is reached;
-        already-running agents are allowed to finish naturally.
 
         Returns list of SubagentResult (one per agent, including failures).
         """
@@ -175,7 +206,6 @@ class SubagentPool:
 
         try:
             with ThreadPoolExecutor(max_workers=self._n) as pool:
-                # Launch initial batch
                 futures: dict = {}
                 for _ in range(self._n):
                     finished[f"agent-{next_idx}"] = False
@@ -183,35 +213,14 @@ class SubagentPool:
                     next_idx += 1
 
                 while futures:
-                    # Wait for the next agent to complete
-                    done_futures = {f for f in futures if f.done()}
-                    if not done_futures:
-                        # Brief sleep to avoid busy-waiting
+                    done = self._collect_done(futures, results, finished)
+                    if not done:
                         time.sleep(0.5)
                         continue
-
-                    for future in done_futures:
-                        result = future.result()
-                        finished[result.agent_id] = True
-                        if result.success:
-                            log_success(f"  {result.agent_id} finished")
-                        results.append(result)
-                        del futures[future]
-
-                        # Respawn if queue still has files and time budget remains
-                        elapsed = time.monotonic() - pool_start
-                        if elapsed >= max_duration:
-                            queue = FileQueue(self._queue_path)
-                            remaining = queue.remaining()
-                            if remaining > 0:
-                                log_warning(
-                                    f"  Pool time limit ({max_duration}s) reached — "
-                                    f"{remaining} files left, not spawning new agents"
-                                )
-                            continue
-                        queue = FileQueue(self._queue_path)
-                        if queue.remaining() > 0:
-                            log_info(f"  {queue.remaining()} files left — spawning agent-{next_idx}")
+                    for _ in done:
+                        if self._should_respawn(pool_start, max_duration):
+                            remaining = FileQueue(self._queue_path).remaining()
+                            log_info(f"  {remaining} files left — spawning agent-{next_idx}")
                             finished[f"agent-{next_idx}"] = False
                             futures[pool.submit(self._run_single, next_idx)] = next_idx
                             next_idx += 1

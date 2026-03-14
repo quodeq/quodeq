@@ -183,6 +183,17 @@ class TestRunnerModelResolution:
 # Tests: API → env var → subprocess (integration)
 # ---------------------------------------------------------------------------
 
+class _StubJobManager:
+    """Captures the env dict passed to start_job for assertion."""
+
+    def __init__(self):
+        self.captured_env: dict = {}
+
+    def start_job(self, cmd, cwd, env):
+        self.captured_env = env
+        return {"jobId": "test"}
+
+
 class TestApiToSubprocessIntegration:
     """POST /api/evaluations with subagentModel should set SUBAGENT_MODEL
     in the env passed to the subprocess."""
@@ -193,21 +204,14 @@ class TestApiToSubprocessIntegration:
 
         repo = tmp_path / "repo"
         repo.mkdir()
-        captured = {}
-
-        class StubJobs:
-            def start_job(self, cmd, cwd, env):
-                captured["env"] = env
-                return {"jobId": "test"}
-
-        provider = FilesystemActionProvider(job_manager=StubJobs())
+        stub = _StubJobManager()
+        provider = FilesystemActionProvider(job_manager=stub)
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(tmp_path / "reports"),
             options=EvaluationOptions(subagent_model="claude-sonnet-4-6"),
         )
-
-        assert captured["env"]["SUBAGENT_MODEL"] == "claude-sonnet-4-6"
+        assert stub.captured_env["SUBAGENT_MODEL"] == "claude-sonnet-4-6"
 
     def test_full_chain_opus(self, tmp_path: Path) -> None:
         from quodeq.provider.base import EvaluationOptions
@@ -215,21 +219,14 @@ class TestApiToSubprocessIntegration:
 
         repo = tmp_path / "repo"
         repo.mkdir()
-        captured = {}
-
-        class StubJobs:
-            def start_job(self, cmd, cwd, env):
-                captured["env"] = env
-                return {"jobId": "test"}
-
-        provider = FilesystemActionProvider(job_manager=StubJobs())
+        stub = _StubJobManager()
+        provider = FilesystemActionProvider(job_manager=stub)
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(tmp_path / "reports"),
             options=EvaluationOptions(subagent_model="claude-opus-4-6"),
         )
-
-        assert captured["env"]["SUBAGENT_MODEL"] == "claude-opus-4-6"
+        assert stub.captured_env["SUBAGENT_MODEL"] == "claude-opus-4-6"
 
     def test_full_chain_no_model_no_env_key(self, tmp_path: Path) -> None:
         from quodeq.provider.base import EvaluationOptions
@@ -237,18 +234,11 @@ class TestApiToSubprocessIntegration:
 
         repo = tmp_path / "repo"
         repo.mkdir()
-        captured = {}
-
-        class StubJobs:
-            def start_job(self, cmd, cwd, env):
-                captured["env"] = env
-                return {"jobId": "test"}
-
-        provider = FilesystemActionProvider(job_manager=StubJobs())
+        stub = _StubJobManager()
+        provider = FilesystemActionProvider(job_manager=stub)
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(tmp_path / "reports"),
             options=EvaluationOptions(),
         )
-
-        assert "SUBAGENT_MODEL" not in captured["env"]
+        assert "SUBAGENT_MODEL" not in stub.captured_env

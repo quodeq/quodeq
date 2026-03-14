@@ -80,7 +80,7 @@ def run_generate_dimensions(paths: ConfigPaths) -> None:
 def add_discipline(name: str, language: str, category: str, paths: ConfigPaths) -> None:
     """Register a new discipline by creating its directory and config entry."""
     (paths.evaluators_dir / name).mkdir(parents=True, exist_ok=True)
-    registry = paths.evaluators_dir.parent / "config" / "disciplines.conf"
+    registry = paths.disciplines_conf
     registry.parent.mkdir(parents=True, exist_ok=True)
     content = registry.read_text() if registry.exists() else ""
     entry = f"[{name}]\nlanguage={language}\ncategory={category}\n"

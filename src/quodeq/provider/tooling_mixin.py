@@ -17,7 +17,8 @@ from quodeq.shared.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, get_an
 
 _CLI_MODEL_TIMEOUT_S = 8
 _ANTHROPIC_API_TIMEOUT_S = 8
-_AI_DEFAULTS_PATH = Path(__file__).resolve().parent.parent / "config" / "ai_defaults.json"
+_PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+_AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
 
 
 def _load_fallback_claude_models() -> list[str]:

@@ -2,11 +2,13 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any, Iterable
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
-from quodeq.engine.evidence_parser import _build_req_refs_lookup, _resolve_llm_refs
+from quodeq.engine.analysis_stream import extract_files_from_event
+from quodeq.engine.evidence_parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 
 
@@ -14,7 +16,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
     """Build a normalized finding dict from a raw JSON object."""
     req = obj.get("req")
     all_req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
-    req_refs = _resolve_llm_refs(obj.get("refs"), all_req_refs)
+    req_refs = resolve_llm_refs(obj.get("refs"), all_req_refs)
     entry = build_finding_base(FindingSpec(
         principle=obj["p"],
         file=obj.get("file"),
@@ -75,7 +77,6 @@ def _count_files_in_stream(stream_path: Path) -> int:
                 except json.JSONDecodeError:
                     continue
     except OSError as exc:
-        import logging
         logging.getLogger(__name__).warning("Failed to read stream file %s: %s", stream_path, exc)
     return len(files)
 
@@ -85,7 +86,7 @@ def parse_violations_from_jsonl(
     compiled_dir: Path | None = None,
 ) -> dict[str, Any] | None:
     """Parse live JSONL findings written by the MCP server."""
-    req_refs_lookup = _build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
+    req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
     try:
         with open(jsonl_path) as _f:
             violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup)
@@ -175,20 +176,7 @@ def _parse_entries_from_texts(
 
 def _extract_files_from_stream_event(event: dict) -> set[str]:
     """Extract file paths from Read/Grep tool_use blocks in a stream event."""
-    files: set[str] = set()
-    etype = event.get("type", "")
-    if etype == "assistant":
-        blocks = event.get("message", {}).get("content", [])
-    elif etype == "item.completed":
-        blocks = event.get("item", {}).get("content", [])
-    else:
-        return files
-    for block in blocks:
-        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
-            fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
-            if fp:
-                files.add(fp)
-    return files
+    return extract_files_from_event(event)
 
 
 def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:

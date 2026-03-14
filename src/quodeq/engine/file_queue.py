@@ -1,7 +1,7 @@
 """Cross-process file queue for distributing work across subagents.
 
 Backed by a JSON file with atomic writes (write-to-temp + rename).
-Cross-process safe via file locking (fcntl on Unix, msvcrt on Windows).
+Cross-process safe via file locking (fcntl on Unix, msvcrt on Windows; both imported lazily).
 Maintains a take log so no file is silently lost.
 """
 from __future__ import annotations
@@ -40,8 +40,9 @@ class FileQueue:
     - **Atomic writes**: state is written to a temp file then renamed, so a
       crash mid-write never corrupts the queue.
     - **Exclusive locking**: a separate ``.lock`` file serialises all access
-      via ``fcntl.flock``.  The OS releases the lock automatically if the
-      holding process dies.
+      via ``fcntl.flock`` (Unix) or ``msvcrt.locking`` (Windows), both
+      imported lazily.  The OS releases the lock automatically if the holding
+      process dies.
     - **Take log**: every ``take()`` is recorded with agent id and timestamp,
       so files can be accounted for even after a crash.
     """

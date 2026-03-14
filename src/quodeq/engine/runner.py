@@ -1,16 +1,11 @@
 """Runner — orchestrates the AI-driven exploration pipeline.
 
-Pipeline per dimension:
-    1. Build prompt (prompt_builder)
-    2. Run AI analysis (analysis.py — spawn AI CLI)
-    3. Extract JSONL from stream
-    4. Parse into Evidence (evidence_parser)
+Per dimension: build prompt → run AI analysis → extract JSONL → parse Evidence.
 Merge per-dimension Evidence into a single Evidence object.
 """
 from __future__ import annotations
 
 import json
-import os
 import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -59,16 +54,12 @@ CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
 
 
 class _MarkerFields(TypedDict, total=False):
-    """Fields that may appear in a structured JSON marker."""
     dimension: str
     dimensions: list[str]
 
 
 def _emit_marker(phase: str, **kwargs: _MarkerFields) -> None:
-    """Emit a structured JSON marker for job tracking.
-
-    Only emitted when stdout is captured by the job manager (not a TTY).
-    """
+    """Emit a structured JSON marker (only when stdout is not a TTY)."""
     if sys.stdout.isatty():
         return
     print(json.dumps({CC_MARKER_KEY: phase, **kwargs}), flush=True)
@@ -197,102 +188,14 @@ def _parse_dimension_evidence(
 def _process_dimension_with_subagents(
     config: RunConfig, dim_id: str, idx: int, ctx: _PluginContext,
 ) -> Evidence | None:
-    """Run dimension analysis using N parallel subagents.
-
-    1. List source files for the queue
-    2. Build subagent prompt (subagent.md template)
-    3. Launch SubagentPool
-    4. Merge JSONL outputs
-    5. Parse merged evidence
-    """
-    from quodeq.engine.file_queue import FileQueue
-    from quodeq.engine.plugin_loader import load_plugin
-    from quodeq.engine.plugin_detector import list_source_files
-    from quodeq.engine.subagent_pool import SubagentPool
-
-    evidence_dir = config.work_dir or config.src
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-
-    # 1. List source files
-    plugin_dir = config.evaluators_dir / config.plugin_id
-    plugin_data = load_plugin(plugin_dir)
-    extensions = set(plugin_data.get("detects", {}).get("extensions", []))
-    files = list_source_files(config.src, extensions) if extensions else []
-    if not files:
-        log_warning(
-            f"[{idx}/{ctx.total}] {dim_id} — no source files for subagent queue"
-            f" (src={config.src}, plugin={config.plugin_id}, extensions={extensions})"
-        )
-        # Fall back to single-agent path which uses its own search strategy
-        prompt = _build_dimension_prompt(config, dim_id, ctx)
-        stream_file, jsonl_file = _run_dimension_analysis(config, dim_id, prompt, idx, ctx)
-        return _parse_dimension_evidence(config, dim_id, stream_file, jsonl_file, ctx)
-
-    # 2. Create queue
-    queue_path = evidence_dir / f"{dim_id}_queue.json"
-    FileQueue(queue_path, files)
-    log_info(f"  [{idx}/{ctx.total}] {dim_id} — {len(files)} files queued for {config.options.n_subagents} subagents")
-
-    # 3. Build subagent prompt
-    subagent_template = load_template(template_name="subagent.md")
-    prompt = build_analysis_prompt(
-        subagent_template,
-        PromptContext(
-            plugin_id=config.plugin_id,
-            repo_name=str(config.src),
-            date_str=ctx.date_str,
-            dimension=dim_id,
-            source_file_count=config.source_file_count,
-            dimensions_data=ctx.dimensions_data,
-            analysis_md=ctx.analysis_md,
-            standards_dir=config.standards_dir,
-        ),
+    """Run dimension analysis using N parallel subagents (delegates to _subagent_runner)."""
+    from quodeq.engine._subagent_runner import process_dimension_with_subagents
+    return process_dimension_with_subagents(
+        config, dim_id, idx, ctx,
+        build_prompt_fn=_build_dimension_prompt,
+        run_analysis_fn=_run_dimension_analysis,
+        parse_evidence_fn=_parse_dimension_evidence,
     )
-
-    # 4. Launch pool — subagent model comes from options (default: Haiku for speed)
-    subagent_model = config.options.subagent_model or os.environ.get("SUBAGENT_MODEL") or "claude-haiku-4-5"
-    base_ac = AnalysisConfig(
-        analysis_budget=config.options.analysis_budget,
-        compiled_dir=compiled_dir,
-        max_turns=config.options.max_turns,
-        max_duration=config.options.max_duration,
-        ai_model=subagent_model,
-    )
-    pool = SubagentPool(
-        n_agents=config.options.n_subagents,
-        work_dir=config.src,
-        prompt=prompt,
-        evidence_dir=evidence_dir,
-        queue_path=queue_path,
-        dimension=dim_id,
-        config=base_ac,
-    )
-    results = pool.run()
-
-    # 5. Deduplicate shared JSONL (agents may produce cross-agent dupes)
-    merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
-    SubagentPool.deduplicate_jsonl(merged_jsonl)
-
-    # Count files read across all agent streams, then clean up
-    total_files_read = 0
-    for r in results:
-        if r.stream_file.exists():
-            total_files_read += count_files_from_stream(r.stream_file)
-            cleanup_stream(r.stream_file)
-
-    ev = parse_jsonl_to_evidence(
-        merged_jsonl,
-        EvidenceContext(
-            plugin_id=config.plugin_id,
-            repository=str(config.src),
-            date_str=ctx.date_str,
-            source_file_count=config.source_file_count,
-            files_read=total_files_read,
-        ),
-        compiled_dir=compiled_dir,
-    )
-    ev.plugin_name = ctx.plugin_name
-    return ev
 
 
 def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:

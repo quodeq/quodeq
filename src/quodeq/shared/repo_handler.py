@@ -12,6 +12,7 @@ from pathlib import Path
 _REPO_URL_RE = re.compile(
     r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?|git@[\w.\-]+:[\w.\-/]+(\.git)?)$"
 )
+_GIT_CLONE_TIMEOUT_S = 300
 
 
 def is_valid_repo_url(url: str) -> bool:
@@ -33,7 +34,7 @@ def prepare_repository(repo_input: str) -> str:
     try:
         subprocess.run(
             ["git", "clone", repo_input, str(dest)],
-            check=True, env=env, timeout=300,
+            check=True, env=env, timeout=_GIT_CLONE_TIMEOUT_S,
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         shutil.rmtree(tmp_dir, ignore_errors=True)

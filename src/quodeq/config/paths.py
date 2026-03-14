@@ -28,6 +28,11 @@ class ConfigPaths:
         """Return the versioned root path (currently identical to root)."""
         return self.root
 
+    @property
+    def disciplines_conf(self) -> Path:
+        """Return the path to the disciplines configuration file."""
+        return self.root / "config" / "disciplines.conf"
+
     @classmethod
     def from_root(cls, root: Path, version: str | None = None) -> "ConfigPaths":
         """Construct a ConfigPaths instance by deriving all paths from a root directory."""

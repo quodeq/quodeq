@@ -8,6 +8,8 @@ from pathlib import Path
 from quodeq.engine.evidence import Evidence
 from quodeq.engine.scoring_internals import score_to_grade_label
 
+_REPORT_SCHEMA_VERSION = 1
+
 
 def grade_from_score(score: str | None) -> str | None:
     """Convert a numeric score string (e.g. '7/10') to a letter grade (Critical..Exemplary)."""
@@ -114,7 +116,7 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
 
     raw_meta = evidence.get("meta", {})
     return {
-        "schema_version": 1,
+        "schema_version": _REPORT_SCHEMA_VERSION,
         "dimension": dimension,
         "project": evidence.get("repository", ""),
         # runId is always empty here; write_report_json fills it in from the path

@@ -1,0 +1,145 @@
+"""Subagent processing path — runs a dimension via N parallel subagents.
+
+Extracted from runner.py to keep module size within maintainability limits.
+"""
+from __future__ import annotations
+
+import os
+from pathlib import Path
+
+from quodeq.engine.analysis import AnalysisConfig, count_files_from_stream
+from quodeq.engine.evidence import Evidence
+from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
+from quodeq.shared.logging import log_info, log_warning
+
+_DEFAULT_SUBAGENT_MODEL = "claude-haiku-4-5"
+
+
+def _list_plugin_files(config, ctx_total: int, dim_id: str, idx: int):
+    """List source files for the subagent queue.
+
+    Returns (files, extensions) or ([], extensions) if none found.
+    """
+    from quodeq.engine.plugin_loader import load_plugin
+    from quodeq.engine.plugin_detector import list_source_files
+
+    plugin_dir = config.evaluators_dir / config.plugin_id
+    plugin_data = load_plugin(plugin_dir)
+    extensions = set(plugin_data.get("detects", {}).get("extensions", []))
+    files = list_source_files(config.src, extensions) if extensions else []
+    return files, extensions
+
+
+def _build_subagent_prompt(config, dim_id: str, ctx) -> str:
+    """Build the prompt for subagent analysis using the subagent.md template."""
+    subagent_template = load_template(template_name="subagent.md")
+    return build_analysis_prompt(
+        subagent_template,
+        PromptContext(
+            plugin_id=config.plugin_id,
+            repo_name=str(config.src),
+            date_str=ctx.date_str,
+            dimension=dim_id,
+            source_file_count=config.source_file_count,
+            dimensions_data=ctx.dimensions_data,
+            analysis_md=ctx.analysis_md,
+            standards_dir=config.standards_dir,
+        ),
+    )
+
+
+def _launch_pool(config, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str):
+    """Create and run a SubagentPool, returning its results."""
+    from quodeq.engine.subagent_pool import SubagentPool
+
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    subagent_model = (
+        config.options.subagent_model
+        or os.environ.get("SUBAGENT_MODEL")
+        or _DEFAULT_SUBAGENT_MODEL
+    )
+    base_ac = AnalysisConfig(
+        analysis_budget=config.options.analysis_budget,
+        compiled_dir=compiled_dir,
+        max_turns=config.options.max_turns,
+        max_duration=config.options.max_duration,
+        ai_model=subagent_model,
+    )
+    pool = SubagentPool(
+        n_agents=config.options.n_subagents,
+        work_dir=config.src,
+        prompt=prompt,
+        evidence_dir=evidence_dir,
+        queue_path=queue_path,
+        dimension=dim_id,
+        config=base_ac,
+    )
+    return pool, pool.run()
+
+
+def _collect_evidence(config, dim_id: str, evidence_dir: Path, results, ctx) -> Evidence:
+    """Deduplicate JSONL, count files read, and parse into Evidence."""
+    from quodeq.engine.subagent_pool import SubagentPool
+    from quodeq.engine.runner import cleanup_stream
+
+    merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
+    SubagentPool.deduplicate_jsonl(merged_jsonl)
+
+    total_files_read = 0
+    for r in results:
+        if r.stream_file.exists():
+            total_files_read += count_files_from_stream(r.stream_file)
+            cleanup_stream(r.stream_file)
+
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    ev = parse_jsonl_to_evidence(
+        merged_jsonl,
+        EvidenceContext(
+            plugin_id=config.plugin_id,
+            repository=str(config.src),
+            date_str=ctx.date_str,
+            source_file_count=config.source_file_count,
+            files_read=total_files_read,
+        ),
+        compiled_dir=compiled_dir,
+    )
+    ev.plugin_name = ctx.plugin_name
+    return ev
+
+
+def process_dimension_with_subagents(
+    config, dim_id: str, idx: int, ctx,
+    build_prompt_fn, run_analysis_fn, parse_evidence_fn,
+) -> Evidence | None:
+    """Run dimension analysis using N parallel subagents.
+
+    Falls back to single-agent path (via provided callbacks) when no source
+    files are detected for the queue.
+    """
+    from quodeq.engine.file_queue import FileQueue
+
+    evidence_dir = config.work_dir or config.src
+
+    # 1. List source files
+    files, extensions = _list_plugin_files(config, ctx.total, dim_id, idx)
+    if not files:
+        log_warning(
+            f"[{idx}/{ctx.total}] {dim_id} — no source files for subagent queue"
+            f" (src={config.src}, plugin={config.plugin_id}, extensions={extensions})"
+        )
+        prompt = build_prompt_fn(config, dim_id, ctx)
+        stream_file, jsonl_file = run_analysis_fn(config, dim_id, prompt, idx, ctx)
+        return parse_evidence_fn(config, dim_id, stream_file, jsonl_file, ctx)
+
+    # 2. Create queue
+    queue_path = evidence_dir / f"{dim_id}_queue.json"
+    FileQueue(queue_path, files)
+    log_info(f"  [{idx}/{ctx.total}] {dim_id} — {len(files)} files queued for {config.options.n_subagents} subagents")
+
+    # 3. Build prompt and launch pool
+    prompt = _build_subagent_prompt(config, dim_id, ctx)
+    pool, results = _launch_pool(config, dim_id, evidence_dir, queue_path, prompt)
+
+    # 4. Collect and return evidence
+    return _collect_evidence(config, dim_id, evidence_dir, results, ctx)

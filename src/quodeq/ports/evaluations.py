@@ -1,3 +1,4 @@
+"""Port interface for stored evaluation reports."""
 from __future__ import annotations
 
 from typing import Protocol

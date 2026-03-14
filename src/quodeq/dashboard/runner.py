@@ -37,6 +37,7 @@ def _get_pid_file() -> Path:
     return run_dir / "action_api.pid"
 
 
+_PORT_CHECK_TIMEOUT_S = 2
 _HEALTH_CHECK_TIMEOUT_S = 0.5
 _POLL_INTERVAL_S = 0.1
 _HEALTH_POLL_INTERVAL_S = 0.2
@@ -61,7 +62,7 @@ def validate_paths(config: DashboardConfig) -> None:
 
 def _is_port_open(host: str, port: int) -> bool:
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(2)
+        sock.settimeout(_PORT_CHECK_TIMEOUT_S)
         return sock.connect_ex((host, port)) == 0
 
 

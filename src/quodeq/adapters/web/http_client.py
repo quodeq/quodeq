@@ -17,6 +17,7 @@ from quodeq.ports.data_errors import AuthError, NotFoundError, ServerError
 _HTTP_TIMEOUT_S = 10
 _MAX_RETRIES = 3
 _RETRY_BASE_DELAY_S = 0.5
+_RETRY_JITTER_S = 0.3
 _CIRCUIT_BREAKER_THRESHOLD = 5
 _CIRCUIT_BREAKER_RESET_S = 60
 
@@ -77,18 +78,18 @@ class HttpClient:
         if not url.startswith(("http://", "https://")):
             raise ValueError(f"URL must use http or https scheme: {url!r}")
         if self._is_circuit_open():
-            return HttpResponse(503, {"error": "circuit breaker open — too many recent failures"})
+            return HttpResponse(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "circuit breaker open — too many recent failures"})
 
         last_response: HttpResponse | None = None
         for attempt in range(_MAX_RETRIES):
             result = self._attempt_get(url, headers)
             last_response = result
-            if result.status < 500:
+            if result.status < HTTPStatus.INTERNAL_SERVER_ERROR:
                 self._record_success()
                 return result
             # Retry on 5xx / network errors with exponential backoff + jitter
             if attempt < _MAX_RETRIES - 1:
-                delay = _RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, 0.3)
+                delay = _RETRY_BASE_DELAY_S * (2 ** attempt) + random.uniform(0, _RETRY_JITTER_S)
                 time.sleep(delay)
 
         self._record_failure()

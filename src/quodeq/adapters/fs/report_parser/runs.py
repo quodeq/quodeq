@@ -195,34 +195,41 @@ def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
     return run_infos
 
 
+@dataclass(frozen=True)
+class RunLookupCache:
+    """Pre-computed data to avoid repeated I/O when looking up previous runs."""
+
+    runs: list[RunInfo]
+    get_run_data: Callable[[str], list[dict[str, Any]]]
+
+
 def _get_previous_run_for_dimension(
     reports_root: Path,
     project: str,
     current_run_id: str,
     dimension: str,
     *,
-    cached_runs: list[RunInfo] | None = None,
-    get_run_data: Callable[[str], list[dict[str, Any]]] | None = None,
+    cache: RunLookupCache | None = None,
 ) -> dict[str, Any] | None:
     """Return the most recent run data for *dimension* before *current_run_id*, or None.
 
     Callers processing multiple dimensions for the same project should pass
-    *cached_runs* (the result of a single list_runs call) and *get_run_data*
-    (a dict-backed callable) to share I/O across calls rather than repeating
-    the directory scan and file reads for each dimension.
+    a *cache* (built from a single ``list_runs`` call and a dict-backed
+    callable) to share I/O across calls rather than repeating the directory
+    scan and file reads for each dimension.
     """
     project_path = reports_root / project
     if not project_path.exists():
         return None
-    all_runs = cached_runs if cached_runs is not None else list_runs(reports_root, project)
+    all_runs = cache.runs if cache is not None else list_runs(reports_root, project)
     current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
     if current_idx < 0:
         return None
     _data_cache: dict[str, list[dict[str, Any]]] = {}
 
     def _fetch(run_id: str) -> list[dict[str, Any]]:
-        if get_run_data is not None:
-            return get_run_data(run_id)
+        if cache is not None:
+            return cache.get_run_data(run_id)
         if run_id not in _data_cache:
             _data_cache[run_id] = read_run_data(reports_root, project, run_id)
         return _data_cache[run_id]

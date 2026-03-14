@@ -1,3 +1,4 @@
+"""Port interface for quality dimension definitions."""
 from __future__ import annotations
 
 from typing import Protocol

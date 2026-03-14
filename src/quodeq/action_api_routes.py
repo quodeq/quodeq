@@ -2,23 +2,20 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
-import tempfile
-import zipfile
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, Response, after_this_request, jsonify, request, send_file, send_from_directory
+from flask import Flask, Response, jsonify, request, send_from_directory
 
+from quodeq.action_api_zip import export_project_zip
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.tooling_mixin import _ALLOWED_CLIENT_IDS as _ALLOWED_AI_CMDS
 from quodeq.shared.utils import get_evaluations_dir
 
 _CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
 _logger = logging.getLogger(__name__)
-_MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
 
 
 def _sanitize_url(url: str) -> str:
@@ -38,53 +35,6 @@ def _reports_dir() -> str:
         from flask import abort
         abort(HTTPStatus.FORBIDDEN)
     return str(resolved)
-
-
-def _build_project_zip(project_path: Path) -> Path:
-    """Create a temporary zip archive of a project directory and return its path."""
-    fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="quodeq_export_")
-    os.close(fd)
-    total_size = 0
-    try:
-        with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for file_entry in project_path.rglob("*"):
-                if file_entry.is_symlink():
-                    continue
-                if file_entry.is_file():
-                    total_size += file_entry.stat().st_size
-                    if total_size > _MAX_ZIP_SIZE_BYTES:
-                        raise ValueError("Project exceeds maximum export size")
-                    zf.write(file_entry, file_entry.relative_to(project_path.parent))
-    except Exception:
-        os.unlink(tmp_path)
-        raise
-    return Path(tmp_path)
-
-
-def _export_project_zip(project: str, reports_dir: str) -> Response | tuple[Response, int]:
-    """Build and return a zip archive download response for a project directory."""
-    project_path = (Path(reports_dir) / project).resolve()
-    if not project_path.is_relative_to(Path(reports_dir).resolve()):
-        body, status = _error("Invalid project name", HTTPStatus.BAD_REQUEST, "BAD_REQUEST")
-        return jsonify(body), status
-    if not project_path.exists() or not project_path.is_dir():
-        body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-        return jsonify(body), status
-    try:
-        tmp_path = _build_project_zip(project_path)
-    except ValueError:
-        body, status = _error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
-        return jsonify(body), status
-
-    @after_this_request
-    def _cleanup(response: Response) -> Response:
-        try:
-            os.unlink(str(tmp_path))
-        except OSError:
-            pass
-        return response
-
-    return send_file(str(tmp_path), mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")
 
 
 def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
@@ -113,7 +63,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
         """Download a project's report directory as a zip archive."""
-        return _export_project_zip(project, _reports_dir())
+        return export_project_zip(project, _reports_dir())
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:

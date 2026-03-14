@@ -1,0 +1,203 @@
+"""Compliance dampening and graded-mode scoring tests (split from test_scoring)."""
+from __future__ import annotations
+
+from quodeq.engine.evidence import Evidence, PrincipleEvidence
+from quodeq.engine.scoring import score_evidence
+
+
+def _make_evidence_with_confidence(
+    confidence_level="high",
+    violations=None,
+    compliance=None,
+    n_violations=1,
+    n_compliance=2,
+):
+    """Build Evidence with explicit confidence level and finding counts."""
+    viol = violations or [
+        {"file": f"v{i}.ts", "line": i, "snippet": "eval(x)", "reason": "injection", "severity": "high", "vt": "code-injection"}
+        for i in range(n_violations)
+    ]
+    comp = compliance or [
+        {"file": f"c{i}.ts", "line": i, "snippet": "JSON.parse(x)", "reason": "safe"}
+        for i in range(n_compliance)
+    ]
+    total = len(viol) + len(comp)
+    pct = round(len(comp) / total * 100, 1) if total > 0 else 0.0
+    pe = PrincipleEvidence(
+        practice_id="ts-001",
+        display_name="Avoid eval()",
+        dimension="security",
+        severity="high",
+        violations=viol,
+        compliance=comp,
+        metrics={
+            "total_instances": total,
+            "compliant": len(comp),
+            "violating": len(viol),
+            "compliance_percentage": pct,
+            "confidence_level": confidence_level,
+            "is_balanced": len(viol) > 0 and len(comp) > 0,
+        },
+    )
+    return Evidence(
+        repository="test-repo",
+        plugin_id="typescript",
+        date="2026-03-03",
+        source_file_count=100,
+        files_read=50,
+        coverage_pct=50.0,
+        principles={"ts-001": pe},
+    )
+
+
+# ---------------------------------------------------------------------------
+# Compliance dampening tests
+# ---------------------------------------------------------------------------
+
+def test_balanced_ratio_dampens_deductions():
+    """Compliance/violation ratio >= 1.0 -> 0.95 dampening."""
+    violations = [
+        {"file": "a.ts", "line": 1, "snippet": "eval(x)", "reason": "r",
+         "severity": "critical", "vt": "code-injection"},
+    ]
+    compliance = [
+        {"file": f"c{i}.ts", "line": i, "snippet": "ok", "reason": f"r{i}",
+         "severity": "minor", "vt": f"comp-type-{i}"}
+        for i in range(2)
+    ]
+    ev = _make_evidence_with_confidence(
+        confidence_level="high",
+        violations=violations,
+        compliance=compliance,
+        n_violations=1,
+        n_compliance=2,
+    )
+    scores = score_evidence(ev, mode="numerical")
+    ts001 = scores["principles"]["ts-001"]
+    assert ts001["dampening_multiplier"] == 0.90
+    assert ts001["final_score"] == 8.2
+
+
+def test_strong_compliance_ratio_gives_max_discount():
+    """Compliance/violation ratio >= 3.0 -> 0.85 dampening (max discount)."""
+    violations = [
+        {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
+         "severity": "major", "vt": "bad-pattern"},
+    ]
+    compliance = [
+        {"file": f"c{i}.ts", "line": i, "snippet": "ok", "reason": f"r{i}",
+         "severity": "minor", "vt": f"safe-{i}"}
+        for i in range(4)
+    ]
+    ev = _make_evidence_with_confidence(
+        confidence_level="high",
+        violations=violations,
+        compliance=compliance,
+        n_violations=1,
+        n_compliance=4,
+    )
+    scores = score_evidence(ev, mode="numerical")
+    ts001 = scores["principles"]["ts-001"]
+    assert ts001["dampening_multiplier"] == 0.85
+    assert ts001["final_score"] == 9.2
+
+
+def test_no_compliance_penalises_deductions():
+    """No compliance at all -> 1.30x penalty on deductions."""
+    violations = [
+        {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
+         "severity": "major", "vt": "bad"},
+    ]
+    ev = _make_evidence_with_confidence(
+        confidence_level="high",
+        violations=violations,
+        compliance=[],
+        n_violations=1,
+        n_compliance=0,
+    )
+    scores = score_evidence(ev, mode="numerical")
+    ts001 = scores["principles"]["ts-001"]
+    assert ts001["dampening_multiplier"] == 1.30
+    assert ts001["final_score"] == 8.7
+
+
+def test_weak_compliance_ratio_penalises():
+    """Compliance/violation ratio < 0.5 but > 0 -> 1.15x penalty."""
+    violations = [
+        {"file": f"v{i}.ts", "line": i, "snippet": "x", "reason": f"r{i}",
+         "severity": "minor", "vt": f"vt-{i}"}
+        for i in range(4)
+    ]
+    compliance = [
+        {"file": "c.ts", "line": 1, "snippet": "ok", "reason": "r",
+         "severity": "minor", "vt": "comp-1"},
+    ]
+    ev = _make_evidence_with_confidence(
+        confidence_level="high",
+        violations=violations,
+        compliance=compliance,
+        n_violations=4,
+        n_compliance=1,
+    )
+    scores = score_evidence(ev, mode="numerical")
+    ts001 = scores["principles"]["ts-001"]
+    assert ts001["dampening_multiplier"] == 1.15
+    assert ts001["final_score"] == 8.8
+
+
+def test_dampening_in_graded_mode():
+    """Dampening should reduce grade drops in non-numerical mode too."""
+    violations = [
+        {"file": f"v{i}.ts", "line": i, "snippet": "x", "reason": f"r{i}",
+         "severity": "critical", "vt": f"vt-{i}"}
+        for i in range(4)
+    ]
+    compliance = [
+        {"file": f"c{i}.ts", "line": i, "snippet": "ok", "reason": f"r{i}",
+         "severity": "minor", "vt": f"comp-{i}"}
+        for i in range(6)
+    ]
+    ev = _make_evidence_with_confidence(
+        confidence_level="high",
+        violations=violations,
+        compliance=compliance,
+        n_violations=4,
+        n_compliance=6,
+    )
+    scores = score_evidence(ev, mode="non-numerical")
+    ts001 = scores["principles"]["ts-001"]
+    assert ts001["dampening_multiplier"] == 0.95
+    assert ts001["severity_drops"] == 2
+    assert ts001["grade"] == "Proficient"
+
+
+def test_overall_low_confidence_when_most_insufficient():
+    """Overall should be flagged low confidence when >50% principles are Insufficient."""
+    pe_low1 = PrincipleEvidence(
+        practice_id="p1", display_name="P1", dimension="security",
+        severity="high", violations=[], compliance=[],
+        metrics={"total_instances": 1, "compliant": 1, "violating": 0,
+                 "compliance_percentage": 100.0, "confidence_level": "low", "is_balanced": False},
+    )
+    pe_low2 = PrincipleEvidence(
+        practice_id="p2", display_name="P2", dimension="security",
+        severity="high", violations=[], compliance=[],
+        metrics={"total_instances": 1, "compliant": 1, "violating": 0,
+                 "compliance_percentage": 100.0, "confidence_level": "low", "is_balanced": False},
+    )
+    pe_high = PrincipleEvidence(
+        practice_id="p3", display_name="P3", dimension="security",
+        severity="high", violations=[], compliance=[
+            {"file": "a.ts", "line": 1, "snippet": "ok", "reason": "safe"},
+        ],
+        metrics={"total_instances": 10, "compliant": 10, "violating": 0,
+                 "compliance_percentage": 100.0, "confidence_level": "high", "is_balanced": False},
+    )
+    ev = Evidence(
+        repository="test", plugin_id="ts", date="2026-03-03",
+        source_file_count=100, files_read=50, coverage_pct=50.0,
+        principles={"p1": pe_low1, "p2": pe_low2, "p3": pe_high},
+    )
+    scores = score_evidence(ev, mode="numerical")
+    assert scores["overall"]["confidence"] == "low"
+    assert "1/3" in scores["overall"]["confidence_reason"]

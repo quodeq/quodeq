@@ -13,27 +13,34 @@ from quodeq.shared.utils import get_asvs_url, show_diff
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
 
 
+def _fetch_with_retry(url: str, timeout: int = 30, max_retries: int = 3) -> bytes:
+    """Fetch URL content with exponential-backoff retries.
+
+    Retries on network errors up to *max_retries* times, raising
+    ``ConnectionError`` if all attempts fail.
+    """
+    import random
+    import time
+
+    last_exc: Exception | None = None
+    for attempt in range(max_retries):
+        try:
+            with urllib.request.urlopen(url, timeout=timeout) as r:
+                return r.read()
+        except (urllib.error.URLError, OSError, TimeoutError) as exc:
+            last_exc = exc
+            if attempt < max_retries - 1:
+                time.sleep(0.5 * (2 ** attempt) + random.uniform(0, 0.3))
+    raise ConnectionError(f"Failed to fetch after {max_retries} attempts: {last_exc}") from last_exc
+
+
 def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
     """Fetch OWASP ASVS L1 requirements and write to standards_dir/asvs/level1.json.
 
     Returns the number of requirements fetched.
     When QUODEQ_ASVS_SHA256 is set, validates the download against the expected hash.
     """
-    import time
-    import random
-    _max_retries = 3
-    last_exc: Exception | None = None
-    for _attempt in range(_max_retries):
-        try:
-            with urllib.request.urlopen(get_asvs_url(), timeout=30) as r:
-                content = r.read()
-            break
-        except (urllib.error.URLError, OSError, TimeoutError) as exc:
-            last_exc = exc
-            if _attempt < _max_retries - 1:
-                time.sleep(0.5 * (2 ** _attempt) + random.uniform(0, 0.3))
-    else:
-        raise ConnectionError(f"Failed to fetch ASVS after {_max_retries} attempts: {last_exc}") from last_exc
+    content = _fetch_with_retry(get_asvs_url())
 
     actual_hash = hashlib.sha256(content).hexdigest()
     expected_hash = os.environ.get(_ASVS_SHA256_ENV)
@@ -79,6 +86,7 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
 
 
 def _parse_asvs_l1(raw: dict) -> list[dict]:
+    """Extract all Level-1-required items from the full ASVS JSON structure."""
     requirements = []
     for chapter in raw.get("Requirements", []):
         requirements.extend(_extract_l1_from_chapter(chapter))

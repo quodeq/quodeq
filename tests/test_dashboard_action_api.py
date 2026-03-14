@@ -3,20 +3,20 @@ from pathlib import Path
 from quodeq.dashboard import _build, runner
 
 
+class _DummyProcess:
+    def poll(self):
+        return None
+
+    def terminate(self):
+        return None
+
+
 def test_spawn_action_api_sets_env(monkeypatch):
     captured = {}
 
     def fake_popen(cmd, env=None, **kwargs):
         captured["env"] = env
-
-        class Dummy:
-            def poll(self):
-                return None
-
-            def terminate(self):
-                return None
-
-        return Dummy()
+        return _DummyProcess()
 
     monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
     runner._spawn_action_api(8001)
@@ -28,15 +28,7 @@ def test_spawn_action_api_sets_static_dist(monkeypatch):
 
     def fake_popen(cmd, env=None, **kwargs):
         captured["env"] = env
-
-        class Dummy:
-            def poll(self):
-                return None
-
-            def terminate(self):
-                return None
-
-        return Dummy()
+        return _DummyProcess()
 
     monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
     runner._spawn_action_api(8001, static_dist=Path("/tmp/dist"))
