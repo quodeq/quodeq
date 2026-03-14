@@ -1,0 +1,18 @@
+name: Enforce main source branch
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+jobs:
+  check-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify PR source is develop
+        run: |
+          if [ "${{ github.head_ref }}" != "develop" ]; then
+            echo "::error::PRs to main must come from the develop branch."
+            exit 1
+          fi
+          echo "Source branch is develop. OK."

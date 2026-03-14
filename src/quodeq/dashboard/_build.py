@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from pathlib import Path
 
 from quodeq.shared.logging import log_info
@@ -12,8 +13,9 @@ _MIN_NPM_MAJOR = 8
 def _check_npm() -> None:
     """Raise RuntimeError if npm is not found or is below the minimum version."""
     try:
+        use_shell = sys.platform == "win32"
         result = subprocess.run(
-            ["npm", "--version"], capture_output=True, text=True, check=True,
+            ["npm", "--version"], capture_output=True, text=True, check=True, shell=use_shell,
         )
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         raise RuntimeError("npm not found; install Node.js before building the UI.") from exc
@@ -31,8 +33,9 @@ def _check_npm() -> None:
 def npm_build(path: Path) -> None:
     """Run npm install and build in the given directory."""
     _check_npm()
-    subprocess.run(["npm", "install"], cwd=str(path), check=True)
-    subprocess.run(["npm", "run", "build"], cwd=str(path), check=True)
+    use_shell = sys.platform == "win32"
+    subprocess.run(["npm", "install"], cwd=str(path), check=True, shell=use_shell)
+    subprocess.run(["npm", "run", "build"], cwd=str(path), check=True, shell=use_shell)
 
 
 def sources_newer_than_dist(web_root: Path, dist_index: Path) -> bool:
