@@ -159,7 +159,7 @@ def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:
     assert payload["name"] == "repo"
     assert payload["discipline"] == "cli_bash"
     assert payload["location"] == "local"
-    assert payload["path"] == repo_path.resolve().name
+    assert payload["path"] == str(repo_path.resolve())
     assert "uuid" in payload
 
 

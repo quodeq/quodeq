@@ -41,7 +41,7 @@ def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[
             for ref in req.get("refs", []):
                 url = ref.get("url")
                 if url:
-                    refs.append({"label": _ref_label(ref), "url": url})
+                    refs.append({"label": _ref_label(ref), "url": url, "source": ref.get("source", "")})
             if refs:
                 lookup[req_id] = refs
     return lookup

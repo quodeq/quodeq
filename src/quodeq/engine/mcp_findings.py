@@ -120,8 +120,7 @@ def _select_best_refs(
     """
     by_source: dict[str, list[dict]] = {}
     for ref in all_refs:
-        label = ref.get("label", "")
-        source = label.split("-")[0] if "-" in label else label
+        source = ref.get("source", "") or ref.get("label", "").split("-")[0]
         by_source.setdefault(source, []).append(ref)
 
     result: list[dict] = []
@@ -154,7 +153,7 @@ def _load_compiled_refs(compiled_dir: str | None, dimension: str | None) -> dict
             if not req_id:
                 continue
             refs = [
-                {"label": _ref_label(r), "url": r["url"], "name": r.get("name", "")}
+                {"label": _ref_label(r), "url": r["url"], "name": r.get("name", ""), "source": r.get("source", "")}
                 for r in req.get("refs", []) if r.get("url")
             ]
             if refs:
