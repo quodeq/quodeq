@@ -166,6 +166,8 @@ def write_reports(evidence: Evidence, scores: dict, output_dir: Path) -> None:
     dashboard_report = build_dashboard_report(evidence, scores)
 
     dim = evidence.plugin_id
+    if ".." in dim or "/" in dim or "\\" in dim:
+        raise ValueError(f"Invalid plugin_id for report output: {dim!r}")
     try:
         (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
         (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))

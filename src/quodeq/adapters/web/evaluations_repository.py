@@ -1,6 +1,8 @@
 """Web API-backed repository for evaluation reports."""
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from quodeq.adapters.web.base_repository import WebRepository
 
 
@@ -13,4 +15,4 @@ class WebEvaluationsRepository(WebRepository):
 
     def get_report(self, report_id: str) -> dict:
         """Fetch a single evaluation report by ID from the remote API."""
-        return self._get_dict(f"/reports/{report_id}")
+        return self._get_dict(f"/reports/{quote(report_id, safe='')}")

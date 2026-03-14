@@ -74,6 +74,8 @@ class HttpClient:
 
     def get_json(self, url: str, headers: dict[str, str]) -> HttpResponse:
         """Send a GET request with retry + circuit breaker and return parsed JSON."""
+        if not url.startswith(("http://", "https://")):
+            raise ValueError(f"URL must use http or https scheme: {url!r}")
         if self._is_circuit_open():
             return HttpResponse(503, {"error": "circuit breaker open — too many recent failures"})
 
@@ -106,7 +108,7 @@ class HttpClient:
             except (json.JSONDecodeError, UnicodeDecodeError):
                 payload = {"error": "http error"}
             return HttpResponse(exc.code, payload)
-        except (URLError, socket.timeout, OSError) as exc:
-            return HttpResponse(502, {"error": f"network error: {exc}"})
-        except (json.JSONDecodeError, UnicodeDecodeError) as exc:
-            return HttpResponse(502, {"error": f"invalid response: {exc}"})
+        except (URLError, socket.timeout, OSError):
+            return HttpResponse(502, {"error": "network error"})
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return HttpResponse(502, {"error": "invalid response"})

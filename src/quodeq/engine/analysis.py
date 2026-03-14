@@ -148,7 +148,7 @@ def count_files_from_stream(stream_file: Path) -> int:
     return len(_count_files_from_stream(stream_file))
 
 
-_AI_TOOLS: str = os.environ.get("QUODEQ_AI_TOOLS", "Bash,Glob,Grep,Read")
+_AI_TOOLS: str = os.environ.get("QUODEQ_AI_TOOLS", "Glob,Grep,Read")
 _BASE_AI_ARGS: tuple[str, ...] = tuple(
     os.environ.get("QUODEQ_AI_BASE_ARGS", "--print --output-format stream-json --verbose").split()
 )

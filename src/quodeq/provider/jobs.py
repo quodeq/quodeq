@@ -45,7 +45,7 @@ class Job:
         return {
             "jobId": self.job_id,
             "status": self.status,
-            "command": " ".join(self.command),
+            "command": self.command[0] if self.command else "",
             "startedAt": self.started_at,
             "endedAt": self.ended_at,
             "exitCode": self.exit_code,

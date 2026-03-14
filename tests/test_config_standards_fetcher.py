@@ -40,8 +40,9 @@ def _asvs_payload() -> dict:
 
 
 @pytest.fixture()
-def _mock_urlopen():
+def _mock_urlopen(monkeypatch):
     """Patch urlopen to return _asvs_payload as bytes."""
+    monkeypatch.setenv("QUODEQ_ASVS_SKIP_INTEGRITY", "1")
     content = json.dumps(_asvs_payload()).encode()
     response = MagicMock()
     response.read.return_value = content
@@ -73,3 +74,16 @@ class TestFetchAsvsL1:
         mock_urlopen, _ = _mock_urlopen
         fetch_asvs_l1(tmp_path)
         assert mock_urlopen.call_args.kwargs.get("timeout") == 30
+
+    def test_integrity_required_by_default(self, tmp_path: Path, monkeypatch) -> None:
+        """Without QUODEQ_ASVS_SHA256 or skip flag, fetch must fail."""
+        monkeypatch.delenv("QUODEQ_ASVS_SKIP_INTEGRITY", raising=False)
+        monkeypatch.delenv("QUODEQ_ASVS_SHA256", raising=False)
+        content = json.dumps(_asvs_payload()).encode()
+        response = MagicMock()
+        response.read.return_value = content
+        response.__enter__ = lambda self: self
+        response.__exit__ = MagicMock(return_value=False)
+        with patch("quodeq.config.standards_fetcher.urllib.request.urlopen", return_value=response):
+            with pytest.raises(ValueError, match="integrity verification required"):
+                fetch_asvs_l1(tmp_path)

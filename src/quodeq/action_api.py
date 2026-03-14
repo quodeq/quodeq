@@ -139,7 +139,7 @@ def main() -> None:
     signal.signal(signal.SIGTERM, _handle_shutdown)
     signal.signal(signal.SIGINT, _handle_shutdown)
 
-    app.run(host=get_action_api_host(), port=get_action_api_port())
+    app.run(host=get_action_api_host(), port=get_action_api_port(), debug=False)
 
 
 if __name__ == "__main__":

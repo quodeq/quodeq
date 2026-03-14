@@ -1,6 +1,8 @@
 """Web API-backed repository for quality dimension definitions."""
 from __future__ import annotations
 
+from urllib.parse import quote
+
 from quodeq.adapters.web.base_repository import WebRepository
 
 
@@ -13,4 +15,4 @@ class WebDimensionsRepository(WebRepository):
 
     def get_dimension(self, dimension_id: str) -> dict:
         """Fetch a single dimension definition by ID from the remote API."""
-        return self._get_dict(f"/dimensions/{dimension_id}")
+        return self._get_dict(f"/dimensions/{quote(dimension_id, safe='')}")

@@ -102,7 +102,7 @@ def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | 
         "name": resolved.name,
         "discipline": discipline,
         "location": "local",
-        "path": str(resolved),
+        "path": resolved.name,
     }
 
 

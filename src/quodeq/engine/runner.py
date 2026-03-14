@@ -27,6 +27,7 @@ from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_eviden
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.validation import validate_path_segment
 
 
 @dataclass
@@ -295,6 +296,7 @@ def _process_dimension_with_subagents(
 
 def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
     """Load plugin data and resolve which dimensions to analyze."""
+    validate_path_segment(config.plugin_id)
     plugin_dir = config.evaluators_dir / config.plugin_id
     if not plugin_dir.exists():
         raise ValueError(f"Plugin directory not found: {plugin_dir}")

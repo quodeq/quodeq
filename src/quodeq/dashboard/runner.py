@@ -27,7 +27,7 @@ from quodeq.dashboard._build import maybe_build_ui
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
 from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
 from quodeq.shared.paths import resolve_path
-from quodeq.shared.utils import ACTION_API_MODULE, DEFAULT_HOST
+from quodeq.shared.utils import ACTION_API_MODULE, DEFAULT_HOST, get_evaluations_dir
 
 
 def _get_pid_file() -> Path:
@@ -92,12 +92,13 @@ def _kill_stale_action_api(host: str, port: int) -> None:
         time.sleep(_POLL_INTERVAL_S)
 
 
-def _spawn_action_api(port: int, static_dist: Path | None = None) -> subprocess.Popen:
+def _spawn_action_api(port: int, static_dist: Path | None = None, evaluations_dir: str | None = None) -> subprocess.Popen:
     env = os.environ.copy()
     env["QUODEQ_ACTION_API_PORT"] = str(port)
     env.setdefault("QUODEQ_ACTION_API_HOST", DEFAULT_HOST)
     if static_dist:
         env["QUODEQ_STATIC_DIST"] = str(static_dist)
+    env["QUODEQ_EVALUATIONS_DIR"] = evaluations_dir or get_evaluations_dir()
     proc = subprocess.Popen(
         [sys.executable, "-m", ACTION_API_MODULE],
         env=env,
@@ -131,9 +132,9 @@ def _action_api_healthy(base_url: str) -> bool:
         return False
 
 
-def _spawn_and_wait(port: int, base_url: str, static_dist: Path | None = None) -> tuple[str, subprocess.Popen]:
+def _spawn_and_wait(port: int, base_url: str, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen]:
     """Spawn the action API on *port* and wait for it to become healthy."""
-    process = _spawn_action_api(port, static_dist=static_dist)
+    process = _spawn_action_api(port, static_dist=static_dist, evaluations_dir=evaluations_dir)
     try:
         _wait_for_action_api(base_url)
     except (subprocess.TimeoutExpired, OSError, TimeoutError):
@@ -144,7 +145,12 @@ def _spawn_and_wait(port: int, base_url: str, static_dist: Path | None = None) -
     return base_url, process
 
 
-def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None) -> tuple[str, subprocess.Popen | None]:
+def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen | None]:
+    if host not in ("127.0.0.1", "localhost", "::1", "0.0.0.0"):
+        import logging
+        logging.getLogger(__name__).warning(
+            "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,
+        )
     port = start_port
     for _ in range(max_tries):
         base_url = f"http://{host}:{port}"
@@ -153,17 +159,17 @@ def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_d
                 return base_url, None
             port += 1
             continue
-        return _spawn_and_wait(port, base_url, static_dist)
+        return _spawn_and_wait(port, base_url, static_dist, evaluations_dir=evaluations_dir)
     raise RuntimeError("Unable to find a free port for Action API.")
 
 
-def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = None) -> tuple[str, subprocess.Popen | None]:
+def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen | None]:
     base_url = f"http://{host}:{port}"
     if _is_port_open(host, port):
         if _action_api_healthy(base_url):
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    return _spawn_and_wait(port, base_url, static_dist)
+    return _spawn_and_wait(port, base_url, static_dist, evaluations_dir=evaluations_dir)
 
 
 def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
@@ -251,14 +257,17 @@ def run_dashboard(config: DashboardConfig) -> int:
     action_api_host = config.api_host or DEFAULT_HOST
     action_api_port = config.api_port or config.port
     static_dist = config.static_dist
+    evaluations_dir = str(config.reports_dir)
     if config.api_forced:
         action_api_url, action_api_process = _ensure_action_api_forced(
             action_api_host, action_api_port, static_dist=static_dist,
+            evaluations_dir=evaluations_dir,
         )
     else:
         _kill_stale_action_api(action_api_host, action_api_port)
         action_api_url, action_api_process = _ensure_action_api(
             action_api_host, action_api_port, static_dist=static_dist,
+            evaluations_dir=evaluations_dir,
         )
 
     _serve_and_wait(action_api_url, action_api_process, config)

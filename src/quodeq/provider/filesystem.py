@@ -244,7 +244,9 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def get_project_info(self, reports_dir: str, project: str) -> dict[str, Any] | None:
         """Return project metadata including discipline and available dimensions."""
-        info_path = Path(reports_dir) / project / "repository_info.json"
+        info_path = (Path(reports_dir) / project / "repository_info.json").resolve()
+        if not info_path.is_relative_to(Path(reports_dir).resolve()):
+            return None
         if not info_path.exists():
             return None
         try:
@@ -267,7 +269,9 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
         """Return parsed evaluation data for a single dimension in a run."""
         from quodeq.config.paths import default_paths
-        base = Path(reports_dir) / project / run_id
+        base = (Path(reports_dir) / project / run_id).resolve()
+        if not base.is_relative_to(Path(reports_dir).resolve()):
+            return None
         compiled_dir = default_paths().standards_dir / "compiled"
         result = resolve_dimension_eval(base, project, run_id, dimension, compiled_dir=compiled_dir if compiled_dir.exists() else None)
         if result is not None:

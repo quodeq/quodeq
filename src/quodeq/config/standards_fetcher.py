@@ -42,12 +42,18 @@ def fetch_asvs_l1(standards_dir: Path, *, dry_run: bool = False) -> int:
             f"ASVS integrity check failed: expected {expected_hash}, got {actual_hash}"
         )
     if not expected_hash:
-        import logging
-        logging.getLogger(__name__).warning(
-            "ASVS downloaded without integrity verification (set %s=%s to pin)",
-            _ASVS_SHA256_ENV,
-            actual_hash,
-        )
+        if os.environ.get("QUODEQ_ASVS_SKIP_INTEGRITY") == "1":
+            import logging
+            logging.getLogger(__name__).warning(
+                "ASVS integrity verification skipped (pin with %s=%s)",
+                _ASVS_SHA256_ENV,
+                actual_hash,
+            )
+        else:
+            raise ValueError(
+                f"ASVS integrity verification required: set {_ASVS_SHA256_ENV}={actual_hash} "
+                f"to pin this download, or set QUODEQ_ASVS_SKIP_INTEGRITY=1 to bypass"
+            )
 
     try:
         raw = json.loads(content)

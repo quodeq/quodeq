@@ -211,12 +211,13 @@ class TestIsStreamValid:
 class TestBuildAiCmd:
     """Guard against regressions that silently break evaluations (0 findings)."""
 
-    def test_bash_in_allowed_tools(self):
-        """Bash must be in the tools list — analysis prompts rely on it."""
+    def test_bash_not_in_default_tools(self):
+        """Bash must NOT be in the default tools — it enables arbitrary command
+        execution which could be exploited via prompt injection to exfiltrate data."""
         args, _ = _build_ai_cmd("test prompt", AnalysisConfig())
         tools_idx = args.index("--tools")
         tools_value = args[tools_idx + 1]
-        assert "Bash" in tools_value.split(",")
+        assert "Bash" not in tools_value.split(",")
 
     def test_read_glob_grep_in_allowed_tools(self):
         """File exploration tools must be available."""
