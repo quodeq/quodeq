@@ -273,11 +273,12 @@ def _process_dimension_with_subagents(
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
-    # Count files read across all agent streams
+    # Count files read across all agent streams, then clean up
     total_files_read = 0
     for r in results:
         if r.stream_file.exists():
             total_files_read += count_files_from_stream(r.stream_file)
+            cleanup_stream(r.stream_file)
 
     ev = parse_jsonl_to_evidence(
         merged_jsonl,
