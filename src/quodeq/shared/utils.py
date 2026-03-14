@@ -152,9 +152,17 @@ def get_static_dist() -> str | None:
     return None
 
 
-def get_evaluations_dir(default: str = "evaluations") -> str:
-    """Return the evaluations directory from environment or default."""
-    return os.environ.get("QUODEQ_EVALUATIONS_DIR", default)
+def get_evaluations_dir(default: str | None = None) -> str:
+    """Return the evaluations directory from environment or user-level default.
+
+    Priority: QUODEQ_EVALUATIONS_DIR env var > explicit *default* > ~/.quodeq/evaluations
+    """
+    from_env = os.environ.get("QUODEQ_EVALUATIONS_DIR")
+    if from_env:
+        return from_env
+    if default is not None:
+        return default
+    return str(Path.home() / ".quodeq" / "evaluations")
 
 
 def get_anthropic_api_key() -> str | None:

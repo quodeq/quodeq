@@ -81,7 +81,12 @@ class TestGetters:
 
     def test_get_evaluations_dir_default(self, monkeypatch):
         monkeypatch.delenv("QUODEQ_EVALUATIONS_DIR", raising=False)
-        assert utils.get_evaluations_dir() == "evaluations"
+        expected = str(Path.home() / ".quodeq" / "evaluations")
+        assert utils.get_evaluations_dir() == expected
+
+    def test_get_evaluations_dir_explicit_default(self, monkeypatch):
+        monkeypatch.delenv("QUODEQ_EVALUATIONS_DIR", raising=False)
+        assert utils.get_evaluations_dir("evaluations") == "evaluations"
 
     def test_get_evaluations_dir_from_env(self, monkeypatch):
         monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", "/custom/dir")

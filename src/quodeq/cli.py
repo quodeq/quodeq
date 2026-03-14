@@ -23,7 +23,7 @@ from quodeq.engine._runner_report import run_full
 from quodeq.engine.runner import AnalysisOptions, RunConfig, run
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import prepare_repository
-from quodeq.shared.utils import is_repo_url, project_name_from_repo
+from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo
 
 
 def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
@@ -33,7 +33,7 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "-p", "--plugin", default=None, help="Plugin ID (overrides auto-detection)"
     )
     parser.add_argument(
-        "-o", "--output", default="evaluations", help="Reports output directory"
+        "-o", "--output", default=get_evaluations_dir(), help="Reports output directory"
     )
     parser.add_argument(
         "-m", "--mode", default="numerical",
