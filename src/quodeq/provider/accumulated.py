@@ -16,6 +16,8 @@ from quodeq.adapters.fs.report_parser import (
 )
 
 # Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
+# Process-local cache; in multi-worker deployments, replace with a shared cache
+# (Redis, memcached) via the dimension_fetcher callable.
 _ACC_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
 _ACC_DIM_CACHE_MAX = 256
 _ACC_DIM_LOCK = threading.Lock()

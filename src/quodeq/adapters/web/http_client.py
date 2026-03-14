@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import random
 import threading
 import time
@@ -14,12 +15,12 @@ from urllib.error import URLError
 
 from quodeq.ports.data_errors import AuthError, NotFoundError, ServerError
 
-_HTTP_TIMEOUT_S = 10
-_MAX_RETRIES = 3
-_RETRY_BASE_DELAY_S = 0.5
+_HTTP_TIMEOUT_S = int(os.environ.get("QUODEQ_HTTP_TIMEOUT", "10"))
+_MAX_RETRIES = int(os.environ.get("QUODEQ_HTTP_MAX_RETRIES", "3"))
+_RETRY_BASE_DELAY_S = float(os.environ.get("QUODEQ_HTTP_RETRY_DELAY", "0.5"))
 _RETRY_JITTER_S = 0.3
-_CIRCUIT_BREAKER_THRESHOLD = 5
-_CIRCUIT_BREAKER_RESET_S = 60
+_CIRCUIT_BREAKER_THRESHOLD = int(os.environ.get("QUODEQ_CB_THRESHOLD", "5"))
+_CIRCUIT_BREAKER_RESET_S = int(os.environ.get("QUODEQ_CB_RESET", "60"))
 
 
 @dataclass(frozen=True)

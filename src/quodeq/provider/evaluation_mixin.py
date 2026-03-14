@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Protocol
 
 from quodeq.provider.base import EvaluationOptions
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
@@ -14,6 +14,41 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_n
 
 if TYPE_CHECKING:
     from quodeq.provider.jobs import JobManager
+
+
+class EvaluationDispatcher(Protocol):
+    """Abstraction for dispatching evaluation work.
+
+    The default implementation spawns a local subprocess via ``JobManager``.
+    Replace with a task-queue or remote-worker implementation for horizontal
+    scaling (e.g. Celery, cloud functions).
+    """
+
+    def dispatch(
+        self,
+        cmd: list[str],
+        *,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        """Submit an evaluation command and return the initial job state."""
+        ...
+
+
+class SubprocessDispatcher:
+    """Default dispatcher that delegates to the in-process ``JobManager``."""
+
+    def __init__(self, job_manager: JobManager) -> None:
+        self._jobs = job_manager
+
+    def dispatch(
+        self,
+        cmd: list[str],
+        *,
+        cwd: str | None = None,
+        env: dict[str, str] | None = None,
+    ) -> dict[str, Any]:
+        return self._jobs.start_job(cmd, cwd=cwd, env=env)
 
 
 def _build_evaluate_cmd(
@@ -47,10 +82,22 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str) -> No
 class FsEvaluationMixin:
     """Mixin for evaluation start/status/cancel methods.
 
-    Requires the host class to provide a ``_jobs`` attribute (a ``JobManager``).
+    Requires the host class to provide a ``_jobs`` attribute (a ``JobManager``)
+    and optionally a ``_dispatcher`` attribute (an ``EvaluationDispatcher``).
+    When no dispatcher is set, a ``SubprocessDispatcher`` wrapping ``_jobs``
+    is used automatically.
     """
 
     _jobs: JobManager
+    _dispatcher: EvaluationDispatcher | None
+
+    @property
+    def dispatcher(self) -> EvaluationDispatcher:
+        """Return the evaluation dispatcher, defaulting to subprocess-based."""
+        d = getattr(self, "_dispatcher", None)
+        if d is not None:
+            return d
+        return SubprocessDispatcher(self._jobs)
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
         """Start an asynchronous evaluation subprocess for a repository."""
@@ -74,11 +121,7 @@ class FsEvaluationMixin:
             env["SUBAGENT_MODEL"] = options.subagent_model
 
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
-        # NOTE: evaluations are dispatched as local subprocesses. There is no
-        # job queue or work-distribution layer here. Horizontal scaling would
-        # require an abstraction (e.g. task queue, remote worker) above this
-        # call site; the JobManager interface is designed to support that swap.
-        return self._jobs.start_job(cmd, cwd=cwd, env=env)
+        return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str) -> dict[str, Any] | None:
         """Return the current status of an evaluation job."""

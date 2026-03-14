@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
+import os
+
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_warning
 
-VALID_CATEGORIES = frozenset({"backend", "frontend", "mobile", "infra"})
+VALID_CATEGORIES = frozenset(
+    os.environ.get("QUODEQ_DISCIPLINE_CATEGORIES", "backend,frontend,mobile,infra").split(",")
+)
 
 
 def validate_new_discipline(name: str, language: str, category: str) -> int:

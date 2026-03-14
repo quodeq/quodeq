@@ -13,8 +13,55 @@ import tempfile
 import time
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 _QUEUE_VERSION = 1
+
+
+def _lock_file(fd: int) -> None:
+    """Acquire an exclusive lock on the file descriptor, dispatching by platform."""
+    if sys.platform == "win32":
+        import msvcrt
+        msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_EX)
+
+
+def _unlock_file(fd: int) -> None:
+    """Release the lock on the file descriptor, dispatching by platform."""
+    if sys.platform == "win32":
+        import msvcrt
+        msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        fcntl.flock(fd, fcntl.LOCK_UN)
+
+
+@runtime_checkable
+class WorkQueue(Protocol):
+    """Interface for a work-distribution queue.
+
+    ``FileQueue`` satisfies this protocol via structural subtyping.
+    Alternative implementations (e.g. Redis-backed) can implement this
+    protocol to plug into the same orchestration layer.
+    """
+
+    def take(self, count: int = 5, agent_id: str = "") -> list[str]:
+        """Atomically remove and return the next *count* items."""
+        ...
+
+    def remaining(self) -> int:
+        """Number of items still pending."""
+        ...
+
+    def taken_log(self) -> list[dict]:
+        """Return the full take log for audit / crash recovery."""
+        ...
+
+    def all_taken_files(self) -> list[str]:
+        """Return flat list of every file that was taken, in order."""
+        ...
 
 
 class FileQueueError(RuntimeError):
@@ -124,20 +171,10 @@ class FileQueue:
         """
         fd = os.open(str(self._lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
         try:
-            if sys.platform == "win32":
-                import msvcrt
-                msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(fd, fcntl.LOCK_EX)
+            _lock_file(fd)
             yield
         finally:
-            if sys.platform == "win32":
-                import msvcrt
-                msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
-            else:
-                import fcntl
-                fcntl.flock(fd, fcntl.LOCK_UN)
+            _unlock_file(fd)
             os.close(fd)
 
     def _read_state(self) -> dict:

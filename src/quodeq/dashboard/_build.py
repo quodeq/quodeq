@@ -11,7 +11,11 @@ _MIN_NPM_MAJOR = 8
 
 
 def _check_npm() -> None:
-    """Raise RuntimeError if npm is not found or is below the minimum version."""
+    """Raise RuntimeError if npm is not found or is below the minimum version.
+
+    Note: Node.js / npm is a system dependency required for source builds only.
+    When installed via pip or pipx with pre-built static assets, Node.js is not needed.
+    """
     try:
         use_shell = sys.platform == "win32"
         result = subprocess.run(

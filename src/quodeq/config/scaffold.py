@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 _DEFAULT_PLUGIN_VERSION = "1.0.0"
@@ -9,44 +10,58 @@ _DEFAULT_DIMENSION_WEIGHT = 1.0
 _SECURITY_DIMENSION_WEIGHT = 1.2
 _PERFORMANCE_DIMENSION_WEIGHT = 0.8
 
+_logger = logging.getLogger(__name__)
+
 
 def _min_engine_version() -> str:
     """Derive the engine_version constraint from the installed quodeq version."""
     from quodeq import __version__
     return f"=={__version__}" if __version__ else "==0.4.0"
 
-RUNTIME_PRESETS: dict[str, dict] = {
-    "typescript": {
-        "display_name": "TypeScript / Node.js",
-        "extensions": [".ts", ".tsx"],
-        "config_files": ["tsconfig.json", "package.json"],
-    },
-    "kotlin": {
-        "display_name": "Kotlin / JVM",
-        "extensions": [".kt", ".kts"],
-        "config_files": ["build.gradle.kts", "build.gradle"],
-    },
-    "python": {
-        "display_name": "Python",
-        "extensions": [".py"],
-        "config_files": ["pyproject.toml", "setup.py", "requirements.txt"],
-    },
-    "bash": {
-        "display_name": "Bash / Shell",
-        "extensions": [".sh", ".bash"],
-        "config_files": [".bashrc", "Makefile"],
-    },
-    "java": {
-        "display_name": "Java / JVM",
-        "extensions": [".java"],
-        "config_files": ["pom.xml", "build.gradle"],
-    },
-    "mobile_ios": {
-        "display_name": "iOS / Swift",
-        "extensions": [".swift"],
-        "config_files": ["Package.swift", "Podfile"],
-    },
-}
+
+def _load_runtime_presets() -> dict[str, dict]:
+    """Load runtime presets from the bundled JSON file, falling back to hardcoded defaults."""
+    _FALLBACK: dict[str, dict] = {
+        "typescript": {
+            "display_name": "TypeScript / Node.js",
+            "extensions": [".ts", ".tsx"],
+            "config_files": ["tsconfig.json", "package.json"],
+        },
+        "kotlin": {
+            "display_name": "Kotlin / JVM",
+            "extensions": [".kt", ".kts"],
+            "config_files": ["build.gradle.kts", "build.gradle"],
+        },
+        "python": {
+            "display_name": "Python",
+            "extensions": [".py"],
+            "config_files": ["pyproject.toml", "setup.py", "requirements.txt"],
+        },
+        "bash": {
+            "display_name": "Bash / Shell",
+            "extensions": [".sh", ".bash"],
+            "config_files": [".bashrc", "Makefile"],
+        },
+        "java": {
+            "display_name": "Java / JVM",
+            "extensions": [".java"],
+            "config_files": ["pom.xml", "build.gradle"],
+        },
+        "mobile_ios": {
+            "display_name": "iOS / Swift",
+            "extensions": [".swift"],
+            "config_files": ["Package.swift", "Podfile"],
+        },
+    }
+    json_path = Path(__file__).resolve().parent.parent / "data" / "config" / "runtime_presets.json"
+    try:
+        return json.loads(json_path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        _logger.debug("Failed to load runtime presets from %s, using fallback: %s", json_path, exc)
+        return _FALLBACK
+
+
+RUNTIME_PRESETS: dict[str, dict] = _load_runtime_presets()
 
 
 def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:

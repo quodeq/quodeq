@@ -3,11 +3,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import build_totals
 from quodeq.provider.violation_context import FindingSpec, build_finding_base, format_file_line
+
+_logger = logging.getLogger(__name__)
 
 
 def _build_finding(item: dict, *, include_severity: bool) -> dict[str, Any]:
@@ -31,6 +34,9 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
         data = json.loads(json_path.read_text())
     except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
+
+    if data.get("schema_version") is None:
+        _logger.debug("No schema_version in %s; future versions may require it for migration", json_path)
 
     violations = [_build_finding(v, include_severity=True) for v in data.get("violations", [])]
     compliance = [_build_finding(c, include_severity=False) for c in data.get("compliance", [])]

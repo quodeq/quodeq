@@ -12,7 +12,7 @@ from pathlib import Path
 _REPO_URL_RE = re.compile(
     r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?|git@[\w.\-]+:[\w.\-/]+(\.git)?)$"
 )
-_GIT_CLONE_TIMEOUT_S = 300
+_GIT_CLONE_TIMEOUT_S = int(os.environ.get("QUODEQ_GIT_CLONE_TIMEOUT", "300"))
 
 
 def is_valid_repo_url(url: str) -> bool:

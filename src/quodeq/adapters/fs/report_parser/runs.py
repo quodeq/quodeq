@@ -1,4 +1,8 @@
-"""Run discovery, date parsing, and report aggregation for filesystem reports."""
+"""Run discovery, date parsing, and report aggregation for filesystem reports.
+
+NOTE: Storage is filesystem-based. To support alternative backends (S3, database),
+introduce a RunStorage port/protocol and adapt callers.
+"""
 
 from __future__ import annotations
 

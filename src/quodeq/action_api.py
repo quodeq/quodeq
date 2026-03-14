@@ -7,6 +7,7 @@ import os
 import time
 from collections import OrderedDict
 from http import HTTPStatus
+from typing import Protocol, runtime_checkable
 
 from flask import Flask, Response, jsonify, request
 
@@ -25,6 +26,69 @@ from quodeq.action_api_routes import (
 _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 60  # max state-changing requests per window
 _RATE_STORE_MAX_IPS = 10_000  # max tracked IPs to prevent unbounded memory growth
+
+
+@runtime_checkable
+class RateLimitStore(Protocol):
+    """Abstraction for rate-limit state storage.
+
+    Implementations track per-IP request timestamps within a sliding window.
+    The default ``InMemoryRateLimitStore`` keeps state in-process; replace with
+    a Redis-backed implementation for multi-worker deployments.
+    """
+
+    def record(self, ip: str, now: float) -> None:
+        """Record a state-changing request from *ip* at time *now*."""
+        ...
+
+    def check(self, ip: str, now: float) -> bool:
+        """Return True if *ip* has exceeded the rate limit at time *now*."""
+        ...
+
+
+class InMemoryRateLimitStore:
+    """Process-local rate-limit store backed by an LRU OrderedDict."""
+
+    def __init__(
+        self,
+        window: float = _RATE_LIMIT_WINDOW,
+        max_requests: int = _RATE_LIMIT_MAX,
+        max_ips: int = _RATE_STORE_MAX_IPS,
+    ) -> None:
+        self._store: OrderedDict[str, list[float]] = OrderedDict()
+        self._window = window
+        self._max_requests = max_requests
+        self._max_ips = max_ips
+
+    def _evict_stale(self, now: float) -> None:
+        if len(self._store) <= self._max_ips:
+            return
+        stale = []
+        for k, v in self._store.items():
+            if all(now - t >= self._window for t in v):
+                stale.append(k)
+            else:
+                break  # LRU order: first non-stale entry means the rest are newer
+        for k in stale:
+            del self._store[k]
+        if len(self._store) > self._max_ips:
+            self._store.clear()
+
+    def record(self, ip: str, now: float) -> None:
+        """Record a state-changing request from *ip* at time *now*."""
+        self._store.setdefault(ip, []).append(now)
+        self._store.move_to_end(ip)
+
+    def check(self, ip: str, now: float) -> bool:
+        """Return True if *ip* has exceeded the rate limit at time *now*."""
+        self._evict_stale(now)
+        timestamps = [t for t in self._store.get(ip, []) if now - t < self._window]
+        if not timestamps:
+            self._store.pop(ip, None)
+        else:
+            self._store[ip] = timestamps
+            self._store.move_to_end(ip)
+        return len(timestamps) >= self._max_requests
 
 
 def _default_provider() -> ActionProvider:
@@ -57,53 +121,31 @@ def _check_csrf() -> Response | tuple[Response, int] | None:
     return None
 
 
-def _check_rate_limit(rate_store: OrderedDict) -> Response | tuple[Response, int] | None:
-    """Enforce rate limiting on state-changing requests.
-
-    rate_store is an LRU-ordered OrderedDict (most-recently-used at the end),
-    which lets the stale-IP scan stop at the first non-stale entry instead of
-    scanning all 10,000 tracked IPs on every state-changing request.
-    """
+def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] | None:
+    """Enforce rate limiting on state-changing requests."""
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return None
     ip = request.remote_addr or "unknown"
     now = time.monotonic()
-    if len(rate_store) > _RATE_STORE_MAX_IPS:
-        stale = []
-        for k, v in rate_store.items():
-            if all(now - t >= _RATE_LIMIT_WINDOW for t in v):
-                stale.append(k)
-            else:
-                break  # LRU order: first non-stale entry means the rest are newer
-        for k in stale:
-            del rate_store[k]
-        if len(rate_store) > _RATE_STORE_MAX_IPS:
-            rate_store.clear()
-    timestamps = [t for t in rate_store.get(ip, []) if now - t < _RATE_LIMIT_WINDOW]
-    if not timestamps:
-        rate_store.pop(ip, None)
-    else:
-        rate_store[ip] = timestamps
-        rate_store.move_to_end(ip)
-    if len(timestamps) >= _RATE_LIMIT_MAX:
+    if store.check(ip, now):
         return jsonify({"error": "Too many requests", "code": "RATE_LIMITED"}), HTTPStatus.TOO_MANY_REQUESTS
-    rate_store.setdefault(ip, []).append(now)
-    rate_store.move_to_end(ip)
+    store.record(ip, now)
     return None
 
 
-def create_app(provider: ActionProvider | None = None, static_dist: str | None = None) -> Flask:
+def create_app(
+    provider: ActionProvider | None = None,
+    static_dist: str | None = None,
+    rate_limit_store: RateLimitStore | None = None,
+) -> Flask:
     """Create and configure the Flask application with all API routes."""
     app = Flask(__name__)
     provider = provider or _default_provider()
-    # rate_store is process-local: limits are not shared across workers or
-    # restarts. For multi-process deployments, replace with a shared backend
-    # (e.g. Redis) and update _check_rate_limit accordingly.
-    rate_store: OrderedDict[str, list[float]] = OrderedDict()
+    store = rate_limit_store or InMemoryRateLimitStore()
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
-        return _check_auth() or _check_csrf() or _check_rate_limit(rate_store)
+        return _check_auth() or _check_csrf() or _check_rate_limit(store)
 
     @app.after_request
     def _add_security_headers(response: Response) -> Response:

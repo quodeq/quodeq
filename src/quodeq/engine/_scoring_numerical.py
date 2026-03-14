@@ -1,15 +1,17 @@
 """Numerical-mode scoring helpers: deduction computation and grade drops."""
 from __future__ import annotations
 
+import os
+
 # Progressive drop tables: (min_type_count_inclusive, levels_to_drop).
 # Checked top-to-bottom; first matching row wins.
 _CRITICAL_DROP_TABLE: list[tuple[int, int]] = [(12, 3), (4, 2), (1, 1)]
 _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 
 # Per-type deduction constants for numerical mode.
-_CRITICAL_PENALTY = 2.0   # per distinct critical violation type, cap 3 types
-_MAJOR_PENALTY = 1.0      # per distinct major violation type, cap 5 types
-_MINOR_PENALTY = 0.25     # per distinct minor violation type
+_CRITICAL_PENALTY = float(os.environ.get("QUODEQ_CRITICAL_PENALTY", "2.0"))
+_MAJOR_PENALTY = float(os.environ.get("QUODEQ_MAJOR_PENALTY", "1.0"))
+_MINOR_PENALTY = float(os.environ.get("QUODEQ_MINOR_PENALTY", "0.25"))
 
 
 def build_deductions(violation_type_counts: dict[str, int], scale_multiplier: int = 1) -> dict:

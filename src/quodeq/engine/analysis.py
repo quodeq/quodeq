@@ -23,8 +23,8 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model
 HeartbeatCallback = Callable[[int, dict], None]
 
 
-_DEFAULT_MAX_TURNS = 200
-_DEFAULT_MAX_DURATION = 1800  # 30 minutes
+_DEFAULT_MAX_TURNS = int(os.environ.get("QUODEQ_MAX_TURNS", "200"))
+_DEFAULT_MAX_DURATION = int(os.environ.get("QUODEQ_MAX_DURATION", "1800"))  # 30 minutes
 _TERMINATE_TIMEOUT_S = 10
 
 

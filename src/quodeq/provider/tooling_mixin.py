@@ -48,7 +48,12 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
         return None
 
 
-_ALLOWED_CLIENT_IDS = frozenset({"claude", "codex", "copilot"})
+_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "copilot"})
+_ALLOWED_CLIENT_IDS = (
+    frozenset(os.environ["QUODEQ_AI_CLIENTS"].split(","))
+    if "QUODEQ_AI_CLIENTS" in os.environ
+    else _DEFAULT_CLIENT_IDS
+)
 
 
 class FsToolingMixin:
@@ -89,13 +94,19 @@ class FsToolingMixin:
             "isGitRepo": (target / ".git").exists(),
         }
 
+    _CLI_CANDIDATES = [
+        {"id": "claude", "label": "Claude"},
+        {"id": "codex", "label": "Codex"},
+        {"id": "copilot", "label": "Copilot"},
+    ]
+
     def get_ai_clients(self) -> dict[str, list[dict[str, str]]]:
         """Return AI CLI clients that are installed on the system."""
-        candidates = [
-            {"id": "claude", "label": "Claude"},
-            {"id": "codex", "label": "Codex"},
-            {"id": "copilot", "label": "Copilot"},
-        ]
+        if "QUODEQ_AI_CLIENTS" in os.environ:
+            ids = [c.strip() for c in os.environ["QUODEQ_AI_CLIENTS"].split(",") if c.strip()]
+            candidates = [{"id": c, "label": c.capitalize()} for c in ids]
+        else:
+            candidates = self._CLI_CANDIDATES
         return {"clients": [c for c in candidates if shutil.which(c["id"])]}
 
     def _get_cli_models(self, client_id: str) -> dict[str, list[str]]:

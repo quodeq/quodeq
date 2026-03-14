@@ -6,6 +6,8 @@ from pathlib import Path
 
 from quodeq.shared.logging import log_debug
 
+_MCP_SERVER_NAME = "findings"
+
 
 def get_mcp_status(stream_file: Path) -> str | None:
     """Return MCP server status from the stream init event, or None if unavailable."""
@@ -19,7 +21,7 @@ def get_mcp_status(stream_file: Path) -> str | None:
                 return None
             d = json.loads(first)
             for srv in d.get("mcp_servers", []):
-                if srv.get("name") == "findings":
+                if srv.get("name") == _MCP_SERVER_NAME:
                     return srv.get("status")
     except (json.JSONDecodeError, OSError) as exc:
         log_debug(f"Failed to read MCP status from {stream_file}: {exc}")
