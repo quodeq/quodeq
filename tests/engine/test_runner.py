@@ -22,7 +22,7 @@ def _make_plugin_dir(base: Path) -> Path:
         "id": "typescript",
         "name": "TypeScript",
         "version": "1.0.0",
-        "engine_version": "==0.4.0",
+        "engine_version": "==0.4.1",
         "detects": {"extensions": [".ts"]},
     }))
 

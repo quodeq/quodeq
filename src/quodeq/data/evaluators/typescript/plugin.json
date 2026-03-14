@@ -2,7 +2,7 @@
   "id": "typescript",
   "name": "TypeScript / Node.js",
   "version": "1.0.0",
-  "engine_version": "==0.4.0",
+  "engine_version": "==0.4.1",
   "detects": {
     "extensions": [".ts", ".tsx", ".js", ".jsx"],
     "config_files": ["tsconfig.json", "package.json"]
