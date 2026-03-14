@@ -2,10 +2,14 @@
 
 from __future__ import annotations
 
-from quodeq.config.paths import ConfigPaths
-from quodeq.shared.logging import log_error
+import os
 
-VALID_CATEGORIES = frozenset({"backend", "frontend", "mobile", "infra"})
+from quodeq.config.paths import ConfigPaths
+from quodeq.shared.logging import log_error, log_warning
+
+VALID_CATEGORIES = frozenset(
+    os.environ.get("QUODEQ_DISCIPLINE_CATEGORIES", "backend,frontend,mobile,infra").split(",")
+)
 
 
 def validate_new_discipline(name: str, language: str, category: str) -> int:
@@ -23,11 +27,16 @@ def validate_new_discipline(name: str, language: str, category: str) -> int:
 
 def get_discipline_language(name: str, paths: ConfigPaths) -> str | None:
     """Look up the programming language configured for a discipline."""
-    conf = paths.root / "config" / "disciplines.conf"
+    conf = paths.disciplines_conf
     if not conf.exists():
         return None
     current = None
-    for line in conf.read_text().splitlines():
+    try:
+        conf_lines = conf.read_text().splitlines()
+    except (OSError, UnicodeDecodeError) as exc:
+        log_warning(f"Could not read disciplines config {conf}: {exc}")
+        return None
+    for line in conf_lines:
         line = line.strip()
         if not line:
             continue

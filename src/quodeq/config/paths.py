@@ -6,6 +6,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 
+# Bundled data directory shipped inside the package.
+_DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+
+
 @dataclass(frozen=True)
 class ConfigPaths:
     """Immutable set of resolved paths to all configuration directories and files."""
@@ -24,6 +28,11 @@ class ConfigPaths:
         """Return the versioned root path (currently identical to root)."""
         return self.root
 
+    @property
+    def disciplines_conf(self) -> Path:
+        """Return the path to the disciplines configuration file."""
+        return self.root / "config" / "disciplines.conf"
+
     @classmethod
     def from_root(cls, root: Path, version: str | None = None) -> "ConfigPaths":
         """Construct a ConfigPaths instance by deriving all paths from a root directory."""
@@ -38,6 +47,11 @@ class ConfigPaths:
             gitignore_file=root / ".gitignore",
         )
 
+    @classmethod
+    def from_data_dir(cls, data_dir: Path) -> "ConfigPaths":
+        """Construct a ConfigPaths from the bundled package data directory."""
+        return cls.from_root(data_dir)
+
 
 def _looks_like_project_root(root: Path) -> bool:
     return (
@@ -47,11 +61,19 @@ def _looks_like_project_root(root: Path) -> bool:
 
 
 def default_paths(version: str | None = None) -> ConfigPaths:
-    """Locate the project root automatically and return its ConfigPaths."""
+    """Return ConfigPaths from the bundled data directory, or the project root in dev."""
+    # Prefer bundled data directory (works when installed as a package)
+    if _DATA_DIR.is_dir() and _looks_like_project_root(_DATA_DIR):
+        return ConfigPaths.from_data_dir(_DATA_DIR)
+
+    # Fallback: walk up to the project root (development mode)
     module_path = Path(__file__).resolve()
     for root in module_path.parent.parents:
         if _looks_like_project_root(root):
             return ConfigPaths.from_root(root, version=version)
 
-    root = module_path.parents[3]
+    if len(module_path.parents) > 3:
+        root = module_path.parents[3]
+    else:
+        root = module_path.parent
     return ConfigPaths.from_root(root, version=version)

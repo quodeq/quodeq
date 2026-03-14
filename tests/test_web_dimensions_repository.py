@@ -1,5 +1,7 @@
+import pytest
 from quodeq.adapters.web.http_client import HttpResponse
 from quodeq.adapters.web.dimensions_repository import WebDimensionsRepository
+from quodeq.ports.data_errors import NotFoundError
 
 
 class FakeClient:
@@ -16,3 +18,9 @@ def test_web_dimensions_repository_reads_dimension():
     assert repo.list_dimensions() == ["robustness"]
     payload = repo.get_dimension("robustness")
     assert payload["metadata"]["name"] == "robustness"
+
+
+def test_web_dimensions_repository_404_raises():
+    repo = WebDimensionsRepository(base_url="https://api.example.com", client=FakeClient())
+    with pytest.raises(NotFoundError):
+        repo.get_dimension("nonexistent")

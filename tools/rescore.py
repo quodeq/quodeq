@@ -20,8 +20,8 @@ from quodeq.evaluate.lib.scoring import run_scoring
 from quodeq.evaluate.lib.report_json import write_report_json
 
 SCORING_MODE_BY_HASH = {
-    "6fee1ee3": "numerical",
-    "33f4ef56": "non-numerical",
+    "6fee1ee3": "numerical",      # scoring prompt v1 (numerical deductions)
+    "33f4ef56": "non-numerical",   # scoring prompt v2 (grade-ladder drops)
 }
 DEFAULT_SCORING_MODE = "numerical"
 
@@ -32,7 +32,11 @@ def detect_mode_from_evidence(evidence: dict) -> str:
 
 
 def rescore_evidence_file(evidence_path: Path, evaluators_root: Path) -> bool:
-    evidence = json.loads(evidence_path.read_text())
+    try:
+        evidence = json.loads(evidence_path.read_text())
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        print(f"  SKIP  cannot read {evidence_path}: {exc}")
+        return False
     discipline = evidence.get("discipline", "")
     dimension = evidence_path.stem.replace("_evidence", "")
     mapping_path = evaluators_root / discipline / f"{dimension}.json"
@@ -41,12 +45,20 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path) -> bool:
         print(f"  SKIP  mapping not found: {mapping_path}")
         return False
 
-    mapping = json.loads(mapping_path.read_text())
+    try:
+        mapping = json.loads(mapping_path.read_text())
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        print(f"  SKIP  cannot read mapping {mapping_path}: {exc}")
+        return False
     mode = detect_mode_from_evidence(evidence)
     scores = run_scoring(evidence, mapping, mode)
 
     scores_path = evidence_path.with_name(f"{dimension}_scores.json")
-    scores_path.write_text(json.dumps(scores, indent=2, sort_keys=True))
+    try:
+        scores_path.write_text(json.dumps(scores, indent=2, sort_keys=True))
+    except OSError as exc:
+        print(f"  ERROR writing {scores_path}: {exc}")
+        return False
 
     # evaluation/{dimension}.json lives one level up, in sibling "evaluation" dir
     eval_dir = evidence_path.parent.parent / "evaluation"

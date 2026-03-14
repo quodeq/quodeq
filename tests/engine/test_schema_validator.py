@@ -19,7 +19,7 @@ def _valid_plugin():
         "id": "typescript",
         "name": "TypeScript / Node.js",
         "version": "1.0.0",
-        "engine_version": ">=2.0.0",
+        "engine_version": "==0.4.0",
         "detects": {
             "extensions": [".ts", ".tsx"],
             "config_files": ["tsconfig.json"],
@@ -90,7 +90,8 @@ def test_dimensions_missing_weight():
 # ── validate_plugin_dir ───────────────────────────────────────────────
 
 def test_validate_real_typescript_plugin():
-    ts_dir = Path(__file__).parent.parent.parent / "evaluators" / "typescript"
+    from quodeq.config.paths import default_paths
+    ts_dir = default_paths().evaluators_dir / "typescript"
     if not ts_dir.exists():
         pytest.skip("TypeScript plugin not available")
     errors = validate_plugin_dir(ts_dir)

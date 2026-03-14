@@ -5,8 +5,10 @@ from pathlib import Path
 
 from quodeq.engine.runner import RunConfig, run_per_dimension, cleanup_stream
 
+_NUMERICAL_MODE = "numerical"
 
-def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> dict:
+
+def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -> dict:
     """Full pipeline: run per-dimension → score each → write per-dimension reports.
 
     Returns dict of {dimension: overall_score_str}.
@@ -24,7 +26,7 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = "numerical") -> di
         # Clean up stream now that the eval JSON exists
         cleanup_stream(work_dir / f"{dimension}_live.stream")
         overall = scores.get("overall", {})
-        if mode == "numerical":
+        if mode == _NUMERICAL_MODE:
             val = overall.get("weighted_score")
             results[dimension] = f"{val}/10" if val is not None else "N/A"
         else:

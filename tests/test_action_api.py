@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-import os
-
 import pytest
 
 from quodeq.action_api import create_app
@@ -10,13 +8,16 @@ from quodeq.provider.base import ActionProvider, EvaluationOptions
 
 @pytest.fixture(autouse=True)
 def _disable_auth(monkeypatch):
-    """Disable auth for API tests that are not testing authentication."""
-    monkeypatch.setenv("QUODEQ_AUTH_DISABLED", "1")
+    """Disable auth by ensuring QUODEQ_API_KEY is unset so _check_auth() is a no-op."""
+    monkeypatch.delenv("QUODEQ_API_KEY", raising=False)
 
 
 class StubProvider(ActionProvider):
     def list_projects(self, reports_dir: str):
         return {"projects": [{"name": "demo", "runsCount": 1, "latestRunId": "20260101", "latestDate": "2026-01-01"}]}
+
+    def get_project_info(self, reports_dir: str, project: str):
+        return {"project": project, "discipline": "python"}
 
     def get_dashboard(self, reports_dir: str, project: str, run: str):
         return {"project": project, "selectedRun": {"runId": run}}
@@ -41,8 +42,23 @@ class StubProvider(ActionProvider):
             return {"jobId": "job-1", "status": "done", "logs": []}
         return None
 
+    def cancel_evaluation(self, job_id: str) -> bool:
+        return False
+
+    def list_evaluations(self) -> list[dict]:
+        return []
+
+    def delete_project(self, reports_dir: str, project: str) -> bool:
+        return project == "demo"
+
     def browse_repo(self, path: str | None):
         return {"current": "/tmp", "parent": "/", "directories": [], "isGitRepo": False}
+
+    def get_ai_clients(self):
+        return {"clients": []}
+
+    def get_client_models(self, client_id: str):
+        return {"models": []}
 
 
 def test_list_projects_endpoint():
@@ -63,3 +79,61 @@ def test_start_evaluation_requires_repo():
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["code"] == "INVALID_INPUT"
+
+
+def test_dashboard_returns_project_data():
+    app = create_app(StubProvider())
+    client = app.test_client()
+
+    response = client.get("/api/projects/demo/dashboard")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["project"] == "demo"
+
+
+def test_delete_nonexistent_project_returns_404():
+    app = create_app(StubProvider())
+    client = app.test_client()
+
+    response = client.delete("/api/projects/nonexistent")
+    assert response.status_code == 404
+    payload = response.get_json()
+    assert payload["code"] == "NOT_FOUND"
+
+
+def test_get_evaluation_status_for_known_job():
+    app = create_app(StubProvider())
+    client = app.test_client()
+
+    response = client.get("/api/evaluations/job-1")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["jobId"] == "job-1"
+
+
+def test_get_evaluation_status_unknown_returns_404():
+    app = create_app(StubProvider())
+    client = app.test_client()
+
+    response = client.get("/api/evaluations/unknown-job")
+    assert response.status_code == 404
+
+
+def test_health_endpoint():
+    app = create_app(StubProvider())
+    client = app.test_client()
+
+    response = client.get("/api/health")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert payload["ok"] is True
+
+
+def test_plugins_endpoint():
+    app = create_app(StubProvider())
+    client = app.test_client()
+
+    response = client.get("/api/plugins")
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert isinstance(payload, list)

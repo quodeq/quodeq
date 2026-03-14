@@ -10,7 +10,7 @@ import os
 import re
 import threading
 import uuid
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 
 import subprocess
 
@@ -45,7 +45,7 @@ class Job:
         return {
             "jobId": self.job_id,
             "status": self.status,
-            "command": " ".join(self.command),
+            "command": self.command[0] if self.command else "",
             "startedAt": self.started_at,
             "endedAt": self.ended_at,
             "exitCode": self.exit_code,
@@ -58,20 +58,67 @@ class Job:
         }
 
 
+@runtime_checkable
+class JobStore(Protocol):
+    """Abstraction for persisting job state.
+
+    The default ``InMemoryJobStore`` keeps jobs in a process-local dict.
+    Replace with a database- or Redis-backed implementation for multi-worker
+    deployments where job state must survive restarts and be shared across
+    processes.
+    """
+
+    def get(self, job_id: str) -> Job | None:
+        """Return the job with the given ID, or None."""
+        ...
+
+    def put(self, job: Job) -> None:
+        """Insert or update a job."""
+        ...
+
+    def list(self) -> list[Job]:
+        """Return all tracked jobs."""
+        ...
+
+    def delete(self, job_id: str) -> None:
+        """Remove a job by ID (no-op if not found)."""
+        ...
+
+
+class InMemoryJobStore:
+    """Process-local job store backed by a plain dict."""
+
+    def __init__(self) -> None:
+        self._jobs: dict[str, Job] = {}
+
+    def get(self, job_id: str) -> Job | None:
+        return self._jobs.get(job_id)
+
+    def put(self, job: Job) -> None:
+        self._jobs[job.job_id] = job
+
+    def list(self) -> list[Job]:
+        return list(self._jobs.values())
+
+    def delete(self, job_id: str) -> None:
+        self._jobs.pop(job_id, None)
+
+
 class JobManager:
     """Thread-safe manager for spawning and tracking evaluation subprocesses.
 
-    NOTE: Job state is stored in process memory (_jobs dict). This means job
-    history is lost on restart and cannot be shared across multiple processes or
-    workers. To support horizontal scaling, replace this class with an
-    implementation backed by a persistent store (e.g. database, Redis). The
-    interface (start_job / get_job / cancel_job / list_jobs) is intentionally
-    stable to allow substitution without changing callers.
+    NOTE: Job state is stored via a ``JobStore`` (defaulting to in-memory).
+    To support horizontal scaling, supply a persistent ``JobStore``
+    implementation (e.g. database, Redis) to the constructor.
     """
 
-    def __init__(self, spawn_impl: Callable[..., subprocess.Popen] | None = None) -> None:
+    def __init__(
+        self,
+        spawn_impl: Callable[..., subprocess.Popen] | None = None,
+        job_store: JobStore | None = None,
+    ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
-        self._jobs: dict[str, Job] = {}
+        self._store: JobStore = job_store or InMemoryJobStore()
         self._processes: dict[str, Any] = {}
         self._lock = threading.Lock()
 
@@ -87,17 +134,25 @@ class JobManager:
             exit_code=None,
         )
 
-        process = self._spawn(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            text=True,
-            cwd=cwd,
-            env=env,
-        )
+        try:
+            process = self._spawn(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=cwd,
+                env=env,
+            )
+        except (OSError, subprocess.SubprocessError) as exc:
+            job.status = "failed"
+            job.ended_at = datetime.now(timezone.utc).isoformat()
+            job.exit_code = -1
+            with self._lock:
+                self._store.put(job)
+            return job.to_dict()
 
         with self._lock:
-            self._jobs[job_id] = job
+            self._store.put(job)
             self._processes[job_id] = process
 
         threading.Thread(target=self._consume_stream, args=(job_id, process.stdout), daemon=True).start()
@@ -109,12 +164,13 @@ class JobManager:
     def cancel_job(self, job_id: str) -> bool:
         """Terminate a running job. Return True if cancelled successfully."""
         with self._lock:
-            job = self._jobs.get(job_id)
+            job = self._store.get(job_id)
             process = self._processes.get(job_id)
             if not job or job.status != "running":
                 return False
             job.status = "cancelled"
             job.ended_at = datetime.now(timezone.utc).isoformat()
+            self._store.put(job)
         if process:
             process.terminate()
         return True
@@ -122,7 +178,7 @@ class JobManager:
     def get_job(self, job_id: str) -> dict[str, Any] | None:
         """Return the current state of a job, or None if not found."""
         with self._lock:
-            job = self._jobs.get(job_id)
+            job = self._store.get(job_id)
             if not job:
                 return None
             return job.to_dict()
@@ -130,7 +186,7 @@ class JobManager:
     def list_jobs(self) -> list[dict[str, Any]]:
         """Return all tracked jobs as serialized dicts."""
         with self._lock:
-            return [job.to_dict() for job in self._jobs.values()]
+            return [job.to_dict() for job in self._store.list()]
 
     @staticmethod
     def _apply_marker(job: Job, line: str) -> None:
@@ -165,27 +221,29 @@ class JobManager:
         for line in stream:
             stripped = line.rstrip("\n")
             with self._lock:
-                job = self._jobs.get(job_id)
+                job = self._store.get(job_id)
                 if not job:
                     return
                 self._append_log(job, stripped)
 
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
-        completed = [jid for jid, j in self._jobs.items() if j.status != "running"]
+        all_jobs = self._store.list()
+        completed = [j.job_id for j in all_jobs if j.status != "running"]
         excess = len(completed) - _MAX_COMPLETED_JOBS
         if excess > 0:
             for jid in completed[:excess]:
-                del self._jobs[jid]
+                self._store.delete(jid)
 
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
         exit_code = process.wait()
         with self._lock:
             self._processes.pop(job_id, None)
-            job = self._jobs.get(job_id)
+            job = self._store.get(job_id)
             if not job or job.status == "cancelled":
                 return
             job.exit_code = exit_code
             job.ended_at = datetime.now(timezone.utc).isoformat()
             job.status = "done" if exit_code == 0 else "failed"
+            self._store.put(job)
             self._evict_completed_jobs()

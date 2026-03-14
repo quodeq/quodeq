@@ -1,4 +1,4 @@
-"""Minimal MCP tool server: receives findings via tool calls, writes JSONL.
+"""MCP tool server: receives findings via tool calls, deduplicates, enriches, writes JSONL.
 
 Protocol: JSON-RPC 2.0 over stdio, newline-delimited JSON (no Content-Length).
 No external dependencies.
@@ -7,7 +7,11 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from typing import TextIO
+
+from quodeq.engine.file_queue import FileQueue
+from quodeq.engine._mcp_args import _ServerArgs, _parse_args
 
 _FINDING_SCHEMA_VERSION = 1
 _JSONRPC_VERSION = "2.0"
@@ -16,15 +20,15 @@ _SERVER_NAME = "quodeq-findings"
 _SERVER_VERSION = "1.0.0"
 _JSONRPC_METHOD_NOT_FOUND = -32601
 
-TOOL_NAME = "report_finding"
-TOOL_DESC = (
+REPORT_FINDING_NAME = "report_finding"
+REPORT_FINDING_DESC = (
     "Report a code quality finding (violation or compliance). "
     "Call this for EVERY finding you discover, immediately after confirming it."
 )
-TOOL_SCHEMA = {
+REPORT_FINDING_SCHEMA = {
     "type": "object",
     "properties": {
-        "p": {"type": "string", "description": "Principle name from the standards checklist"},
+        "p": {"type": "string", "description": "Sub-characteristic name (the ### heading from the checklist, e.g. 'Modularity', 'Analyzability'). NEVER a requirement ID."},
         "t": {"type": "string", "enum": ["violation", "compliance"], "description": "Finding type"},
         "d": {"type": "string", "description": "Dimension being evaluated"},
         "w": {"type": "string", "description": "Short description of the finding"},
@@ -35,10 +39,138 @@ TOOL_SCHEMA = {
         "vt": {"type": "string", "description": "Violation type identifier"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
         "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'R-FT-1', 'S-CON-3')"},
-        "refs": {"type": "array", "items": {"type": "string"}, "description": "Specific standard references applicable to this finding (e.g. ['CWE-391', 'ERR05-J', 'CISQ-ASCRM'])"},
     },
     "required": ["p", "t", "d", "w"],
 }
+
+GET_NEXT_FILES_NAME = "get_next_files"
+GET_NEXT_FILES_DESC = (
+    "Get your next batch of files to analyse from the queue. "
+    "Call this to receive file paths, then Read each one and report findings. "
+    "When this returns an empty list, you are done."
+)
+GET_NEXT_FILES_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "count": {
+            "type": "integer",
+            "description": "Number of files to retrieve (default 5)",
+        },
+    },
+}
+
+# Kept for backward compatibility with imports
+TOOL_NAME = REPORT_FINDING_NAME
+TOOL_SCHEMA = REPORT_FINDING_SCHEMA
+
+
+class FindingsRouter:
+    """Deduplicates and enriches findings before writing to JSONL.
+
+    - Dedup by (principle, file, line, type) — skips duplicate findings
+    - Enriches req_refs from compiled standards — LLM doesn't need to pick refs
+    - Returns feedback to the LLM so it can move on from duplicates
+    """
+
+    def __init__(self, output_fh: TextIO, compiled_refs: dict[str, list[dict]] | None = None):
+        self._fh = output_fh
+        self._refs = compiled_refs or {}
+        self._seen: set[tuple] = set()
+        self.counter = 0
+
+    def receive(self, args: dict) -> tuple[str, bool]:
+        """Process a finding. Returns (message, is_duplicate)."""
+        key = (args.get("p"), args.get("file"), args.get("line"), args.get("t"))
+        if key in self._seen:
+            return "Duplicate finding, already captured. Move on.", True
+        self._seen.add(key)
+
+        finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
+        finding.update({k: v for k, v in args.items() if v is not None})
+
+        # Enrich with compiled standard refs — server-side, zero LLM tokens
+        # Pick one ref per source type (e.g. one CWE, one CISQ) using best text match
+        req = args.get("req")
+        if req and req in self._refs:
+            finding["req_refs"] = _select_best_refs(
+                self._refs[req], args.get("w", ""), args.get("reason", ""),
+            )
+
+        self._fh.write(json.dumps(finding) + "\n")
+        self._fh.flush()
+        self.counter += 1
+        return f"Finding #{self.counter} recorded.", False
+
+
+def _text_overlap(ref_name: str, description: str, reason: str) -> int:
+    """Score how well a ref name matches the finding text by counting shared words."""
+    stop = {"a", "an", "the", "of", "to", "in", "for", "is", "and", "or", "not", "with", "without"}
+    ref_words = set(ref_name.lower().split()) - stop
+    finding_words = (set(description.lower().split()) | set(reason.lower().split())) - stop
+    return len(ref_words & finding_words)
+
+
+def _select_best_refs(
+    all_refs: list[dict], description: str, reason: str,
+) -> list[dict]:
+    """Pick one ref per source type (CWE, CISQ, etc.), choosing the best text match.
+
+    When no words overlap at all, picks the broadest (first/lowest-ID) ref as a
+    safe default rather than an arbitrary specific one.
+    """
+    by_source: dict[str, list[dict]] = {}
+    for ref in all_refs:
+        label = ref.get("label", "")
+        source = label.split("-")[0] if "-" in label else label
+        by_source.setdefault(source, []).append(ref)
+
+    result: list[dict] = []
+    for source, refs in by_source.items():
+        if len(refs) == 1:
+            result.append(refs[0])
+        else:
+            scored = [(r, _text_overlap(r.get("name", ""), description, reason)) for r in refs]
+            max_score = max(s for _, s in scored)
+            if max_score == 0:
+                # No text match — pick the broadest (first listed, typically the parent)
+                result.append(refs[0])
+            else:
+                result.append(max(scored, key=lambda x: x[1])[0])
+    return result
+
+
+def _load_compiled_refs(compiled_dir: str | None, dimension: str | None) -> dict[str, list[dict]]:
+    """Load {req_id: [{label, url}, ...]} from compiled standards."""
+    if not compiled_dir or not dimension:
+        return {}
+    try:
+        data = json.loads((Path(compiled_dir) / f"{dimension}.json").read_text())
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return {}
+    lookup: dict[str, list[dict]] = {}
+    for principle in data.get("principles", []):
+        for req in principle.get("requirements", []):
+            req_id = req.get("id")
+            if not req_id:
+                continue
+            refs = [
+                {"label": _ref_label(r), "url": r["url"], "name": r.get("name", "")}
+                for r in req.get("refs", []) if r.get("url")
+            ]
+            if refs:
+                lookup[req_id] = refs
+    return lookup
+
+
+def _ref_label(ref: dict) -> str:
+    """Build a display label for a ref."""
+    source = ref.get("source", "")
+    ref_id = ref.get("id")
+    if source == "cwe" and ref_id:
+        return f"CWE-{ref_id}"
+    if ref_id:
+        return ref_id
+    return source.upper() if source else "REF"
 
 
 def _read_message() -> dict | None:
@@ -75,37 +207,60 @@ def _handle_initialize(request_id: object, msg: dict) -> dict:
     })
 
 
-def _handle_tools_list(request_id: object) -> dict:
+def _handle_tools_list(request_id: object, *, has_queue: bool = False) -> dict:
     """Handle the 'tools/list' JSON-RPC method."""
-    return _ok(request_id, {"tools": [{
-        "name": TOOL_NAME,
-        "description": TOOL_DESC,
-        "inputSchema": TOOL_SCHEMA,
-    }]})
+    tools = [{
+        "name": REPORT_FINDING_NAME,
+        "description": REPORT_FINDING_DESC,
+        "inputSchema": REPORT_FINDING_SCHEMA,
+    }]
+    if has_queue:
+        tools.append({
+            "name": GET_NEXT_FILES_NAME,
+            "description": GET_NEXT_FILES_DESC,
+            "inputSchema": GET_NEXT_FILES_SCHEMA,
+        })
+    return _ok(request_id, {"tools": tools})
 
 
-def _handle_tools_call(request_id: object, params: dict, findings_fh: TextIO, counter: int) -> tuple[dict, int]:
-    """Handle the 'tools/call' JSON-RPC method.
-
-    Returns (response_dict, updated_counter).
-    """
+def _handle_tools_call(
+    request_id: object, params: dict,
+    router: FindingsRouter, queue: FileQueue | None = None,
+    agent_id: str = "",
+) -> dict:
+    """Handle the 'tools/call' JSON-RPC method."""
     name = params.get("name")
     args = params.get("arguments", {})
 
-    if name != TOOL_NAME:
+    if name == REPORT_FINDING_NAME:
+        message, _is_dup = router.receive(args)
         return _ok(request_id, {
-            "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
-            "isError": True,
-        }), counter
+            "content": [{"type": "text", "text": message}],
+        })
 
-    finding = {"schema_version": _FINDING_SCHEMA_VERSION, **{k: v for k, v in args.items() if v is not None}}
-    findings_fh.write(json.dumps(finding) + "\n")
-    findings_fh.flush()
-    counter += 1
+    if name == GET_NEXT_FILES_NAME:
+        if queue is None:
+            return _ok(request_id, {
+                "content": [{"type": "text", "text": "No file queue configured."}],
+                "isError": True,
+            })
+        count = args.get("count", 5)
+        if not isinstance(count, int) or count < 1:
+            count = 5
+        files = queue.take(count, agent_id=agent_id)
+        if not files:
+            return _ok(request_id, {
+                "content": [{"type": "text", "text": "Queue empty — no more files. You are done."}],
+            })
+        file_list = "\n".join(files)
+        return _ok(request_id, {
+            "content": [{"type": "text", "text": f"{len(files)} files to analyse:\n{file_list}"}],
+        })
 
     return _ok(request_id, {
-        "content": [{"type": "text", "text": f"Finding #{counter} recorded."}],
-    }), counter
+        "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
+        "isError": True,
+    })
 
 
 def _handle_unknown_method(req_id: object, method: str) -> None:
@@ -115,42 +270,54 @@ def _handle_unknown_method(req_id: object, method: str) -> None:
                "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
 
 
-def _dispatch(msg: dict, findings_fh: TextIO, counter: int) -> int:
-    """Route a single JSON-RPC message and return the updated counter."""
+def _dispatch(
+    msg: dict, router: FindingsRouter,
+    queue: FileQueue | None = None, agent_id: str = "",
+) -> None:
+    """Route a single JSON-RPC message."""
     method = msg.get("method", "")
     req_id = msg.get("id")
 
     if method in ("notifications/initialized", "notifications/cancelled"):
-        return counter
+        return
     if method == "initialize":
         _send(_handle_initialize(req_id, msg))
     elif method == "tools/list":
-        _send(_handle_tools_list(req_id))
+        _send(_handle_tools_list(req_id, has_queue=queue is not None))
     elif method == "tools/call":
-        response, counter = _handle_tools_call(req_id, msg.get("params", {}), findings_fh, counter)
-        _send(response)
+        _send(_handle_tools_call(req_id, msg.get("params", {}), router, queue, agent_id))
     elif method == "ping":
         _send(_ok(req_id, {}))
     else:
         _handle_unknown_method(req_id, method)
-    return counter
 
 
 def main() -> None:
     """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
-    from quodeq.shared.utils import get_findings_file
-    findings_file = sys.argv[1] if len(sys.argv) > 1 else get_findings_file()
-    if not findings_file:
-        sys.stderr.write("Usage: mcp_findings.py <findings_file>  (or set FINDINGS_FILE env)\n")
+    sa = _parse_args()
+    if not sa.findings_file:
+        sys.stderr.write(
+            "Usage: mcp_findings.py <findings_file> [--compiled-dir DIR --dimension DIM]"
+            " [--queue PATH --agent-id ID]\n"
+        )
         sys.exit(1)
 
-    counter = 0
-    with open(findings_file, "a") as findings_fh:
-        while True:
-            msg = _read_message()
-            if msg is None:
-                break
-            counter = _dispatch(msg, findings_fh, counter)
+    compiled_refs = _load_compiled_refs(sa.compiled_dir, sa.dimension)
+    queue: FileQueue | None = None
+    if sa.queue_path:
+        queue = FileQueue(Path(sa.queue_path))
+
+    try:
+        with open(sa.findings_file, "a") as findings_fh:
+            router = FindingsRouter(findings_fh, compiled_refs)
+            while True:
+                msg = _read_message()
+                if msg is None:
+                    break
+                _dispatch(msg, router, queue, sa.agent_id)
+    except OSError as exc:
+        sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")
+        sys.exit(1)
 
 
 if __name__ == "__main__":

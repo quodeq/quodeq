@@ -1,9 +1,15 @@
 """AI CLI subprocess runner for executing prompts via the configured AI command."""
 from __future__ import annotations
 
+import re
 import subprocess
 
 from quodeq.shared.utils import get_ai_cmd
+
+_SENSITIVE_PATTERNS = re.compile(
+    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
+    re.IGNORECASE,
+)
 
 _AI_CLI_TIMEOUT_S = 300
 
@@ -22,7 +28,8 @@ def run_ai_cli(prompt: str) -> tuple[str | None, str | None]:
     except FileNotFoundError:
         return None, f"AI command not found: {cmd}"
     except subprocess.CalledProcessError as exc:
-        return None, exc.stderr.strip() or "AI command failed"
+        raw = exc.stderr.strip() if exc.stderr else ""
+        return None, _SENSITIVE_PATTERNS.sub(r"\1=***", raw) or "AI command failed"
     except subprocess.TimeoutExpired:
         return None, "AI command timed out"
 

@@ -22,6 +22,9 @@ from quodeq.engine.scoring_internals import (
 )
 
 # Re-export public API symbols that other modules may import from here.
+_BASE_SCORE = 10
+_INSUFFICIENT_MAJORITY_RATIO = 0.5
+
 __all__ = [
     "DEFAULT_WEIGHT",
     "build_deductions",
@@ -68,40 +71,12 @@ class _PrincipleContext:
     scale_mult: int
 
 
-def _score_principle_numerical(ctx: _PrincipleContext) -> dict:
-    """Score a single principle in numerical mode."""
-    if ctx.conf_level == "low":
-        return {
-            "display_name": ctx.pdata.get("display_name", ctx.key),
-            "weight": ctx.pdata.get("weight", DEFAULT_WEIGHT),
-            "compliance_percentage": ctx.pct,
-            "base_score": 0,
-            "deductions": build_deductions({}, scale_multiplier=ctx.scale_mult),
-            "final_score": 0.0,
-            "grade": "Insufficient",
-            "taxonomy_used": ctx.using_taxonomy,
-            "confidence_level": ctx.conf_level,
-            "confidence_interval": ctx.ci["confidence_interval"],
-            "grade_stability": ctx.ci["grade_stability"],
-        }
-
-    base_pts = 10
-    deductions = build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
-
-    dampened_deduction = round(deductions["total_deduction"] * ctx.dampening, 2)
-    effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
-    adjusted = min(effective_cap, round(base_pts - dampened_deduction, 1))
-    final_pts = max(0.0, min(10.0, adjusted))
-
+def _base_principle_result(ctx: _PrincipleContext) -> dict:
+    """Build the common fields shared by both scoring modes."""
     return {
         "display_name": ctx.pdata.get("display_name", ctx.key),
         "weight": ctx.pdata.get("weight", DEFAULT_WEIGHT),
         "compliance_percentage": ctx.pct,
-        "base_score": base_pts,
-        "deductions": deductions,
-        "dampening_multiplier": ctx.dampening,
-        "final_score": final_pts,
-        "grade": score_to_grade_label(final_pts),
         "taxonomy_used": ctx.using_taxonomy,
         "confidence_level": ctx.conf_level,
         "confidence_interval": ctx.ci["confidence_interval"],
@@ -109,21 +84,46 @@ def _score_principle_numerical(ctx: _PrincipleContext) -> dict:
     }
 
 
+def _score_principle_numerical(ctx: _PrincipleContext) -> dict:
+    """Score a single principle in numerical mode."""
+    result = _base_principle_result(ctx)
+    if ctx.conf_level == "low":
+        result.update(
+            base_score=0,
+            deductions=build_deductions({}, scale_multiplier=ctx.scale_mult),
+            final_score=0.0,
+            grade="Insufficient",
+        )
+        return result
+
+    base_pts = _BASE_SCORE
+    deductions = build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
+
+    dampened_deduction = round(deductions["total_deduction"] * ctx.dampening, 2)
+    effective_cap = min(deductions["critical_cap"], deductions["major_cap"])
+    adjusted = min(effective_cap, round(base_pts - dampened_deduction, 1))
+    final_pts = max(0.0, min(float(_BASE_SCORE), adjusted))
+
+    result.update(
+        base_score=base_pts,
+        deductions=deductions,
+        dampening_multiplier=ctx.dampening,
+        final_score=final_pts,
+        grade=score_to_grade_label(final_pts),
+    )
+    return result
+
+
 def _score_principle_graded(ctx: _PrincipleContext) -> dict:
     """Score a single principle in non-numerical (graded) mode."""
+    result = _base_principle_result(ctx)
     if ctx.conf_level == "low":
-        return {
-            "display_name": ctx.pdata.get("display_name", ctx.key),
-            "weight": ctx.pdata.get("weight", DEFAULT_WEIGHT),
-            "compliance_percentage": ctx.pct,
-            "base_grade": "Insufficient",
-            "severity_drops": 0,
-            "grade": "Insufficient",
-            "taxonomy_used": ctx.using_taxonomy,
-            "confidence_level": ctx.conf_level,
-            "confidence_interval": ctx.ci["confidence_interval"],
-            "grade_stability": ctx.ci["grade_stability"],
-        }
+        result.update(
+            base_grade="Insufficient",
+            severity_drops=0,
+            grade="Insufficient",
+        )
+        return result
 
     base_label = "Exemplary"
     level_drops = count_grade_drops(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
@@ -132,19 +132,13 @@ def _score_principle_graded(ctx: _PrincipleContext) -> dict:
     dampened_drops = int(level_drops * ctx.dampening)
     final_label = drop_grade(base_label, dampened_drops)
 
-    return {
-        "display_name": ctx.pdata.get("display_name", ctx.key),
-        "weight": ctx.pdata.get("weight", DEFAULT_WEIGHT),
-        "compliance_percentage": ctx.pct,
-        "base_grade": base_label,
-        "severity_drops": level_drops,
-        "dampening_multiplier": ctx.dampening,
-        "grade": final_label,
-        "taxonomy_used": ctx.using_taxonomy,
-        "confidence_level": ctx.conf_level,
-        "confidence_interval": ctx.ci["confidence_interval"],
-        "grade_stability": ctx.ci["grade_stability"],
-    }
+    result.update(
+        base_grade=base_label,
+        severity_drops=level_drops,
+        dampening_multiplier=ctx.dampening,
+        grade=final_label,
+    )
+    return result
 
 
 # ---------------------------------------------------------------------------
@@ -229,68 +223,62 @@ def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
     }
 
 
-def _weighted_overall(principles_scores: dict, mode: str) -> dict:
-    """Compute a weighted overall score or grade from per-principle results.
+def _accumulate_weights(
+    principles_scores: dict, mode: str,
+) -> tuple[int, float, int, int]:
+    """Sum weighted values across scorable principles.
 
-    Each principle's weight string is parsed to an integer multiplier. In
-    numerical mode the weighted mean of final_score values is returned. In
-    non-numerical mode grades are converted to ladder indices, the weighted
-    mean is computed, and the result is rounded back to the nearest grade.
-
-    When more than half of the principles are Insufficient, the overall is
-    flagged as low confidence since it only reflects a minority of principles.
+    Returns (total_weight, total_value, total_count, insufficient_count).
     """
     total_count = len(principles_scores)
     insufficient_count = sum(
         1 for p in principles_scores.values() if p.get("grade") == "Insufficient"
     )
-
     total_weight = 0
     total_value = 0.0
-
     for pdata in principles_scores.values():
         if pdata.get("grade") == "Insufficient":
             continue
         multiplier = weight_as_multiplier(pdata.get("weight", DEFAULT_WEIGHT))
         total_weight += multiplier
-
         if mode == "numerical":
             total_value += pdata["final_score"] * multiplier
         else:
-            grade_index = GRADE_LADDER.index(pdata["grade"])
-            total_value += grade_index * multiplier
+            total_value += GRADE_LADDER.index(pdata["grade"]) * multiplier
+    return total_weight, total_value, total_count, insufficient_count
 
-    low_confidence = (
-        total_count > 0 and insufficient_count > total_count / 2
-    )
 
-    if total_weight == 0:
-        if mode == "numerical":
-            return {"weighted_score": 0.0, "grade": "Insufficient"}
-        return {"weighted_grade": "Insufficient"}
-
+def _build_overall_result(mode: str, total_weight: int, total_value: float) -> dict:
+    """Build the overall result dict from aggregated weights."""
     if mode == "numerical":
         mean_score = round(total_value / total_weight, 1)
-        result = {
+        return {
             "weighted_score": mean_score,
             "grade": score_to_grade_label(mean_score),
             "total_weight": total_weight,
         }
-    else:
-        mean_index = total_value / total_weight
-        ladder_pos = min(len(GRADE_LADDER) - 1, round(mean_index))
-        result = {
-            "weighted_grade": GRADE_LADDER[ladder_pos],
-            "total_weight": total_weight,
-        }
+    mean_index = total_value / total_weight
+    ladder_pos = min(len(GRADE_LADDER) - 1, round(mean_index))
+    return {"weighted_grade": GRADE_LADDER[ladder_pos], "total_weight": total_weight}
 
-    if low_confidence:
-        scored_count = total_count - insufficient_count
+
+def _weighted_overall(principles_scores: dict, mode: str) -> dict:
+    """Compute a weighted overall score or grade from per-principle results."""
+    tw, tv, total, insuff = _accumulate_weights(principles_scores, mode)
+
+    if tw == 0:
+        if mode == "numerical":
+            return {"weighted_score": 0.0, "grade": "Insufficient"}
+        return {"weighted_grade": "Insufficient"}
+
+    result = _build_overall_result(mode, tw, tv)
+
+    if total > 0 and insuff > total * _INSUFFICIENT_MAJORITY_RATIO:
+        scored = total - insuff
         result["confidence"] = "low"
         result["confidence_reason"] = (
-            f"Only {scored_count}/{total_count} principles had sufficient evidence"
+            f"Only {scored}/{total} principles had sufficient evidence"
         )
-
     return result
 
 

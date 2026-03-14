@@ -6,6 +6,7 @@ import re
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import parse_numeric_score
+from quodeq.adapters.fs.report_parser.json_parser import _empty_severity_buckets
 from quodeq.engine.scoring_internals import score_to_grade_label
 
 
@@ -98,6 +99,6 @@ def parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: str
         "project": project,
         "principleGrades": principle_grades,
         "principles": [],
-        "priorityRemediation": {"critical": [], "major": [], "minor": []},
+        "priorityRemediation": _empty_severity_buckets(),
         "rawContent": markdown,
     }

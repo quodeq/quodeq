@@ -13,6 +13,12 @@ class DataProvider:
     """Container for application-level repository dependencies."""
     evaluators: EvaluatorsRepository | None = None
 
+    def require_evaluators(self) -> EvaluatorsRepository:
+        """Return evaluators or raise if not configured."""
+        if self.evaluators is None:
+            raise RuntimeError("DataProvider.evaluators is not configured")
+        return self.evaluators
+
 
 def default_provider(root: Path) -> DataProvider:
     """Create a DataProvider backed by the filesystem adapters."""

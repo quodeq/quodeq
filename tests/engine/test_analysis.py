@@ -47,12 +47,7 @@ def _item_completed_event(text: str, reads: list[str] | None = None) -> str:
     })
 
 
-def _evidence_line(**overrides) -> str:
-    obj = {"p": "ts-001", "t": "violation", "d": "security", "w": "eval usage",
-           "file": "app.ts", "line": 10, "severity": "high", "vt": "violation",
-           "reason": "eval is dangerous"}
-    obj.update(overrides)
-    return json.dumps(obj)
+from tests.engine.conftest import _evidence_line
 
 
 # ---------------------------------------------------------------------------
@@ -211,12 +206,13 @@ class TestIsStreamValid:
 class TestBuildAiCmd:
     """Guard against regressions that silently break evaluations (0 findings)."""
 
-    def test_bash_in_allowed_tools(self):
-        """Bash must be in the tools list — analysis prompts rely on it."""
+    def test_bash_not_in_default_tools(self):
+        """Bash must NOT be in the default tools — it enables arbitrary command
+        execution which could be exploited via prompt injection to exfiltrate data."""
         args, _ = _build_ai_cmd("test prompt", AnalysisConfig())
         tools_idx = args.index("--tools")
         tools_value = args[tools_idx + 1]
-        assert "Bash" in tools_value.split(",")
+        assert "Bash" not in tools_value.split(",")
 
     def test_read_glob_grep_in_allowed_tools(self):
         """File exploration tools must be available."""

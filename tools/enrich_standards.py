@@ -25,11 +25,17 @@ STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010
 # ---------------------------------------------------------------------------
 
 _MAPPING_PATH = Path(__file__).resolve().parent / "enrich_standards_mapping.json"
-MAPPING: dict = json.loads(_MAPPING_PATH.read_text())
+try:
+    MAPPING: dict = json.loads(_MAPPING_PATH.read_text())
+except (OSError, json.JSONDecodeError) as _exc:
+    raise SystemExit(f"Cannot load mapping file {_MAPPING_PATH}: {_exc}") from _exc
 
 # Prefix map: dimension → principle → id prefix
 _PREFIX_MAP_PATH = Path(__file__).resolve().parent / "enrich_standards_prefix_map.json"
-_PREFIX_MAP: dict = json.loads(_PREFIX_MAP_PATH.read_text())
+try:
+    _PREFIX_MAP: dict = json.loads(_PREFIX_MAP_PATH.read_text())
+except (OSError, json.JSONDecodeError) as _exc:
+    raise SystemExit(f"Cannot load prefix map {_PREFIX_MAP_PATH}: {_exc}") from _exc
 
 
 def _get_existing_cwes(data: dict) -> set[int]:
@@ -116,6 +122,7 @@ def main() -> None:
         print("DRY RUN — use --apply to write changes\n")
 
     grand_total = 0
+    # NOTE: this list is coupled with ALL_DIMENSIONS in tools/compile_standards.py
     for dimension in ["security", "reliability", "maintainability", "performance"]:
         print(f"\n{'='*60}")
         print(f"  {dimension.upper()}")

@@ -1,3 +1,4 @@
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -28,3 +29,13 @@ def test_prepare_repository_url_creates_tmp(monkeypatch, tmp_path: Path):
 
     assert Path(dest).name == "my-repo"
     assert Path(dest).exists()
+
+
+def test_prepare_repository_clone_failure(monkeypatch):
+    def fake_run(cmd, check, **kwargs):
+        raise subprocess.CalledProcessError(128, cmd)
+
+    monkeypatch.setattr("subprocess.run", fake_run)
+
+    with pytest.raises(subprocess.CalledProcessError):
+        prepare_repository("https://example.com/bad-repo.git")

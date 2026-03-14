@@ -3,11 +3,19 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import build_totals
 from quodeq.provider.violation_context import FindingSpec, build_finding_base, format_file_line
+
+_logger = logging.getLogger(__name__)
+
+
+def _empty_severity_buckets() -> dict[str, list]:
+    """Return a fresh ``{critical: [], major: [], minor: []}`` dict."""
+    return {"critical": [], "major": [], "minor": []}
 
 
 def _build_finding(item: dict, *, include_severity: bool) -> dict[str, Any]:
@@ -29,10 +37,11 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
     """Parse a dimension evaluation JSON file into a normalized report dict."""
     try:
         data = json.loads(json_path.read_text())
-    except OSError:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
-    except json.JSONDecodeError:
-        return None
+
+    if data.get("schema_version") is None:
+        _logger.debug("No schema_version in %s; future versions may require it for migration", json_path)
 
     violations = [_build_finding(v, include_severity=True) for v in data.get("violations", [])]
     compliance = [_build_finding(c, include_severity=False) for c in data.get("compliance", [])]
@@ -57,9 +66,7 @@ def parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
     dimension = evidence_path.name.replace("_evidence.json", "")
     try:
         data = json.loads(evidence_path.read_text())
-    except OSError:
-        data = {}
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         data = {}
     return {
         "dimension": dimension,
@@ -93,55 +100,40 @@ def _seed_principles(principles: list[dict], principle_map: dict[str, Any]) -> N
         principle_map[name] = entry
 
 
-def _collect_violations(violations: list[dict], principle_map: dict[str, Any]) -> None:
-    """Append normalized violation dicts to the appropriate principle entries."""
-    for v in violations:
-        key = v.get("principle", "")
+def _collect_findings(
+    items: list[dict], principle_map: dict[str, Any], finding_type: str,
+) -> None:
+    """Append normalized finding dicts to the appropriate principle entries.
+
+    *finding_type* must be ``"violations"`` or ``"compliance"``.
+    """
+    for item in items:
+        key = item.get("principle", "")
         if key not in principle_map:
             principle_map[key] = _empty_principle(key)
-        vd: dict[str, Any] = {
-            "code": v.get("snippet", ""),
-            "severity": v.get("severity", "minor"),
-            "file": format_file_line(v.get("file"), v.get("line")),
-            "title": v.get("title", ""),
-            "reason": v.get("reason", ""),
+        entry: dict[str, Any] = {
+            "code": item.get("snippet", ""),
+            "file": format_file_line(item.get("file"), item.get("line")),
+            "title": item.get("title", ""),
+            "reason": item.get("reason", ""),
         }
-        if v.get("cwe"):
-            vd["cwe"] = v["cwe"]
-        if v.get("req"):
-            vd["req"] = v["req"]
-        if v.get("req_refs"):
-            vd["req_refs"] = v["req_refs"]
-        principle_map[key]["violations"].append(vd)
-
-
-def _collect_compliance(compliance: list[dict], principle_map: dict[str, Any]) -> None:
-    """Append normalized compliance dicts to the appropriate principle entries."""
-    for c in compliance:
-        key = c.get("principle", "")
-        if key not in principle_map:
-            principle_map[key] = _empty_principle(key)
-        cd: dict[str, Any] = {
-            "code": c.get("snippet", ""),
-            "file": format_file_line(c.get("file"), c.get("line")),
-            "title": c.get("title", ""),
-            "reason": c.get("reason", ""),
-        }
-        if c.get("cwe"):
-            cd["cwe"] = c["cwe"]
-        if c.get("req"):
-            cd["req"] = c["req"]
-        if c.get("req_refs"):
-            cd["req_refs"] = c["req_refs"]
-        principle_map[key]["compliance"].append(cd)
+        if finding_type == "violations":
+            entry["severity"] = item.get("severity", "minor")
+        if item.get("cwe"):
+            entry["cwe"] = item["cwe"]
+        if item.get("req"):
+            entry["req"] = item["req"]
+        if item.get("req_refs"):
+            entry["req_refs"] = item["req_refs"]
+        principle_map[key][finding_type].append(entry)
 
 
 def _build_principle_map(data: dict[str, Any]) -> dict[str, Any]:
     """Build a mapping from principle name to its aggregated violations/compliance."""
     principle_map: dict[str, Any] = {}
     _seed_principles(data.get("principles", []), principle_map)
-    _collect_violations(data.get("violations", []), principle_map)
-    _collect_compliance(data.get("compliance", []), principle_map)
+    _collect_findings(data.get("violations", []), principle_map, "violations")
+    _collect_findings(data.get("compliance", []), principle_map, "compliance")
     return principle_map
 
 
@@ -149,9 +141,7 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
     """Parse a JSON evaluation file into a detailed report with principle breakdowns."""
     try:
         data = json.loads(json_path.read_text())
-    except OSError:
-        return None
-    except json.JSONDecodeError:
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
         return None
 
     principle_grades = [
@@ -182,6 +172,6 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
         "principles": list(principle_map.values()),
         "violations": data.get("violations", []),
         "compliance": data.get("compliance", []),
-        "priorityRemediation": {"critical": [], "major": [], "minor": []},
+        "priorityRemediation": _empty_severity_buckets(),
         "rawContent": None,
     }

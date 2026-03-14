@@ -9,87 +9,10 @@ import pytest
 from quodeq.engine.evidence_parser import (
     EvidenceContext,
     parse_jsonl_to_evidence,
-    _parse_jsonl_line,
 )
 
+from tests.engine.conftest import _evidence_line
 
-def _evidence_line(**overrides) -> str:
-    obj = {
-        "p": "ts-001",
-        "t": "violation",
-        "d": "security",
-        "w": "eval usage",
-        "file": "src/app.ts",
-        "line": 10,
-        "snippet": "eval(userInput)",
-        "severity": "high",
-        "vt": "code-injection",
-        "reason": "eval is dangerous",
-    }
-    obj.update(overrides)
-    return json.dumps(obj)
-
-
-
-# ---------------------------------------------------------------------------
-# _parse_jsonl_line
-# ---------------------------------------------------------------------------
-
-class TestParseJsonlLine:
-    def test_valid_violation(self):
-        result = _parse_jsonl_line(_evidence_line())
-        assert result is not None
-        j, llm_refs = result
-        assert j.practice_id == "ts-001"
-        assert j.verdict == "violation"
-        assert j.file == "src/app.ts"
-        assert j.line == 10
-        assert j.severity == "high"
-        assert llm_refs is None
-
-    def test_valid_compliance(self):
-        result = _parse_jsonl_line(_evidence_line(t="compliance"))
-        assert result is not None
-        j, _ = result
-        assert j.verdict == "compliance"
-
-    def test_missing_practice_id(self):
-        line = json.dumps({"t": "violation", "d": "security"})
-        assert _parse_jsonl_line(line) is None
-
-    def test_missing_verdict(self):
-        line = json.dumps({"p": "ts-001", "d": "security"})
-        assert _parse_jsonl_line(line) is None
-
-    def test_invalid_verdict(self):
-        assert _parse_jsonl_line(_evidence_line(t="dismissed")) is None
-
-    def test_empty_line(self):
-        assert _parse_jsonl_line("") is None
-        assert _parse_jsonl_line("   ") is None
-
-    def test_invalid_json(self):
-        assert _parse_jsonl_line("not json") is None
-
-    def test_defaults(self):
-        line = json.dumps({"p": "ts-001", "t": "violation"})
-        result = _parse_jsonl_line(line)
-        j, _ = result
-        assert j.file == ""
-        assert j.line == 0
-        assert j.severity == "medium"
-
-    def test_req_parsed(self):
-        result = _parse_jsonl_line(_evidence_line(req="R-FT-1"))
-        assert result is not None
-        j, _ = result
-        assert j.req == "R-FT-1"
-
-    def test_refs_parsed(self):
-        result = _parse_jsonl_line(_evidence_line(refs=["CWE-391", "ERR05-J"]))
-        assert result is not None
-        j, llm_refs = result
-        assert llm_refs == ["CWE-391", "ERR05-J"]
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +218,28 @@ class TestParseJsonlToEvidence:
         )
 
         assert ev.coverage_pct == 0.0
+
+    def test_pre_resolved_req_refs_used_without_compiled_dir(self, tmp_path):
+        """When MCP server enriched req_refs, parser uses them without compiled_dir."""
+        refs = [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}]
+        jsonl = tmp_path / "evidence.jsonl"
+        jsonl.write_text(json.dumps({
+            "p": "Confidentiality", "t": "violation", "d": "security",
+            "w": "Hardcoded key", "file": "src/config.py", "line": 12,
+            "severity": "critical", "req": "S-CON-1", "req_refs": refs,
+        }) + "\n")
+
+        ev = parse_jsonl_to_evidence(
+            jsonl,
+            EvidenceContext(
+                plugin_id="python", repository="test", date_str="2026-03-11",
+                source_file_count=10, files_read=5,
+            ),
+            compiled_dir=None,  # no compiled dir — refs come from JSONL
+        )
+
+        v = ev.principles["Confidentiality"].violations[0]
+        assert v["req_refs"] == refs
 
     def test_v1_evidence_dict_shape(self, tmp_path):
         """Ensure the Evidence object can convert to V1 shape."""

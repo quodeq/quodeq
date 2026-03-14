@@ -11,6 +11,7 @@ function statusTitle(status) {
   if (status === 'running') return 'Evaluation in Progress';
   if (status === 'done') return 'Evaluation Complete';
   if (status === 'failed') return 'Evaluation Failed';
+  if (status === 'lost') return 'Evaluation Lost';
   return 'Evaluation Cancelled';
 }
 
@@ -50,6 +51,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
   const isRunning = job.status === 'running';
   const isDone = job.status === 'done';
   const isFailed = job.status === 'failed';
+  const isLost = job.status === 'lost';
   const projectName = deriveProjectName(job.repo);
 
   return (
@@ -62,6 +64,16 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
           {isRunning && (
             <button type="button" className="job-cancel-inline" onClick={onCancel}>
               Cancel
+            </button>
+          )}
+          {!isRunning && isDone && (
+            <button type="button" className="job-header-view-btn" onClick={() => onDismiss('view')}>
+              View Results
+            </button>
+          )}
+          {!isRunning && (
+            <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>
+              {isDone ? 'Dismiss' : 'Close'}
             </button>
           )}
           <span className={`job-status-badge ${job.status}`}>{job.status}</span>
@@ -100,6 +112,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
       >
         {isRunning && <span className="eval-status-phase">{phaseLabel(job)}</span>}
         {isFailed && <span className="eval-status-phase eval-status-phase--error">{lastRelevantLog(job.logs) || 'Analysis failed'}</span>}
+        {isLost && <span className="eval-status-phase eval-status-phase--error">Server restarted — job tracking lost</span>}
         {isRunning && job.dimensions?.length > 0 && (
           <span className="eval-status-dims">
             {job.dimensions.map(d => (
@@ -124,18 +137,6 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         </div>
       )}
 
-      {!isRunning && (
-        <div className="job-actions">
-          {isDone && (
-            <button className="view-results-btn" onClick={() => onDismiss('view')}>
-              View Results
-            </button>
-          )}
-          <button className="job-close-btn" onClick={() => onDismiss('close')}>
-            {isDone ? 'Dismiss' : 'Close'}
-          </button>
-        </div>
-      )}
 
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>

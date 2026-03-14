@@ -2,14 +2,37 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from typing import Any
 
 from quodeq.engine.plugin_loader import scan_plugin_dirs
 
 _PLUGIN_CACHE_TTL = 60  # seconds; allows runtime plugin changes to propagate
-_plugin_cache: list[dict[str, Any]] | None = None
-_plugin_cache_ts: float = 0.0
+
+
+class _PluginCache:
+    """Thread-safe TTL cache for plugin metadata."""
+
+    def __init__(self, ttl: float = _PLUGIN_CACHE_TTL) -> None:
+        self._lock = threading.Lock()
+        self._cache: list[dict[str, Any]] | None = None
+        self._ts: float = 0.0
+        self._ttl = ttl
+
+    def get(self) -> list[dict[str, Any]] | None:
+        with self._lock:
+            if self._cache is not None and time.monotonic() - self._ts < self._ttl:
+                return self._cache
+        return None
+
+    def set(self, data: list[dict[str, Any]]) -> None:
+        with self._lock:
+            self._cache = data
+            self._ts = time.monotonic()
+
+
+_plugin_cache = _PluginCache()
 
 
 def discover_plugins() -> list[dict[str, Any]]:
@@ -19,10 +42,9 @@ def discover_plugins() -> list[dict[str, Any]]:
     at runtime (without a process restart) are picked up on the next request
     after the TTL expires.
     """
-    global _plugin_cache, _plugin_cache_ts
-    now = time.monotonic()
-    if _plugin_cache is not None and now - _plugin_cache_ts < _PLUGIN_CACHE_TTL:
-        return _plugin_cache
+    cached = _plugin_cache.get()
+    if cached is not None:
+        return cached
     from quodeq.config.paths import default_paths
     evaluators_root = default_paths().evaluators_dir
     result: list[dict[str, Any]] = []
@@ -40,8 +62,7 @@ def discover_plugins() -> list[dict[str, Any]]:
                     for d in dims_data.get("applies", [])
                 ],
             })
-        except (KeyError, ValueError):
+        except (KeyError, ValueError, OSError, json.JSONDecodeError, UnicodeDecodeError):
             continue
-    _plugin_cache = result
-    _plugin_cache_ts = now
+    _plugin_cache.set(result)
     return result

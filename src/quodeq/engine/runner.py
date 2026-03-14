@@ -1,10 +1,6 @@
 """Runner — orchestrates the AI-driven exploration pipeline.
 
-Pipeline per dimension:
-    1. Build prompt (prompt_builder)
-    2. Run AI analysis (analysis.py — spawn AI CLI)
-    3. Extract JSONL from stream
-    4. Parse into Evidence (evidence_parser)
+Per dimension: build prompt → run AI analysis → extract JSONL → parse Evidence.
 Merge per-dimension Evidence into a single Evidence object.
 """
 from __future__ import annotations
@@ -26,6 +22,7 @@ from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_eviden
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.validation import validate_path_segment
 
 
 @dataclass
@@ -37,6 +34,8 @@ class AnalysisOptions:
     dimensions: list[str] | None = None
     max_turns: int | None = None
     max_duration: int | None = None
+    n_subagents: int = 1
+    subagent_model: str | None = None
 
 
 @dataclass
@@ -55,16 +54,12 @@ CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
 
 
 class _MarkerFields(TypedDict, total=False):
-    """Fields that may appear in a structured JSON marker."""
     dimension: str
     dimensions: list[str]
 
 
 def _emit_marker(phase: str, **kwargs: _MarkerFields) -> None:
-    """Emit a structured JSON marker for job tracking.
-
-    Only emitted when stdout is captured by the job manager (not a TTY).
-    """
+    """Emit a structured JSON marker (only when stdout is not a TTY)."""
     if sys.stdout.isatty():
         return
     print(json.dumps({CC_MARKER_KEY: phase, **kwargs}), flush=True)
@@ -131,10 +126,13 @@ def _run_dimension_analysis(
 
     heartbeat = config.options.heartbeat_callback or _make_heartbeat(dim_id, idx, ctx.total)
 
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     ac_kwargs: dict[str, Any] = dict(
         jsonl_file=jsonl_file,
         analysis_budget=config.options.analysis_budget,
         heartbeat_callback=heartbeat,
+        compiled_dir=compiled_dir,
+        dimension=dim_id,
     )
     if config.options.max_turns is not None:
         ac_kwargs["max_turns"] = config.options.max_turns
@@ -187,15 +185,31 @@ def _parse_dimension_evidence(
     return ev
 
 
+def _process_dimension_with_subagents(
+    config: RunConfig, dim_id: str, idx: int, ctx: _PluginContext,
+) -> Evidence | None:
+    """Run dimension analysis using N parallel subagents (delegates to _subagent_runner)."""
+    from quodeq.engine._subagent_runner import DimensionCallbacks, process_dimension_with_subagents
+    return process_dimension_with_subagents(
+        config, dim_id, idx, ctx,
+        callbacks=DimensionCallbacks(
+            build_prompt=_build_dimension_prompt,
+            run_analysis=_run_dimension_analysis,
+            parse_evidence=_parse_dimension_evidence,
+        ),
+    )
+
+
 def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
     """Load plugin data and resolve which dimensions to analyze."""
+    validate_path_segment(config.plugin_id)
     plugin_dir = config.evaluators_dir / config.plugin_id
     if not plugin_dir.exists():
         raise ValueError(f"Plugin directory not found: {plugin_dir}")
 
     full = load_plugin_full(plugin_dir)
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
-    all_dims_raw = [d["id"] for d in full["dimensions"].get("applies", [])]
+    all_dims_raw = [d.get("id") for d in full["dimensions"].get("applies", []) if d.get("id")]
     dimensions = [d for d in all_dims_raw if d in config.options.dimensions] if config.options.dimensions else all_dims_raw
 
     ctx = _PluginContext(
@@ -220,12 +234,15 @@ def _process_single_dimension(
     _emit_marker("analyzing", dimension=dimension)
     log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
-    prompt = _build_dimension_prompt(config, dimension, ctx)
-    stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
+    if config.options.n_subagents > 1:
+        ev = _process_dimension_with_subagents(config, dimension, idx, ctx)
+    else:
+        prompt = _build_dimension_prompt(config, dimension, ctx)
+        stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
+        ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
 
-    ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
     if ev is None:
-        log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid stream, skipping")
+        log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
         return None
 
     _emit_marker("scoring", dimension=dimension)
@@ -243,7 +260,12 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     skipped_count = 0
 
     for idx, dimension in enumerate(dimensions, 1):
-        ev = _process_single_dimension(config, dimension, idx, ctx)
+        try:
+            ev = _process_single_dimension(config, dimension, idx, ctx)
+        except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
+            log_warning(f"[{idx}/{ctx.total}] {dimension} — failed: {exc}")
+            skipped_count += 1
+            continue
         if ev is None:
             skipped_count += 1
             continue

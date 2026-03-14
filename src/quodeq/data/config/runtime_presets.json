@@ -1,0 +1,32 @@
+{
+  "typescript": {
+    "display_name": "TypeScript / Node.js",
+    "extensions": [".ts", ".tsx"],
+    "config_files": ["tsconfig.json", "package.json"]
+  },
+  "kotlin": {
+    "display_name": "Kotlin / JVM",
+    "extensions": [".kt", ".kts"],
+    "config_files": ["build.gradle.kts", "build.gradle"]
+  },
+  "python": {
+    "display_name": "Python",
+    "extensions": [".py"],
+    "config_files": ["pyproject.toml", "setup.py", "requirements.txt"]
+  },
+  "bash": {
+    "display_name": "Bash / Shell",
+    "extensions": [".sh", ".bash"],
+    "config_files": [".bashrc", "Makefile"]
+  },
+  "java": {
+    "display_name": "Java / JVM",
+    "extensions": [".java"],
+    "config_files": ["pom.xml", "build.gradle"]
+  },
+  "mobile_ios": {
+    "display_name": "iOS / Swift",
+    "extensions": [".swift"],
+    "config_files": ["Package.swift", "Podfile"]
+  }
+}

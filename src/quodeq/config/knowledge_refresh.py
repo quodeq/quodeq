@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 import urllib.error
 import urllib.request
 import urllib.parse
@@ -173,19 +174,54 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
     return [results[repo["name"]] for repo in repos if repo["name"] in results]
 
 
+class _FetchClient:
+    """Thread-safe HTTP fetcher with circuit breaker (trips after repeated failures)."""
+
+    _CIRCUIT_THRESHOLD = 5
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._failures = 0
+
+    def fetch(self, url: str, headers: dict | None = None) -> str | None:
+        """Fetch *url* and return body text, or None on failure."""
+        with self._lock:
+            if self._failures >= self._CIRCUIT_THRESHOLD:
+                return None
+        try:
+            req = urllib.request.Request(url, headers=headers or {})
+            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT_S) as r:
+                with self._lock:
+                    self._failures = 0
+                return r.read().decode("utf-8", errors="replace")
+        except (urllib.error.URLError, OSError, ValueError):
+            with self._lock:
+                self._failures += 1
+            return None
+
+
+_fetch_client: _FetchClient | None = None
+
+
+def _get_fetch_client() -> _FetchClient:
+    """Return the module-level _FetchClient, creating it lazily on first use."""
+    global _fetch_client
+    if _fetch_client is None:
+        _fetch_client = _FetchClient()
+    return _fetch_client
+
+
 def _fetch_url(url: str, headers: dict | None = None) -> str | None:
-    try:
-        req = urllib.request.Request(url, headers=headers or {})
-        with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT_S) as r:
-            return r.read().decode("utf-8", errors="replace")
-    except (urllib.error.URLError, OSError, ValueError):
-        return None
+    return _get_fetch_client().fetch(url, headers)
 
 
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:
     combined = "\n\n---\n\n".join(content_samples)
     existing = out_path.read_text() if out_path.exists() else "none"
-    template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text()
+    try:
+        template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read practices template: {exc}") from exc
     return render_template(template, {
         "RUNTIME": runtime,
         "EXISTING": existing,
@@ -195,7 +231,10 @@ def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: 
 
 def _build_analysis_prompt(runtime: str, linter_docs: str, out_path: Path) -> str:
     existing = out_path.read_text() if out_path.exists() else "none"
-    template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text()
+    try:
+        template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise FileNotFoundError(f"Cannot read analysis template: {exc}") from exc
     return render_template(template, {
         "RUNTIME": runtime,
         "RUNTIME_TITLE": runtime.title(),

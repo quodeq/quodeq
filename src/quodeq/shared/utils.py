@@ -107,18 +107,23 @@ def get_ai_model() -> str | None:
     return os.environ.get("AI_MODEL") or None
 
 
-def get_action_api_port() -> int:
-    """Return the action API port from environment or default."""
-    raw = os.environ.get("QUODEQ_ACTION_API_PORT")
+def _env_int(var: str, default: int) -> int:
+    """Read an environment variable as an int, warn and return *default* on failure."""
+    raw = os.environ.get(var)
     if raw is not None:
         try:
             return int(raw)
         except ValueError:
             import logging
             logging.getLogger(__name__).warning(
-                "Invalid QUODEQ_ACTION_API_PORT=%r, using default", raw,
+                "Invalid %s=%r, using default", var, raw,
             )
-    return _get_config()["action_api_port"]
+    return default
+
+
+def get_action_api_port() -> int:
+    """Return the action API port from environment or default."""
+    return _env_int("QUODEQ_ACTION_API_PORT", _get_config()["action_api_port"])
 
 
 def get_action_api_host() -> str:
@@ -128,26 +133,32 @@ def get_action_api_host() -> str:
 
 def get_dashboard_port() -> int:
     """Return the dashboard preview port from environment or default."""
-    raw = os.environ.get("QUODEQ_DASHBOARD_PORT")
-    if raw is not None:
-        try:
-            return int(raw)
-        except ValueError:
-            import logging
-            logging.getLogger(__name__).warning(
-                "Invalid QUODEQ_DASHBOARD_PORT=%r, using default", raw,
-            )
-    return _get_config()["dashboard_port"]
+    return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"])
 
 
 def get_static_dist() -> str | None:
-    """Return the static dist path from environment, or None."""
-    return os.environ.get("QUODEQ_STATIC_DIST")
+    """Return the static dist path from environment, or the bundled static dir."""
+    from_env = os.environ.get("QUODEQ_STATIC_DIST")
+    if from_env:
+        return from_env
+    # Fall back to static assets bundled inside the package
+    bundled = Path(__file__).resolve().parent.parent / "static"
+    if bundled.is_dir() and (bundled / "index.html").exists():
+        return str(bundled)
+    return None
 
 
-def get_evaluations_dir(default: str = "evaluations") -> str:
-    """Return the evaluations directory from environment or default."""
-    return os.environ.get("QUODEQ_EVALUATIONS_DIR", default)
+def get_evaluations_dir(default: str | None = None) -> str:
+    """Return the evaluations directory from environment or user-level default.
+
+    Priority: QUODEQ_EVALUATIONS_DIR env var > explicit *default* > ~/.quodeq/evaluations
+    """
+    from_env = os.environ.get("QUODEQ_EVALUATIONS_DIR")
+    if from_env:
+        return from_env
+    if default is not None:
+        return default
+    return str(Path.home() / ".quodeq" / "evaluations")
 
 
 def get_anthropic_api_key() -> str | None:

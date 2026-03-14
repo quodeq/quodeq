@@ -6,4 +6,6 @@ def test_action_api_health():
     client = app.test_client()
     response = client.get("/api/health")
     assert response.status_code == 200
-    assert response.get_json() == {"ok": True}
+    data = response.get_json()
+    assert data["ok"] is True
+    assert "version" in data

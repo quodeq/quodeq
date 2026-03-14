@@ -12,7 +12,11 @@ _SCHEMAS_DIR = Path(__file__).parent / "schemas"
 
 @lru_cache(maxsize=32)
 def _load_schema(name: str) -> dict:
-    return json.loads((_SCHEMAS_DIR / name).read_text())
+    path = _SCHEMAS_DIR / name
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot load schema {path}: {exc}") from exc
 
 
 def validate_plugin(data: dict) -> list[str]:
@@ -43,7 +47,11 @@ def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
         if not filepath.exists():
             errors[filename] = [f"{filename} not found"]
             continue
-        data = json.loads(filepath.read_text())
+        try:
+            data = json.loads(filepath.read_text())
+        except (OSError, json.JSONDecodeError) as exc:
+            errors[filename] = [f"Cannot read {filename}: {exc}"]
+            continue
         file_errors = validator_fn(data)
         if file_errors:
             errors[filename] = file_errors

@@ -1,4 +1,9 @@
-"""Quality dimension codes and display helpers."""
+"""Quality dimension codes and display helpers.
+
+DIMENSION_CODES defines the default set of quality dimension shortcodes and their
+full names. These can be extended via plugin dimensions.json files that follow the
+same (shortcode, full_name) tuple format.
+"""
 
 from __future__ import annotations
 

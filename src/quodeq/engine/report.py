@@ -8,6 +8,8 @@ from pathlib import Path
 from quodeq.engine.evidence import Evidence
 from quodeq.engine.scoring_internals import score_to_grade_label
 
+_REPORT_SCHEMA_VERSION = 1
+
 
 def grade_from_score(score: str | None) -> str | None:
     """Convert a numeric score string (e.g. '7/10') to a letter grade (Critical..Exemplary)."""
@@ -114,7 +116,7 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
 
     raw_meta = evidence.get("meta", {})
     return {
-        "schema_version": 1,
+        "schema_version": _REPORT_SCHEMA_VERSION,
         "dimension": dimension,
         "project": evidence.get("repository", ""),
         # runId is always empty here; write_report_json fills it in from the path
@@ -166,8 +168,13 @@ def write_reports(evidence: Evidence, scores: dict, output_dir: Path) -> None:
     dashboard_report = build_dashboard_report(evidence, scores)
 
     dim = evidence.plugin_id
-    (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
-    (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))
+    if ".." in dim or "/" in dim or "\\" in dim:
+        raise ValueError(f"Invalid plugin_id for report output: {dim!r}")
+    try:
+        (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
+        (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))
+    except OSError as exc:
+        raise OSError(f"Failed to write report files to {output_dir}: {exc}") from exc
 
 
 def write_dimension_report(evidence: Evidence, scores: dict, dimension: str, output_dir: Path) -> None:
@@ -176,4 +183,7 @@ def write_dimension_report(evidence: Evidence, scores: dict, dimension: str, out
 
     report = build_dashboard_report(evidence, scores)
     report["dimension"] = dimension
-    (output_dir / f"{dimension}.json").write_text(json.dumps(report, indent=2))
+    try:
+        (output_dir / f"{dimension}.json").write_text(json.dumps(report, indent=2))
+    except OSError as exc:
+        raise OSError(f"Failed to write dimension report {dimension} to {output_dir}: {exc}") from exc

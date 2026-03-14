@@ -52,13 +52,19 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
         )
         stdout, err = run_ai_cli(prompt)
         if err:
-            raise RuntimeError(err)
-        output_path.write_text(stdout)
+            raise RuntimeError(f"Evaluator generation failed for {dimension} → {output_path}: {err}")
+        try:
+            output_path.write_text(stdout)
+        except OSError as exc:
+            raise RuntimeError(f"Failed to write evaluator {output_path}: {exc}") from exc
 
 
 def run_generate_dimensions(paths: ConfigPaths) -> None:
     """Generate dimension definitions via the AI CLI and save the output."""
-    template = (paths.prompts_dir / "dimensions-generator.md").read_text()
+    try:
+        template = (paths.prompts_dir / "dimensions-generator.md").read_text()
+    except (OSError, UnicodeDecodeError) as exc:
+        raise RuntimeError(f"Failed to read dimensions template: {exc}") from exc
     prompt = render_template(template, {
         "DIMENSIONS": ", ".join(DIMENSION_NAMES),
         "OUTPUT_DIR": str(paths.dimensions_dir),
@@ -74,7 +80,7 @@ def run_generate_dimensions(paths: ConfigPaths) -> None:
 def add_discipline(name: str, language: str, category: str, paths: ConfigPaths) -> None:
     """Register a new discipline by creating its directory and config entry."""
     (paths.evaluators_dir / name).mkdir(parents=True, exist_ok=True)
-    registry = paths.root / "config" / "disciplines.conf"
+    registry = paths.disciplines_conf
     registry.parent.mkdir(parents=True, exist_ok=True)
     content = registry.read_text() if registry.exists() else ""
     entry = f"[{name}]\nlanguage={language}\ncategory={category}\n"
@@ -90,7 +96,7 @@ def run_refresh_practices(
 ) -> int:
     """Refresh practices data for a plugin runtime from GitHub cursor-rules."""
     from quodeq.config.knowledge_refresh import refresh_practices
-    evaluators_dir = paths.root / "evaluators"
+    evaluators_dir = paths.evaluators_dir
     return refresh_practices(runtime, evaluators_dir, min_stars=min_stars, dry_run=dry_run)
 
 
@@ -102,7 +108,7 @@ def run_refresh_analysis(
 ) -> int:
     """Refresh analysis data for a plugin runtime from linter documentation."""
     from quodeq.config.knowledge_refresh import refresh_analysis
-    evaluators_dir = paths.root / "evaluators"
+    evaluators_dir = paths.evaluators_dir
     return refresh_analysis(runtime, evaluators_dir, dry_run=dry_run)
 
 
@@ -119,7 +125,7 @@ def run_refresh_standards(paths: ConfigPaths, *, dry_run: bool = False) -> int:
 def run_scaffold_plugin(runtime: str, paths: ConfigPaths) -> int:
     """Create a new plugin skeleton directory for the given runtime."""
     from quodeq.config.scaffold import scaffold_plugin
-    evaluators_dir = paths.root / "evaluators"
+    evaluators_dir = paths.evaluators_dir
     try:
         plugin_dir = scaffold_plugin(runtime, evaluators_dir)
         print(f"Created plugin skeleton at {plugin_dir}")

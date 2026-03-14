@@ -1,6 +1,7 @@
 """Dashboard and accumulated-view logic, split from action_provider_fs."""
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -14,6 +15,7 @@ from quodeq.adapters.fs.report_parser import (
     read_run_data,
     summarize_dimensions,
 )
+from quodeq.provider._cache import make_lru_dimension_fetcher
 from quodeq.provider.accumulated import numeric_average
 
 
@@ -22,6 +24,7 @@ _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 # Maximum number of historical runs scanned for trend, previous scores, and
 # stale dimensions. The full run list is still returned in availableRuns (metadata
 # only, no disk reads) so users can navigate to older runs directly.
+_LATEST_RUN = "latest"
 _MAX_HISTORY_RUNS = 100
 
 # Module-level LRU cache shared across requests; evicts least-recently-used
@@ -29,6 +32,7 @@ _MAX_HISTORY_RUNS = 100
 # request caching for hot-path dimension reads (P-TIM-6).
 _RUN_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
 _RUN_DIM_CACHE_MAX = 256
+_RUN_DIM_LOCK = threading.Lock()
 
 
 @dataclass
@@ -178,25 +182,10 @@ def _build_accumulated_trend(
 def _make_run_dimension_fetcher(
     reports_root: Path, project: str,
 ) -> Callable[[str], list[dict[str, Any]]]:
-    """Return a callable that fetches dimension data for a run.
-
-    Results are stored in the module-level _RUN_DIM_CACHE (LRU, bounded at
-    _RUN_DIM_CACHE_MAX entries) so repeated calls within and across requests
-    avoid redundant file reads.
-    """
-    def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
-        key = (reports_root, project, run_id)
-        if key in _RUN_DIM_CACHE:
-            _RUN_DIM_CACHE.move_to_end(key)
-            return _RUN_DIM_CACHE[key]
-        data = read_run_data(reports_root, project, run_id)
-        _RUN_DIM_CACHE[key] = data
-        _RUN_DIM_CACHE.move_to_end(key)
-        if len(_RUN_DIM_CACHE) > _RUN_DIM_CACHE_MAX:
-            _RUN_DIM_CACHE.popitem(last=False)  # evict oldest
-        return data
-
-    return get_run_dimensions
+    """Return a cached fetcher for run dimension data (LRU, bounded)."""
+    return make_lru_dimension_fetcher(
+        reports_root, project, _RUN_DIM_CACHE, _RUN_DIM_LOCK, _RUN_DIM_CACHE_MAX,
+    )
 
 
 def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
@@ -206,7 +195,7 @@ def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
     if not runs:
         raise FileNotFoundError(f"No runs found for project: {project}")
 
-    selected_run = runs[0] if run == "latest" else next((item for item in runs if item.run_id == run), None)
+    selected_run = runs[0] if run == _LATEST_RUN else next((item for item in runs if item.run_id == run), None)
     if not selected_run:
         raise FileNotFoundError(f"Run not found: {run}")
 

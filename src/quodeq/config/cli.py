@@ -15,6 +15,8 @@ from quodeq.config.actions import run_scaffold_plugin
 from quodeq.config.dimensions import render_dimension_table
 from quodeq.config.paths import default_paths
 
+_DEFAULT_MIN_STARS = 500
+
 
 def build_parser() -> argparse.ArgumentParser:
     """Build and return the argument parser for the configure subcommand."""
@@ -53,8 +55,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Refresh analysis.md for a plugin runtime from linter docs")
     parser.add_argument("--refresh-standards", action="store_true",
                         help="Re-fetch OWASP ASVS L1 into standards/asvs/level1.json")
-    parser.add_argument("--min-stars", type=int, default=500,
-                        help="Minimum stars for cursor-rules repos (default: 500)")
+    parser.add_argument("--min-stars", type=int, default=_DEFAULT_MIN_STARS,
+                        help="Minimum stars for cursor-rules repos (default: %(default)s)")
     parser.add_argument("--dry-run", action="store_true",
                         help="Show what would change without writing files")
     # Plugin scaffolding

@@ -15,8 +15,14 @@ PROVIDERS = {
 }
 
 
-def get_current_provider(paths: ConfigPaths) -> str:
-    """Return the currently configured AI provider name, defaulting to 'claude'."""
+def get_current_provider(paths: ConfigPaths, *, provider: str | None = None) -> str:
+    """Return the currently configured AI provider name, defaulting to 'claude'.
+
+    When *provider* is given it is returned directly, skipping file and env
+    lookups.  This makes the function easily testable without env mutation.
+    """
+    if provider is not None:
+        return provider
     if paths.env_file.exists():
         for line in paths.env_file.read_text().splitlines():
             if line.strip().startswith("export AI_PROVIDER="):
