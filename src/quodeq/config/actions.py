@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from datetime import date
 
@@ -13,6 +14,8 @@ from quodeq.config.sources import has_required_sources_table
 
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error
+
+_GENERATED_DIMS_FILENAME = "generated.json"
 
 
 @dataclass(frozen=True)
@@ -31,35 +34,47 @@ def resolve_parallel(parallel: str | None, sequential: bool) -> int:
     return int(parallel)
 
 
+def _generate_single_evaluator(
+    discipline: str, dimension: str, paths: ConfigPaths, *, today: date | None = None,
+) -> None:
+    """Generate a single evaluator JSON file for one dimension."""
+    output_path = paths.evaluators_dir / discipline / f"{dimension}.json"
+    prompt = build_evaluator_prompt(
+        template_path=paths.prompts_dir / "dimension-mapper.md",
+        context=EvaluatorContext(
+            discipline=discipline,
+            dimension=dimension,
+            practices_dir=paths.practices_dir / discipline,
+            dimensions_dir=paths.dimensions_dir,
+            output_path=output_path,
+            date_value=(today or date.today()).isoformat(),
+        ),
+    )
+    stdout, err = run_ai_cli(prompt)
+    if err:
+        raise RuntimeError(f"Evaluator generation failed for {dimension} → {output_path}: {err}")
+    try:
+        output_path.write_text(stdout, encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(f"Failed to write evaluator {output_path}: {exc}") from exc
+
+
 def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
     """Generate evaluator JSON files for every dimension of a discipline."""
     if not discipline:
         log_error("--generate-maps requires a dimension name")
         return 1
     dimensions = [p.stem for p in paths.dimensions_dir.glob("*.json")]
-    for dimension in dimensions:
-        output_path = paths.evaluators_dir / discipline / f"{dimension}.json"
-        prompt = build_evaluator_prompt(
-            template_path=paths.prompts_dir / "dimension-mapper.md",
-            context=EvaluatorContext(
-                discipline=discipline,
-                dimension=dimension,
-                practices_dir=paths.practices_dir / discipline,
-                dimensions_dir=paths.dimensions_dir,
-                output_path=output_path,
-                date_value=date.today().isoformat(),
-            ),
-        )
-        stdout, err = run_ai_cli(prompt)
-        if err:
-            raise RuntimeError(f"Evaluator generation failed for {dimension} → {output_path}: {err}")
-        try:
-            output_path.write_text(stdout)
-        except OSError as exc:
-            raise RuntimeError(f"Failed to write evaluator {output_path}: {exc}") from exc
+    with ThreadPoolExecutor() as pool:
+        futures = {
+            pool.submit(_generate_single_evaluator, discipline, dim, paths): dim
+            for dim in dimensions
+        }
+        for future in as_completed(futures):
+            future.result()  # propagates any RuntimeError
 
 
-def run_generate_dimensions(paths: ConfigPaths) -> None:
+def run_generate_dimensions(paths: ConfigPaths, *, today: date | None = None) -> None:
     """Generate dimension definitions via the AI CLI and save the output."""
     try:
         template = (paths.prompts_dir / "dimensions-generator.md").read_text()
@@ -68,13 +83,19 @@ def run_generate_dimensions(paths: ConfigPaths) -> None:
     prompt = render_template(template, {
         "DIMENSIONS": ", ".join(DIMENSION_NAMES),
         "OUTPUT_DIR": str(paths.dimensions_dir),
-        "DATE": date.today().isoformat(),
+        "DATE": (today or date.today()).isoformat(),
     })
     stdout, err = run_ai_cli(prompt)
     if err:
-        raise RuntimeError(err)
-    output_path = paths.dimensions_dir / "generated.json"
-    output_path.write_text(stdout)
+        raise RuntimeError(
+            f"AI generation failed: {err}. Check your API key, network connection, "
+            f"and AI provider configuration."
+        )
+    output_path = paths.dimensions_dir / _GENERATED_DIMS_FILENAME
+    try:
+        output_path.write_text(stdout, encoding="utf-8")
+    except OSError as exc:
+        raise RuntimeError(f"Failed to write dimensions output to {output_path}: {exc}") from exc
 
 
 def add_discipline(name: str, language: str, category: str, paths: ConfigPaths) -> None:
@@ -84,7 +105,10 @@ def add_discipline(name: str, language: str, category: str, paths: ConfigPaths) 
     registry.parent.mkdir(parents=True, exist_ok=True)
     content = registry.read_text() if registry.exists() else ""
     entry = f"[{name}]\nlanguage={language}\ncategory={category}\n"
-    registry.write_text(content + entry)
+    try:
+        registry.write_text(content + entry)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to write discipline config to {registry}: {exc}") from exc
 
 
 def run_refresh_practices(

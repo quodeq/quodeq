@@ -31,7 +31,9 @@ def test_all_dimensions_have_grouped_sub_characteristics():
 def test_load_asvs_l1():
     asvs = load_asvs_l1()
     assert asvs["level"] == 1
-    assert len(asvs["requirements"]) > 50
+    # ASVS L1 has ~60+ requirements; threshold prevents accidental truncation
+    _MIN_ASVS_L1_REQUIREMENTS = 50
+    assert len(asvs["requirements"]) > _MIN_ASVS_L1_REQUIREMENTS
     assert all("id" in r for r in asvs["requirements"])
 
 

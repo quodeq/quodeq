@@ -7,16 +7,25 @@ from pathlib import Path
 
 import jsonschema
 
+from quodeq.shared.utils import TEXT_ENCODING
+
 _SCHEMAS_DIR = Path(__file__).parent / "schemas"
+_SCHEMA_CACHE_SIZE = 32
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=_SCHEMA_CACHE_SIZE)
 def _load_schema(name: str) -> dict:
     path = _SCHEMAS_DIR / name
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding=TEXT_ENCODING))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot load schema {path}: {exc}") from exc
+
+
+@lru_cache(maxsize=_SCHEMA_CACHE_SIZE)
+def _get_validator(schema_file: str) -> jsonschema.Draft202012Validator:
+    schema = _load_schema(schema_file)
+    return jsonschema.Draft202012Validator(schema)
 
 
 def validate_plugin(data: dict) -> list[str]:
@@ -48,7 +57,7 @@ def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
             errors[filename] = [f"{filename} not found"]
             continue
         try:
-            data = json.loads(filepath.read_text())
+            data = json.loads(filepath.read_text(encoding=TEXT_ENCODING))
         except (OSError, json.JSONDecodeError) as exc:
             errors[filename] = [f"Cannot read {filename}: {exc}"]
             continue
@@ -60,6 +69,5 @@ def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
 
 
 def _validate(data: dict, schema_file: str) -> list[str]:
-    schema = _load_schema(schema_file)
-    validator = jsonschema.Draft202012Validator(schema)
+    validator = _get_validator(schema_file)
     return [e.message for e in validator.iter_errors(data)]

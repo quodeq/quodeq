@@ -14,9 +14,15 @@ _REPO_URL_RE = re.compile(
 )
 
 
+_DEFAULT_CLONE_TIMEOUT_S = 300
+
+
 def _get_clone_timeout() -> int:
     """Return the git clone timeout, reading the env var lazily."""
-    return int(os.environ.get("QUODEQ_GIT_CLONE_TIMEOUT", "300"))
+    try:
+        return int(os.environ.get("QUODEQ_GIT_CLONE_TIMEOUT", str(_DEFAULT_CLONE_TIMEOUT_S)))
+    except ValueError:
+        return _DEFAULT_CLONE_TIMEOUT_S
 
 
 def is_valid_repo_url(url: str) -> bool:
@@ -30,7 +36,7 @@ def prepare_repository(repo_input: str) -> str:
     Raises ValueError if the URL does not match the expected git repository format.
     """
     if not _REPO_URL_RE.match(repo_input):
-        raise ValueError(f"Invalid repository URL format: {repo_input}")
+        raise ValueError(f"Invalid repository URL format: {repo_input}. Expected: https://github.com/user/repo or git@github.com:user/repo.git")
     repo_name = repo_input.split("/")[-1].replace(".git", "")
     tmp_dir = tempfile.mkdtemp()
     dest = Path(tmp_dir) / repo_name

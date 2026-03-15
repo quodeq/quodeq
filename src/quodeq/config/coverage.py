@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import logging
+
+_logger = logging.getLogger(__name__)
+_INVALID_COVERAGE_MSG = "Invalid coverage format %r; expected '85%%' or '3/4'"
+_PERCENT_SCALE = 100
+
 
 def parse_coverage_percent(value: str) -> int:
     """Parse a percentage string (e.g. '85%') into an integer."""
     try:
         return int(value.strip().rstrip("%"))
     except ValueError:
+        _logger.warning(_INVALID_COVERAGE_MSG, value)
         return 0
 
 
@@ -18,11 +25,13 @@ def coverage_percent(value: str) -> int:
         try:
             d = int(denom)
         except ValueError:
+            _logger.warning(_INVALID_COVERAGE_MSG, value)
             return 0
         if d == 0:
             return 0
         try:
-            return int(round((int(num) / d) * 100))
+            return int(round((int(num) / d) * _PERCENT_SCALE))
         except ValueError:
+            _logger.warning(_INVALID_COVERAGE_MSG, value)
             return 0
     return parse_coverage_percent(value)

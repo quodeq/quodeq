@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from quodeq.adapters.hybrid._hybrid_call import hybrid_call
 from quodeq.ports.evaluations import EvaluationsRepository
 
@@ -17,6 +19,13 @@ class HybridEvaluationsRepository:
         """Return all report IDs, preferring the web source."""
         return hybrid_call(self._web.list_reports, self._fs.list_reports)
 
-    def get_report(self, report_id: str) -> dict:
-        """Fetch a single evaluation report, preferring the web source."""
+    def get_report(self, report_id: str) -> dict[str, Any]:
+        """Fetch a single evaluation report, preferring the web source.
+
+        Args:
+            report_id: Unique identifier for the evaluation report.
+
+        Returns:
+            Parsed report dict; falls back to filesystem on web errors.
+        """
         return hybrid_call(self._web.get_report, self._fs.get_report, report_id)

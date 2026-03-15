@@ -99,6 +99,18 @@ class FsEvaluationMixin:
             return d
         return SubprocessDispatcher(self._jobs)
 
+    @staticmethod
+    def _build_eval_env(repo: str, options: EvaluationOptions) -> dict[str, str]:
+        """Build the subprocess environment for an evaluation run."""
+        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+        env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
+        ai_model = options.ai_model or get_ai_model()
+        if ai_model:
+            env["AI_MODEL"] = ai_model
+        if options.subagent_model:
+            env["SUBAGENT_MODEL"] = options.subagent_model
+        return env
+
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
         """Start an asynchronous evaluation subprocess for a repository."""
         if is_repo_url(repo):
@@ -111,15 +123,7 @@ class FsEvaluationMixin:
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir)
-
-        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
-        env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
-        ai_model = options.ai_model or get_ai_model()
-        if ai_model:
-            env["AI_MODEL"] = ai_model
-        if options.subagent_model:
-            env["SUBAGENT_MODEL"] = options.subagent_model
-
+        env = self._build_eval_env(repo, options)
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 

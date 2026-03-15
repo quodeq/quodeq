@@ -9,9 +9,19 @@ from pathlib import Path
 
 from flask import Response, after_this_request, jsonify, send_file
 
-from quodeq.action_api_helpers import _error
+from quodeq.action_api_helpers import error_response
 
-_MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
+_DEFAULT_MAX_ZIP_SIZE_MB = 100
+
+
+def _max_zip_size_bytes(max_mb: int | None = None) -> int:
+    """Return the max zip export size in bytes.
+
+    *max_mb* overrides the env var for testing.
+    """
+    if max_mb is None:
+        max_mb = int(os.environ.get("QUODEQ_MAX_ZIP_SIZE_MB", str(_DEFAULT_MAX_ZIP_SIZE_MB)))
+    return max_mb * 1024 * 1024
 
 
 def _build_project_zip(project_path: Path) -> Path:
@@ -19,6 +29,7 @@ def _build_project_zip(project_path: Path) -> Path:
     fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="quodeq_export_")
     os.close(fd)
     total_size = 0
+    size_limit = _max_zip_size_bytes()
     try:
         with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for file_entry in project_path.rglob("*"):
@@ -26,10 +37,10 @@ def _build_project_zip(project_path: Path) -> Path:
                     continue
                 if file_entry.is_file():
                     total_size += file_entry.stat().st_size
-                    if total_size > _MAX_ZIP_SIZE_BYTES:
+                    if total_size > size_limit:
                         raise ValueError("Project exceeds maximum export size")
                     zf.write(file_entry, file_entry.relative_to(project_path.parent))
-    except Exception:
+    except (OSError, zipfile.BadZipFile, ValueError):
         os.unlink(tmp_path)
         raise
     return Path(tmp_path)
@@ -39,15 +50,15 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
     """Build and return a zip archive download response for a project directory."""
     project_path = (Path(reports_dir) / project).resolve()
     if not project_path.is_relative_to(Path(reports_dir).resolve()):
-        body, status = _error("Invalid project name", HTTPStatus.BAD_REQUEST, "BAD_REQUEST")
+        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "BAD_REQUEST")
         return jsonify(body), status
     if not project_path.exists() or not project_path.is_dir():
-        body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status
     try:
         tmp_path = _build_project_zip(project_path)
     except ValueError:
-        body, status = _error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+        body, status = error_response("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
         return jsonify(body), status
 
     @after_this_request

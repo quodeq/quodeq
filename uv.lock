@@ -343,7 +343,7 @@ requires-dist = [
 [package.metadata.requires-dev]
 dev = [
     { name = "pytest", specifier = "==9.0.2" },
-    { name = "pytest-cov", specifier = ">=6.0" },
+    { name = "pytest-cov", specifier = "==7.0.0" },
 ]
 
 [[package]]

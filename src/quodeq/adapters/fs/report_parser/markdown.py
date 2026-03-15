@@ -6,8 +6,11 @@ import re
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import parse_numeric_score
-from quodeq.adapters.fs.report_parser.json_parser import _empty_severity_buckets
+from quodeq.adapters.fs.report_parser.json_parser import empty_severity_buckets
 from quodeq.engine.scoring_internals import score_to_grade_label
+
+_DIVIDER_RE = re.compile(r"^\s*\|?\s*[-:]+(\s*\|\s*[-:]+)+\s*\|?\s*$")
+_GRADE_SCORE_RE = re.compile(r"^(\d+(?:\.\d+)?/10)(?:\s+(\w+))?$")
 
 
 def clean_cell(value: str) -> str:
@@ -24,7 +27,11 @@ def split_table_row(line: str) -> list[str]:
 
 def is_divider_row(line: str) -> bool:
     """Return True if the line is a markdown table divider (dashes and pipes)."""
-    return re.match(r"^\s*\|?\s*[-:]+(\s*\|\s*[-:]+)+\s*\|?\s*$", line) is not None
+    return _DIVIDER_RE.match(line) is not None
+
+
+_EXEC_SUMMARY_HEADER = "## executive summary"
+_SECTION_PREFIX = "## "
 
 
 def extract_exec_summary(markdown: str) -> list[str]:
@@ -32,14 +39,14 @@ def extract_exec_summary(markdown: str) -> list[str]:
     lines = markdown.splitlines()
     start = -1
     for idx, line in enumerate(lines):
-        if line.strip().lower() == "## executive summary":
+        if line.strip().lower() == _EXEC_SUMMARY_HEADER:
             start = idx
             break
     if start < 0:
         return []
     result = []
     for line in lines[start + 1 :]:
-        if line.strip().startswith("## "):
+        if line.strip().startswith(_SECTION_PREFIX):
             break
         if "|" in line:
             result.append(line)
@@ -52,7 +59,7 @@ def _parse_grade_and_score(cells: list[str], is_four_col: bool) -> tuple[str | N
     grade = None
     if is_four_col:
         raw = cells[-1]
-        match = re.match(r"^(\d+(?:\.\d+)?/10)(?:\s+(\w+))?$", raw)
+        match = _GRADE_SCORE_RE.match(raw)
         if match:
             score = match.group(1)
             grade = match.group(2)
@@ -99,6 +106,6 @@ def parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: str
         "project": project,
         "principleGrades": principle_grades,
         "principles": [],
-        "priorityRemediation": _empty_severity_buckets(),
+        "priorityRemediation": empty_severity_buckets(),
         "rawContent": markdown,
     }

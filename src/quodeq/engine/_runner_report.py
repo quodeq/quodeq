@@ -6,6 +6,7 @@ from pathlib import Path
 from quodeq.engine.runner import RunConfig, run_per_dimension, cleanup_stream
 
 _NUMERICAL_MODE = "numerical"
+_NA_LABEL = "N/A"
 
 
 def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -> dict:
@@ -28,8 +29,8 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
         overall = scores.get("overall", {})
         if mode == _NUMERICAL_MODE:
             val = overall.get("weighted_score")
-            results[dimension] = f"{val}/10" if val is not None else "N/A"
+            results[dimension] = f"{val}/10" if val is not None else _NA_LABEL
         else:
-            results[dimension] = overall.get("weighted_grade", "N/A")
+            results[dimension] = overall.get("weighted_grade", _NA_LABEL)
 
     return results

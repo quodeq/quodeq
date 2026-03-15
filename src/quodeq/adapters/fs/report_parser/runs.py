@@ -1,21 +1,27 @@
 """Run discovery, date parsing, and report aggregation for filesystem reports.
 
-NOTE: Storage is filesystem-based. To support alternative backends (S3, database),
-introduce a RunStorage port/protocol and adapt callers.
+The ``RunStorage`` protocol defines the interface callers depend on.
+The module-level functions (``read_run_data``, ``list_runs``) provide the
+default filesystem implementation.  Alternative backends (S3, database)
+should implement ``RunStorage`` and be injected at the call site.
 """
 
 from __future__ import annotations
 
-import json
+import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Protocol, runtime_checkable
 
+_logger = logging.getLogger(__name__)
+
+from quodeq.adapters.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
-from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import is_repo_url
+from quodeq.shared.validation import validate_path_segment
+
+_GIT_SUFFIX = ".git"
 
 
 @dataclass(frozen=True)
@@ -27,74 +33,71 @@ class RunInfo:
     date_label: str
 
 
+@runtime_checkable
+class RunStorage(Protocol):
+    """Interface for run data storage backends.
+
+    The default filesystem implementation is provided by the module-level
+    ``read_run_data`` and ``list_runs`` functions.  Alternative backends
+    (S3, database) should implement this protocol.
+    """
+
+    def read_run_data(self, project: str, run_id: str) -> list[dict[str, Any]]:
+        """Load all dimension evaluations and evidence for a single run."""
+        ...
+
+    def list_runs(self, project: str, *, limit: int = 0) -> list[RunInfo]:
+        """Return runs for a project, sorted newest-first by date."""
+        ...
+
+
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
-    """List directory entries, returning an empty list on OS errors."""
+    """List directory entries, returning an empty list on OS errors.
+
+    Example::
+
+        entries = safe_read_dir(Path("/data/reports"))
+    """
     try:
         with os.scandir(path) as it:
             return list(it)
-    except OSError:
+    except OSError as exc:
+        _logger.debug(
+            "Could not list directory %s: %s. Check path exists and file permissions are correct",
+            path.name,
+            exc,
+        )
         return []
-
-
-def _normalize_date(raw: str) -> tuple[str, str] | None:
-    """Parse a date/datetime string and return (sortable_iso, human_label).
-
-    Accepts ISO datetime (2026-03-01T14:30:25), ISO date (2026-03-01),
-    or compact date (20260301).  The first element is the full string
-    (including time when available) so that same-day runs sort correctly.
-    """
-    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
-        try:
-            parsed = datetime.strptime(raw, fmt)
-            if parsed.tzinfo is not None:
-                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
-            sortable = parsed.isoformat(timespec='seconds') if "T" in fmt else parsed.date().isoformat()
-            label = f"{parsed.year}-{parsed.month:02d}-{parsed.day:02d}"
-            return sortable, label
-        except ValueError:
-            continue
-    return None
-
-
-def _find_date_in_dir(directory: Path, suffix: str) -> tuple[str | None, str] | None:
-    """Scan JSON files in *directory* matching *suffix* for a parsable date field."""
-    for entry in safe_read_dir(directory):
-        if not entry.is_file() or not entry.name.endswith(suffix):
-            continue
-        try:
-            data = json.loads(Path(entry.path).read_text())
-            raw = data.get("date")
-            if raw:
-                result = _normalize_date(str(raw))
-                if result:
-                    return result
-        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
-            log_debug(f"Failed to read date from {entry.path}: {exc}")
-    return None
 
 
 def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
     """Read the date from evidence or evaluation files in a run directory."""
+    validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
 
-    result = _find_date_in_dir(run_dir / "evidence", "_evidence.json")
+    result = find_date_in_dir(run_dir / "evidence", "_evidence.json", safe_read_dir)
     if result:
         return result
 
-    result = _find_date_in_dir(run_dir / "evaluation", ".json")
+    result = find_date_in_dir(run_dir / "evaluation", ".json", safe_read_dir)
     if result:
         return result
 
-    fallback = _normalize_date(run_id)
+    fallback = normalize_date(run_id)
     if fallback:
         return fallback
     return None, run_id
 
 
 def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | None]:
-    """Build a repository metadata dict from a local path or remote URL."""
+    """Build a repository metadata dict from a local path or remote URL.
+
+    Example::
+
+        build_repository_info("https://github.com/org/repo.git", "python")
+    """
     if is_repo_url(repo):
-        name = repo.split("/")[-1].replace(".git", "")
+        name = repo.split("/")[-1].replace(_GIT_SUFFIX, "")
         return {
             "name": name,
             "discipline": discipline,
@@ -119,7 +122,7 @@ def _load_markdown_backed_evals(
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith("_eval.md"):
             continue
-        dimension = entry.name[:-8]
+        dimension = entry.name.removesuffix("_eval.md")
         json_path = evaluation_dir / f"{dimension}.json"
         parsed = parse_report_json(json_path) if json_path.exists() else None
         if parsed:
@@ -136,7 +139,7 @@ def _load_json_only_evals(
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith(".json"):
             continue
-        dimension = entry.name[:-5]
+        dimension = entry.name.removesuffix(".json")
         if dimension in seen:
             continue
         parsed = parse_report_json(Path(entry.path))
@@ -159,12 +162,24 @@ def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
     for entry in safe_read_dir(evidence_dir):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
             parsed_ev = parse_evidence_file(Path(entry.path))
-            evidence_map[parsed_ev["dimension"]] = parsed_ev
+            dimension = parsed_ev.get("dimension")
+            if dimension is None:
+                _logger.warning(
+                    "Evidence file %s missing 'dimension' key, skipping", entry.name,
+                )
+                continue
+            evidence_map[dimension] = parsed_ev
     return evidence_map
 
 
 def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
-    """Load all dimension evaluations and evidence for a single run."""
+    """Load all dimension evaluations and evidence for a single run.
+
+    Example::
+
+        dims = read_run_data(Path("/reports"), "my-project", "20260301")
+    """
+    validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
     evaluations = _load_evaluations(run_dir / "evaluation")
     evidence_map = _load_evidence_map(run_dir / "evidence")
@@ -186,8 +201,16 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[st
     return dimensions
 
 
-def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
-    """Return all runs for a project, sorted newest-first by date."""
+def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunInfo]:
+    """Return runs for a project, sorted newest-first by date.
+
+    When *limit* > 0 only the most recent *limit* runs are returned.
+
+    Example::
+
+        runs = list_runs(Path("/reports"), "my-project", limit=5)
+    """
+    validate_path_segment(project)
     project_dir = reports_root / project
     run_infos: list[RunInfo] = []
     for entry in safe_read_dir(project_dir):
@@ -196,7 +219,27 @@ def list_runs(reports_root: Path, project: str) -> list[RunInfo]:
         date_iso, date_label = _parse_run_date(reports_root, project, entry.name)
         run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label))
     run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)
+    if limit > 0:
+        return run_infos[:limit]
     return run_infos
+
+
+def _make_caching_fetcher(
+    reports_root: Path, project: str,
+    data_cache: dict[str, list[dict[str, Any]]] | None = None,
+) -> Callable[[str], list[dict[str, Any]]]:
+    """Return a fetcher that caches run data reads.
+
+    *data_cache* is injectable for testing; defaults to a fresh dict.
+    """
+    cache = data_cache if data_cache is not None else {}
+
+    def _fetch(run_id: str) -> list[dict[str, Any]]:
+        if run_id not in cache:
+            cache[run_id] = read_run_data(reports_root, project, run_id)
+        return cache[run_id]
+
+    return _fetch
 
 
 @dataclass(frozen=True)
@@ -222,26 +265,24 @@ def _get_previous_run_for_dimension(
     callable) to share I/O across calls rather than repeating the directory
     scan and file reads for each dimension.
     """
+    validate_path_segment(project, current_run_id)
     project_path = reports_root / project
     if not project_path.exists():
         return None
-    all_runs = cache.runs if cache is not None else list_runs(reports_root, project)
+    if cache is None:
+        all_runs = list_runs(reports_root, project)
+        cache = RunLookupCache(
+            runs=all_runs,
+            get_run_data=_make_caching_fetcher(reports_root, project),
+        )
+    all_runs = cache.runs
     current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
     if current_idx < 0:
         return None
-    _data_cache: dict[str, list[dict[str, Any]]] = {}
-
-    def _fetch(run_id: str) -> list[dict[str, Any]]:
-        if cache is not None:
-            return cache.get_run_data(run_id)
-        if run_id not in _data_cache:
-            _data_cache[run_id] = read_run_data(reports_root, project, run_id)
-        return _data_cache[run_id]
 
     for run_info in all_runs[current_idx + 1:]:
-        dims = _fetch(run_info.run_id)
-        dims_by_name = {d.get("dimension"): d for d in dims if d.get("dimension")}
-        dim = dims_by_name.get(dimension)
+        dims = cache.get_run_data(run_info.run_id)
+        dim = next((d for d in dims if d.get("dimension") == dimension), None)
         if dim:
             return {"runId": run_info.run_id, "dimension": dim}
     return None

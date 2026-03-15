@@ -88,7 +88,8 @@ def load_plugin_full(plugin_dir: Path) -> dict:
     }
 
 
-def _try_load(plugin_dir: Path) -> dict | None:
+def _try_load(plugin_dir: Path) -> dict[str, object] | None:
+    """Try loading a plugin from *plugin_dir*, returning None on failure."""
     plugin_file = plugin_dir / "plugin.json"
     if not plugin_file.exists():
         return None

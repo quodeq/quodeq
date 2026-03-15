@@ -21,7 +21,7 @@ import json
 import sys
 from pathlib import Path
 
-SEPARATORS = [" \u2014 ", " — "]
+SEPARATORS = [" \u2014 "]  # em-dash; previous list had a duplicate entry
 
 
 def _find_first_sep(text: str) -> tuple[int, str] | tuple[None, None]:

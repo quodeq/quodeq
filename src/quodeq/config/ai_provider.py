@@ -8,6 +8,8 @@ from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_info, log_success
 from quodeq.shared.utils import get_ai_provider
 
+_AI_PROVIDER_EXPORT_PREFIX = "export AI_PROVIDER="
+
 PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
     "copilot": ("GITHUB_TOKEN", "copilot"),
@@ -15,18 +17,28 @@ PROVIDERS = {
 }
 
 
-def get_current_provider(paths: ConfigPaths, *, provider: str | None = None) -> str:
+def get_current_provider(
+    paths: ConfigPaths,
+    *,
+    provider: str | None = None,
+    default_provider: str | None = None,
+) -> str:
     """Return the currently configured AI provider name, defaulting to 'claude'.
 
     When *provider* is given it is returned directly, skipping file and env
     lookups.  This makes the function easily testable without env mutation.
+
+    *default_provider* overrides the env-based fallback when no config file
+    entry is found, making the function fully testable without env mutation.
     """
     if provider is not None:
         return provider
     if paths.env_file.exists():
         for line in paths.env_file.read_text().splitlines():
-            if line.strip().startswith("export AI_PROVIDER="):
+            if line.strip().startswith(_AI_PROVIDER_EXPORT_PREFIX):
                 return line.split("=", 1)[1].strip()
+    if default_provider is not None:
+        return default_provider
     return get_ai_provider()
 
 

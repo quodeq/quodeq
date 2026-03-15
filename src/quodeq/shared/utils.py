@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+import re as _re
+import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -10,6 +13,21 @@ from pathlib import Path
 from typing import Any, Iterator
 
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
+_DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
+
+TEXT_ENCODING = "utf-8"
+"""Standard text encoding used across the codebase for file I/O."""
+
+SENSITIVE_PATTERNS = _re.compile(
+    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
+    _re.IGNORECASE,
+)
+"""Compiled regex for detecting secrets in log/error output."""
+
+
+def sanitize_sensitive(text: str) -> str:
+    """Mask potential secrets in *text* for safe logging/display."""
+    return SENSITIVE_PATTERNS.sub(r"\1=***", text)
 
 
 @dataclass
@@ -47,7 +65,7 @@ class Config:
     @classmethod
     def from_file(cls, path: Path) -> Config:
         obj = cls()
-        obj._data = json.loads(path.read_text())
+        obj._data = json.loads(path.read_text(encoding=TEXT_ENCODING))
         return obj
 
 
@@ -69,10 +87,14 @@ def _get_config() -> Config:
     return _config_instance
 
 
-# Public accessors for defaults used as constants by other modules.
-ANTHROPIC_API_URL: str = _get_config()["anthropic_api_url"]
-ANTHROPIC_API_VERSION: str = _get_config()["anthropic_api_version"]
-DEFAULT_HOST: str = _get_config()["default_host"]
+IS_WIN32: bool = sys.platform == "win32"
+"""True when the current platform is Windows (win32)."""
+
+
+def __getattr__(name: str) -> str:
+    """Lazy accessor for config-derived constants (ANTHROPIC_API_URL, etc.)."""
+    from quodeq.shared.config_loader import __getattr__ as _cl_getattr
+    return _cl_getattr(name)
 
 
 def is_repo_url(repo_input: str) -> bool:
@@ -87,9 +109,12 @@ def project_name_from_repo(repo: str) -> str:
     return Path(repo).name
 
 
-def read_json(path: Path) -> dict:
+def read_json(path: Path) -> dict[str, Any]:
     """Read and parse a JSON file, returning the parsed dict."""
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text(encoding=TEXT_ENCODING))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
 
 
 def get_ai_provider() -> str:
@@ -114,7 +139,6 @@ def _env_int(var: str, default: int) -> int:
         try:
             return int(raw)
         except ValueError:
-            import logging
             logging.getLogger(__name__).warning(
                 "Invalid %s=%r, using default", var, raw,
             )
@@ -158,7 +182,7 @@ def get_evaluations_dir(default: str | None = None) -> str:
         return from_env
     if default is not None:
         return default
-    return str(Path.home() / ".quodeq" / "evaluations")
+    return str(_DEFAULT_EVALUATIONS_DIR)
 
 
 def get_anthropic_api_key() -> str | None:

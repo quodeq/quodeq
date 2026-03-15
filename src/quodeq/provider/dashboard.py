@@ -1,9 +1,10 @@
 """Dashboard and accumulated-view logic, split from action_provider_fs."""
 from __future__ import annotations
 
+import os
 import threading
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -16,7 +17,19 @@ from quodeq.adapters.fs.report_parser import (
     summarize_dimensions,
 )
 from quodeq.provider._cache import make_lru_dimension_fetcher
+from quodeq.provider._dashboard_stale import collect_stale_dimensions
+
+# Re-export for backward compatibility (tests import this name)
+_collect_stale_dimensions = collect_stale_dimensions
 from quodeq.provider.accumulated import numeric_average
+
+
+@dataclass
+class DashboardCacheConfig:
+    """Optional cache overrides for build_dashboard (mirrors AccumulatedCacheConfig)."""
+    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None
+    lock: threading.Lock | None = None
+    max_size: int | None = None
 
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
@@ -27,20 +40,22 @@ _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 _LATEST_RUN = "latest"
 _MAX_HISTORY_RUNS = 100
 
+# NOTE: Process-local cache; not shared across workers. Replace with Redis/memcached for multi-worker deployments.
 # Module-level LRU cache shared across requests; evicts least-recently-used
 # entries once the limit is reached, capping memory while providing cross-
 # request caching for hot-path dimension reads (P-TIM-6).
 _RUN_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
-_RUN_DIM_CACHE_MAX = 256
 _RUN_DIM_LOCK = threading.Lock()
 
 
-@dataclass
-class _StaleDimState:
-    """Groups the three mutable tracking dicts used by _collect_stale_dimensions."""
-    stale_dim_map: dict[str, dict[str, Any]] = field(default_factory=dict)
-    non_na_count: dict[str, int] = field(default_factory=dict)
-    stale_previous_by_dimension: dict[str, dict[str, Any]] = field(default_factory=dict)
+_DEFAULT_RUN_DIM_CACHE_MAX = 256
+
+
+def _run_dim_cache_max(override: int | None = None) -> int:
+    """Return the run-dimension cache size limit. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
 
 
 def _collect_previous_scores(
@@ -61,72 +76,6 @@ def _collect_previous_scores(
             if dim_name not in previous_by_dimension:
                 previous_by_dimension[dim_name] = {**dim, "runId": runs[older_idx].run_id}
     return previous_by_dimension
-
-
-def _find_stale_from_run(
-    run_dir: RunInfo, selected_dim_names: set[str],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    """Return stale dimension dicts found in a single run directory."""
-    results: list[dict] = []
-    run_dimensions = get_run_dimensions(run_dir.run_id)
-    for dim in run_dimensions:
-        dim_name = dim.get("dimension")
-        if not dim_name or dim_name in selected_dim_names:
-            continue
-        results.append({
-            "dim_name": dim_name,
-            "dim": dim,
-            "run_id": run_dir.run_id,
-            "date_iso": run_dir.date_iso,
-            "date_label": run_dir.date_label,
-            "grade": dim.get("overallGrade"),
-        })
-    return results
-
-
-def _record_stale_entry(entry: dict, state: _StaleDimState) -> None:
-    """Add a stale dimension entry to the map if not already present."""
-    dim_name = entry["dim_name"]
-    if dim_name not in state.stale_dim_map:
-        state.stale_dim_map[dim_name] = {
-            **entry["dim"],
-            "stale": True,
-            "fromRunId": entry["run_id"],
-            "fromDateISO": entry["date_iso"],
-            "fromDateLabel": entry["date_label"],
-        }
-
-
-def _track_stale_grade(entry: dict, state: _StaleDimState) -> None:
-    """Track grade counts for stale entries to identify the second valid score."""
-    grade = entry["grade"]
-    if not grade or str(grade).upper() in _SKIP_GRADES:
-        return
-    dim_name = entry["dim_name"]
-    state.non_na_count[dim_name] = state.non_na_count.get(dim_name, 0) + 1
-    if state.non_na_count[dim_name] == 2 and dim_name not in state.stale_previous_by_dimension:
-        state.stale_previous_by_dimension[dim_name] = entry["dim"]
-
-
-def _collect_stale_dimensions(
-    runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
-) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
-    """Find dimensions present in other runs but absent from the selected run."""
-    state = _StaleDimState()
-
-    for older_idx in range(selected_index + 1, len(runs)):
-        for entry in _find_stale_from_run(runs[older_idx], selected_dim_names, get_run_dimensions):
-            _record_stale_entry(entry, state)
-            _track_stale_grade(entry, state)
-
-    for newer_idx in range(selected_index):
-        for entry in _find_stale_from_run(runs[newer_idx], selected_dim_names, get_run_dimensions):
-            _record_stale_entry(entry, state)
-
-    stale_dimensions = sorted(state.stale_dim_map.values(), key=lambda d: d.get("dimension") or "")
-    return stale_dimensions, state.stale_previous_by_dimension
 
 
 def _enrich_dimensions_with_trend(
@@ -180,54 +129,130 @@ def _build_accumulated_trend(
 
 
 def _make_run_dimension_fetcher(
-    reports_root: Path, project: str,
+    reports_root: Path,
+    project: str,
+    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
+    lock: threading.Lock | None = None,
+    max_size: int | None = None,
 ) -> Callable[[str], list[dict[str, Any]]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
     return make_lru_dimension_fetcher(
-        reports_root, project, _RUN_DIM_CACHE, _RUN_DIM_LOCK, _RUN_DIM_CACHE_MAX,
+        reports_root,
+        project,
+        cache if cache is not None else _RUN_DIM_CACHE,
+        lock if lock is not None else _RUN_DIM_LOCK,
+        max_size if max_size is not None else _run_dim_cache_max(),
     )
 
 
-def build_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
-    """Build a full dashboard response for *project* at *run*."""
-    reports_root = Path(reports_dir)
-    runs = list_runs(reports_root, project)
-    if not runs:
-        raise FileNotFoundError(f"No runs found for project: {project}")
+@dataclass
+class _DashboardPayload:
+    """Pre-computed parts for the dashboard response."""
+    selected_summary: dict[str, Any]
+    trend: list[dict[str, Any]]
+    dimensions_with_trend: list[dict[str, Any]]
+    previous_by_dimension: dict[str, dict[str, Any]]
+    stale_previous_by_dimension: dict[str, dict[str, Any]]
+    stale_dimensions: list[dict[str, Any]]
 
-    selected_run = runs[0] if run == _LATEST_RUN else next((item for item in runs if item.run_id == run), None)
-    if not selected_run:
-        raise FileNotFoundError(f"Run not found: {run}")
 
-    selected_dimensions = read_run_data(reports_root, project, selected_run.run_id)
-    selected_summary = summarize_dimensions(selected_dimensions)
-    selected_dim_names = {d.get("dimension") for d in selected_dimensions}
-    selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), None)
-    if selected_index is None:
-        raise RuntimeError(f"Run {selected_run.run_id!r} disappeared from the run list unexpectedly.")
-
-    # Cap runs scanned for history. Always include the selected run so
-    # selected_index remains a valid index into history_runs.
-    history_runs = runs[:max(_MAX_HISTORY_RUNS, selected_index + 1)]
-    get_run_dimensions = _make_run_dimension_fetcher(reports_root, project)
-    previous_by_dimension = _collect_previous_scores(history_runs, selected_index, selected_dim_names, get_run_dimensions)
-    stale_dimensions, stale_previous_by_dimension = (
-        _collect_stale_dimensions(history_runs, selected_index, selected_dim_names, get_run_dimensions)
-    )
-    dimensions_with_trend = _enrich_dimensions_with_trend(selected_dimensions, previous_by_dimension)
-    trend = _build_accumulated_trend(history_runs, get_run_dimensions)
-
+def _build_dashboard_result(
+    project: str,
+    runs: list[RunInfo],
+    selected_run: RunInfo,
+    payload: _DashboardPayload,
+) -> dict[str, Any]:
+    """Assemble the final dashboard response dict from pre-computed parts."""
     return {
         "project": project,
         "availableRuns": [
             {"runId": item.run_id, "dateISO": item.date_iso, "dateLabel": item.date_label}
             for item in runs
         ],
-        "selectedRun": {"runId": selected_run.run_id, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
-        "summary": {**selected_summary, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
-        "trend": trend,
-        "dimensions": dimensions_with_trend,
-        "previousByDimension": previous_by_dimension,
-        "stalePreviousByDimension": stale_previous_by_dimension,
-        "staleDimensions": stale_dimensions,
+        "selectedRun": {
+            "runId": selected_run.run_id,
+            "dateISO": selected_run.date_iso,
+            "dateLabel": selected_run.date_label,
+        },
+        "summary": {**payload.selected_summary, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
+        "trend": payload.trend,
+        "dimensions": payload.dimensions_with_trend,
+        "previousByDimension": payload.previous_by_dimension,
+        "stalePreviousByDimension": payload.stale_previous_by_dimension,
+        "staleDimensions": payload.stale_dimensions,
     }
+
+
+def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
+    """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent."""
+    selected_run = runs[0] if run == _LATEST_RUN else next((item for item in runs if item.run_id == run), None)
+    if not selected_run:
+        raise FileNotFoundError(f"Run not found: {run}")
+    selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), None)
+    if selected_index is None:
+        raise RuntimeError(f"Run {selected_run.run_id!r} disappeared from the run list unexpectedly.")
+    return selected_run, selected_index
+
+
+@dataclass(frozen=True)
+class _SelectedRunContext:
+    """Pre-resolved data for the selected run in a dashboard request."""
+    run: RunInfo
+    index: int
+    dimensions: list[dict[str, Any]]
+    summary: dict[str, Any]
+
+
+def _compute_dashboard_payload(
+    reports_root: Path, project: str, runs: list[RunInfo],
+    ctx: _SelectedRunContext, cc: DashboardCacheConfig,
+) -> _DashboardPayload:
+    """Compute history-dependent parts of the dashboard response."""
+    selected_dim_names = {d.get("dimension") for d in ctx.dimensions}
+    history_runs = runs[:max(_MAX_HISTORY_RUNS, ctx.index + 1)]
+    get_run_dimensions = _make_run_dimension_fetcher(
+        reports_root, project, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+    )
+    previous_by_dimension = _collect_previous_scores(
+        history_runs, ctx.index, selected_dim_names, get_run_dimensions,
+    )
+    stale_dimensions, stale_previous_by_dimension = collect_stale_dimensions(
+        history_runs, ctx.index, selected_dim_names, get_run_dimensions,
+    )
+    return _DashboardPayload(
+        selected_summary=ctx.summary,
+        trend=_build_accumulated_trend(history_runs, get_run_dimensions),
+        dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
+        previous_by_dimension=previous_by_dimension,
+        stale_previous_by_dimension=stale_previous_by_dimension,
+        stale_dimensions=stale_dimensions,
+    )
+
+
+def build_dashboard(
+    reports_dir: str,
+    project: str,
+    run: str,
+    *,
+    cache_config: DashboardCacheConfig | None = None,
+) -> dict[str, Any]:
+    """Build a full dashboard response for *project* at *run*.
+
+    Pass *cache_config* to override the module-level LRU cache.
+    """
+    cc = cache_config or DashboardCacheConfig()
+    reports_root = Path(reports_dir)
+    runs = list_runs(reports_root, project)
+    if not runs:
+        raise FileNotFoundError(f"No runs found for project: {project}")
+
+    selected_run, selected_index = _resolve_selected_run(runs, run)
+    selected_dims = read_run_data(reports_root, project, selected_run.run_id)
+    ctx = _SelectedRunContext(
+        run=selected_run,
+        index=selected_index,
+        dimensions=selected_dims,
+        summary=summarize_dimensions(selected_dims),
+    )
+    payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc)
+    return _build_dashboard_result(project, runs, selected_run, payload)

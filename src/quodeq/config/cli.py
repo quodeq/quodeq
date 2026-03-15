@@ -16,6 +16,21 @@ from quodeq.config.dimensions import render_dimension_table
 from quodeq.config.paths import default_paths
 
 _DEFAULT_MIN_STARS = 500
+_MAX_PARALLEL_WORKERS = 16
+
+
+def _parallel_range(value: str) -> int:
+    """Validate that --parallel is an integer in the range 1–16."""
+    v = int(value)
+    if not 1 <= v <= _MAX_PARALLEL_WORKERS:
+        raise argparse.ArgumentTypeError(f"must be between 1 and {_MAX_PARALLEL_WORKERS}, got {v}")
+    return v
+
+
+def _print_and_zero(text: str) -> int:
+    """Print *text* and return 0 (used as a handler helper)."""
+    print(text)
+    return 0
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -42,8 +57,8 @@ def build_parser() -> argparse.ArgumentParser:
                         help="List coverage gaps for a plugin runtime (omit value to list all)")
     parser.add_argument("--fill-gap", nargs=2, metavar=("RUNTIME", "PRINCIPLE"),
                         help="Generate an evaluator to fill a coverage gap for the given principle")
-    parser.add_argument("--parallel",
-                        help="Number of parallel workers to use for generation tasks")
+    parser.add_argument("--parallel", type=_parallel_range,
+                        help=f"Number of parallel workers (default: %(default)s, range: 1-{_MAX_PARALLEL_WORKERS})")
     parser.add_argument("--sequential", action="store_true",
                         help="Run generation tasks sequentially instead of in parallel")
     parser.add_argument("--data-version", default=None,
@@ -69,13 +84,14 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate configuration action."""
     parser = build_parser()
     args = parser.parse_args(argv)
-    paths = default_paths(version=args.data_version)
+
+    paths = default_paths()
 
     handlers: list[tuple[str, Callable]] = [
         ("generate_maps",       lambda v: run_generate_evaluators(v, paths) or 0),
-        ("generate_dimensions", lambda _: (run_generate_dimensions(paths), 0)[1]),
+        ("generate_dimensions", lambda _: run_generate_dimensions(paths) or 0),
         ("check_sources",       lambda v: check_sources(v, paths)),
-        ("list_dimensions",     lambda _: (print(render_dimension_table()), 0)[1]),
+        ("list_dimensions",     lambda _: _print_and_zero(render_dimension_table())),
         ("refresh_practices",   lambda v: run_refresh_practices(v, paths,
                                      min_stars=args.min_stars, dry_run=args.dry_run)),
         ("refresh_analysis",    lambda v: run_refresh_analysis(v, paths, dry_run=args.dry_run)),

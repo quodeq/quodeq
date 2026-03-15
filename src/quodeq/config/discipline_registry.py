@@ -6,7 +6,9 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
-from typing import Iterable
+from typing import Any, Iterable
+
+from quodeq.shared.utils import TEXT_ENCODING
 
 _logger = logging.getLogger(__name__)
 
@@ -111,9 +113,9 @@ def _pad_and_finalize(files: list[str | None], contains: list[str | None], kwarg
     )
 
 
-def _parse_fields(lines: Iterable[tuple[str, str]]) -> dict:
+def _parse_fields(lines: Iterable[tuple[str, str]]) -> dict[str, Any]:
     """Parse key=value pairs into a kwargs dict for DisciplineRule construction."""
-    kwargs: dict = {}
+    kwargs: dict[str, Any] = {}
     files: list[str | None] = []
     contains: list[str | None] = []
     for key, value in lines:
@@ -132,6 +134,7 @@ class DisciplineRegistry:
         self._sorted_disciplines: list[DisciplineRule] = sorted(
             self.disciplines.values(), key=lambda rule: rule.detect_priority
         )
+        self._file_cache: dict[Path, str] = {}
 
     @classmethod
     def from_file(cls, path: Path) -> "DisciplineRegistry":
@@ -139,9 +142,12 @@ class DisciplineRegistry:
         sections: dict[str, list[tuple[str, str]]] = {}
         current_name: str | None = None
         try:
-            lines = path.read_text().splitlines()
+            lines = path.read_text(encoding=TEXT_ENCODING).splitlines()
         except (OSError, UnicodeDecodeError) as exc:
-            raise ValueError(f"Cannot read disciplines config {path}: {exc}") from exc
+            raise ValueError(
+                f"Cannot read disciplines config {path}: {exc}. "
+                f"Check file permissions or run 'quodeq configure' to regenerate."
+            ) from exc
         for raw in lines:
             line = raw.strip()
             if not line or line.startswith("#"):
@@ -168,7 +174,11 @@ class DisciplineRegistry:
 
     def _file_contains(self, path: Path, needle: str) -> bool:
         try:
-            return needle in path.read_text(errors="ignore")
+            content = self._file_cache.get(path)
+            if content is None:
+                content = path.read_text(encoding=TEXT_ENCODING, errors="ignore")
+                self._file_cache[path] = content
+            return needle in content
         except OSError as exc:
             _logger.debug("Could not read %s for content check: %s", path, exc)
             return False
@@ -200,8 +210,13 @@ class DisciplineRegistry:
         return self._any_detect_file_matches(repo, rule)
 
     def detect_matches(self, repo: Path) -> list[str]:
-        """Return the names of all disciplines whose rules match the given repo."""
+        """Return the names of all disciplines whose rules match the given repo.
+
+        Fallback-only disciplines (``detect_fallback=True``) are only included
+        when no non-fallback discipline matched.
+        """
         matches: list[str] = []
+        fallback_matches: list[str] = []
         matched_names: set[str] = set()
         for rule in self.iter_disciplines():
             if rule.detect_excludes and any(
@@ -209,16 +224,19 @@ class DisciplineRegistry:
             ):
                 continue
             if self._matches_rule(repo, rule):
-                matches.append(rule.name)
-                matched_names.add(rule.name)
-        return matches
+                if rule.detect_fallback:
+                    fallback_matches.append(rule.name)
+                else:
+                    matches.append(rule.name)
+                    matched_names.add(rule.name)
+        return matches if matches else fallback_matches
 
     def choose_highest_priority(self, matches: list[str]) -> str:
         """Select the discipline with the lowest (highest-priority) detect_priority value."""
-        rules = [self.disciplines[name] for name in matches if name in self.disciplines]
-        if not rules:
-            if not matches:
-                raise ValueError("No matches to choose from")
-            return matches[0]
-        rules.sort(key=lambda rule: rule.detect_priority)
-        return rules[0].name
+        if not matches:
+            raise ValueError("No matches to choose from")
+        match_set = set(matches)
+        for rule in self._sorted_disciplines:
+            if rule.name in match_set:
+                return rule.name
+        return matches[0]

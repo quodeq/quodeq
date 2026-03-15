@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 from collections import Counter
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 
 _SKIP_DIRS = frozenset({
@@ -57,15 +60,17 @@ def _detect_by_extension_count(plugins: list[dict], src: Path) -> str | None:
     """Pass 2: return the plugin whose file extensions are most prevalent, or None.
 
     Performs a single rglob traversal to collect suffix counts, then scores each
-    plugin in O(1) per extension — O(n) total regardless of plugin count.
+    plugin in O(1) per extension -- O(n) total regardless of plugin count.
     """
+    # Collect all extensions present in the source tree -- reuse _walk_source_files
+    # logic but we need all extensions, so we pass a permissive set. Instead,
+    # iterate directly to count every suffix.
+    all_exts: set[str] = set()
+    for data in plugins:
+        all_exts.update(data.get("detects", {}).get("extensions", []))
     suffix_counts: Counter[str] = Counter()
-    for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
-        for fname in filenames:
-            ext = os.path.splitext(fname)[1]
-            if ext:
-                suffix_counts[ext] += 1
+    for _rel, suffix in _walk_source_files(src, all_exts):
+        suffix_counts[suffix] += 1
     if not suffix_counts:
         return None
     best_id: str | None = None
@@ -85,7 +90,7 @@ def detect_plugin(src: Path, evaluators_dir: Path) -> str:
     """Auto-detect the best plugin for a repository.
 
     Uses a two-pass approach:
-    1. Check for config files at repo root (strong signal — e.g. pyproject.toml → python)
+    1. Check for config files at repo root (strong signal -- e.g. pyproject.toml -> python)
     2. Fall back to counting source files by extension (weak signal)
     """
     plugins: list[dict] = []
@@ -97,7 +102,8 @@ def detect_plugin(src: Path, evaluators_dir: Path) -> str:
             continue
         try:
             data = json.loads(pf.read_text())
-        except (json.JSONDecodeError, KeyError):
+        except (json.JSONDecodeError, KeyError) as exc:
+            _logger.warning("Skipping malformed plugin.json in %s: %s", pf.parent.name, exc)
             continue
         plugins.append(data)
 

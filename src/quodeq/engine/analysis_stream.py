@@ -5,13 +5,17 @@ import json
 from pathlib import Path
 
 from quodeq.shared.logging import log_debug
+from quodeq.shared.utils import TEXT_ENCODING
+
+_TOOL_USE_TYPE = "tool_use"
+_FILE_READ_TOOLS = frozenset({"Read", "Grep"})
 
 
 def extract_files_from_blocks(blocks: list) -> set[str]:
     """Extract file paths from Read/Grep tool_use blocks."""
     files: set[str] = set()
     for block in blocks:
-        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
+        if isinstance(block, dict) and block.get("type") == _TOOL_USE_TYPE and block.get("name") in _FILE_READ_TOOLS:
             fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
             if fp:
                 files.add(fp)
@@ -43,7 +47,7 @@ def count_files_in_stream(stream_file: Path) -> set[str]:
     """Extract unique file paths from Read/Grep tool_use events in the stream."""
     files: set[str] = set()
     try:
-        with open(stream_file) as f:
+        with open(stream_file, encoding=TEXT_ENCODING) as f:
             for line in f:
                 data = parse_stream_event(line)
                 if data is not None:
@@ -58,7 +62,7 @@ def count_jsonl_lines(jsonl_file: Path) -> int:
     try:
         if not jsonl_file.exists():
             return 0
-        with open(jsonl_file) as f:
+        with open(jsonl_file, encoding=TEXT_ENCODING) as f:
             return sum(1 for line in f if line.strip())
     except OSError:
         return 0

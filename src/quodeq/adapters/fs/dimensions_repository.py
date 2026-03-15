@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
-from quodeq.ports.data_errors import NotFoundError
+from quodeq.adapters.fs._json_loader import get_json_file, list_json_dir
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -16,19 +15,22 @@ class FilesystemDimensionsRepository:
         self._root = root
 
     def list_dimensions(self) -> list[str]:
-        """Return sorted names of all available dimensions."""
-        dimensions_dir = self._root / "dimensions"
-        if not dimensions_dir.exists():
-            raise NotFoundError(f"Dimensions directory not found: {dimensions_dir}")
-        return sorted(path.stem for path in dimensions_dir.glob("*.json") if path.is_file())
+        """Return sorted names of all available dimensions.
+
+        Example::
+
+            repo = FilesystemDimensionsRepository(root)
+            names = repo.list_dimensions()  # ['maintainability', 'security', ...]
+        """
+        return list_json_dir(self._root / "dimensions", "Dimensions directory not found")
 
     def get_dimension(self, name: str) -> dict:
-        """Load and return a single dimension definition by name."""
+        """Load and return a single dimension definition by name.
+
+        Example::
+
+            repo = FilesystemDimensionsRepository(root)
+            dim = repo.get_dimension('security')  # {'name': 'security', ...}
+        """
         validate_path_segment(name)
-        path = self._root / "dimensions" / f"{name}.json"
-        if not path.exists():
-            raise NotFoundError(f"Dimension not found: {name}")
-        try:
-            return json.loads(path.read_text())
-        except json.JSONDecodeError as exc:
-            raise NotFoundError(f"Invalid JSON in dimension file: {name}") from exc
+        return get_json_file(self._root / "dimensions", name, "Dimension not found")

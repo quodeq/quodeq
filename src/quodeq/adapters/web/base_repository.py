@@ -12,17 +12,20 @@ class WebRepository:
         self._base_url = base_url.rstrip("/")
         self._client = client or HttpClient()
 
-    def _get_dict(self, path: str) -> dict:
+    def _get_dict(self, path: str) -> dict[str, object]:
         """GET *path*, validate the response is a dict, and return it."""
         response = self._client.get_json(f"{self._base_url}{path}", {})
         check_response_status(response)
         if not isinstance(response.data, dict):
-            raise InvalidDataError("Invalid data format")
+            raise InvalidDataError(
+                "Invalid data format: expected a JSON object with 'data' key. "
+                "Verify the API endpoint URL and authentication."
+            )
         return response.data
 
-    def _get_list(self, path: str, key: str) -> list:
+    def _get_list(self, path: str, key: str) -> list[object]:
         """GET *path*, validate response contains a list at *key*, and return it."""
         data = self._get_dict(path)
         if key not in data or not isinstance(data[key], list):
-            raise InvalidDataError("Invalid data format")
+            raise InvalidDataError("Invalid data format: expected 'data' to be a list")
         return data[key]

@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import hmac
+import logging
 import os
+import sys
 import time
 from collections import OrderedDict
 from http import HTTPStatus
 from typing import Protocol, runtime_checkable
+
+_logger = logging.getLogger(__name__)
 
 from flask import Flask, Response, jsonify, request
 
@@ -22,6 +26,8 @@ from quodeq.action_api_routes import (
     register_discovery_routes,
     register_static_routes,
 )
+
+_HEALTH_PATH = "/api/health"
 
 _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 60  # max state-changing requests per window
@@ -47,7 +53,13 @@ class RateLimitStore(Protocol):
 
 
 class InMemoryRateLimitStore:
-    """Process-local rate-limit store backed by an LRU OrderedDict."""
+    """Process-local rate-limit store backed by an LRU OrderedDict.
+
+    For multi-worker deployments, implement the ``RateLimitStore`` protocol
+    with a shared backend (e.g. Redis) and pass it to ``create_app`` via
+    the ``rate_limit_store`` parameter, or register a factory via
+    ``create_rate_limit_store``.
+    """
 
     def __init__(
         self,
@@ -91,6 +103,16 @@ class InMemoryRateLimitStore:
         return len(timestamps) >= self._max_requests
 
 
+def create_rate_limit_store() -> RateLimitStore:
+    """Create the default rate-limit store.
+
+    Override this factory to plug in a shared backend for multi-worker
+    deployments (e.g. Redis).  The returned object must satisfy the
+    ``RateLimitStore`` protocol.
+    """
+    return InMemoryRateLimitStore()
+
+
 def _default_provider() -> ActionProvider:
     """Create the default filesystem-based provider (lazy import)."""
     from quodeq.provider.filesystem import FilesystemActionProvider
@@ -99,7 +121,7 @@ def _default_provider() -> ActionProvider:
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
     """Verify API key authentication when *api_key* is set."""
-    if request.path == "/api/health":
+    if request.path == _HEALTH_PATH:
         return None
     if api_key:
         auth = request.headers.get("Authorization", "")
@@ -113,10 +135,11 @@ def _check_csrf() -> Response | tuple[Response, int] | None:
     if request.method in ("GET", "HEAD", "OPTIONS"):
         return None
     origin = request.headers.get("Origin")
-    if origin:
-        allowed = {f"http://{request.host}", f"https://{request.host}"}
-        if origin not in allowed:
-            return jsonify({"error": "Origin not allowed", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+    if not origin:
+        return jsonify({"error": "Origin header required", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
+    allowed = {f"http://{request.host}", f"https://{request.host}"}
+    if origin not in allowed:
+        return jsonify({"error": "Origin not allowed", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
     return None
 
 
@@ -136,12 +159,23 @@ def create_app(
     provider: ActionProvider | None = None,
     static_dist: str | None = None,
     rate_limit_store: RateLimitStore | None = None,
+    api_key: str | None = None,
 ) -> Flask:
-    """Create and configure the Flask application with all API routes."""
+    """Create and configure the Flask application with all API routes.
+
+    *api_key* overrides the ``QUODEQ_API_KEY`` env-var lookup when provided,
+    making the app testable without environment mutation.  Pass an empty string
+    to explicitly disable authentication.
+    """
     app = Flask(__name__)
     provider = provider or _default_provider()
-    store = rate_limit_store or InMemoryRateLimitStore()
-    api_key = os.environ.get("QUODEQ_API_KEY")
+    store = rate_limit_store or create_rate_limit_store()
+    if api_key is None:
+        _msg = (
+            "QUODEQ_API_KEY is not set — API endpoints are unauthenticated. "
+            "Set QUODEQ_API_KEY for production use."
+        )
+        _logger.warning(_msg)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
@@ -173,7 +207,7 @@ def main() -> None:
     """Start the Flask development server using environment configuration."""
     import signal
 
-    app = create_app(static_dist=get_static_dist())
+    app = create_app(static_dist=get_static_dist(), api_key=os.environ.get("QUODEQ_API_KEY"))
 
     def _handle_shutdown(signum: int, frame: object) -> None:
         raise SystemExit(0)

@@ -24,18 +24,21 @@ GRADE_LADDER: list[str] = [
 # Asymmetric: max discount 15%, max penalty 30%.
 # Uses raw distinct type counts (no severity weighting) to avoid bias from
 # compliance findings that lack proper severity fields.
+_MAX_PENALTY_MULTIPLIER = 1.30
+
 _RATIO_DAMPENING_TABLE: list[tuple[float, float]] = [
     (3.0, 0.85),   # strong compliance evidence
     (2.0, 0.90),   # good compliance
     (1.0, 0.95),   # balanced
     (0.5, 1.00),   # neutral
     (0.0, 1.15),   # weak compliance (ratio > 0 but < 0.5)
-    (-1.0, 1.30),  # no compliance at all (sentinel, always matches)
+    (-1.0, _MAX_PENALTY_MULTIPLIER),  # no compliance at all (sentinel, always matches)
 ]
 
 # ---------------------------------------------------------------------------
 # Project-size scaling
 # ---------------------------------------------------------------------------
+# Scoring algorithm constants — modify via plugin configuration, not env vars.
 # Each entry is (min_file_count_inclusive, multiplier).
 # Tiers: Small (<500) x1 | Medium (500-5k) x2 | Large (5k-20k) x3
 #        XLarge (20k-50k) x4 | XXLarge (50k-100k) x5 | Enterprise (100k+) x6
@@ -70,24 +73,31 @@ def scale_multiplier(source_file_count: int) -> int:
 # Violation-type counting
 # ---------------------------------------------------------------------------
 
+def _tally_types(items: list[dict], key_field: str, skip_empty: bool = False) -> dict[str, int]:
+    """Count distinct types per severity bucket.
+
+    *key_field* selects which dict key to group by (e.g. ``"vt"`` or ``"reason"``).
+    When *skip_empty* is ``True``, items whose *key_field* is falsy are ignored.
+    """
+    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
+    for item in items:
+        value = item.get(key_field)
+        if skip_empty and not value:
+            continue
+        if value is None:
+            value = "unknown"
+        sev = item.get("severity", "minor")
+        buckets.setdefault(sev, set()).add(value)
+    return {sev: len(seen) for sev, seen in buckets.items()}
+
+
 def tally_types_by_taxonomy(violations: list[dict]) -> dict[str, int]:
     """Count distinct violation types per severity using the 'vt' taxonomy field.
 
     Only violations that carry a non-empty 'vt' value contribute; each unique
     (severity, vt) combination is counted once.
     """
-    buckets: dict[str, set] = {
-        "critical": set(),
-        "major": set(),
-        "minor": set(),
-    }
-    for item in violations:
-        vt_tag = item.get("vt")
-        if not vt_tag:
-            continue
-        sev = item.get("severity", "minor")
-        buckets.setdefault(sev, set()).add(vt_tag)
-    return {sev: len(seen) for sev, seen in buckets.items()}
+    return _tally_types(violations, "vt", skip_empty=True)
 
 
 def tally_types_by_reason(violations: list[dict]) -> dict[str, int]:
@@ -96,16 +106,7 @@ def tally_types_by_reason(violations: list[dict]) -> dict[str, int]:
     Used when no 'vt' field is present in the evidence; each unique reason
     string within a severity bucket is treated as one violation type.
     """
-    buckets: dict[str, set] = {
-        "critical": set(),
-        "major": set(),
-        "minor": set(),
-    }
-    for item in violations:
-        sev = item.get("severity", "minor")
-        reason = item.get("reason", "unknown")
-        buckets.setdefault(sev, set()).add(reason)
-    return {sev: len(seen) for sev, seen in buckets.items()}
+    return _tally_types(violations, "reason")
 
 
 def evidence_has_taxonomy(violations: list[dict]) -> bool:
@@ -119,24 +120,12 @@ def evidence_has_taxonomy(violations: list[dict]) -> bool:
 
 def tally_compliance_types_by_taxonomy(compliance: list[dict]) -> dict[str, int]:
     """Count distinct compliance types per severity using the 'vt' field."""
-    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
-    for item in compliance:
-        vt_tag = item.get("vt")
-        if not vt_tag:
-            continue
-        sev = item.get("severity", "minor")
-        buckets.setdefault(sev, set()).add(vt_tag)
-    return {sev: len(seen) for sev, seen in buckets.items()}
+    return _tally_types(compliance, "vt", skip_empty=True)
 
 
 def tally_compliance_types_by_reason(compliance: list[dict]) -> dict[str, int]:
     """Count distinct compliance types per severity using (severity, reason) pairs."""
-    buckets: dict[str, set] = {"critical": set(), "major": set(), "minor": set()}
-    for item in compliance:
-        sev = item.get("severity", "minor")
-        reason = item.get("reason", "unknown")
-        buckets.setdefault(sev, set()).add(reason)
-    return {sev: len(seen) for sev, seen in buckets.items()}
+    return _tally_types(compliance, "reason")
 
 
 def compliance_dampening(
@@ -148,17 +137,17 @@ def compliance_dampening(
     Uses raw distinct type counts (sum across all severities, no weighting)
     to avoid bias from compliance findings that lack severity fields.
 
-    Asymmetric: max discount 15% (0.85×), max penalty 30% (1.30×).
-    No compliance at all gets the full 1.30× penalty.
+    Asymmetric: max discount 15% (0.85x), max penalty 30% (1.30x).
+    No compliance at all gets the full 1.30x penalty.
     """
     total_compliance = sum(compliance_type_counts.values())
     total_violations = sum(violation_type_counts.values())
 
     if total_violations == 0:
-        return 1.0  # no violations → dampening is irrelevant
+        return 1.0  # no violations -> dampening is irrelevant
 
     if total_compliance == 0:
-        return 1.30  # no compliance at all → max penalty
+        return _MAX_PENALTY_MULTIPLIER  # no compliance at all -> max penalty
 
     ratio = total_compliance / total_violations
     for threshold, multiplier in _RATIO_DAMPENING_TABLE:
@@ -181,6 +170,17 @@ def drop_grade(grade: str, drops: int) -> str:
 # Confidence interval
 # ---------------------------------------------------------------------------
 
+_CI_BASE_WIDTH = 1.0
+_CI_LOW_CONFIDENCE_PENALTY = 1.0
+_CI_MEDIUM_CONFIDENCE_PENALTY = 0.5
+_CI_UNBALANCED_PENALTY = 0.5
+_CI_SPARSITY_PENALTY = 0.5
+_SPARSITY_RATIO = 0.01
+_CI_UNSTABLE_THRESHOLD = 1.5
+_GRADE_UNSTABLE_LABEL = "+/- 1 level"
+_GRADE_STABLE_LABEL = "stable"
+
+
 def confidence_interval_for(
     confidence_level: str,
     is_balanced: bool,
@@ -196,28 +196,28 @@ def confidence_interval_for(
 
     grade_stability is 'stable' unless the interval exceeds 1.5.
     """
-    width = 1.0
+    width = _CI_BASE_WIDTH
 
     if confidence_level == "low":
-        width += 1.0
+        width += _CI_LOW_CONFIDENCE_PENALTY
     elif confidence_level == "medium":
-        width += 0.5
+        width += _CI_MEDIUM_CONFIDENCE_PENALTY
 
     if not is_balanced:
-        width += 0.5
+        width += _CI_UNBALANCED_PENALTY
 
-    sparsity_floor = 0.01 * files_read if files_read > 0 else 0
+    sparsity_floor = _SPARSITY_RATIO * files_read if files_read > 0 else 0
     if sparsity_floor > 0 and total_instances < sparsity_floor:
-        width += 0.5
+        width += _CI_SPARSITY_PENALTY
 
     return {
         "confidence_interval": width,
-        "grade_stability": "± 1 level" if width > 1.5 else "stable",
+        "grade_stability": _GRADE_UNSTABLE_LABEL if width > _CI_UNSTABLE_THRESHOLD else _GRADE_STABLE_LABEL,
     }
 
 
 # ---------------------------------------------------------------------------
-# Numerical score → grade label
+# Numerical score -> grade label
 # ---------------------------------------------------------------------------
 
 _GRADE_THRESHOLDS: list[tuple[int, str]] = [
@@ -229,7 +229,7 @@ _GRADE_THRESHOLDS: list[tuple[int, str]] = [
 
 
 def score_to_grade_label(score: float) -> str:
-    """Convert a 0–10 numerical score to a descriptive grade label."""
+    """Convert a 0-10 numerical score to a descriptive grade label."""
     for threshold, label in _GRADE_THRESHOLDS:
         if score >= threshold:
             return label
@@ -240,13 +240,17 @@ def score_to_grade_label(score: float) -> str:
 # Weight parsing
 # ---------------------------------------------------------------------------
 
+_WEIGHT_TRIPLE = "x3"
+_WEIGHT_DOUBLE = "x2"
+
+
 def weight_as_multiplier(weight_str: str) -> int:
     """Extract the integer multiplier from a weight label like 'High (x3)'.
 
-    Recognises 'x3' → 3, 'x2' → 2, anything else → 1.
+    Recognises 'x3' -> 3, 'x2' -> 2, anything else -> 1.
     """
-    if "x3" in weight_str:
+    if _WEIGHT_TRIPLE in weight_str:
         return 3
-    if "x2" in weight_str:
+    if _WEIGHT_DOUBLE in weight_str:
         return 2
     return 1

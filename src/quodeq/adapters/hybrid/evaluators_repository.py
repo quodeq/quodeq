@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 from quodeq.adapters.hybrid._hybrid_call import hybrid_call
 from quodeq.ports.evaluators import EvaluatorsRepository
 
@@ -14,9 +16,20 @@ class HybridEvaluatorsRepository:
         self._fs = fs
 
     def list_evaluators(self, discipline: str) -> list[str]:
-        """Return all evaluator names for a discipline, preferring the web source."""
+        """Return all evaluator names for a discipline, preferring the web source.
+
+        Example::
+
+            repo = HybridEvaluatorsRepository(web=web_repo, fs=fs_repo)
+            names = repo.list_evaluators("python")
+        """
         return hybrid_call(self._web.list_evaluators, self._fs.list_evaluators, discipline)
 
-    def get_evaluator(self, discipline: str, dimension: str) -> dict:
-        """Fetch a single evaluator definition, preferring the web source."""
+    def get_evaluator(self, discipline: str, dimension: str) -> dict[str, Any]:
+        """Fetch a single evaluator definition, preferring the web source.
+
+        Example::
+
+            evaluator = repo.get_evaluator("python", "security")
+        """
         return hybrid_call(self._web.get_evaluator, self._fs.get_evaluator, discipline, dimension)

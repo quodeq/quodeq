@@ -12,18 +12,23 @@ from quodeq.config.prompt_templates import render_template
 
 _logger = logging.getLogger(__name__)
 
+_NO_GUIDANCE = "_No additional guidance._"
+_NO_STANDARDS = "_No compiled standards available._"
+_NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
+_STANDARDS_READ_ERROR = "_Could not read compiled standards._"
+
 
 def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
     """Render compiled standards as a requirements checklist organized by principle."""
     compiled_file = compiled_dir / f"{dimension}.json"
     if not compiled_file.exists():
-        return "_No compiled standards for this dimension._"
+        return _NO_STANDARDS_FOR_DIM
 
     try:
         data = json.loads(compiled_file.read_text())
     except (OSError, json.JSONDecodeError) as exc:
         _logger.warning("Could not read compiled standards %s: %s", compiled_file, exc)
-        return "_Could not read compiled standards._"
+        return _STANDARDS_READ_ERROR
     lines = []
     for principle in data.get("principles", []):
         reqs = principle.get("requirements", [])
@@ -102,7 +107,10 @@ class PromptContext:
     standards_dir: Path | None = None
 
 
-@lru_cache(maxsize=128)
+_TEMPLATE_HASH_CACHE_SIZE = 128
+
+
+@lru_cache(maxsize=_TEMPLATE_HASH_CACHE_SIZE)
 def _template_hash(template: str) -> str:
     """Return a short hash of the template string, computed once per unique template."""
     return hashlib.sha256(template.encode()).hexdigest()[:12]
@@ -113,7 +121,7 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
     dimensions_text = render_dimensions(context.dimensions_data, context.dimension)
     prompt_hash = _template_hash(template)
 
-    standards_checklist = "_No compiled standards available._"
+    standards_checklist = _NO_STANDARDS
     if context.standards_dir:
         compiled_dir = context.standards_dir / "compiled"
         if compiled_dir.exists():
@@ -128,7 +136,7 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
             "DIMENSION": context.dimension,
             "SOURCE_FILE_COUNT": str(context.source_file_count),
             "STANDARDS_CHECKLIST": standards_checklist,
-            "ANALYSIS_GUIDANCE": context.analysis_md or "_No additional guidance._",
+            "ANALYSIS_GUIDANCE": context.analysis_md or _NO_GUIDANCE,
             "DIMENSIONS": dimensions_text,
             "PROMPT_HASH": prompt_hash,
         },

@@ -24,6 +24,7 @@ from quodeq.engine.scoring_internals import (
 # Re-export public API symbols that other modules may import from here.
 _BASE_SCORE = 10
 _INSUFFICIENT_MAJORITY_RATIO = 0.5
+MODE_NUMERICAL = "numerical"
 
 __all__ = [
     "DEFAULT_WEIGHT",
@@ -145,55 +146,58 @@ def _score_principle_graded(ctx: _PrincipleContext) -> dict:
 # Main scoring entry points
 # ---------------------------------------------------------------------------
 
+def _build_principle_context(
+    key: str, pdata: dict, scale_mult: int, files_read: int,
+) -> _PrincipleContext:
+    """Extract evidence data for a single principle and return a scoring context."""
+    metrics = pdata.get("metrics", {})
+    pct = metrics.get("compliance_percentage", 0.0)
+    violations = pdata.get("violations", [])
+    compliance = pdata.get("compliance", [])
+    conf_level = metrics.get("confidence_level", "medium")
+
+    using_taxonomy = evidence_has_taxonomy(violations)
+    vt_counts = (
+        tally_types_by_taxonomy(violations)
+        if using_taxonomy
+        else tally_types_by_reason(violations)
+    )
+    ct_counts = (
+        tally_compliance_types_by_taxonomy(compliance)
+        if using_taxonomy
+        else tally_compliance_types_by_reason(compliance)
+    )
+    dampen = compliance_dampening(ct_counts, vt_counts)
+    ci = confidence_interval_for(
+        confidence_level=conf_level,
+        is_balanced=metrics.get("is_balanced", True),
+        total_instances=metrics.get("total_instances", 0),
+        files_read=files_read,
+    )
+    return _PrincipleContext(
+        key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
+        dampening=dampen, using_taxonomy=using_taxonomy,
+        conf_level=conf_level, ci=ci, scale_mult=scale_mult,
+    )
+
+
 def _score_all_principles(
     raw_principles: dict, mode: str, scale_mult: int, files_read: int,
 ) -> dict:
     """Score every principle in *raw_principles* and return the per-principle dict."""
+    scorer = _score_principle_numerical if mode == MODE_NUMERICAL else _score_principle_graded
     per_principle: dict = {}
     for key, pdata in raw_principles.items():
-        metrics = pdata.get("metrics", {})
-        pct = metrics.get("compliance_percentage", 0.0)
-        violations = pdata.get("violations", [])
-        compliance = pdata.get("compliance", [])
-        conf_level = metrics.get("confidence_level", "medium")
-
-        using_taxonomy = evidence_has_taxonomy(violations)
-        vt_counts = (
-            tally_types_by_taxonomy(violations)
-            if using_taxonomy
-            else tally_types_by_reason(violations)
-        )
-        ct_counts = (
-            tally_compliance_types_by_taxonomy(compliance)
-            if using_taxonomy
-            else tally_compliance_types_by_reason(compliance)
-        )
-        dampen = compliance_dampening(ct_counts, vt_counts)
-        ci = confidence_interval_for(
-            confidence_level=conf_level,
-            is_balanced=metrics.get("is_balanced", True),
-            total_instances=metrics.get("total_instances", 0),
-            files_read=files_read,
-        )
-        ctx = _PrincipleContext(
-            key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
-            dampening=dampen, using_taxonomy=using_taxonomy,
-            conf_level=conf_level, ci=ci, scale_mult=scale_mult,
-        )
-        if mode == "numerical":
-            per_principle[key] = _score_principle_numerical(ctx)
-        else:
-            per_principle[key] = _score_principle_graded(ctx)
+        ctx = _build_principle_context(key, pdata, scale_mult, files_read)
+        per_principle[key] = scorer(ctx)
     return per_principle
 
 
-def run_scoring(evidence: dict, mapping: dict, mode: str) -> dict:
+def run_scoring(evidence: dict, mode: str) -> dict:
     """Compute per-principle scores and return the full result dictionary.
 
     Args:
         evidence: Parsed evidence JSON for a single evaluation dimension.
-        mapping:  Parsed mapping JSON (not used internally but kept for API
-                  compatibility with callers that pass it).
         mode:     'numerical' or 'non-numerical'.
 
     Returns:
@@ -241,7 +245,7 @@ def _accumulate_weights(
             continue
         multiplier = weight_as_multiplier(pdata.get("weight", DEFAULT_WEIGHT))
         total_weight += multiplier
-        if mode == "numerical":
+        if mode == MODE_NUMERICAL:
             total_value += pdata["final_score"] * multiplier
         else:
             total_value += GRADE_LADDER.index(pdata["grade"]) * multiplier
@@ -250,7 +254,7 @@ def _accumulate_weights(
 
 def _build_overall_result(mode: str, total_weight: int, total_value: float) -> dict:
     """Build the overall result dict from aggregated weights."""
-    if mode == "numerical":
+    if mode == MODE_NUMERICAL:
         mean_score = round(total_value / total_weight, 1)
         return {
             "weighted_score": mean_score,
@@ -267,7 +271,7 @@ def _weighted_overall(principles_scores: dict, mode: str) -> dict:
     tw, tv, total, insuff = _accumulate_weights(principles_scores, mode)
 
     if tw == 0:
-        if mode == "numerical":
+        if mode == MODE_NUMERICAL:
             return {"weighted_score": 0.0, "grade": "Insufficient"}
         return {"weighted_grade": "Insufficient"}
 
@@ -285,4 +289,4 @@ def _weighted_overall(principles_scores: dict, mode: str) -> dict:
 def score_evidence(evidence: Evidence, mode: str = "numerical") -> dict:
     """Score Evidence using the scoring engine."""
     ev_dict = evidence.to_evidence_dict()
-    return run_scoring(ev_dict, mapping={}, mode=mode)
+    return run_scoring(ev_dict, mode=mode)

@@ -13,18 +13,40 @@ class _ServerArgs:
     agent_id: str = ""
 
 
-def _parse_args() -> _ServerArgs:
-    """Parse CLI arguments for the MCP findings server."""
+_FLAG_MAP = {
+    "--compiled-dir": "compiled_dir",
+    "--dimension": "dimension",
+    "--queue": "queue_path",
+    "--agent-id": "agent_id",
+}
+
+_USAGE = """\
+Usage: mcp_findings.py <findings_file> [OPTIONS]
+
+Options:
+  --compiled-dir DIR   Directory containing compiled standards
+  --dimension DIM      Dimension to evaluate
+  --queue PATH         Path to the file queue JSON
+  --agent-id ID        Agent identifier
+  -h, --help           Show this help message and exit
+"""
+
+
+def _parse_args(argv: list[str] | None = None) -> _ServerArgs:
+    """Parse CLI arguments for the MCP findings server.
+
+    *argv* overrides ``sys.argv[1:]`` when provided, making the parser
+    testable without monkeypatching sys.argv.
+    """
     from quodeq.shared.utils import get_findings_file
 
     result = _ServerArgs()
-    args = sys.argv[1:]
-    _FLAG_MAP = {
-        "--compiled-dir": "compiled_dir",
-        "--dimension": "dimension",
-        "--queue": "queue_path",
-        "--agent-id": "agent_id",
-    }
+    args = argv if argv is not None else sys.argv[1:]
+
+    if "--help" in args or "-h" in args:
+        sys.stdout.write(_USAGE)
+        raise SystemExit(0)
+
     i = 0
     while i < len(args):
         if args[i] in _FLAG_MAP and i + 1 < len(args):
@@ -34,6 +56,7 @@ def _parse_args() -> _ServerArgs:
             result.findings_file = args[i]
             i += 1
         else:
+            sys.stderr.write(f"Warning: unrecognised argument '{args[i]}'\n")
             i += 1
 
     if not result.findings_file:

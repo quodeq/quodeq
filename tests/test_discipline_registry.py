@@ -72,7 +72,8 @@ detect_fallback=true
     registry = DisciplineRegistry.from_file(conf)
     matches = registry.detect_matches(repo)
     assert "frontend_react" in matches
-    assert "nodejs" in matches
+    # nodejs has detect_fallback=true — excluded when a non-fallback matched
+    assert "nodejs" not in matches
 
 
 def test_choose_highest_priority(tmp_path: Path):

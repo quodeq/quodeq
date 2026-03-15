@@ -6,22 +6,22 @@ Merge per-dimension Evidence into a single Evidence object.
 from __future__ import annotations
 
 import json
-import sys
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, TypedDict
+from typing import Any
 
 from quodeq.engine.analysis import AnalysisConfig, HeartbeatCallback, count_files_from_stream, run_analysis
 from quodeq.engine.stream_parser import extract_evidence_from_stream
 from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid
 from quodeq.engine.evidence import Evidence
 from quodeq.engine._merge import merge_evidence
+from quodeq.engine._runner_markers import CC_MARKER_KEY, cleanup_stream, emit_marker, make_heartbeat
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
-
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -50,36 +50,6 @@ class RunConfig:
     options: AnalysisOptions = field(default_factory=AnalysisOptions)
 
 
-CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
-
-
-class _MarkerFields(TypedDict, total=False):
-    dimension: str
-    dimensions: list[str]
-
-
-def _emit_marker(phase: str, **kwargs: _MarkerFields) -> None:
-    """Emit a structured JSON marker (only when stdout is not a TTY)."""
-    if sys.stdout.isatty():
-        return
-    print(json.dumps({CC_MARKER_KEY: phase, **kwargs}), flush=True)
-
-
-def _make_heartbeat(dim_name: str, idx: int, total: int) -> Callable[[int, dict], None]:
-    """Return a heartbeat callback that prints progress to stdout."""
-    def _cb(elapsed: int, progress: dict) -> None:
-        secs = elapsed % 60
-        mins = elapsed // 60
-        evidence = progress.get("evidence", 0)
-        log_info(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {evidence} findings")
-    return _cb
-
-
-def cleanup_stream(stream_file: Path) -> None:
-    """Remove stream and stderr files after successful evidence extraction."""
-    stream_file.unlink(missing_ok=True)
-    err_file = Path(str(stream_file) + ".err")
-    err_file.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)
@@ -124,7 +94,7 @@ def _run_dimension_analysis(
     stream_file = evidence_dir / f"{dim_id}_live.stream"
     jsonl_file = evidence_dir / f"{dim_id}_evidence.jsonl"
 
-    heartbeat = config.options.heartbeat_callback or _make_heartbeat(dim_id, idx, ctx.total)
+    heartbeat = config.options.heartbeat_callback or make_heartbeat(dim_id, idx, ctx.total)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     ac_kwargs: dict[str, Any] = dict(
@@ -210,11 +180,14 @@ def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
     full = load_plugin_full(plugin_dir)
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
     all_dims_raw = [d.get("id") for d in full["dimensions"].get("applies", []) if d.get("id")]
-    dimensions = [d for d in all_dims_raw if d in config.options.dimensions] if config.options.dimensions else all_dims_raw
+    if config.options.dimensions:
+        dimensions = [d for d in all_dims_raw if d in config.options.dimensions]
+    else:
+        dimensions = all_dims_raw
 
     ctx = _PluginContext(
         dimensions_data=full["dimensions"],
-        analysis_md=analysis_file.read_text() if analysis_file.exists() else "",
+        analysis_md=analysis_file.read_text(encoding=TEXT_ENCODING) if analysis_file.exists() else "",
         date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         template=load_template(config.options.template_path),
         plugin_name=full["plugin"].get("name", config.plugin_id),
@@ -227,11 +200,19 @@ class EvaluationError(RuntimeError):
     """Raised when an evaluation completes but produces no usable findings."""
 
 
+def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) -> None:
+    """Emit scoring marker and log summary for a completed dimension."""
+    emit_marker("scoring", dimension=dimension)
+    violations = sum(len(pe.violations) for pe in ev.principles.values())
+    compliances = sum(len(pe.compliance) for pe in ev.principles.values())
+    log_success(f"[{idx}/{total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")
+
+
 def _process_single_dimension(
     config: RunConfig, dimension: str, idx: int, ctx: _PluginContext,
 ) -> Evidence | None:
     """Analyze a single dimension: build prompt, run AI, parse evidence."""
-    _emit_marker("analyzing", dimension=dimension)
+    emit_marker("analyzing", dimension=dimension)
     log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
     if config.options.n_subagents > 1:
@@ -245,10 +226,7 @@ def _process_single_dimension(
         log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
         return None
 
-    _emit_marker("scoring", dimension=dimension)
-    violations = sum(len(pe.violations) for pe in ev.principles.values())
-    compliances = sum(len(pe.compliance) for pe in ev.principles.values())
-    log_success(f"[{idx}/{ctx.total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")
+    _log_dimension_result(ev, dimension, idx, ctx.total)
     return ev
 
 
@@ -256,7 +234,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
     dimensions, ctx = _load_plugin_context(config)
     result: dict[str, Evidence] = {}
-    _emit_marker("setup", dimensions=dimensions)
+    emit_marker("setup", dimensions=dimensions)
     skipped_count = 0
 
     for idx, dimension in enumerate(dimensions, 1):

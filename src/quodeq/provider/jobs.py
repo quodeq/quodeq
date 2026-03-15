@@ -7,19 +7,24 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 import json
 import os
+from pathlib import Path
 import re
 import threading
 import uuid
 from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 
+import logging
 import subprocess
 
 from quodeq.engine.runner import CC_MARKER_KEY
 
-MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
+_logger = logging.getLogger(__name__)
+
+_MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
+_CONSUME_BATCH_SIZE = 32
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 
 
@@ -33,7 +38,7 @@ class Job:
     started_at: str
     ended_at: str | None
     exit_code: int | None
-    logs: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_LOG_LINES))
+    logs: deque[str] = field(default_factory=lambda: deque(maxlen=_MAX_LOG_LINES))
     output_project: str | None = None
     output_run_id: str | None = None
     phase: str | None = None
@@ -45,7 +50,7 @@ class Job:
         return {
             "jobId": self.job_id,
             "status": self.status,
-            "command": self.command[0] if self.command else "",
+            "command": Path(self.command[0]).name if self.command else "",
             "startedAt": self.started_at,
             "endedAt": self.ended_at,
             "exitCode": self.exit_code,
@@ -86,7 +91,19 @@ class JobStore(Protocol):
 
 
 class InMemoryJobStore:
-    """Process-local job store backed by a plain dict."""
+    """Process-local job store backed by a plain dict.
+
+    .. warning::
+
+       All job state lives in process memory and is lost on restart.
+       This store cannot be shared across workers or processes.
+
+    For multi-worker deployments, implement the ``JobStore`` protocol
+    with a persistent backend (e.g. database, Redis) and pass it to
+    ``JobManager`` via the ``job_store`` parameter, or override
+    ``create_job_store``.
+    """
+    # See https://github.com/anthropics/quodeq/issues/42 for persistent adapter plans.
 
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
@@ -104,6 +121,15 @@ class InMemoryJobStore:
         self._jobs.pop(job_id, None)
 
 
+def create_job_store() -> JobStore:
+    """Create the default job store.
+
+    Override this factory to plug in a persistent backend for multi-worker
+    deployments.  The returned object must satisfy the ``JobStore`` protocol.
+    """
+    return InMemoryJobStore()
+
+
 class JobManager:
     """Thread-safe manager for spawning and tracking evaluation subprocesses.
 
@@ -116,11 +142,13 @@ class JobManager:
         self,
         spawn_impl: Callable[..., subprocess.Popen] | None = None,
         job_store: JobStore | None = None,
+        on_job_complete: Callable[[str, Job], None] | None = None,
     ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
-        self._store: JobStore = job_store or InMemoryJobStore()
+        self._store: JobStore = job_store or create_job_store()
         self._processes: dict[str, Any] = {}
         self._lock = threading.Lock()
+        self._on_job_complete = on_job_complete
 
     def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
         """Spawn a subprocess and return its initial job state."""
@@ -144,12 +172,16 @@ class JobManager:
                 env=env,
             )
         except (OSError, subprocess.SubprocessError) as exc:
+            _logger.error("Failed to start job subprocess: %s", exc)
             job.status = "failed"
             job.ended_at = datetime.now(timezone.utc).isoformat()
             job.exit_code = -1
+            job.logs.append(f"Failed to start process: {exc}")
             with self._lock:
                 self._store.put(job)
-            return job.to_dict()
+            result = job.to_dict()
+            result["error"] = str(exc)
+            return result
 
         with self._lock:
             self._store.put(job)
@@ -215,16 +247,28 @@ class JobManager:
             job.output_project = match.group(1)
             job.output_run_id = match.group(2)
 
+    def _flush_batch(self, job_id: str, batch: list[str]) -> bool:
+        """Write accumulated log lines to the job. Returns False if job disappeared."""
+        with self._lock:
+            job = self._store.get(job_id)
+            if not job:
+                return False
+            for stripped in batch:
+                self._append_log(job, stripped)
+        return True
+
     def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
         if stream is None:
             return
+        batch: list[str] = []
         for line in stream:
-            stripped = line.rstrip("\n")
-            with self._lock:
-                job = self._store.get(job_id)
-                if not job:
+            batch.append(line.rstrip("\n"))
+            if len(batch) >= _CONSUME_BATCH_SIZE:
+                if not self._flush_batch(job_id, batch):
                     return
-                self._append_log(job, stripped)
+                batch.clear()
+        if batch:
+            self._flush_batch(job_id, batch)
 
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
@@ -247,3 +291,5 @@ class JobManager:
             job.status = "done" if exit_code == 0 else "failed"
             self._store.put(job)
             self._evict_completed_jobs()
+        if self._on_job_complete is not None:
+            self._on_job_complete(job_id, job)

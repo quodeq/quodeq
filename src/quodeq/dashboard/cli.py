@@ -10,13 +10,17 @@ from quodeq.shared.utils import get_dashboard_port, get_evaluations_dir, get_sta
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
 
 
+# Walk up from src/quodeq/dashboard/cli.py to project root (4 levels: dashboard -> quodeq -> src -> root)
+_DIST_PARENT_DEPTH = 4
+_DEV_STATIC_DIST = Path(__file__).resolve().parents[_DIST_PARENT_DEPTH - 1] / "ui" / "web" / "dist"
+
+
 def _default_static_dist() -> str:
     """Return the best default for --static-dist (bundled or development)."""
     bundled = get_static_dist()
     if bundled:
         return bundled
-    # Fall back to ui/web/dist relative to the project root (3 levels up from this file)
-    return str(Path(__file__).resolve().parent.parent.parent.parent / "ui" / "web" / "dist")
+    return str(_DEV_STATIC_DIST)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -38,7 +42,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="Skip rebuilding the UI before starting the server")
     parser.add_argument("--reinstall", action="store_true",
                         help="Force reinstallation of UI dependencies before building")
-    parser.add_argument("--open", default="true",
+    parser.add_argument("--open", action=argparse.BooleanOptionalAction, default=True,
                         help="Open the dashboard in a browser after starting (default: %(default)s)")
     return parser
 
@@ -58,7 +62,7 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
             api_forced=api_forced,
         ),
         build=BuildConfig(
-            open_browser=args.open.lower() != "false",
+            open_browser=bool(args.open),
             no_build=args.no_build,
             reinstall=args.reinstall,
         ),

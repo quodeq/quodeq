@@ -1,4 +1,4 @@
-"""AI CLI subprocess runner — spawns the AI CLI, captures stream-json, extracts JSONL."""
+"""AI CLI subprocess runner -- spawns the AI CLI, captures stream-json, extracts JSONL."""
 from __future__ import annotations
 
 import json
@@ -14,11 +14,10 @@ from typing import Callable
 from quodeq.engine.analysis_stream import (
     count_files_in_stream,
     count_jsonl_lines,
-    extract_files_from_event,
-    parse_stream_event,
 )
+from quodeq.engine._progress_reader import _IncrementalProgressReader
 from quodeq.shared.logging import log_debug, log_warning
-from quodeq.shared.utils import get_ai_cmd, get_ai_model
+from quodeq.shared.utils import get_ai_cmd, get_ai_model, sanitize_sensitive as _sanitize_stderr
 
 HeartbeatCallback = Callable[[int, dict], None]
 
@@ -89,14 +88,25 @@ _DEFAULT_AI_TOOLS = "Glob,Grep,Read"
 _DEFAULT_BASE_AI_ARGS = "--print --output-format stream-json --verbose"
 
 
-def _get_ai_tools() -> str:
-    return os.environ.get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
+def _get_ai_tools(env: dict[str, str] | None = None) -> str:
+    """Return the comma-separated list of AI tools to enable.
+
+    Reads QUODEQ_AI_TOOLS from the environment (default: "Glob,Grep,Read").
+    """
+    return (env or os.environ).get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
 
 
-def _get_base_ai_args() -> tuple[str, ...]:
-    return tuple(os.environ.get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
+def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
+    """Return base CLI arguments for the AI subprocess.
 
-_PROVIDER_CONFIGS: dict[str, dict] = {
+    Reads QUODEQ_AI_BASE_ARGS from the environment
+    (default: "--print --output-format stream-json --verbose").
+    """
+    return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
+
+_AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
+
+_PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
     "claude": {
         "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
         "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
@@ -108,6 +118,17 @@ _PROVIDER_CONFIGS: dict[str, dict] = {
         "env_remove": [],
     },
 }
+
+
+def _load_provider_configs() -> dict[str, dict]:
+    """Load AI provider configs from external JSON, falling back to built-in defaults."""
+    try:
+        return json.loads(_AI_PROVIDERS_PATH.read_text())
+    except (OSError, json.JSONDecodeError):
+        return _PROVIDER_CONFIGS_FALLBACK
+
+
+_PROVIDER_CONFIGS: dict[str, dict] = _load_provider_configs()
 
 
 class AnalysisError(RuntimeError):
@@ -159,52 +180,6 @@ def _terminate_process(process: subprocess.Popen) -> None:
         process.kill()
 
 
-class _IncrementalProgressReader:
-    """Reads new bytes from stream/JSONL files since last check."""
-
-    def __init__(self, stream_file: Path, jsonl_file: Path | None) -> None:
-        self._stream_file = stream_file
-        self._jsonl_file = jsonl_file
-        self._stream_offset = 0
-        self._jsonl_offset = 0
-        self._seen_files: set[str] = set()
-        self._jsonl_count = 0
-
-    def read_progress(self) -> dict:
-        """Return incremental progress since the last call."""
-        self._read_stream()
-        self._read_jsonl()
-        return {"files_read": len(self._seen_files), "evidence": self._jsonl_count}
-
-    def _read_stream(self) -> None:
-        try:
-            with open(self._stream_file, "rb") as f:
-                f.seek(self._stream_offset)
-                new_bytes = f.read()
-                self._stream_offset += len(new_bytes)
-            for line in new_bytes.decode("utf-8", errors="replace").splitlines():
-                data = parse_stream_event(line)
-                if data is not None:
-                    self._seen_files.update(extract_files_from_event(data))
-        except (OSError, ValueError) as exc:
-            log_debug(f"Failed to read stream {self._stream_file}: {exc}")
-
-    def _read_jsonl(self) -> None:
-        if self._jsonl_file is None or not self._jsonl_file.exists():
-            return
-        try:
-            with open(self._jsonl_file, "rb") as jf:
-                jf.seek(self._jsonl_offset)
-                new_bytes = jf.read()
-                self._jsonl_offset += len(new_bytes)
-            self._jsonl_count += sum(
-                1 for line in new_bytes.decode("utf-8", errors="replace").splitlines()
-                if line.strip()
-            )
-        except OSError as exc:
-            log_debug(f"Failed to read JSONL {self._jsonl_file}: {exc}")
-
-
 def _run_with_heartbeat(
     process: subprocess.Popen,
     config: AnalysisConfig,
@@ -227,7 +202,10 @@ def _run_with_heartbeat(
             if config.heartbeat_callback:
                 config.heartbeat_callback(elapsed, reader.read_progress())
             if config.max_duration is not None and elapsed >= config.max_duration:
-                log_warning(f"Analysis exceeded max duration ({config.max_duration}s) — terminating")
+                log_warning(
+                    f"Analysis exceeded max duration ({config.max_duration}s) "
+                    f"-- terminating. Increase with --max-duration or QUODEQ_MAX_DURATION env var."
+                )
                 _terminate_process(process)
                 timed_out = True
     return timed_out
@@ -245,17 +223,6 @@ def _build_analysis_env(ai_cmd: str | None = None) -> dict[str, str]:
     return env
 
 
-_SENSITIVE_PATTERNS = re.compile(
-    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
-    re.IGNORECASE,
-)
-
-
-def _sanitize_stderr(text: str) -> str:
-    """Remove potential secrets from stderr output before including in errors."""
-    return _SENSITIVE_PATTERNS.sub(r"\1=***", text)
-
-
 def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
     """Raise AnalysisError if the process exited with a non-zero code."""
     if process.returncode != 0:
@@ -271,6 +238,20 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
         )
 
 
+def _spawn_and_monitor(
+    args: list[str], work_dir: Path, env: dict,
+    stream_file: Path, stream_err: Path, cfg: AnalysisConfig,
+) -> tuple[subprocess.Popen, bool]:
+    """Spawn the AI CLI process, monitor with heartbeat, return (process, timed_out)."""
+    with open(stream_file, "w") as out, open(stream_err, "w") as err:
+        process = subprocess.Popen(
+            args, cwd=str(work_dir), env=env,
+            stdout=out, stderr=err, stdin=subprocess.DEVNULL,
+        )
+        timed_out = _run_with_heartbeat(process, cfg, stream_file)
+    return process, timed_out
+
+
 def run_analysis(
     work_dir: Path, prompt: str, stream_file: Path,
     config: AnalysisConfig | None = None,
@@ -282,18 +263,10 @@ def run_analysis(
     stream_err = Path(str(stream_file) + ".err")
 
     try:
-        with open(stream_file, "w") as out, open(stream_err, "w") as err:
-            process = subprocess.Popen(
-                args, cwd=str(work_dir), env=env,
-                stdout=out, stderr=err, stdin=subprocess.DEVNULL,
-            )
-            timed_out = _run_with_heartbeat(process, cfg, stream_file)
+        process, timed_out = _spawn_and_monitor(args, work_dir, env, stream_file, stream_err, cfg)
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
 
-    # When terminated by timeout, the evidence collected so far is still valid
-    # (MCP server writes findings to JSONL in real time). Skip the error check
-    # so the pipeline can score whatever was gathered before the cutoff.
     if not timed_out:
         _check_process_result(process, stream_err)

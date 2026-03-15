@@ -1,8 +1,10 @@
 """Accumulated (cross-run) view logic for the filesystem action provider."""
 from __future__ import annotations
 
+import os
 import threading
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -17,11 +19,20 @@ from quodeq.adapters.fs.report_parser import (
 from quodeq.provider._cache import make_lru_dimension_fetcher
 
 # Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
-# Process-local cache; in multi-worker deployments, replace with a shared cache
-# (Redis, memcached) via the dimension_fetcher callable.
+# For multi-worker deployments, override the cache via compute_accumulated(cache_config=...)
+# or supply a shared backend (e.g. Redis OrderedDict wrapper) through AccumulatedCacheConfig.
 _ACC_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
-_ACC_DIM_CACHE_MAX = 256
 _ACC_DIM_LOCK = threading.Lock()
+
+
+_DEFAULT_ACC_CACHE_MAX = 256
+
+
+def _acc_dim_cache_max(override: int | None = None) -> int:
+    """Return the accumulated-view cache size limit. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
 
 
 def _make_acc_dimension_fetcher(
@@ -29,7 +40,7 @@ def _make_acc_dimension_fetcher(
 ) -> Callable[[str], list[dict[str, Any]]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
     return make_lru_dimension_fetcher(
-        reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _ACC_DIM_CACHE_MAX,
+        reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max(),
     )
 
 
@@ -140,8 +151,90 @@ def _compute_accumulated_scores(
     return avg_score, prev_avg_score
 
 
-def compute_accumulated(reports_dir: str, project: str, as_of: str | None) -> dict[str, Any] | None:
-    """Compute the accumulated (cross-run) view for *project*."""
+@dataclass
+class AccumulatedCacheConfig:
+    """Optional cache parameters for compute_accumulated (overrides module-level cache)."""
+
+    cache: OrderedDict[tuple, list[dict[str, Any]]] = field(default_factory=OrderedDict)
+    cache_lock: threading.Lock = field(default_factory=threading.Lock)
+    cache_max: int | None = None
+
+
+def _resolve_cache(
+    cache_config: AccumulatedCacheConfig | None,
+) -> tuple[OrderedDict, threading.Lock, int]:
+    """Resolve cache, lock, and max-size from *cache_config* or module defaults."""
+    if cache_config is not None:
+        return (
+            cache_config.cache,
+            cache_config.cache_lock,
+            cache_config.cache_max if cache_config.cache_max is not None else _acc_dim_cache_max(),
+        )
+    return _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max()
+
+
+@dataclass(frozen=True)
+class _AccumulatedResult:
+    """Pre-computed parts for the accumulated response."""
+    all_dimensions: list[dict[str, Any]]
+    dimensions_with_trend: list[dict[str, Any]]
+    severity: dict[str, int]
+    avg_score: float | None
+    prev_avg_score: float | None
+
+
+def _build_accumulated_response(
+    project: str,
+    result: _AccumulatedResult,
+) -> dict[str, Any]:
+    """Assemble the final accumulated response dict."""
+    return {
+        "project": project,
+        "dimensions": result.dimensions_with_trend,
+        "summary": {
+            "overallGrade": most_frequent_grade(
+                [d.get("overallGrade") for d in result.all_dimensions if d.get("overallGrade")]
+            ),
+            "numericAverage": result.avg_score,
+            "previousNumericAverage": result.prev_avg_score,
+            "totalViolations": result.severity["totalViolations"],
+            "totalCompliance": result.severity["totalCompliance"],
+            "dimensionCount": len(result.dimensions_with_trend),
+            "severity": {"critical": result.severity["critical"], "major": result.severity["major"], "minor": result.severity["minor"]},
+        },
+    }
+
+
+def _compute_result(
+    reports_root: Path, project: str, all_run_infos: list[RunInfo],
+    cache_config: AccumulatedCacheConfig | None,
+) -> _AccumulatedResult:
+    """Load run data and compute trends, severity, and scores."""
+    runs = [r.run_id for r in all_run_infos]
+    _cache, _lock, _max = _resolve_cache(cache_config)
+    get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
+    latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
+        reports_root, project, all_run_infos, runs, get_run_data
+    )
+    all_dimensions = list(latest_by_dimension.values())
+    dimensions_with_trend = _compute_accumulated_trends(all_dimensions, prev_occurrence)
+    severity = _aggregate_severity_counts(all_dimensions)
+    avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, prev_run_latest)
+    return _AccumulatedResult(all_dimensions, dimensions_with_trend, severity, avg_score, prev_avg_score)
+
+
+def compute_accumulated(
+    reports_dir: str,
+    project: str,
+    as_of: str | None,
+    *,
+    cache_config: AccumulatedCacheConfig | None = None,
+) -> dict[str, Any] | None:
+    """Compute the accumulated (cross-run) view for *project*.
+
+    Optional *cache_config* overrides the module-level LRU cache, making
+    the function testable without global state mutation.
+    """
     reports_root = Path(reports_dir)
     project_path = reports_root / project
     if not project_path.exists():
@@ -151,31 +244,8 @@ def compute_accumulated(reports_dir: str, project: str, as_of: str | None) -> di
     if as_of:
         as_of_idx = next((idx for idx, r in enumerate(all_run_infos) if r.run_id == as_of), None)
         all_run_infos = all_run_infos[as_of_idx:] if as_of_idx is not None else []
-    runs = [r.run_id for r in all_run_infos]
-    if not runs:
+    if not all_run_infos:
         return None
 
-    get_run_data = _make_acc_dimension_fetcher(reports_root, project)
-    latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, all_run_infos, runs, get_run_data
-    )
-    all_dimensions = list(latest_by_dimension.values())
-    dimensions_with_trend = _compute_accumulated_trends(all_dimensions, prev_occurrence)
-    severity = _aggregate_severity_counts(all_dimensions)
-    avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, prev_run_latest)
-
-    return {
-        "project": project,
-        "dimensions": dimensions_with_trend,
-        "summary": {
-            "overallGrade": most_frequent_grade(
-                [d.get("overallGrade") for d in all_dimensions if d.get("overallGrade")]
-            ),
-            "numericAverage": avg_score,
-            "previousNumericAverage": prev_avg_score,
-            "totalViolations": severity["totalViolations"],
-            "totalCompliance": severity["totalCompliance"],
-            "dimensionCount": len(dimensions_with_trend),
-            "severity": {"critical": severity["critical"], "major": severity["major"], "minor": severity["minor"]},
-        },
-    }
+    result = _compute_result(reports_root, project, all_run_infos, cache_config)
+    return _build_accumulated_response(project, result)

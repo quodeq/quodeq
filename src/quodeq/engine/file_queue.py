@@ -3,6 +3,11 @@
 Backed by a JSON file with atomic writes (write-to-temp + rename).
 Cross-process safe via file locking (fcntl on Unix, msvcrt on Windows; both imported lazily).
 Maintains a take log so no file is silently lost.
+
+**Scaling note:** ``FileQueue`` relies on OS-level file locking, which
+requires a shared filesystem.  For multi-machine deployments, implement
+the ``WorkQueue`` protocol with a networked backend (e.g. Redis, SQS)
+and inject it at the orchestration layer.
 """
 from __future__ import annotations
 
@@ -71,6 +76,7 @@ class FileQueueError(RuntimeError):
 
 
 class FileQueue:
+    # NOTE: Single-node only. Replace with a distributed queue (Redis, SQS) for horizontal scaling.
     """Distributes files across N subagent processes.
 
     The queue state lives in a JSON file::
@@ -146,6 +152,13 @@ class FileQueue:
         with self._locked():
             state = self._read_state()
         return len(state["pending"])
+
+    def stats(self) -> tuple[int, int]:
+        """Return (remaining, taken) counts in a single file read."""
+        with self._locked():
+            state = self._read_state()
+        taken = sum(len(e["files"]) for e in state["taken"])
+        return len(state["pending"]), taken
 
     def taken_log(self) -> list[dict]:
         """Return the full take log for audit / crash recovery."""

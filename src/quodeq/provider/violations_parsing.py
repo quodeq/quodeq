@@ -3,43 +3,62 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
-from quodeq.engine.analysis_stream import extract_files_from_event
+from quodeq.engine.analysis_stream import count_files_in_stream, extract_files_from_event
 from quodeq.engine.evidence_parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
+from quodeq.shared.utils import TEXT_ENCODING
+
+_logger = logging.getLogger(__name__)
+
+_TYPE_VIOLATION = "violation"
+_TYPE_COMPLIANCE = "compliance"
+_FINDING_TYPES = frozenset({_TYPE_VIOLATION, _TYPE_COMPLIANCE})
+
+
+@dataclass(frozen=True)
+class _ResponseOptions:
+    """Keyword-only parameters for _build_violation_response."""
+    partial: bool = False
+    progress: dict[str, int] | None = None
 
 
 def _build_violation_response(
     ctx: ViolationContext,
     violations: list[dict[str, Any]],
     compliance: list[dict[str, Any]],
-    *,
-    partial: bool = False,
-    progress: dict[str, int] | None = None,
-    files_read: int = 0,
+    options: _ResponseOptions | None = None,
 ) -> dict[str, Any]:
     """Build the common response dict for violation/compliance parse results."""
+    opts = options or _ResponseOptions()
     result: dict[str, Any] = {
         "dimension": ctx.dimension,
         "runId": ctx.run_id,
         "project": ctx.project,
         "violations": violations,
         "compliance": compliance,
-        "partial": partial,
+        "partial": opts.partial,
     }
-    if progress is not None:
-        result["progress"] = progress
+    if opts.progress is not None:
+        result["progress"] = opts.progress
     return result
 
 
 def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None) -> dict[str, Any]:
     """Build a normalized finding dict from a raw JSON object."""
     req = obj.get("req")
-    all_req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
-    req_refs = resolve_llm_refs(obj.get("refs"), all_req_refs)
+    # Prefer MCP-enriched req_refs (already filtered to best-match);
+    # fall back to compiled-standards lookup + LLM ref selection.
+    pre_resolved = obj.get("req_refs")
+    if isinstance(pre_resolved, list) and pre_resolved:
+        req_refs = pre_resolved
+    else:
+        all_req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
+        req_refs = resolve_llm_refs(obj.get("refs"), all_req_refs)
     entry = build_finding_base(FindingSpec(
         principle=obj["p"],
         file=obj.get("file"),
@@ -72,14 +91,14 @@ def _parse_jsonl_findings(
             obj = json.loads(raw)
         except json.JSONDecodeError:
             continue
-        if not obj.get("p") or obj.get("t") not in ("violation", "compliance"):
+        if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
             continue
         dedup_key = (obj.get("p"), obj.get("t"), obj.get("file"), obj.get("line"))
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
         entry = _build_finding_entry(obj, dimension, req_refs_lookup)
-        if obj["t"] == "violation":
+        if obj["t"] == _TYPE_VIOLATION:
             violations.append(entry)
         else:
             compliance.append(entry)
@@ -87,21 +106,11 @@ def _parse_jsonl_findings(
 
 
 def _count_files_in_stream(stream_path: Path) -> int:
-    """Count unique file paths read by the AI in a stream file."""
-    files: set[str] = set()
-    try:
-        with open(stream_path) as _sf:
-            for raw_line in _sf:
-                stripped = raw_line.strip()
-                if not stripped:
-                    continue
-                try:
-                    files.update(_extract_files_from_stream_event(json.loads(stripped)))
-                except json.JSONDecodeError:
-                    continue
-    except OSError as exc:
-        logging.getLogger(__name__).warning("Failed to read stream file %s: %s", stream_path, exc)
-    return len(files)
+    """Count unique file paths read by the AI in a stream file.
+
+    Delegates to :func:`quodeq.engine.analysis_stream.count_files_in_stream`.
+    """
+    return len(count_files_in_stream(stream_path))
 
 
 def parse_violations_from_jsonl(
@@ -111,15 +120,18 @@ def parse_violations_from_jsonl(
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
     try:
-        with open(jsonl_path) as _f:
+        with open(jsonl_path, encoding=TEXT_ENCODING) as _f:
             violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup)
-    except OSError:
+    except OSError as exc:
+        _logger.warning("Failed to read findings file: %s", exc)
         return None
     files_read = _count_files_in_stream(stream_path) if stream_path and stream_path.exists() else 0
     return _build_violation_response(
         ctx, violations, compliance,
-        partial=True,
-        progress={"filesRead": files_read, "violations": len(violations), "compliance": len(compliance)},
+        _ResponseOptions(
+            partial=True,
+            progress={"filesRead": files_read, "violations": len(violations), "compliance": len(compliance)},
+        ),
     )
 
 
@@ -150,11 +162,34 @@ def _extract_violations_from_principles(principles: dict) -> list[dict[str, Any]
 def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a completed evidence JSON file."""
     try:
-        data = json.loads(evidence_path.read_text())
+        data = json.loads(evidence_path.read_text(encoding=TEXT_ENCODING))
     except (OSError, json.JSONDecodeError):
         return None
     violations = _extract_violations_from_principles(data.get("principles") or {})
-    return _build_violation_response(ctx, violations, [], partial=True)
+    return _build_violation_response(ctx, violations, [], _ResponseOptions(partial=True))
+
+
+def _try_parse_text_line(
+    stripped_line: str, dimension: str, seen: set[str],
+) -> tuple[str, dict[str, Any]] | None:
+    """Parse a single JSON line from a text block, returning (type, entry) or None."""
+    if not stripped_line.startswith("{"):
+        return None
+    try:
+        obj = json.loads(stripped_line)
+    except json.JSONDecodeError:
+        return None
+    if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
+        return None
+    key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
+    if key in seen:
+        return None
+    seen.add(key)
+    entry = _build_finding_entry(obj, dimension)
+    snippet = entry.get("snippet")
+    if snippet:
+        entry["snippet"] = str(snippet).splitlines()[0].strip()
+    return obj["t"], entry
 
 
 def _parse_entries_from_texts(
@@ -165,62 +200,58 @@ def _parse_entries_from_texts(
     compliance: list[dict[str, Any]] = []
     for text in texts:
         for text_line in text.splitlines():
-            stripped_line = text_line.strip()
-            if not stripped_line.startswith("{"):
+            result = _try_parse_text_line(text_line.strip(), dimension, seen)
+            if result is None:
                 continue
-            try:
-                obj = json.loads(stripped_line)
-            except json.JSONDecodeError:
-                continue
-            if not obj.get("p") or obj.get("t") not in ("violation", "compliance"):
-                continue
-            key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
-            if key in seen:
-                continue
-            seen.add(key)
-            entry = _build_finding_entry(obj, dimension)
-            snippet = entry.get("snippet")
-            if snippet:
-                entry["snippet"] = str(snippet).splitlines()[0].strip()
-            if obj["t"] == "violation":
+            finding_type, entry = result
+            if finding_type == _TYPE_VIOLATION:
                 violations.append(entry)
             else:
                 compliance.append(entry)
     return violations, compliance
 
 
-def _extract_files_from_stream_event(event: dict) -> set[str]:
-    """Extract file paths from Read/Grep tool_use blocks in a stream event."""
-    return extract_files_from_event(event)
+@dataclass
+class _StreamAccumulator:
+    """Mutable accumulator for stream-line parsing results."""
+    dimension: str
+    violations: list[dict[str, Any]] = field(default_factory=list)
+    compliance: list[dict[str, Any]] = field(default_factory=list)
+    seen: set[str] = field(default_factory=set)
+    files_read: set[str] = field(default_factory=set)
+
+
+def _parse_stream_line(stripped: str, acc: _StreamAccumulator) -> None:
+    """Parse one non-empty stream line, appending findings to *acc*."""
+    try:
+        event = json.loads(stripped)
+    except json.JSONDecodeError:
+        return
+    extractor = TEXT_EXTRACTORS.get(event.get("type"))
+    texts = extractor(event) if extractor else []
+    new_v, new_c = _parse_entries_from_texts(texts, acc.dimension, acc.seen)
+    acc.violations.extend(new_v)
+    acc.compliance.extend(new_c)
+    acc.files_read.update(extract_files_from_event(event))
 
 
 def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a live-stream event log file."""
-    violations: list[dict[str, Any]] = []
-    compliance: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    files_read: set[str] = set()
+    acc = _StreamAccumulator(dimension=ctx.dimension)
     try:
-        with open(stream_path) as _stream:
+        with open(stream_path, encoding=TEXT_ENCODING) as _stream:
             for raw_line in _stream:
                 stripped = raw_line.strip()
-                if not stripped:
-                    continue
-                try:
-                    event = json.loads(stripped)
-                except json.JSONDecodeError:
-                    continue
-                extractor = TEXT_EXTRACTORS.get(event.get("type"))
-                texts = extractor(event) if extractor else []
-                new_v, new_c = _parse_entries_from_texts(texts, ctx.dimension, seen)
-                violations.extend(new_v)
-                compliance.extend(new_c)
-                files_read.update(_extract_files_from_stream_event(event))
-    except OSError:
+                if stripped:
+                    _parse_stream_line(stripped, acc)
+    except OSError as exc:
+        _logger.warning("Failed to read stream file: %s", exc)
         return None
 
     return _build_violation_response(
-        ctx, violations, compliance,
-        partial=True,
-        progress={"filesRead": len(files_read), "violations": len(violations), "compliance": len(compliance)},
+        ctx, acc.violations, acc.compliance,
+        _ResponseOptions(
+            partial=True,
+            progress={"filesRead": len(acc.files_read), "violations": len(acc.violations), "compliance": len(acc.compliance)},
+        ),
     )

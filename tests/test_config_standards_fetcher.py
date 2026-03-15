@@ -42,7 +42,6 @@ def _asvs_payload() -> dict:
 @pytest.fixture()
 def _mock_urlopen(monkeypatch):
     """Patch urlopen to return _asvs_payload as bytes."""
-    monkeypatch.setenv("QUODEQ_ASVS_SKIP_INTEGRITY", "1")
     content = json.dumps(_asvs_payload()).encode()
     response = MagicMock()
     response.read.return_value = content
@@ -54,7 +53,7 @@ def _mock_urlopen(monkeypatch):
 
 class TestFetchAsvsL1:
     def test_writes_l1_requirements(self, tmp_path: Path, _mock_urlopen) -> None:
-        count = fetch_asvs_l1(tmp_path)
+        count = fetch_asvs_l1(tmp_path, skip_integrity=True)
         assert count == 1
         out = json.loads((tmp_path / "asvs" / "level1.json").read_text())
         assert out["level"] == 1
@@ -62,7 +61,7 @@ class TestFetchAsvsL1:
         assert out["requirements"][0]["id"] == "V2.1.1"
 
     def test_dry_run_does_not_write(self, tmp_path: Path, _mock_urlopen) -> None:
-        fetch_asvs_l1(tmp_path, dry_run=True)
+        fetch_asvs_l1(tmp_path, dry_run=True, skip_integrity=True)
         assert not (tmp_path / "asvs" / "level1.json").exists()
 
     def test_hash_mismatch_raises(self, tmp_path: Path, _mock_urlopen, monkeypatch) -> None:
@@ -72,8 +71,9 @@ class TestFetchAsvsL1:
 
     def test_urlopen_called_with_timeout(self, tmp_path: Path, _mock_urlopen) -> None:
         mock_urlopen, _ = _mock_urlopen
-        fetch_asvs_l1(tmp_path)
-        assert mock_urlopen.call_args.kwargs.get("timeout") == 30
+        fetch_asvs_l1(tmp_path, skip_integrity=True)
+        from quodeq.config.standards_fetcher import _DEFAULT_FETCH_TIMEOUT_S
+        assert mock_urlopen.call_args.kwargs.get("timeout") == _DEFAULT_FETCH_TIMEOUT_S
 
     def test_integrity_required_by_default(self, tmp_path: Path, monkeypatch) -> None:
         """Without QUODEQ_ASVS_SHA256 or skip flag, fetch must fail."""

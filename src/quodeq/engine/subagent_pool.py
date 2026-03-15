@@ -1,4 +1,4 @@
-"""SubagentPool — launches N parallel AI CLI subprocesses sharing a FileQueue.
+"""SubagentPool -- launches N parallel AI CLI subprocesses sharing a FileQueue.
 
 Each subagent:
   - Gets its own MCP server with access to the shared queue
@@ -10,45 +10,25 @@ The pool merges all JSONL files at the end, deduplicating by (p, file, line, t).
 """
 from __future__ import annotations
 
-import json
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
 
+from quodeq.engine._jsonl_utils import deduplicate_jsonl, dedup_jsonl_lines, merge_jsonl
 from quodeq.engine.analysis import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.engine.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.utils import TEXT_ENCODING
 
+_AGENT_ID_PREFIX = "agent"
 _HEARTBEAT_INTERVAL = 10
 _FUTURE_POLL_INTERVAL_S = 0.5
-
-
-def _dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:
-    """Deduplicate JSONL lines by ``(p, file, line, t)`` key.
-
-    Returns a list of stripped, unique JSON lines.
-    """
-    seen: set[tuple] = set()
-    unique: list[str] = []
-    for line in lines:
-        stripped = line.strip()
-        if not stripped:
-            continue
-        try:
-            obj = json.loads(stripped)
-        except json.JSONDecodeError:
-            continue
-        key = (obj.get("p"), obj.get("file"), obj.get("line"), obj.get("t"))
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(stripped)
-    return unique
+_HEARTBEAT_JOIN_TIMEOUT_S = 2
 
 _DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
+_SECONDS_PER_MINUTE = 60
 
 
 @dataclass
@@ -98,6 +78,12 @@ class SubagentPool:
         self._queue_path = paths.queue_path
         self._dimension = dimension
         self._base_config = config or AnalysisConfig()
+        self._jsonl_lock = threading.Lock()
+        # Initialised here so helpers like _collect_done/_process_completed_futures
+        # never encounter missing attributes regardless of call order.
+        self._futures: dict[Future[SubagentResult], int] = {}
+        self._finished: dict[str, bool] = {}
+        self._next_idx = 0
 
     def _shared_jsonl_path(self) -> Path:
         """The shared JSONL path all agents write to (same path the UI expects)."""
@@ -105,9 +91,9 @@ class SubagentPool:
 
     def _build_agent_config(self, idx: int) -> tuple[AnalysisConfig, Path, Path]:
         """Build per-agent AnalysisConfig, JSONL path, and stream path."""
-        agent_id = f"agent-{idx}"
-        # All agents append to the same JSONL — the UI reads this file live.
-        # Append-mode writes of short lines are atomic on POSIX.
+        agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
+        # All agents append to the same JSONL -- the UI reads this file live.
+        # Writes are synchronized via self._jsonl_lock.
         jsonl_file = self._shared_jsonl_path()
         stream_file = self._evidence_dir / f"{self._dimension}_{agent_id}.stream"
 
@@ -129,7 +115,7 @@ class SubagentPool:
 
     def _run_single(self, idx: int) -> SubagentResult:
         """Run a single subagent. Returns SubagentResult."""
-        agent_id = f"agent-{idx}"
+        agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
         ac, jsonl_file, stream_file = self._build_agent_config(idx)
         try:
             run_analysis(
@@ -154,8 +140,9 @@ class SubagentPool:
         jsonl = self._shared_jsonl_path()
         try:
             if jsonl.exists():
-                with open(jsonl) as f:
-                    return sum(1 for line in f if line.strip())
+                with self._jsonl_lock:
+                    with open(jsonl, encoding=TEXT_ENCODING) as f:
+                        return sum(1 for line in f if line.strip())
         except OSError:
             pass
         return 0
@@ -166,11 +153,9 @@ class SubagentPool:
         while not stop.wait(_HEARTBEAT_INTERVAL):
             try:
                 elapsed = int(time.monotonic() - start)
-                mins, secs = divmod(elapsed, 60)
+                mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
                 findings = self._count_total_findings()
-                queue = FileQueue(self._queue_path)
-                remaining = queue.remaining()
-                taken = len(queue.all_taken_files())
+                remaining, taken = FileQueue(self._queue_path).stats()
                 done = sum(1 for v in finished.values() if v)
                 log_info(
                     f"  [{self._dimension}] {mins}m{secs:02d}s | "
@@ -183,37 +168,77 @@ class SubagentPool:
 
     def _should_respawn(
         self, pool_start: float, max_duration: float,
-    ) -> bool:
-        """Return True if a new agent should be spawned (time and queue check)."""
+    ) -> int:
+        """Return remaining file count if a new agent should be spawned, else 0."""
+        remaining = FileQueue(self._queue_path).remaining()
         elapsed = time.monotonic() - pool_start
         if elapsed >= max_duration:
-            queue = FileQueue(self._queue_path)
-            remaining = queue.remaining()
             if remaining > 0:
                 log_warning(
-                    f"  Pool time limit ({max_duration}s) reached — "
+                    f"  Pool time limit ({max_duration}s) reached -- "
                     f"{remaining} files left, not spawning new agents"
                 )
-            return False
-        return FileQueue(self._queue_path).remaining() > 0
+            return 0
+        return remaining
 
     def _collect_done(
-        self, futures: dict, results: list[SubagentResult],
-        finished: dict[str, bool],
-    ) -> set:
+        self, results: list[SubagentResult],
+    ) -> set[Future[SubagentResult]]:
         """Collect completed futures, updating results and finished map.
 
         Returns the set of completed futures.
         """
-        done_futures = {f for f in futures if f.done()}
+        done_futures = {f for f in self._futures if f.done()}
         for future in done_futures:
             result = future.result()
-            finished[result.agent_id] = True
+            self._finished[result.agent_id] = True
             if result.success:
                 log_success(f"  {result.agent_id} finished")
             results.append(result)
-            del futures[future]
+            del self._futures[future]
         return done_futures
+
+    def _process_completed_futures(
+        self,
+        done: set[Future[SubagentResult]],
+        pool_start: float,
+        max_duration: float,
+        executor: ThreadPoolExecutor,
+    ) -> None:
+        """Respawn agents for each completed future if queue still has files."""
+        for _ in done:
+            remaining = self._should_respawn(pool_start, max_duration)
+            if remaining:
+                log_info(f"  {remaining} files left -- spawning agent-{self._next_idx}")
+                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+                self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
+                self._next_idx += 1
+
+    def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
+        """Create and start the heartbeat monitoring thread."""
+        stop = threading.Event()
+        heartbeat = threading.Thread(
+            target=self._heartbeat_loop, args=(stop, self._finished), daemon=True,
+        )
+        heartbeat.start()
+        return stop, heartbeat
+
+    def _run_pool_loop(
+        self, results: list[SubagentResult], max_duration: float, pool_start: float,
+    ) -> None:
+        """Execute the main thread-pool loop: submit initial agents and respawn on completion."""
+        with ThreadPoolExecutor(max_workers=self._n) as pool:
+            for _ in range(self._n):
+                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+                self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
+                self._next_idx += 1
+
+            while self._futures:
+                done = self._collect_done(results)
+                if not done:
+                    time.sleep(_FUTURE_POLL_INTERVAL_S)
+                    continue
+                self._process_completed_futures(done, pool_start, max_duration, pool)
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, respawning when slots free up and queue has files.
@@ -223,42 +248,19 @@ class SubagentPool:
         max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
         log_info(f"Launching {self._n} subagents for {self._dimension}")
         results: list[SubagentResult] = []
-        finished: dict[str, bool] = {}
-        next_idx = 0
-        pool_start = time.monotonic()
+        self._finished.clear()
+        self._futures.clear()
+        self._next_idx = 0
 
-        stop = threading.Event()
-        heartbeat = threading.Thread(
-            target=self._heartbeat_loop, args=(stop, finished), daemon=True,
-        )
-        heartbeat.start()
-
+        stop, heartbeat = self._start_heartbeat()
         try:
-            with ThreadPoolExecutor(max_workers=self._n) as pool:
-                futures: dict = {}
-                for _ in range(self._n):
-                    finished[f"agent-{next_idx}"] = False
-                    futures[pool.submit(self._run_single, next_idx)] = next_idx
-                    next_idx += 1
-
-                while futures:
-                    done = self._collect_done(futures, results, finished)
-                    if not done:
-                        time.sleep(_FUTURE_POLL_INTERVAL_S)
-                        continue
-                    for _ in done:
-                        if self._should_respawn(pool_start, max_duration):
-                            remaining = FileQueue(self._queue_path).remaining()
-                            log_info(f"  {remaining} files left — spawning agent-{next_idx}")
-                            finished[f"agent-{next_idx}"] = False
-                            futures[pool.submit(self._run_single, next_idx)] = next_idx
-                            next_idx += 1
+            self._run_pool_loop(results, max_duration, time.monotonic())
         finally:
             stop.set()
-            heartbeat.join(timeout=2)
+            heartbeat.join(timeout=_HEARTBEAT_JOIN_TIMEOUT_S)
 
         succeeded = sum(1 for r in results if r.success)
-        log_info(f"Subagent pool done: {succeeded}/{next_idx} agents ran, {succeeded} succeeded")
+        log_info(f"Subagent pool done: {succeeded}/{self._next_idx} agents ran, {succeeded} succeeded")
         return results
 
     @staticmethod
@@ -267,15 +269,7 @@ class SubagentPool:
 
         Returns the number of unique findings kept.
         """
-        if not jsonl_path.exists():
-            return 0
-        with open(jsonl_path) as f:
-            unique_lines = _dedup_jsonl_lines(f)
-        with open(jsonl_path, "w") as f:
-            for line in unique_lines:
-                f.write(line + "\n")
-        log_info(f"Deduplicated {jsonl_path.name}: {len(unique_lines)} unique findings")
-        return len(unique_lines)
+        return deduplicate_jsonl(jsonl_path)
 
     @staticmethod
     def merge_jsonl(results: list[SubagentResult], output: Path) -> Path:
@@ -283,15 +277,4 @@ class SubagentPool:
 
         Returns the output path.
         """
-        all_lines: list[str] = []
-        for result in results:
-            if not result.jsonl_file.exists():
-                continue
-            with open(result.jsonl_file) as f:
-                all_lines.extend(f)
-        unique_lines = _dedup_jsonl_lines(all_lines)
-        with open(output, "w") as out:
-            for line in unique_lines:
-                out.write(line + "\n")
-        log_info(f"Merged {len(unique_lines)} unique findings into {output.name}")
-        return output
+        return merge_jsonl((r.jsonl_file for r in results), output)

@@ -8,9 +8,19 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
 from typing import Protocol
 
 _INDEX_FILE = "project_index.json"
+_MAX_LEGACY_SCAN = 500
+
+# mtime-based cache for _load_index to avoid re-reading on every call
+_index_cache: dict[Path, tuple[float, dict[str, str]]] = {}
+
+
+def clear_index_cache() -> None:
+    """Clear the mtime-based index cache (useful for testing and isolation)."""
+    _index_cache.clear()
 
 
 class ProjectRepository(Protocol):
@@ -22,11 +32,11 @@ class ProjectRepository(Protocol):
     """
 
     def load_index(self, reports_dir: Path) -> dict[str, str]:
-        """Load the name→uuid mapping. Return empty dict on missing/corrupt data."""
+        """Load the name->uuid mapping. Return empty dict on missing/corrupt data."""
         ...
 
     def save_index(self, reports_dir: Path, index: dict[str, str]) -> None:
-        """Persist the name→uuid mapping."""
+        """Persist the name->uuid mapping."""
         ...
 
 
@@ -45,46 +55,73 @@ def _index_key(identity: ProjectIdentity) -> str:
 
 
 def _load_index(reports_dir: Path) -> dict[str, str]:
-    """Load the project index file, returning an empty dict on missing/corrupt file."""
+    """Load the project index file, returning an empty dict on missing/corrupt file.
+
+    Uses mtime-based caching to avoid re-reading the file when it hasn't changed.
+    """
+    index_path = reports_dir / _INDEX_FILE
     try:
-        return json.loads((reports_dir / _INDEX_FILE).read_text())
+        mtime = index_path.stat().st_mtime
+    except OSError:
+        return {}
+    cached = _index_cache.get(index_path)
+    if cached is not None and cached[0] == mtime:
+        return dict(cached[1])  # return a copy so callers can mutate safely
+    try:
+        data = json.loads(index_path.read_text())
     except (OSError, json.JSONDecodeError):
         return {}
+    _index_cache[index_path] = (mtime, dict(data))
+    return data
 
 
 def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
     """Write the project index file atomically."""
     index_path = reports_dir / _INDEX_FILE
+    _index_cache.pop(index_path, None)  # invalidate cache
     try:
         fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
         try:
             with os.fdopen(fd, "w") as f:
                 json.dump(index, f, indent=2)
             os.replace(tmp, index_path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+        finally:
+            if os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
     except OSError as exc:
         logging.getLogger(__name__).warning("Could not save project index: %s", exc)
 
 
-def _find_existing_project(reports_dir: Path, identity: ProjectIdentity) -> str | None:
+def _find_existing_project(
+    reports_dir: Path,
+    identity: ProjectIdentity,
+    load_fn: Callable[[Path], dict[str, str]] = _load_index,
+    save_fn: Callable[[Path, dict[str, str]], None] = _save_index,
+) -> str | None:
     """Look up project by (name, path) in the index; fall back to directory scan for
     projects created before the index existed, updating the index on success."""
     key = _index_key(identity)
-    index = _load_index(reports_dir)
+    index = load_fn(reports_dir)
     if key in index:
         # Verify the directory still exists (guard against manual deletion)
         if (reports_dir / index[key]).is_dir():
             return index[key]
-        # Index is stale — remove the entry and fall through to scan
+        # Index is stale -- remove the entry and fall through to scan
         del index[key]
-        _save_index(reports_dir, index)
+        save_fn(reports_dir, index)
 
-    # Legacy scan: find projects created before the index was introduced
+    # Legacy scan: find projects created before the index was introduced.
+    # Bounded to _MAX_LEGACY_SCAN entries to avoid O(n) disk I/O on large collections.
+    scanned = 0
     for entry in reports_dir.iterdir():
         if not entry.is_dir() or entry.name.startswith("."):
             continue
+        scanned += 1
+        if scanned > _MAX_LEGACY_SCAN:
+            break
         info_file = entry / "repository_info.json"
         if not info_file.exists():
             continue
@@ -95,12 +132,17 @@ def _find_existing_project(reports_dir: Path, identity: ProjectIdentity) -> str 
         if info.get("name") == identity.project_name and info.get("path") == identity.repo_path:
             # Back-fill the index so future lookups are O(1)
             index[key] = entry.name
-            _save_index(reports_dir, index)
+            save_fn(reports_dir, index)
             return entry.name
     return None
 
 
-def _create_project(reports_dir: Path, identity: ProjectIdentity) -> str:
+def _create_project(
+    reports_dir: Path,
+    identity: ProjectIdentity,
+    load_fn: Callable[[Path], dict[str, str]] = _load_index,
+    save_fn: Callable[[Path, dict[str, str]], None] = _save_index,
+) -> str:
     """Create a new UUID project directory, write repository_info.json, and index it."""
     project_uuid = str(uuid.uuid4())
     project_dir = reports_dir / project_uuid
@@ -116,19 +158,34 @@ def _create_project(reports_dir: Path, identity: ProjectIdentity) -> str:
         (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
     except OSError as exc:
         logging.getLogger(__name__).warning("Could not write repository_info.json: %s", exc)
-    index = _load_index(reports_dir)
+    index = load_fn(reports_dir)
     index[_index_key(identity)] = project_uuid
-    _save_index(reports_dir, index)
+    save_fn(reports_dir, index)
     return project_uuid
 
 
-def resolve_project_uuid(reports_dir: Path, identity: ProjectIdentity) -> str:
-    """Find or create a UUID project directory matching identity."""
-    resolved_path = identity.repo_path if identity.location == "online" else Path(identity.repo_path).resolve().name
+def resolve_project_uuid(
+    reports_dir: Path,
+    identity: ProjectIdentity,
+    repository: ProjectRepository | None = None,
+) -> str:
+    """Find or create a UUID project directory matching identity.
+
+    When *repository* is provided, it is used for loading/saving the index
+    instead of the default filesystem helpers, making the storage layer
+    injectable for testing or alternative backends.
+    """
+    if identity.location == "online":
+        resolved_path = identity.repo_path
+    else:
+        resolved_path = str(Path(identity.repo_path).resolve())
     resolved = ProjectIdentity(identity.project_name, resolved_path, identity.discipline, identity.location)
     if not reports_dir.exists():
         reports_dir.mkdir(parents=True, exist_ok=True)
-    existing = _find_existing_project(reports_dir, resolved)
+
+    load_fn = repository.load_index if repository is not None else _load_index
+    save_fn = repository.save_index if repository is not None else _save_index
+    existing = _find_existing_project(reports_dir, resolved, load_fn, save_fn)
     if existing:
         return existing
-    return _create_project(reports_dir, resolved)
+    return _create_project(reports_dir, resolved, load_fn, save_fn)

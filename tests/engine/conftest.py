@@ -7,6 +7,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from quodeq.engine import mcp_findings
+from quodeq.engine.evidence import Evidence, PrincipleEvidence
 
 
 def _make_request(method: str, req_id: int = 1, params: dict | None = None) -> str:
@@ -45,3 +46,48 @@ def _evidence_line(**overrides) -> str:
     }
     obj.update(overrides)
     return json.dumps(obj)
+
+
+def make_evidence_with_confidence(
+    confidence_level="high",
+    violations=None,
+    compliance=None,
+    n_violations=1,
+    n_compliance=2,
+):
+    """Build Evidence with explicit confidence level and finding counts."""
+    viol = violations or [
+        {"file": f"v{i}.ts", "line": i, "snippet": "eval(x)", "reason": "injection", "severity": "high", "vt": "code-injection"}
+        for i in range(n_violations)
+    ]
+    comp = compliance or [
+        {"file": f"c{i}.ts", "line": i, "snippet": "JSON.parse(x)", "reason": "safe"}
+        for i in range(n_compliance)
+    ]
+    total = len(viol) + len(comp)
+    pct = round(len(comp) / total * 100, 1) if total > 0 else 0.0
+    pe = PrincipleEvidence(
+        practice_id="ts-001",
+        display_name="Avoid eval()",
+        dimension="security",
+        severity="high",
+        violations=viol,
+        compliance=comp,
+        metrics={
+            "total_instances": total,
+            "compliant": len(comp),
+            "violating": len(viol),
+            "compliance_percentage": pct,
+            "confidence_level": confidence_level,
+            "is_balanced": len(viol) > 0 and len(comp) > 0,
+        },
+    )
+    return Evidence(
+        repository="test-repo",
+        plugin_id="typescript",
+        date="2026-03-03",
+        source_file_count=100,
+        files_read=50,
+        coverage_pct=50.0,
+        principles={"ts-001": pe},
+    )

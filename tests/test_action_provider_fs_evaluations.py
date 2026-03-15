@@ -64,10 +64,11 @@ def test_get_dimension_eval_from_json(tmp_path: Path) -> None:
     assert any(item["principle"] == "Separation of Concerns" for item in grades)
 
 
-def test_browse_repo_filters_hidden(tmp_path: Path) -> None:
+def test_browse_repo_filters_hidden(tmp_path: Path, monkeypatch) -> None:
     (tmp_path / "visible").mkdir()
     (tmp_path / ".hidden").mkdir()
 
+    monkeypatch.setattr(Path, "home", staticmethod(lambda: tmp_path))
     provider = FilesystemActionProvider()
     payload = provider.browse_repo(str(tmp_path))
 
@@ -159,7 +160,7 @@ def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:
     assert payload["name"] == "repo"
     assert payload["discipline"] == "cli_bash"
     assert payload["location"] == "local"
-    assert payload["path"] == repo_path.resolve().name
+    assert payload["path"] == str(repo_path.resolve())
     assert "uuid" in payload
 
 

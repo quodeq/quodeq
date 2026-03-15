@@ -1,50 +1,31 @@
-"""Evidence parser — converts extracted JSONL lines into V2 Evidence model."""
+"""Evidence parser -- converts extracted JSONL lines into V2 Evidence model."""
 from __future__ import annotations
 
 import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+import os as _os
+
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
+from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 
+_logger = logging.getLogger(__name__)
 
-def _ref_label(ref: dict) -> str:
-    """Build a display label for a ref (e.g. 'CWE-396', 'ERR08-J', 'WCAG 1.1.1')."""
-    source = ref.get("source", "")
-    ref_id = ref.get("id")
-    if source == "cwe" and ref_id:
-        return f"CWE-{ref_id}"
-    if source == "wcag22" and ref_id:
-        return f"WCAG {ref_id}"
-    if source == "asvs" and ref_id:
-        return f"ASVS {ref_id}"
-    if ref_id:
-        return ref_id
-    return source.upper() if source else "REF"
+_CWE_URL_TEMPLATE = _os.environ.get(
+    "QUODEQ_CWE_URL_TEMPLATE",
+    "https://cwe.mitre.org/data/definitions/{cwe_id}.html",
+)
 
 
 def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
-    """Return {req_id: [{label, url}, ...]} for all refs of each requirement."""
-    try:
-        dim_file = compiled_dir / f"{dimension}.json"
-        data = json.loads(dim_file.read_text())
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
-        return {}
+    """Return {req_id: [{label, url}, ...]} for all refs of each requirement.
 
-    lookup: dict[str, list[dict]] = {}
-    for principle in data.get("principles", []):
-        for req in principle.get("requirements", []):
-            req_id = req.get("id")
-            if not req_id:
-                continue
-            refs = []
-            for ref in req.get("refs", []):
-                url = ref.get("url")
-                if url:
-                    refs.append({"label": _ref_label(ref), "url": url})
-            if refs:
-                lookup[req_id] = refs
-    return lookup
+    Delegates to _ref_utils.load_compiled_refs for the heavy lifting.
+    """
+    return load_compiled_refs(str(compiled_dir), dimension)
 
 
 @dataclass
@@ -57,31 +38,39 @@ class EvidenceContext:
     files_read: int
 
 
-def resolve_llm_refs(llm_refs: list[str] | None, all_req_refs: list[dict] | None) -> list[dict] | None:
+def resolve_llm_refs(
+    llm_refs: list[str] | None,
+    all_req_refs: list[dict] | None,
+    cwe_url_template: str = _CWE_URL_TEMPLATE,
+) -> list[dict] | None:
     """Filter req_refs to only those the LLM selected, building URLs for unknown labels.
 
-    Only refs that carry a ``url`` are kept.  If nothing with a URL remains
-    after filtering, *all_req_refs* is returned so the caller always gets
-    the compiled CWE/CISQ references.
+    Only refs that carry a ``url`` are kept.  When the LLM did not select
+    any refs (``llm_refs`` is None/empty), returns ``None`` rather than
+    dumping all compiled refs — showing none is better than showing noise.
+
+    *cwe_url_template* may be overridden for offline or internal deployments.
     """
     if not llm_refs:
-        return all_req_refs
+        return None
     by_label = {r["label"]: r for r in (all_req_refs or [])}
     result = []
+    upper_labels = {k.upper(): r for k, r in by_label.items()}
     for label in llm_refs:
         if label in by_label:
             result.append(by_label[label])
         elif label.upper().startswith("CWE-"):
             cwe_id = label.split("-", 1)[1]
-            result.append({"label": label.upper(), "url": f"https://cwe.mitre.org/data/definitions/{cwe_id}.html"})
+            result.append({"label": label.upper(), "url": cwe_url_template.format(cwe_id=cwe_id)})
         else:
             # Prefix match: "CISQ-ASCRM-CWE-396" matches known label "CISQ"
-            matched = next((r for k, r in by_label.items() if label.upper().startswith(k.upper())), None)
+            label_upper = label.upper()
+            matched = next((r for k, r in upper_labels.items() if label_upper.startswith(k)), None)
             if matched:
                 result.append(matched)
-    # Only keep refs that have a URL — drop bare labels without links
+    # Only keep refs that have a URL -- drop bare labels without links
     result = [r for r in result if r.get("url")]
-    return result if result else all_req_refs
+    return result if result else None
 
 
 def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
@@ -91,7 +80,8 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         return None
     try:
         obj = json.loads(line)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        _logger.warning("Skipping malformed JSONL line: %s", exc)
         return None
 
     practice_id = obj.get("p")
@@ -194,7 +184,7 @@ def _read_judgments(
         return []
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
-    with open(jsonl_file) as _jf:
+    with open(jsonl_file, encoding=TEXT_ENCODING) as _jf:
         for line in _jf:
             result = _parse_jsonl_line(line)
             if result is not None:
@@ -214,12 +204,13 @@ def parse_jsonl_to_evidence(
     grouped = _group_judgments(judgments)
     all_principles = set(grouped.violations.keys()) | set(grouped.compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}
+    dimension_name = judgments[0].dimension if judgments else ""
 
     for sc in sorted(all_principles):
         pe = PrincipleEvidence(
             practice_id=sc,
             display_name=sc,
-            dimension=judgments[0].dimension if judgments else "",
+            dimension=dimension_name,
             severity=grouped.severity.get(sc, "medium"),
             violations=[_judgment_to_dict(j) for j in grouped.violations.get(sc, [])],
             compliance=[_judgment_to_dict(j) for j in grouped.compliance.get(sc, [])],

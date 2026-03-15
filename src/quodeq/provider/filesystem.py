@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import os
+import shutil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -49,11 +51,6 @@ def _read_latest_run_summary(
         return None, None, None
 
 
-def _or_none(value: Any) -> Any:
-    """Return *value* if truthy, else None (coerce empty strings to None)."""
-    return value or None
-
-
 def _check_path_exists(path: str | None, location: str | None) -> bool | None:
     """Return whether a local path exists, or None if not applicable."""
     if location == "local" and path:
@@ -65,11 +62,11 @@ def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str
     """Extract and normalize optional metadata fields from repository info."""
     return {
         "name": info.get("name") or entry_name,
-        "parent": _or_none(info.get("parent")),
-        "displayName": _or_none(info.get("displayName")),
-        "discipline": _or_none(info.get("discipline")),
-        "path": _or_none(info.get("path")),
-        "location": _or_none(info.get("location")),
+        "parent": info.get("parent") or None,
+        "displayName": info.get("displayName") or None,
+        "discipline": info.get("discipline") or None,
+        "path": info.get("path") or None,
+        "location": info.get("location") or None,
     }
 
 
@@ -108,7 +105,14 @@ def _find_best_parent(p_path: str, project_id: str, candidates: list[dict[str, A
     return None
 
 
-_MAX_PROJECTS_LISTED = 200
+_DEFAULT_MAX_PROJECTS_LISTED = 200
+
+
+def _max_projects_listed(override: int | None = None) -> int:
+    """Return the max number of projects to list. *override* bypasses env."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_MAX_PROJECTS_LISTED", str(_DEFAULT_MAX_PROJECTS_LISTED)))
 
 
 def _auto_detect_parents(projects: list[dict[str, Any]]) -> None:
@@ -155,10 +159,17 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
     return None
 
 
-def _list_available_dimensions_for_discipline(discipline: str) -> list[str]:
-    """Resolve available dimensions for a plugin via its dimensions.json."""
+def _list_available_dimensions_for_discipline(
+    discipline: str, evaluators_dir: Path | None = None,
+) -> list[str]:
+    """Resolve available dimensions for a plugin via its dimensions.json.
+
+    *evaluators_dir* overrides the default path lookup, making the function
+    testable without relying on the global config.
+    """
     try:
-        plugin_dir = default_paths().evaluators_dir / discipline
+        base = evaluators_dir if evaluators_dir is not None else default_paths().evaluators_dir
+        plugin_dir = base / discipline
         dims_file = plugin_dir / "dimensions.json"
         if dims_file.exists():
             data = json.loads(dims_file.read_text())
@@ -184,6 +195,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     """
 
     def __init__(self, job_manager: JobManager | None = None) -> None:
+        super().__init__()
         self._jobs = job_manager or JobManager()
         self._model_fetchers: dict[str, Callable] = {
             "claude": self._get_claude_models,
@@ -200,7 +212,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             if not runs:
                 continue
             projects.append(_build_project_entry(reports_root, entry.name, runs))
-            if len(projects) >= _MAX_PROJECTS_LISTED:
+            if len(projects) >= _max_projects_listed():
                 break
         projects.sort(key=lambda item: item["name"])
         _auto_detect_parents(projects)
@@ -229,7 +241,6 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         """Remove a project directory and all its report data."""
-        import shutil
         reports_root = Path(reports_dir).resolve()
         project_path = (reports_root / project).resolve()
         if not project_path.is_relative_to(reports_root):

@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import io
-import time
+import threading
+
+import pytest
 
 from quodeq.provider.jobs import JobManager
 
@@ -16,7 +18,21 @@ class FakeProcess:
         return self._returncode
 
 
-def test_job_manager_tracks_status_and_logs() -> None:
+def _make_manager_with_event(spawn_impl, job_id_holder: list) -> tuple[JobManager, threading.Event]:
+    """Create a JobManager that signals *done* when the job completes."""
+    done = threading.Event()
+
+    def _on_complete(jid, _job):
+        if not job_id_holder or jid == job_id_holder[0]:
+            done.set()
+
+    manager = JobManager(spawn_impl=spawn_impl, on_job_complete=_on_complete)
+    return manager, done
+
+
+@pytest.fixture()
+def completed_success_job() -> dict:
+    """Run a successful job and return the final result dict."""
     def spawn_impl(*_args, **_kwargs):
         return FakeProcess(
             stdout="Report path: /app/reports/sample-project/20260220/evaluation\nhello\n",
@@ -24,39 +40,49 @@ def test_job_manager_tracks_status_and_logs() -> None:
             returncode=0,
         )
 
-    manager = JobManager(spawn_impl=spawn_impl)
+    job_id_holder: list[str] = []
+    manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["echo", "ok"])
+    job_id_holder.append(job["jobId"])
+    done.wait(timeout=5.0)
+    result = manager.get_job(job["jobId"])
+    assert result is not None
+    return result
 
-    assert job["status"] in {"running", "done", "failed"}
 
-    for _ in range(50):
-        updated = manager.get_job(job["jobId"])
-        if updated and updated["status"] != "running":
-            job = updated
-            break
-        time.sleep(0.01)
+def test_successful_job_status(completed_success_job: dict) -> None:
+    assert completed_success_job["status"] == "done"
 
-    assert job["status"] == "done"
-    assert job["exitCode"] == 0
-    assert any("hello" in line for line in job["logs"])
-    assert job["outputProject"] == "sample-project"
-    assert job["outputRunId"] == "20260220"
+
+def test_successful_job_exit_code(completed_success_job: dict) -> None:
+    assert completed_success_job["exitCode"] == 0
+
+
+def test_successful_job_captures_logs(completed_success_job: dict) -> None:
+    assert any("hello" in line for line in completed_success_job["logs"])
+
+
+def test_successful_job_parses_output_project(completed_success_job: dict) -> None:
+    assert completed_success_job["outputProject"] == "sample-project"
+
+
+def test_successful_job_parses_output_run_id(completed_success_job: dict) -> None:
+    assert completed_success_job["outputRunId"] == "20260220"
 
 
 def test_job_manager_handles_failure() -> None:
     def spawn_impl(*_args, **_kwargs):
         return FakeProcess(stdout="", stderr="boom\n", returncode=2)
 
-    manager = JobManager(spawn_impl=spawn_impl)
+    job_id_holder: list[str] = []
+    manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["false"])
+    job_id_holder.append(job["jobId"])
 
-    for _ in range(50):
-        updated = manager.get_job(job["jobId"])
-        if updated and updated["status"] != "running":
-            job = updated
-            break
-        time.sleep(0.01)
+    done.wait(timeout=5.0)
+    result = manager.get_job(job["jobId"])
+    assert result is not None
 
-    assert job["status"] == "failed"
-    assert job["exitCode"] == 2
-    assert any("boom" in line for line in job["logs"])
+    assert result["status"] == "failed"
+    assert result["exitCode"] == 2
+    assert any("boom" in line for line in result["logs"])

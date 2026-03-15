@@ -5,17 +5,17 @@ import json
 from pathlib import Path
 
 from quodeq.shared.logging import log_debug
+from quodeq.shared.utils import TEXT_ENCODING
 
 _MCP_SERVER_NAME = "findings"
 
 
 def get_mcp_status(stream_file: Path) -> str | None:
     """Return MCP server status from the stream init event, or None if unavailable."""
-    path = Path(stream_file)
-    if not path.exists() or path.stat().st_size == 0:
+    if not stream_file.exists() or stream_file.stat().st_size == 0:
         return None
     try:
-        with open(path) as f:
+        with open(stream_file, encoding=TEXT_ENCODING) as f:
             first = f.readline().strip()
             if not first:
                 return None
@@ -30,10 +30,9 @@ def get_mcp_status(stream_file: Path) -> str | None:
 
 def is_stream_valid(stream_file: Path) -> bool:
     """Return True if stream exists, is non-empty, and has no error events."""
-    path = Path(stream_file)
-    if not path.exists() or path.stat().st_size == 0:
+    if not stream_file.exists() or stream_file.stat().st_size == 0:
         return False
-    with open(path) as f:
+    with open(stream_file, encoding=TEXT_ENCODING) as f:
         for line in f:
             try:
                 d = json.loads(line.strip())
