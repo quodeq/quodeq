@@ -8,6 +8,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.shared.types import DimensionData
+
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
     calculate_trend,
@@ -21,7 +23,7 @@ from quodeq.provider._cache import make_lru_dimension_fetcher
 # Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
 # For multi-worker deployments, override the cache via compute_accumulated(cache_config=...)
 # or supply a shared backend (e.g. Redis OrderedDict wrapper) through AccumulatedCacheConfig.
-_ACC_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
+_ACC_DIM_CACHE: OrderedDict[tuple, list[DimensionData]] = OrderedDict()
 _ACC_DIM_LOCK = threading.Lock()
 
 
@@ -37,7 +39,7 @@ def _acc_dim_cache_max(override: int | None = None) -> int:
 
 def _make_acc_dimension_fetcher(
     reports_root: Path, project: str,
-) -> Callable[[str], list[dict[str, Any]]]:
+) -> Callable[[str], list[DimensionData]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
     return make_lru_dimension_fetcher(
         reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max(),
@@ -46,8 +48,8 @@ def _make_acc_dimension_fetcher(
 
 def _read_all_run_data(
     reports_root: Path, project: str, all_run_infos: list[RunInfo], runs: list[str],
-    get_run_data: Callable[[str], list[dict[str, Any]]] | None = None,
-) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    get_run_data: Callable[[str], list[DimensionData]] | None = None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], list[DimensionData]]:
     """Build accumulated data structures in a single sequential pass.
 
     Returns:
@@ -88,9 +90,9 @@ def _read_all_run_data(
 
 
 def _compute_accumulated_trends(
-    all_dimensions: list[dict[str, Any]],
+    all_dimensions: list[DimensionData],
     prev_occurrence: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
+) -> list[DimensionData]:
     """Compute trend data for each accumulated dimension using pre-built prev_occurrence."""
     result = []
     for dim in all_dimensions:
@@ -111,7 +113,7 @@ def _compute_accumulated_trends(
     return result
 
 
-def _aggregate_severity_counts(all_dimensions: list[dict[str, Any]]) -> dict[str, int]:
+def _aggregate_severity_counts(all_dimensions: list[DimensionData]) -> dict[str, int]:
     """Sum violation/compliance counts and severity buckets across dimensions."""
     total_violations = 0
     total_compliance = 0
@@ -135,7 +137,7 @@ def _aggregate_severity_counts(all_dimensions: list[dict[str, Any]]) -> dict[str
     }
 
 
-def numeric_average(dimensions: list[dict[str, Any]]) -> float | None:
+def numeric_average(dimensions: list[DimensionData]) -> float | None:
     """Compute the average numeric score from a list of dimension dicts."""
     raw = [d.get("overallScore") for d in dimensions if d.get("overallScore")]
     numeric = [s for s in (parse_numeric_score(v) for v in raw) if s is not None]
@@ -143,7 +145,7 @@ def numeric_average(dimensions: list[dict[str, Any]]) -> float | None:
 
 
 def _compute_accumulated_scores(
-    all_dimensions: list[dict[str, Any]], prev_run_latest: list[dict[str, Any]],
+    all_dimensions: list[DimensionData], prev_run_latest: list[DimensionData],
 ) -> tuple[float | None, float | None]:
     """Compute current and previous overall average scores."""
     avg_score = numeric_average(all_dimensions)
@@ -155,7 +157,7 @@ def _compute_accumulated_scores(
 class AccumulatedCacheConfig:
     """Optional cache parameters for compute_accumulated (overrides module-level cache)."""
 
-    cache: OrderedDict[tuple, list[dict[str, Any]]] = field(default_factory=OrderedDict)
+    cache: OrderedDict[tuple, list[DimensionData]] = field(default_factory=OrderedDict)
     cache_lock: threading.Lock = field(default_factory=threading.Lock)
     cache_max: int | None = None
 
@@ -176,8 +178,8 @@ def _resolve_cache(
 @dataclass(frozen=True)
 class _AccumulatedResult:
     """Pre-computed parts for the accumulated response."""
-    all_dimensions: list[dict[str, Any]]
-    dimensions_with_trend: list[dict[str, Any]]
+    all_dimensions: list[DimensionData]
+    dimensions_with_trend: list[DimensionData]
     severity: dict[str, int]
     avg_score: float | None
     prev_avg_score: float | None

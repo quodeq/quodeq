@@ -18,6 +18,7 @@ _logger = logging.getLogger(__name__)
 
 from quodeq.adapters.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
+from quodeq.shared.types import DimensionData
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_path_segment
 
@@ -172,7 +173,7 @@ def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
     return evidence_map
 
 
-def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
+def read_run_data(reports_root: Path, project: str, run_id: str) -> list[DimensionData]:
     """Load all dimension evaluations and evidence for a single run.
 
     Example::

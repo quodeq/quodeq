@@ -4,6 +4,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from quodeq.shared.types import DimensionData
+
 from quodeq.adapters.fs.report_parser import RunInfo
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
@@ -19,8 +21,8 @@ class StaleDimState:
 
 def find_stale_from_run(
     run_dir: RunInfo, selected_dim_names: set[str],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
+    get_run_dimensions: Callable[[str], list[DimensionData]],
+) -> list[DimensionData]:
     """Return stale dimension dicts found in a single run directory."""
     results: list[dict] = []
     run_dimensions = get_run_dimensions(run_dir.run_id)
@@ -65,8 +67,8 @@ def track_stale_grade(entry: dict, state: StaleDimState) -> None:
 
 def collect_stale_dimensions(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
-) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    get_run_dimensions: Callable[[str], list[DimensionData]],
+) -> tuple[list[DimensionData], dict[str, dict[str, Any]]]:
     """Find dimensions present in other runs but absent from the selected run."""
     state = StaleDimState()
 

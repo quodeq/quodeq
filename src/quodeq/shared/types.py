@@ -222,6 +222,27 @@ class FileViolationEntry(TypedDict):
     minor: int
 
 
+# ---------------------------------------------------------------------------
+# Dimension run data (merged evaluation + evidence)
+# ---------------------------------------------------------------------------
+
+class DimensionData(TypedDict, total=False):
+    """One dimension's merged evaluation + evidence data from a run.
+
+    Returned by ``read_run_data`` and used throughout dashboard/accumulated.
+    """
+    dimension: str | None
+    overallScore: str | None
+    overallGrade: str | None
+    principles: list[PrincipleGradeEntry]
+    violations: list[FindingDict]
+    compliance: list[FindingDict]
+    totals: TotalsDict
+    sourceFileCount: int | None
+    evidenceDate: str | None
+    discipline: str | None
+
+
 class ViolationSummary(TypedDict, total=False):
     """Aggregated violation summary returned by ``aggregate_violations``."""
     total: int

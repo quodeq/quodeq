@@ -8,6 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.shared.types import DimensionData, DimensionSummary
+
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
     calculate_trend,
@@ -27,7 +29,7 @@ from quodeq.provider.accumulated import numeric_average
 @dataclass
 class DashboardCacheConfig:
     """Optional cache overrides for build_dashboard (mirrors AccumulatedCacheConfig)."""
-    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None
+    cache: OrderedDict[tuple, list[DimensionData]] | None = None
     lock: threading.Lock | None = None
     max_size: int | None = None
 
@@ -44,7 +46,7 @@ _MAX_HISTORY_RUNS = 100
 # Module-level LRU cache shared across requests; evicts least-recently-used
 # entries once the limit is reached, capping memory while providing cross-
 # request caching for hot-path dimension reads (P-TIM-6).
-_RUN_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
+_RUN_DIM_CACHE: OrderedDict[tuple, list[DimensionData]] = OrderedDict()
 _RUN_DIM_LOCK = threading.Lock()
 
 
@@ -60,7 +62,7 @@ def _run_dim_cache_max(override: int | None = None) -> int:
 
 def _collect_previous_scores(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
+    get_run_dimensions: Callable[[str], list[DimensionData]],
 ) -> dict[str, dict[str, Any]]:
     """Find the most recent previous score for each dimension in the selected run."""
     previous_by_dimension: dict[str, dict[str, Any]] = {}
@@ -79,8 +81,8 @@ def _collect_previous_scores(
 
 
 def _enrich_dimensions_with_trend(
-    selected_dimensions: list[dict[str, Any]], previous_by_dimension: dict[str, dict[str, Any]]
-) -> list[dict[str, Any]]:
+    selected_dimensions: list[DimensionData], previous_by_dimension: dict[str, dict[str, Any]]
+) -> list[DimensionData]:
     """Attach trend and previous-run data to each selected dimension."""
     result = []
     for dim in selected_dimensions:
@@ -99,10 +101,10 @@ def _enrich_dimensions_with_trend(
 
 def _build_accumulated_trend(
     runs: list[RunInfo],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
+    get_run_dimensions: Callable[[str], list[DimensionData]],
+) -> list[dict[str, object]]:
     """Build trend using accumulated scores across all runs (oldest to newest)."""
-    trend: list[dict[str, Any]] = []
+    trend: list[dict[str, object]] = []
     acc_by_dim: dict[str, dict[str, Any]] = {}
     for item in reversed(runs):  # oldest -> newest
         run_dims = get_run_dimensions(item.run_id)
@@ -131,10 +133,10 @@ def _build_accumulated_trend(
 def _make_run_dimension_fetcher(
     reports_root: Path,
     project: str,
-    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
+    cache: OrderedDict[tuple, list[DimensionData]] | None = None,
     lock: threading.Lock | None = None,
     max_size: int | None = None,
-) -> Callable[[str], list[dict[str, Any]]]:
+) -> Callable[[str], list[DimensionData]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
     return make_lru_dimension_fetcher(
         reports_root,
@@ -149,11 +151,11 @@ def _make_run_dimension_fetcher(
 class _DashboardPayload:
     """Pre-computed parts for the dashboard response."""
     selected_summary: dict[str, Any]
-    trend: list[dict[str, Any]]
-    dimensions_with_trend: list[dict[str, Any]]
+    trend: list[dict[str, object]]
+    dimensions_with_trend: list[DimensionData]
     previous_by_dimension: dict[str, dict[str, Any]]
     stale_previous_by_dimension: dict[str, dict[str, Any]]
-    stale_dimensions: list[dict[str, Any]]
+    stale_dimensions: list[DimensionData]
 
 
 def _build_dashboard_result(
@@ -199,7 +201,7 @@ class _SelectedRunContext:
     """Pre-resolved data for the selected run in a dashboard request."""
     run: RunInfo
     index: int
-    dimensions: list[dict[str, Any]]
+    dimensions: list[DimensionData]
     summary: dict[str, Any]
 
 

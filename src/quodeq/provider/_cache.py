@@ -6,22 +6,24 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.shared.types import DimensionData
+
 from quodeq.adapters.fs.report_parser import read_run_data
 
 
 def make_lru_dimension_fetcher(
     reports_root: Path,
     project: str,
-    cache: OrderedDict[tuple, list[dict[str, Any]]],
+    cache: OrderedDict[tuple, list[DimensionData]],
     lock: threading.Lock,
     max_size: int,
-) -> Callable[[str], list[dict[str, Any]]]:
+) -> Callable[[str], list[DimensionData]]:
     """Return a callable that fetches dimension data for a run.
 
     Results are stored in *cache* (LRU, bounded at *max_size* entries) so
     repeated calls within and across requests avoid redundant file reads.
     """
-    def get_run_dimensions(run_id: str) -> list[dict[str, Any]]:
+    def get_run_dimensions(run_id: str) -> list[DimensionData]:
         key = (reports_root, project, run_id)
         with lock:
             if key in cache:
