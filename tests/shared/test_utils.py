@@ -96,9 +96,13 @@ class TestGetters:
         monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
         assert utils.get_anthropic_api_key() is None
 
-    def test_get_static_dist_none_by_default(self, monkeypatch):
+    def test_get_static_dist_default(self, monkeypatch):
         monkeypatch.delenv("QUODEQ_STATIC_DIST", raising=False)
-        assert utils.get_static_dist() is None
+        result = utils.get_static_dist()
+        # In dev checkout with pre-built UI, returns the bundled path; in CI returns None
+        if result is not None:
+            assert Path(result).is_dir()
+            assert (Path(result) / "index.html").is_file()
 
 
 class TestShowDiff:
