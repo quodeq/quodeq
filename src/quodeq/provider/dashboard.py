@@ -8,7 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.core.types import DimensionResult, to_camel_dict
+from quodeq.core.types import DimensionResult, DimensionSummary, to_camel_dict
 
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
@@ -149,7 +149,7 @@ def _make_run_dimension_fetcher(
 @dataclass
 class _DashboardPayload:
     """Pre-computed parts for the dashboard response."""
-    selected_summary: dict[str, Any]
+    selected_summary: DimensionSummary
     trend: list[dict[str, Any]]
     dimensions_with_trend: list[DimensionResult]
     previous_by_dimension: dict[str, DimensionResult]
@@ -175,7 +175,7 @@ def _build_dashboard_result(
             "dateISO": selected_run.date_iso,
             "dateLabel": selected_run.date_label,
         },
-        "summary": {**payload.selected_summary, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
+        "summary": {**to_camel_dict(payload.selected_summary), "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
         "trend": payload.trend,
         "dimensions": [to_camel_dict(d) for d in payload.dimensions_with_trend],
         "previousByDimension": {k: to_camel_dict(v) for k, v in payload.previous_by_dimension.items()},
@@ -201,7 +201,7 @@ class _SelectedRunContext:
     run: RunInfo
     index: int
     dimensions: list[DimensionResult]
-    summary: dict[str, Any]
+    summary: DimensionSummary
 
 
 def _compute_dashboard_payload(

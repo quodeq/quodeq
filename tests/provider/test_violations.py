@@ -92,8 +92,8 @@ class TestResolveDimensionEval:
         (evidence_dir / "security_evidence.json").write_text(json.dumps(evidence))
         result = resolve_dimension_eval(base, "proj", "run-1", "security")
         assert result is not None
-        assert result["dimension"] == "security"
-        assert len(result["violations"]) == 1
+        assert result.dimension == "security"
+        assert len(result.violations) == 1
 
     def test_resolves_from_eval_json(self, tmp_path):
         base = tmp_path / "run-1"

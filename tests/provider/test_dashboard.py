@@ -7,7 +7,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.adapters.fs.report_parser import RunInfo
-from quodeq.core.types import DimensionResult
+from quodeq.core.types import DimensionResult, DimensionSummary
 from quodeq.provider.dashboard import (
     _collect_previous_scores,
     _collect_stale_dimensions,
@@ -103,7 +103,7 @@ class TestBuildDashboard:
     def test_builds_dashboard_for_latest(self, tmp_path):
         run = _make_run("r1", "2024-01-01")
         dims = [_dim("security", "B", "7.0")]
-        summary = {"overallGrade": "B", "numericAverage": 7.0}
+        summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
             patch("quodeq.provider.dashboard.list_runs", return_value=[run]),
             patch("quodeq.provider.dashboard.read_run_data", return_value=dims),

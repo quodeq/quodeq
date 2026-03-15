@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import build_totals
+from quodeq.core.types import Finding
 from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.provider.violation_context import FindingSpec, build_finding_base, format_file_line
 
@@ -26,8 +27,8 @@ def empty_severity_buckets() -> dict[str, list]:
     return {"critical": [], "major": [], "minor": []}
 
 
-def _build_finding(item: dict, *, include_severity: bool) -> dict[str, Any]:
-    """Build a normalized finding dict from a violation or compliance item."""
+def _build_finding(item: dict, *, include_severity: bool) -> Finding:
+    """Build a normalized finding from a violation or compliance item."""
     return build_finding_base(FindingSpec(
         principle=item.get("principle"),
         file=item.get("file"),

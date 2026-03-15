@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+
+from quodeq.core.types import Finding, ReqRef
 
 
 @dataclass(frozen=True)
@@ -29,29 +30,30 @@ class FindingSpec:
     include_severity: bool = True
 
 
-def build_finding_base(spec: FindingSpec) -> dict[str, Any]:
+def build_finding_base(spec: FindingSpec) -> Finding:
     """Build the core fields shared by all finding/violation normalizers.
 
     Used by both ``violations_parsing`` (JSONL/stream) and ``json_parser``
     (evaluation JSON) to avoid duplicating the same field assembly (CWE-1041).
     """
-    entry: dict[str, Any] = {
-        "principle": spec.principle,
-        "file": spec.file,
-        "line": spec.line,
-        "title": spec.title,
-        "reason": spec.reason,
-        "snippet": spec.snippet,
-    }
-    if spec.include_severity:
-        entry["severity"] = spec.severity or "minor"
-    if spec.cwe:
-        entry["cwe"] = spec.cwe
-    if spec.req:
-        entry["req"] = spec.req
+    req_refs: list[ReqRef] = []
     if spec.req_refs:
-        entry["req_refs"] = spec.req_refs
-    return entry
+        req_refs = [
+            ReqRef(label=ref.get("label", ""), url=ref.get("url", ""))
+            for ref in spec.req_refs
+        ]
+    return Finding(
+        principle=spec.principle,
+        file=spec.file,
+        line=spec.line,
+        title=spec.title,
+        reason=spec.reason,
+        snippet=spec.snippet,
+        severity=(spec.severity or "minor") if spec.include_severity else "minor",
+        cwe=spec.cwe if spec.cwe else None,
+        req=spec.req if spec.req else None,
+        req_refs=req_refs,
+    )
 
 
 def format_file_line(file: str | None, line: int | str | None) -> str | None:

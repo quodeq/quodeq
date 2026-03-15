@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser import parse_eval_from_json, parse_eval_markdown
+from quodeq.core.types import ViolationResponse
 from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.provider.violation_context import ViolationContext  # noqa: F401 — re-export
 from quodeq.provider.violations_parsing import (
@@ -27,7 +28,7 @@ def _max_violation_files(override: int | None = None) -> int:
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     compiled_dir: Path | None = None,
-) -> dict[str, Any] | None:
+) -> ViolationResponse | dict[str, Any] | None:
     """Try successive file formats to load evaluation data for a dimension."""
 
     eval_path = base / "evaluation" / f"{dimension}.json"

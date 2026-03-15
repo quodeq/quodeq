@@ -136,15 +136,8 @@ def parse_parsed_report(raw: dict[str, object]) -> ParsedReport:
     if isinstance(principles_raw, list):
         principles = [parse_principle_grade(p) for p in principles_raw if isinstance(p, dict)]
 
-    violations_raw = raw.get("violations")
-    violations: list[Finding] = []
-    if isinstance(violations_raw, list):
-        violations = [parse_finding(f) for f in violations_raw if isinstance(f, dict)]
-
-    compliance_raw = raw.get("compliance")
-    compliance: list[Finding] = []
-    if isinstance(compliance_raw, list):
-        compliance = [parse_finding(f) for f in compliance_raw if isinstance(f, dict)]
+    violations = _parse_finding_list(raw.get("violations"))
+    compliance = _parse_finding_list(raw.get("compliance"))
 
     detail_raw = raw.get("detailPrinciples")
     detail_principles: list[object] = []
@@ -152,7 +145,12 @@ def parse_parsed_report(raw: dict[str, object]) -> ParsedReport:
         detail_principles = list(detail_raw)
 
     totals_raw = raw.get("totals")
-    totals = parse_totals(totals_raw) if isinstance(totals_raw, dict) else None
+    if isinstance(totals_raw, Totals):
+        totals = totals_raw
+    elif isinstance(totals_raw, dict):
+        totals = parse_totals(totals_raw)
+    else:
+        totals = None
 
     return ParsedReport(
         dimension=_opt_str(raw.get("dimension")),
@@ -179,6 +177,19 @@ def parse_evidence_file_meta(raw: dict[str, object]) -> EvidenceFileMeta:
     )
 
 
+def _parse_finding_list(raw_list: object) -> list[Finding]:
+    """Parse a list of findings, accepting both dicts and Finding instances."""
+    if not isinstance(raw_list, list):
+        return []
+    result: list[Finding] = []
+    for item in raw_list:
+        if isinstance(item, Finding):
+            result.append(item)
+        elif isinstance(item, dict):
+            result.append(parse_finding(item))
+    return result
+
+
 def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
     dim = raw.get("dimension")
     if not isinstance(dim, str):
@@ -190,18 +201,16 @@ def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
     if isinstance(principles_raw, list):
         principles = [parse_principle_grade(p) for p in principles_raw if isinstance(p, dict)]
 
-    violations_raw = raw.get("violations")
-    violations: list[Finding] = []
-    if isinstance(violations_raw, list):
-        violations = [parse_finding(f) for f in violations_raw if isinstance(f, dict)]
-
-    compliance_raw = raw.get("compliance")
-    compliance: list[Finding] = []
-    if isinstance(compliance_raw, list):
-        compliance = [parse_finding(f) for f in compliance_raw if isinstance(f, dict)]
+    violations = _parse_finding_list(raw.get("violations"))
+    compliance = _parse_finding_list(raw.get("compliance"))
 
     totals_raw = raw.get("totals")
-    totals = parse_totals(totals_raw) if isinstance(totals_raw, dict) else None
+    if isinstance(totals_raw, Totals):
+        totals = totals_raw
+    elif isinstance(totals_raw, dict):
+        totals = parse_totals(totals_raw)
+    else:
+        totals = None
 
     return DimensionResult(
         dimension=dim,

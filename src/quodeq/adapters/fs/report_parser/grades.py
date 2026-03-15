@@ -6,7 +6,7 @@ import logging
 import re
 from typing import Any
 
-from quodeq.core.types import DimensionResult
+from quodeq.core.types import DimensionResult, DimensionSummary, Finding, GradeBreakdown, SeverityTally, Totals
 from quodeq.engine.scoring_internals import GRADE_LADDER
 
 _logger = logging.getLogger(__name__)
@@ -62,24 +62,29 @@ def most_frequent_grade(grades: list[str]) -> str | None:
     return max(counts, key=lambda g: (counts[g], _grade_rank(g)))
 
 
-def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, Any]]) -> dict[str, Any]:
+def build_totals(violations: list[Finding], compliance: list[Finding]) -> Totals:
     """Aggregate violation and compliance counts grouped by severity.
 
     Example::
 
-        build_totals([{"severity": "major"}], [{"severity": "minor"}])
+        build_totals([Finding(severity="major")], [Finding(severity="minor")])
     """
-    severity = {k: 0 for k in SEVERITIES}
+    severity: dict[str, int] = {k: 0 for k in SEVERITIES}
     for entry in violations:
-        key = entry.get("severity", "unknown")
+        key = entry.severity or "unknown"
         if key not in SEVERITIES:
             key = "unknown"
         severity[key] += 1
-    return {
-        "violationCount": len(violations),
-        "complianceCount": len(compliance),
-        "severity": severity,
-    }
+    return Totals(
+        violation_count=len(violations),
+        compliance_count=len(compliance),
+        severity=SeverityTally(
+            critical=severity["critical"],
+            major=severity["major"],
+            minor=severity["minor"],
+            unknown=severity["unknown"],
+        ),
+    )
 
 
 def calculate_trend(current_score: Any, previous_score: Any) -> str:
@@ -100,12 +105,12 @@ def calculate_trend(current_score: Any, previous_score: Any) -> str:
     return "same"
 
 
-def summarize_dimensions(dimensions: list[DimensionResult]) -> dict[str, Any]:
+def summarize_dimensions(dimensions: list[DimensionResult]) -> DimensionSummary:
     """Produce an aggregate summary across multiple dimension evaluation results.
 
     Example::
 
-        summarize_dimensions([{"overallGrade": "Good", "overallScore": "8/10"}])
+        summarize_dimensions([DimensionResult(dimension="security", overall_grade="Good", overall_score="8/10")])
     """
     overall_grades = [d.overall_grade for d in dimensions if d.overall_grade]
     numeric_scores = [
@@ -115,16 +120,16 @@ def summarize_dimensions(dimensions: list[DimensionResult]) -> dict[str, Any]:
     if numeric_scores:
         numeric_average = round(sum(numeric_scores) / len(numeric_scores), _SCORE_DECIMAL_PLACES)
 
-    grade_breakdown: dict[str, int] = {}
+    grade_counts: dict[str, int] = {}
     for grade in overall_grades:
-        grade_breakdown[grade] = grade_breakdown.get(grade, 0) + 1
+        grade_counts[grade] = grade_counts.get(grade, 0) + 1
 
-    return {
-        "dimensionsCount": len(dimensions),
-        "overallGrade": most_frequent_grade(overall_grades),
-        "numericAverage": numeric_average,
-        "gradeBreakdown": [
-            {"grade": grade, "count": count}
-            for grade, count in sorted(grade_breakdown.items(), key=lambda item: (-item[1], item[0]))
+    return DimensionSummary(
+        dimensions_count=len(dimensions),
+        overall_grade=most_frequent_grade(overall_grades),
+        numeric_average=numeric_average,
+        grade_breakdown=[
+            GradeBreakdown(grade=grade, count=count)
+            for grade, count in sorted(grade_counts.items(), key=lambda item: (-item[1], item[0]))
         ],
-    }
+    )

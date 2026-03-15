@@ -14,7 +14,7 @@ from quodeq.provider.evaluation_mixin import FsEvaluationMixin
 from quodeq.provider.tooling_mixin import FsToolingMixin
 from quodeq.provider.violations import aggregate_violations, resolve_dimension_eval
 from quodeq.config.paths import default_paths
-from quodeq.core.types import DimensionResult
+from quodeq.core.types import DimensionResult, ViolationResponse, to_camel_dict
 from quodeq.provider.accumulated import compute_accumulated
 from quodeq.provider.dashboard import build_dashboard
 from quodeq.adapters.fs.report_parser import (
@@ -44,8 +44,8 @@ def _read_latest_run_summary(
     try:
         dims = read_run_data(reports_root, entry_name, run_id)
         summary = summarize_dimensions(dims)
-        grade = summary.get("overallGrade")
-        score = summary.get("numericAverage")
+        grade = summary.overall_grade
+        score = summary.numeric_average
         files = next((d.source_file_count for d in dims if d.source_file_count), None)
         return grade, score, files
     except (OSError, json.JSONDecodeError, KeyError):
@@ -287,7 +287,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         compiled_dir = default_paths().standards_dir / "compiled"
         result = resolve_dimension_eval(base, project, run_id, dimension, compiled_dir=compiled_dir if compiled_dir.exists() else None)
         if result is not None:
-            return result
+            return to_camel_dict(result) if isinstance(result, ViolationResponse) else result
         # Run exists but dimension hasn't started yet
         if base.is_dir():
             return {"waiting": True, "project": project, "runId": run_id, "dimension": dimension}
