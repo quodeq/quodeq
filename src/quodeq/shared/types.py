@@ -6,7 +6,20 @@ each dict.
 """
 from __future__ import annotations
 
-from typing import TypedDict
+from typing import TypedDict, Union
+
+# ---------------------------------------------------------------------------
+# JSON value type — the precise union returned by json.loads()
+# ---------------------------------------------------------------------------
+
+JsonValue = Union[str, int, float, bool, None, list["JsonValue"], dict[str, "JsonValue"]]
+"""Recursive type alias for any value that ``json.loads`` can produce.
+
+Use instead of ``Any`` when a variable holds parsed-but-unstructured JSON.
+"""
+
+JsonObject = dict[str, JsonValue]
+"""A parsed JSON object (the top-level dict from ``json.loads``)."""
 
 
 # ---------------------------------------------------------------------------

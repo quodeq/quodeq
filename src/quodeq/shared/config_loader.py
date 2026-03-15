@@ -10,7 +10,9 @@ import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Iterator
+
+from quodeq.shared.types import JsonObject, JsonValue
 
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
 
@@ -23,19 +25,19 @@ class Config:
     supports safe overrides via the :meth:`override` context manager.
     """
 
-    _data: dict[str, Any] = field(default_factory=dict, init=False)
+    _data: JsonObject = field(default_factory=dict, init=False)
 
-    def __getitem__(self, key: str) -> Any:
+    def __getitem__(self, key: str) -> JsonValue:
         return self._data[key]
 
-    def get(self, key: str, default: Any = None) -> Any:
+    def get(self, key: str, default: JsonValue = None) -> JsonValue:
         return self._data.get(key, default)
 
-    def update(self, **overrides: Any) -> None:
+    def update(self, **overrides: JsonValue) -> None:
         self._data.update(overrides)
 
     @contextmanager
-    def override(self, **overrides: Any) -> Iterator[None]:
+    def override(self, **overrides: JsonValue) -> Iterator[None]:
         """Temporarily override config values; restores originals on exit."""
         saved = {k: self._data[k] for k in overrides if k in self._data}
         removed = {k for k in overrides if k not in self._data}
