@@ -184,7 +184,10 @@ def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
     full = load_plugin_full(plugin_dir)
     analysis_file = plugin_dir / "knowledge" / "analysis.md"
     all_dims_raw = [d.get("id") for d in full["dimensions"].get("applies", []) if d.get("id")]
-    dimensions = [d for d in all_dims_raw if d in config.options.dimensions] if config.options.dimensions else all_dims_raw
+    if config.options.dimensions:
+        dimensions = [d for d in all_dims_raw if d in config.options.dimensions]
+    else:
+        dimensions = all_dims_raw
 
     ctx = _PluginContext(
         dimensions_data=full["dimensions"],

@@ -145,56 +145,50 @@ def _score_principle_graded(ctx: _PrincipleContext) -> dict:
 # Main scoring entry points
 # ---------------------------------------------------------------------------
 
+def _build_principle_context(
+    key: str, pdata: dict, scale_mult: int, files_read: int,
+) -> _PrincipleContext:
+    """Extract evidence data for a single principle and return a scoring context."""
+    metrics = pdata.get("metrics", {})
+    pct = metrics.get("compliance_percentage", 0.0)
+    violations = pdata.get("violations", [])
+    compliance = pdata.get("compliance", [])
+    conf_level = metrics.get("confidence_level", "medium")
+
+    using_taxonomy = evidence_has_taxonomy(violations)
+    vt_counts = (
+        tally_types_by_taxonomy(violations)
+        if using_taxonomy
+        else tally_types_by_reason(violations)
+    )
+    ct_counts = (
+        tally_compliance_types_by_taxonomy(compliance)
+        if using_taxonomy
+        else tally_compliance_types_by_reason(compliance)
+    )
+    dampen = compliance_dampening(ct_counts, vt_counts)
+    ci = confidence_interval_for(
+        confidence_level=conf_level,
+        is_balanced=metrics.get("is_balanced", True),
+        total_instances=metrics.get("total_instances", 0),
+        files_read=files_read,
+    )
+    return _PrincipleContext(
+        key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
+        dampening=dampen, using_taxonomy=using_taxonomy,
+        conf_level=conf_level, ci=ci, scale_mult=scale_mult,
+    )
+
+
 def _score_all_principles(
     raw_principles: dict, mode: str, scale_mult: int, files_read: int,
 ) -> dict:
-    """Score every principle in *raw_principles* and return the per-principle dict.
-
-    Orchestration flow per principle:
-      1. Extract metrics, violations, compliance from evidence
-      2. Detect taxonomy mode (vt field vs reason field)
-      3. Tally violation types by severity
-      4. Tally compliance types by severity
-      5. Compute compliance dampening multiplier
-      6. Compute confidence interval
-      7. Bundle into _PrincipleContext
-      8. Dispatch to numerical or graded scorer
-    """
+    """Score every principle in *raw_principles* and return the per-principle dict."""
+    scorer = _score_principle_numerical if mode == "numerical" else _score_principle_graded
     per_principle: dict = {}
     for key, pdata in raw_principles.items():
-        metrics = pdata.get("metrics", {})
-        pct = metrics.get("compliance_percentage", 0.0)
-        violations = pdata.get("violations", [])
-        compliance = pdata.get("compliance", [])
-        conf_level = metrics.get("confidence_level", "medium")
-
-        using_taxonomy = evidence_has_taxonomy(violations)
-        vt_counts = (
-            tally_types_by_taxonomy(violations)
-            if using_taxonomy
-            else tally_types_by_reason(violations)
-        )
-        ct_counts = (
-            tally_compliance_types_by_taxonomy(compliance)
-            if using_taxonomy
-            else tally_compliance_types_by_reason(compliance)
-        )
-        dampen = compliance_dampening(ct_counts, vt_counts)
-        ci = confidence_interval_for(
-            confidence_level=conf_level,
-            is_balanced=metrics.get("is_balanced", True),
-            total_instances=metrics.get("total_instances", 0),
-            files_read=files_read,
-        )
-        ctx = _PrincipleContext(
-            key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
-            dampening=dampen, using_taxonomy=using_taxonomy,
-            conf_level=conf_level, ci=ci, scale_mult=scale_mult,
-        )
-        if mode == "numerical":
-            per_principle[key] = _score_principle_numerical(ctx)
-        else:
-            per_principle[key] = _score_principle_graded(ctx)
+        ctx = _build_principle_context(key, pdata, scale_mult, files_read)
+        per_principle[key] = scorer(ctx)
     return per_principle
 
 

@@ -170,7 +170,7 @@ def create_app(
     app = Flask(__name__)
     provider = provider or _default_provider()
     store = rate_limit_store or create_rate_limit_store()
-    if not api_key:
+    if api_key is None:
         _msg = (
             "QUODEQ_API_KEY is not set — API endpoints are unauthenticated. "
             "Set QUODEQ_API_KEY for production use."

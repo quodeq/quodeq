@@ -108,9 +108,16 @@ def _spawn_and_wait_local(port: int, base_url: str, api_config: ApiConfig | None
     return spawn_and_wait(port, base_url, _get_pid_file(), _get_default_host(), api_config)
 
 
-def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen | None]:
+def _allow_plaintext_http(override: bool | None = None) -> bool:
+    """Return True if plaintext HTTP to non-localhost is allowed."""
+    if override is not None:
+        return override
+    return os.environ.get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
+
+
+def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None, evaluations_dir: str | None = None, allow_plaintext: bool | None = None) -> tuple[str, subprocess.Popen | None]:
     if host not in _LOCAL_HOSTS:
-        if os.environ.get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1":
+        if _allow_plaintext_http(allow_plaintext):
             import logging
             logging.getLogger(__name__).warning(
                 "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,

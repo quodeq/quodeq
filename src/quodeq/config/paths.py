@@ -54,12 +54,17 @@ class ConfigPaths:
         return cls.from_root(data_dir)
 
 
-def load_env_file(paths: ConfigPaths) -> None:
-    """Source all ``export VAR=value`` lines from ``.quodeq.env`` into ``os.environ``.
+def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> None:
+    """Source all ``export VAR=value`` lines from ``.quodeq.env`` into *target*.
 
-    Already-set environment variables are NOT overwritten, so explicit env
-    takes precedence over the file.
+    *target* defaults to ``os.environ``.  Already-set keys are NOT
+    overwritten, so explicit env takes precedence over the file.
+
+    Pass an explicit *target* dict in tests to avoid mutating the real
+    environment.
     """
+    if target is None:
+        target = os.environ
     if not paths.env_file.exists():
         return
     for line in paths.env_file.read_text().splitlines():
@@ -73,8 +78,8 @@ def load_env_file(paths: ConfigPaths) -> None:
         key, _, value = line.partition("=")
         key = key.strip()
         value = value.strip()
-        if key and key not in os.environ:
-            os.environ[key] = os.path.expanduser(value)
+        if key and key not in target:
+            target[key] = os.path.expanduser(value)
 
 
 def _looks_like_project_root(root: Path) -> bool:

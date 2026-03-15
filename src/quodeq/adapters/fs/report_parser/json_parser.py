@@ -16,6 +16,7 @@ _SUPPORTED_SCHEMA_VERSIONS = frozenset({None, 1})
 _FINDING_TYPE_VIOLATIONS = "violations"
 _FINDING_TYPE_COMPLIANCE = "compliance"
 _EVIDENCE_SUFFIX = "_evidence.json"
+_OVERALL_PRINCIPLE = "Overall"
 
 
 def empty_severity_buckets() -> dict[str, list]:
@@ -164,7 +165,7 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
     ]
     principle_grades.append(
         {
-            "principle": "Overall",
+            "principle": _OVERALL_PRINCIPLE,
             "score": data.get("overallScore"),
             "grade": data.get("overallGrade"),
             "isOverall": True,

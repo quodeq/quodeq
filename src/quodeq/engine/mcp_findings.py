@@ -27,9 +27,6 @@ from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 
 _FINDING_SCHEMA_VERSION = 1
 
-# Kept for backward compatibility with imports
-TOOL_NAME = REPORT_FINDING_NAME
-TOOL_SCHEMA = REPORT_FINDING_SCHEMA
 
 
 class FindingsRouter:

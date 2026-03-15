@@ -19,19 +19,30 @@ from quodeq.shared.utils import TEXT_ENCODING, get_github_raw_base_url, get_gith
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
 _REFRESH_TEMPLATES_DIR = Path(__file__).parent / "refresh_templates"
-def _fetch_timeout_s() -> int:
-    """Return fetch timeout in seconds (reads env at call time)."""
-    return int(os.environ.get("QUODEQ_FETCH_TIMEOUT", "15"))
+_DEFAULT_FETCH_TIMEOUT = 15
+_DEFAULT_CONTENT_SAMPLE_LIMIT = 4000
+_DEFAULT_MAX_FETCH_WORKERS = 8
 
 
-def _content_sample_limit() -> int:
-    """Return content sample character limit (reads env at call time)."""
-    return int(os.environ.get("QUODEQ_CONTENT_SAMPLE_LIMIT", "4000"))
+def _fetch_timeout_s(override: int | None = None) -> int:
+    """Return fetch timeout in seconds. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_FETCH_TIMEOUT", str(_DEFAULT_FETCH_TIMEOUT)))
 
 
-def _max_fetch_workers() -> int:
-    """Return max fetch worker threads (reads env at call time)."""
-    return int(os.environ.get("QUODEQ_MAX_FETCH_WORKERS", "8"))
+def _content_sample_limit(override: int | None = None) -> int:
+    """Return content sample character limit. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_CONTENT_SAMPLE_LIMIT", str(_DEFAULT_CONTENT_SAMPLE_LIMIT)))
+
+
+def _max_fetch_workers(override: int | None = None) -> int:
+    """Return max fetch worker threads. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_MAX_FETCH_WORKERS", str(_DEFAULT_MAX_FETCH_WORKERS)))
 _MAX_CONTENT_REPOS = 3
 _LINTER_DOCS_LIMIT = 6000
 _EXISTING_CONTENT_LIMIT = 2000

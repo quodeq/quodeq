@@ -83,7 +83,8 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run
         print(f"  SKIP  cannot read {evidence_path}: {exc}")
         return False
     discipline = evidence.get("discipline", "")
-    dimension = evidence_path.stem.replace("_evidence", "")
+    _EVIDENCE_STEM_SUFFIX = "_evidence"
+    dimension = evidence_path.stem.replace(_EVIDENCE_STEM_SUFFIX, "")
     mapping_path = evaluators_root / discipline / f"{dimension}.json"
 
     if not mapping_path.exists():
@@ -91,7 +92,7 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run
         return False
 
     try:
-        mapping = json.loads(mapping_path.read_text())
+        json.loads(mapping_path.read_text())  # validate mapping is readable
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read mapping {mapping_path}: {exc}")
         return False

@@ -10,26 +10,19 @@ from pathlib import Path
 
 _DEFAULT_PLUGIN_VERSION = "1.0.0"
 
+# Canonical dimension IDs used in scaffold boilerplate
+_DIM_MAINTAINABILITY = "maintainability"
+_DIM_RELIABILITY = "reliability"
+_DIM_SECURITY = "security"
+_DIM_PERFORMANCE = "performance"
+_EXCLUDED_DIMS = ["usability", "flexibility"]
 
-def _default_dimension_weight(override: float | None = None) -> float:
-    """Return the default dimension weight. *override* bypasses env for testing."""
+
+def _env_weight(env_var: str, default: str, override: float | None = None) -> float:
+    """Return a dimension weight from *override*, env var, or *default*."""
     if override is not None:
         return override
-    return float(os.environ.get("QUODEQ_DEFAULT_DIM_WEIGHT", "1.0"))
-
-
-def _security_dimension_weight(override: float | None = None) -> float:
-    """Return the security dimension weight. *override* bypasses env for testing."""
-    if override is not None:
-        return override
-    return float(os.environ.get("QUODEQ_SECURITY_DIM_WEIGHT", "1.2"))
-
-
-def _performance_dimension_weight(override: float | None = None) -> float:
-    """Return the performance dimension weight. *override* bypasses env for testing."""
-    if override is not None:
-        return override
-    return float(os.environ.get("QUODEQ_PERFORMANCE_DIM_WEIGHT", "0.8"))
+    return float(os.environ.get(env_var, default))
 
 _logger = logging.getLogger(__name__)
 
@@ -108,14 +101,17 @@ def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:
 
 def _write_dimensions_json(plugin_dir: Path) -> None:
     """Write dimensions.json with default dimension weights."""
+    default_w = _env_weight("QUODEQ_DEFAULT_DIM_WEIGHT", "1.0")
+    security_w = _env_weight("QUODEQ_SECURITY_DIM_WEIGHT", "1.2")
+    perf_w = _env_weight("QUODEQ_PERFORMANCE_DIM_WEIGHT", "0.8")
     (plugin_dir / "dimensions.json").write_text(json.dumps({
         "applies": [
-            {"id": "maintainability", "weight": _default_dimension_weight(), "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
-            {"id": "reliability", "weight": _default_dimension_weight(), "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
-            {"id": "security", "weight": _security_dimension_weight(), "iso_25010": "Security", "source": "OWASP ASVS L1"},
-            {"id": "performance", "weight": _performance_dimension_weight(), "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
+            {"id": _DIM_MAINTAINABILITY, "weight": default_w, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
+            {"id": _DIM_RELIABILITY, "weight": default_w, "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
+            {"id": _DIM_SECURITY, "weight": security_w, "iso_25010": "Security", "source": "OWASP ASVS L1"},
+            {"id": _DIM_PERFORMANCE, "weight": perf_w, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
         ],
-        "excludes": ["usability", "flexibility"],
+        "excludes": _EXCLUDED_DIMS,
     }, indent=2) + "\n")
 
 

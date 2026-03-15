@@ -19,8 +19,9 @@ def _max_zip_size_bytes(max_mb: int | None = None) -> int:
 
     *max_mb* overrides the env var for testing.
     """
-    mb = max_mb if max_mb is not None else int(os.environ.get("QUODEQ_MAX_ZIP_SIZE_MB", str(_DEFAULT_MAX_ZIP_SIZE_MB)))
-    return mb * 1024 * 1024
+    if max_mb is None:
+        max_mb = int(os.environ.get("QUODEQ_MAX_ZIP_SIZE_MB", str(_DEFAULT_MAX_ZIP_SIZE_MB)))
+    return max_mb * 1024 * 1024
 
 
 def _build_project_zip(project_path: Path) -> Path:

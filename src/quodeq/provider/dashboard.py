@@ -36,9 +36,14 @@ _RUN_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
 _RUN_DIM_LOCK = threading.Lock()
 
 
-def _run_dim_cache_max() -> int:
-    """Return the run-dimension cache size limit (env-configurable)."""
-    return int(os.environ.get("QUODEQ_RUN_DIM_CACHE_MAX", "256"))
+_DEFAULT_RUN_DIM_CACHE_MAX = 256
+
+
+def _run_dim_cache_max(override: int | None = None) -> int:
+    """Return the run-dimension cache size limit. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
 
 
 @dataclass

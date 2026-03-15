@@ -21,8 +21,13 @@ from quodeq.ports.data_errors import AuthError, NotFoundError, ServerError
 _logger = logging.getLogger(__name__)
 
 
-def _allow_private_urls() -> bool:
-    """Return True if private/internal URL requests are allowed (reads env at call time)."""
+def _allow_private_urls(override: bool | None = None) -> bool:
+    """Return True if private/internal URL requests are allowed.
+
+    *override* bypasses the env var for testing.
+    """
+    if override is not None:
+        return override
     return os.environ.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
 
 
@@ -102,6 +107,7 @@ class HttpClientConfig:
     retry_jitter: float | None = None
     cb_threshold: int | None = None
     cb_reset: int | None = None
+    allow_private_urls: bool | None = None
 
 
 def check_response_status(response: HttpResponse) -> None:
@@ -134,6 +140,7 @@ class HttpClient:
         self._retry_jitter = cfg.retry_jitter if cfg.retry_jitter is not None else _retry_jitter_s()
         self._cb_threshold = cfg.cb_threshold if cfg.cb_threshold is not None else _circuit_breaker_threshold()
         self._cb_reset = cfg.cb_reset if cfg.cb_reset is not None else _circuit_breaker_reset_s()
+        self._allow_private = cfg.allow_private_urls
         self._lock = threading.Lock()
         self._failure_count = 0
         self._circuit_opened_at: float | None = None
@@ -169,7 +176,7 @@ class HttpClient:
             _logger.warning("Cleartext HTTP request to %s — consider using https://", parsed.hostname)
 
         hostname = parsed.hostname or ""
-        if _is_private_address(hostname) and not _allow_private_urls():
+        if _is_private_address(hostname) and not _allow_private_urls(self._allow_private):
             raise ValueError(
                 f"Requests to private/internal addresses are blocked: {hostname!r}. "
                 "Set QUODEQ_ALLOW_PRIVATE_URLS=1 to allow."

@@ -50,11 +50,6 @@ def _read_latest_run_summary(
         return None, None, None
 
 
-def _or_none(value: Any) -> Any:
-    """Return *value* if truthy, else None (coerce empty strings to None)."""
-    return value or None
-
-
 def _check_path_exists(path: str | None, location: str | None) -> bool | None:
     """Return whether a local path exists, or None if not applicable."""
     if location == "local" and path:
@@ -66,11 +61,11 @@ def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str
     """Extract and normalize optional metadata fields from repository info."""
     return {
         "name": info.get("name") or entry_name,
-        "parent": _or_none(info.get("parent")),
-        "displayName": _or_none(info.get("displayName")),
-        "discipline": _or_none(info.get("discipline")),
-        "path": _or_none(info.get("path")),
-        "location": _or_none(info.get("location")),
+        "parent": info.get("parent") or None,
+        "displayName": info.get("displayName") or None,
+        "discipline": info.get("discipline") or None,
+        "path": info.get("path") or None,
+        "location": info.get("location") or None,
     }
 
 

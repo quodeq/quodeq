@@ -12,12 +12,17 @@ _SENSITIVE_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-def _ai_cli_timeout() -> int:
-    """Return the AI CLI timeout in seconds (reads env at call time)."""
-    return int(os.environ.get("QUODEQ_AI_CLI_TIMEOUT", "300"))
+_DEFAULT_AI_CLI_TIMEOUT = 300
 
 
-def run_ai_cli(prompt: str) -> tuple[str | None, str | None]:
+def _ai_cli_timeout(override: int | None = None) -> int:
+    """Return the AI CLI timeout in seconds. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_AI_CLI_TIMEOUT", str(_DEFAULT_AI_CLI_TIMEOUT)))
+
+
+def run_ai_cli(prompt: str, *, timeout: int | None = None) -> tuple[str | None, str | None]:
     """Run the configured AI CLI with the given prompt and return (stdout, error)."""
     cmd = get_ai_cmd()
     try:
@@ -26,7 +31,7 @@ def run_ai_cli(prompt: str) -> tuple[str | None, str | None]:
             check=True,
             capture_output=True,
             text=True,
-            timeout=_ai_cli_timeout(),
+            timeout=_ai_cli_timeout(timeout),
         )
     except FileNotFoundError:
         return None, f"AI command not found: {cmd}"

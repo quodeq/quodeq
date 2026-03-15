@@ -17,6 +17,11 @@ _MAX_LEGACY_SCAN = 500
 _index_cache: dict[Path, tuple[float, dict[str, str]]] = {}
 
 
+def clear_index_cache() -> None:
+    """Clear the mtime-based index cache (useful for testing and isolation)."""
+    _index_cache.clear()
+
+
 class ProjectRepository(Protocol):
     """Abstraction over the storage layer used to persist project identities.
 

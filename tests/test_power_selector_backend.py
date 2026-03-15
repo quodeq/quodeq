@@ -177,34 +177,35 @@ class TestApiRouteSubagentModel:
 
 class TestRunnerSubagentModelResolution:
     """The runner should pick subagent_model from options first, then
-    SUBAGENT_MODEL env, then fall back to claude-haiku-4-5."""
+    QUODEQ_SUBAGENT_MODEL env, then fall back to claude-haiku-4-5."""
+
+    @staticmethod
+    def _resolve(opts: AnalysisOptions) -> str:
+        """Mirror the production resolution path in _subagent_runner."""
+        from quodeq.engine._subagent_runner import _default_subagent_model
+        return opts.subagent_model or _default_subagent_model()
 
     def test_options_takes_priority(self) -> None:
         opts = AnalysisOptions(subagent_model="claude-opus-4-6")
-        model = opts.subagent_model or os.environ.get("SUBAGENT_MODEL") or "claude-haiku-4-5"
-        assert model == "claude-opus-4-6"
+        assert self._resolve(opts) == "claude-opus-4-6"
 
     def test_env_fallback(self, monkeypatch) -> None:
-        monkeypatch.setenv("SUBAGENT_MODEL", "claude-sonnet-4-6")
+        monkeypatch.setenv("QUODEQ_SUBAGENT_MODEL", "claude-sonnet-4-6")
         opts = AnalysisOptions()  # subagent_model is None
-        model = opts.subagent_model or os.environ.get("SUBAGENT_MODEL") or "claude-haiku-4-5"
-        assert model == "claude-sonnet-4-6"
+        assert self._resolve(opts) == "claude-sonnet-4-6"
 
     def test_default_haiku(self, monkeypatch) -> None:
-        monkeypatch.delenv("SUBAGENT_MODEL", raising=False)
+        monkeypatch.delenv("QUODEQ_SUBAGENT_MODEL", raising=False)
         opts = AnalysisOptions()
-        model = opts.subagent_model or os.environ.get("SUBAGENT_MODEL") or "claude-haiku-4-5"
-        assert model == "claude-haiku-4-5"
+        assert self._resolve(opts) == "claude-haiku-4-5"
 
     def test_options_beats_env(self, monkeypatch) -> None:
-        monkeypatch.setenv("SUBAGENT_MODEL", "claude-haiku-4-5")
+        monkeypatch.setenv("QUODEQ_SUBAGENT_MODEL", "claude-haiku-4-5")
         opts = AnalysisOptions(subagent_model="claude-opus-4-6")
-        model = opts.subagent_model or os.environ.get("SUBAGENT_MODEL") or "claude-haiku-4-5"
-        assert model == "claude-opus-4-6"
+        assert self._resolve(opts) == "claude-opus-4-6"
 
     def test_empty_string_falls_through(self, monkeypatch) -> None:
         """Empty string in options is falsy → should fall through to env/default."""
-        monkeypatch.delenv("SUBAGENT_MODEL", raising=False)
+        monkeypatch.delenv("QUODEQ_SUBAGENT_MODEL", raising=False)
         opts = AnalysisOptions(subagent_model="")
-        model = opts.subagent_model or os.environ.get("SUBAGENT_MODEL") or "claude-haiku-4-5"
-        assert model == "claude-haiku-4-5"
+        assert self._resolve(opts) == "claude-haiku-4-5"

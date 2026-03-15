@@ -13,19 +13,30 @@ _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 # Read at call time (not import time) so env changes take effect without restart.
 
 
-def _critical_penalty() -> float:
+_DEFAULT_CRITICAL_PENALTY = 2.0
+_DEFAULT_MAJOR_PENALTY = 1.0
+_DEFAULT_MINOR_PENALTY = 0.25
+
+
+def _critical_penalty(override: float | None = None) -> float:
     """Points deducted per critical violation type (default: 2.0)."""
-    return float(os.environ.get("QUODEQ_CRITICAL_PENALTY", "2.0"))
+    if override is not None:
+        return override
+    return float(os.environ.get("QUODEQ_CRITICAL_PENALTY", str(_DEFAULT_CRITICAL_PENALTY)))
 
 
-def _major_penalty() -> float:
+def _major_penalty(override: float | None = None) -> float:
     """Points deducted per major violation type (default: 1.0)."""
-    return float(os.environ.get("QUODEQ_MAJOR_PENALTY", "1.0"))
+    if override is not None:
+        return override
+    return float(os.environ.get("QUODEQ_MAJOR_PENALTY", str(_DEFAULT_MAJOR_PENALTY)))
 
 
-def _minor_penalty() -> float:
+def _minor_penalty(override: float | None = None) -> float:
     """Points deducted per minor violation type (default: 0.25)."""
-    return float(os.environ.get("QUODEQ_MINOR_PENALTY", "0.25"))
+    if override is not None:
+        return override
+    return float(os.environ.get("QUODEQ_MINOR_PENALTY", str(_DEFAULT_MINOR_PENALTY)))
 
 
 _CRITICAL_SCORE_CAP = 3

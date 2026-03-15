@@ -72,22 +72,32 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
     return index
 
 
-def build_req_index(
-    standards_dir: Path,
-    dimension: str,
-    cwe_db: object | None = None,
-) -> dict[str, list[dict]]:
-    """Build a principle -> [requirement] index for a dimension.
-
-    Returns: {"Fault Tolerance": [{"id": "R-FT-1", "source": "iso25010", "text": "...", "refs": [...]}]}
-    """
+def _load_iso_data(standards_dir: Path, dimension: str) -> dict:
+    """Read and parse the ISO 25010 JSON file for *dimension*."""
     iso_file = standards_dir / "iso25010" / f"{dimension}.json"
     try:
-        iso_data = json.loads(iso_file.read_text(encoding=_TEXT_ENCODING))
+        return json.loads(iso_file.read_text(encoding=_TEXT_ENCODING))
     except OSError as exc:
         raise FileNotFoundError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise ValueError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
+
+
+def build_req_index(
+    standards_dir: Path,
+    dimension: str,
+    cwe_db: object | None = None,
+    iso_data: dict | None = None,
+) -> dict[str, list[dict]]:
+    """Build a principle -> [requirement] index for a dimension.
+
+    *iso_data* may be passed to avoid re-reading the ISO file when the
+    caller already has it loaded.
+
+    Returns: {"Fault Tolerance": [{"id": "R-FT-1", "source": "iso25010", "text": "...", "refs": [...]}]}
+    """
+    if iso_data is None:
+        iso_data = _load_iso_data(standards_dir, dimension)
     index = _build_req_index(iso_data)
     attach_cwe_refs(index, cwe_db, _get_cwe_name)
     attach_cisq_refs(index, standards_dir, dimension)
@@ -99,22 +109,9 @@ def build_req_index(
 
 def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
     """Compile a single dimension into the requirement-centric output format."""
-    iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    try:
-        iso_data = json.loads(iso_file.read_text(encoding=_TEXT_ENCODING))
-    except OSError as exc:
-        raise FileNotFoundError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
+    iso_data = _load_iso_data(standards_dir, dimension)
     dim_name = iso_data.get("name", dimension.title())
-
-    # Build the req index from pre-loaded data to avoid re-reading the ISO file.
-    index = _build_req_index(iso_data)
-    attach_cwe_refs(index, cwe_db, _get_cwe_name)
-    attach_cisq_refs(index, standards_dir, dimension)
-    attach_asvs_refs(index, standards_dir, dimension)
-    attach_cert_refs(index, standards_dir, dimension)
-    attach_wcag_refs(index, standards_dir, dimension)
+    index = build_req_index(standards_dir, dimension, cwe_db, iso_data=iso_data)
 
     sources = ["iso25010"]
     if dimension in CISQ_DIMENSIONS:

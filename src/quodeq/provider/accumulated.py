@@ -160,6 +160,45 @@ class AccumulatedCacheConfig:
     cache_max: int | None = None
 
 
+def _resolve_cache(
+    cache_config: AccumulatedCacheConfig | None,
+) -> tuple[OrderedDict, threading.Lock, int]:
+    """Resolve cache, lock, and max-size from *cache_config* or module defaults."""
+    if cache_config is not None:
+        return (
+            cache_config.cache,
+            cache_config.cache_lock,
+            cache_config.cache_max if cache_config.cache_max is not None else _acc_dim_cache_max(),
+        )
+    return _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max()
+
+
+def _build_accumulated_response(
+    project: str,
+    all_dimensions: list[dict[str, Any]],
+    dimensions_with_trend: list[dict[str, Any]],
+    severity: dict[str, int],
+    avg_score: float | None,
+    prev_avg_score: float | None,
+) -> dict[str, Any]:
+    """Assemble the final accumulated response dict."""
+    return {
+        "project": project,
+        "dimensions": dimensions_with_trend,
+        "summary": {
+            "overallGrade": most_frequent_grade(
+                [d.get("overallGrade") for d in all_dimensions if d.get("overallGrade")]
+            ),
+            "numericAverage": avg_score,
+            "previousNumericAverage": prev_avg_score,
+            "totalViolations": severity["totalViolations"],
+            "totalCompliance": severity["totalCompliance"],
+            "dimensionCount": len(dimensions_with_trend),
+            "severity": {"critical": severity["critical"], "major": severity["major"], "minor": severity["minor"]},
+        },
+    }
+
+
 def compute_accumulated(
     reports_dir: str,
     project: str,
@@ -185,14 +224,7 @@ def compute_accumulated(
     if not runs:
         return None
 
-    if cache_config is not None:
-        _cache = cache_config.cache
-        _lock = cache_config.cache_lock
-        _max = cache_config.cache_max if cache_config.cache_max is not None else _acc_dim_cache_max()
-    else:
-        _cache = _ACC_DIM_CACHE
-        _lock = _ACC_DIM_LOCK
-        _max = _acc_dim_cache_max()
+    _cache, _lock, _max = _resolve_cache(cache_config)
     get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
     latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
         reports_root, project, all_run_infos, runs, get_run_data
@@ -202,18 +234,6 @@ def compute_accumulated(
     severity = _aggregate_severity_counts(all_dimensions)
     avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, prev_run_latest)
 
-    return {
-        "project": project,
-        "dimensions": dimensions_with_trend,
-        "summary": {
-            "overallGrade": most_frequent_grade(
-                [d.get("overallGrade") for d in all_dimensions if d.get("overallGrade")]
-            ),
-            "numericAverage": avg_score,
-            "previousNumericAverage": prev_avg_score,
-            "totalViolations": severity["totalViolations"],
-            "totalCompliance": severity["totalCompliance"],
-            "dimensionCount": len(dimensions_with_trend),
-            "severity": {"critical": severity["critical"], "major": severity["major"], "minor": severity["minor"]},
-        },
-    }
+    return _build_accumulated_response(
+        project, all_dimensions, dimensions_with_trend, severity, avg_score, prev_avg_score,
+    )

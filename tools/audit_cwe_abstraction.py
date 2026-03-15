@@ -23,6 +23,8 @@ _RATE_LIMIT_SLEEP_S = 0.1
 _TERMINAL_WIDTH = 80
 _MAX_RATIONALE_DISPLAY = 120
 
+_API_TIMEOUT_S = 10
+
 _ALLOWED_USAGES = {"allowed", "allowed-with-review"}
 _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
 
@@ -48,7 +50,7 @@ def fetch_cwe_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | Non
     url = f"{api_base}/weakness/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=_API_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             if "Weaknesses" in data and data["Weaknesses"]:
                 w = data["Weaknesses"][0]
@@ -75,7 +77,7 @@ def _fetch_category_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict
     url = f"{api_base}/category/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=_API_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             if "Categories" in data and data["Categories"]:
                 c = data["Categories"][0]
@@ -98,7 +100,7 @@ def _fetch_view_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | N
     url = f"{api_base}/view/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        with urllib.request.urlopen(req, timeout=_API_TIMEOUT_S) as resp:
             data = json.loads(resp.read())
             if "Views" in data and data["Views"]:
                 v = data["Views"][0]

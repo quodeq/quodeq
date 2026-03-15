@@ -178,7 +178,7 @@ def _read_judgments(
         return []
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
-    with open(jsonl_file) as _jf:
+    with open(jsonl_file, encoding="utf-8") as _jf:
         for line in _jf:
             result = _parse_jsonl_line(line)
             if result is not None:

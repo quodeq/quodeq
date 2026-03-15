@@ -75,6 +75,11 @@ class SubagentPool:
         self._dimension = dimension
         self._base_config = config or AnalysisConfig()
         self._jsonl_lock = threading.Lock()
+        # Initialised here so helpers like _collect_done/_process_completed_futures
+        # never encounter missing attributes regardless of call order.
+        self._futures: dict[Future[SubagentResult], int] = {}
+        self._finished: dict[str, bool] = {}
+        self._next_idx = 0
 
     def _shared_jsonl_path(self) -> Path:
         """The shared JSONL path all agents write to (same path the UI expects)."""
@@ -210,15 +215,12 @@ class SubagentPool:
 
         Returns list of SubagentResult (one per agent, including failures).
 
-        Note: this method initialises ``_futures``, ``_finished``, and ``_next_idx``
-        as instance attributes.  These are exclusively used by ``_collect_done`` and
-        ``_process_completed_futures`` during the lifetime of this call; calling those
-        helpers outside ``run()`` is unsupported and will raise ``AttributeError``.
         """
         max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
         log_info(f"Launching {self._n} subagents for {self._dimension}")
         results: list[SubagentResult] = []
-        self._finished: dict[str, bool] = {}
+        self._finished.clear()
+        self._futures.clear()
         self._next_idx = 0
         pool_start = time.monotonic()
 
@@ -230,7 +232,6 @@ class SubagentPool:
 
         try:
             with ThreadPoolExecutor(max_workers=self._n) as pool:
-                self._futures: dict[Future[SubagentResult], int] = {}
                 for _ in range(self._n):
                     self._finished[f"agent-{self._next_idx}"] = False
                     self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
