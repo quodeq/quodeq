@@ -97,8 +97,7 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
 
 def _collect_evidence(config: RunConfig, dim_id: str, evidence_dir: Path, results: list[Any], ctx: Any) -> Evidence:
     """Deduplicate JSONL, count files read, and parse into Evidence."""
-    # Imported here to avoid circular import: runner -> _subagent_runner -> runner
-    from quodeq.engine.runner import cleanup_stream
+    from quodeq.engine._runner_markers import cleanup_stream
 
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)

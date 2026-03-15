@@ -16,7 +16,7 @@ from quodeq.engine.stream_parser import extract_evidence_from_stream
 from quodeq.engine.stream_validation import get_mcp_status, is_stream_valid
 from quodeq.engine.evidence import Evidence
 from quodeq.engine._merge import merge_evidence
-from quodeq.engine._runner_markers import CC_MARKER_KEY, emit_marker, make_heartbeat
+from quodeq.engine._runner_markers import CC_MARKER_KEY, cleanup_stream, emit_marker, make_heartbeat
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
@@ -49,11 +49,6 @@ class RunConfig:
     options: AnalysisOptions = field(default_factory=AnalysisOptions)
 
 
-def cleanup_stream(stream_file: Path) -> None:
-    """Remove stream and stderr files after successful evidence extraction."""
-    stream_file.unlink(missing_ok=True)
-    err_file = Path(str(stream_file) + ".err")
-    err_file.unlink(missing_ok=True)
 
 
 @dataclass(frozen=True)

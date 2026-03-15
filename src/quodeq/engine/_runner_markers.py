@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.shared.logging import log_info
@@ -15,6 +16,13 @@ def emit_marker(phase: str, **kwargs: Any) -> None:
     if sys.stdout.isatty():
         return
     print(json.dumps({CC_MARKER_KEY: phase, **kwargs}), flush=True)
+
+
+def cleanup_stream(stream_file: Path) -> None:
+    """Remove stream and stderr files after successful evidence extraction."""
+    stream_file.unlink(missing_ok=True)
+    err_file = Path(str(stream_file) + ".err")
+    err_file.unlink(missing_ok=True)
 
 
 def make_heartbeat(dim_name: str, idx: int, total: int) -> Callable[[int, dict], None]:

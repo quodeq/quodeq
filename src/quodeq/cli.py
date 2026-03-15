@@ -200,6 +200,32 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     return 0
 
 
+def _build_run_config(
+    args: argparse.Namespace, src: Path, plugin_id: str,
+    evaluators_dir: Path, evidence_dir: Path,
+) -> RunConfig:
+    """Assemble a RunConfig from CLI args and resolved paths."""
+    standards_dir = default_paths().standards_dir
+    dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
+    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
+
+    return RunConfig(
+        src=src,
+        plugin_id=plugin_id,
+        evaluators_dir=evaluators_dir,
+        standards_dir=standards_dir if standards_dir.exists() else None,
+        source_file_count=_prescan_sources(args, evaluators_dir / plugin_id, src),
+        work_dir=evidence_dir,
+        options=AnalysisOptions(
+            dimensions=dimensions_filter,
+            max_turns=args.max_turns if args.max_turns is not None else _env_int("QUODEQ_MAX_TURNS", None),
+            max_duration=args.max_duration if args.max_duration is not None else _env_int("QUODEQ_MAX_DURATION", None),
+            n_subagents=args.n_subagents,
+            subagent_model=_subagent_model(),
+        ),
+    )
+
+
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
     src = _resolve_repo(args)
@@ -215,32 +241,10 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if plugin_id is None:
         return 1
 
-    source_file_count = _prescan_sources(args, evaluators_dir / plugin_id, src)
     _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
     print(f"Report path: {evaluation_dir}")
 
-    standards_dir = default_paths().standards_dir
-    dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
-    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
-
-    config = RunConfig(
-        src=src,
-        plugin_id=plugin_id,
-        evaluators_dir=evaluators_dir,
-        standards_dir=standards_dir if standards_dir.exists() else None,
-        source_file_count=source_file_count,
-        work_dir=evidence_dir,
-        options=AnalysisOptions(
-            dimensions=dimensions_filter,
-            max_turns=args.max_turns if args.max_turns is not None else _env_int("QUODEQ_MAX_TURNS", None),
-            max_duration=args.max_duration if args.max_duration is not None else _env_int("QUODEQ_MAX_DURATION", None),
-            n_subagents=args.n_subagents,
-            # SUBAGENT_MODEL env var: override the AI model used by subagent workers
-            # (e.g. "claude-sonnet-4-20250514"). Unset or empty = use default model.
-            subagent_model=_subagent_model(),
-        ),
-    )
-
+    config = _build_run_config(args, src, plugin_id, evaluators_dir, evidence_dir)
     return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
 
 

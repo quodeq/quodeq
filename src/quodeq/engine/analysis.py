@@ -238,6 +238,20 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
         )
 
 
+def _spawn_and_monitor(
+    args: list[str], work_dir: Path, env: dict,
+    stream_file: Path, stream_err: Path, cfg: AnalysisConfig,
+) -> tuple[subprocess.Popen, bool]:
+    """Spawn the AI CLI process, monitor with heartbeat, return (process, timed_out)."""
+    with open(stream_file, "w") as out, open(stream_err, "w") as err:
+        process = subprocess.Popen(
+            args, cwd=str(work_dir), env=env,
+            stdout=out, stderr=err, stdin=subprocess.DEVNULL,
+        )
+        timed_out = _run_with_heartbeat(process, cfg, stream_file)
+    return process, timed_out
+
+
 def run_analysis(
     work_dir: Path, prompt: str, stream_file: Path,
     config: AnalysisConfig | None = None,
@@ -249,18 +263,10 @@ def run_analysis(
     stream_err = Path(str(stream_file) + ".err")
 
     try:
-        with open(stream_file, "w") as out, open(stream_err, "w") as err:
-            process = subprocess.Popen(
-                args, cwd=str(work_dir), env=env,
-                stdout=out, stderr=err, stdin=subprocess.DEVNULL,
-            )
-            timed_out = _run_with_heartbeat(process, cfg, stream_file)
+        process, timed_out = _spawn_and_monitor(args, work_dir, env, stream_file, stream_err, cfg)
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
 
-    # When terminated by timeout, the evidence collected so far is still valid
-    # (MCP server writes findings to JSONL in real time). Skip the error check
-    # so the pipeline can score whatever was gathered before the cutoff.
     if not timed_out:
         _check_process_result(process, stream_err)

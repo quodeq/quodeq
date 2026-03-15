@@ -101,6 +101,17 @@ def _fetch_and_parse_practices(
     return payload, None
 
 
+def _write_or_diff(out_path: Path, content: str, dry_run: bool, label: str) -> None:
+    """Write *content* to *out_path*, or show a diff in dry-run mode."""
+    if dry_run:
+        log_info(f"[dry-run] Would write {label} to {out_path}")
+        show_diff(out_path, content)
+    else:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(content, encoding=TEXT_ENCODING)
+        log_success(f"Written {label} to {out_path}")
+
+
 def refresh_practices(
     runtime: str,
     evaluators_dir: Path,
@@ -122,15 +133,8 @@ def refresh_practices(
         return 1
 
     new_content = json.dumps(payload, indent=2)
-    if dry_run:
-        count = len(payload.get("practices", []))
-        log_info(f"[dry-run] Would write {count} practices to {out_path}")
-        show_diff(out_path, new_content)
-        return 0
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(new_content, encoding=TEXT_ENCODING)
-    log_success(f"Written {len(payload.get('practices', []))} practices to {out_path}")
+    count = len(payload.get("practices", []))
+    _write_or_diff(out_path, new_content, dry_run, f"{count} practices")
     return 0
 
 
