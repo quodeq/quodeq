@@ -11,6 +11,7 @@ from quodeq.engine._runner_report import run_full
 from quodeq.engine.runner import run, RunConfig, EvaluationError
 from quodeq.engine._merge import merge_evidence
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
+from tests.engine.conftest import _evidence_line
 
 
 def _make_plugin_dir(base: Path) -> Path:
@@ -46,9 +47,6 @@ def _stream_event_with_evidence(*evidence_lines: str) -> str:
             "message": {"content": [{"type": "text", "text": line}]},
         }))
     return "\n".join(events) + "\n"
-
-
-from tests.engine.conftest import _evidence_line
 
 
 def _mock_run_analysis_factory(stream_content: str):

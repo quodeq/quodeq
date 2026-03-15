@@ -11,7 +11,16 @@ from flask import Response, after_this_request, jsonify, send_file
 
 from quodeq.action_api_helpers import _error
 
-_MAX_ZIP_SIZE_BYTES = 100 * 1024 * 1024  # 100 MB
+_DEFAULT_MAX_ZIP_SIZE_MB = 100
+
+
+def _max_zip_size_bytes(max_mb: int | None = None) -> int:
+    """Return the max zip export size in bytes.
+
+    *max_mb* overrides the env var for testing.
+    """
+    mb = max_mb if max_mb is not None else int(os.environ.get("QUODEQ_MAX_ZIP_SIZE_MB", str(_DEFAULT_MAX_ZIP_SIZE_MB)))
+    return mb * 1024 * 1024
 
 
 def _build_project_zip(project_path: Path) -> Path:
@@ -26,10 +35,10 @@ def _build_project_zip(project_path: Path) -> Path:
                     continue
                 if file_entry.is_file():
                     total_size += file_entry.stat().st_size
-                    if total_size > _MAX_ZIP_SIZE_BYTES:
+                    if total_size > _max_zip_size_bytes():
                         raise ValueError("Project exceeds maximum export size")
                     zf.write(file_entry, file_entry.relative_to(project_path.parent))
-    except Exception:
+    except (OSError, zipfile.BadZipFile, ValueError):
         os.unlink(tmp_path)
         raise
     return Path(tmp_path)

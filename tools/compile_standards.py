@@ -24,6 +24,7 @@ from _standards_refs import (
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root / "src"))
 
+_TEXT_ENCODING = "utf-8"
 STANDARDS_DIR = repo_root / "standards"
 OUTPUT_DIR = STANDARDS_DIR / "compiled"
 
@@ -82,7 +83,7 @@ def build_req_index(
     """
     iso_file = standards_dir / "iso25010" / f"{dimension}.json"
     try:
-        iso_data = json.loads(iso_file.read_text())
+        iso_data = json.loads(iso_file.read_text(encoding=_TEXT_ENCODING))
     except OSError as exc:
         raise FileNotFoundError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
     except json.JSONDecodeError as exc:
@@ -100,16 +101,20 @@ def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
     """Compile a single dimension into the requirement-centric output format."""
     iso_file = standards_dir / "iso25010" / f"{dimension}.json"
     try:
-        iso_data = json.loads(iso_file.read_text())
+        iso_data = json.loads(iso_file.read_text(encoding=_TEXT_ENCODING))
     except OSError as exc:
         raise FileNotFoundError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
     except json.JSONDecodeError as exc:
         raise ValueError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
     dim_name = iso_data.get("name", dimension.title())
 
-    # Delegate to build_req_index to avoid duplicating the index-building
-    # and cross-reference attachment logic.
-    index = build_req_index(standards_dir, dimension, cwe_db)
+    # Build the req index from pre-loaded data to avoid re-reading the ISO file.
+    index = _build_req_index(iso_data)
+    attach_cwe_refs(index, cwe_db, _get_cwe_name)
+    attach_cisq_refs(index, standards_dir, dimension)
+    attach_asvs_refs(index, standards_dir, dimension)
+    attach_cert_refs(index, standards_dir, dimension)
+    attach_wcag_refs(index, standards_dir, dimension)
 
     sources = ["iso25010"]
     if dimension in CISQ_DIMENSIONS:
@@ -148,7 +153,7 @@ def report_gaps(standards_dir: Path, dimension: str) -> list[str]:
 
     iso_file = standards_dir / "iso25010" / f"{dimension}.json"
     try:
-        iso_data = json.loads(iso_file.read_text())
+        iso_data = json.loads(iso_file.read_text(encoding=_TEXT_ENCODING))
     except OSError as exc:
         raise FileNotFoundError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
     except json.JSONDecodeError as exc:
@@ -162,7 +167,7 @@ def report_gaps(standards_dir: Path, dimension: str) -> list[str]:
     if not cisq_file.exists():
         return []
     try:
-        cisq_data = json.loads(cisq_file.read_text())
+        cisq_data = json.loads(cisq_file.read_text(encoding=_TEXT_ENCODING))
     except OSError as exc:
         raise FileNotFoundError(f"Cannot read CISQ file {cisq_file}: {exc}") from exc
     except json.JSONDecodeError as exc:
@@ -202,7 +207,7 @@ def main() -> None:
     for dim in dimensions:
         compiled = compile_dimension(args.standards_dir, dim, cwe_db)
         out_file = args.output_dir / f"{dim}.json"
-        out_file.write_text(json.dumps(compiled, indent=2) + "\n")
+        out_file.write_text(json.dumps(compiled, indent=2) + "\n", encoding=_TEXT_ENCODING)
         n_principles = len(compiled["principles"])
         n_reqs = sum(len(p["requirements"]) for p in compiled["principles"])
         print(f"  {dim}: {n_principles} principles, {n_reqs} requirements -> {out_file}")

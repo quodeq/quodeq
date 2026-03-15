@@ -31,9 +31,12 @@ class DimensionCallbacks:
     parse_evidence: Callable[..., Evidence | None]
 
 
+_DEFAULT_SUBAGENT_MODEL = "claude-haiku-4-5"
+
+
 def _default_subagent_model() -> str:
     """Return the subagent model, reading from env at call time (not import time)."""
-    return os.environ.get("QUODEQ_SUBAGENT_MODEL", "claude-haiku-4-5")
+    return os.environ.get("QUODEQ_SUBAGENT_MODEL", _DEFAULT_SUBAGENT_MODEL)
 
 
 def _list_plugin_files(config: RunConfig, ctx_total: int, dim_id: str, idx: int) -> tuple[list[str], set[str]]:

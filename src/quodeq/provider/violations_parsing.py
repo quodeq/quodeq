@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -14,26 +15,31 @@ from quodeq.provider.violation_context import FindingSpec, ViolationContext, bui
 _logger = logging.getLogger(__name__)
 
 
+@dataclass(frozen=True)
+class _ResponseOptions:
+    """Keyword-only parameters for _build_violation_response."""
+    partial: bool = False
+    progress: dict[str, int] | None = None
+
+
 def _build_violation_response(
     ctx: ViolationContext,
     violations: list[dict[str, Any]],
     compliance: list[dict[str, Any]],
-    *,
-    partial: bool = False,
-    progress: dict[str, int] | None = None,
-    files_read: int = 0,
+    options: _ResponseOptions | None = None,
 ) -> dict[str, Any]:
     """Build the common response dict for violation/compliance parse results."""
+    opts = options or _ResponseOptions()
     result: dict[str, Any] = {
         "dimension": ctx.dimension,
         "runId": ctx.run_id,
         "project": ctx.project,
         "violations": violations,
         "compliance": compliance,
-        "partial": partial,
+        "partial": opts.partial,
     }
-    if progress is not None:
-        result["progress"] = progress
+    if opts.progress is not None:
+        result["progress"] = opts.progress
     return result
 
 
@@ -111,8 +117,10 @@ def parse_violations_from_jsonl(
     files_read = _count_files_in_stream(stream_path) if stream_path and stream_path.exists() else 0
     return _build_violation_response(
         ctx, violations, compliance,
-        partial=True,
-        progress={"filesRead": files_read, "violations": len(violations), "compliance": len(compliance)},
+        _ResponseOptions(
+            partial=True,
+            progress={"filesRead": files_read, "violations": len(violations), "compliance": len(compliance)},
+        ),
     )
 
 
@@ -147,7 +155,7 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
     except (OSError, json.JSONDecodeError):
         return None
     violations = _extract_violations_from_principles(data.get("principles") or {})
-    return _build_violation_response(ctx, violations, [], partial=True)
+    return _build_violation_response(ctx, violations, [], _ResponseOptions(partial=True))
 
 
 def _parse_entries_from_texts(
@@ -210,6 +218,8 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
 
     return _build_violation_response(
         ctx, violations, compliance,
-        partial=True,
-        progress={"filesRead": len(files_read), "violations": len(violations), "compliance": len(compliance)},
+        _ResponseOptions(
+            partial=True,
+            progress={"filesRead": len(files_read), "violations": len(violations), "compliance": len(compliance)},
+        ),
     )

@@ -46,34 +46,42 @@ def _is_private_address(hostname: str) -> bool:
         pass
     return False
 
+_DEFAULT_HTTP_TIMEOUT = 10
+_DEFAULT_MAX_RETRIES = 3
+_DEFAULT_RETRY_BASE_DELAY = 0.5
+_DEFAULT_RETRY_JITTER = 0.3
+_DEFAULT_CB_THRESHOLD = 5
+_DEFAULT_CB_RESET = 60
+
+
 def _http_timeout_s() -> int:
     """Return HTTP timeout in seconds (reads env at call time). Must be > 0."""
-    return int(os.environ.get("QUODEQ_HTTP_TIMEOUT", "10"))
+    return int(os.environ.get("QUODEQ_HTTP_TIMEOUT", str(_DEFAULT_HTTP_TIMEOUT)))
 
 
 def _max_retries() -> int:
     """Return max HTTP retries (reads env at call time). Must be >= 1."""
-    return int(os.environ.get("QUODEQ_HTTP_MAX_RETRIES", "3"))
+    return int(os.environ.get("QUODEQ_HTTP_MAX_RETRIES", str(_DEFAULT_MAX_RETRIES)))
 
 
 def _retry_base_delay_s() -> float:
     """Return retry base delay in seconds (reads env at call time). Must be >= 0."""
-    return float(os.environ.get("QUODEQ_HTTP_RETRY_DELAY", "0.5"))
+    return float(os.environ.get("QUODEQ_HTTP_RETRY_DELAY", str(_DEFAULT_RETRY_BASE_DELAY)))
 
 
 def _retry_jitter_s() -> float:
     """Return retry jitter in seconds (reads env at call time). Must be >= 0."""
-    return float(os.environ.get("QUODEQ_HTTP_RETRY_JITTER", "0.3"))
+    return float(os.environ.get("QUODEQ_HTTP_RETRY_JITTER", str(_DEFAULT_RETRY_JITTER)))
 
 
 def _circuit_breaker_threshold() -> int:
     """Return circuit breaker failure threshold (reads env at call time). Must be >= 1."""
-    return int(os.environ.get("QUODEQ_CB_THRESHOLD", "5"))
+    return int(os.environ.get("QUODEQ_CB_THRESHOLD", str(_DEFAULT_CB_THRESHOLD)))
 
 
 def _circuit_breaker_reset_s() -> int:
     """Return circuit breaker reset seconds (reads env at call time). Must be > 0."""
-    return int(os.environ.get("QUODEQ_CB_RESET", "60"))
+    return int(os.environ.get("QUODEQ_CB_RESET", str(_DEFAULT_CB_RESET)))
 
 
 @dataclass(frozen=True)
@@ -183,7 +191,8 @@ class HttpClient:
                 time.sleep(delay)
 
         self._record_failure()
-        assert last_response is not None
+        if last_response is None:
+            raise RuntimeError("No response received — max_retries may be 0")
         return last_response
 
     def _attempt_get(self, url: str, headers: dict[str, str]) -> HttpResponse:

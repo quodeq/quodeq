@@ -10,6 +10,7 @@ import pytest
 from quodeq.engine.analysis import AnalysisConfig, _build_ai_cmd
 from quodeq.engine.stream_parser import _extract_jsonl_from_text, extract_evidence_from_stream
 from quodeq.engine.stream_validation import is_stream_valid
+from tests.engine.conftest import _evidence_line
 
 
 # ---------------------------------------------------------------------------
@@ -46,9 +47,6 @@ def _item_completed_event(text: str, reads: list[str] | None = None) -> str:
         "type": "item.completed",
         "item": {"type": "agent_message", "text": text, "content": content},
     })
-
-
-from tests.engine.conftest import _evidence_line
 
 
 # ---------------------------------------------------------------------------

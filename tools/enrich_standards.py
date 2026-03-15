@@ -20,6 +20,7 @@ _tools_dir = str(Path(__file__).resolve().parent)
 if _tools_dir not in sys.path:
     sys.path.insert(0, _tools_dir)
 
+_TEXT_ENCODING = "utf-8"
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 
 # ---------------------------------------------------------------------------
@@ -35,6 +36,7 @@ _PREFIX_MAP_PATH = Path(__file__).resolve().parent / "enrich_standards_prefix_ma
 # Lazily loaded at first use (avoids file reads at import time).
 _MAPPING: dict | None = None
 _PREFIX_MAP: dict | None = None
+_UNKNOWN_PREFIX = "X-XXX"
 
 
 def _load_mapping() -> dict:
@@ -94,7 +96,7 @@ def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
         print(f"  SKIP {dimension}: file not found")
         return 0
 
-    data = json.loads(filepath.read_text())
+    data = json.loads(filepath.read_text(encoding=_TEXT_ENCODING))
     existing = _get_existing_cwes(data)
     prefixes = _load_prefix_map().get(dimension, {})
     total_added = 0
@@ -104,7 +106,7 @@ def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
         if sc_name not in mapping[dimension]:
             continue
 
-        prefix = prefixes.get(sc_name, "X-XXX")
+        prefix = prefixes.get(sc_name, _UNKNOWN_PREFIX)
         highest = _get_highest_id(sc["requirements"], prefix)
 
         for req_text, cwe_ids in mapping[dimension][sc_name]:
@@ -127,7 +129,7 @@ def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
                 print(f"  {new_req['id']}: {len(new_cwes)} CWEs → {sc_name}")
 
     if not dry_run and total_added > 0:
-        filepath.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        filepath.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
         print(f"  Wrote {filepath.name} (+{total_added} CWEs)")
 
     return total_added

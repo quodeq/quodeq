@@ -4,6 +4,8 @@ Extracted from compile_standards.py to keep that module under 300 lines.
 """
 from __future__ import annotations
 
+import json
+import logging
 from pathlib import Path
 
 from quodeq.shared.utils import read_json as _read_json
@@ -15,6 +17,8 @@ _CERT_MAIN_URL = "https://wiki.sei.cmu.edu/confluence/display/seccode"
 CISQ_DIMENSIONS = {"maintainability", "security", "reliability", "performance"}
 WCAG_DIMENSIONS = {"usability"}
 CERT_DIMENSIONS = {"reliability"}
+
+_logger = logging.getLogger(__name__)
 
 
 def attach_cwe_refs(index: dict[str, list[dict]], cwe_db: object | None, get_cwe_name) -> None:
@@ -38,7 +42,11 @@ def attach_cisq_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     cisq_file = standards_dir / "cisq" / f"{dimension}.json"
     if not cisq_file.exists():
         return
-    cisq_data = _read_json(cisq_file)
+    try:
+        cisq_data = _read_json(cisq_file)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _logger.warning("Skipping CISQ refs for %s: %s", dimension, exc)
+        return
     cisq_lookup = {c["id"]: c for c in cisq_data.get("cwes", [])}
     for reqs in index.values():
         for req in reqs:
@@ -61,7 +69,11 @@ def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     asvs_file = standards_dir / "asvs" / "level1.json"
     if not asvs_file.exists():
         return
-    asvs_data = _read_json(asvs_file)
+    try:
+        asvs_data = _read_json(asvs_file)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _logger.warning("Skipping ASVS refs: %s", exc)
+        return
     asvs_by_cwe: dict[int, list[dict]] = {}
     for r in asvs_data.get("requirements", []):
         for cwe_id in r.get("cwe", []):
@@ -89,7 +101,11 @@ def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     cert_file = standards_dir / "cert" / f"{dimension}.json"
     if not cert_file.exists():
         return
-    cert_data = _read_json(cert_file)
+    try:
+        cert_data = _read_json(cert_file)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _logger.warning("Skipping CERT refs for %s: %s", dimension, exc)
+        return
     cert_by_cwe: dict[int, list[dict]] = {}
     cert_by_id: dict[str, dict] = {}
     for rule in cert_data.get("rules", []):
@@ -128,7 +144,11 @@ def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     wcag_file = standards_dir / "wcag" / "level_a.json"
     if not wcag_file.exists():
         return
-    wcag_data = _read_json(wcag_file)
+    try:
+        wcag_data = _read_json(wcag_file)
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        _logger.warning("Skipping WCAG refs: %s", exc)
+        return
     wcag_lookup = {c["id"]: c for c in wcag_data.get("criteria", [])}
     for reqs in index.values():
         for req in reqs:

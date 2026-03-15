@@ -109,7 +109,14 @@ def _find_best_parent(p_path: str, project_id: str, candidates: list[dict[str, A
     return None
 
 
-_MAX_PROJECTS_LISTED = int(os.environ.get("QUODEQ_MAX_PROJECTS_LISTED", "200"))
+_DEFAULT_MAX_PROJECTS_LISTED = 200
+
+
+def _max_projects_listed(override: int | None = None) -> int:
+    """Return the max number of projects to list. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_MAX_PROJECTS_LISTED", str(_DEFAULT_MAX_PROJECTS_LISTED)))
 
 
 def _auto_detect_parents(projects: list[dict[str, Any]]) -> None:
@@ -209,7 +216,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             if not runs:
                 continue
             projects.append(_build_project_entry(reports_root, entry.name, runs))
-            if len(projects) >= _MAX_PROJECTS_LISTED:
+            if len(projects) >= _max_projects_listed():
                 break
         projects.sort(key=lambda item: item["name"])
         _auto_detect_parents(projects)

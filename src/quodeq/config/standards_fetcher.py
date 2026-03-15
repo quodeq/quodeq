@@ -12,7 +12,7 @@ import urllib.request
 from datetime import date
 from pathlib import Path
 
-from quodeq.shared.utils import get_asvs_url, show_diff
+from quodeq.shared.utils import TEXT_ENCODING, get_asvs_url, show_diff
 
 _logger = logging.getLogger(__name__)
 
@@ -21,9 +21,14 @@ _ASVS_SKIP_INTEGRITY_ENV = "QUODEQ_ASVS_SKIP_INTEGRITY"
 _ASVS_DEFAULT_LEVEL = 1
 
 
-def _asvs_version() -> str:
-    """Return the ASVS version string (reads env at call time)."""
-    return os.environ.get("QUODEQ_ASVS_VERSION", "4.0.3")
+_DEFAULT_ASVS_VERSION = "4.0.3"
+
+
+def _asvs_version(override: str | None = None) -> str:
+    """Return the ASVS version string. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return os.environ.get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
 
 _RETRY_BASE_DELAY_S = 0.5
 _RETRY_JITTER_S = 0.3
@@ -66,11 +71,8 @@ def _verify_integrity(
         expected_hash = os.environ.get(_ASVS_SHA256_ENV)
     if skip_integrity is None:
         skip_integrity = False
-    if os.environ.get(_ASVS_SKIP_INTEGRITY_ENV) == "1":
-        _logger.warning(
-            "%s is set but no longer honored; use the programmatic skip_integrity parameter instead",
-            _ASVS_SKIP_INTEGRITY_ENV,
-        )
+    # NOTE: QUODEQ_ASVS_SKIP_INTEGRITY env var is no longer honored.
+    # Use the skip_integrity parameter directly instead.
     if expected_hash and actual_hash != expected_hash:
         raise ValueError(
             f"ASVS integrity check failed: expected {expected_hash}, got {actual_hash}"
@@ -131,7 +133,7 @@ def fetch_asvs_l1(
         show_diff(out_path, json.dumps(output, indent=2))
     else:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(output, indent=2))
+        out_path.write_text(json.dumps(output, indent=2), encoding=TEXT_ENCODING)
 
     return len(requirements)
 

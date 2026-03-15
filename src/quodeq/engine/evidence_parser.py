@@ -74,7 +74,8 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         return None
     try:
         obj = json.loads(line)
-    except json.JSONDecodeError:
+    except json.JSONDecodeError as exc:
+        _logger.warning("Skipping malformed JSONL line: %s", exc)
         return None
 
     practice_id = obj.get("p")

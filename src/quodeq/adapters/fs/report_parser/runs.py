@@ -68,7 +68,6 @@ def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
         return []
 
 
-
 def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
     """Read the date from evidence or evaluation files in a run directory."""
     validate_path_segment(project, run_id)
@@ -223,6 +222,24 @@ def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunIn
     return run_infos
 
 
+def _make_caching_fetcher(
+    reports_root: Path, project: str,
+    data_cache: dict[str, list[dict[str, Any]]] | None = None,
+) -> Callable[[str], list[dict[str, Any]]]:
+    """Return a fetcher that caches run data reads.
+
+    *data_cache* is injectable for testing; defaults to a fresh dict.
+    """
+    cache = data_cache if data_cache is not None else {}
+
+    def _fetch(run_id: str) -> list[dict[str, Any]]:
+        if run_id not in cache:
+            cache[run_id] = read_run_data(reports_root, project, run_id)
+        return cache[run_id]
+
+    return _fetch
+
+
 @dataclass(frozen=True)
 class RunLookupCache:
     """Pre-computed data to avoid repeated I/O when looking up previous runs."""
@@ -252,14 +269,10 @@ def _get_previous_run_for_dimension(
         return None
     if cache is None:
         all_runs = list_runs(reports_root, project)
-        _data_cache: dict[str, list[dict[str, Any]]] = {}
-
-        def _fetch(run_id: str) -> list[dict[str, Any]]:
-            if run_id not in _data_cache:
-                _data_cache[run_id] = read_run_data(reports_root, project, run_id)
-            return _data_cache[run_id]
-
-        cache = RunLookupCache(runs=all_runs, get_run_data=_fetch)
+        cache = RunLookupCache(
+            runs=all_runs,
+            get_run_data=_make_caching_fetcher(reports_root, project),
+        )
     all_runs = cache.runs
     current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
     if current_idx < 0:

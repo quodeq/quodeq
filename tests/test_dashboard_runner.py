@@ -96,7 +96,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
 
     run_dashboard(config)
     # Original config is frozen; the resolved config inside run_dashboard picks 4174
-    assert config.port == 4173  # original unchanged
+    assert config.server.port == 4173  # original unchanged
 
 
 def test_validate_paths_missing_reports_custom_message(tmp_path: Path):

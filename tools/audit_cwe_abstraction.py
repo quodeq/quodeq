@@ -20,6 +20,11 @@ from pathlib import Path
 
 _PROGRESS_LOG_INTERVAL = 20
 _RATE_LIMIT_SLEEP_S = 0.1
+_TERMINAL_WIDTH = 80
+_MAX_RATIONALE_DISPLAY = 120
+
+_ALLOWED_USAGES = {"allowed", "allowed-with-review"}
+_KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
 
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 _DEFAULT_API_BASE = "https://cwe-api.mitre.org/api/v1/cwe"
@@ -130,10 +135,8 @@ def _compute_llm_mapping_usage(cwe_id: int, mapping_usage: str, abstraction: str
     return "Allowed-with-Review"
 
 
-def _print_results(results: list[dict], *, problems_only: bool) -> None:
-    """Print categorized audit results to stdout and write JSON output."""
-    _ALLOWED_USAGES = {"allowed", "allowed-with-review"}
-    _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
+def _categorize_results(results: list[dict]) -> dict[str, list[dict]]:
+    """Sort results into prohibited/discouraged/allowed/unknown buckets."""
     categorized: dict[str, list[dict]] = {"prohibited": [], "discouraged": [], "allowed": [], "unknown": []}
     for r in results:
         usage = r["mapping_usage"].lower()
@@ -145,42 +148,46 @@ def _print_results(results: list[dict], *, problems_only: bool) -> None:
             categorized["allowed"].append(r)
         else:
             categorized["unknown"].append(r)
+    return categorized
+
+
+def _print_category(label: str, entries: list[dict], *, show_rationale: bool = False) -> None:
+    """Print a single category section."""
+    print(f"\n{'=' * _TERMINAL_WIDTH}")
+    print(f"{label}")
+    print(f"{'=' * _TERMINAL_WIDTH}")
+    for r in entries:
+        print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] {r['name']}")
+        print(f"           Dimensions: {', '.join(r['dimensions'])}")
+        if show_rationale and r["mapping_rationale"]:
+            print(f"           Rationale: {r['mapping_rationale'][:_MAX_RATIONALE_DISPLAY]}")
+
+
+def _print_results(results: list[dict], *, problems_only: bool) -> None:
+    """Print categorized audit results to stdout and write JSON output."""
+    categorized = _categorize_results(results)
     prohibited = categorized["prohibited"]
     discouraged = categorized["discouraged"]
     allowed = categorized["allowed"]
     unknown = categorized["unknown"]
 
     if not problems_only:
-        print(f"\n{'='*80}")
-        print(f"SUMMARY")
-        print(f"{'='*80}")
+        print(f"\n{'=' * _TERMINAL_WIDTH}")
+        print("SUMMARY")
+        print(f"{'=' * _TERMINAL_WIDTH}")
         print(f"  ALLOWED:          {len(allowed)}")
         print(f"  DISCOURAGED:      {len(discouraged)}")
         print(f"  PROHIBITED:       {len(prohibited)}")
         print(f"  Unknown/Other:    {len(unknown)}")
 
     if prohibited:
-        print(f"\n{'='*80}")
-        print(f"PROHIBITED ({len(prohibited)}) — Must be removed")
-        print(f"{'='*80}")
-        for r in prohibited:
-            print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] {r['name']}")
-            print(f"           Dimensions: {', '.join(r['dimensions'])}")
-            if r["mapping_rationale"]:
-                print(f"           Rationale: {r['mapping_rationale'][:120]}")
-
+        _print_category(f"PROHIBITED ({len(prohibited)}) — Must be removed", prohibited, show_rationale=True)
     if discouraged:
-        print(f"\n{'='*80}")
-        print(f"DISCOURAGED ({len(discouraged)}) — Should use more specific children")
-        print(f"{'='*80}")
-        for r in discouraged:
-            print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] {r['name']}")
-            print(f"           Dimensions: {', '.join(r['dimensions'])}")
-
+        _print_category(f"DISCOURAGED ({len(discouraged)}) — Should use more specific children", discouraged)
     if unknown and not problems_only:
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * _TERMINAL_WIDTH}")
         print(f"UNKNOWN/OTHER ({len(unknown)})")
-        print(f"{'='*80}")
+        print(f"{'=' * _TERMINAL_WIDTH}")
         for r in unknown:
             print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} — {r['name']}")
 

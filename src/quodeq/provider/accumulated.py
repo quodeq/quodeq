@@ -25,9 +25,14 @@ _ACC_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
 _ACC_DIM_LOCK = threading.Lock()
 
 
-def _acc_dim_cache_max() -> int:
-    """Return the accumulated-view cache size limit (env-configurable)."""
-    return int(os.environ.get("QUODEQ_ACC_CACHE_MAX", "256"))
+_DEFAULT_ACC_CACHE_MAX = 256
+
+
+def _acc_dim_cache_max(override: int | None = None) -> int:
+    """Return the accumulated-view cache size limit. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
 
 
 def _make_acc_dimension_fetcher(

@@ -26,7 +26,7 @@ def test_plugin_passes_validation(plugin_dir):
 
 
 def test_plugin_load_missing_dir(tmp_path):
-    with pytest.raises((FileNotFoundError, OSError)):
+    with pytest.raises((FileNotFoundError, OSError, ValueError)):
         load_plugin(tmp_path / "nonexistent")
 
 

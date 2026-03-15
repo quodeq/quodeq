@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.shared.logging import log_debug
+from quodeq.shared.utils import TEXT_ENCODING
 
 
 def normalize_date(raw: str) -> tuple[str, str] | None:
@@ -38,7 +39,7 @@ def find_date_in_dir(
         if not entry.is_file() or not entry.name.endswith(suffix):
             continue
         try:
-            data = json.loads(Path(entry.path).read_text())
+            data = json.loads(Path(entry.path).read_text(encoding=TEXT_ENCODING))
             raw = data.get("date")
             if raw:
                 result = normalize_date(str(raw))

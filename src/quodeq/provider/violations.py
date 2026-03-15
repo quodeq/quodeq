@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser import parse_eval_from_json, parse_eval_markdown
+from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.provider.violation_context import ViolationContext  # noqa: F401 — re-export
 from quodeq.provider.violations_parsing import (
     parse_violations_from_evidence,
@@ -13,9 +14,14 @@ from quodeq.provider.violations_parsing import (
     parse_violations_from_stream,
 )
 
-def _max_violation_files() -> int:
-    """Return the max number of violation files to include (env-configurable)."""
-    return int(os.environ.get("QUODEQ_MAX_VIOLATION_FILES", "20"))
+_DEFAULT_MAX_VIOLATION_FILES = 20
+
+
+def _max_violation_files(override: int | None = None) -> int:
+    """Return the max number of violation files to include. *override* bypasses env for testing."""
+    if override is not None:
+        return override
+    return int(os.environ.get("QUODEQ_MAX_VIOLATION_FILES", str(_DEFAULT_MAX_VIOLATION_FILES)))
 
 
 def resolve_dimension_eval(
@@ -31,7 +37,7 @@ def resolve_dimension_eval(
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
     if markdown_path.exists():
         try:
-            content = markdown_path.read_text(encoding="utf-8")
+            content = markdown_path.read_text(encoding=TEXT_ENCODING)
         except OSError:
             return None
         return parse_eval_markdown(content, project, run_id, dimension)

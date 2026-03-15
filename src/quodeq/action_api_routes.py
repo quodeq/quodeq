@@ -9,7 +9,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from quodeq.action_api_helpers import _error
+from quodeq.action_api_helpers import _error, validate_evaluation_payload
 from quodeq.action_api_zip import export_project_zip
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
@@ -144,42 +144,6 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(payload)
 
 
-def _validate_evaluation_payload(payload: dict) -> str | None:
-    """Validate the evaluate request payload.
-
-    Returns an error message string if validation fails, or ``None`` if valid.
-    Required fields: ``repo`` (non-empty string).
-    Optional typed fields: ``discipline`` (str), ``dimensions`` (str),
-    ``numerical`` (bool), ``aiCmd`` (str), ``aiModel`` (str),
-    ``subagentModel`` (str).
-    """
-    missing: list[str] = []
-    invalid: list[str] = []
-
-    repo = payload.get("repo")
-    if not repo:
-        missing.append("repo")
-    elif not isinstance(repo, str):
-        invalid.append("repo (must be a string)")
-
-    str_fields = ("discipline", "dimensions", "aiCmd", "aiModel", "subagentModel")
-    for field in str_fields:
-        value = payload.get(field)
-        if value is not None and not isinstance(value, str):
-            invalid.append(f"{field} (must be a string)")
-
-    numerical = payload.get("numerical")
-    if numerical is not None and not isinstance(numerical, bool):
-        invalid.append("numerical (must be a boolean)")
-
-    parts: list[str] = []
-    if missing:
-        parts.append(f"missing required fields: {', '.join(missing)}")
-    if invalid:
-        parts.append(f"invalid fields: {', '.join(invalid)}")
-    return "; ".join(parts) if parts else None
-
-
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> None:
     """Register evaluation listing and creation routes."""
 
@@ -192,7 +156,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
     def start_evaluation() -> Response | tuple[Response, int]:
         """Start a new evaluation job for a repository."""
         payload = request.get_json(silent=True) or {}
-        validation_error = _validate_evaluation_payload(payload)
+        validation_error = validate_evaluation_payload(payload)
         if validation_error:
             body, status = _error(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
@@ -274,6 +238,9 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
     def browse() -> Response | tuple[Response, int]:
         """List directories at a given path for repository browsing."""
         path = request.args.get("path")
+        if path is None:
+            body, status = _error("Missing required 'path' query parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
         payload = provider.browse_repo(path)
         if "error" in payload:
             browse_status = HTTPStatus.BAD_REQUEST if _BROWSE_NOT_A_DIR_KEYWORD in payload["error"].lower() else HTTPStatus.NOT_FOUND

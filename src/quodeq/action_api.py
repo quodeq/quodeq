@@ -27,6 +27,8 @@ from quodeq.action_api_routes import (
     register_static_routes,
 )
 
+_HEALTH_PATH = "/api/health"
+
 _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 60  # max state-changing requests per window
 _RATE_STORE_MAX_IPS = 10_000  # max tracked IPs to prevent unbounded memory growth
@@ -119,7 +121,7 @@ def _default_provider() -> ActionProvider:
 
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
     """Verify API key authentication when *api_key* is set."""
-    if request.path == "/api/health":
+    if request.path == _HEALTH_PATH:
         return None
     if api_key:
         auth = request.headers.get("Authorization", "")

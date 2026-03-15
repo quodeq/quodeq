@@ -65,7 +65,12 @@ def spawn_action_api(
     default_host: str,
     api_config: ApiConfig | None = None,
 ) -> subprocess.Popen:
-    """Spawn the action API subprocess and record its PID."""
+    """Spawn the action API subprocess and record its PID.
+
+    The ``get_evaluations_dir`` import is deferred to avoid a circular
+    dependency between ``dashboard._api_health`` and ``shared.utils``
+    (which imports logging, which may trigger dashboard config loading).
+    """
     from quodeq.shared.utils import get_evaluations_dir
 
     cfg = api_config or ApiConfig()

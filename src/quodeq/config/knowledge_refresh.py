@@ -14,7 +14,7 @@ from pathlib import Path
 from quodeq.shared.ai_cli import run_ai_cli
 from quodeq.config.prompt_templates import render_template
 from quodeq.shared.logging import log_error, log_info, log_success, log_warning
-from quodeq.shared.utils import get_github_raw_base_url, get_github_search_url, show_diff
+from quodeq.shared.utils import TEXT_ENCODING, get_github_raw_base_url, get_github_search_url, show_diff
 
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
@@ -32,6 +32,7 @@ def _content_sample_limit() -> int:
 def _max_fetch_workers() -> int:
     """Return max fetch worker threads (reads env at call time)."""
     return int(os.environ.get("QUODEQ_MAX_FETCH_WORKERS", "8"))
+_MAX_CONTENT_REPOS = 3
 _LINTER_DOCS_LIMIT = 6000
 _EXISTING_CONTENT_LIMIT = 2000
 _SAFE_NAME_RE = re.compile(r'^[\w./-]+$')
@@ -68,7 +69,7 @@ def _fetch_and_parse_practices(
     log_info(f"Found {len(repos)} repos (min {min_stars} stars)")
 
     log_info("Fetching content samples from top repos...")
-    content_samples = _fetch_repo_content(repos[:3])
+    content_samples = _fetch_repo_content(repos[:_MAX_CONTENT_REPOS])
     if not content_samples:
         return None, "Could not fetch content from any repo"
 
@@ -114,7 +115,7 @@ def refresh_practices(
         return 0
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(new_content)
+    out_path.write_text(new_content, encoding=TEXT_ENCODING)
     log_success(f"Written {len(payload.get('practices', []))} practices to {out_path}")
     return 0
 
@@ -155,7 +156,7 @@ def refresh_analysis(
         return 0
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(stdout)
+    out_path.write_text(stdout, encoding=TEXT_ENCODING)
     log_success(f"Written analysis.md to {out_path}")
     return 0
 
@@ -270,9 +271,9 @@ def _fetch_url(url: str, headers: dict | None = None, *, client: _FetchClient | 
 
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:
     combined = "\n\n---\n\n".join(content_samples)
-    existing = out_path.read_text() if out_path.exists() else "none"
+    existing = out_path.read_text(encoding=TEXT_ENCODING) if out_path.exists() else "none"
     try:
-        template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text()
+        template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text(encoding=TEXT_ENCODING)
     except (OSError, UnicodeDecodeError) as exc:
         raise FileNotFoundError(f"Cannot read practices template: {exc}") from exc
     return render_template(template, {
@@ -283,9 +284,9 @@ def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: 
 
 
 def _build_analysis_prompt(runtime: str, linter_docs: str, out_path: Path) -> str:
-    existing = out_path.read_text() if out_path.exists() else "none"
+    existing = out_path.read_text(encoding=TEXT_ENCODING) if out_path.exists() else "none"
     try:
-        template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text()
+        template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text(encoding=TEXT_ENCODING)
     except (OSError, UnicodeDecodeError) as exc:
         raise FileNotFoundError(f"Cannot read analysis template: {exc}") from exc
     return render_template(template, {

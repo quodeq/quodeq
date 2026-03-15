@@ -32,31 +32,3 @@ class DashboardConfig:
     repo_root: Path
     reports_defaulted: bool = False
 
-    # Convenience accessors for backward compatibility
-    @property
-    def port(self) -> int:
-        return self.server.port
-
-    @property
-    def open_browser(self) -> bool:
-        return self.build.open_browser
-
-    @property
-    def no_build(self) -> bool:
-        return self.build.no_build
-
-    @property
-    def reinstall(self) -> bool:
-        return self.build.reinstall
-
-    @property
-    def api_host(self) -> str | None:
-        return self.server.api_host
-
-    @property
-    def api_port(self) -> int | None:
-        return self.server.api_port
-
-    @property
-    def api_forced(self) -> bool:
-        return self.server.api_forced

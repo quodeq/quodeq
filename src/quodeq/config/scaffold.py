@@ -11,18 +11,24 @@ from pathlib import Path
 _DEFAULT_PLUGIN_VERSION = "1.0.0"
 
 
-def _default_dimension_weight() -> float:
-    """Return the default dimension weight (reads env at call time)."""
+def _default_dimension_weight(override: float | None = None) -> float:
+    """Return the default dimension weight. *override* bypasses env for testing."""
+    if override is not None:
+        return override
     return float(os.environ.get("QUODEQ_DEFAULT_DIM_WEIGHT", "1.0"))
 
 
-def _security_dimension_weight() -> float:
-    """Return the security dimension weight (reads env at call time)."""
+def _security_dimension_weight(override: float | None = None) -> float:
+    """Return the security dimension weight. *override* bypasses env for testing."""
+    if override is not None:
+        return override
     return float(os.environ.get("QUODEQ_SECURITY_DIM_WEIGHT", "1.2"))
 
 
-def _performance_dimension_weight() -> float:
-    """Return the performance dimension weight (reads env at call time)."""
+def _performance_dimension_weight(override: float | None = None) -> float:
+    """Return the performance dimension weight. *override* bypasses env for testing."""
+    if override is not None:
+        return override
     return float(os.environ.get("QUODEQ_PERFORMANCE_DIM_WEIGHT", "0.8"))
 
 _logger = logging.getLogger(__name__)

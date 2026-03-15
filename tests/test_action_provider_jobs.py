@@ -17,17 +17,14 @@ class FakeProcess:
 
 
 def _wait_for_job(manager: JobManager, job_id: str, timeout: float = 5.0) -> dict:
-    """Block until a job leaves the 'running' state, using an event-based approach."""
+    """Block until a job leaves the 'running' state, using the on_job_complete callback."""
     done = threading.Event()
 
-    original_monitor = manager._monitor_process
-
-    def _patched_monitor(jid, process):
-        original_monitor(jid, process)
+    def _on_complete(jid, job):
         if jid == job_id:
             done.set()
 
-    manager._monitor_process = _patched_monitor  # type: ignore[method-assign]
+    manager._on_job_complete = _on_complete
     done.wait(timeout=timeout)
     result = manager.get_job(job_id)
     assert result is not None

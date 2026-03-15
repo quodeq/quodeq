@@ -21,12 +21,14 @@ import json
 import sys
 from pathlib import Path
 
+_TEXT_ENCODING = "utf-8"
+
 
 def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
     """Parse a JSONL evidence file into a (principle, file, line) -> cwe_id map."""
     lookup: dict[tuple[str, str, int], int] = {}
     try:
-        lines = jsonl_path.read_text().splitlines()
+        lines = jsonl_path.read_text(encoding=_TEXT_ENCODING).splitlines()
     except (OSError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {jsonl_path}: {exc}")
         return lookup
@@ -78,7 +80,7 @@ def migrate_file(eval_path: Path, apply: bool) -> tuple[int, int] | None:
         return None
 
     try:
-        data = json.loads(eval_path.read_text())
+        data = json.loads(eval_path.read_text(encoding=_TEXT_ENCODING))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {eval_path}: {exc}")
         return None
@@ -87,7 +89,7 @@ def migrate_file(eval_path: Path, apply: bool) -> tuple[int, int] | None:
 
     if apply and (v_count or c_count):
         try:
-            eval_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+            eval_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
         except OSError as exc:
             print(f"  ERROR writing {eval_path}: {exc}")
 

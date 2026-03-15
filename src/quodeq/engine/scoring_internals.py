@@ -168,6 +168,15 @@ def drop_grade(grade: str, drops: int) -> str:
 # Confidence interval
 # ---------------------------------------------------------------------------
 
+_CI_BASE_WIDTH = 1.0
+_CI_LOW_CONFIDENCE_PENALTY = 1.0
+_CI_MEDIUM_CONFIDENCE_PENALTY = 0.5
+_CI_UNBALANCED_PENALTY = 0.5
+_CI_SPARSITY_PENALTY = 0.5
+_SPARSITY_RATIO = 0.01
+_CI_UNSTABLE_THRESHOLD = 1.5
+
+
 def confidence_interval_for(
     confidence_level: str,
     is_balanced: bool,
@@ -183,23 +192,23 @@ def confidence_interval_for(
 
     grade_stability is 'stable' unless the interval exceeds 1.5.
     """
-    width = 1.0
+    width = _CI_BASE_WIDTH
 
     if confidence_level == "low":
-        width += 1.0
+        width += _CI_LOW_CONFIDENCE_PENALTY
     elif confidence_level == "medium":
-        width += 0.5
+        width += _CI_MEDIUM_CONFIDENCE_PENALTY
 
     if not is_balanced:
-        width += 0.5
+        width += _CI_UNBALANCED_PENALTY
 
-    sparsity_floor = 0.01 * files_read if files_read > 0 else 0
+    sparsity_floor = _SPARSITY_RATIO * files_read if files_read > 0 else 0
     if sparsity_floor > 0 and total_instances < sparsity_floor:
-        width += 0.5
+        width += _CI_SPARSITY_PENALTY
 
     return {
         "confidence_interval": width,
-        "grade_stability": "+/- 1 level" if width > 1.5 else "stable",
+        "grade_stability": "+/- 1 level" if width > _CI_UNSTABLE_THRESHOLD else "stable",
     }
 
 

@@ -79,9 +79,12 @@ def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
             with os.fdopen(fd, "w") as f:
                 json.dump(index, f, indent=2)
             os.replace(tmp, index_path)
-        except BaseException:
-            os.unlink(tmp)
-            raise
+        finally:
+            if os.path.exists(tmp):
+                try:
+                    os.unlink(tmp)
+                except OSError:
+                    pass
     except OSError as exc:
         logging.getLogger(__name__).warning("Could not save project index: %s", exc)
 
@@ -174,16 +177,9 @@ def resolve_project_uuid(
     if not reports_dir.exists():
         reports_dir.mkdir(parents=True, exist_ok=True)
 
-    if repository is not None:
-        load_fn = repository.load_index
-        save_fn = repository.save_index
-        existing = _find_existing_project(reports_dir, resolved, load_fn, save_fn)
-        if existing:
-            return existing
-        return _create_project(reports_dir, resolved, load_fn, save_fn)
-
-    # Default filesystem behavior
-    existing = _find_existing_project(reports_dir, resolved)
+    load_fn = repository.load_index if repository is not None else _load_index
+    save_fn = repository.save_index if repository is not None else _save_index
+    existing = _find_existing_project(reports_dir, resolved, load_fn, save_fn)
     if existing:
         return existing
-    return _create_project(reports_dir, resolved)
+    return _create_project(reports_dir, resolved, load_fn, save_fn)

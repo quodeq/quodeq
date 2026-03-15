@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
 import sys
 import threading
@@ -11,6 +12,10 @@ from pathlib import Path
 from typing import Any, Iterator
 
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
+_DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
+
+TEXT_ENCODING = "utf-8"
+"""Standard text encoding used across the codebase for file I/O."""
 
 
 @dataclass
@@ -94,7 +99,10 @@ def project_name_from_repo(repo: str) -> str:
 
 def read_json(path: Path) -> dict:
     """Read and parse a JSON file, returning the parsed dict."""
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
 
 
 def get_ai_provider() -> str:
@@ -119,7 +127,6 @@ def _env_int(var: str, default: int) -> int:
         try:
             return int(raw)
         except ValueError:
-            import logging
             logging.getLogger(__name__).warning(
                 "Invalid %s=%r, using default", var, raw,
             )
@@ -163,7 +170,7 @@ def get_evaluations_dir(default: str | None = None) -> str:
         return from_env
     if default is not None:
         return default
-    return str(Path.home() / ".quodeq" / "evaluations")
+    return str(_DEFAULT_EVALUATIONS_DIR)
 
 
 def get_anthropic_api_key() -> str | None:

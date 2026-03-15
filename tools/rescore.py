@@ -43,11 +43,13 @@ def detect_mode_from_evidence(evidence: dict) -> str:
     return SCORING_MODE_BY_HASH.get(h, DEFAULT_SCORING_MODE)
 
 
-def _write_scores_and_report(
-    evidence_path: Path, dimension: str, scores: dict,
-    score: object, grade: object, tier: object,
-) -> bool:
+def _write_scores_and_report(evidence_path: Path, dimension: str, scores: dict) -> bool:
     """Write scores JSON and evaluation report to disk. Returns True on success."""
+    overall = scores.get("overall", {})
+    score = overall.get("score", "?")
+    grade = overall.get("grade", "?")
+    tier = scores.get("scale", {}).get("tier", "?")
+
     scores_path = evidence_path.with_name(f"{dimension}_scores.json")
     try:
         scores_path.write_text(json.dumps(scores, indent=2, sort_keys=True))
@@ -96,19 +98,19 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run
     mode = detect_mode_from_evidence(evidence)
     scores = run_scoring(evidence, mode)
 
-    overall = scores.get("overall", {})
-    score = overall.get("score", "?")
-    grade = overall.get("grade", "?")
-    tier = scores.get("scale", {}).get("tier", "?")
-
     if dry_run:
+        overall = scores.get("overall", {})
+        score = overall.get("score", "?")
+        grade = overall.get("grade", "?")
+        tier = scores.get("scale", {}).get("tier", "?")
         print(f"  DRY   {dimension:<20}  score={score}  grade={grade}  tier={tier}")
         return True
 
-    return _write_scores_and_report(evidence_path, dimension, scores, score, grade, tier)
+    return _write_scores_and_report(evidence_path, dimension, scores)
 
 
-def main():
+def _build_parser() -> argparse.ArgumentParser:
+    """Build the CLI argument parser."""
     parser = argparse.ArgumentParser(
         description="Re-apply deterministic scoring to all existing evidence files.",
     )
@@ -129,12 +131,15 @@ def main():
         "--apply", action="store_true", dest="apply_",
         help="Write changes",
     )
-    args = parser.parse_args()
+    return parser
+
+
+def main():
+    args = _build_parser().parse_args()
 
     dry_run = not args.apply_
     evals_dir = Path(args.evaluations_dir) if args.evaluations_dir else repo_root / "evaluations"
-    project = args.project
-    project_dir = evals_dir / project
+    project_dir = evals_dir / args.project
 
     if not project_dir.exists():
         print(f"Project dir not found: {project_dir}")

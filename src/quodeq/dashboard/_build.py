@@ -7,6 +7,8 @@ from pathlib import Path
 from quodeq.shared.logging import log_info
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
 _MIN_NPM_MAJOR = 8
+_WATCH_DIRS = ("src", "public")
+_WATCH_FILES = ("package.json", "vite.config.js")
 
 
 def _check_npm() -> None:
@@ -46,8 +48,8 @@ def sources_newer_than_dist(web_root: Path, dist_index: Path) -> bool:
     if not dist_index.exists():
         return True
     dist_mtime = dist_index.stat().st_mtime
-    watch_dirs = [web_root / "src", web_root / "public"]
-    watch_files = [web_root / "package.json", web_root / "vite.config.js"]
+    watch_dirs = [web_root / d for d in _WATCH_DIRS]
+    watch_files = [web_root / f for f in _WATCH_FILES]
     for watch_file in watch_files:
         if watch_file.exists() and watch_file.stat().st_mtime > dist_mtime:
             return True

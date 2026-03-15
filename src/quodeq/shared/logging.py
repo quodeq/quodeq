@@ -30,15 +30,20 @@ def _color(code: str) -> str:
 _LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
 logging.addLevelName(_LOG_SUCCESS, "SUCCESS")
 
-_STYLES: dict = {
-    logging.DEBUG: ("\033[0;90m", "[DEBUG]"),
-    logging.INFO: ("\033[0;34m", "[INFO]"),
-    _LOG_SUCCESS: ("\033[0;32m", "[SUCCESS]"),
-    logging.WARNING: ("\033[1;33m", "[WARNING]"),
-    logging.ERROR: ("\033[0;31m", "[ERROR]"),
-}
-
+_ANSI_GREY = "\033[0;90m"
+_ANSI_BLUE = "\033[0;34m"
+_ANSI_GREEN = "\033[0;32m"
+_ANSI_YELLOW = "\033[1;33m"
+_ANSI_RED = "\033[0;31m"
 _NC = "\033[0m"
+
+_STYLES: dict = {
+    logging.DEBUG: (_ANSI_GREY, "[DEBUG]"),
+    logging.INFO: (_ANSI_BLUE, "[INFO]"),
+    _LOG_SUCCESS: (_ANSI_GREEN, "[SUCCESS]"),
+    logging.WARNING: (_ANSI_YELLOW, "[WARNING]"),
+    logging.ERROR: (_ANSI_RED, "[ERROR]"),
+}
 
 
 class _ColorFormatter(logging.Formatter):

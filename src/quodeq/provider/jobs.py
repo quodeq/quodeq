@@ -24,6 +24,7 @@ MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
+_CONSUME_BATCH_SIZE = 32
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 
 
@@ -141,11 +142,13 @@ class JobManager:
         self,
         spawn_impl: Callable[..., subprocess.Popen] | None = None,
         job_store: JobStore | None = None,
+        on_job_complete: Callable[[str, Job], None] | None = None,
     ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
         self._processes: dict[str, Any] = {}
         self._lock = threading.Lock()
+        self._on_job_complete = on_job_complete
 
     def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
         """Spawn a subprocess and return its initial job state."""
@@ -247,11 +250,10 @@ class JobManager:
     def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
         if stream is None:
             return
-        _BATCH_SIZE = 32
         batch: list[str] = []
         for line in stream:
             batch.append(line.rstrip("\n"))
-            if len(batch) >= _BATCH_SIZE:
+            if len(batch) >= _CONSUME_BATCH_SIZE:
                 with self._lock:
                     job = self._store.get(job_id)
                     if not job:
@@ -288,3 +290,5 @@ class JobManager:
             job.status = "done" if exit_code == 0 else "failed"
             self._store.put(job)
             self._evict_completed_jobs()
+        if self._on_job_complete is not None:
+            self._on_job_complete(job_id, job)

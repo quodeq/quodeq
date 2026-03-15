@@ -209,6 +209,11 @@ class SubagentPool:
         """Launch agents in parallel, respawning when slots free up and queue has files.
 
         Returns list of SubagentResult (one per agent, including failures).
+
+        Note: this method initialises ``_futures``, ``_finished``, and ``_next_idx``
+        as instance attributes.  These are exclusively used by ``_collect_done`` and
+        ``_process_completed_futures`` during the lifetime of this call; calling those
+        helpers outside ``run()`` is unsupported and will raise ``AttributeError``.
         """
         max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
         log_info(f"Launching {self._n} subagents for {self._dimension}")

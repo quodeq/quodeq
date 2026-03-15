@@ -109,10 +109,6 @@ class TestEvaluationMixinSubagentModel:
 # ---------------------------------------------------------------------------
 
 class TestApiRouteSubagentModel:
-    @pytest.fixture(autouse=True)
-    def _disable_auth(self, monkeypatch):
-        monkeypatch.setenv("QUODEQ_AUTH_DISABLED", "1")
-
     def _make_capturing_provider(self, captured: dict):
         from quodeq.provider.base import ActionProvider
 

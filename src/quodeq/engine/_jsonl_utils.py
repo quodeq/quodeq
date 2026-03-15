@@ -1,15 +1,11 @@
 """JSONL merge and deduplication utilities for subagent pool output."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import TYPE_CHECKING, Iterable
+from typing import Iterable
 
 from quodeq.shared.logging import log_info
-
-if TYPE_CHECKING:
-    pass
-
-import json
 
 
 def dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:

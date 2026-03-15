@@ -42,7 +42,8 @@ def _get_pid_file() -> Path:
 
     Override the default location via ``QUODEQ_RUN_DIR``.
     """
-    run_dir = Path(os.environ.get("QUODEQ_RUN_DIR", "")) if os.environ.get("QUODEQ_RUN_DIR") else Path.home() / ".quodeq" / "run"
+    env_run_dir = os.environ.get("QUODEQ_RUN_DIR")
+    run_dir = Path(env_run_dir) if env_run_dir else Path.home() / ".quodeq" / "run"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir / "action_api.pid"
 
@@ -151,18 +152,18 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     static_dist = resolve_path(str(config.static_dist))
     repo_root = resolve_path(str(config.repo_root))
 
-    chosen_port = _choose_ui_port(config.port)
-    if chosen_port != config.port:
-        log_warning(f"Port {config.port} is in use. Using {chosen_port} instead.")
+    chosen_port = _choose_ui_port(config.server.port)
+    if chosen_port != config.server.port:
+        log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
-    maybe_build_ui(config.no_build, config.reinstall, static_dist, repo_root)
+    maybe_build_ui(config.build.no_build, config.build.reinstall, static_dist, repo_root)
 
     return DashboardConfig(
         server=ServerConfig(
             port=chosen_port,
-            api_host=config.api_host,
-            api_port=config.api_port,
-            api_forced=config.api_forced,
+            api_host=config.server.api_host,
+            api_port=config.server.api_port,
+            api_forced=config.server.api_forced,
         ),
         build=config.build,
         reports_dir=reports_dir,
@@ -185,7 +186,7 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
     """Open browser, register signal handlers, and block until exit."""
     log_success(f"Dashboard running at {action_api_url}")
 
-    if config.open_browser:
+    if config.build.open_browser:
         webbrowser.open(action_api_url)
 
     def _stop_children() -> None:
@@ -225,13 +226,13 @@ def run_dashboard(config: DashboardConfig) -> int:
     log_info("Starting dashboard...")
     log_info(f"Reports: {config.reports_dir}")
     log_info(f"Static:  {config.static_dist}")
-    log_info(f"Port:    {config.port}")
+    log_info(f"Port:    {config.server.port}")
 
-    action_api_host = config.api_host or _get_default_host()
-    action_api_port = config.api_port or config.port
+    action_api_host = config.server.api_host or _get_default_host()
+    action_api_port = config.server.api_port or config.server.port
     static_dist = config.static_dist
     evaluations_dir = str(config.reports_dir)
-    if config.api_forced:
+    if config.server.api_forced:
         action_api_url, action_api_process = _ensure_action_api_forced(
             action_api_host, action_api_port, static_dist=static_dist,
             evaluations_dir=evaluations_dir,

@@ -44,7 +44,7 @@ class TestReadJson:
         assert utils.read_json(f) == {"key": "value"}
 
     def test_raises_on_missing_file(self, tmp_path):
-        with pytest.raises(FileNotFoundError):
+        with pytest.raises((FileNotFoundError, ValueError)):
             utils.read_json(tmp_path / "missing.json")
 
 
