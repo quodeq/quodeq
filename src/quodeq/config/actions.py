@@ -50,7 +50,7 @@ def _generate_single_evaluator(discipline: str, dimension: str, paths: ConfigPat
     if err:
         raise RuntimeError(f"Evaluator generation failed for {dimension} → {output_path}: {err}")
     try:
-        output_path.write_text(stdout)
+        output_path.write_text(stdout, encoding="utf-8")
     except OSError as exc:
         raise RuntimeError(f"Failed to write evaluator {output_path}: {exc}") from exc
 
@@ -89,7 +89,7 @@ def run_generate_dimensions(paths: ConfigPaths) -> None:
         )
     output_path = paths.dimensions_dir / "generated.json"
     try:
-        output_path.write_text(stdout)
+        output_path.write_text(stdout, encoding="utf-8")
     except OSError as exc:
         raise RuntimeError(f"Failed to write dimensions output to {output_path}: {exc}") from exc
 

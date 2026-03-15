@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
@@ -17,6 +17,10 @@ from quodeq.adapters.fs.report_parser import (
     summarize_dimensions,
 )
 from quodeq.provider._cache import make_lru_dimension_fetcher
+from quodeq.provider._dashboard_stale import collect_stale_dimensions
+
+# Re-export for backward compatibility (tests import this name)
+_collect_stale_dimensions = collect_stale_dimensions
 from quodeq.provider.accumulated import numeric_average
 
 
@@ -46,14 +50,6 @@ def _run_dim_cache_max(override: int | None = None) -> int:
     return int(os.environ.get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
 
 
-@dataclass
-class _StaleDimState:
-    """Groups the three mutable tracking dicts used by _collect_stale_dimensions."""
-    stale_dim_map: dict[str, dict[str, Any]] = field(default_factory=dict)
-    non_na_count: dict[str, int] = field(default_factory=dict)
-    stale_previous_by_dimension: dict[str, dict[str, Any]] = field(default_factory=dict)
-
-
 def _collect_previous_scores(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
     get_run_dimensions: Callable[[str], list[dict[str, Any]]],
@@ -72,72 +68,6 @@ def _collect_previous_scores(
             if dim_name not in previous_by_dimension:
                 previous_by_dimension[dim_name] = {**dim, "runId": runs[older_idx].run_id}
     return previous_by_dimension
-
-
-def _find_stale_from_run(
-    run_dir: RunInfo, selected_dim_names: set[str],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
-) -> list[dict[str, Any]]:
-    """Return stale dimension dicts found in a single run directory."""
-    results: list[dict] = []
-    run_dimensions = get_run_dimensions(run_dir.run_id)
-    for dim in run_dimensions:
-        dim_name = dim.get("dimension")
-        if not dim_name or dim_name in selected_dim_names:
-            continue
-        results.append({
-            "dim_name": dim_name,
-            "dim": dim,
-            "run_id": run_dir.run_id,
-            "date_iso": run_dir.date_iso,
-            "date_label": run_dir.date_label,
-            "grade": dim.get("overallGrade"),
-        })
-    return results
-
-
-def _record_stale_entry(entry: dict, state: _StaleDimState) -> None:
-    """Add a stale dimension entry to the map if not already present."""
-    dim_name = entry["dim_name"]
-    if dim_name not in state.stale_dim_map:
-        state.stale_dim_map[dim_name] = {
-            **entry["dim"],
-            "stale": True,
-            "fromRunId": entry["run_id"],
-            "fromDateISO": entry["date_iso"],
-            "fromDateLabel": entry["date_label"],
-        }
-
-
-def _track_stale_grade(entry: dict, state: _StaleDimState) -> None:
-    """Track grade counts for stale entries to identify the second valid score."""
-    grade = entry["grade"]
-    if not grade or str(grade).upper() in _SKIP_GRADES:
-        return
-    dim_name = entry["dim_name"]
-    state.non_na_count[dim_name] = state.non_na_count.get(dim_name, 0) + 1
-    if state.non_na_count[dim_name] == 2 and dim_name not in state.stale_previous_by_dimension:
-        state.stale_previous_by_dimension[dim_name] = entry["dim"]
-
-
-def _collect_stale_dimensions(
-    runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
-) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
-    """Find dimensions present in other runs but absent from the selected run."""
-    state = _StaleDimState()
-
-    for older_idx in range(selected_index + 1, len(runs)):
-        for entry in _find_stale_from_run(runs[older_idx], selected_dim_names, get_run_dimensions):
-            _record_stale_entry(entry, state)
-            _track_stale_grade(entry, state)
-
-    for newer_idx in range(selected_index):
-        for entry in _find_stale_from_run(runs[newer_idx], selected_dim_names, get_run_dimensions):
-            _record_stale_entry(entry, state)
-
-    stale_dimensions = sorted(state.stale_dim_map.values(), key=lambda d: d.get("dimension") or "")
-    return stale_dimensions, state.stale_previous_by_dimension
 
 
 def _enrich_dimensions_with_trend(
@@ -285,7 +215,7 @@ def build_dashboard(
     )
     previous_by_dimension = _collect_previous_scores(history_runs, selected_index, selected_dim_names, get_run_dimensions)
     stale_dimensions, stale_previous_by_dimension = (
-        _collect_stale_dimensions(history_runs, selected_index, selected_dim_names, get_run_dimensions)
+        collect_stale_dimensions(history_runs, selected_index, selected_dim_names, get_run_dimensions)
     )
     dimensions_with_trend = _enrich_dimensions_with_trend(selected_dimensions, previous_by_dimension)
     trend = _build_accumulated_trend(history_runs, get_run_dimensions)

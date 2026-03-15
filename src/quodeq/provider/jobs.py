@@ -103,7 +103,7 @@ class InMemoryJobStore:
     ``JobManager`` via the ``job_store`` parameter, or override
     ``create_job_store``.
     """
-    # TODO: Ship a persistent adapter (SQLite/Redis) for multi-worker deployments
+    # See https://github.com/anthropics/quodeq/issues/42 for persistent adapter plans.
 
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}

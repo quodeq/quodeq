@@ -4,17 +4,18 @@ from __future__ import annotations
 import json
 import os
 import re
-import threading
-import urllib.error
-import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from quodeq.config._fetch_client import FetchClient, fetch_url, get_fetch_client, set_fetch_client  # noqa: F401 — re-export
 from quodeq.shared.ai_cli import run_ai_cli
 from quodeq.config.prompt_templates import render_template
 from quodeq.shared.logging import log_error, log_info, log_success, log_warning
 from quodeq.shared.utils import TEXT_ENCODING, get_github_raw_base_url, get_github_search_url, show_diff
+
+# Re-export for backward compatibility
+_FetchClient = FetchClient
 
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
@@ -43,6 +44,7 @@ def _max_fetch_workers(override: int | None = None) -> int:
     if override is not None:
         return override
     return int(os.environ.get("QUODEQ_MAX_FETCH_WORKERS", str(_DEFAULT_MAX_FETCH_WORKERS)))
+
 _MAX_CONTENT_REPOS = 3
 _LINTER_DOCS_LIMIT = 6000
 _EXISTING_CONTENT_LIMIT = 2000
@@ -228,56 +230,8 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
     return [results[repo["name"]] for repo in repos if repo["name"] in results]
 
 
-class _FetchClient:
-    """Thread-safe HTTP fetcher with circuit breaker (trips after repeated failures)."""
-
-    _CIRCUIT_THRESHOLD = 5
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._failures = 0
-
-    def fetch(self, url: str, headers: dict | None = None) -> str | None:
-        """Fetch *url* and return body text, or None on failure."""
-        with self._lock:
-            if self._failures >= self._CIRCUIT_THRESHOLD:
-                return None
-        try:
-            req = urllib.request.Request(url, headers=headers or {})
-            with urllib.request.urlopen(req, timeout=_fetch_timeout_s()) as r:
-                with self._lock:
-                    self._failures = 0
-                return r.read().decode("utf-8", errors="replace")
-        except (urllib.error.URLError, OSError, ValueError):
-            with self._lock:
-                self._failures += 1
-            return None
-
-
-# Lazy initialization pattern: the _FetchClient is expensive (thread-safe circuit
-# breaker with internal lock) and should only be created when actually needed.
-# A list holder avoids the `global` keyword while still allowing test replacement.
-_fetch_client_lock = threading.Lock()
-_fetch_client_holder: list[_FetchClient] = []  # 0 or 1 element; avoids `global` keyword
-
-
-def _get_fetch_client() -> _FetchClient:
-    """Return the module-level _FetchClient, creating it lazily on first use."""
-    with _fetch_client_lock:
-        if not _fetch_client_holder:
-            _fetch_client_holder.append(_FetchClient())
-        return _fetch_client_holder[0]
-
-
-def set_fetch_client(client: _FetchClient) -> None:
-    """Replace the module-level fetch client (e.g. for testing or alternative HTTP backends)."""
-    with _fetch_client_lock:
-        _fetch_client_holder.clear()
-        _fetch_client_holder.append(client)
-
-
-def _fetch_url(url: str, headers: dict | None = None, *, client: _FetchClient | None = None) -> str | None:
-    return (client or _get_fetch_client()).fetch(url, headers)
+def _fetch_url(url: str, headers: dict | None = None, *, client: FetchClient | None = None) -> str | None:
+    return fetch_url(url, headers, client=client or get_fetch_client(_fetch_timeout_s()))
 
 
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:

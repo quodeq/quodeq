@@ -16,19 +16,16 @@ class FakeProcess:
         return self._returncode
 
 
-def _wait_for_job(manager: JobManager, job_id: str, timeout: float = 5.0) -> dict:
-    """Block until a job leaves the 'running' state, using the on_job_complete callback."""
+def _make_manager_with_event(spawn_impl, job_id_holder: list) -> tuple[JobManager, threading.Event]:
+    """Create a JobManager that signals *done* when the job completes."""
     done = threading.Event()
 
-    def _on_complete(jid, job):
-        if jid == job_id:
+    def _on_complete(jid, _job):
+        if not job_id_holder or jid == job_id_holder[0]:
             done.set()
 
-    manager._on_job_complete = _on_complete
-    done.wait(timeout=timeout)
-    result = manager.get_job(job_id)
-    assert result is not None
-    return result
+    manager = JobManager(spawn_impl=spawn_impl, on_job_complete=_on_complete)
+    return manager, done
 
 
 def test_job_manager_tracks_status_and_logs() -> None:
@@ -39,29 +36,37 @@ def test_job_manager_tracks_status_and_logs() -> None:
             returncode=0,
         )
 
-    manager = JobManager(spawn_impl=spawn_impl)
+    job_id_holder: list[str] = []
+    manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["echo", "ok"])
+    job_id_holder.append(job["jobId"])
 
     assert job["status"] in {"running", "done", "failed"}
 
-    job = _wait_for_job(manager, job["jobId"])
+    done.wait(timeout=5.0)
+    result = manager.get_job(job["jobId"])
+    assert result is not None
 
-    assert job["status"] == "done"
-    assert job["exitCode"] == 0
-    assert any("hello" in line for line in job["logs"])
-    assert job["outputProject"] == "sample-project"
-    assert job["outputRunId"] == "20260220"
+    assert result["status"] == "done"
+    assert result["exitCode"] == 0
+    assert any("hello" in line for line in result["logs"])
+    assert result["outputProject"] == "sample-project"
+    assert result["outputRunId"] == "20260220"
 
 
 def test_job_manager_handles_failure() -> None:
     def spawn_impl(*_args, **_kwargs):
         return FakeProcess(stdout="", stderr="boom\n", returncode=2)
 
-    manager = JobManager(spawn_impl=spawn_impl)
+    job_id_holder: list[str] = []
+    manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["false"])
+    job_id_holder.append(job["jobId"])
 
-    job = _wait_for_job(manager, job["jobId"])
+    done.wait(timeout=5.0)
+    result = manager.get_job(job["jobId"])
+    assert result is not None
 
-    assert job["status"] == "failed"
-    assert job["exitCode"] == 2
-    assert any("boom" in line for line in job["logs"])
+    assert result["status"] == "failed"
+    assert result["exitCode"] == 2
+    assert any("boom" in line for line in result["logs"])

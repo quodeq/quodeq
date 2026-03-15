@@ -109,7 +109,7 @@ def parse_violations_from_jsonl(
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
     try:
-        with open(jsonl_path) as _f:
+        with open(jsonl_path, encoding="utf-8") as _f:
             violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup)
     except OSError as exc:
         _logger.warning("Failed to read findings file: %s", exc)
@@ -151,7 +151,7 @@ def _extract_violations_from_principles(principles: dict) -> list[dict[str, Any]
 def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a completed evidence JSON file."""
     try:
-        data = json.loads(evidence_path.read_text())
+        data = json.loads(evidence_path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return None
     violations = _extract_violations_from_principles(data.get("principles") or {})
@@ -197,7 +197,7 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
     seen: set[str] = set()
     files_read: set[str] = set()
     try:
-        with open(stream_path) as _stream:
+        with open(stream_path, encoding="utf-8") as _stream:
             for raw_line in _stream:
                 stripped = raw_line.strip()
                 if not stripped:

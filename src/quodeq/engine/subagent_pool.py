@@ -137,7 +137,7 @@ class SubagentPool:
         try:
             if jsonl.exists():
                 with self._jsonl_lock:
-                    with open(jsonl) as f:
+                    with open(jsonl, encoding="utf-8") as f:
                         return sum(1 for line in f if line.strip())
         except OSError:
             pass

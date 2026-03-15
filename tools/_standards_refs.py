@@ -62,6 +62,22 @@ def attach_cisq_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
                     })
 
 
+def _collect_asvs_refs_for_req(req: dict, asvs_by_cwe: dict[int, list[dict]]) -> None:
+    """Append ASVS refs to a single requirement, deduplicating by ID."""
+    seen: set[str] = set()
+    for cwe_id in req["_cwe_ids"]:
+        for asvs_req in asvs_by_cwe.get(cwe_id, []):
+            asvs_id = asvs_req["id"]
+            if asvs_id not in seen:
+                seen.add(asvs_id)
+                req["refs"].append({
+                    "source": "asvs",
+                    "id": asvs_id,
+                    "name": asvs_req["text"],
+                    "url": _ASVS_MAIN_URL,
+                })
+
+
 def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:
     """Attach ASVS cross-references (security dimension only)."""
     if dimension != "security":
@@ -80,18 +96,34 @@ def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
             asvs_by_cwe.setdefault(cwe_id, []).append(r)
     for reqs in index.values():
         for req in reqs:
-            seen: set[str] = set()
-            for cwe_id in req["_cwe_ids"]:
-                for asvs_req in asvs_by_cwe.get(cwe_id, []):
-                    asvs_id = asvs_req["id"]
-                    if asvs_id not in seen:
-                        seen.add(asvs_id)
-                        req["refs"].append({
-                            "source": "asvs",
-                            "id": asvs_id,
-                            "name": asvs_req["text"],
-                            "url": _ASVS_MAIN_URL,
-                        })
+            _collect_asvs_refs_for_req(req, asvs_by_cwe)
+
+
+def _collect_cert_refs_for_req(
+    req: dict, cert_by_cwe: dict[int, list[dict]], cert_by_id: dict[str, dict],
+) -> None:
+    """Append CERT refs to a single requirement, deduplicating by ID."""
+    seen: set[str] = set()
+    for cwe_id in req["_cwe_ids"]:
+        for rule in cert_by_cwe.get(cwe_id, []):
+            if rule["id"] not in seen:
+                seen.add(rule["id"])
+                req["refs"].append({
+                    "source": "cert",
+                    "id": rule["id"],
+                    "name": rule["name"],
+                    "url": rule.get("source_url", _CERT_MAIN_URL),
+                })
+    for cert_id in req["_cert_ids"]:
+        if cert_id not in seen and cert_id in cert_by_id:
+            rule = cert_by_id[cert_id]
+            seen.add(cert_id)
+            req["refs"].append({
+                "source": "cert",
+                "id": rule["id"],
+                "name": rule["name"],
+                "url": rule.get("source_url", _CERT_MAIN_URL),
+            })
 
 
 def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:
@@ -114,27 +146,7 @@ def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
             cert_by_cwe.setdefault(cwe_id, []).append(rule)
     for reqs in index.values():
         for req in reqs:
-            seen: set[str] = set()
-            for cwe_id in req["_cwe_ids"]:
-                for rule in cert_by_cwe.get(cwe_id, []):
-                    if rule["id"] not in seen:
-                        seen.add(rule["id"])
-                        req["refs"].append({
-                            "source": "cert",
-                            "id": rule["id"],
-                            "name": rule["name"],
-                            "url": rule.get("source_url", _CERT_MAIN_URL),
-                        })
-            for cert_id in req["_cert_ids"]:
-                if cert_id not in seen and cert_id in cert_by_id:
-                    rule = cert_by_id[cert_id]
-                    seen.add(cert_id)
-                    req["refs"].append({
-                        "source": "cert",
-                        "id": rule["id"],
-                        "name": rule["name"],
-                        "url": rule.get("source_url", _CERT_MAIN_URL),
-                    })
+            _collect_cert_refs_for_req(req, cert_by_cwe, cert_by_id)
 
 
 def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimension: str) -> None:

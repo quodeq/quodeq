@@ -29,6 +29,7 @@ def _build_project_zip(project_path: Path) -> Path:
     fd, tmp_path = tempfile.mkstemp(suffix=".zip", prefix="quodeq_export_")
     os.close(fd)
     total_size = 0
+    size_limit = _max_zip_size_bytes()
     try:
         with zipfile.ZipFile(tmp_path, "w", zipfile.ZIP_DEFLATED) as zf:
             for file_entry in project_path.rglob("*"):
@@ -36,7 +37,7 @@ def _build_project_zip(project_path: Path) -> Path:
                     continue
                 if file_entry.is_file():
                     total_size += file_entry.stat().st_size
-                    if total_size > _max_zip_size_bytes():
+                    if total_size > size_limit:
                         raise ValueError("Project exceeds maximum export size")
                     zf.write(file_entry, file_entry.relative_to(project_path.parent))
     except (OSError, zipfile.BadZipFile, ValueError):

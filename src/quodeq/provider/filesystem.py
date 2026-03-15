@@ -108,7 +108,7 @@ _DEFAULT_MAX_PROJECTS_LISTED = 200
 
 
 def _max_projects_listed(override: int | None = None) -> int:
-    """Return the max number of projects to list. *override* bypasses env for testing."""
+    """Return the max number of projects to list. *override* bypasses env."""
     if override is not None:
         return override
     return int(os.environ.get("QUODEQ_MAX_PROJECTS_LISTED", str(_DEFAULT_MAX_PROJECTS_LISTED)))

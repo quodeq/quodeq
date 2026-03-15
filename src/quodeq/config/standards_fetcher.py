@@ -17,7 +17,6 @@ from quodeq.shared.utils import TEXT_ENCODING, get_asvs_url, show_diff
 _logger = logging.getLogger(__name__)
 
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
-_ASVS_SKIP_INTEGRITY_ENV = "QUODEQ_ASVS_SKIP_INTEGRITY"
 _ASVS_DEFAULT_LEVEL = 1
 
 
@@ -68,7 +67,7 @@ def _verify_integrity(
     """
     actual_hash = hashlib.sha256(content).hexdigest()
     if expected_hash is None:
-        expected_hash = os.environ.get(_ASVS_SHA256_ENV)
+        expected_hash = os.environ.get("QUODEQ_ASVS_SHA256")
     if skip_integrity is None:
         skip_integrity = False
     # NOTE: QUODEQ_ASVS_SKIP_INTEGRITY env var is no longer honored.

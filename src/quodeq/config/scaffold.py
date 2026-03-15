@@ -18,11 +18,9 @@ _DIM_PERFORMANCE = "performance"
 _EXCLUDED_DIMS = ["usability", "flexibility"]
 
 
-def _env_weight(env_var: str, default: str, override: float | None = None) -> float:
-    """Return a dimension weight from *override*, env var, or *default*."""
-    if override is not None:
-        return override
-    return float(os.environ.get(env_var, default))
+def _env_weight(env_var: str, default: float) -> float:
+    """Return a dimension weight from env var or *default*."""
+    return float(os.environ.get(env_var, str(default)))
 
 _logger = logging.getLogger(__name__)
 
@@ -82,7 +80,15 @@ def _load_runtime_presets() -> dict[str, dict]:
         return _FALLBACK
 
 
-RUNTIME_PRESETS: dict[str, dict] = _load_runtime_presets()
+def get_runtime_presets() -> dict[str, dict]:
+    """Return runtime presets (loaded once, cached)."""
+    return _RUNTIME_PRESETS
+
+
+_RUNTIME_PRESETS: dict[str, dict] = _load_runtime_presets()
+
+# Backward-compatible alias
+RUNTIME_PRESETS = _RUNTIME_PRESETS
 
 
 def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:
@@ -101,9 +107,9 @@ def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:
 
 def _write_dimensions_json(plugin_dir: Path) -> None:
     """Write dimensions.json with default dimension weights."""
-    default_w = _env_weight("QUODEQ_DEFAULT_DIM_WEIGHT", "1.0")
-    security_w = _env_weight("QUODEQ_SECURITY_DIM_WEIGHT", "1.2")
-    perf_w = _env_weight("QUODEQ_PERFORMANCE_DIM_WEIGHT", "0.8")
+    default_w = _env_weight("QUODEQ_DEFAULT_DIM_WEIGHT", 1.0)
+    security_w = _env_weight("QUODEQ_SECURITY_DIM_WEIGHT", 1.2)
+    perf_w = _env_weight("QUODEQ_PERFORMANCE_DIM_WEIGHT", 0.8)
     (plugin_dir / "dimensions.json").write_text(json.dumps({
         "applies": [
             {"id": _DIM_MAINTAINABILITY, "weight": default_w, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},

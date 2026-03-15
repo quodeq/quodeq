@@ -39,7 +39,7 @@ def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -
     if not compiled_dir or not dimension:
         return {}
     try:
-        data = json.loads((Path(compiled_dir) / f"{dimension}.json").read_text())
+        data = json.loads((Path(compiled_dir) / f"{dimension}.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
         return {}

@@ -148,13 +148,7 @@ def report_gaps(standards_dir: Path, dimension: str) -> list[str]:
     if dimension not in CISQ_DIMENSIONS:
         return []
 
-    iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    try:
-        iso_data = json.loads(iso_file.read_text(encoding=_TEXT_ENCODING))
-    except OSError as exc:
-        raise FileNotFoundError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
+    iso_data = _load_iso_data(standards_dir, dimension)
     iso_cwes: set[int] = set()
     for sc in iso_data.get("sub_characteristics", []):
         for req in sc.get("requirements", []):

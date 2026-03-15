@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
+from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 
 _logger = logging.getLogger(__name__)
@@ -178,7 +179,7 @@ def _read_judgments(
         return []
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
-    with open(jsonl_file, encoding="utf-8") as _jf:
+    with open(jsonl_file, encoding=TEXT_ENCODING) as _jf:
         for line in _jf:
             result = _parse_jsonl_line(line)
             if result is not None:

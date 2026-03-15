@@ -67,7 +67,8 @@ def maybe_build_ui(no_build: bool, reinstall: bool, static_dist: Path, repo_root
     if no_build:
         return
     # Skip build when serving pre-built bundled assets (pip install)
-    web_source = repo_root / "ui" / "web"
+    _WEB_SOURCE_DIR = "ui/web"
+    web_source = repo_root / _WEB_SOURCE_DIR
     if not web_source.is_dir():
         log_info("Using bundled static assets (no ui/web source found).")
         return

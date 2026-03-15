@@ -34,22 +34,21 @@ def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
     return count, lines
 
 
-def _collect_file_reads(data: dict) -> set[str]:
-    """Extract file paths from Read tool_use blocks in an event."""
+def _extract_read_paths(blocks: list) -> set[str]:
+    """Extract file paths from Read tool_use blocks in a content list."""
     files: set[str] = set()
-    # assistant events
-    for block in data.get("message", {}).get("content", []):
-        if block.get("type") == "tool_use" and block.get("name") == "Read":
-            fp = block.get("input", {}).get("file_path")
-            if fp:
-                files.add(fp)
-    # item.completed events
-    item = data.get("item", {})
-    for block in item.get("content", []):
+    for block in blocks:
         if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Read":
             fp = block.get("input", {}).get("file_path")
             if fp:
                 files.add(fp)
+    return files
+
+
+def _collect_file_reads(data: dict) -> set[str]:
+    """Extract file paths from Read tool_use blocks in an event."""
+    files = _extract_read_paths(data.get("message", {}).get("content", []))
+    files |= _extract_read_paths(data.get("item", {}).get("content", []))
     return files
 
 

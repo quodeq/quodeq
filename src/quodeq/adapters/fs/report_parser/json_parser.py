@@ -141,7 +141,7 @@ def _build_principle_map(data: dict[str, Any]) -> dict[str, Any]:
     """Build a mapping from principle name to its aggregated violations/compliance."""
     principle_map: dict[str, Any] = {}
     _seed_principles(data.get("principles", []), principle_map)
-    _collect_findings(data.get("violations", []), principle_map, "violations")
+    _collect_findings(data.get("violations", []), principle_map, _FINDING_TYPE_VIOLATIONS)
     _collect_findings(data.get("compliance", []), principle_map, _FINDING_TYPE_COMPLIANCE)
     return principle_map
 

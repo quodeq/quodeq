@@ -45,75 +45,56 @@ def get_all_cwes() -> dict[int, list[str]]:
     return cwe_dims
 
 
+def _fetch_cwe_endpoint(
+    endpoint: str, collection_key: str, cwe_id: int, api_base: str,
+) -> dict | None:
+    """Fetch a CWE entity from *endpoint* and return the first item under *collection_key*."""
+    url = f"{api_base}/{endpoint}/{cwe_id}"
+    try:
+        req = urllib.request.Request(url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=_API_TIMEOUT_S) as resp:
+            data = json.loads(resp.read())
+            items = data.get(collection_key, [])
+            return items[0] if items else None
+    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
 def fetch_cwe_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | None:
     """Fetch abstraction and mapping info from CWE API."""
-    url = f"{api_base}/weakness/{cwe_id}"
-    try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=_API_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-            if "Weaknesses" in data and data["Weaknesses"]:
-                w = data["Weaknesses"][0]
-                mapping_notes = w.get("MappingNotes", {})
-                return {
-                    "id": cwe_id,
-                    "name": w.get("Name", ""),
-                    "abstraction": w.get("Abstraction", "Unknown"),
-                    "status": w.get("Status", ""),
-                    "mapping_usage": mapping_notes.get("Usage", "Unknown"),
-                    "mapping_rationale": mapping_notes.get("Rationale", ""),
-                }
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return _fetch_category_info(cwe_id, api_base) or _fetch_view_info(cwe_id, api_base)
-        print(f"  HTTP {e.code} for CWE-{cwe_id}", file=sys.stderr)
-    except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
-        print(f"  Error for CWE-{cwe_id}: {e}", file=sys.stderr)
-    return None
-
-
-def _fetch_category_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | None:
-    """Try fetching as a category if weakness lookup returned 404."""
-    url = f"{api_base}/category/{cwe_id}"
-    try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=_API_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-            if "Categories" in data and data["Categories"]:
-                c = data["Categories"][0]
-                mapping_notes = c.get("MappingNotes", {})
-                return {
-                    "id": cwe_id,
-                    "name": c.get("Name", ""),
-                    "abstraction": "Category",
-                    "status": c.get("Status", ""),
-                    "mapping_usage": mapping_notes.get("Usage", "Prohibited"),
-                    "mapping_rationale": "Categories are not weaknesses",
-                }
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError, UnicodeDecodeError):
-        pass
-    return None
-
-
-def _fetch_view_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | None:
-    """Try fetching as a view if category lookup also returned 404."""
-    url = f"{api_base}/view/{cwe_id}"
-    try:
-        req = urllib.request.Request(url, headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=_API_TIMEOUT_S) as resp:
-            data = json.loads(resp.read())
-            if "Views" in data and data["Views"]:
-                v = data["Views"][0]
-                return {
-                    "id": cwe_id,
-                    "name": v.get("Name", ""),
-                    "abstraction": "View",
-                    "status": v.get("Status", ""),
-                    "mapping_usage": "Prohibited",
-                    "mapping_rationale": "Views are not weaknesses",
-                }
-    except (urllib.error.URLError, urllib.error.HTTPError, OSError, json.JSONDecodeError, UnicodeDecodeError):
-        pass
+    w = _fetch_cwe_endpoint("weakness", "Weaknesses", cwe_id, api_base)
+    if w is not None:
+        mapping_notes = w.get("MappingNotes", {})
+        return {
+            "id": cwe_id,
+            "name": w.get("Name", ""),
+            "abstraction": w.get("Abstraction", "Unknown"),
+            "status": w.get("Status", ""),
+            "mapping_usage": mapping_notes.get("Usage", "Unknown"),
+            "mapping_rationale": mapping_notes.get("Rationale", ""),
+        }
+    # 404 from weakness — try category then view
+    cat = _fetch_cwe_endpoint("category", "Categories", cwe_id, api_base)
+    if cat is not None:
+        mapping_notes = cat.get("MappingNotes", {})
+        return {
+            "id": cwe_id,
+            "name": cat.get("Name", ""),
+            "abstraction": "Category",
+            "status": cat.get("Status", ""),
+            "mapping_usage": mapping_notes.get("Usage", "Prohibited"),
+            "mapping_rationale": "Categories are not weaknesses",
+        }
+    view = _fetch_cwe_endpoint("view", "Views", cwe_id, api_base)
+    if view is not None:
+        return {
+            "id": cwe_id,
+            "name": view.get("Name", ""),
+            "abstraction": "View",
+            "status": view.get("Status", ""),
+            "mapping_usage": "Prohibited",
+            "mapping_rationale": "Views are not weaknesses",
+        }
     return None
 
 

@@ -36,9 +36,11 @@ SCORING_MODE_BY_HASH = {
     _SCORING_PROMPT_V2_HASH: "non-numerical",
 }
 DEFAULT_SCORING_MODE = "numerical"
+_EVIDENCE_STEM_SUFFIX = "_evidence"
 
 
 def detect_mode_from_evidence(evidence: dict) -> str:
+    """Return the scoring mode ('numerical' or 'non-numerical') for *evidence*."""
     h = evidence.get("meta", {}).get("scoring_prompt_version", "")
     return SCORING_MODE_BY_HASH.get(h, DEFAULT_SCORING_MODE)
 
@@ -83,7 +85,6 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run
         print(f"  SKIP  cannot read {evidence_path}: {exc}")
         return False
     discipline = evidence.get("discipline", "")
-    _EVIDENCE_STEM_SUFFIX = "_evidence"
     dimension = evidence_path.stem.replace(_EVIDENCE_STEM_SUFFIX, "")
     mapping_path = evaluators_root / discipline / f"{dimension}.json"
 
@@ -91,13 +92,12 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run
         print(f"  SKIP  mapping not found: {mapping_path}")
         return False
 
-    try:
-        json.loads(mapping_path.read_text())  # validate mapping is readable
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        print(f"  SKIP  cannot read mapping {mapping_path}: {exc}")
-        return False
     mode = detect_mode_from_evidence(evidence)
-    scores = run_scoring(evidence, mode)
+    try:
+        scores = run_scoring(evidence, mode)
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError, ValueError) as exc:
+        print(f"  SKIP  scoring failed for {evidence_path}: {exc}")
+        return False
 
     if dry_run:
         overall = scores.get("overall", {})

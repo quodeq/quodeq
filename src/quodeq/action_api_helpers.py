@@ -8,7 +8,7 @@ def _error(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
     return {"error": message, "code": code}, status
 
 
-def validate_evaluation_payload(payload: dict) -> str | None:
+def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
     """Validate the evaluate request payload.
 
     Returns an error message string if validation fails, or ``None`` if valid.

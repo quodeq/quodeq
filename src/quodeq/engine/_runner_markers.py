@@ -3,19 +3,14 @@ from __future__ import annotations
 
 import json
 import sys
-from typing import Callable, TypedDict
+from typing import Any, Callable
 
 from quodeq.shared.logging import log_info
 
 CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
 
 
-class _MarkerFields(TypedDict, total=False):
-    dimension: str
-    dimensions: list[str]
-
-
-def emit_marker(phase: str, **kwargs: _MarkerFields) -> None:
+def emit_marker(phase: str, **kwargs: Any) -> None:
     """Emit a structured JSON marker (only when stdout is not a TTY)."""
     if sys.stdout.isatty():
         return
