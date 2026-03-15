@@ -27,7 +27,15 @@ def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
     elif not isinstance(repo, str):
         invalid.append("repo (must be a string)")
 
-    str_fields = ("discipline", "dimensions", "aiCmd", "aiModel", "subagentModel")
+    # dimensions accepts both string ("a,b") and array (["a","b"]) from frontend
+    dims = payload.get("dimensions")
+    if dims is not None:
+        if isinstance(dims, list):
+            payload["dimensions"] = ",".join(str(d) for d in dims)
+        elif not isinstance(dims, str):
+            invalid.append("dimensions (must be a string or array of strings)")
+
+    str_fields = ("discipline", "aiCmd", "aiModel", "subagentModel")
     for field in str_fields:
         value = payload.get(field)
         if value is not None and not isinstance(value, str):
