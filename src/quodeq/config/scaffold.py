@@ -1,14 +1,29 @@
 """Scaffold boilerplate plugin directories from runtime presets."""
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import logging
+import os
+import shutil
 from pathlib import Path
 
 _DEFAULT_PLUGIN_VERSION = "1.0.0"
-_DEFAULT_DIMENSION_WEIGHT = 1.0
-_SECURITY_DIMENSION_WEIGHT = 1.2
-_PERFORMANCE_DIMENSION_WEIGHT = 0.8
+
+
+def _default_dimension_weight() -> float:
+    """Return the default dimension weight (reads env at call time)."""
+    return float(os.environ.get("QUODEQ_DEFAULT_DIM_WEIGHT", "1.0"))
+
+
+def _security_dimension_weight() -> float:
+    """Return the security dimension weight (reads env at call time)."""
+    return float(os.environ.get("QUODEQ_SECURITY_DIM_WEIGHT", "1.2"))
+
+
+def _performance_dimension_weight() -> float:
+    """Return the performance dimension weight (reads env at call time)."""
+    return float(os.environ.get("QUODEQ_PERFORMANCE_DIM_WEIGHT", "0.8"))
 
 _logger = logging.getLogger(__name__)
 
@@ -21,7 +36,7 @@ def _min_engine_version() -> str:
     try:
         from importlib.metadata import version as _pkg_version
         return f"=={_pkg_version('quodeq')}"
-    except Exception:
+    except importlib.metadata.PackageNotFoundError:
         _logger.debug("Could not determine quodeq version for engine constraint")
         return ">=0.4.0"
 
@@ -89,10 +104,10 @@ def _write_dimensions_json(plugin_dir: Path) -> None:
     """Write dimensions.json with default dimension weights."""
     (plugin_dir / "dimensions.json").write_text(json.dumps({
         "applies": [
-            {"id": "maintainability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
-            {"id": "reliability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
-            {"id": "security", "weight": _SECURITY_DIMENSION_WEIGHT, "iso_25010": "Security", "source": "OWASP ASVS L1"},
-            {"id": "performance", "weight": _PERFORMANCE_DIMENSION_WEIGHT, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
+            {"id": "maintainability", "weight": _default_dimension_weight(), "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
+            {"id": "reliability", "weight": _default_dimension_weight(), "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
+            {"id": "security", "weight": _security_dimension_weight(), "iso_25010": "Security", "source": "OWASP ASVS L1"},
+            {"id": "performance", "weight": _performance_dimension_weight(), "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
         ],
         "excludes": ["usability", "flexibility"],
     }, indent=2) + "\n")
@@ -133,7 +148,6 @@ def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
             f"- Resource management\n"
         )
     except OSError:
-        import shutil
         shutil.rmtree(plugin_dir, ignore_errors=True)
         raise
 

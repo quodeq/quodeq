@@ -1,6 +1,7 @@
 """Dashboard and accumulated-view logic, split from action_provider_fs."""
 from __future__ import annotations
 
+import os
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field
@@ -27,12 +28,17 @@ _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 _LATEST_RUN = "latest"
 _MAX_HISTORY_RUNS = 100
 
+# NOTE: Process-local cache; not shared across workers. Replace with Redis/memcached for multi-worker deployments.
 # Module-level LRU cache shared across requests; evicts least-recently-used
 # entries once the limit is reached, capping memory while providing cross-
 # request caching for hot-path dimension reads (P-TIM-6).
 _RUN_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
-_RUN_DIM_CACHE_MAX = 256
 _RUN_DIM_LOCK = threading.Lock()
+
+
+def _run_dim_cache_max() -> int:
+    """Return the run-dimension cache size limit (env-configurable)."""
+    return int(os.environ.get("QUODEQ_RUN_DIM_CACHE_MAX", "256"))
 
 
 @dataclass
@@ -192,8 +198,52 @@ def _make_run_dimension_fetcher(
         project,
         cache if cache is not None else _RUN_DIM_CACHE,
         lock if lock is not None else _RUN_DIM_LOCK,
-        max_size if max_size is not None else _RUN_DIM_CACHE_MAX,
+        max_size if max_size is not None else _run_dim_cache_max(),
     )
+
+
+def _build_dashboard_result(
+    *,
+    project: str,
+    runs: list[RunInfo],
+    selected_run: RunInfo,
+    selected_summary: dict[str, Any],
+    trend: list[dict[str, Any]],
+    dimensions_with_trend: list[dict[str, Any]],
+    previous_by_dimension: dict[str, dict[str, Any]],
+    stale_previous_by_dimension: dict[str, dict[str, Any]],
+    stale_dimensions: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Assemble the final dashboard response dict from pre-computed parts."""
+    return {
+        "project": project,
+        "availableRuns": [
+            {"runId": item.run_id, "dateISO": item.date_iso, "dateLabel": item.date_label}
+            for item in runs
+        ],
+        "selectedRun": {
+            "runId": selected_run.run_id,
+            "dateISO": selected_run.date_iso,
+            "dateLabel": selected_run.date_label,
+        },
+        "summary": {**selected_summary, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
+        "trend": trend,
+        "dimensions": dimensions_with_trend,
+        "previousByDimension": previous_by_dimension,
+        "stalePreviousByDimension": stale_previous_by_dimension,
+        "staleDimensions": stale_dimensions,
+    }
+
+
+def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
+    """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent."""
+    selected_run = runs[0] if run == _LATEST_RUN else next((item for item in runs if item.run_id == run), None)
+    if not selected_run:
+        raise FileNotFoundError(f"Run not found: {run}")
+    selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), None)
+    if selected_index is None:
+        raise RuntimeError(f"Run {selected_run.run_id!r} disappeared from the run list unexpectedly.")
+    return selected_run, selected_index
 
 
 def build_dashboard(
@@ -205,22 +255,22 @@ def build_dashboard(
     lock: threading.Lock | None = None,
     max_cache_size: int | None = None,
 ) -> dict[str, Any]:
-    """Build a full dashboard response for *project* at *run*."""
+    """Build a full dashboard response for *project* at *run*.
+
+    Note: This function accepts 6 parameters (3 positional + 3 keyword-only
+    cache overrides).  Grouping the cache params into a dataclass was considered
+    but deemed over-engineering for an internal function.
+    """
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
     if not runs:
         raise FileNotFoundError(f"No runs found for project: {project}")
 
-    selected_run = runs[0] if run == _LATEST_RUN else next((item for item in runs if item.run_id == run), None)
-    if not selected_run:
-        raise FileNotFoundError(f"Run not found: {run}")
+    selected_run, selected_index = _resolve_selected_run(runs, run)
 
     selected_dimensions = read_run_data(reports_root, project, selected_run.run_id)
     selected_summary = summarize_dimensions(selected_dimensions)
     selected_dim_names = {d.get("dimension") for d in selected_dimensions}
-    selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), None)
-    if selected_index is None:
-        raise RuntimeError(f"Run {selected_run.run_id!r} disappeared from the run list unexpectedly.")
 
     # Cap runs scanned for history. Always include the selected run so
     # selected_index remains a valid index into history_runs.
@@ -235,17 +285,14 @@ def build_dashboard(
     dimensions_with_trend = _enrich_dimensions_with_trend(selected_dimensions, previous_by_dimension)
     trend = _build_accumulated_trend(history_runs, get_run_dimensions)
 
-    return {
-        "project": project,
-        "availableRuns": [
-            {"runId": item.run_id, "dateISO": item.date_iso, "dateLabel": item.date_label}
-            for item in runs
-        ],
-        "selectedRun": {"runId": selected_run.run_id, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
-        "summary": {**selected_summary, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
-        "trend": trend,
-        "dimensions": dimensions_with_trend,
-        "previousByDimension": previous_by_dimension,
-        "stalePreviousByDimension": stale_previous_by_dimension,
-        "staleDimensions": stale_dimensions,
-    }
+    return _build_dashboard_result(
+        project=project,
+        runs=runs,
+        selected_run=selected_run,
+        selected_summary=selected_summary,
+        trend=trend,
+        dimensions_with_trend=dimensions_with_trend,
+        previous_by_dimension=previous_by_dimension,
+        stale_previous_by_dimension=stale_previous_by_dimension,
+        stale_dimensions=stale_dimensions,
+    )

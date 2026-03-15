@@ -9,7 +9,6 @@ import urllib.error
 import urllib.request
 import urllib.parse
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from functools import lru_cache
 from pathlib import Path
 
 from quodeq.shared.ai_cli import run_ai_cli
@@ -20,9 +19,19 @@ from quodeq.shared.utils import get_github_raw_base_url, get_github_search_url, 
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
 _REFRESH_TEMPLATES_DIR = Path(__file__).parent / "refresh_templates"
-_FETCH_TIMEOUT_S = 15
-_CONTENT_SAMPLE_LIMIT = 4000
-_MAX_FETCH_WORKERS = 8
+def _fetch_timeout_s() -> int:
+    """Return fetch timeout in seconds (reads env at call time)."""
+    return int(os.environ.get("QUODEQ_FETCH_TIMEOUT", "15"))
+
+
+def _content_sample_limit() -> int:
+    """Return content sample character limit (reads env at call time)."""
+    return int(os.environ.get("QUODEQ_CONTENT_SAMPLE_LIMIT", "4000"))
+
+
+def _max_fetch_workers() -> int:
+    """Return max fetch worker threads (reads env at call time)."""
+    return int(os.environ.get("QUODEQ_MAX_FETCH_WORKERS", "8"))
 _LINTER_DOCS_LIMIT = 6000
 _EXISTING_CONTENT_LIMIT = 2000
 _SAFE_NAME_RE = re.compile(r'^[\w./-]+$')
@@ -36,9 +45,45 @@ def _validate_repo_field(value: str, field_name: str) -> bool:
     return True
 
 
-@lru_cache(maxsize=1)
 def _get_linter_sources() -> dict[str, str]:
-    return json.loads(_LINTER_SOURCES_PATH.read_text())
+    """Load linter sources from JSON file, returning empty dict on failure."""
+    try:
+        return json.loads(_LINTER_SOURCES_PATH.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        log_warning(f"Failed to load linter sources from {_LINTER_SOURCES_PATH}: {exc}")
+        return {}
+
+
+def _fetch_and_parse_practices(
+    runtime: str, min_stars: int, out_path: Path,
+) -> tuple[dict | None, str | None]:
+    """Fetch cursor-rules repos and generate practices via AI.
+
+    Returns (payload_dict, error_message). On success error_message is None.
+    """
+    log_info(f"Fetching cursor-rules repos for {runtime}...")
+    repos = _fetch_cursor_rules_repos(runtime, min_stars)
+    if not repos:
+        return None, f"No cursor-rules repos found for runtime={runtime!r} with min_stars={min_stars}"
+    log_info(f"Found {len(repos)} repos (min {min_stars} stars)")
+
+    log_info("Fetching content samples from top repos...")
+    content_samples = _fetch_repo_content(repos[:3])
+    if not content_samples:
+        return None, "Could not fetch content from any repo"
+
+    log_info("Generating practices via AI...")
+    prompt = _build_practices_prompt(runtime, content_samples, out_path)
+    stdout, err = run_ai_cli(prompt)
+    if err:
+        return None, f"LLM error: {err}"
+
+    try:
+        payload = json.loads(stdout)
+    except (json.JSONDecodeError, TypeError) as exc:
+        return None, f"LLM returned invalid JSON: {exc}"
+
+    return payload, None
 
 
 def refresh_practices(
@@ -56,30 +101,9 @@ def refresh_practices(
     """
     out_path = evaluators_dir / runtime / "knowledge" / "practices.json"
 
-    log_info(f"Fetching cursor-rules repos for {runtime}...")
-    repos = _fetch_cursor_rules_repos(runtime, min_stars)
-    if not repos:
-        log_warning(f"No cursor-rules repos found for runtime={runtime!r} with min_stars={min_stars}")
-        return 1
-    log_info(f"Found {len(repos)} repos (min {min_stars} stars)")
-
-    log_info("Fetching content samples from top repos...")
-    content_samples = _fetch_repo_content(repos[:3])
-    if not content_samples:
-        log_error("Could not fetch content from any repo")
-        return 1
-
-    log_info("Generating practices via AI...")
-    prompt = _build_practices_prompt(runtime, content_samples, out_path)
-    stdout, err = run_ai_cli(prompt)
-    if err:
-        log_error(f"LLM error: {err}")
-        return 1
-
-    try:
-        payload = json.loads(stdout)
-    except (json.JSONDecodeError, TypeError) as exc:
-        log_error(f"LLM returned invalid JSON: {exc}")
+    payload, error = _fetch_and_parse_practices(runtime, min_stars, out_path)
+    if error:
+        log_error(error)
         return 1
 
     new_content = json.dumps(payload, indent=2)
@@ -177,11 +201,11 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
             content = _fetch_url(url)
             if content:
                 header = f"# Source: {repo['name']} ({repo['stars']} stars)\n\n"
-                return header + content[:_CONTENT_SAMPLE_LIMIT]
+                return header + content[:_content_sample_limit()]
         return None
 
     results: dict[str, str] = {}
-    with ThreadPoolExecutor(max_workers=min(len(repos), _MAX_FETCH_WORKERS)) as executor:
+    with ThreadPoolExecutor(max_workers=min(len(repos), _max_fetch_workers())) as executor:
         future_to_repo = {executor.submit(_try_repo, repo): repo for repo in repos}
         for future in as_completed(future_to_repo):
             repo = future_to_repo[future]
@@ -208,7 +232,7 @@ class _FetchClient:
                 return None
         try:
             req = urllib.request.Request(url, headers=headers or {})
-            with urllib.request.urlopen(req, timeout=_FETCH_TIMEOUT_S) as r:
+            with urllib.request.urlopen(req, timeout=_fetch_timeout_s()) as r:
                 with self._lock:
                     self._failures = 0
                 return r.read().decode("utf-8", errors="replace")
@@ -218,24 +242,26 @@ class _FetchClient:
             return None
 
 
+# Lazy initialization pattern: the _FetchClient is expensive (thread-safe circuit
+# breaker with internal lock) and should only be created when actually needed.
+# A list holder avoids the `global` keyword while still allowing test replacement.
 _fetch_client_lock = threading.Lock()
-_fetch_client: _FetchClient | None = None
+_fetch_client_holder: list[_FetchClient] = []  # 0 or 1 element; avoids `global` keyword
 
 
 def _get_fetch_client() -> _FetchClient:
     """Return the module-level _FetchClient, creating it lazily on first use."""
-    global _fetch_client
     with _fetch_client_lock:
-        if _fetch_client is None:
-            _fetch_client = _FetchClient()
-        return _fetch_client
+        if not _fetch_client_holder:
+            _fetch_client_holder.append(_FetchClient())
+        return _fetch_client_holder[0]
 
 
 def set_fetch_client(client: _FetchClient) -> None:
     """Replace the module-level fetch client (e.g. for testing or alternative HTTP backends)."""
-    global _fetch_client
     with _fetch_client_lock:
-        _fetch_client = client
+        _fetch_client_holder.clear()
+        _fetch_client_holder.append(client)
 
 
 def _fetch_url(url: str, headers: dict | None = None, *, client: _FetchClient | None = None) -> str | None:
@@ -268,5 +294,3 @@ def _build_analysis_prompt(runtime: str, linter_docs: str, out_path: Path) -> st
         "EXISTING": existing[:_EXISTING_CONTENT_LIMIT] if existing != "none" else "none",
         "LINTER_DOCS": linter_docs[:_LINTER_DOCS_LIMIT],
     })
-
-

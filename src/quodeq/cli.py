@@ -13,7 +13,7 @@ from typing import Callable
 
 from quodeq.config.cli import build_parser as build_config_parser
 from quodeq.config.cli import main as configure_main
-from quodeq.config.paths import default_paths
+from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 from quodeq.engine.analysis import AnalysisError
 from quodeq.engine.runner import EvaluationError
@@ -38,6 +38,11 @@ def _env_int(var: str, default: int | None) -> int | None:
         return int(raw)
     except ValueError:
         return default
+
+
+def _subagent_model() -> str | None:
+    """Return the subagent model override from the environment, or None."""
+    return os.environ.get("SUBAGENT_MODEL") or None
 
 
 def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
@@ -104,6 +109,8 @@ def build_parser() -> argparse.ArgumentParser:
 def _resolve_repo(args: argparse.Namespace) -> Path | None:
     """Resolve the repo argument to a local path (cloning if needed)."""
     repo_path = args.repo
+    # NOTE: print() here uses plain text only.  If ANSI escapes are added in
+    # the future, gate them on the NO_COLOR environment variable.
     if is_repo_url(repo_path):
         try:
             repo_path = prepare_repository(repo_path)
@@ -171,7 +178,11 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
             print("Starting evaluation...", file=sys.stderr)
             evidence = run(config)
             out_file = evidence_dir / f"{config.plugin_id}_evidence.json"
-            out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2))
+            try:
+                out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2))
+            except OSError as exc:
+                print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
+                return 1
             print(f"Evidence written to {out_file}")
         else:
             print("Starting evaluation...", file=sys.stderr)
@@ -224,7 +235,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
             n_subagents=args.n_subagents,
             # SUBAGENT_MODEL env var: override the AI model used by subagent workers
             # (e.g. "claude-sonnet-4-20250514"). Unset or empty = use default model.
-            subagent_model=os.environ.get("SUBAGENT_MODEL") or None,
+            subagent_model=_subagent_model(),
         ),
     )
 
@@ -249,6 +260,7 @@ _COMMAND_HANDLERS: dict[str, Callable] = {
 
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate subcommand handler."""
+    load_env_file(default_paths())
     parser = build_parser()
     args = parser.parse_args(argv)
     if args.handler_command == "evaluate":

@@ -16,7 +16,10 @@ _REPO_URL_RE = re.compile(
 
 def _get_clone_timeout() -> int:
     """Return the git clone timeout, reading the env var lazily."""
-    return int(os.environ.get("QUODEQ_GIT_CLONE_TIMEOUT", "300"))
+    try:
+        return int(os.environ.get("QUODEQ_GIT_CLONE_TIMEOUT", "300"))
+    except ValueError:
+        return 300
 
 
 def is_valid_repo_url(url: str) -> bool:

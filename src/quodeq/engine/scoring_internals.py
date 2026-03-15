@@ -36,6 +36,7 @@ _RATIO_DAMPENING_TABLE: list[tuple[float, float]] = [
 # ---------------------------------------------------------------------------
 # Project-size scaling
 # ---------------------------------------------------------------------------
+# Scoring algorithm constants — modify via plugin configuration, not env vars.
 # Each entry is (min_file_count_inclusive, multiplier).
 # Tiers: Small (<500) x1 | Medium (500-5k) x2 | Large (5k-20k) x3
 #        XLarge (20k-50k) x4 | XXLarge (50k-100k) x5 | Enterprise (100k+) x6
@@ -134,17 +135,17 @@ def compliance_dampening(
     Uses raw distinct type counts (sum across all severities, no weighting)
     to avoid bias from compliance findings that lack severity fields.
 
-    Asymmetric: max discount 15% (0.85×), max penalty 30% (1.30×).
-    No compliance at all gets the full 1.30× penalty.
+    Asymmetric: max discount 15% (0.85x), max penalty 30% (1.30x).
+    No compliance at all gets the full 1.30x penalty.
     """
     total_compliance = sum(compliance_type_counts.values())
     total_violations = sum(violation_type_counts.values())
 
     if total_violations == 0:
-        return 1.0  # no violations → dampening is irrelevant
+        return 1.0  # no violations -> dampening is irrelevant
 
     if total_compliance == 0:
-        return 1.30  # no compliance at all → max penalty
+        return 1.30  # no compliance at all -> max penalty
 
     ratio = total_compliance / total_violations
     for threshold, multiplier in _RATIO_DAMPENING_TABLE:
@@ -198,12 +199,12 @@ def confidence_interval_for(
 
     return {
         "confidence_interval": width,
-        "grade_stability": "± 1 level" if width > 1.5 else "stable",
+        "grade_stability": "+/- 1 level" if width > 1.5 else "stable",
     }
 
 
 # ---------------------------------------------------------------------------
-# Numerical score → grade label
+# Numerical score -> grade label
 # ---------------------------------------------------------------------------
 
 _GRADE_THRESHOLDS: list[tuple[int, str]] = [
@@ -215,7 +216,7 @@ _GRADE_THRESHOLDS: list[tuple[int, str]] = [
 
 
 def score_to_grade_label(score: float) -> str:
-    """Convert a 0–10 numerical score to a descriptive grade label."""
+    """Convert a 0-10 numerical score to a descriptive grade label."""
     for threshold, label in _GRADE_THRESHOLDS:
         if score >= threshold:
             return label
@@ -233,7 +234,7 @@ _WEIGHT_DOUBLE = "x2"
 def weight_as_multiplier(weight_str: str) -> int:
     """Extract the integer multiplier from a weight label like 'High (x3)'.
 
-    Recognises 'x3' → 3, 'x2' → 2, anything else → 1.
+    Recognises 'x3' -> 3, 'x2' -> 2, anything else -> 1.
     """
     if _WEIGHT_TRIPLE in weight_str:
         return 3

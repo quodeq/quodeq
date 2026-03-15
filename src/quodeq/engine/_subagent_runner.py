@@ -1,4 +1,4 @@
-"""Subagent processing path — runs a dimension via N parallel subagents.
+"""Subagent processing path -- runs a dimension via N parallel subagents.
 
 Extracted from runner.py to keep module size within maintainability limits.
 """
@@ -12,7 +12,11 @@ from typing import TYPE_CHECKING, Any, Callable
 from quodeq.engine.analysis import AnalysisConfig, count_files_from_stream
 from quodeq.engine.evidence import Evidence
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.engine.file_queue import FileQueue
+from quodeq.engine.plugin_detector import list_source_files
+from quodeq.engine.plugin_loader import load_plugin
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
+from quodeq.engine.subagent_pool import PoolPaths, SubagentPool
 from quodeq.shared.logging import log_info, log_warning
 
 if TYPE_CHECKING:
@@ -26,7 +30,10 @@ class DimensionCallbacks:
     run_analysis: Callable[..., tuple[Path, Path]]
     parse_evidence: Callable[..., Evidence | None]
 
-_DEFAULT_SUBAGENT_MODEL = os.environ.get("QUODEQ_SUBAGENT_MODEL", "claude-haiku-4-5")
+
+def _default_subagent_model() -> str:
+    """Return the subagent model, reading from env at call time (not import time)."""
+    return os.environ.get("QUODEQ_SUBAGENT_MODEL", "claude-haiku-4-5")
 
 
 def _list_plugin_files(config: RunConfig, ctx_total: int, dim_id: str, idx: int) -> tuple[list[str], set[str]]:
@@ -34,9 +41,6 @@ def _list_plugin_files(config: RunConfig, ctx_total: int, dim_id: str, idx: int)
 
     Returns (files, extensions) or ([], extensions) if none found.
     """
-    from quodeq.engine.plugin_loader import load_plugin
-    from quodeq.engine.plugin_detector import list_source_files
-
     plugin_dir = config.evaluators_dir / config.plugin_id
     plugin_data = load_plugin(plugin_dir)
     extensions = set(plugin_data.get("detects", {}).get("extensions", []))
@@ -64,10 +68,8 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
 
 def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
-    from quodeq.engine.subagent_pool import PoolPaths, SubagentPool
-
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _DEFAULT_SUBAGENT_MODEL
+    subagent_model = config.options.subagent_model or _default_subagent_model()
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -87,7 +89,7 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
 
 def _collect_evidence(config: RunConfig, dim_id: str, evidence_dir: Path, results: list[Any], ctx: Any) -> Evidence:
     """Deduplicate JSONL, count files read, and parse into Evidence."""
-    from quodeq.engine.subagent_pool import SubagentPool
+    # Imported here to avoid circular import: runner -> _subagent_runner -> runner
     from quodeq.engine.runner import cleanup_stream
 
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
@@ -124,15 +126,13 @@ def process_dimension_with_subagents(
     Falls back to single-agent path (via provided callbacks) when no source
     files are detected for the queue.
     """
-    from quodeq.engine.file_queue import FileQueue
-
     evidence_dir = config.work_dir or config.src
 
     # 1. List source files
     files, extensions = _list_plugin_files(config, ctx.total, dim_id, idx)
     if not files:
         log_warning(
-            f"[{idx}/{ctx.total}] {dim_id} — no source files for subagent queue"
+            f"[{idx}/{ctx.total}] {dim_id} -- no source files for subagent queue"
             f" (src={config.src}, plugin={config.plugin_id}, extensions={extensions})"
         )
         prompt = callbacks.build_prompt(config, dim_id, ctx)
@@ -142,7 +142,7 @@ def process_dimension_with_subagents(
     # 2. Create queue
     queue_path = evidence_dir / f"{dim_id}_queue.json"
     FileQueue(queue_path, files)
-    log_info(f"  [{idx}/{ctx.total}] {dim_id} — {len(files)} files queued for {config.options.n_subagents} subagents")
+    log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued for {config.options.n_subagents} subagents")
 
     # 3. Build prompt and launch pool
     prompt = _build_subagent_prompt(config, dim_id, ctx)

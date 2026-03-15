@@ -167,8 +167,6 @@ def create_app(
     app = Flask(__name__)
     provider = provider or _default_provider()
     store = rate_limit_store or create_rate_limit_store()
-    if api_key is None:
-        api_key = os.environ.get("QUODEQ_API_KEY")
     if not api_key:
         _logger.warning(
             "QUODEQ_API_KEY is not set — API endpoints are unauthenticated. "
@@ -205,7 +203,7 @@ def main() -> None:
     """Start the Flask development server using environment configuration."""
     import signal
 
-    app = create_app(static_dist=get_static_dist())
+    app = create_app(static_dist=get_static_dist(), api_key=os.environ.get("QUODEQ_API_KEY"))
 
     def _handle_shutdown(signum: int, frame: object) -> None:
         raise SystemExit(0)

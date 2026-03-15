@@ -4,50 +4,7 @@ from __future__ import annotations
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
 from quodeq.engine.scoring import score_evidence
 
-
-def _make_evidence_with_confidence(
-    confidence_level="high",
-    violations=None,
-    compliance=None,
-    n_violations=1,
-    n_compliance=2,
-):
-    """Build Evidence with explicit confidence level and finding counts."""
-    viol = violations or [
-        {"file": f"v{i}.ts", "line": i, "snippet": "eval(x)", "reason": "injection", "severity": "high", "vt": "code-injection"}
-        for i in range(n_violations)
-    ]
-    comp = compliance or [
-        {"file": f"c{i}.ts", "line": i, "snippet": "JSON.parse(x)", "reason": "safe"}
-        for i in range(n_compliance)
-    ]
-    total = len(viol) + len(comp)
-    pct = round(len(comp) / total * 100, 1) if total > 0 else 0.0
-    pe = PrincipleEvidence(
-        practice_id="ts-001",
-        display_name="Avoid eval()",
-        dimension="security",
-        severity="high",
-        violations=viol,
-        compliance=comp,
-        metrics={
-            "total_instances": total,
-            "compliant": len(comp),
-            "violating": len(viol),
-            "compliance_percentage": pct,
-            "confidence_level": confidence_level,
-            "is_balanced": len(viol) > 0 and len(comp) > 0,
-        },
-    )
-    return Evidence(
-        repository="test-repo",
-        plugin_id="typescript",
-        date="2026-03-03",
-        source_file_count=100,
-        files_read=50,
-        coverage_pct=50.0,
-        principles={"ts-001": pe},
-    )
+from tests.engine.conftest import make_evidence_with_confidence
 
 
 # ---------------------------------------------------------------------------
@@ -65,7 +22,7 @@ def test_balanced_ratio_dampens_deductions():
          "severity": "minor", "vt": f"comp-type-{i}"}
         for i in range(2)
     ]
-    ev = _make_evidence_with_confidence(
+    ev = make_evidence_with_confidence(
         confidence_level="high",
         violations=violations,
         compliance=compliance,
@@ -89,7 +46,7 @@ def test_strong_compliance_ratio_gives_max_discount():
          "severity": "minor", "vt": f"safe-{i}"}
         for i in range(4)
     ]
-    ev = _make_evidence_with_confidence(
+    ev = make_evidence_with_confidence(
         confidence_level="high",
         violations=violations,
         compliance=compliance,
@@ -108,7 +65,7 @@ def test_no_compliance_penalises_deductions():
         {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
          "severity": "major", "vt": "bad"},
     ]
-    ev = _make_evidence_with_confidence(
+    ev = make_evidence_with_confidence(
         confidence_level="high",
         violations=violations,
         compliance=[],
@@ -132,7 +89,7 @@ def test_weak_compliance_ratio_penalises():
         {"file": "c.ts", "line": 1, "snippet": "ok", "reason": "r",
          "severity": "minor", "vt": "comp-1"},
     ]
-    ev = _make_evidence_with_confidence(
+    ev = make_evidence_with_confidence(
         confidence_level="high",
         violations=violations,
         compliance=compliance,
@@ -157,7 +114,7 @@ def test_dampening_in_graded_mode():
          "severity": "minor", "vt": f"comp-{i}"}
         for i in range(6)
     ]
-    ev = _make_evidence_with_confidence(
+    ev = make_evidence_with_confidence(
         confidence_level="high",
         violations=violations,
         compliance=compliance,

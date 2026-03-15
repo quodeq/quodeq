@@ -232,6 +232,6 @@ class TestRefreshAnalysis:
 
 class TestSymbolicConstants:
     def test_constants_are_defined(self):
-        assert kr._CONTENT_SAMPLE_LIMIT == 4000
+        assert kr._content_sample_limit() == 4000
         assert kr._LINTER_DOCS_LIMIT == 6000
         assert kr._EXISTING_CONTENT_LIMIT == 2000

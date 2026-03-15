@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 import re
 from typing import Any
 
 from quodeq.engine.scoring_internals import GRADE_LADDER
+
+_logger = logging.getLogger(__name__)
 
 NUMERIC_GRADE_ORDER = ["Critical", "Poor", "Adequate", "Good", "Exemplary"]
 TEXT_GRADE_ORDER = GRADE_LADDER
@@ -17,11 +20,18 @@ _TEXT_RANK: dict[str, int] = {g: i for i, g in enumerate(TEXT_GRADE_ORDER)}
 
 
 def parse_numeric_score(score_text: str | None) -> float | None:
-    """Extract the first numeric value from a score string, or return None."""
+    """Extract the first numeric value from a score string, or return None.
+
+    Example::
+
+        parse_numeric_score("7.5/10")  # -> 7.5
+        parse_numeric_score("no score")  # -> None
+    """
     if not score_text:
         return None
     match = _SCORE_RE.search(str(score_text))
     if not match:
+        _logger.debug("No numeric score found in %r; expected format like '7.5/10'", score_text)
         return None
     return float(match.group(1))
 
@@ -35,7 +45,12 @@ def _grade_rank(grade: str) -> int:
 
 
 def most_frequent_grade(grades: list[str]) -> str | None:
-    """Return the most common grade, breaking ties by higher grade rank."""
+    """Return the most common grade, breaking ties by higher grade rank.
+
+    Example::
+
+        most_frequent_grade(["Good", "Good", "Poor"])  # -> "Good"
+    """
     if not grades:
         return None
     counts: dict[str, int] = {}
@@ -46,7 +61,12 @@ def most_frequent_grade(grades: list[str]) -> str | None:
 
 
 def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, Any]]) -> dict[str, Any]:
-    """Aggregate violation and compliance counts grouped by severity."""
+    """Aggregate violation and compliance counts grouped by severity.
+
+    Example::
+
+        build_totals([{"severity": "major"}], [{"severity": "minor"}])
+    """
     severity = {"critical": 0, "major": 0, "minor": 0, "unknown": 0}
     for entry in violations:
         key = entry.get("severity", "unknown")
@@ -61,7 +81,12 @@ def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, An
 
 
 def calculate_trend(current_score: Any, previous_score: Any) -> str:
-    """Compare two scores and return a trend direction: 'up', 'down', 'same', or 'none'."""
+    """Compare two scores and return a trend direction: 'up', 'down', 'same', or 'none'.
+
+    Example::
+
+        calculate_trend("8/10", "6/10")  # -> "up"
+    """
     current = parse_numeric_score(str(current_score)) if current_score is not None else None
     previous = parse_numeric_score(str(previous_score)) if previous_score is not None else None
     if current is None or previous is None:
@@ -74,7 +99,12 @@ def calculate_trend(current_score: Any, previous_score: Any) -> str:
 
 
 def summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
-    """Produce an aggregate summary across multiple dimension evaluation results."""
+    """Produce an aggregate summary across multiple dimension evaluation results.
+
+    Example::
+
+        summarize_dimensions([{"overallGrade": "Good", "overallScore": "8/10"}])
+    """
     overall_grades = [d.get("overallGrade") for d in dimensions if d.get("overallGrade")]
     numeric_scores = [
         score for score in (parse_numeric_score(d.get("overallScore")) for d in dimensions) if score is not None

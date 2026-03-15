@@ -43,7 +43,7 @@ def count_files_in_stream(stream_file: Path) -> set[str]:
     """Extract unique file paths from Read/Grep tool_use events in the stream."""
     files: set[str] = set()
     try:
-        with open(stream_file) as f:
+        with open(stream_file, encoding="utf-8") as f:
             for line in f:
                 data = parse_stream_event(line)
                 if data is not None:
@@ -58,7 +58,7 @@ def count_jsonl_lines(jsonl_file: Path) -> int:
     try:
         if not jsonl_file.exists():
             return 0
-        with open(jsonl_file) as f:
+        with open(jsonl_file, encoding="utf-8") as f:
             return sum(1 for line in f if line.strip())
     except OSError:
         return 0

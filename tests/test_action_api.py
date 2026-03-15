@@ -61,78 +61,60 @@ class StubProvider(ActionProvider):
         return {"models": []}
 
 
-def test_list_projects_endpoint():
-    app = create_app(StubProvider())
-    client = app.test_client()
+@pytest.fixture()
+def client():
+    """Flask test client backed by a StubProvider."""
+    return create_app(StubProvider()).test_client()
 
+
+def test_list_projects_endpoint(client):
     response = client.get("/api/projects")
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["projects"][0]["name"] == "demo"
 
 
-def test_start_evaluation_requires_repo():
-    app = create_app(StubProvider())
-    client = app.test_client()
-
+def test_start_evaluation_requires_repo(client):
     response = client.post("/api/evaluations", json={}, headers={"Origin": "http://localhost"})
     assert response.status_code == 400
     payload = response.get_json()
     assert payload["code"] == "INVALID_INPUT"
 
 
-def test_dashboard_returns_project_data():
-    app = create_app(StubProvider())
-    client = app.test_client()
-
+def test_dashboard_returns_project_data(client):
     response = client.get("/api/projects/demo/dashboard")
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["project"] == "demo"
 
 
-def test_delete_nonexistent_project_returns_404():
-    app = create_app(StubProvider())
-    client = app.test_client()
-
+def test_delete_nonexistent_project_returns_404(client):
     response = client.delete("/api/projects/nonexistent", headers={"Origin": "http://localhost"})
     assert response.status_code == 404
     payload = response.get_json()
     assert payload["code"] == "NOT_FOUND"
 
 
-def test_get_evaluation_status_for_known_job():
-    app = create_app(StubProvider())
-    client = app.test_client()
-
+def test_get_evaluation_status_for_known_job(client):
     response = client.get("/api/evaluations/job-1")
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["jobId"] == "job-1"
 
 
-def test_get_evaluation_status_unknown_returns_404():
-    app = create_app(StubProvider())
-    client = app.test_client()
-
+def test_get_evaluation_status_unknown_returns_404(client):
     response = client.get("/api/evaluations/unknown-job")
     assert response.status_code == 404
 
 
-def test_health_endpoint():
-    app = create_app(StubProvider())
-    client = app.test_client()
-
+def test_health_endpoint(client):
     response = client.get("/api/health")
     assert response.status_code == 200
     payload = response.get_json()
     assert payload["ok"] is True
 
 
-def test_plugins_endpoint():
-    app = create_app(StubProvider())
-    client = app.test_client()
-
+def test_plugins_endpoint(client):
     response = client.get("/api/plugins")
     assert response.status_code == 200
     payload = response.get_json()

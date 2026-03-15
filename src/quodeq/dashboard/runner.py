@@ -12,22 +12,20 @@ Key functions and their contracts:
 from __future__ import annotations
 
 from pathlib import Path
-import json
 import os
 import signal
 import socket
 import subprocess
 import sys
 import time
-import urllib.error
-import urllib.request
 import webbrowser
 
+from quodeq.dashboard._api_health import ApiConfig, action_api_healthy, spawn_and_wait
 from quodeq.dashboard._build import maybe_build_ui
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
 from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
 from quodeq.shared.paths import resolve_path
-from quodeq.shared.utils import ACTION_API_MODULE, DEFAULT_HOST, get_evaluations_dir
+from quodeq.shared.config_loader import get_default_host as _get_default_host
 
 
 _LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
@@ -37,13 +35,6 @@ _IS_WIN32 = sys.platform == "win32"
 def _terminate_pid(pid: int) -> None:
     """Send a termination signal to a process, platform-aware."""
     os.kill(pid, signal.SIGTERM if not _IS_WIN32 else signal.CTRL_BREAK_EVENT)
-
-
-def _popen_platform_kwargs() -> dict:
-    """Return platform-specific Popen kwargs for process group isolation."""
-    if _IS_WIN32:
-        return {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-    return {"start_new_session": True}
 
 
 def _get_pid_file() -> Path:
@@ -57,9 +48,7 @@ def _get_pid_file() -> Path:
 
 
 _PORT_CHECK_TIMEOUT_S = 2
-_HEALTH_CHECK_TIMEOUT_S = 0.5
 _POLL_INTERVAL_S = 0.1
-_HEALTH_POLL_INTERVAL_S = 0.2
 _PROCESS_WAIT_TIMEOUT_S = 5
 _MAX_PORT = 65535
 _STALE_KILL_DEADLINE_S = 3
@@ -85,7 +74,8 @@ def _is_port_open(host: str, port: int) -> bool:
         return sock.connect_ex((host, port)) == 0
 
 
-def _choose_ui_port(start: int, host: str = DEFAULT_HOST) -> int:
+def _choose_ui_port(start: int, host: str | None = None) -> int:
+    host = host if host is not None else _get_default_host()
     port = start
     while _is_port_open(host, port):
         port += 1
@@ -112,57 +102,9 @@ def _kill_stale_action_api(host: str, port: int) -> None:
         time.sleep(_POLL_INTERVAL_S)
 
 
-def _spawn_action_api(port: int, static_dist: Path | None = None, evaluations_dir: str | None = None) -> subprocess.Popen:
-    env = os.environ.copy()
-    env["QUODEQ_ACTION_API_PORT"] = str(port)
-    env.setdefault("QUODEQ_ACTION_API_HOST", DEFAULT_HOST)
-    if static_dist:
-        env["QUODEQ_STATIC_DIST"] = str(static_dist)
-    env["QUODEQ_EVALUATIONS_DIR"] = evaluations_dir or get_evaluations_dir()
-    proc = subprocess.Popen(
-        [sys.executable, "-m", ACTION_API_MODULE],
-        env=env,
-        **_popen_platform_kwargs(),
-    )
-    try:
-        _get_pid_file().write_text(str(proc.pid))
-    except (OSError, AttributeError) as exc:
-        log_warning(f"Could not write PID file: {exc}")
-    return proc
-
-
-def _wait_for_action_api(base_url: str, timeout_s: float = 10) -> None:
-    deadline = time.monotonic() + timeout_s
-    while time.monotonic() < deadline:
-        if _action_api_healthy(base_url):
-            return None
-        time.sleep(_HEALTH_POLL_INTERVAL_S)
-    raise TimeoutError(f"Action API did not become ready within {timeout_s} seconds.")
-
-
-def _action_api_healthy(base_url: str) -> bool:
-    url = f"{base_url}/api/health"
-    try:
-        with urllib.request.urlopen(url, timeout=_HEALTH_CHECK_TIMEOUT_S) as response:
-            if response.status != 200:
-                return False
-            payload = json.loads(response.read().decode("utf-8"))
-            return payload.get("ok") is True
-    except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
-        return False
-
-
-def _spawn_and_wait(port: int, base_url: str, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen]:
+def _spawn_and_wait_local(port: int, base_url: str, api_config: ApiConfig | None = None) -> tuple[str, subprocess.Popen]:
     """Spawn the action API on *port* and wait for it to become healthy."""
-    process = _spawn_action_api(port, static_dist=static_dist, evaluations_dir=evaluations_dir)
-    try:
-        _wait_for_action_api(base_url)
-    except (subprocess.TimeoutExpired, OSError, TimeoutError):
-        if process.poll() is None:
-            process.terminate()
-            process.wait()
-        raise
-    return base_url, process
+    return spawn_and_wait(port, base_url, _get_pid_file(), _get_default_host(), api_config)
 
 
 def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen | None]:
@@ -178,25 +120,26 @@ def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_d
                 "Set QUODEQ_ALLOW_PLAINTEXT_HTTP=1 to explicitly opt in, "
                 "or use a TLS reverse proxy."
             )
+    api_config = ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir)
     port = start_port
     for _ in range(max_tries):
         base_url = f"http://{host}:{port}"
         if _is_port_open(host, port):
-            if _action_api_healthy(base_url):
+            if action_api_healthy(base_url):
                 return base_url, None
             port += 1
             continue
-        return _spawn_and_wait(port, base_url, static_dist, evaluations_dir=evaluations_dir)
+        return _spawn_and_wait_local(port, base_url, api_config)
     raise RuntimeError("Unable to find a free port for Action API.")
 
 
 def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen | None]:
     base_url = f"http://{host}:{port}"
     if _is_port_open(host, port):
-        if _action_api_healthy(base_url):
+        if action_api_healthy(base_url):
             return base_url, None
         raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    return _spawn_and_wait(port, base_url, static_dist, evaluations_dir=evaluations_dir)
+    return _spawn_and_wait_local(port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir))
 
 
 def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
@@ -284,7 +227,7 @@ def run_dashboard(config: DashboardConfig) -> int:
     log_info(f"Static:  {config.static_dist}")
     log_info(f"Port:    {config.port}")
 
-    action_api_host = config.api_host or DEFAULT_HOST
+    action_api_host = config.api_host or _get_default_host()
     action_api_port = config.api_port or config.port
     static_dist = config.static_dist
     evaluations_dir = str(config.reports_dir)

@@ -19,42 +19,42 @@ def get_valid_categories(categories: str | None = None) -> frozenset[str]:
     return frozenset(raw.split(","))
 
 
-# Populated from QUODEQ_DISCIPLINE_CATEGORIES env var (comma-separated).
-# Default: "backend,frontend,mobile,infra"
-VALID_CATEGORIES = get_valid_categories()
+def validate_new_discipline(
+    name: str,
+    language: str,
+    category: str,
+    valid_categories: frozenset[str] | None = None,
+) -> int:
+    """Validate that name, language, and category are acceptable for a new discipline.
 
-
-def validate_new_discipline(name: str, language: str, category: str) -> int:
-    """Validate that name, language, and category are acceptable for a new discipline."""
+    *valid_categories* overrides the env-var lookup when provided,
+    allowing callers to pass fresh env-var values or test values.
+    """
+    cats = valid_categories if valid_categories is not None else get_valid_categories()
     if not name or not language:
         log_error(
-            f"Usage: add-discipline <name> <language> [--category=<{'|'.join(sorted(VALID_CATEGORIES))}>]"
+            f"Usage: add-discipline <name> <language> [--category=<{'|'.join(sorted(cats))}>]"
         )
         return 1
-    if category not in VALID_CATEGORIES:
-        log_error(f"Invalid category '{category}'. Must be one of: {', '.join(sorted(VALID_CATEGORIES))}")
+    if category not in cats:
+        log_error(f"Invalid category '{category}'. Must be one of: {', '.join(sorted(cats))}")
         return 1
     return 0
 
 
 def get_discipline_language(name: str, paths: ConfigPaths) -> str | None:
     """Look up the programming language configured for a discipline."""
+    from quodeq.config.discipline_registry import DisciplineRegistry
+
     conf = paths.disciplines_conf
     if not conf.exists():
         return None
-    current = None
     try:
-        conf_lines = conf.read_text().splitlines()
-    except (OSError, UnicodeDecodeError) as exc:
-        log_warning(f"Could not read disciplines config {conf.name}: {exc}")
+        registry = DisciplineRegistry.from_file(conf)
+    except ValueError as exc:
+        log_warning(str(exc))
         return None
-    for line in conf_lines:
-        line = line.strip()
-        if not line:
-            continue
-        if line.startswith("[") and line.endswith("]"):
-            current = line[1:-1]
-            continue
-        if current == name and line.startswith("language="):
-            return line.split("=", 1)[1].strip()
-    return None
+    rule = registry.disciplines.get(name)
+    if rule is None:
+        return None
+    return rule.language

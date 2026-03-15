@@ -4,8 +4,9 @@ Extracted from compile_standards.py to keep that module under 300 lines.
 """
 from __future__ import annotations
 
-import json
 from pathlib import Path
+
+from quodeq.shared.utils import read_json as _read_json
 
 _ASVS_MAIN_URL = "https://owasp.org/www-project-application-security-verification-standard/"
 _CISQ_MAIN_URL = "https://www.it-cisq.org/coding-rules/"
@@ -37,7 +38,7 @@ def attach_cisq_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     cisq_file = standards_dir / "cisq" / f"{dimension}.json"
     if not cisq_file.exists():
         return
-    cisq_data = json.loads(cisq_file.read_text())
+    cisq_data = _read_json(cisq_file)
     cisq_lookup = {c["id"]: c for c in cisq_data.get("cwes", [])}
     for reqs in index.values():
         for req in reqs:
@@ -60,7 +61,7 @@ def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     asvs_file = standards_dir / "asvs" / "level1.json"
     if not asvs_file.exists():
         return
-    asvs_data = json.loads(asvs_file.read_text())
+    asvs_data = _read_json(asvs_file)
     asvs_by_cwe: dict[int, list[dict]] = {}
     for r in asvs_data.get("requirements", []):
         for cwe_id in r.get("cwe", []):
@@ -88,7 +89,7 @@ def attach_cert_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     cert_file = standards_dir / "cert" / f"{dimension}.json"
     if not cert_file.exists():
         return
-    cert_data = json.loads(cert_file.read_text())
+    cert_data = _read_json(cert_file)
     cert_by_cwe: dict[int, list[dict]] = {}
     cert_by_id: dict[str, dict] = {}
     for rule in cert_data.get("rules", []):
@@ -127,7 +128,7 @@ def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     wcag_file = standards_dir / "wcag" / "level_a.json"
     if not wcag_file.exists():
         return
-    wcag_data = json.loads(wcag_file.read_text())
+    wcag_data = _read_json(wcag_file)
     wcag_lookup = {c["id"]: c for c in wcag_data.get("criteria", [])}
     for reqs in index.values():
         for req in reqs:

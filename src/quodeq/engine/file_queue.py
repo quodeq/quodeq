@@ -76,6 +76,7 @@ class FileQueueError(RuntimeError):
 
 
 class FileQueue:
+    # NOTE: Single-node only. Replace with a distributed queue (Redis, SQS) for horizontal scaling.
     """Distributes files across N subagent processes.
 
     The queue state lives in a JSON file::

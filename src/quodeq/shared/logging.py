@@ -17,33 +17,38 @@ def _should_use_color(env: dict[str, str] | None = None) -> bool:
     return not environ.get("NO_COLOR") and environ.get("TERM") != "dumb"
 
 
-_USE_COLOR = _should_use_color()
+def _use_color() -> bool:
+    """Return whether color output is currently enabled (evaluated on each call)."""
+    return _should_use_color()
 
-BLUE   = "\033[0;34m" if _USE_COLOR else ""
-GREEN  = "\033[0;32m" if _USE_COLOR else ""
-YELLOW = "\033[1;33m" if _USE_COLOR else ""
-GREY   = "\033[0;90m" if _USE_COLOR else ""
-RED    = "\033[0;31m" if _USE_COLOR else ""
-NC     = "\033[0m"    if _USE_COLOR else ""
+
+def _color(code: str) -> str:
+    """Return the ANSI *code* if color is enabled, else empty string."""
+    return code if _use_color() else ""
+
 
 _LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
 logging.addLevelName(_LOG_SUCCESS, "SUCCESS")
 
 _STYLES: dict = {
-    logging.DEBUG: (GREY, "[DEBUG]"),
-    logging.INFO: (BLUE, "[INFO]"),
-    _LOG_SUCCESS: (GREEN, "[SUCCESS]"),
-    logging.WARNING: (YELLOW, "[WARNING]"),
-    logging.ERROR: (RED, "[ERROR]"),
+    logging.DEBUG: ("\033[0;90m", "[DEBUG]"),
+    logging.INFO: ("\033[0;34m", "[INFO]"),
+    _LOG_SUCCESS: ("\033[0;32m", "[SUCCESS]"),
+    logging.WARNING: ("\033[1;33m", "[WARNING]"),
+    logging.ERROR: ("\033[0;31m", "[ERROR]"),
 }
+
+_NC = "\033[0m"
 
 
 class _ColorFormatter(logging.Formatter):
     """Format log records with ANSI color codes based on severity level."""
 
     def format(self, record: logging.LogRecord) -> str:
-        color, prefix = _STYLES.get(record.levelno, (NC, f"[{record.levelname}]"))
-        return f"{color}{prefix}{NC} {record.getMessage()}"
+        raw_color, prefix = _STYLES.get(record.levelno, ("", f"[{record.levelname}]"))
+        if _use_color():
+            return f"{raw_color}{prefix}{_NC} {record.getMessage()}"
+        return f"{prefix} {record.getMessage()}"
 
 
 class _StderrHandler(logging.StreamHandler):
@@ -64,7 +69,7 @@ class _StderrHandler(logging.StreamHandler):
         pass
 
 
-# Module-level logger configuration is intentional — standard Python convention.
+# Module-level logger configuration is intentional -- standard Python convention.
 # The "quodeq" logger is set up once at import time so all log_* helpers work immediately.
 _logger = logging.getLogger("quodeq")
 _logger.addHandler(_StderrHandler())

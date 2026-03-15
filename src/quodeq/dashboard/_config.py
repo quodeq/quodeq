@@ -4,8 +4,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.shared.utils import DEFAULT_HOST
-
 
 @dataclass(frozen=True)
 class ServerConfig:

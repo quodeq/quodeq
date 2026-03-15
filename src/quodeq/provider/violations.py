@@ -13,7 +13,9 @@ from quodeq.provider.violations_parsing import (
     parse_violations_from_stream,
 )
 
-_MAX_VIOLATION_FILES = int(os.environ.get("QUODEQ_MAX_VIOLATION_FILES", "20"))
+def _max_violation_files() -> int:
+    """Return the max number of violation files to include (env-configurable)."""
+    return int(os.environ.get("QUODEQ_MAX_VIOLATION_FILES", "20"))
 
 
 def resolve_dimension_eval(
@@ -29,7 +31,7 @@ def resolve_dimension_eval(
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
     if markdown_path.exists():
         try:
-            content = markdown_path.read_text()
+            content = markdown_path.read_text(encoding="utf-8")
         except OSError:
             return None
         return parse_eval_markdown(content, project, run_id, dimension)
@@ -70,6 +72,6 @@ def aggregate_violations(dashboard: dict[str, Any]) -> dict[str, Any]:
             sev = violation.get("severity", "minor")
             if sev in entry:
                 entry[sev] += 1
-    summary["files"] = sorted(summary["byFile"].values(), key=lambda item: item["count"], reverse=True)[:_MAX_VIOLATION_FILES]
+    summary["files"] = sorted(summary["byFile"].values(), key=lambda item: item["count"], reverse=True)[:_max_violation_files()]
     summary.pop("byFile", None)
     return summary

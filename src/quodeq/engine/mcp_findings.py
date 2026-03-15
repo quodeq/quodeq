@@ -23,6 +23,7 @@ from quodeq.engine._mcp_dispatch import (
     _read_message,
     dispatch as _dispatch,
 )
+from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs as _load_compiled_refs
 
 _FINDING_SCHEMA_VERSION = 1
 
@@ -34,8 +35,8 @@ TOOL_SCHEMA = REPORT_FINDING_SCHEMA
 class FindingsRouter:
     """Deduplicates and enriches findings before writing to JSONL.
 
-    - Dedup by (principle, file, line, type) — skips duplicate findings
-    - Enriches req_refs from compiled standards — LLM doesn't need to pick refs
+    - Dedup by (principle, file, line, type) -- skips duplicate findings
+    - Enriches req_refs from compiled standards -- LLM doesn't need to pick refs
     - Returns feedback to the LLM so it can move on from duplicates
     """
 
@@ -55,7 +56,7 @@ class FindingsRouter:
         finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
         finding.update({k: v for k, v in args.items() if v is not None})
 
-        # Enrich with compiled standard refs — server-side, zero LLM tokens
+        # Enrich with compiled standard refs -- server-side, zero LLM tokens
         # Pick one ref per source type (e.g. one CWE, one CISQ) using best text match
         req = args.get("req")
         if req and req in self._refs:
@@ -98,46 +99,11 @@ def _select_best_refs(
             scored = [(r, _text_overlap(r.get("name", ""), description, reason)) for r in refs]
             max_score = max(s for _, s in scored)
             if max_score == 0:
-                # No text match — pick the broadest (first listed, typically the parent)
+                # No text match -- pick the broadest (first listed, typically the parent)
                 result.append(refs[0])
             else:
                 result.append(max(scored, key=lambda x: x[1])[0])
     return result
-
-
-def _load_compiled_refs(compiled_dir: str | None, dimension: str | None) -> dict[str, list[dict]]:
-    """Load {req_id: [{label, url}, ...]} from compiled standards."""
-    if not compiled_dir or not dimension:
-        return {}
-    try:
-        data = json.loads((Path(compiled_dir) / f"{dimension}.json").read_text())
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
-        logging.getLogger(__name__).warning("Failed to load compiled standards for %s: %s", dimension, exc)
-        return {}
-    lookup: dict[str, list[dict]] = {}
-    for principle in data.get("principles", []):
-        for req in principle.get("requirements", []):
-            req_id = req.get("id")
-            if not req_id:
-                continue
-            refs = [
-                {"label": _ref_label(r), "url": r["url"], "name": r.get("name", ""), "source": r.get("source", "")}
-                for r in req.get("refs", []) if r.get("url")
-            ]
-            if refs:
-                lookup[req_id] = refs
-    return lookup
-
-
-def _ref_label(ref: dict) -> str:
-    """Build a display label for a ref."""
-    source = ref.get("source", "")
-    ref_id = ref.get("id")
-    if source == "cwe" and ref_id:
-        return f"CWE-{ref_id}"
-    if ref_id:
-        return ref_id
-    return source.upper() if source else "REF"
 
 
 def main() -> None:

@@ -3,6 +3,8 @@ from __future__ import annotations
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
 from quodeq.engine.scoring import score_evidence
 
+from tests.engine.conftest import make_evidence_with_confidence
+
 
 def _make_evidence(violations=None, compliance=None) -> Evidence:
     pe = PrincipleEvidence(
@@ -87,53 +89,9 @@ def test_scoring_structure():
 # Deduction-only scoring model tests
 # ---------------------------------------------------------------------------
 
-def _make_evidence_with_confidence(
-    confidence_level="high",
-    violations=None,
-    compliance=None,
-    n_violations=1,
-    n_compliance=2,
-):
-    """Build Evidence with explicit confidence level and finding counts."""
-    viol = violations or [
-        {"file": f"v{i}.ts", "line": i, "snippet": "eval(x)", "reason": "injection", "severity": "high", "vt": "code-injection"}
-        for i in range(n_violations)
-    ]
-    comp = compliance or [
-        {"file": f"c{i}.ts", "line": i, "snippet": "JSON.parse(x)", "reason": "safe"}
-        for i in range(n_compliance)
-    ]
-    total = len(viol) + len(comp)
-    pct = round(len(comp) / total * 100, 1) if total > 0 else 0.0
-    pe = PrincipleEvidence(
-        practice_id="ts-001",
-        display_name="Avoid eval()",
-        dimension="security",
-        severity="high",
-        violations=viol,
-        compliance=comp,
-        metrics={
-            "total_instances": total,
-            "compliant": len(comp),
-            "violating": len(viol),
-            "compliance_percentage": pct,
-            "confidence_level": confidence_level,
-            "is_balanced": len(viol) > 0 and len(comp) > 0,
-        },
-    )
-    return Evidence(
-        repository="test-repo",
-        plugin_id="typescript",
-        date="2026-03-03",
-        source_file_count=100,
-        files_read=50,
-        coverage_pct=50.0,
-        principles={"ts-001": pe},
-    )
-
 
 def test_numerical_low_confidence_returns_insufficient():
-    ev = _make_evidence_with_confidence(confidence_level="low")
+    ev = make_evidence_with_confidence(confidence_level="low")
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores["principles"]["ts-001"]
     assert ts001["grade"] == "Insufficient"
@@ -141,14 +99,14 @@ def test_numerical_low_confidence_returns_insufficient():
 
 
 def test_graded_low_confidence_returns_insufficient():
-    ev = _make_evidence_with_confidence(confidence_level="low")
+    ev = make_evidence_with_confidence(confidence_level="low")
     scores = score_evidence(ev, mode="non-numerical")
     ts001 = scores["principles"]["ts-001"]
     assert ts001["grade"] == "Insufficient"
 
 
 def test_numerical_high_confidence_no_violations():
-    ev = _make_evidence_with_confidence(
+    ev = make_evidence_with_confidence(
         confidence_level="high", violations=[], n_violations=0, n_compliance=10,
     )
     scores = score_evidence(ev, mode="numerical")
@@ -159,7 +117,7 @@ def test_numerical_high_confidence_no_violations():
 
 
 def test_numerical_high_confidence_with_violations():
-    ev = _make_evidence_with_confidence(
+    ev = make_evidence_with_confidence(
         confidence_level="high", n_violations=2, n_compliance=8,
         violations=[
             {"file": "a.ts", "line": 1, "snippet": "eval(x)", "reason": "r", "severity": "critical", "vt": "code-injection"},
@@ -177,7 +135,7 @@ def test_numerical_high_confidence_with_violations():
 
 
 def test_graded_high_confidence_no_violations():
-    ev = _make_evidence_with_confidence(
+    ev = make_evidence_with_confidence(
         confidence_level="high", violations=[], n_violations=0, n_compliance=10,
     )
     scores = score_evidence(ev, mode="non-numerical")
@@ -214,9 +172,7 @@ def test_weighted_overall_excludes_insufficient():
 
 
 def test_all_insufficient_overall():
-    ev = _make_evidence_with_confidence(confidence_level="low")
+    ev = make_evidence_with_confidence(confidence_level="low")
     scores = score_evidence(ev, mode="numerical")
     assert scores["overall"]["grade"] == "Insufficient"
     assert scores["overall"]["weighted_score"] == 0.0
-
-

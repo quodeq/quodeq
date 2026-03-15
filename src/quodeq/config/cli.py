@@ -18,6 +18,12 @@ from quodeq.config.paths import default_paths
 _DEFAULT_MIN_STARS = 500
 
 
+def _print_and_zero(text: str) -> int:
+    """Print *text* and return 0 (used as a handler helper)."""
+    print(text)
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     """Build and return the argument parser for the configure subcommand."""
     parser = argparse.ArgumentParser(prog="quodeq configure")
@@ -69,13 +75,17 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate configuration action."""
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    if args.parallel is not None and not (1 <= args.parallel <= 16):
+        parser.error("--parallel must be between 1 and 16")
+
     paths = default_paths()
 
     handlers: list[tuple[str, Callable]] = [
         ("generate_maps",       lambda v: run_generate_evaluators(v, paths) or 0),
         ("generate_dimensions", lambda _: run_generate_dimensions(paths) or 0),
         ("check_sources",       lambda v: check_sources(v, paths)),
-        ("list_dimensions",     lambda _: (print(render_dimension_table()), 0)[1]),
+        ("list_dimensions",     lambda _: _print_and_zero(render_dimension_table())),
         ("refresh_practices",   lambda v: run_refresh_practices(v, paths,
                                      min_stars=args.min_stars, dry_run=args.dry_run)),
         ("refresh_analysis",    lambda v: run_refresh_analysis(v, paths, dry_run=args.dry_run)),

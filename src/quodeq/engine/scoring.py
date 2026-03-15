@@ -148,7 +148,18 @@ def _score_principle_graded(ctx: _PrincipleContext) -> dict:
 def _score_all_principles(
     raw_principles: dict, mode: str, scale_mult: int, files_read: int,
 ) -> dict:
-    """Score every principle in *raw_principles* and return the per-principle dict."""
+    """Score every principle in *raw_principles* and return the per-principle dict.
+
+    Orchestration flow per principle:
+      1. Extract metrics, violations, compliance from evidence
+      2. Detect taxonomy mode (vt field vs reason field)
+      3. Tally violation types by severity
+      4. Tally compliance types by severity
+      5. Compute compliance dampening multiplier
+      6. Compute confidence interval
+      7. Bundle into _PrincipleContext
+      8. Dispatch to numerical or graded scorer
+    """
     per_principle: dict = {}
     for key, pdata in raw_principles.items():
         metrics = pdata.get("metrics", {})

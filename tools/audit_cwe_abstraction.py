@@ -22,7 +22,7 @@ _PROGRESS_LOG_INTERVAL = 20
 _RATE_LIMIT_SLEEP_S = 0.1
 
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
-API_BASE = "https://cwe-api.mitre.org/api/v1/cwe"
+_DEFAULT_API_BASE = "https://cwe-api.mitre.org/api/v1/cwe"
 
 
 def get_all_cwes() -> dict[int, list[str]]:
@@ -38,9 +38,9 @@ def get_all_cwes() -> dict[int, list[str]]:
     return cwe_dims
 
 
-def fetch_cwe_info(cwe_id: int) -> dict | None:
+def fetch_cwe_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | None:
     """Fetch abstraction and mapping info from CWE API."""
-    url = f"{API_BASE}/weakness/{cwe_id}"
+    url = f"{api_base}/weakness/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -58,16 +58,16 @@ def fetch_cwe_info(cwe_id: int) -> dict | None:
                 }
     except urllib.error.HTTPError as e:
         if e.code == 404:
-            return _fetch_category_info(cwe_id) or _fetch_view_info(cwe_id)
+            return _fetch_category_info(cwe_id, api_base) or _fetch_view_info(cwe_id, api_base)
         print(f"  HTTP {e.code} for CWE-{cwe_id}", file=sys.stderr)
     except (urllib.error.URLError, OSError, json.JSONDecodeError, UnicodeDecodeError) as e:
         print(f"  Error for CWE-{cwe_id}: {e}", file=sys.stderr)
     return None
 
 
-def _fetch_category_info(cwe_id: int) -> dict | None:
+def _fetch_category_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | None:
     """Try fetching as a category if weakness lookup returned 404."""
-    url = f"{API_BASE}/category/{cwe_id}"
+    url = f"{api_base}/category/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -88,9 +88,9 @@ def _fetch_category_info(cwe_id: int) -> dict | None:
     return None
 
 
-def _fetch_view_info(cwe_id: int) -> dict | None:
+def _fetch_view_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | None:
     """Try fetching as a view if category lookup also returned 404."""
-    url = f"{API_BASE}/view/{cwe_id}"
+    url = f"{api_base}/view/{cwe_id}"
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=10) as resp:
@@ -179,14 +179,20 @@ def _print_results(results: list[dict], *, problems_only: bool) -> None:
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--problems", action="store_true", help="Show only PROHIBITED/DISCOURAGED")
+    parser.add_argument(
+        "--api-base",
+        default=_DEFAULT_API_BASE,
+        help=f"CWE REST API base URL (default: {_DEFAULT_API_BASE})",
+    )
     args = parser.parse_args()
+    api_base: str = args.api_base
 
     cwe_dims = get_all_cwes()
     print(f"Total unique CWEs in ISO 25010 files: {len(cwe_dims)}\n")
 
     results: list[dict] = []
     for i, cwe_id in enumerate(sorted(cwe_dims.keys()), 1):
-        info = fetch_cwe_info(cwe_id)
+        info = fetch_cwe_info(cwe_id, api_base)
         if info:
             info["dimensions"] = cwe_dims[cwe_id]
             info["fetched_date"] = str(date.today())

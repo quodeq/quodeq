@@ -10,9 +10,23 @@ _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 
 # Per-type deduction constants for numerical mode.
 # Override via env vars; values must be > 0.
-_CRITICAL_PENALTY = float(os.environ.get("QUODEQ_CRITICAL_PENALTY", "2.0"))  # points per critical type (default: 2.0)
-_MAJOR_PENALTY = float(os.environ.get("QUODEQ_MAJOR_PENALTY", "1.0"))  # points per major type (default: 1.0)
-_MINOR_PENALTY = float(os.environ.get("QUODEQ_MINOR_PENALTY", "0.25"))  # points per minor type (default: 0.25)
+# Read at call time (not import time) so env changes take effect without restart.
+
+
+def _critical_penalty() -> float:
+    """Points deducted per critical violation type (default: 2.0)."""
+    return float(os.environ.get("QUODEQ_CRITICAL_PENALTY", "2.0"))
+
+
+def _major_penalty() -> float:
+    """Points deducted per major violation type (default: 1.0)."""
+    return float(os.environ.get("QUODEQ_MAJOR_PENALTY", "1.0"))
+
+
+def _minor_penalty() -> float:
+    """Points deducted per minor violation type (default: 0.25)."""
+    return float(os.environ.get("QUODEQ_MINOR_PENALTY", "0.25"))
+
 
 _CRITICAL_SCORE_CAP = 3
 _MAJOR_SCORE_CAP = 5
@@ -38,9 +52,9 @@ def build_deductions(
     - If the raw major count reaches 5*scale, the score is hard-capped at 5.
     - Both caps may apply simultaneously (take min).
     """
-    crit_pen = critical_penalty if critical_penalty is not None else _CRITICAL_PENALTY
-    maj_pen = major_penalty if major_penalty is not None else _MAJOR_PENALTY
-    min_pen = minor_penalty if minor_penalty is not None else _MINOR_PENALTY
+    crit_pen = critical_penalty if critical_penalty is not None else _critical_penalty()
+    maj_pen = major_penalty if major_penalty is not None else _major_penalty()
+    min_pen = minor_penalty if minor_penalty is not None else _minor_penalty()
 
     n_critical = violation_type_counts.get("critical", 0)
     n_major = violation_type_counts.get("major", 0)

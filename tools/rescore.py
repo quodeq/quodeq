@@ -3,22 +3,31 @@
 
 Usage:
     python3 tools/rescore.py [evaluations_dir] [project]
+    python3 tools/rescore.py --dry-run                      # preview changes
+    python3 tools/rescore.py --apply                        # write changes (default is dry-run)
 
 Defaults:
     evaluations_dir = evaluations/
     project         = quodeq
 """
+import argparse
 import json
 import sys
 from pathlib import Path
 
-# Allow running from repo root without installing the package
+# Allow running from repo root without installing the package.
+# This mirrors the same pattern used by tools/compile_standards.py.
+# When invoked via `uv run python tools/rescore.py` the venv handles
+# discovery automatically; the insert is only needed for bare `python3`
+# invocations outside the project venv.
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root / "src"))
 
 from quodeq.evaluate.lib.scoring import run_scoring
 from quodeq.evaluate.lib.report_json import write_report_json
 
+# Content hashes that identify prompt versions — used to select the correct
+# scoring mode for evidence produced by different prompt revisions.
 _SCORING_PROMPT_V1_HASH = "6fee1ee3"  # scoring prompt v1 (numerical deductions)
 _SCORING_PROMPT_V2_HASH = "33f4ef56"  # scoring prompt v2 (grade-ladder drops)
 
@@ -34,7 +43,38 @@ def detect_mode_from_evidence(evidence: dict) -> str:
     return SCORING_MODE_BY_HASH.get(h, DEFAULT_SCORING_MODE)
 
 
-def rescore_evidence_file(evidence_path: Path, evaluators_root: Path) -> bool:
+def _write_scores_and_report(
+    evidence_path: Path, dimension: str, scores: dict,
+    score: object, grade: object, tier: object,
+) -> bool:
+    """Write scores JSON and evaluation report to disk. Returns True on success."""
+    scores_path = evidence_path.with_name(f"{dimension}_scores.json")
+    try:
+        scores_path.write_text(json.dumps(scores, indent=2, sort_keys=True))
+    except OSError as exc:
+        print(f"  ERROR writing {scores_path}: {exc}")
+        return False
+
+    # evaluation/{dimension}.json lives one level up, in sibling "evaluation" dir
+    eval_dir = evidence_path.parent.parent / "evaluation"
+    eval_dir.mkdir(exist_ok=True)
+    output_path = eval_dir / f"{dimension}.json"
+
+    try:
+        write_report_json(
+            evidence_file=str(evidence_path),
+            output_file=str(output_path),
+            scores_file=str(scores_path),
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        print(f"  ERROR writing report {output_path}: {exc}")
+        return False
+
+    print(f"  OK    {dimension:<20}  score={score}  grade={grade}  tier={tier}")
+    return True
+
+
+def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run: bool = False) -> bool:
     try:
         evidence = json.loads(evidence_path.read_text())
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
@@ -56,35 +96,44 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path) -> bool:
     mode = detect_mode_from_evidence(evidence)
     scores = run_scoring(evidence, mode)
 
-    scores_path = evidence_path.with_name(f"{dimension}_scores.json")
-    try:
-        scores_path.write_text(json.dumps(scores, indent=2, sort_keys=True))
-    except OSError as exc:
-        print(f"  ERROR writing {scores_path}: {exc}")
-        return False
-
-    # evaluation/{dimension}.json lives one level up, in sibling "evaluation" dir
-    eval_dir = evidence_path.parent.parent / "evaluation"
-    eval_dir.mkdir(exist_ok=True)
-    output_path = eval_dir / f"{dimension}.json"
-
-    write_report_json(
-        evidence_file=str(evidence_path),
-        output_file=str(output_path),
-        scores_file=str(scores_path),
-    )
-
     overall = scores.get("overall", {})
     score = overall.get("score", "?")
     grade = overall.get("grade", "?")
     tier = scores.get("scale", {}).get("tier", "?")
-    print(f"  OK    {dimension:<20}  score={score}  grade={grade}  tier={tier}")
-    return True
+
+    if dry_run:
+        print(f"  DRY   {dimension:<20}  score={score}  grade={grade}  tier={tier}")
+        return True
+
+    return _write_scores_and_report(evidence_path, dimension, scores, score, grade, tier)
 
 
 def main():
-    evals_dir = Path(sys.argv[1]) if len(sys.argv) > 1 else repo_root / "evaluations"
-    project = sys.argv[2] if len(sys.argv) > 2 else "quodeq"
+    parser = argparse.ArgumentParser(
+        description="Re-apply deterministic scoring to all existing evidence files.",
+    )
+    parser.add_argument(
+        "evaluations_dir", nargs="?", default=None,
+        help="Evaluations root directory (default: evaluations/)",
+    )
+    parser.add_argument(
+        "project", nargs="?", default="quodeq",
+        help="Project name (default: quodeq)",
+    )
+    group = parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--dry-run", action="store_true", default=True,
+        help="Preview what would change without writing (default)",
+    )
+    group.add_argument(
+        "--apply", action="store_true", dest="apply_",
+        help="Write changes",
+    )
+    args = parser.parse_args()
+
+    dry_run = not args.apply_
+    evals_dir = Path(args.evaluations_dir) if args.evaluations_dir else repo_root / "evaluations"
+    project = args.project
     project_dir = evals_dir / project
 
     if not project_dir.exists():
@@ -94,17 +143,20 @@ def main():
     evaluators_root = repo_root / "evaluators"
     evidence_files = sorted(project_dir.glob("*/evidence/*_evidence.json"))
 
-    print(f"Found {len(evidence_files)} evidence files in {project_dir}\n")
+    mode_label = "DRY-RUN" if dry_run else "APPLY"
+    print(f"Found {len(evidence_files)} evidence files in {project_dir}  [{mode_label}]\n")
     ok = fail = 0
     for ef in evidence_files:
         run_id = ef.parents[1].name
         print(f"[{run_id}]")
-        if rescore_evidence_file(ef, evaluators_root):
+        if rescore_evidence_file(ef, evaluators_root, dry_run=dry_run):
             ok += 1
         else:
             fail += 1
 
     print(f"\nDone — {ok} rescored, {fail} skipped/failed")
+    if dry_run and ok:
+        print("Run with --apply to write changes.")
 
 
 if __name__ == "__main__":

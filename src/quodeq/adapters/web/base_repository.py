@@ -17,7 +17,10 @@ class WebRepository:
         response = self._client.get_json(f"{self._base_url}{path}", {})
         check_response_status(response)
         if not isinstance(response.data, dict):
-            raise InvalidDataError("Invalid data format: expected a JSON object with 'data' key")
+            raise InvalidDataError(
+                "Invalid data format: expected a JSON object with 'data' key. "
+                "Verify the API response structure or check the endpoint URL."
+            )
         return response.data
 
     def _get_list(self, path: str, key: str) -> list:

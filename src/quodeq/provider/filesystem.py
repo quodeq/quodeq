@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Callable
 
@@ -108,7 +109,7 @@ def _find_best_parent(p_path: str, project_id: str, candidates: list[dict[str, A
     return None
 
 
-_MAX_PROJECTS_LISTED = 200
+_MAX_PROJECTS_LISTED = int(os.environ.get("QUODEQ_MAX_PROJECTS_LISTED", "200"))
 
 
 def _auto_detect_parents(projects: list[dict[str, Any]]) -> None:
@@ -191,6 +192,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     """
 
     def __init__(self, job_manager: JobManager | None = None) -> None:
+        super().__init__()
         self._jobs = job_manager or JobManager()
         self._model_fetchers: dict[str, Callable] = {
             "claude": self._get_claude_models,

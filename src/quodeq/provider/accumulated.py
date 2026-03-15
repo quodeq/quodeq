@@ -4,6 +4,7 @@ from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
@@ -18,11 +19,15 @@ from quodeq.adapters.fs.report_parser import (
 from quodeq.provider._cache import make_lru_dimension_fetcher
 
 # Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
-# For multi-worker deployments, override the cache via compute_accumulated(cache=...)
-# or supply a shared backend (e.g. Redis OrderedDict wrapper) through the injectable params.
+# For multi-worker deployments, override the cache via compute_accumulated(cache_config=...)
+# or supply a shared backend (e.g. Redis OrderedDict wrapper) through AccumulatedCacheConfig.
 _ACC_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
-_ACC_DIM_CACHE_MAX = int(os.environ.get("QUODEQ_ACC_CACHE_MAX", "256"))
 _ACC_DIM_LOCK = threading.Lock()
+
+
+def _acc_dim_cache_max() -> int:
+    """Return the accumulated-view cache size limit (env-configurable)."""
+    return int(os.environ.get("QUODEQ_ACC_CACHE_MAX", "256"))
 
 
 def _make_acc_dimension_fetcher(
@@ -30,7 +35,7 @@ def _make_acc_dimension_fetcher(
 ) -> Callable[[str], list[dict[str, Any]]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
     return make_lru_dimension_fetcher(
-        reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _ACC_DIM_CACHE_MAX,
+        reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max(),
     )
 
 
@@ -141,19 +146,26 @@ def _compute_accumulated_scores(
     return avg_score, prev_avg_score
 
 
+@dataclass
+class AccumulatedCacheConfig:
+    """Optional cache parameters for compute_accumulated (overrides module-level cache)."""
+
+    cache: OrderedDict[tuple, list[dict[str, Any]]] = field(default_factory=OrderedDict)
+    cache_lock: threading.Lock = field(default_factory=threading.Lock)
+    cache_max: int | None = None
+
+
 def compute_accumulated(
     reports_dir: str,
     project: str,
     as_of: str | None,
     *,
-    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
-    cache_lock: threading.Lock | None = None,
-    cache_max: int | None = None,
+    cache_config: AccumulatedCacheConfig | None = None,
 ) -> dict[str, Any] | None:
     """Compute the accumulated (cross-run) view for *project*.
 
-    Optional *cache*, *cache_lock*, and *cache_max* override the module-level
-    LRU cache, making the function testable without global state mutation.
+    Optional *cache_config* overrides the module-level LRU cache, making
+    the function testable without global state mutation.
     """
     reports_root = Path(reports_dir)
     project_path = reports_root / project
@@ -168,9 +180,14 @@ def compute_accumulated(
     if not runs:
         return None
 
-    _cache = cache if cache is not None else _ACC_DIM_CACHE
-    _lock = cache_lock if cache_lock is not None else _ACC_DIM_LOCK
-    _max = cache_max if cache_max is not None else _ACC_DIM_CACHE_MAX
+    if cache_config is not None:
+        _cache = cache_config.cache
+        _lock = cache_config.cache_lock
+        _max = cache_config.cache_max if cache_config.cache_max is not None else _acc_dim_cache_max()
+    else:
+        _cache = _ACC_DIM_CACHE
+        _lock = _ACC_DIM_LOCK
+        _max = _acc_dim_cache_max()
     get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
     latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
         reports_root, project, all_run_infos, runs, get_run_data

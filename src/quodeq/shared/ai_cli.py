@@ -1,6 +1,7 @@
 """AI CLI subprocess runner for executing prompts via the configured AI command."""
 from __future__ import annotations
 
+import os
 import re
 import subprocess
 
@@ -11,7 +12,9 @@ _SENSITIVE_PATTERNS = re.compile(
     re.IGNORECASE,
 )
 
-_AI_CLI_TIMEOUT_S = 300
+def _ai_cli_timeout() -> int:
+    """Return the AI CLI timeout in seconds (reads env at call time)."""
+    return int(os.environ.get("QUODEQ_AI_CLI_TIMEOUT", "300"))
 
 
 def run_ai_cli(prompt: str) -> tuple[str | None, str | None]:
@@ -23,13 +26,13 @@ def run_ai_cli(prompt: str) -> tuple[str | None, str | None]:
             check=True,
             capture_output=True,
             text=True,
-            timeout=_AI_CLI_TIMEOUT_S,
+            timeout=_ai_cli_timeout(),
         )
     except FileNotFoundError:
         return None, f"AI command not found: {cmd}"
     except subprocess.CalledProcessError as exc:
         raw = exc.stderr.strip() if exc.stderr else ""
-        return None, _SENSITIVE_PATTERNS.sub(r"\1=***", raw) or "AI command failed"
+        return None, _SENSITIVE_PATTERNS.sub(r"\1=***", raw) or "AI command failed — check that the AI binary is installed, API key is set, and network is available"
     except subprocess.TimeoutExpired:
         return None, "AI command timed out"
 

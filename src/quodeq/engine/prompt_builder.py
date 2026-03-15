@@ -12,6 +12,9 @@ from quodeq.config.prompt_templates import render_template
 
 _logger = logging.getLogger(__name__)
 
+_NO_GUIDANCE = "_No additional guidance._"
+_NO_STANDARDS = "_No compiled standards available._"
+
 
 def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
     """Render compiled standards as a requirements checklist organized by principle."""
@@ -113,7 +116,7 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
     dimensions_text = render_dimensions(context.dimensions_data, context.dimension)
     prompt_hash = _template_hash(template)
 
-    standards_checklist = "_No compiled standards available._"
+    standards_checklist = _NO_STANDARDS
     if context.standards_dir:
         compiled_dir = context.standards_dir / "compiled"
         if compiled_dir.exists():
@@ -128,7 +131,7 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
             "DIMENSION": context.dimension,
             "SOURCE_FILE_COUNT": str(context.source_file_count),
             "STANDARDS_CHECKLIST": standards_checklist,
-            "ANALYSIS_GUIDANCE": context.analysis_md or "_No additional guidance._",
+            "ANALYSIS_GUIDANCE": context.analysis_md or _NO_GUIDANCE,
             "DIMENSIONS": dimensions_text,
             "PROMPT_HASH": prompt_hash,
         },

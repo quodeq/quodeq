@@ -10,10 +10,11 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from typing import Any
+from typing import Any, Callable
 
 from quodeq.adapters.fs.report_parser import safe_read_dir
-from quodeq.shared.utils import ANTHROPIC_API_URL, ANTHROPIC_API_VERSION, get_anthropic_api_key
+from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
+from quodeq.shared.utils import get_anthropic_api_key
 
 _CLI_MODEL_TIMEOUT_S = 8
 _CLI_OUTPUT_IGNORE_PREFIXES = {"#", "=", "-", "[", "("}
@@ -36,10 +37,10 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
     """Fetch model list from the Anthropic API. Returns None on failure."""
     try:
         req = urllib.request.Request(
-            ANTHROPIC_API_URL,
+            get_anthropic_api_url(),
             headers={
                 "x-api-key": api_key,
-                "anthropic-version": ANTHROPIC_API_VERSION,
+                "anthropic-version": get_anthropic_api_version(),
             },
         )
         with urllib.request.urlopen(req, timeout=_ANTHROPIC_API_TIMEOUT_S) as resp:
@@ -53,7 +54,7 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
 _DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "copilot"})
 
 
-def _get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
+def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
     """Return the set of allowed AI client IDs (lazy, reads env on each call).
 
     *env* overrides ``os.environ`` when provided, making the function
@@ -68,16 +69,19 @@ def _get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]
 class FsToolingMixin:
     """Mixin for browse_repo and AI client discovery methods."""
 
+    def __init__(self) -> None:
+        self._model_fetchers: dict[str, Callable] = {}
+
     def browse_repo(self, path: str | None) -> dict[str, Any]:
         """List directories at the given path for repository browsing."""
         target = Path(path) if path else Path.home()
         target = target.resolve()
         if not target.is_relative_to(Path.home()):
-            return {"error": "Path outside allowed boundary"}
+            return {"error": "Path outside allowed boundary", "error_code": "PATH_OUTSIDE_BOUNDARY"}
         if not target.exists():
-            return {"error": "Path not found", "path": str(target)}
+            return {"error": "Path not found", "error_code": "PATH_NOT_FOUND", "path": str(target)}
         if not target.is_dir():
-            return {"error": "Path is not a directory", "path": str(target)}
+            return {"error": "Path is not a directory", "error_code": "PATH_NOT_DIRECTORY", "path": str(target)}
 
         directories = []
         for entry in safe_read_dir(target):
@@ -130,7 +134,7 @@ class FsToolingMixin:
         return {"clients": [c for c in candidates if shutil.which(c["id"])]}
 
     def _get_cli_models(self, client_id: str) -> dict[str, list[str]]:
-        if client_id not in _get_allowed_client_ids():
+        if client_id not in get_allowed_client_ids():
             return {"models": []}
         if not shutil.which(client_id):
             return {"models": []}

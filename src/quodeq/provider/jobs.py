@@ -13,9 +13,12 @@ import threading
 import uuid
 from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 
+import logging
 import subprocess
 
 from quodeq.engine.runner import CC_MARKER_KEY
+
+_logger = logging.getLogger(__name__)
 
 MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
@@ -89,11 +92,17 @@ class JobStore(Protocol):
 class InMemoryJobStore:
     """Process-local job store backed by a plain dict.
 
+    .. warning::
+
+       All job state lives in process memory and is lost on restart.
+       This store cannot be shared across workers or processes.
+
     For multi-worker deployments, implement the ``JobStore`` protocol
     with a persistent backend (e.g. database, Redis) and pass it to
     ``JobManager`` via the ``job_store`` parameter, or override
     ``create_job_store``.
     """
+    # TODO: Ship a persistent adapter (SQLite/Redis) for multi-worker deployments
 
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
@@ -160,12 +169,15 @@ class JobManager:
                 env=env,
             )
         except (OSError, subprocess.SubprocessError) as exc:
+            _logger.error("Failed to start job subprocess: %s", exc)
             job.status = "failed"
             job.ended_at = datetime.now(timezone.utc).isoformat()
             job.exit_code = -1
             with self._lock:
                 self._store.put(job)
-            return job.to_dict()
+            result = job.to_dict()
+            result["error"] = str(exc)
+            return result
 
         with self._lock:
             self._store.put(job)

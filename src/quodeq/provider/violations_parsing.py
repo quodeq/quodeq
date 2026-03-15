@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
-from quodeq.engine.analysis_stream import extract_files_from_event
+from quodeq.engine.analysis_stream import count_files_in_stream, extract_files_from_event
 from quodeq.engine.evidence_parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 
@@ -89,21 +89,11 @@ def _parse_jsonl_findings(
 
 
 def _count_files_in_stream(stream_path: Path) -> int:
-    """Count unique file paths read by the AI in a stream file."""
-    files: set[str] = set()
-    try:
-        with open(stream_path) as _sf:
-            for raw_line in _sf:
-                stripped = raw_line.strip()
-                if not stripped:
-                    continue
-                try:
-                    files.update(_extract_files_from_stream_event(json.loads(stripped)))
-                except json.JSONDecodeError:
-                    continue
-    except OSError as exc:
-        _logger.warning("Failed to read stream file %s: %s", stream_path, exc)
-    return len(files)
+    """Count unique file paths read by the AI in a stream file.
+
+    Delegates to :func:`quodeq.engine.analysis_stream.count_files_in_stream`.
+    """
+    return len(count_files_in_stream(stream_path))
 
 
 def parse_violations_from_jsonl(
@@ -192,11 +182,6 @@ def _parse_entries_from_texts(
     return violations, compliance
 
 
-def _extract_files_from_stream_event(event: dict) -> set[str]:
-    """Extract file paths from Read/Grep tool_use blocks in a stream event."""
-    return extract_files_from_event(event)
-
-
 def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a live-stream event log file."""
     violations: list[dict[str, Any]] = []
@@ -218,7 +203,7 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
                 new_v, new_c = _parse_entries_from_texts(texts, ctx.dimension, seen)
                 violations.extend(new_v)
                 compliance.extend(new_c)
-                files_read.update(_extract_files_from_stream_event(event))
+                files_read.update(extract_files_from_event(event))
     except OSError as exc:
         _logger.warning("Failed to read stream file: %s", exc)
         return None

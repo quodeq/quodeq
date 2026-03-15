@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from typing import Any
 
 from quodeq.engine.plugin_loader import scan_plugin_dirs
+
+_logger = logging.getLogger(__name__)
 
 _PLUGIN_CACHE_TTL = 60  # seconds; allows runtime plugin changes to propagate
 
@@ -50,7 +53,7 @@ def discover_plugins() -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for child in scan_plugin_dirs(evaluators_root):
         try:
-            plugin_data = json.loads((child / "plugin.json").read_text())
+            plugin_data = json.loads((child / "plugin.json").read_text(encoding="utf-8"))
             dims_file = child / "dimensions.json"
             dims_data = json.loads(dims_file.read_text()) if dims_file.exists() else {"applies": []}
             result.append({
@@ -62,7 +65,8 @@ def discover_plugins() -> list[dict[str, Any]]:
                     for d in dims_data.get("applies", [])
                 ],
             })
-        except (KeyError, ValueError, OSError, json.JSONDecodeError, UnicodeDecodeError):
+        except (KeyError, ValueError, OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+            _logger.warning("Skipping plugin %s: %s", child.name, exc)
             continue
     _plugin_cache.set(result)
     return result

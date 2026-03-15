@@ -83,9 +83,15 @@ def run_generate_dimensions(paths: ConfigPaths) -> None:
     })
     stdout, err = run_ai_cli(prompt)
     if err:
-        raise RuntimeError(err)
+        raise RuntimeError(
+            f"AI generation failed: {err}. Check your API key, network connection, "
+            f"and AI provider configuration."
+        )
     output_path = paths.dimensions_dir / "generated.json"
-    output_path.write_text(stdout)
+    try:
+        output_path.write_text(stdout)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to write dimensions output to {output_path}: {exc}") from exc
 
 
 def add_discipline(name: str, language: str, category: str, paths: ConfigPaths) -> None:
@@ -95,7 +101,10 @@ def add_discipline(name: str, language: str, category: str, paths: ConfigPaths) 
     registry.parent.mkdir(parents=True, exist_ok=True)
     content = registry.read_text() if registry.exists() else ""
     entry = f"[{name}]\nlanguage={language}\ncategory={category}\n"
-    registry.write_text(content + entry)
+    try:
+        registry.write_text(content + entry)
+    except OSError as exc:
+        raise RuntimeError(f"Failed to write discipline config to {registry}: {exc}") from exc
 
 
 def run_refresh_practices(

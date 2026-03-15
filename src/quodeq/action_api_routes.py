@@ -12,7 +12,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 from quodeq.action_api_helpers import _error
 from quodeq.action_api_zip import export_project_zip
 from quodeq.provider.base import ActionProvider
-from quodeq.provider.tooling_mixin import _get_allowed_client_ids as _get_allowed_ai_cmds
+from quodeq.provider.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.shared.utils import get_evaluations_dir
 
 _CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")

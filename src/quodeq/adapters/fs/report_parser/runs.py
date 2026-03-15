@@ -8,18 +8,18 @@ should implement ``RunStorage`` and be injected at the call site.
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Protocol, runtime_checkable
 
+from quodeq.adapters.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
-from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_path_segment
+
+_GIT_SUFFIX = ".git"
 
 
 @dataclass(frozen=True)
@@ -50,50 +50,23 @@ class RunStorage(Protocol):
 
 
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
-    """List directory entries, returning an empty list on OS errors."""
+    """List directory entries, returning an empty list on OS errors.
+
+    Example::
+
+        entries = safe_read_dir(Path("/data/reports"))
+    """
     try:
         with os.scandir(path) as it:
             return list(it)
     except OSError as exc:
-        logging.getLogger(__name__).debug("Could not list directory %s: %s", path.name, exc)
+        logging.getLogger(__name__).debug(
+            "Could not list directory %s: %s. Check path exists and file permissions are correct",
+            path.name,
+            exc,
+        )
         return []
 
-
-def _normalize_date(raw: str) -> tuple[str, str] | None:
-    """Parse a date/datetime string and return (sortable_iso, human_label).
-
-    Accepts ISO datetime (2026-03-01T14:30:25), ISO date (2026-03-01),
-    or compact date (20260301).  The first element is the full string
-    (including time when available) so that same-day runs sort correctly.
-    """
-    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d", "%Y%m%d"):
-        try:
-            parsed = datetime.strptime(raw, fmt)
-            if parsed.tzinfo is not None:
-                parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
-            sortable = parsed.isoformat(timespec='seconds') if "T" in fmt else parsed.date().isoformat()
-            label = f"{parsed.year}-{parsed.month:02d}-{parsed.day:02d}"
-            return sortable, label
-        except ValueError:
-            continue
-    return None
-
-
-def _find_date_in_dir(directory: Path, suffix: str) -> tuple[str | None, str] | None:
-    """Scan JSON files in *directory* matching *suffix* for a parsable date field."""
-    for entry in safe_read_dir(directory):
-        if not entry.is_file() or not entry.name.endswith(suffix):
-            continue
-        try:
-            data = json.loads(Path(entry.path).read_text())
-            raw = data.get("date")
-            if raw:
-                result = _normalize_date(str(raw))
-                if result:
-                    return result
-        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
-            log_debug(f"Failed to read date from {entry.name}: {exc}")
-    return None
 
 
 def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str | None, str]:
@@ -101,24 +74,29 @@ def _parse_run_date(reports_root: Path, project: str, run_id: str) -> tuple[str 
     validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
 
-    result = _find_date_in_dir(run_dir / "evidence", "_evidence.json")
+    result = find_date_in_dir(run_dir / "evidence", "_evidence.json", safe_read_dir)
     if result:
         return result
 
-    result = _find_date_in_dir(run_dir / "evaluation", ".json")
+    result = find_date_in_dir(run_dir / "evaluation", ".json", safe_read_dir)
     if result:
         return result
 
-    fallback = _normalize_date(run_id)
+    fallback = normalize_date(run_id)
     if fallback:
         return fallback
     return None, run_id
 
 
 def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | None]:
-    """Build a repository metadata dict from a local path or remote URL."""
+    """Build a repository metadata dict from a local path or remote URL.
+
+    Example::
+
+        build_repository_info("https://github.com/org/repo.git", "python")
+    """
     if is_repo_url(repo):
-        name = repo.split("/")[-1].replace(".git", "")
+        name = repo.split("/")[-1].replace(_GIT_SUFFIX, "")
         return {
             "name": name,
             "discipline": discipline,
@@ -183,12 +161,23 @@ def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
     for entry in safe_read_dir(evidence_dir):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
             parsed_ev = parse_evidence_file(Path(entry.path))
-            evidence_map[parsed_ev["dimension"]] = parsed_ev
+            dimension = parsed_ev.get("dimension")
+            if dimension is None:
+                logging.getLogger(__name__).warning(
+                    "Evidence file %s missing 'dimension' key, skipping", entry.name,
+                )
+                continue
+            evidence_map[dimension] = parsed_ev
     return evidence_map
 
 
 def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
-    """Load all dimension evaluations and evidence for a single run."""
+    """Load all dimension evaluations and evidence for a single run.
+
+    Example::
+
+        dims = read_run_data(Path("/reports"), "my-project", "20260301")
+    """
     validate_path_segment(project, run_id)
     run_dir = reports_root / project / run_id
     evaluations = _load_evaluations(run_dir / "evaluation")
@@ -215,6 +204,10 @@ def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunIn
     """Return runs for a project, sorted newest-first by date.
 
     When *limit* > 0 only the most recent *limit* runs are returned.
+
+    Example::
+
+        runs = list_runs(Path("/reports"), "my-project", limit=5)
     """
     validate_path_segment(project)
     project_dir = reports_root / project

@@ -142,7 +142,10 @@ class DisciplineRegistry:
         try:
             lines = path.read_text().splitlines()
         except (OSError, UnicodeDecodeError) as exc:
-            raise ValueError(f"Cannot read disciplines config {path}: {exc}") from exc
+            raise ValueError(
+                f"Cannot read disciplines config {path}: {exc}. "
+                f"Check file permissions or run 'quodeq init' to create the configuration."
+            ) from exc
         for raw in lines:
             line = raw.strip()
             if not line or line.startswith("#"):

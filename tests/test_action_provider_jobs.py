@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-import time
+import threading
 
 from quodeq.provider.jobs import JobManager
 
@@ -14,6 +14,24 @@ class FakeProcess:
 
     def wait(self) -> int:
         return self._returncode
+
+
+def _wait_for_job(manager: JobManager, job_id: str, timeout: float = 5.0) -> dict:
+    """Block until a job leaves the 'running' state, using an event-based approach."""
+    done = threading.Event()
+
+    original_monitor = manager._monitor_process
+
+    def _patched_monitor(jid, process):
+        original_monitor(jid, process)
+        if jid == job_id:
+            done.set()
+
+    manager._monitor_process = _patched_monitor  # type: ignore[method-assign]
+    done.wait(timeout=timeout)
+    result = manager.get_job(job_id)
+    assert result is not None
+    return result
 
 
 def test_job_manager_tracks_status_and_logs() -> None:
@@ -29,12 +47,7 @@ def test_job_manager_tracks_status_and_logs() -> None:
 
     assert job["status"] in {"running", "done", "failed"}
 
-    for _ in range(50):
-        updated = manager.get_job(job["jobId"])
-        if updated and updated["status"] != "running":
-            job = updated
-            break
-        time.sleep(0.01)
+    job = _wait_for_job(manager, job["jobId"])
 
     assert job["status"] == "done"
     assert job["exitCode"] == 0
@@ -50,12 +63,7 @@ def test_job_manager_handles_failure() -> None:
     manager = JobManager(spawn_impl=spawn_impl)
     job = manager.start_job(["false"])
 
-    for _ in range(50):
-        updated = manager.get_job(job["jobId"])
-        if updated and updated["status"] != "running":
-            job = updated
-            break
-        time.sleep(0.01)
+    job = _wait_for_job(manager, job["jobId"])
 
     assert job["status"] == "failed"
     assert job["exitCode"] == 2

@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 DEFAULT_WEIGHT = "Medium (x2)"
 _HIGH_CONFIDENCE_THRESHOLD = 10  # minimum total instances for "high" confidence
 _MEDIUM_CONFIDENCE_THRESHOLD = 5  # minimum total instances for "medium" confidence
+_LOW_CONF_MAJORITY_DIVISOR = 2  # denominator for "low confidence majority" threshold
 
 
 @dataclass
@@ -89,7 +90,7 @@ class Evidence:
             "low_confidence_principles": low_conf,
             "unbalanced_principles": unbalanced,
             "overall_confidence": (
-                "low" if len(low_conf) > len(self.principles) / 2
+                "low" if len(low_conf) > len(self.principles) / _LOW_CONF_MAJORITY_DIVISOR
                 else "medium" if low_conf
                 else "high"
             ),

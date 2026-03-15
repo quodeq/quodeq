@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -51,6 +52,29 @@ class ConfigPaths:
     def from_data_dir(cls, data_dir: Path) -> "ConfigPaths":
         """Construct a ConfigPaths from the bundled package data directory."""
         return cls.from_root(data_dir)
+
+
+def load_env_file(paths: ConfigPaths) -> None:
+    """Source all ``export VAR=value`` lines from ``.quodeq.env`` into ``os.environ``.
+
+    Already-set environment variables are NOT overwritten, so explicit env
+    takes precedence over the file.
+    """
+    if not paths.env_file.exists():
+        return
+    for line in paths.env_file.read_text().splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        if line.startswith("export "):
+            line = line[len("export "):]
+        if "=" not in line:
+            continue
+        key, _, value = line.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if key and key not in os.environ:
+            os.environ[key] = os.path.expanduser(value)
 
 
 def _looks_like_project_root(root: Path) -> bool:

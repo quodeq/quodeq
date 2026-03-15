@@ -13,6 +13,25 @@ class _ServerArgs:
     agent_id: str = ""
 
 
+_FLAG_MAP = {
+    "--compiled-dir": "compiled_dir",
+    "--dimension": "dimension",
+    "--queue": "queue_path",
+    "--agent-id": "agent_id",
+}
+
+_USAGE = """\
+Usage: mcp_findings.py <findings_file> [OPTIONS]
+
+Options:
+  --compiled-dir DIR   Directory containing compiled standards
+  --dimension DIM      Dimension to evaluate
+  --queue PATH         Path to the file queue JSON
+  --agent-id ID        Agent identifier
+  -h, --help           Show this help message and exit
+"""
+
+
 def _parse_args(argv: list[str] | None = None) -> _ServerArgs:
     """Parse CLI arguments for the MCP findings server.
 
@@ -23,12 +42,11 @@ def _parse_args(argv: list[str] | None = None) -> _ServerArgs:
 
     result = _ServerArgs()
     args = argv if argv is not None else sys.argv[1:]
-    _FLAG_MAP = {
-        "--compiled-dir": "compiled_dir",
-        "--dimension": "dimension",
-        "--queue": "queue_path",
-        "--agent-id": "agent_id",
-    }
+
+    if "--help" in args or "-h" in args:
+        sys.stdout.write(_USAGE)
+        sys.exit(0)
+
     i = 0
     while i < len(args):
         if args[i] in _FLAG_MAP and i + 1 < len(args):

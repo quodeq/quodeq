@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
 
@@ -10,16 +9,19 @@ from quodeq.engine.schema_validator import validate_plugin_dir
 
 from quodeq.config.paths import default_paths
 
-PLUGIN_DIR = default_paths().evaluators_dir / "bash"
+
+@pytest.fixture()
+def plugin_dir():
+    return default_paths().evaluators_dir / "bash"
 
 
-def test_plugin_loads():
-    data = load_plugin(PLUGIN_DIR)
+def test_plugin_loads(plugin_dir):
+    data = load_plugin(plugin_dir)
     assert data["id"] == "bash"
 
 
-def test_plugin_passes_validation():
-    errors = validate_plugin_dir(PLUGIN_DIR)
+def test_plugin_passes_validation(plugin_dir):
+    errors = validate_plugin_dir(plugin_dir)
     assert errors == {}, f"Validation errors: {errors}"
 
 

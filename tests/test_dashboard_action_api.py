@@ -1,6 +1,7 @@
 from pathlib import Path
 
-from quodeq.dashboard import _build, runner
+from quodeq.dashboard import _api_health, _build, runner
+from quodeq.dashboard._api_health import ApiConfig
 
 
 class _DummyProcess:
@@ -11,28 +12,29 @@ class _DummyProcess:
         return None
 
 
-def test_spawn_action_api_sets_env(monkeypatch):
+def test_spawn_action_api_sets_env(monkeypatch, tmp_path):
     captured = {}
 
     def fake_popen(cmd, env=None, **kwargs):
         captured["env"] = env
         return _DummyProcess()
 
-    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
-    runner._spawn_action_api(8001)
+    monkeypatch.setattr(_api_health.subprocess, "Popen", fake_popen)
+    _api_health.spawn_action_api(8001, tmp_path / "fake.pid", "127.0.0.1")
     assert captured["env"]["QUODEQ_ACTION_API_PORT"] == "8001"
 
 
-def test_spawn_action_api_sets_static_dist(monkeypatch):
+def test_spawn_action_api_sets_static_dist(monkeypatch, tmp_path):
     captured = {}
 
     def fake_popen(cmd, env=None, **kwargs):
         captured["env"] = env
         return _DummyProcess()
 
-    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
-    runner._spawn_action_api(8001, static_dist=Path("/tmp/dist"))
-    assert captured["env"]["QUODEQ_STATIC_DIST"] == "/tmp/dist"
+    dist_path = tmp_path / "dist"
+    monkeypatch.setattr(_api_health.subprocess, "Popen", fake_popen)
+    _api_health.spawn_action_api(8001, tmp_path / "fake.pid", "127.0.0.1", ApiConfig(static_dist=dist_path))
+    assert captured["env"]["QUODEQ_STATIC_DIST"] == str(dist_path)
 
 
 def test_force_action_api_host_port(monkeypatch):

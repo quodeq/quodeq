@@ -19,7 +19,11 @@ from urllib.parse import urlparse
 from quodeq.ports.data_errors import AuthError, NotFoundError, ServerError
 
 _logger = logging.getLogger(__name__)
-_ALLOW_PRIVATE_URLS = os.environ.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
+
+
+def _allow_private_urls() -> bool:
+    """Return True if private/internal URL requests are allowed (reads env at call time)."""
+    return os.environ.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
 
 
 def _is_private_address(hostname: str) -> bool:
@@ -42,12 +46,34 @@ def _is_private_address(hostname: str) -> bool:
         pass
     return False
 
-_HTTP_TIMEOUT_S = int(os.environ.get("QUODEQ_HTTP_TIMEOUT", "10"))  # seconds, must be > 0
-_MAX_RETRIES = int(os.environ.get("QUODEQ_HTTP_MAX_RETRIES", "3"))  # must be >= 1
-_RETRY_BASE_DELAY_S = float(os.environ.get("QUODEQ_HTTP_RETRY_DELAY", "0.5"))  # seconds, must be >= 0
-_RETRY_JITTER_S = float(os.environ.get("QUODEQ_HTTP_RETRY_JITTER", "0.3"))  # seconds, must be >= 0
-_CIRCUIT_BREAKER_THRESHOLD = int(os.environ.get("QUODEQ_CB_THRESHOLD", "5"))  # failures before opening circuit, must be >= 1
-_CIRCUIT_BREAKER_RESET_S = int(os.environ.get("QUODEQ_CB_RESET", "60"))  # seconds before resetting circuit, must be > 0
+def _http_timeout_s() -> int:
+    """Return HTTP timeout in seconds (reads env at call time). Must be > 0."""
+    return int(os.environ.get("QUODEQ_HTTP_TIMEOUT", "10"))
+
+
+def _max_retries() -> int:
+    """Return max HTTP retries (reads env at call time). Must be >= 1."""
+    return int(os.environ.get("QUODEQ_HTTP_MAX_RETRIES", "3"))
+
+
+def _retry_base_delay_s() -> float:
+    """Return retry base delay in seconds (reads env at call time). Must be >= 0."""
+    return float(os.environ.get("QUODEQ_HTTP_RETRY_DELAY", "0.5"))
+
+
+def _retry_jitter_s() -> float:
+    """Return retry jitter in seconds (reads env at call time). Must be >= 0."""
+    return float(os.environ.get("QUODEQ_HTTP_RETRY_JITTER", "0.3"))
+
+
+def _circuit_breaker_threshold() -> int:
+    """Return circuit breaker failure threshold (reads env at call time). Must be >= 1."""
+    return int(os.environ.get("QUODEQ_CB_THRESHOLD", "5"))
+
+
+def _circuit_breaker_reset_s() -> int:
+    """Return circuit breaker reset seconds (reads env at call time). Must be > 0."""
+    return int(os.environ.get("QUODEQ_CB_RESET", "60"))
 
 
 @dataclass(frozen=True)
@@ -56,6 +82,18 @@ class HttpResponse:
 
     status: int
     data: dict
+
+
+@dataclass(frozen=True)
+class HttpClientConfig:
+    """Configuration parameters for HttpClient (grouping the six keyword-only settings)."""
+
+    timeout: int | None = None
+    max_retries: int | None = None
+    retry_base_delay: float | None = None
+    retry_jitter: float | None = None
+    cb_threshold: int | None = None
+    cb_reset: int | None = None
 
 
 def check_response_status(response: HttpResponse) -> None:
@@ -80,22 +118,14 @@ class HttpClient:
     that trips after repeated network failures.
     """
 
-    def __init__(
-        self,
-        *,
-        timeout: int | None = None,
-        max_retries: int | None = None,
-        retry_base_delay: float | None = None,
-        retry_jitter: float | None = None,
-        cb_threshold: int | None = None,
-        cb_reset: int | None = None,
-    ) -> None:
-        self._timeout = timeout if timeout is not None else _HTTP_TIMEOUT_S
-        self._max_retries = max_retries if max_retries is not None else _MAX_RETRIES
-        self._retry_base_delay = retry_base_delay if retry_base_delay is not None else _RETRY_BASE_DELAY_S
-        self._retry_jitter = retry_jitter if retry_jitter is not None else _RETRY_JITTER_S
-        self._cb_threshold = cb_threshold if cb_threshold is not None else _CIRCUIT_BREAKER_THRESHOLD
-        self._cb_reset = cb_reset if cb_reset is not None else _CIRCUIT_BREAKER_RESET_S
+    def __init__(self, config: HttpClientConfig | None = None) -> None:
+        cfg = config or HttpClientConfig()
+        self._timeout = cfg.timeout if cfg.timeout is not None else _http_timeout_s()
+        self._max_retries = cfg.max_retries if cfg.max_retries is not None else _max_retries()
+        self._retry_base_delay = cfg.retry_base_delay if cfg.retry_base_delay is not None else _retry_base_delay_s()
+        self._retry_jitter = cfg.retry_jitter if cfg.retry_jitter is not None else _retry_jitter_s()
+        self._cb_threshold = cfg.cb_threshold if cfg.cb_threshold is not None else _circuit_breaker_threshold()
+        self._cb_reset = cfg.cb_reset if cfg.cb_reset is not None else _circuit_breaker_reset_s()
         self._lock = threading.Lock()
         self._failure_count = 0
         self._circuit_opened_at: float | None = None
@@ -131,7 +161,7 @@ class HttpClient:
             _logger.warning("Cleartext HTTP request to %s — consider using https://", parsed.hostname)
 
         hostname = parsed.hostname or ""
-        if _is_private_address(hostname) and not _ALLOW_PRIVATE_URLS:
+        if _is_private_address(hostname) and not _allow_private_urls():
             raise ValueError(
                 f"Requests to private/internal addresses are blocked: {hostname!r}. "
                 "Set QUODEQ_ALLOW_PRIVATE_URLS=1 to allow."

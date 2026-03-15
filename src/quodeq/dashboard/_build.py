@@ -2,11 +2,10 @@
 from __future__ import annotations
 
 import subprocess
-import sys
 from pathlib import Path
 
 from quodeq.shared.logging import log_info
-
+from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
 _MIN_NPM_MAJOR = 8
 
 
@@ -17,7 +16,7 @@ def _check_npm() -> None:
     When installed via pip or pipx with pre-built static assets, Node.js is not needed.
     """
     try:
-        use_shell = sys.platform == "win32"
+        use_shell = _IS_WIN32
         result = subprocess.run(
             ["npm", "--version"], capture_output=True, text=True, check=True, shell=use_shell,
         )
@@ -37,7 +36,7 @@ def _check_npm() -> None:
 def npm_build(path: Path) -> None:
     """Run npm install and build in the given directory."""
     _check_npm()
-    use_shell = sys.platform == "win32"
+    use_shell = _IS_WIN32
     subprocess.run(["npm", "install"], cwd=str(path), check=True, shell=use_shell)
     subprocess.run(["npm", "run", "build"], cwd=str(path), check=True, shell=use_shell)
 

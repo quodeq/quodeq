@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -69,10 +70,14 @@ def _get_config() -> Config:
     return _config_instance
 
 
-# Public accessors for defaults used as constants by other modules.
-ANTHROPIC_API_URL: str = _get_config()["anthropic_api_url"]
-ANTHROPIC_API_VERSION: str = _get_config()["anthropic_api_version"]
-DEFAULT_HOST: str = _get_config()["default_host"]
+IS_WIN32: bool = sys.platform == "win32"
+"""True when the current platform is Windows (win32)."""
+
+
+def __getattr__(name: str) -> str:
+    """Lazy accessor for config-derived constants (ANTHROPIC_API_URL, etc.)."""
+    from quodeq.shared.config_loader import __getattr__ as _cl_getattr
+    return _cl_getattr(name)
 
 
 def is_repo_url(repo_input: str) -> bool:

@@ -12,6 +12,7 @@ from quodeq.provider.violation_context import FindingSpec, build_finding_base, f
 
 _logger = logging.getLogger(__name__)
 _SUPPORTED_SCHEMA_VERSIONS = frozenset({None, 1})
+_FINDING_TYPE_VIOLATIONS = "violations"
 
 
 def empty_severity_buckets() -> dict[str, list]:
@@ -120,7 +121,7 @@ def _collect_findings(
             "title": item.get("title", ""),
             "reason": item.get("reason", ""),
         }
-        if finding_type == "violations":
+        if finding_type == _FINDING_TYPE_VIOLATIONS:
             entry["severity"] = item.get("severity", "minor")
         if item.get("cwe"):
             entry["cwe"] = item["cwe"]

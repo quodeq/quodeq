@@ -225,6 +225,14 @@ class EvaluationError(RuntimeError):
     """Raised when an evaluation completes but produces no usable findings."""
 
 
+def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) -> None:
+    """Emit scoring marker and log summary for a completed dimension."""
+    _emit_marker("scoring", dimension=dimension)
+    violations = sum(len(pe.violations) for pe in ev.principles.values())
+    compliances = sum(len(pe.compliance) for pe in ev.principles.values())
+    log_success(f"[{idx}/{total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")
+
+
 def _process_single_dimension(
     config: RunConfig, dimension: str, idx: int, ctx: _PluginContext,
 ) -> Evidence | None:
@@ -243,10 +251,7 @@ def _process_single_dimension(
         log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
         return None
 
-    _emit_marker("scoring", dimension=dimension)
-    violations = sum(len(pe.violations) for pe in ev.principles.values())
-    compliances = sum(len(pe.compliance) for pe in ev.principles.values())
-    log_success(f"[{idx}/{ctx.total}] {dimension} — {ev.files_read} files, {violations}v/{compliances}c")
+    _log_dimension_result(ev, dimension, idx, ctx.total)
     return ev
 
 

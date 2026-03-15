@@ -48,7 +48,12 @@ def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
 
 
 def _patch_entries(entries: list[dict], lookup: dict[tuple[str, str, int], int]) -> int:
-    """Add missing 'cwe' to each entry. Returns count of entries patched."""
+    """Add missing 'cwe' to each entry. Returns count of entries patched.
+
+    NOTE: migrate_reason_title.py has a similarly-named concept (migrate_entry)
+    but operates on a different field ('reason'/'title') with different logic.
+    Extracting a shared helper would over-abstract two unrelated migration passes.
+    """
     patched = 0
     for entry in entries:
         if "cwe" in entry:
