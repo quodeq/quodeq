@@ -8,9 +8,10 @@ from pathlib import Path
 import jsonschema
 
 _SCHEMAS_DIR = Path(__file__).parent / "schemas"
+_SCHEMA_CACHE_SIZE = 32
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=_SCHEMA_CACHE_SIZE)
 def _load_schema(name: str) -> dict:
     path = _SCHEMAS_DIR / name
     try:
@@ -19,7 +20,7 @@ def _load_schema(name: str) -> dict:
         raise ValueError(f"Cannot load schema {path}: {exc}") from exc
 
 
-@lru_cache(maxsize=32)
+@lru_cache(maxsize=_SCHEMA_CACHE_SIZE)
 def _get_validator(schema_file: str) -> jsonschema.Draft202012Validator:
     schema = _load_schema(schema_file)
     return jsonschema.Draft202012Validator(schema)

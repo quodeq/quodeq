@@ -201,6 +201,23 @@ def _parse_entries_from_texts(
     return violations, compliance
 
 
+def _parse_stream_line(
+    stripped: str, dimension: str, seen: set[str],
+    violations: list[dict[str, Any]], compliance: list[dict[str, Any]], files_read: set[str],
+) -> None:
+    """Parse one non-empty stream line, appending findings in-place."""
+    try:
+        event = json.loads(stripped)
+    except json.JSONDecodeError:
+        return
+    extractor = TEXT_EXTRACTORS.get(event.get("type"))
+    texts = extractor(event) if extractor else []
+    new_v, new_c = _parse_entries_from_texts(texts, dimension, seen)
+    violations.extend(new_v)
+    compliance.extend(new_c)
+    files_read.update(extract_files_from_event(event))
+
+
 def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a live-stream event log file."""
     violations: list[dict[str, Any]] = []
@@ -211,18 +228,8 @@ def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> di
         with open(stream_path, encoding=TEXT_ENCODING) as _stream:
             for raw_line in _stream:
                 stripped = raw_line.strip()
-                if not stripped:
-                    continue
-                try:
-                    event = json.loads(stripped)
-                except json.JSONDecodeError:
-                    continue
-                extractor = TEXT_EXTRACTORS.get(event.get("type"))
-                texts = extractor(event) if extractor else []
-                new_v, new_c = _parse_entries_from_texts(texts, ctx.dimension, seen)
-                violations.extend(new_v)
-                compliance.extend(new_c)
-                files_read.update(extract_files_from_event(event))
+                if stripped:
+                    _parse_stream_line(stripped, ctx.dimension, seen, violations, compliance, files_read)
     except OSError as exc:
         _logger.warning("Failed to read stream file: %s", exc)
         return None

@@ -46,12 +46,15 @@ def detect_mode_from_evidence(evidence: dict) -> str:
     return SCORING_MODE_BY_HASH.get(h, DEFAULT_SCORING_MODE)
 
 
+def _extract_score_summary(scores: dict) -> tuple[str, str, str]:
+    """Return (score, grade, tier) from a scores dict, defaulting to '?'."""
+    overall = scores.get("overall", {})
+    return overall.get("score", "?"), overall.get("grade", "?"), scores.get("scale", {}).get("tier", "?")
+
+
 def _write_scores_and_report(evidence_path: Path, dimension: str, scores: dict) -> bool:
     """Write scores JSON and evaluation report to disk. Returns True on success."""
-    overall = scores.get("overall", {})
-    score = overall.get("score", "?")
-    grade = overall.get("grade", "?")
-    tier = scores.get("scale", {}).get("tier", "?")
+    score, grade, tier = _extract_score_summary(scores)
 
     scores_path = evidence_path.with_name(f"{dimension}_scores.json")
     try:
@@ -106,10 +109,7 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run
         return False
 
     if dry_run:
-        overall = scores.get("overall", {})
-        score = overall.get("score", "?")
-        grade = overall.get("grade", "?")
-        tier = scores.get("scale", {}).get("tier", "?")
+        score, grade, tier = _extract_score_summary(scores)
         print(f"  DRY   {dimension:<20}  score={score}  grade={grade}  tier={tier}")
         return True
 

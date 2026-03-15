@@ -17,7 +17,7 @@ from quodeq.engine.analysis_stream import (
 )
 from quodeq.engine._progress_reader import _IncrementalProgressReader
 from quodeq.shared.logging import log_debug, log_warning
-from quodeq.shared.utils import get_ai_cmd, get_ai_model
+from quodeq.shared.utils import get_ai_cmd, get_ai_model, sanitize_sensitive as _sanitize_stderr
 
 HeartbeatCallback = Callable[[int, dict], None]
 
@@ -221,9 +221,6 @@ def _build_analysis_env(ai_cmd: str | None = None) -> dict[str, str]:
     for key in provider_cfg.get("env_remove", []):
         env.pop(key, None)
     return env
-
-
-from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
 
 
 def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:

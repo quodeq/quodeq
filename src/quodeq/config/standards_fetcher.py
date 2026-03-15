@@ -71,8 +71,6 @@ def _verify_integrity(
         expected_hash = os.environ.get("QUODEQ_ASVS_SHA256")
     if skip_integrity is None:
         skip_integrity = False
-    # NOTE: QUODEQ_ASVS_SKIP_INTEGRITY env var is no longer honored.
-    # Use the skip_integrity parameter directly instead.
     if expected_hash and actual_hash != expected_hash:
         raise ValueError(
             f"ASVS integrity check failed: expected {expected_hash}, got {actual_hash}"

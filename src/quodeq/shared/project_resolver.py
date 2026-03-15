@@ -8,6 +8,7 @@ import tempfile
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
+from collections.abc import Callable
 from typing import Protocol
 
 _INDEX_FILE = "project_index.json"
@@ -97,8 +98,8 @@ def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
 def _find_existing_project(
     reports_dir: Path,
     identity: ProjectIdentity,
-    load_fn=_load_index,
-    save_fn=_save_index,
+    load_fn: Callable[[Path], dict[str, str]] = _load_index,
+    save_fn: Callable[[Path, dict[str, str]], None] = _save_index,
 ) -> str | None:
     """Look up project by (name, path) in the index; fall back to directory scan for
     projects created before the index existed, updating the index on success."""
@@ -139,8 +140,8 @@ def _find_existing_project(
 def _create_project(
     reports_dir: Path,
     identity: ProjectIdentity,
-    load_fn=_load_index,
-    save_fn=_save_index,
+    load_fn: Callable[[Path], dict[str, str]] = _load_index,
+    save_fn: Callable[[Path, dict[str, str]], None] = _save_index,
 ) -> str:
     """Create a new UUID project directory, write repository_info.json, and index it."""
     project_uuid = str(uuid.uuid4())

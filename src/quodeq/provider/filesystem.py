@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 from pathlib import Path
 from typing import Any, Callable
 
@@ -240,7 +241,6 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         """Remove a project directory and all its report data."""
-        import shutil
         reports_root = Path(reports_dir).resolve()
         project_path = (reports_root / project).resolve()
         if not project_path.is_relative_to(reports_root):

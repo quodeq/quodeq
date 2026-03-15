@@ -16,13 +16,14 @@ from quodeq.config.dimensions import render_dimension_table
 from quodeq.config.paths import default_paths
 
 _DEFAULT_MIN_STARS = 500
+_MAX_PARALLEL_WORKERS = 16
 
 
 def _parallel_range(value: str) -> int:
     """Validate that --parallel is an integer in the range 1–16."""
     v = int(value)
-    if not 1 <= v <= 16:
-        raise argparse.ArgumentTypeError(f"must be between 1 and 16, got {v}")
+    if not 1 <= v <= _MAX_PARALLEL_WORKERS:
+        raise argparse.ArgumentTypeError(f"must be between 1 and {_MAX_PARALLEL_WORKERS}, got {v}")
     return v
 
 
@@ -57,7 +58,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--fill-gap", nargs=2, metavar=("RUNTIME", "PRINCIPLE"),
                         help="Generate an evaluator to fill a coverage gap for the given principle")
     parser.add_argument("--parallel", type=_parallel_range,
-                        help="Number of parallel workers (default: %(default)s, range: 1-16)")
+                        help=f"Number of parallel workers (default: %(default)s, range: 1-{_MAX_PARALLEL_WORKERS})")
     parser.add_argument("--sequential", action="store_true",
                         help="Run generation tasks sequentially instead of in parallel")
     parser.add_argument("--data-version", default=None,

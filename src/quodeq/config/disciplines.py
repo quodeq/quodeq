@@ -5,7 +5,7 @@ from __future__ import annotations
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_warning
 
-_DEFAULT_CATEGORIES = "backend,frontend,mobile,infra"
+_DEFAULT_CATEGORIES = frozenset({"backend", "frontend", "mobile", "infra"})
 
 
 def get_valid_categories(categories: str | None = None) -> frozenset[str]:
@@ -14,8 +14,9 @@ def get_valid_categories(categories: str | None = None) -> frozenset[str]:
     *categories* must be provided by the caller; defaults to the built-in
     list when ``None``.
     """
-    raw = categories if categories is not None else _DEFAULT_CATEGORIES
-    return frozenset(raw.split(","))
+    if categories is not None:
+        return frozenset(categories.split(","))
+    return _DEFAULT_CATEGORIES
 
 
 def validate_new_discipline(

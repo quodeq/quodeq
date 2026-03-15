@@ -24,7 +24,8 @@ from _standards_refs import (
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root / "src"))
 
-_TEXT_ENCODING = "utf-8"
+from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
+
 STANDARDS_DIR = repo_root / "standards"
 OUTPUT_DIR = STANDARDS_DIR / "compiled"
 

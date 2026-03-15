@@ -28,6 +28,14 @@ class ProjectActions(Protocol):
         """Return project metadata including discipline and available dimensions."""
         ...
 
+    def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
+        """Update the local filesystem path for a project. Return True on success."""
+        ...
+
+    def delete_project(self, reports_dir: str, project: str) -> bool:
+        """Remove a project and all its report data. Return True on success."""
+        ...
+
 
 class ReportActions(Protocol):
     """Methods for reading evaluation reports and dashboards."""

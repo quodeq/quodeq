@@ -208,6 +208,34 @@ def _resolve_dashboard_cache(
     return DashboardCacheConfig()
 
 
+def _compute_dashboard_payload(
+    reports_root: Path, project: str,
+    runs: list[RunInfo], selected_run: RunInfo, selected_index: int,
+    selected_dimensions: list[dict[str, Any]], selected_summary: dict[str, Any],
+    cc: DashboardCacheConfig,
+) -> _DashboardPayload:
+    """Compute history-dependent parts of the dashboard response."""
+    selected_dim_names = {d.get("dimension") for d in selected_dimensions}
+    history_runs = runs[:max(_MAX_HISTORY_RUNS, selected_index + 1)]
+    get_run_dimensions = _make_run_dimension_fetcher(
+        reports_root, project, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
+    )
+    previous_by_dimension = _collect_previous_scores(
+        history_runs, selected_index, selected_dim_names, get_run_dimensions,
+    )
+    stale_dimensions, stale_previous_by_dimension = collect_stale_dimensions(
+        history_runs, selected_index, selected_dim_names, get_run_dimensions,
+    )
+    return _DashboardPayload(
+        selected_summary=selected_summary,
+        trend=_build_accumulated_trend(history_runs, get_run_dimensions),
+        dimensions_with_trend=_enrich_dimensions_with_trend(selected_dimensions, previous_by_dimension),
+        previous_by_dimension=previous_by_dimension,
+        stale_previous_by_dimension=stale_previous_by_dimension,
+        stale_dimensions=stale_dimensions,
+    )
+
+
 def build_dashboard(
     reports_dir: str,
     project: str,
@@ -231,25 +259,8 @@ def build_dashboard(
     selected_run, selected_index = _resolve_selected_run(runs, run)
     selected_dimensions = read_run_data(reports_root, project, selected_run.run_id)
     selected_summary = summarize_dimensions(selected_dimensions)
-    selected_dim_names = {d.get("dimension") for d in selected_dimensions}
-
-    history_runs = runs[:max(_MAX_HISTORY_RUNS, selected_index + 1)]
-    get_run_dimensions = _make_run_dimension_fetcher(
-        reports_root, project, cache=_cc.cache, lock=_cc.lock, max_size=_cc.max_size,
-    )
-    previous_by_dimension = _collect_previous_scores(history_runs, selected_index, selected_dim_names, get_run_dimensions)
-    stale_dimensions, stale_previous_by_dimension = (
-        collect_stale_dimensions(history_runs, selected_index, selected_dim_names, get_run_dimensions)
-    )
-    dimensions_with_trend = _enrich_dimensions_with_trend(selected_dimensions, previous_by_dimension)
-    trend = _build_accumulated_trend(history_runs, get_run_dimensions)
-
-    payload = _DashboardPayload(
-        selected_summary=selected_summary,
-        trend=trend,
-        dimensions_with_trend=dimensions_with_trend,
-        previous_by_dimension=previous_by_dimension,
-        stale_previous_by_dimension=stale_previous_by_dimension,
-        stale_dimensions=stale_dimensions,
+    payload = _compute_dashboard_payload(
+        reports_root, project, runs, selected_run, selected_index,
+        selected_dimensions, selected_summary, _cc,
     )
     return _build_dashboard_result(project, runs, selected_run, payload)

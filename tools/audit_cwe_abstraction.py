@@ -28,14 +28,15 @@ _API_TIMEOUT_S = 10
 _ALLOWED_USAGES = {"allowed", "allowed-with-review"}
 _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
 
-STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
+_DEFAULT_STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 _DEFAULT_API_BASE = "https://cwe-api.mitre.org/api/v1/cwe"
 
 
-def get_all_cwes() -> dict[int, list[str]]:
+def get_all_cwes(standards_dir: Path | None = None) -> dict[int, list[str]]:
     """Extract all CWE IDs from ISO 25010 files, mapped to their dimension(s)."""
+    base = standards_dir or _DEFAULT_STANDARDS_DIR
     cwe_dims: dict[int, list[str]] = {}
-    for filepath in sorted(STANDARDS_DIR.glob("*.json")):
+    for filepath in sorted(base.glob("*.json")):
         data = json.loads(filepath.read_text())
         dimension = data.get("id", filepath.stem)
         for sc in data.get("sub_characteristics", []):
@@ -183,6 +184,10 @@ def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--problems", action="store_true", help="Show only PROHIBITED/DISCOURAGED")
     parser.add_argument(
+        "--standards-dir", type=Path, default=_DEFAULT_STANDARDS_DIR,
+        help=f"ISO 25010 standards directory (default: {_DEFAULT_STANDARDS_DIR})",
+    )
+    parser.add_argument(
         "--api-base",
         default=_DEFAULT_API_BASE,
         help=f"CWE REST API base URL (default: {_DEFAULT_API_BASE})",
@@ -190,7 +195,7 @@ def main() -> None:
     args = parser.parse_args()
     api_base: str = args.api_base
 
-    cwe_dims = get_all_cwes()
+    cwe_dims = get_all_cwes(args.standards_dir)
     print(f"Total unique CWEs in ISO 25010 files: {len(cwe_dims)}\n")
 
     results: list[dict] = []
