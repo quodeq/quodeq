@@ -14,9 +14,9 @@ _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 @dataclass
 class StaleDimState:
     """Groups the three mutable tracking dicts used by collect_stale_dimensions."""
-    stale_dim_map: dict[str, dict[str, Any]] = field(default_factory=dict)
+    stale_dim_map: dict[str, DimensionData] = field(default_factory=dict)
     non_na_count: dict[str, int] = field(default_factory=dict)
-    stale_previous_by_dimension: dict[str, dict[str, Any]] = field(default_factory=dict)
+    stale_previous_by_dimension: dict[str, DimensionData] = field(default_factory=dict)
 
 
 def find_stale_from_run(
@@ -68,7 +68,7 @@ def track_stale_grade(entry: dict, state: StaleDimState) -> None:
 def collect_stale_dimensions(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
     get_run_dimensions: Callable[[str], list[DimensionData]],
-) -> tuple[list[DimensionData], dict[str, dict[str, Any]]]:
+) -> tuple[list[DimensionData], dict[str, DimensionData]]:
     """Find dimensions present in other runs but absent from the selected run."""
     state = StaleDimState()
 

@@ -49,7 +49,7 @@ def _make_acc_dimension_fetcher(
 def _read_all_run_data(
     reports_root: Path, project: str, all_run_infos: list[RunInfo], runs: list[str],
     get_run_data: Callable[[str], list[DimensionData]] | None = None,
-) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], list[DimensionData]]:
+) -> tuple[dict[str, DimensionData], dict[str, DimensionData], list[DimensionData]]:
     """Build accumulated data structures in a single sequential pass.
 
     Returns:
@@ -59,9 +59,9 @@ def _read_all_run_data(
         prev_run_latest: most recent dimension data from runs[1:] (for previous average).
     """
     run_lookup = {r.run_id: r for r in all_run_infos}
-    latest_by_dimension: dict[str, dict[str, Any]] = {}
-    prev_occurrence: dict[str, dict[str, Any]] = {}
-    prev_run_latest_map: dict[str, dict[str, Any]] = {}
+    latest_by_dimension: dict[str, DimensionData] = {}
+    prev_occurrence: dict[str, DimensionData] = {}
+    prev_run_latest_map: dict[str, DimensionData] = {}
     _fetch = get_run_data or (lambda rid: read_run_data(reports_root, project, rid))
 
     for run_idx_i, run_id in enumerate(runs):
@@ -91,7 +91,7 @@ def _read_all_run_data(
 
 def _compute_accumulated_trends(
     all_dimensions: list[DimensionData],
-    prev_occurrence: dict[str, dict[str, Any]],
+    prev_occurrence: dict[str, DimensionData],
 ) -> list[DimensionData]:
     """Compute trend data for each accumulated dimension using pre-built prev_occurrence."""
     result = []
@@ -188,7 +188,7 @@ class _AccumulatedResult:
 def _build_accumulated_response(
     project: str,
     result: _AccumulatedResult,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Assemble the final accumulated response dict."""
     return {
         "project": project,

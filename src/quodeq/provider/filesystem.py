@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.shared.types import ProjectEntry, ProjectListResponse, ProjectMetadata
+from quodeq.shared.types import ProjectEntry, ProjectListResponse, ProjectMetadata, ViolationSummary
 
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.jobs import JobManager
@@ -92,7 +92,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
     }
 
 
-def _find_best_parent(p_path: str, project_id: str, candidates: list[dict[str, Any]]) -> str | None:
+def _find_best_parent(p_path: str, project_id: str, candidates: list[ProjectEntry]) -> str | None:
     """Find the candidate whose path is the longest prefix of *p_path*.
 
     Candidates must be pre-sorted by descending path length so the first
@@ -117,7 +117,7 @@ def _max_projects_listed(override: int | None = None) -> int:
     return int(os.environ.get("QUODEQ_MAX_PROJECTS_LISTED", str(_DEFAULT_MAX_PROJECTS_LISTED)))
 
 
-def _auto_detect_parents(projects: list[dict[str, Any]]) -> None:
+def _auto_detect_parents(projects: list[ProjectEntry]) -> None:
     """Set parent for local projects that share a path prefix with another project."""
     local_with_path = [p for p in projects if p.get("location") == "local" and p.get("path")]
     # Sort descending by path length so _find_best_parent returns on first match.
@@ -294,7 +294,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return {"waiting": True, "project": project, "runId": run_id, "dimension": dimension}
         return None
 
-    def get_violations(self, reports_dir: str, project: str, run_id: str) -> dict[str, Any]:
+    def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         """Return aggregated violation counts and top files for a run."""
         dashboard = self.get_dashboard(reports_dir, project, run_id)
         return aggregate_violations(dashboard)

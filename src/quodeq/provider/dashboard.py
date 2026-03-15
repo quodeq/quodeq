@@ -63,9 +63,9 @@ def _run_dim_cache_max(override: int | None = None) -> int:
 def _collect_previous_scores(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
     get_run_dimensions: Callable[[str], list[DimensionData]],
-) -> dict[str, dict[str, Any]]:
+) -> dict[str, DimensionData]:
     """Find the most recent previous score for each dimension in the selected run."""
-    previous_by_dimension: dict[str, dict[str, Any]] = {}
+    previous_by_dimension: dict[str, DimensionData] = {}
     for older_idx in range(selected_index + 1, len(runs)):
         run_dimensions = get_run_dimensions(runs[older_idx].run_id)
         for dim in run_dimensions:
@@ -81,7 +81,7 @@ def _collect_previous_scores(
 
 
 def _enrich_dimensions_with_trend(
-    selected_dimensions: list[DimensionData], previous_by_dimension: dict[str, dict[str, Any]]
+    selected_dimensions: list[DimensionData], previous_by_dimension: dict[str, DimensionData]
 ) -> list[DimensionData]:
     """Attach trend and previous-run data to each selected dimension."""
     result = []
@@ -105,7 +105,7 @@ def _build_accumulated_trend(
 ) -> list[dict[str, object]]:
     """Build trend using accumulated scores across all runs (oldest to newest)."""
     trend: list[dict[str, object]] = []
-    acc_by_dim: dict[str, dict[str, Any]] = {}
+    acc_by_dim: dict[str, DimensionData] = {}
     for item in reversed(runs):  # oldest -> newest
         run_dims = get_run_dimensions(item.run_id)
         for dim in run_dims:
@@ -150,11 +150,11 @@ def _make_run_dimension_fetcher(
 @dataclass
 class _DashboardPayload:
     """Pre-computed parts for the dashboard response."""
-    selected_summary: dict[str, Any]
+    selected_summary: DimensionSummary
     trend: list[dict[str, object]]
     dimensions_with_trend: list[DimensionData]
-    previous_by_dimension: dict[str, dict[str, Any]]
-    stale_previous_by_dimension: dict[str, dict[str, Any]]
+    previous_by_dimension: dict[str, DimensionData]
+    stale_previous_by_dimension: dict[str, DimensionData]
     stale_dimensions: list[DimensionData]
 
 
@@ -163,7 +163,7 @@ def _build_dashboard_result(
     runs: list[RunInfo],
     selected_run: RunInfo,
     payload: _DashboardPayload,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Assemble the final dashboard response dict from pre-computed parts."""
     return {
         "project": project,
@@ -202,7 +202,7 @@ class _SelectedRunContext:
     run: RunInfo
     index: int
     dimensions: list[DimensionData]
-    summary: dict[str, Any]
+    summary: DimensionSummary
 
 
 def _compute_dashboard_payload(
@@ -237,7 +237,7 @@ def build_dashboard(
     run: str,
     *,
     cache_config: DashboardCacheConfig | None = None,
-) -> dict[str, Any]:
+) -> dict[str, object]:
     """Build a full dashboard response for *project* at *run*.
 
     Pass *cache_config* to override the module-level LRU cache.

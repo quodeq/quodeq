@@ -18,7 +18,7 @@ _logger = logging.getLogger(__name__)
 
 from quodeq.adapters.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
-from quodeq.shared.types import DimensionData
+from quodeq.shared.types import DimensionData, EvidenceFileMeta, PreviousRunMatch
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_path_segment
 
@@ -43,7 +43,7 @@ class RunStorage(Protocol):
     (S3, database) should implement this protocol.
     """
 
-    def read_run_data(self, project: str, run_id: str) -> list[dict[str, Any]]:
+    def read_run_data(self, project: str, run_id: str) -> list[DimensionData]:
         """Load all dimension evaluations and evidence for a single run."""
         ...
 
@@ -116,9 +116,9 @@ def build_repository_info(repo: str, discipline: str | None) -> dict[str, str | 
 
 def _load_markdown_backed_evals(
     entries: list[os.DirEntry[str]], evaluation_dir: Path,
-) -> tuple[list[dict[str, Any]], set[str]]:
+) -> tuple[list[DimensionData], set[str]]:
     """Load evaluations for dimensions that have a companion _eval.md file."""
-    evaluations: list[dict[str, Any]] = []
+    evaluations: list[DimensionData] = []
     seen: set[str] = set()
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith("_eval.md"):
@@ -134,9 +134,9 @@ def _load_markdown_backed_evals(
 
 def _load_json_only_evals(
     entries: list[os.DirEntry[str]], seen: set[str],
-) -> list[dict[str, Any]]:
+) -> list[DimensionData]:
     """Load evaluations from JSON files not already covered by markdown-backed pass."""
-    evaluations: list[dict[str, Any]] = []
+    evaluations: list[DimensionData] = []
     for entry in entries:
         if not entry.is_file() or not entry.name.endswith(".json"):
             continue
@@ -149,7 +149,7 @@ def _load_json_only_evals(
     return evaluations
 
 
-def _load_evaluations(evaluation_dir: Path) -> list[dict[str, Any]]:
+def _load_evaluations(evaluation_dir: Path) -> list[DimensionData]:
     """Load parsed evaluation dicts from a run's evaluation directory."""
     entries = safe_read_dir(evaluation_dir)
     evaluations, seen = _load_markdown_backed_evals(entries, evaluation_dir)
@@ -157,9 +157,9 @@ def _load_evaluations(evaluation_dir: Path) -> list[dict[str, Any]]:
     return evaluations
 
 
-def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
+def _load_evidence_map(evidence_dir: Path) -> dict[str, EvidenceFileMeta]:
     """Load evidence files keyed by dimension name."""
-    evidence_map: dict[str, dict[str, Any]] = {}
+    evidence_map: dict[str, EvidenceFileMeta] = {}
     for entry in safe_read_dir(evidence_dir):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
             parsed_ev = parse_evidence_file(Path(entry.path))
@@ -227,15 +227,15 @@ def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunIn
 
 def _make_caching_fetcher(
     reports_root: Path, project: str,
-    data_cache: dict[str, list[dict[str, Any]]] | None = None,
-) -> Callable[[str], list[dict[str, Any]]]:
+    data_cache: dict[str, list[DimensionData]] | None = None,
+) -> Callable[[str], list[DimensionData]]:
     """Return a fetcher that caches run data reads.
 
     *data_cache* is injectable for testing; defaults to a fresh dict.
     """
     cache = data_cache if data_cache is not None else {}
 
-    def _fetch(run_id: str) -> list[dict[str, Any]]:
+    def _fetch(run_id: str) -> list[DimensionData]:
         if run_id not in cache:
             cache[run_id] = read_run_data(reports_root, project, run_id)
         return cache[run_id]
@@ -248,7 +248,7 @@ class RunLookupCache:
     """Pre-computed data to avoid repeated I/O when looking up previous runs."""
 
     runs: list[RunInfo]
-    get_run_data: Callable[[str], list[dict[str, Any]]]
+    get_run_data: Callable[[str], list[DimensionData]]
 
 
 def _get_previous_run_for_dimension(
@@ -258,7 +258,7 @@ def _get_previous_run_for_dimension(
     dimension: str,
     *,
     cache: RunLookupCache | None = None,
-) -> dict[str, Any] | None:
+) -> PreviousRunMatch | None:
     """Return the most recent run data for *dimension* before *current_run_id*, or None.
 
     Callers processing multiple dimensions for the same project should pass

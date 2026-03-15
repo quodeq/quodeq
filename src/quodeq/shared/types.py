@@ -243,6 +243,27 @@ class DimensionData(TypedDict, total=False):
     discipline: str | None
 
 
+class PreviousRunMatch(TypedDict):
+    """Result of finding a dimension's data in a previous run."""
+    runId: str
+    dimension: DimensionData
+
+
+class PluginDimensionEntry(TypedDict, total=False):
+    """One dimension entry in a discovered plugin."""
+    id: str
+    weight: int | float
+    iso_25010: str | None
+
+
+class PluginInfo(TypedDict):
+    """Discovered plugin metadata."""
+    id: str
+    name: str
+    extensions: list[str]
+    dimensions: list[PluginDimensionEntry]
+
+
 class ViolationSummary(TypedDict, total=False):
     """Aggregated violation summary returned by ``aggregate_violations``."""
     total: int
