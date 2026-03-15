@@ -1,16 +1,4 @@
-"""Port interface for accessing evaluator definitions."""
+"""Re-export shim — canonical location is quodeq.data.ports.evaluators."""
+from quodeq.data.ports.evaluators import EvaluatorsRepository
 
-from __future__ import annotations
-
-from typing import Protocol
-
-
-class EvaluatorsRepository(Protocol):
-    """Repository for listing and retrieving evaluator configurations."""
-    def list_evaluators(self, discipline: str) -> list[str]:
-        """Return the dimension names available for *discipline*."""
-        ...
-
-    def get_evaluator(self, discipline: str, dimension: str) -> dict:
-        """Return the evaluator mapping document for *dimension* under *discipline*."""
-        ...
+__all__ = ["EvaluatorsRepository"]

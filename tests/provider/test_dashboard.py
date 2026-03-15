@@ -91,12 +91,12 @@ class TestBuildAccumulatedTrend:
 
 class TestBuildDashboard:
     def test_raises_when_no_runs(self, tmp_path):
-        with patch("quodeq.provider.dashboard.list_runs", return_value=[]):
+        with patch("quodeq.services.dashboard.list_runs", return_value=[]):
             with pytest.raises(FileNotFoundError, match="No runs found"):
                 build_dashboard(str(tmp_path), "proj", "latest")
 
     def test_raises_when_run_not_found(self, tmp_path):
-        with patch("quodeq.provider.dashboard.list_runs", return_value=[_make_run("r1")]):
+        with patch("quodeq.services.dashboard.list_runs", return_value=[_make_run("r1")]):
             with pytest.raises(FileNotFoundError, match="Run not found"):
                 build_dashboard(str(tmp_path), "proj", "nonexistent")
 
@@ -105,9 +105,9 @@ class TestBuildDashboard:
         dims = [_dim("security", "B", "7.0")]
         summary = DimensionSummary(dimensions_count=1, overall_grade="B", numeric_average=7.0)
         with (
-            patch("quodeq.provider.dashboard.list_runs", return_value=[run]),
-            patch("quodeq.provider.dashboard.read_run_data", return_value=dims),
-            patch("quodeq.provider.dashboard.summarize_dimensions", return_value=summary),
+            patch("quodeq.services.dashboard.list_runs", return_value=[run]),
+            patch("quodeq.services.dashboard.read_run_data", return_value=dims),
+            patch("quodeq.services.dashboard.summarize_dimensions", return_value=summary),
         ):
             result = build_dashboard(str(tmp_path), "proj", "latest")
         assert result["project"] == "proj"

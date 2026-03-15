@@ -1,33 +1,27 @@
-"""Report parser package — split into sub-modules by responsibility."""
-from quodeq.adapters.fs.report_parser.grades import (
+"""Re-export shim — canonical location is quodeq.data.fs.report_parser."""
+from quodeq.data.fs.report_parser import (
     NUMERIC_GRADE_ORDER,
     SEVERITIES,
     TEXT_GRADE_ORDER,
-    build_totals,
-    calculate_trend,
-    most_frequent_grade,
-    parse_numeric_score,
-    summarize_dimensions,
-)
-from quodeq.adapters.fs.report_parser.json_parser import (
-    empty_severity_buckets,
-    parse_eval_from_json,
-    parse_evidence_file,
-    parse_report_json,
-)
-from quodeq.adapters.fs.report_parser.markdown import (
-    clean_cell,
-    extract_exec_summary,
-    is_divider_row,
-    parse_eval_markdown,
-    split_table_row,
-)
-from quodeq.adapters.fs.report_parser.runs import (
     RunInfo,
     build_repository_info,
+    build_totals,
+    calculate_trend,
+    clean_cell,
+    empty_severity_buckets,
+    extract_exec_summary,
+    is_divider_row,
     list_runs,
+    most_frequent_grade,
+    parse_eval_from_json,
+    parse_eval_markdown,
+    parse_evidence_file,
+    parse_numeric_score,
+    parse_report_json,
     read_run_data,
     safe_read_dir,
+    split_table_row,
+    summarize_dimensions,
 )
 
 __all__ = [
