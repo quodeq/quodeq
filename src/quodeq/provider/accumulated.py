@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -16,12 +16,13 @@ from quodeq.adapters.fs.report_parser import (
     parse_numeric_score,
     read_run_data,
 )
+from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.provider._cache import make_lru_dimension_fetcher
 
 # Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
 # For multi-worker deployments, override the cache via compute_accumulated(cache_config=...)
 # or supply a shared backend (e.g. Redis OrderedDict wrapper) through AccumulatedCacheConfig.
-_ACC_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
+_ACC_DIM_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
 _ACC_DIM_LOCK = threading.Lock()
 
 
@@ -37,7 +38,7 @@ def _acc_dim_cache_max(override: int | None = None) -> int:
 
 def _make_acc_dimension_fetcher(
     reports_root: Path, project: str,
-) -> Callable[[str], list[dict[str, Any]]]:
+) -> Callable[[str], list[DimensionResult]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
     return make_lru_dimension_fetcher(
         reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max(),
@@ -46,8 +47,8 @@ def _make_acc_dimension_fetcher(
 
 def _read_all_run_data(
     reports_root: Path, project: str, all_run_infos: list[RunInfo], runs: list[str],
-    get_run_data: Callable[[str], list[dict[str, Any]]] | None = None,
-) -> tuple[dict[str, dict[str, Any]], dict[str, dict[str, Any]], list[dict[str, Any]]]:
+    get_run_data: Callable[[str], list[DimensionResult]] | None = None,
+) -> tuple[dict[str, DimensionResult], dict[str, DimensionResult], list[DimensionResult]]:
     """Build accumulated data structures in a single sequential pass.
 
     Returns:
@@ -57,9 +58,9 @@ def _read_all_run_data(
         prev_run_latest: most recent dimension data from runs[1:] (for previous average).
     """
     run_lookup = {r.run_id: r for r in all_run_infos}
-    latest_by_dimension: dict[str, dict[str, Any]] = {}
-    prev_occurrence: dict[str, dict[str, Any]] = {}
-    prev_run_latest_map: dict[str, dict[str, Any]] = {}
+    latest_by_dimension: dict[str, DimensionResult] = {}
+    prev_occurrence: dict[str, DimensionResult] = {}
+    prev_run_latest_map: dict[str, DimensionResult] = {}
     _fetch = get_run_data or (lambda rid: read_run_data(reports_root, project, rid))
 
     for run_idx_i, run_id in enumerate(runs):
@@ -68,18 +69,18 @@ def _read_all_run_data(
         is_first_run = (run_idx_i == 0)
 
         for dim in dims:
-            dim_name = dim.get("dimension")
+            dim_name = dim.dimension
             if not dim_name:
                 continue
             if dim_name not in latest_by_dimension:
-                latest_by_dimension[dim_name] = {
-                    **dim,
-                    "fromRunId": run_id,
-                    "fromDateISO": run_info.date_iso if run_info else None,
-                    "fromDateLabel": run_info.date_label if run_info else None,
-                }
+                latest_by_dimension[dim_name] = replace(
+                    dim,
+                    from_run_id=run_id,
+                    from_date_iso=run_info.date_iso if run_info else None,
+                    from_date_label=run_info.date_label if run_info else None,
+                )
             elif dim_name not in prev_occurrence:
-                prev_occurrence[dim_name] = {"runId": run_id, "dimension": dim}
+                prev_occurrence[dim_name] = replace(dim, run_id=run_id)
 
             if not is_first_run and dim_name not in prev_run_latest_map:
                 prev_run_latest_map[dim_name] = dim
@@ -88,30 +89,30 @@ def _read_all_run_data(
 
 
 def _compute_accumulated_trends(
-    all_dimensions: list[dict[str, Any]],
-    prev_occurrence: dict[str, dict[str, Any]],
-) -> list[dict[str, Any]]:
+    all_dimensions: list[DimensionResult],
+    prev_occurrence: dict[str, DimensionResult],
+) -> list[DimensionResult]:
     """Compute trend data for each accumulated dimension using pre-built prev_occurrence."""
-    result = []
+    result: list[DimensionResult] = []
     for dim in all_dimensions:
-        dim_name = dim.get("dimension")
+        dim_name = dim.dimension
         previous = prev_occurrence.get(dim_name) if dim_name else None
         trend = calculate_trend(
-            dim.get("overallScore"),
-            previous.get("dimension", {}).get("overallScore") if previous else None,
+            dim.overall_score,
+            previous.overall_score if previous else None,
         )
         result.append(
-            {
-                **dim,
-                "trend": trend,
-                "previousRunId": previous.get("runId") if previous else None,
-                "previousScore": previous.get("dimension", {}).get("overallScore") if previous else None,
-            }
+            replace(
+                dim,
+                trend=trend,
+                previous_run_id=previous.run_id if previous else None,
+                previous_score=previous.overall_score if previous else None,
+            )
         )
     return result
 
 
-def _aggregate_severity_counts(all_dimensions: list[dict[str, Any]]) -> dict[str, int]:
+def _aggregate_severity_counts(all_dimensions: list[DimensionResult]) -> dict[str, int]:
     """Sum violation/compliance counts and severity buckets across dimensions."""
     total_violations = 0
     total_compliance = 0
@@ -119,13 +120,13 @@ def _aggregate_severity_counts(all_dimensions: list[dict[str, Any]]) -> dict[str
     major = 0
     minor = 0
     for dim in all_dimensions:
-        totals = dim.get("totals", {})
-        severity = totals.get("severity", {}) if totals else {}
-        total_violations += totals.get("violationCount", 0) if totals else 0
-        total_compliance += totals.get("complianceCount", 0) if totals else 0
-        critical += severity.get("critical", 0)
-        major += severity.get("major", 0)
-        minor += severity.get("minor", 0)
+        totals = dim.totals
+        if totals:
+            total_violations += totals.violation_count
+            total_compliance += totals.compliance_count
+            critical += totals.severity.critical
+            major += totals.severity.major
+            minor += totals.severity.minor
     return {
         "totalViolations": total_violations,
         "totalCompliance": total_compliance,
@@ -135,15 +136,15 @@ def _aggregate_severity_counts(all_dimensions: list[dict[str, Any]]) -> dict[str
     }
 
 
-def numeric_average(dimensions: list[dict[str, Any]]) -> float | None:
-    """Compute the average numeric score from a list of dimension dicts."""
-    raw = [d.get("overallScore") for d in dimensions if d.get("overallScore")]
+def numeric_average(dimensions: list[DimensionResult]) -> float | None:
+    """Compute the average numeric score from a list of DimensionResult objects."""
+    raw = [d.overall_score for d in dimensions if d.overall_score]
     numeric = [s for s in (parse_numeric_score(v) for v in raw) if s is not None]
     return round(sum(numeric) / len(numeric), 1) if numeric else None
 
 
 def _compute_accumulated_scores(
-    all_dimensions: list[dict[str, Any]], prev_run_latest: list[dict[str, Any]],
+    all_dimensions: list[DimensionResult], prev_run_latest: list[DimensionResult],
 ) -> tuple[float | None, float | None]:
     """Compute current and previous overall average scores."""
     avg_score = numeric_average(all_dimensions)
@@ -155,7 +156,7 @@ def _compute_accumulated_scores(
 class AccumulatedCacheConfig:
     """Optional cache parameters for compute_accumulated (overrides module-level cache)."""
 
-    cache: OrderedDict[tuple, list[dict[str, Any]]] = field(default_factory=OrderedDict)
+    cache: OrderedDict[tuple, list[DimensionResult]] = field(default_factory=OrderedDict)
     cache_lock: threading.Lock = field(default_factory=threading.Lock)
     cache_max: int | None = None
 
@@ -176,8 +177,8 @@ def _resolve_cache(
 @dataclass(frozen=True)
 class _AccumulatedResult:
     """Pre-computed parts for the accumulated response."""
-    all_dimensions: list[dict[str, Any]]
-    dimensions_with_trend: list[dict[str, Any]]
+    all_dimensions: list[DimensionResult]
+    dimensions_with_trend: list[DimensionResult]
     severity: dict[str, int]
     avg_score: float | None
     prev_avg_score: float | None
@@ -190,10 +191,10 @@ def _build_accumulated_response(
     """Assemble the final accumulated response dict."""
     return {
         "project": project,
-        "dimensions": result.dimensions_with_trend,
+        "dimensions": [to_camel_dict(d) for d in result.dimensions_with_trend],
         "summary": {
             "overallGrade": most_frequent_grade(
-                [d.get("overallGrade") for d in result.all_dimensions if d.get("overallGrade")]
+                [d.overall_grade for d in result.all_dimensions if d.overall_grade]
             ),
             "numericAverage": result.avg_score,
             "previousNumericAverage": result.prev_avg_score,

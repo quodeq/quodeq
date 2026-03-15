@@ -4,9 +4,11 @@ from __future__ import annotations
 import os
 import threading
 from collections import OrderedDict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any, Callable
+
+from quodeq.core.types import DimensionResult, to_camel_dict
 
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
@@ -27,7 +29,7 @@ from quodeq.provider.accumulated import numeric_average
 @dataclass
 class DashboardCacheConfig:
     """Optional cache overrides for build_dashboard (mirrors AccumulatedCacheConfig)."""
-    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None
+    cache: OrderedDict[tuple, list[DimensionResult]] | None = None
     lock: threading.Lock | None = None
     max_size: int | None = None
 
@@ -44,7 +46,7 @@ _MAX_HISTORY_RUNS = 100
 # Module-level LRU cache shared across requests; evicts least-recently-used
 # entries once the limit is reached, capping memory while providing cross-
 # request caching for hot-path dimension reads (P-TIM-6).
-_RUN_DIM_CACHE: OrderedDict[tuple, list[dict[str, Any]]] = OrderedDict()
+_RUN_DIM_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
 _RUN_DIM_LOCK = threading.Lock()
 
 
@@ -60,60 +62,59 @@ def _run_dim_cache_max(override: int | None = None) -> int:
 
 def _collect_previous_scores(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
-) -> dict[str, dict[str, Any]]:
+    get_run_dimensions: Callable[[str], list[DimensionResult]],
+) -> dict[str, DimensionResult]:
     """Find the most recent previous score for each dimension in the selected run."""
-    previous_by_dimension: dict[str, dict[str, Any]] = {}
+    previous_by_dimension: dict[str, DimensionResult] = {}
     for older_idx in range(selected_index + 1, len(runs)):
         run_dimensions = get_run_dimensions(runs[older_idx].run_id)
         for dim in run_dimensions:
-            dim_name = dim.get("dimension")
+            dim_name = dim.dimension
             if not dim_name or dim_name not in selected_dim_names:
                 continue
-            grade = dim.get("overallGrade")
+            grade = dim.overall_grade
             if not grade or str(grade).upper() in _SKIP_GRADES:
                 continue
             if dim_name not in previous_by_dimension:
-                previous_by_dimension[dim_name] = {**dim, "runId": runs[older_idx].run_id}
+                previous_by_dimension[dim_name] = replace(dim, run_id=runs[older_idx].run_id)
     return previous_by_dimension
 
 
 def _enrich_dimensions_with_trend(
-    selected_dimensions: list[dict[str, Any]], previous_by_dimension: dict[str, dict[str, Any]]
-) -> list[dict[str, Any]]:
+    selected_dimensions: list[DimensionResult], previous_by_dimension: dict[str, DimensionResult]
+) -> list[DimensionResult]:
     """Attach trend and previous-run data to each selected dimension."""
-    result = []
+    result: list[DimensionResult] = []
     for dim in selected_dimensions:
-        previous = previous_by_dimension.get(dim.get("dimension"))
-        trend = calculate_trend(dim.get("overallScore"), previous.get("overallScore") if previous else None)
+        previous = previous_by_dimension.get(dim.dimension or "")
+        trend = calculate_trend(dim.overall_score, previous.overall_score if previous else None)
         result.append(
-            {
-                **dim,
-                "trend": trend,
-                "previousRunId": previous.get("runId") if previous else None,
-                "previousScore": previous.get("overallScore") if previous else None,
-            }
+            replace(
+                dim,
+                trend=trend,
+                previous_run_id=previous.run_id if previous else None,
+                previous_score=previous.overall_score if previous else None,
+            )
         )
     return result
 
 
 def _build_accumulated_trend(
     runs: list[RunInfo],
-    get_run_dimensions: Callable[[str], list[dict[str, Any]]],
+    get_run_dimensions: Callable[[str], list[DimensionResult]],
 ) -> list[dict[str, Any]]:
     """Build trend using accumulated scores across all runs (oldest to newest)."""
     trend: list[dict[str, Any]] = []
-    acc_by_dim: dict[str, dict[str, Any]] = {}
+    acc_by_dim: dict[str, DimensionResult] = {}
     for item in reversed(runs):  # oldest -> newest
         run_dims = get_run_dimensions(item.run_id)
         for dim in run_dims:
-            dim_name = dim.get("dimension")
-            if dim_name:
-                acc_by_dim[dim_name] = dim
+            if dim.dimension:
+                acc_by_dim[dim.dimension] = dim
         if not run_dims:
             continue
         acc_dims = list(acc_by_dim.values())
-        acc_grades = [d.get("overallGrade") for d in acc_dims if d.get("overallGrade")]
+        acc_grades = [d.overall_grade for d in acc_dims if d.overall_grade]
         trend.append(
             {
                 "runId": item.run_id,
@@ -131,10 +132,10 @@ def _build_accumulated_trend(
 def _make_run_dimension_fetcher(
     reports_root: Path,
     project: str,
-    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
+    cache: OrderedDict[tuple, list[DimensionResult]] | None = None,
     lock: threading.Lock | None = None,
     max_size: int | None = None,
-) -> Callable[[str], list[dict[str, Any]]]:
+) -> Callable[[str], list[DimensionResult]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
     return make_lru_dimension_fetcher(
         reports_root,
@@ -150,10 +151,10 @@ class _DashboardPayload:
     """Pre-computed parts for the dashboard response."""
     selected_summary: dict[str, Any]
     trend: list[dict[str, Any]]
-    dimensions_with_trend: list[dict[str, Any]]
-    previous_by_dimension: dict[str, dict[str, Any]]
-    stale_previous_by_dimension: dict[str, dict[str, Any]]
-    stale_dimensions: list[dict[str, Any]]
+    dimensions_with_trend: list[DimensionResult]
+    previous_by_dimension: dict[str, DimensionResult]
+    stale_previous_by_dimension: dict[str, DimensionResult]
+    stale_dimensions: list[DimensionResult]
 
 
 def _build_dashboard_result(
@@ -176,10 +177,10 @@ def _build_dashboard_result(
         },
         "summary": {**payload.selected_summary, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
         "trend": payload.trend,
-        "dimensions": payload.dimensions_with_trend,
-        "previousByDimension": payload.previous_by_dimension,
-        "stalePreviousByDimension": payload.stale_previous_by_dimension,
-        "staleDimensions": payload.stale_dimensions,
+        "dimensions": [to_camel_dict(d) for d in payload.dimensions_with_trend],
+        "previousByDimension": {k: to_camel_dict(v) for k, v in payload.previous_by_dimension.items()},
+        "stalePreviousByDimension": {k: to_camel_dict(v) for k, v in payload.stale_previous_by_dimension.items()},
+        "staleDimensions": [to_camel_dict(d) for d in payload.stale_dimensions],
     }
 
 
@@ -199,7 +200,7 @@ class _SelectedRunContext:
     """Pre-resolved data for the selected run in a dashboard request."""
     run: RunInfo
     index: int
-    dimensions: list[dict[str, Any]]
+    dimensions: list[DimensionResult]
     summary: dict[str, Any]
 
 
@@ -208,7 +209,7 @@ def _compute_dashboard_payload(
     ctx: _SelectedRunContext, cc: DashboardCacheConfig,
 ) -> _DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
-    selected_dim_names = {d.get("dimension") for d in ctx.dimensions}
+    selected_dim_names = {d.dimension for d in ctx.dimensions}
     history_runs = runs[:max(_MAX_HISTORY_RUNS, ctx.index + 1)]
     get_run_dimensions = _make_run_dimension_fetcher(
         reports_root, project, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,

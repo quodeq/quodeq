@@ -6,6 +6,7 @@ import logging
 import re
 from typing import Any
 
+from quodeq.core.types import DimensionResult
 from quodeq.engine.scoring_internals import GRADE_LADDER
 
 _logger = logging.getLogger(__name__)
@@ -99,16 +100,16 @@ def calculate_trend(current_score: Any, previous_score: Any) -> str:
     return "same"
 
 
-def summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize_dimensions(dimensions: list[DimensionResult]) -> dict[str, Any]:
     """Produce an aggregate summary across multiple dimension evaluation results.
 
     Example::
 
         summarize_dimensions([{"overallGrade": "Good", "overallScore": "8/10"}])
     """
-    overall_grades = [d.get("overallGrade") for d in dimensions if d.get("overallGrade")]
+    overall_grades = [d.overall_grade for d in dimensions if d.overall_grade]
     numeric_scores = [
-        score for score in (parse_numeric_score(d.get("overallScore")) for d in dimensions) if score is not None
+        score for score in (parse_numeric_score(d.overall_score) for d in dimensions) if score is not None
     ]
     numeric_average = None
     if numeric_scores:

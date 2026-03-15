@@ -18,6 +18,8 @@ _logger = logging.getLogger(__name__)
 
 from quodeq.adapters.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
+from quodeq.core.types import DimensionResult
+from quodeq.core.types.mappers import parse_dimension_result
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_path_segment
 
@@ -42,7 +44,7 @@ class RunStorage(Protocol):
     (S3, database) should implement this protocol.
     """
 
-    def read_run_data(self, project: str, run_id: str) -> list[dict[str, Any]]:
+    def read_run_data(self, project: str, run_id: str) -> list[DimensionResult]:
         """Load all dimension evaluations and evidence for a single run."""
         ...
 
@@ -172,7 +174,7 @@ def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
     return evidence_map
 
 
-def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[str, Any]]:
+def read_run_data(reports_root: Path, project: str, run_id: str) -> list[DimensionResult]:
     """Load all dimension evaluations and evidence for a single run.
 
     Example::
@@ -184,20 +186,19 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[dict[st
     evaluations = _load_evaluations(run_dir / "evaluation")
     evidence_map = _load_evidence_map(run_dir / "evidence")
 
-    dimensions = []
+    dimensions: list[DimensionResult] = []
     for evaluation in evaluations:
         dimension = evaluation.get("dimension")
         evidence = evidence_map.get(dimension, {})
-        dimensions.append(
-            {
-                **evaluation,
-                "sourceFileCount": evidence.get("sourceFileCount"),
-                "evidenceDate": evidence.get("date"),
-                "discipline": evidence.get("discipline"),
-            }
-        )
+        merged = {
+            **evaluation,
+            "sourceFileCount": evidence.get("sourceFileCount"),
+            "evidenceDate": evidence.get("date"),
+            "discipline": evidence.get("discipline"),
+        }
+        dimensions.append(parse_dimension_result(merged))
 
-    dimensions.sort(key=lambda item: item.get("dimension") or "")
+    dimensions.sort(key=lambda item: item.dimension)
     return dimensions
 
 
@@ -226,15 +227,15 @@ def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunIn
 
 def _make_caching_fetcher(
     reports_root: Path, project: str,
-    data_cache: dict[str, list[dict[str, Any]]] | None = None,
-) -> Callable[[str], list[dict[str, Any]]]:
+    data_cache: dict[str, list[DimensionResult]] | None = None,
+) -> Callable[[str], list[DimensionResult]]:
     """Return a fetcher that caches run data reads.
 
     *data_cache* is injectable for testing; defaults to a fresh dict.
     """
     cache = data_cache if data_cache is not None else {}
 
-    def _fetch(run_id: str) -> list[dict[str, Any]]:
+    def _fetch(run_id: str) -> list[DimensionResult]:
         if run_id not in cache:
             cache[run_id] = read_run_data(reports_root, project, run_id)
         return cache[run_id]
@@ -247,7 +248,7 @@ class RunLookupCache:
     """Pre-computed data to avoid repeated I/O when looking up previous runs."""
 
     runs: list[RunInfo]
-    get_run_data: Callable[[str], list[dict[str, Any]]]
+    get_run_data: Callable[[str], list[DimensionResult]]
 
 
 def _get_previous_run_for_dimension(
@@ -282,7 +283,7 @@ def _get_previous_run_for_dimension(
 
     for run_info in all_runs[current_idx + 1:]:
         dims = cache.get_run_data(run_info.run_id)
-        dim = next((d for d in dims if d.get("dimension") == dimension), None)
+        dim = next((d for d in dims if d.dimension == dimension), None)
         if dim:
             return {"runId": run_info.run_id, "dimension": dim}
     return None
