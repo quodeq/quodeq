@@ -29,7 +29,7 @@ def _max_violation_files(override: int | None = None) -> int:
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     compiled_dir: Path | None = None,
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     """Try successive file formats to load evaluation data for a dimension."""
 
     eval_path = base / "evaluation" / f"{dimension}.json"
@@ -61,9 +61,9 @@ def resolve_dimension_eval(
     return None
 
 
-def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
+def aggregate_violations(dashboard: dict[str, object]) -> ViolationSummary:
     """Aggregate violation counts and top files from dashboard dimensions."""
-    summary: dict[str, Any] = {"total": 0, "critical": 0, "major": 0, "minor": 0, "byFile": {}}
+    summary: dict[str, object] = {"total": 0, "critical": 0, "major": 0, "minor": 0, "byFile": {}}
     for dim in dashboard.get("dimensions", []) or []:
         summary["total"] += dim.get("totals", {}).get("violationCount", 0)
         severity = dim.get("totals", {}).get("severity", {})

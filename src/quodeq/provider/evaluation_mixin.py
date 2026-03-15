@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from quodeq.provider.base import EvaluationOptions
+from quodeq.shared.types import JobDict
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
@@ -30,7 +31,7 @@ class EvaluationDispatcher(Protocol):
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> JobDict:
         """Submit an evaluation command and return the initial job state."""
         ...
 
@@ -47,7 +48,7 @@ class SubprocessDispatcher:
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> JobDict:
         return self._jobs.start_job(cmd, cwd=cwd, env=env)
 
 
@@ -111,7 +112,7 @@ class FsEvaluationMixin:
             env["SUBAGENT_MODEL"] = options.subagent_model
         return env
 
-    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
+    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobDict:
         """Start an asynchronous evaluation subprocess for a repository."""
         if is_repo_url(repo):
             if not is_valid_repo_url(repo):
@@ -127,7 +128,7 @@ class FsEvaluationMixin:
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
-    def get_evaluation_status(self, job_id: str) -> dict[str, Any] | None:
+    def get_evaluation_status(self, job_id: str) -> JobDict | None:
         """Return the current status of an evaluation job."""
         return self._jobs.get_job(job_id)
 

@@ -152,7 +152,7 @@ class JobManager:
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
 
-    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
+    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> JobDict:
         """Spawn a subprocess and return its initial job state."""
         job_id = str(uuid.uuid4())
         job = Job(
@@ -209,7 +209,7 @@ class JobManager:
             process.terminate()
         return True
 
-    def get_job(self, job_id: str) -> dict[str, Any] | None:
+    def get_job(self, job_id: str) -> JobDict | None:
         """Return the current state of a job, or None if not found."""
         with self._lock:
             job = self._store.get(job_id)
@@ -217,7 +217,7 @@ class JobManager:
                 return None
             return job.to_dict()
 
-    def list_jobs(self) -> list[dict[str, Any]]:
+    def list_jobs(self) -> list[JobDict]:
         """Return all tracked jobs as serialized dicts."""
         with self._lock:
             return [job.to_dict() for job in self._store.list()]
