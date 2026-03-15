@@ -46,8 +46,14 @@ def _build_violation_response(
 def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None) -> dict[str, Any]:
     """Build a normalized finding dict from a raw JSON object."""
     req = obj.get("req")
-    all_req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
-    req_refs = resolve_llm_refs(obj.get("refs"), all_req_refs)
+    # Prefer MCP-enriched req_refs (already filtered to best-match);
+    # fall back to compiled-standards lookup + LLM ref selection.
+    pre_resolved = obj.get("req_refs")
+    if isinstance(pre_resolved, list) and pre_resolved:
+        req_refs = pre_resolved
+    else:
+        all_req_refs = req_refs_lookup.get(req) if req and req_refs_lookup else None
+        req_refs = resolve_llm_refs(obj.get("refs"), all_req_refs)
     entry = build_finding_base(FindingSpec(
         principle=obj["p"],
         file=obj.get("file"),
