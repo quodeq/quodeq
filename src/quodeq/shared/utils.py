@@ -100,7 +100,7 @@ def project_name_from_repo(repo: str) -> str:
 def read_json(path: Path) -> dict[str, Any]:
     """Read and parse a JSON file, returning the parsed dict."""
     try:
-        return json.loads(path.read_text())
+        return json.loads(path.read_text(encoding=TEXT_ENCODING))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
 

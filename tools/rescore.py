@@ -79,6 +79,11 @@ def _write_scores_and_report(evidence_path: Path, dimension: str, scores: dict) 
 
 
 def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run: bool = False) -> bool:
+    """Re-score a single evidence file and write updated scores/report.
+
+    Returns True on success (or dry-run preview), False if the file is
+    unreadable or the mapping is missing.
+    """
     try:
         evidence = json.loads(evidence_path.read_text())
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
@@ -146,7 +151,8 @@ def main():
         print(f"Project dir not found: {project_dir}")
         sys.exit(1)
 
-    evaluators_root = repo_root / "evaluators"
+    _EVALUATORS_DIR = "evaluators"
+    evaluators_root = repo_root / _EVALUATORS_DIR
     evidence_files = sorted(project_dir.glob("*/evidence/*_evidence.json"))
 
     mode_label = "DRY-RUN" if dry_run else "APPLY"

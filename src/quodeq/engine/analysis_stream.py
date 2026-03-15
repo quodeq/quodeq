@@ -7,12 +7,15 @@ from pathlib import Path
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import TEXT_ENCODING
 
+_TOOL_USE_TYPE = "tool_use"
+_FILE_READ_TOOLS = frozenset({"Read", "Grep"})
+
 
 def extract_files_from_blocks(blocks: list) -> set[str]:
     """Extract file paths from Read/Grep tool_use blocks."""
     files: set[str] = set()
     for block in blocks:
-        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") in ("Read", "Grep"):
+        if isinstance(block, dict) and block.get("type") == _TOOL_USE_TYPE and block.get("name") in _FILE_READ_TOOLS:
             fp = (block.get("input") or {}).get("file_path") or (block.get("input") or {}).get("path")
             if fp:
                 files.add(fp)

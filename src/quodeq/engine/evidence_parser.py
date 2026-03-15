@@ -6,13 +6,13 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
+import os as _os
+
 from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
 from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 
 _logger = logging.getLogger(__name__)
-
-import os as _os
 
 _CWE_URL_TEMPLATE = _os.environ.get(
     "QUODEQ_CWE_URL_TEMPLATE",

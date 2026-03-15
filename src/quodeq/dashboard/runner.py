@@ -116,7 +116,14 @@ def _allow_plaintext_http(override: bool | None = None) -> bool:
     return os.environ.get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
 
 
-def _ensure_action_api(host: str, start_port: int, max_tries: int = _MAX_PORT_SCAN_TRIES, static_dist: Path | None = None, evaluations_dir: str | None = None, allow_plaintext: bool | None = None) -> tuple[str, subprocess.Popen | None]:
+def _ensure_action_api(
+    host: str,
+    start_port: int,
+    max_tries: int = _MAX_PORT_SCAN_TRIES,
+    static_dist: Path | None = None,
+    evaluations_dir: str | None = None,
+    allow_plaintext: bool | None = None,
+) -> tuple[str, subprocess.Popen | None]:
     if host not in _LOCAL_HOSTS:
         if _allow_plaintext_http(allow_plaintext):
             import logging

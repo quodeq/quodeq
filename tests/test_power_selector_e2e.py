@@ -160,7 +160,8 @@ class TestRunnerModelResolution:
         with patch.dict(os.environ, {"SUBAGENT_MODEL": env_model} if env_model else {}, clear=False):
             if not env_model:
                 os.environ.pop("SUBAGENT_MODEL", None)
-            return opts.subagent_model or _subagent_model() or "claude-haiku-4-5"
+            _FALLBACK_MODEL = "claude-haiku-4-5"
+            return opts.subagent_model or _subagent_model() or _FALLBACK_MODEL
 
     def test_level1_fast_haiku(self) -> None:
         assert self._resolve("claude-haiku-4-5") == "claude-haiku-4-5"

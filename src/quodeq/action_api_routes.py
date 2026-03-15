@@ -43,6 +43,24 @@ def _reports_dir(default_path: str | None = None) -> str:
     return str(resolved)
 
 
+def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
+    """Handle DELETE /api/projects/<project>."""
+    project = request.view_args["project"]
+    if request.args.get("confirm") != "true":
+        body, status = error_response(
+            "Use ?confirm=true to confirm deletion",
+            HTTPStatus.BAD_REQUEST,
+            "CONFIRMATION_REQUIRED",
+        )
+        return jsonify(body), status
+    _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
+    ok = provider.delete_project(_reports_dir(), project)
+    if not ok:
+        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        return jsonify(body), status
+    return jsonify({"deleted": project})
+
+
 def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     """Register project listing, mutation, and export routes."""
 
@@ -74,19 +92,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its report data."""
-        if request.args.get("confirm") != "true":
-            body, status = error_response(
-                "Use ?confirm=true to confirm deletion",
-                HTTPStatus.BAD_REQUEST,
-                "CONFIRMATION_REQUIRED",
-            )
-            return jsonify(body), status
-        _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
-        ok = provider.delete_project(_reports_dir(), project)
-        if not ok:
-            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
-            return jsonify(body), status
-        return jsonify({"deleted": project})
+        return _handle_delete_project(provider)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:

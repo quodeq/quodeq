@@ -176,6 +176,7 @@ def _resolve_cache(
 @dataclass(frozen=True)
 class _AccumulatedResult:
     """Pre-computed parts for the accumulated response."""
+    all_dimensions: list[dict[str, Any]]
     dimensions_with_trend: list[dict[str, Any]]
     severity: dict[str, int]
     avg_score: float | None
@@ -184,7 +185,6 @@ class _AccumulatedResult:
 
 def _build_accumulated_response(
     project: str,
-    all_dimensions: list[dict[str, Any]],
     result: _AccumulatedResult,
 ) -> dict[str, Any]:
     """Assemble the final accumulated response dict."""
@@ -193,7 +193,7 @@ def _build_accumulated_response(
         "dimensions": result.dimensions_with_trend,
         "summary": {
             "overallGrade": most_frequent_grade(
-                [d.get("overallGrade") for d in all_dimensions if d.get("overallGrade")]
+                [d.get("overallGrade") for d in result.all_dimensions if d.get("overallGrade")]
             ),
             "numericAverage": result.avg_score,
             "previousNumericAverage": result.prev_avg_score,
@@ -203,6 +203,24 @@ def _build_accumulated_response(
             "severity": {"critical": result.severity["critical"], "major": result.severity["major"], "minor": result.severity["minor"]},
         },
     }
+
+
+def _compute_result(
+    reports_root: Path, project: str, all_run_infos: list[RunInfo],
+    cache_config: AccumulatedCacheConfig | None,
+) -> _AccumulatedResult:
+    """Load run data and compute trends, severity, and scores."""
+    runs = [r.run_id for r in all_run_infos]
+    _cache, _lock, _max = _resolve_cache(cache_config)
+    get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
+    latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
+        reports_root, project, all_run_infos, runs, get_run_data
+    )
+    all_dimensions = list(latest_by_dimension.values())
+    dimensions_with_trend = _compute_accumulated_trends(all_dimensions, prev_occurrence)
+    severity = _aggregate_severity_counts(all_dimensions)
+    avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, prev_run_latest)
+    return _AccumulatedResult(all_dimensions, dimensions_with_trend, severity, avg_score, prev_avg_score)
 
 
 def compute_accumulated(
@@ -226,21 +244,8 @@ def compute_accumulated(
     if as_of:
         as_of_idx = next((idx for idx, r in enumerate(all_run_infos) if r.run_id == as_of), None)
         all_run_infos = all_run_infos[as_of_idx:] if as_of_idx is not None else []
-    runs = [r.run_id for r in all_run_infos]
-    if not runs:
+    if not all_run_infos:
         return None
 
-    _cache, _lock, _max = _resolve_cache(cache_config)
-    get_run_data = make_lru_dimension_fetcher(reports_root, project, _cache, _lock, _max)
-    latest_by_dimension, prev_occurrence, prev_run_latest = _read_all_run_data(
-        reports_root, project, all_run_infos, runs, get_run_data
-    )
-    all_dimensions = list(latest_by_dimension.values())
-    dimensions_with_trend = _compute_accumulated_trends(all_dimensions, prev_occurrence)
-    severity = _aggregate_severity_counts(all_dimensions)
-    avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, prev_run_latest)
-
-    return _build_accumulated_response(
-        project, all_dimensions,
-        _AccumulatedResult(dimensions_with_trend, severity, avg_score, prev_avg_score),
-    )
+    result = _compute_result(reports_root, project, all_run_infos, cache_config)
+    return _build_accumulated_response(project, result)

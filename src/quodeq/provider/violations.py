@@ -78,6 +78,9 @@ def aggregate_violations(dashboard: dict[str, Any]) -> dict[str, Any]:
             sev = violation.get("severity", "minor")
             if sev in entry:
                 entry[sev] += 1
-    summary["files"] = sorted(summary["byFile"].values(), key=lambda item: item["count"], reverse=True)[:_max_violation_files()]
+    top_files = sorted(
+        summary["byFile"].values(), key=lambda item: item["count"], reverse=True,
+    )
+    summary["files"] = top_files[:_max_violation_files()]
     summary.pop("byFile", None)
     return summary

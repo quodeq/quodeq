@@ -7,16 +7,18 @@ from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.shared.validation import validate_path_segment
 
 
-def _resolve_standards_dir(standards_dir: Path | None) -> Path:
+def _resolve_standards_dir(standards_dir: Path | None = None, *, paths_fn=None) -> Path:
     """Return *standards_dir* or fall back to the project default.
 
-    The ``default_paths`` import is deferred to break a circular dependency:
-    ``engine.standards`` -> ``config.paths`` -> ``shared.utils`` -> ``engine``.
+    *paths_fn* is an injectable factory (defaults to ``config.paths.default_paths``)
+    that breaks the circular dependency: engine.standards -> config.paths -> shared.utils.
     """
     if standards_dir is not None:
         return standards_dir
-    from quodeq.config.paths import default_paths
-    return default_paths().standards_dir
+    if paths_fn is None:
+        from quodeq.config.paths import default_paths
+        paths_fn = default_paths
+    return paths_fn().standards_dir
 
 
 def _load_json(path: Path, label: str) -> dict:

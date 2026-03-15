@@ -15,6 +15,8 @@ from quodeq.config.sources import has_required_sources_table
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error
 
+_GENERATED_DIMS_FILENAME = "generated.json"
+
 
 @dataclass(frozen=True)
 class ConfigureContext:
@@ -89,7 +91,7 @@ def run_generate_dimensions(paths: ConfigPaths, *, today: date | None = None) ->
             f"AI generation failed: {err}. Check your API key, network connection, "
             f"and AI provider configuration."
         )
-    output_path = paths.dimensions_dir / "generated.json"
+    output_path = paths.dimensions_dir / _GENERATED_DIMS_FILENAME
     try:
         output_path.write_text(stdout, encoding="utf-8")
     except OSError as exc:

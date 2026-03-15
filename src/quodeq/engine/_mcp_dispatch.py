@@ -43,6 +43,7 @@ REPORT_FINDING_SCHEMA = {
 }
 
 _DEFAULT_FILE_BATCH_SIZE = 5
+_MAX_LOG_LINE_PREVIEW = 200
 GET_NEXT_FILES_NAME = "get_next_files"
 GET_NEXT_FILES_DESC = (
     "Get your next batch of files to analyse from the queue. "
@@ -79,7 +80,7 @@ def _read_message() -> dict | None:
         try:
             return json.loads(line)
         except json.JSONDecodeError:
-            sys.stderr.write(f"Skipping malformed JSON: {line[:200]}\n")
+            sys.stderr.write(f"Skipping malformed JSON: {line[:_MAX_LOG_LINE_PREVIEW]}\n")
             continue
     return None
 

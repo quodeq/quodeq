@@ -183,7 +183,10 @@ class HttpClient:
             )
 
         if self._is_circuit_open():
-            return HttpResponse(HTTPStatus.SERVICE_UNAVAILABLE, {"error": "circuit breaker open — too many recent failures", "code": "CIRCUIT_OPEN"})
+            return HttpResponse(
+                HTTPStatus.SERVICE_UNAVAILABLE,
+                {"error": "circuit breaker open — too many recent failures", "code": "CIRCUIT_OPEN"},
+            )
 
         last_response: HttpResponse | None = None
         for attempt in range(self._max_retries):

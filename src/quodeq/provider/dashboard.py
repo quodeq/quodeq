@@ -145,17 +145,22 @@ def _make_run_dimension_fetcher(
     )
 
 
+@dataclass
+class _DashboardPayload:
+    """Pre-computed parts for the dashboard response."""
+    selected_summary: dict[str, Any]
+    trend: list[dict[str, Any]]
+    dimensions_with_trend: list[dict[str, Any]]
+    previous_by_dimension: dict[str, dict[str, Any]]
+    stale_previous_by_dimension: dict[str, dict[str, Any]]
+    stale_dimensions: list[dict[str, Any]]
+
+
 def _build_dashboard_result(
-    *,
     project: str,
     runs: list[RunInfo],
     selected_run: RunInfo,
-    selected_summary: dict[str, Any],
-    trend: list[dict[str, Any]],
-    dimensions_with_trend: list[dict[str, Any]],
-    previous_by_dimension: dict[str, dict[str, Any]],
-    stale_previous_by_dimension: dict[str, dict[str, Any]],
-    stale_dimensions: list[dict[str, Any]],
+    payload: _DashboardPayload,
 ) -> dict[str, Any]:
     """Assemble the final dashboard response dict from pre-computed parts."""
     return {
@@ -169,12 +174,12 @@ def _build_dashboard_result(
             "dateISO": selected_run.date_iso,
             "dateLabel": selected_run.date_label,
         },
-        "summary": {**selected_summary, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
-        "trend": trend,
-        "dimensions": dimensions_with_trend,
-        "previousByDimension": previous_by_dimension,
-        "stalePreviousByDimension": stale_previous_by_dimension,
-        "staleDimensions": stale_dimensions,
+        "summary": {**payload.selected_summary, "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
+        "trend": payload.trend,
+        "dimensions": payload.dimensions_with_trend,
+        "previousByDimension": payload.previous_by_dimension,
+        "stalePreviousByDimension": payload.stale_previous_by_dimension,
+        "staleDimensions": payload.stale_dimensions,
     }
 
 
@@ -239,11 +244,12 @@ def build_dashboard(
     dimensions_with_trend = _enrich_dimensions_with_trend(selected_dimensions, previous_by_dimension)
     trend = _build_accumulated_trend(history_runs, get_run_dimensions)
 
-    return _build_dashboard_result(
-        project=project, runs=runs, selected_run=selected_run,
-        selected_summary=selected_summary, trend=trend,
+    payload = _DashboardPayload(
+        selected_summary=selected_summary,
+        trend=trend,
         dimensions_with_trend=dimensions_with_trend,
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,
         stale_dimensions=stale_dimensions,
     )
+    return _build_dashboard_result(project, runs, selected_run, payload)

@@ -18,6 +18,9 @@ CISQ_DIMENSIONS = {"maintainability", "security", "reliability", "performance"}
 WCAG_DIMENSIONS = {"usability"}
 CERT_DIMENSIONS = {"reliability"}
 
+_ASVS_FILE = "asvs/level1.json"
+_WCAG_FILE = "wcag/level_a.json"
+
 _logger = logging.getLogger(__name__)
 
 
@@ -82,7 +85,7 @@ def attach_asvs_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     """Attach ASVS cross-references (security dimension only)."""
     if dimension != "security":
         return
-    asvs_file = standards_dir / "asvs" / "level1.json"
+    asvs_file = standards_dir / _ASVS_FILE
     if not asvs_file.exists():
         return
     try:
@@ -153,7 +156,7 @@ def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
     """Attach WCAG cross-references to requirements with wcag fields."""
     if dimension not in WCAG_DIMENSIONS:
         return
-    wcag_file = standards_dir / "wcag" / "level_a.json"
+    wcag_file = standards_dir / _WCAG_FILE
     if not wcag_file.exists():
         return
     try:

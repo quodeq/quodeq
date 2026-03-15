@@ -20,7 +20,7 @@ from quodeq.engine.runner import CC_MARKER_KEY
 
 _logger = logging.getLogger(__name__)
 
-MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
+_MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
@@ -38,7 +38,7 @@ class Job:
     started_at: str
     ended_at: str | None
     exit_code: int | None
-    logs: deque[str] = field(default_factory=lambda: deque(maxlen=MAX_LOG_LINES))
+    logs: deque[str] = field(default_factory=lambda: deque(maxlen=_MAX_LOG_LINES))
     output_project: str | None = None
     output_run_id: str | None = None
     phase: str | None = None

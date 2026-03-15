@@ -45,6 +45,7 @@ def _max_fetch_workers(override: int | None = None) -> int:
         return override
     return int(os.environ.get("QUODEQ_MAX_FETCH_WORKERS", str(_DEFAULT_MAX_FETCH_WORKERS)))
 
+_GITHUB_SEARCH_PER_PAGE = 10
 _MAX_CONTENT_REPOS = 3
 _LINTER_DOCS_LIMIT = 6000
 _EXISTING_CONTENT_LIMIT = 2000
@@ -183,7 +184,7 @@ def _fetch_cursor_rules_repos(runtime: str, min_stars: int) -> list[dict]:
         "q": f"cursor-rules {runtime}",
         "sort": "stars",
         "order": "desc",
-        "per_page": "10",
+        "per_page": str(_GITHUB_SEARCH_PER_PAGE),
     })
     url = f"{get_github_search_url()}?{query}"
     raw = _fetch_url(url, headers={"Accept": "application/vnd.github+json"})
