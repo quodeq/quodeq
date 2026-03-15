@@ -11,6 +11,10 @@ from pathlib import Path
 from typing import Protocol
 
 _INDEX_FILE = "project_index.json"
+_MAX_LEGACY_SCAN = 500
+
+# mtime-based cache for _load_index to avoid re-reading on every call
+_index_cache: dict[Path, tuple[float, dict[str, str]]] = {}
 
 
 class ProjectRepository(Protocol):
@@ -45,16 +49,30 @@ def _index_key(identity: ProjectIdentity) -> str:
 
 
 def _load_index(reports_dir: Path) -> dict[str, str]:
-    """Load the project index file, returning an empty dict on missing/corrupt file."""
+    """Load the project index file, returning an empty dict on missing/corrupt file.
+
+    Uses mtime-based caching to avoid re-reading the file when it hasn't changed.
+    """
+    index_path = reports_dir / _INDEX_FILE
     try:
-        return json.loads((reports_dir / _INDEX_FILE).read_text())
+        mtime = index_path.stat().st_mtime
+    except OSError:
+        return {}
+    cached = _index_cache.get(index_path)
+    if cached is not None and cached[0] == mtime:
+        return dict(cached[1])  # return a copy so callers can mutate safely
+    try:
+        data = json.loads(index_path.read_text())
     except (OSError, json.JSONDecodeError):
         return {}
+    _index_cache[index_path] = (mtime, dict(data))
+    return data
 
 
 def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
     """Write the project index file atomically."""
     index_path = reports_dir / _INDEX_FILE
+    _index_cache.pop(index_path, None)  # invalidate cache
     try:
         fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
         try:
@@ -86,10 +104,15 @@ def _find_existing_project(
         del index[key]
         save_fn(reports_dir, index)
 
-    # Legacy scan: find projects created before the index was introduced
+    # Legacy scan: find projects created before the index was introduced.
+    # Bounded to _MAX_LEGACY_SCAN entries to avoid O(n) disk I/O on large collections.
+    scanned = 0
     for entry in reports_dir.iterdir():
         if not entry.is_dir() or entry.name.startswith("."):
             continue
+        scanned += 1
+        if scanned > _MAX_LEGACY_SCAN:
+            break
         info_file = entry / "repository_info.json"
         if not info_file.exists():
             continue

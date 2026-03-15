@@ -144,7 +144,7 @@ class DisciplineRegistry:
         except (OSError, UnicodeDecodeError) as exc:
             raise ValueError(
                 f"Cannot read disciplines config {path}: {exc}. "
-                f"Check file permissions or run 'quodeq init' to create the configuration."
+                f"Check file permissions or run 'quodeq configure' to regenerate."
             ) from exc
         for raw in lines:
             line = raw.strip()

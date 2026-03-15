@@ -146,9 +146,7 @@ class SubagentPool:
                 elapsed = int(time.monotonic() - start)
                 mins, secs = divmod(elapsed, 60)
                 findings = self._count_total_findings()
-                q = FileQueue(self._queue_path)
-                remaining = q.remaining()
-                taken = len(q.all_taken_files())
+                remaining, taken = FileQueue(self._queue_path).stats()
                 done = sum(1 for v in finished.values() if v)
                 log_info(
                     f"  [{self._dimension}] {mins}m{secs:02d}s | "
@@ -161,10 +159,9 @@ class SubagentPool:
 
     def _should_respawn(
         self, pool_start: float, max_duration: float,
-    ) -> bool:
-        """Return True if a new agent should be spawned (time and queue check)."""
-        q = FileQueue(self._queue_path)
-        remaining = q.remaining()
+    ) -> int:
+        """Return remaining file count if a new agent should be spawned, else 0."""
+        remaining = FileQueue(self._queue_path).remaining()
         elapsed = time.monotonic() - pool_start
         if elapsed >= max_duration:
             if remaining > 0:
@@ -172,8 +169,8 @@ class SubagentPool:
                     f"  Pool time limit ({max_duration}s) reached -- "
                     f"{remaining} files left, not spawning new agents"
                 )
-            return False
-        return remaining > 0
+            return 0
+        return remaining
 
     def _collect_done(
         self, results: list[SubagentResult],
@@ -201,8 +198,8 @@ class SubagentPool:
     ) -> None:
         """Respawn agents for each completed future if queue still has files."""
         for _ in done:
-            if self._should_respawn(pool_start, max_duration):
-                remaining = FileQueue(self._queue_path).remaining()
+            remaining = self._should_respawn(pool_start, max_duration)
+            if remaining:
                 log_info(f"  {remaining} files left -- spawning agent-{self._next_idx}")
                 self._finished[f"agent-{self._next_idx}"] = False
                 self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx

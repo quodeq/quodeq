@@ -132,10 +132,23 @@ def _compute_llm_mapping_usage(cwe_id: int, mapping_usage: str, abstraction: str
 
 def _print_results(results: list[dict], *, problems_only: bool) -> None:
     """Print categorized audit results to stdout and write JSON output."""
-    prohibited = [r for r in results if r["mapping_usage"].lower() == "prohibited"]
-    discouraged = [r for r in results if r["mapping_usage"].lower() == "discouraged"]
-    allowed = [r for r in results if r["mapping_usage"].lower() in ("allowed", "allowed-with-review")]
-    unknown = [r for r in results if r["mapping_usage"].lower() not in ("prohibited", "discouraged", "allowed", "allowed-with-review")]
+    _ALLOWED_USAGES = {"allowed", "allowed-with-review"}
+    _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
+    categorized: dict[str, list[dict]] = {"prohibited": [], "discouraged": [], "allowed": [], "unknown": []}
+    for r in results:
+        usage = r["mapping_usage"].lower()
+        if usage == "prohibited":
+            categorized["prohibited"].append(r)
+        elif usage == "discouraged":
+            categorized["discouraged"].append(r)
+        elif usage in _ALLOWED_USAGES:
+            categorized["allowed"].append(r)
+        else:
+            categorized["unknown"].append(r)
+    prohibited = categorized["prohibited"]
+    discouraged = categorized["discouraged"]
+    allowed = categorized["allowed"]
+    unknown = categorized["unknown"]
 
     if not problems_only:
         print(f"\n{'='*80}")

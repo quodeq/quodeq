@@ -267,8 +267,7 @@ def _get_previous_run_for_dimension(
 
     for run_info in all_runs[current_idx + 1:]:
         dims = cache.get_run_data(run_info.run_id)
-        dims_by_name = {d.get("dimension"): d for d in dims if d.get("dimension")}
-        dim = dims_by_name.get(dimension)
+        dim = next((d for d in dims if d.get("dimension") == dimension), None)
         if dim:
             return {"runId": run_info.run_id, "dimension": dim}
     return None

@@ -88,8 +88,17 @@ def test_dashboard_returns_project_data(client):
     assert payload["project"] == "demo"
 
 
+def test_delete_project_requires_confirm(client):
+    response = client.delete("/api/projects/demo", headers={"Origin": "http://localhost"})
+    assert response.status_code == 400
+    payload = response.get_json()
+    assert payload["code"] == "CONFIRMATION_REQUIRED"
+
+
 def test_delete_nonexistent_project_returns_404(client):
-    response = client.delete("/api/projects/nonexistent", headers={"Origin": "http://localhost"})
+    response = client.delete(
+        "/api/projects/nonexistent?confirm=true", headers={"Origin": "http://localhost"}
+    )
     assert response.status_code == 404
     payload = response.get_json()
     assert payload["code"] == "NOT_FOUND"

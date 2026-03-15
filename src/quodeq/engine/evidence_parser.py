@@ -49,6 +49,7 @@ def resolve_llm_refs(
         return all_req_refs
     by_label = {r["label"]: r for r in (all_req_refs or [])}
     result = []
+    upper_labels = {k.upper(): r for k, r in by_label.items()}
     for label in llm_refs:
         if label in by_label:
             result.append(by_label[label])
@@ -58,7 +59,6 @@ def resolve_llm_refs(
         else:
             # Prefix match: "CISQ-ASCRM-CWE-396" matches known label "CISQ"
             label_upper = label.upper()
-            upper_labels = {k.upper(): r for k, r in by_label.items()}
             matched = next((r for k, r in upper_labels.items() if label_upper.startswith(k)), None)
             if matched:
                 result.append(matched)

@@ -153,6 +153,13 @@ class FileQueue:
             state = self._read_state()
         return len(state["pending"])
 
+    def stats(self) -> tuple[int, int]:
+        """Return (remaining, taken) counts in a single file read."""
+        with self._locked():
+            state = self._read_state()
+        taken = sum(len(e["files"]) for e in state["taken"])
+        return len(state["pending"]), taken
+
     def taken_log(self) -> list[dict]:
         """Return the full take log for audit / crash recovery."""
         with self._locked():

@@ -173,6 +173,7 @@ class JobManager:
             job.status = "failed"
             job.ended_at = datetime.now(timezone.utc).isoformat()
             job.exit_code = -1
+            job.logs.append(f"Failed to start process: {exc}")
             with self._lock:
                 self._store.put(job)
             result = job.to_dict()
@@ -246,13 +247,25 @@ class JobManager:
     def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
         if stream is None:
             return
+        _BATCH_SIZE = 32
+        batch: list[str] = []
         for line in stream:
-            stripped = line.rstrip("\n")
+            batch.append(line.rstrip("\n"))
+            if len(batch) >= _BATCH_SIZE:
+                with self._lock:
+                    job = self._store.get(job_id)
+                    if not job:
+                        return
+                    for stripped in batch:
+                        self._append_log(job, stripped)
+                batch.clear()
+        if batch:
             with self._lock:
                 job = self._store.get(job_id)
                 if not job:
                     return
-                self._append_log(job, stripped)
+                for stripped in batch:
+                    self._append_log(job, stripped)
 
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""

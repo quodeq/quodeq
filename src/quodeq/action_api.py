@@ -5,6 +5,7 @@ from __future__ import annotations
 import hmac
 import logging
 import os
+import sys
 import time
 from collections import OrderedDict
 from http import HTTPStatus
@@ -168,10 +169,12 @@ def create_app(
     provider = provider or _default_provider()
     store = rate_limit_store or create_rate_limit_store()
     if not api_key:
-        _logger.warning(
+        _msg = (
             "QUODEQ_API_KEY is not set — API endpoints are unauthenticated. "
             "Set QUODEQ_API_KEY for production use."
         )
+        _logger.warning(_msg)
+        print(_msg, file=sys.stderr)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:

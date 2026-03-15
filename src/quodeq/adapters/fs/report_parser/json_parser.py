@@ -70,7 +70,8 @@ def parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
     dimension = evidence_path.name.replace("_evidence.json", "")
     try:
         data = json.loads(evidence_path.read_text())
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        _logger.warning("Failed to read evidence file %s: %s", evidence_path.name, exc)
         data = {}
     return {
         "dimension": dimension,

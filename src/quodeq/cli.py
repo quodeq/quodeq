@@ -258,8 +258,23 @@ _COMMAND_HANDLERS: dict[str, Callable] = {
 }
 
 
+def _apply_no_color() -> None:
+    """Disable colorized logging output when the NO_COLOR env var is set.
+
+    The ``shared.logging`` module already checks NO_COLOR dynamically on each
+    log call, so this function is a no-op in practice.  It exists as an
+    explicit startup hook so that future callers can rely on a single place to
+    enforce the NO_COLOR contract.
+    """
+    if os.environ.get("NO_COLOR"):
+        # shared/logging._should_use_color() already returns False when
+        # NO_COLOR is set.  Nothing further to configure here.
+        pass
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate subcommand handler."""
+    _apply_no_color()
     load_env_file(default_paths())
     parser = build_parser()
     args = parser.parse_args(argv)

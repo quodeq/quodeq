@@ -19,7 +19,7 @@ class WebRepository:
         if not isinstance(response.data, dict):
             raise InvalidDataError(
                 "Invalid data format: expected a JSON object with 'data' key. "
-                "Verify the API response structure or check the endpoint URL."
+                "Verify the API endpoint URL and authentication."
             )
         return response.data
 

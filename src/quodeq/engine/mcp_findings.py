@@ -70,9 +70,12 @@ class FindingsRouter:
         return f"Finding #{self.counter} recorded.", False
 
 
+_STOP_WORDS = frozenset({"a", "an", "the", "of", "to", "in", "for", "is", "and", "or", "not", "with", "without"})
+
+
 def _text_overlap(ref_name: str, description: str, reason: str) -> int:
     """Score how well a ref name matches the finding text by counting shared words."""
-    stop = {"a", "an", "the", "of", "to", "in", "for", "is", "and", "or", "not", "with", "without"}
+    stop = _STOP_WORDS
     ref_words = set(ref_name.lower().split()) - stop
     finding_words = (set(description.lower().split()) | set(reason.lower().split())) - stop
     return len(ref_words & finding_words)

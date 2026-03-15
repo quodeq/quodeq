@@ -74,6 +74,13 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its report data."""
+        if request.args.get("confirm") != "true":
+            body, status = _error(
+                "Use ?confirm=true to confirm deletion",
+                HTTPStatus.BAD_REQUEST,
+                "CONFIRMATION_REQUIRED",
+            )
+            return jsonify(body), status
         _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
         ok = provider.delete_project(_reports_dir(), project)
         if not ok:
@@ -137,6 +144,42 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(payload)
 
 
+def _validate_evaluation_payload(payload: dict) -> str | None:
+    """Validate the evaluate request payload.
+
+    Returns an error message string if validation fails, or ``None`` if valid.
+    Required fields: ``repo`` (non-empty string).
+    Optional typed fields: ``discipline`` (str), ``dimensions`` (str),
+    ``numerical`` (bool), ``aiCmd`` (str), ``aiModel`` (str),
+    ``subagentModel`` (str).
+    """
+    missing: list[str] = []
+    invalid: list[str] = []
+
+    repo = payload.get("repo")
+    if not repo:
+        missing.append("repo")
+    elif not isinstance(repo, str):
+        invalid.append("repo (must be a string)")
+
+    str_fields = ("discipline", "dimensions", "aiCmd", "aiModel", "subagentModel")
+    for field in str_fields:
+        value = payload.get(field)
+        if value is not None and not isinstance(value, str):
+            invalid.append(f"{field} (must be a string)")
+
+    numerical = payload.get("numerical")
+    if numerical is not None and not isinstance(numerical, bool):
+        invalid.append("numerical (must be a boolean)")
+
+    parts: list[str] = []
+    if missing:
+        parts.append(f"missing required fields: {', '.join(missing)}")
+    if invalid:
+        parts.append(f"invalid fields: {', '.join(invalid)}")
+    return "; ".join(parts) if parts else None
+
+
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> None:
     """Register evaluation listing and creation routes."""
 
@@ -149,13 +192,20 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
     def start_evaluation() -> Response | tuple[Response, int]:
         """Start a new evaluation job for a repository."""
         payload = request.get_json(silent=True) or {}
-        repo = payload.get("repo")
-        if not repo:
-            body, status = _error("Repository is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        validation_error = _validate_evaluation_payload(payload)
+        if validation_error:
+            body, status = _error(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
+        repo = payload.get("repo")
         ai_cmd = payload.get("aiCmd") or None
-        if ai_cmd and ai_cmd not in _get_allowed_ai_cmds():
-            body, status = _error("Invalid AI command", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        allowed_cmds = _get_allowed_ai_cmds()
+        if ai_cmd and ai_cmd not in allowed_cmds:
+            allowed_list = ", ".join(sorted(allowed_cmds))
+            body, status = _error(
+                f"Invalid AI command. Allowed: {allowed_list}",
+                HTTPStatus.BAD_REQUEST,
+                "INVALID_INPUT",
+            )
             return jsonify(body), status
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:

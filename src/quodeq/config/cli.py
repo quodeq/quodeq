@@ -18,6 +18,14 @@ from quodeq.config.paths import default_paths
 _DEFAULT_MIN_STARS = 500
 
 
+def _parallel_range(value: str) -> int:
+    """Validate that --parallel is an integer in the range 1–16."""
+    v = int(value)
+    if not 1 <= v <= 16:
+        raise argparse.ArgumentTypeError(f"must be between 1 and 16, got {v}")
+    return v
+
+
 def _print_and_zero(text: str) -> int:
     """Print *text* and return 0 (used as a handler helper)."""
     print(text)
@@ -48,7 +56,7 @@ def build_parser() -> argparse.ArgumentParser:
                         help="List coverage gaps for a plugin runtime (omit value to list all)")
     parser.add_argument("--fill-gap", nargs=2, metavar=("RUNTIME", "PRINCIPLE"),
                         help="Generate an evaluator to fill a coverage gap for the given principle")
-    parser.add_argument("--parallel", type=int,
+    parser.add_argument("--parallel", type=_parallel_range,
                         help="Number of parallel workers (default: %(default)s, range: 1-16)")
     parser.add_argument("--sequential", action="store_true",
                         help="Run generation tasks sequentially instead of in parallel")
@@ -75,9 +83,6 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate configuration action."""
     parser = build_parser()
     args = parser.parse_args(argv)
-
-    if args.parallel is not None and not (1 <= args.parallel <= 16):
-        parser.error("--parallel must be between 1 and 16")
 
     paths = default_paths()
 
