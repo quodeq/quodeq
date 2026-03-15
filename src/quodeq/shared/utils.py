@@ -109,7 +109,7 @@ def project_name_from_repo(repo: str) -> str:
     return Path(repo).name
 
 
-def read_json(path: Path) -> dict[str, Any]:
+def read_json(path: Path) -> dict[str, object]:
     """Read and parse a JSON file, returning the parsed dict."""
     try:
         return json.loads(path.read_text(encoding=TEXT_ENCODING))

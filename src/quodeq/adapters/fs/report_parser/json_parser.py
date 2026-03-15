@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
-from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import build_totals
 from quodeq.shared.types import EvidenceFileMeta, FindingDict, ParsedReport, PrincipleGradeWithOverall
@@ -102,7 +101,7 @@ def _empty_principle(key: str) -> dict:
     }
 
 
-def _seed_principles(principles: list[dict], principle_map: dict[str, Any]) -> None:
+def _seed_principles(principles: list[dict], principle_map: dict[str, object]) -> None:
     """Populate principle_map with scored entries from the principles list."""
     for p in principles:
         name = p.get("name", "")
@@ -113,7 +112,7 @@ def _seed_principles(principles: list[dict], principle_map: dict[str, Any]) -> N
 
 
 def _collect_findings(
-    items: list[dict], principle_map: dict[str, Any], finding_type: str,
+    items: list[dict], principle_map: dict[str, object], finding_type: str,
 ) -> None:
     """Append normalized finding dicts to the appropriate principle entries.
 
@@ -123,7 +122,7 @@ def _collect_findings(
         key = item.get("principle", "")
         if key not in principle_map:
             principle_map[key] = _empty_principle(key)
-        entry: dict[str, Any] = {
+        entry: dict[str, object] = {
             "code": item.get("snippet", ""),
             "file": format_file_line(item.get("file"), item.get("line")),
             "title": item.get("title", ""),
@@ -140,16 +139,16 @@ def _collect_findings(
         principle_map[key][finding_type].append(entry)
 
 
-def _build_principle_map(data: dict[str, Any]) -> dict[str, Any]:
+def _build_principle_map(data: dict[str, object]) -> dict[str, object]:
     """Build a mapping from principle name to its aggregated violations/compliance."""
-    principle_map: dict[str, Any] = {}
+    principle_map: dict[str, object] = {}
     _seed_principles(data.get("principles", []), principle_map)
     _collect_findings(data.get("violations", []), principle_map, _FINDING_TYPE_VIOLATIONS)
     _collect_findings(data.get("compliance", []), principle_map, _FINDING_TYPE_COMPLIANCE)
     return principle_map
 
 
-def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
+def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: str) -> dict[str, object] | None:
     """Parse a JSON evaluation file into a detailed report with principle breakdowns."""
     try:
         data = json.loads(json_path.read_text(encoding=TEXT_ENCODING))

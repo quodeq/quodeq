@@ -148,7 +148,7 @@ class JobManager:
     ) -> None:
         self._spawn = spawn_impl or subprocess.Popen
         self._store: JobStore = job_store or create_job_store()
-        self._processes: dict[str, Any] = {}
+        self._processes: dict[str, subprocess.Popen] = {}
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
 

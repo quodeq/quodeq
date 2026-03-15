@@ -231,7 +231,7 @@ def compute_accumulated(
     as_of: str | None,
     *,
     cache_config: AccumulatedCacheConfig | None = None,
-) -> dict[str, Any] | None:
+) -> dict[str, object] | None:
     """Compute the accumulated (cross-run) view for *project*.
 
     Optional *cache_config* overrides the module-level LRU cache, making

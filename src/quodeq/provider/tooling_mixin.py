@@ -72,7 +72,7 @@ class FsToolingMixin:
     def __init__(self) -> None:
         self._model_fetchers: dict[str, Callable] = {}
 
-    def browse_repo(self, path: str | None) -> dict[str, Any]:
+    def browse_repo(self, path: str | None) -> dict[str, object]:
         """List directories at the given path for repository browsing."""
         target = Path(path) if path else Path.home()
         target = target.resolve()

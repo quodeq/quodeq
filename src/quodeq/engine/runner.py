@@ -97,7 +97,7 @@ def _run_dimension_analysis(
     heartbeat = config.options.heartbeat_callback or make_heartbeat(dim_id, idx, ctx.total)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    ac_kwargs: dict[str, Any] = dict(
+    ac_kwargs: dict[str, object] = dict(
         jsonl_file=jsonl_file,
         analysis_budget=config.options.analysis_budget,
         heartbeat_callback=heartbeat,

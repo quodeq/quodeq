@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import re
-from typing import Any
+
 
 from quodeq.adapters.fs.report_parser.grades import parse_numeric_score
 from quodeq.adapters.fs.report_parser.json_parser import empty_severity_buckets
@@ -77,10 +77,10 @@ def _parse_grade_and_score(cells: list[str], is_four_col: bool) -> tuple[str | N
     return grade, score
 
 
-def parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: str) -> dict[str, Any]:
+def parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: str) -> dict[str, object]:
     """Parse a markdown evaluation report into a structured dict with principle grades."""
     table_lines = [line for line in extract_exec_summary(markdown) if not is_divider_row(line)]
-    principle_grades: list[dict[str, Any]] = []
+    principle_grades: list[dict[str, object]] = []
     if len(table_lines) >= 2:
         header_cells = [c for c in split_table_row(table_lines[0]) if c]
         is_four_col = len(header_cells) >= 4

@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 from collections.abc import Callable
-from typing import Any, Iterable
+from typing import Iterable
 
 from quodeq.shared.utils import TEXT_ENCODING
 
@@ -113,9 +113,9 @@ def _pad_and_finalize(files: list[str | None], contains: list[str | None], kwarg
     )
 
 
-def _parse_fields(lines: Iterable[tuple[str, str]]) -> dict[str, Any]:
+def _parse_fields(lines: Iterable[tuple[str, str]]) -> dict[str, object]:
     """Parse key=value pairs into a kwargs dict for DisciplineRule construction."""
-    kwargs: dict[str, Any] = {}
+    kwargs: dict[str, object] = {}
     files: list[str | None] = []
     contains: list[str | None] = []
     for key, value in lines:
