@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Iterable
 
 from quodeq.shared.logging import log_info
+from quodeq.shared.utils import TEXT_ENCODING
 
 
 def dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:
@@ -38,9 +39,9 @@ def deduplicate_jsonl(jsonl_path: Path) -> int:
     """
     if not jsonl_path.exists():
         return 0
-    with open(jsonl_path) as f:
+    with open(jsonl_path, encoding=TEXT_ENCODING) as f:
         unique_lines = dedup_jsonl_lines(f)
-    with open(jsonl_path, "w") as f:
+    with open(jsonl_path, "w", encoding=TEXT_ENCODING) as f:
         for line in unique_lines:
             f.write(line + "\n")
     log_info(f"Deduplicated {jsonl_path.name}: {len(unique_lines)} unique findings")
@@ -56,11 +57,11 @@ def merge_jsonl(result_jsonl_files: Iterable[Path], output: Path) -> Path:
         for jsonl_file in result_jsonl_files:
             if not jsonl_file.exists():
                 continue
-            with open(jsonl_file) as f:
+            with open(jsonl_file, encoding=TEXT_ENCODING) as f:
                 yield from f
 
     unique_lines = dedup_jsonl_lines(_iter_all_lines())
-    with open(output, "w") as out:
+    with open(output, "w", encoding=TEXT_ENCODING) as out:
         for line in unique_lines:
             out.write(line + "\n")
     log_info(f"Merged {len(unique_lines)} unique findings into {output.name}")

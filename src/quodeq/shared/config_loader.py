@@ -50,7 +50,7 @@ class Config:
     @classmethod
     def from_file(cls, path: Path) -> Config:
         obj = cls()
-        obj._data = json.loads(path.read_text())
+        obj._data = json.loads(path.read_text(encoding="utf-8"))
         return obj
 
 

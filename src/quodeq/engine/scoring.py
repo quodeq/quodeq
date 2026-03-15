@@ -24,6 +24,7 @@ from quodeq.engine.scoring_internals import (
 # Re-export public API symbols that other modules may import from here.
 _BASE_SCORE = 10
 _INSUFFICIENT_MAJORITY_RATIO = 0.5
+MODE_NUMERICAL = "numerical"
 
 __all__ = [
     "DEFAULT_WEIGHT",
@@ -184,7 +185,7 @@ def _score_all_principles(
     raw_principles: dict, mode: str, scale_mult: int, files_read: int,
 ) -> dict:
     """Score every principle in *raw_principles* and return the per-principle dict."""
-    scorer = _score_principle_numerical if mode == "numerical" else _score_principle_graded
+    scorer = _score_principle_numerical if mode == MODE_NUMERICAL else _score_principle_graded
     per_principle: dict = {}
     for key, pdata in raw_principles.items():
         ctx = _build_principle_context(key, pdata, scale_mult, files_read)
@@ -244,7 +245,7 @@ def _accumulate_weights(
             continue
         multiplier = weight_as_multiplier(pdata.get("weight", DEFAULT_WEIGHT))
         total_weight += multiplier
-        if mode == "numerical":
+        if mode == MODE_NUMERICAL:
             total_value += pdata["final_score"] * multiplier
         else:
             total_value += GRADE_LADDER.index(pdata["grade"]) * multiplier
@@ -253,7 +254,7 @@ def _accumulate_weights(
 
 def _build_overall_result(mode: str, total_weight: int, total_value: float) -> dict:
     """Build the overall result dict from aggregated weights."""
-    if mode == "numerical":
+    if mode == MODE_NUMERICAL:
         mean_score = round(total_value / total_weight, 1)
         return {
             "weighted_score": mean_score,
@@ -270,7 +271,7 @@ def _weighted_overall(principles_scores: dict, mode: str) -> dict:
     tw, tv, total, insuff = _accumulate_weights(principles_scores, mode)
 
     if tw == 0:
-        if mode == "numerical":
+        if mode == MODE_NUMERICAL:
             return {"weighted_score": 0.0, "grade": "Insufficient"}
         return {"weighted_grade": "Insufficient"}
 

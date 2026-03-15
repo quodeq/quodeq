@@ -42,6 +42,7 @@ REPORT_FINDING_SCHEMA = {
     "required": ["p", "t", "d", "w"],
 }
 
+_DEFAULT_FILE_BATCH_SIZE = 5
 GET_NEXT_FILES_NAME = "get_next_files"
 GET_NEXT_FILES_DESC = (
     "Get your next batch of files to analyse from the queue. "
@@ -130,9 +131,9 @@ def _handle_tools_call(
                 "content": [{"type": "text", "text": "No file queue configured."}],
                 "isError": True,
             })
-        count = args.get("count", 5)
+        count = args.get("count", _DEFAULT_FILE_BATCH_SIZE)
         if not isinstance(count, int) or count < 1:
-            count = 5
+            count = _DEFAULT_FILE_BATCH_SIZE
         files = queue.take(count, agent_id=agent_id)
         if not files:
             return _ok(request_id, {

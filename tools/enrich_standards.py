@@ -21,6 +21,7 @@ if _tools_dir not in sys.path:
     sys.path.insert(0, _tools_dir)
 
 _TEXT_ENCODING = "utf-8"
+_SEPARATOR_WIDTH = 60
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 
 # ---------------------------------------------------------------------------
@@ -149,16 +150,16 @@ def main() -> None:
 
     grand_total = 0
     for dimension in ALL_DIMENSIONS:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * _SEPARATOR_WIDTH}")
         print(f"  {dimension.upper()}")
-        print(f"{'='*60}")
+        print(f"{'=' * _SEPARATOR_WIDTH}")
         count = enrich_dimension(dimension, dry_run=dry_run)
         grand_total += count
         print(f"  Total new CWEs for {dimension}: {count}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * _SEPARATOR_WIDTH}")
     print(f"  GRAND TOTAL: {grand_total} new CWEs")
-    print(f"{'='*60}")
+    print(f"{'=' * _SEPARATOR_WIDTH}")
 
     if args.apply and args.compile:
         print("\nRecompiling standards...")

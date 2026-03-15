@@ -72,7 +72,7 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
             future.result()  # propagates any RuntimeError
 
 
-def run_generate_dimensions(paths: ConfigPaths) -> None:
+def run_generate_dimensions(paths: ConfigPaths, *, today: date | None = None) -> None:
     """Generate dimension definitions via the AI CLI and save the output."""
     try:
         template = (paths.prompts_dir / "dimensions-generator.md").read_text()
@@ -81,7 +81,7 @@ def run_generate_dimensions(paths: ConfigPaths) -> None:
     prompt = render_template(template, {
         "DIMENSIONS": ", ".join(DIMENSION_NAMES),
         "OUTPUT_DIR": str(paths.dimensions_dir),
-        "DATE": date.today().isoformat(),
+        "DATE": (today or date.today()).isoformat(),
     })
     stdout, err = run_ai_cli(prompt)
     if err:

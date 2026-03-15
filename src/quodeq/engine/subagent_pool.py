@@ -22,6 +22,7 @@ from quodeq.engine.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
 from quodeq.shared.utils import TEXT_ENCODING
 
+_AGENT_ID_PREFIX = "agent"
 _HEARTBEAT_INTERVAL = 10
 _FUTURE_POLL_INTERVAL_S = 0.5
 _HEARTBEAT_JOIN_TIMEOUT_S = 2
@@ -89,7 +90,7 @@ class SubagentPool:
 
     def _build_agent_config(self, idx: int) -> tuple[AnalysisConfig, Path, Path]:
         """Build per-agent AnalysisConfig, JSONL path, and stream path."""
-        agent_id = f"agent-{idx}"
+        agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
         # All agents append to the same JSONL -- the UI reads this file live.
         # Writes are synchronized via self._jsonl_lock.
         jsonl_file = self._shared_jsonl_path()
@@ -113,7 +114,7 @@ class SubagentPool:
 
     def _run_single(self, idx: int) -> SubagentResult:
         """Run a single subagent. Returns SubagentResult."""
-        agent_id = f"agent-{idx}"
+        agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
         ac, jsonl_file, stream_file = self._build_agent_config(idx)
         try:
             run_analysis(
@@ -208,7 +209,7 @@ class SubagentPool:
             remaining = self._should_respawn(pool_start, max_duration)
             if remaining:
                 log_info(f"  {remaining} files left -- spawning agent-{self._next_idx}")
-                self._finished[f"agent-{self._next_idx}"] = False
+                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
                 self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
                 self._next_idx += 1
 
@@ -235,7 +236,7 @@ class SubagentPool:
         try:
             with ThreadPoolExecutor(max_workers=self._n) as pool:
                 for _ in range(self._n):
-                    self._finished[f"agent-{self._next_idx}"] = False
+                    self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
                     self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
                     self._next_idx += 1
 

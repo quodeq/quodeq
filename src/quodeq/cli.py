@@ -27,6 +27,8 @@ from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_f
 
 
 _DEFAULT_N_SUBAGENTS = 5
+_MODE_NUMERICAL = "numerical"
+_MODE_GRADES = "grades"
 
 
 def _env_int(var: str, default: int | None) -> int | None:
@@ -55,8 +57,8 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "-o", "--output", default=get_evaluations_dir(), help="Reports output directory"
     )
     parser.add_argument(
-        "-m", "--mode", default="numerical",
-        choices=["numerical", "grades"], help="Scoring mode",
+        "-m", "--mode", default=_MODE_NUMERICAL,
+        choices=[_MODE_NUMERICAL, _MODE_GRADES], help="Scoring mode",
     )
     parser.add_argument(
         "--no-prescan", action="store_true", help="Skip source-file counting"

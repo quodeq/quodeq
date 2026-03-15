@@ -13,7 +13,10 @@ from quodeq.config.paths import default_paths
 
 @pytest.fixture()
 def plugin_dir() -> Path:
-    return default_paths().evaluators_dir / "bash"
+    path = default_paths().evaluators_dir / "bash"
+    if not path.exists():
+        pytest.skip("bash evaluator not installed")
+    return path
 
 
 def test_plugin_loads(plugin_dir: Path) -> None:

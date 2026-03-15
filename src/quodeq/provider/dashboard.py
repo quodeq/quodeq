@@ -189,13 +189,26 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     return selected_run, selected_index
 
 
+def _resolve_dashboard_cache(
+    cache_config: DashboardCacheConfig | None,
+    cache: OrderedDict[tuple, list[dict[str, Any]]] | None,
+    lock: threading.Lock | None,
+    max_cache_size: int | None,
+) -> DashboardCacheConfig:
+    """Merge deprecated individual cache params into a DashboardCacheConfig."""
+    if cache_config is not None:
+        return cache_config
+    if cache is not None or lock is not None or max_cache_size is not None:
+        return DashboardCacheConfig(cache=cache, lock=lock, max_size=max_cache_size)
+    return DashboardCacheConfig()
+
+
 def build_dashboard(
     reports_dir: str,
     project: str,
     run: str,
     *,
     cache_config: DashboardCacheConfig | None = None,
-    # Deprecated — use cache_config instead:
     cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
     lock: threading.Lock | None = None,
     max_cache_size: int | None = None,
@@ -203,26 +216,19 @@ def build_dashboard(
     """Build a full dashboard response for *project* at *run*.
 
     Pass *cache_config* to override the module-level LRU cache.
-    The individual cache/lock/max_cache_size params are deprecated.
     """
-    # Merge deprecated params into cache_config
-    if cache_config is None and (cache is not None or lock is not None or max_cache_size is not None):
-        cache_config = DashboardCacheConfig(cache=cache, lock=lock, max_size=max_cache_size)
+    _cc = _resolve_dashboard_cache(cache_config, cache, lock, max_cache_size)
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
     if not runs:
         raise FileNotFoundError(f"No runs found for project: {project}")
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
-
     selected_dimensions = read_run_data(reports_root, project, selected_run.run_id)
     selected_summary = summarize_dimensions(selected_dimensions)
     selected_dim_names = {d.get("dimension") for d in selected_dimensions}
 
-    # Cap runs scanned for history. Always include the selected run so
-    # selected_index remains a valid index into history_runs.
     history_runs = runs[:max(_MAX_HISTORY_RUNS, selected_index + 1)]
-    _cc = cache_config or DashboardCacheConfig()
     get_run_dimensions = _make_run_dimension_fetcher(
         reports_root, project, cache=_cc.cache, lock=_cc.lock, max_size=_cc.max_size,
     )
@@ -234,11 +240,8 @@ def build_dashboard(
     trend = _build_accumulated_trend(history_runs, get_run_dimensions)
 
     return _build_dashboard_result(
-        project=project,
-        runs=runs,
-        selected_run=selected_run,
-        selected_summary=selected_summary,
-        trend=trend,
+        project=project, runs=runs, selected_run=selected_run,
+        selected_summary=selected_summary, trend=trend,
         dimensions_with_trend=dimensions_with_trend,
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,

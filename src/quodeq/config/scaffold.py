@@ -16,6 +16,9 @@ _DIM_RELIABILITY = "reliability"
 _DIM_SECURITY = "security"
 _DIM_PERFORMANCE = "performance"
 _EXCLUDED_DIMS = ["usability", "flexibility"]
+_DEFAULT_DIM_WEIGHT = 1.0
+_SECURITY_DIM_WEIGHT = 1.2
+_PERFORMANCE_DIM_WEIGHT = 0.8
 
 
 def _env_weight(env_var: str, default: float) -> float:
@@ -107,9 +110,9 @@ def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:
 
 def _write_dimensions_json(plugin_dir: Path) -> None:
     """Write dimensions.json with default dimension weights."""
-    default_w = _env_weight("QUODEQ_DEFAULT_DIM_WEIGHT", 1.0)
-    security_w = _env_weight("QUODEQ_SECURITY_DIM_WEIGHT", 1.2)
-    perf_w = _env_weight("QUODEQ_PERFORMANCE_DIM_WEIGHT", 0.8)
+    default_w = _env_weight("QUODEQ_DEFAULT_DIM_WEIGHT", _DEFAULT_DIM_WEIGHT)
+    security_w = _env_weight("QUODEQ_SECURITY_DIM_WEIGHT", _SECURITY_DIM_WEIGHT)
+    perf_w = _env_weight("QUODEQ_PERFORMANCE_DIM_WEIGHT", _PERFORMANCE_DIM_WEIGHT)
     (plugin_dir / "dimensions.json").write_text(json.dumps({
         "applies": [
             {"id": _DIM_MAINTAINABILITY, "weight": default_w, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},

@@ -45,7 +45,7 @@ def _parse_args(argv: list[str] | None = None) -> _ServerArgs:
 
     if "--help" in args or "-h" in args:
         sys.stdout.write(_USAGE)
-        sys.exit(0)
+        raise SystemExit(0)
 
     i = 0
     while i < len(args):
