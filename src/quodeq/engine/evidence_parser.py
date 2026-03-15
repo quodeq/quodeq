@@ -45,14 +45,14 @@ def resolve_llm_refs(
 ) -> list[dict] | None:
     """Filter req_refs to only those the LLM selected, building URLs for unknown labels.
 
-    Only refs that carry a ``url`` are kept.  If nothing with a URL remains
-    after filtering, *all_req_refs* is returned so the caller always gets
-    the compiled CWE/CISQ references.
+    Only refs that carry a ``url`` are kept.  When the LLM did not select
+    any refs (``llm_refs`` is None/empty), returns ``None`` rather than
+    dumping all compiled refs — showing none is better than showing noise.
 
     *cwe_url_template* may be overridden for offline or internal deployments.
     """
     if not llm_refs:
-        return all_req_refs
+        return None
     by_label = {r["label"]: r for r in (all_req_refs or [])}
     result = []
     upper_labels = {k.upper(): r for k, r in by_label.items()}
@@ -70,7 +70,7 @@ def resolve_llm_refs(
                 result.append(matched)
     # Only keep refs that have a URL -- drop bare labels without links
     result = [r for r in result if r.get("url")]
-    return result if result else all_req_refs
+    return result if result else None
 
 
 def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
