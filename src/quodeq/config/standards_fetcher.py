@@ -29,11 +29,12 @@ def _asvs_version(override: str | None = None) -> str:
         return override
     return os.environ.get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
 
+_DEFAULT_FETCH_TIMEOUT_S = 30
 _RETRY_BASE_DELAY_S = 0.5
 _RETRY_JITTER_S = 0.3
 
 
-def _fetch_with_retry(url: str, timeout: int = 30, max_retries: int = 3) -> bytes:
+def _fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retries: int = 3) -> bytes:
     """Fetch URL content with exponential-backoff retries.
 
     Retries on network errors up to *max_retries* times, raising

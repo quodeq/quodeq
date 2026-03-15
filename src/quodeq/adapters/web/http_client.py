@@ -57,6 +57,7 @@ _DEFAULT_RETRY_BASE_DELAY = 0.5
 _DEFAULT_RETRY_JITTER = 0.3
 _DEFAULT_CB_THRESHOLD = 5
 _DEFAULT_CB_RESET = 60
+_BACKOFF_BASE = 2
 
 
 def _http_timeout_s() -> int:
@@ -197,7 +198,7 @@ class HttpClient:
                 return result
             # Retry on 5xx / network errors with exponential backoff + jitter
             if attempt < self._max_retries - 1:
-                delay = self._retry_base_delay * (2 ** attempt) + random.uniform(0, self._retry_jitter)
+                delay = self._retry_base_delay * (_BACKOFF_BASE ** attempt) + random.uniform(0, self._retry_jitter)
                 time.sleep(delay)
 
         self._record_failure()

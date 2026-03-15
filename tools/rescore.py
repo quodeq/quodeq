@@ -37,6 +37,7 @@ SCORING_MODE_BY_HASH = {
 }
 DEFAULT_SCORING_MODE = "numerical"
 _EVIDENCE_STEM_SUFFIX = "_evidence"
+_EVALUATORS_DIR = "evaluators"
 
 
 def detect_mode_from_evidence(evidence: dict) -> str:
@@ -151,7 +152,6 @@ def main():
         print(f"Project dir not found: {project_dir}")
         sys.exit(1)
 
-    _EVALUATORS_DIR = "evaluators"
     evaluators_root = repo_root / _EVALUATORS_DIR
     evidence_files = sorted(project_dir.glob("*/evidence/*_evidence.json"))
 

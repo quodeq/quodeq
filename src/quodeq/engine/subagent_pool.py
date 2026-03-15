@@ -28,6 +28,7 @@ _FUTURE_POLL_INTERVAL_S = 0.5
 _HEARTBEAT_JOIN_TIMEOUT_S = 2
 
 _DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
+_SECONDS_PER_MINUTE = 60
 
 
 @dataclass
@@ -152,7 +153,7 @@ class SubagentPool:
         while not stop.wait(_HEARTBEAT_INTERVAL):
             try:
                 elapsed = int(time.monotonic() - start)
-                mins, secs = divmod(elapsed, 60)
+                mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
                 findings = self._count_total_findings()
                 remaining, taken = FileQueue(self._queue_path).stats()
                 done = sum(1 for v in finished.values() if v)
@@ -213,11 +214,36 @@ class SubagentPool:
                 self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
                 self._next_idx += 1
 
+    def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
+        """Create and start the heartbeat monitoring thread."""
+        stop = threading.Event()
+        heartbeat = threading.Thread(
+            target=self._heartbeat_loop, args=(stop, self._finished), daemon=True,
+        )
+        heartbeat.start()
+        return stop, heartbeat
+
+    def _run_pool_loop(
+        self, results: list[SubagentResult], max_duration: float, pool_start: float,
+    ) -> None:
+        """Execute the main thread-pool loop: submit initial agents and respawn on completion."""
+        with ThreadPoolExecutor(max_workers=self._n) as pool:
+            for _ in range(self._n):
+                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+                self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
+                self._next_idx += 1
+
+            while self._futures:
+                done = self._collect_done(results)
+                if not done:
+                    time.sleep(_FUTURE_POLL_INTERVAL_S)
+                    continue
+                self._process_completed_futures(done, pool_start, max_duration, pool)
+
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, respawning when slots free up and queue has files.
 
         Returns list of SubagentResult (one per agent, including failures).
-
         """
         max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
         log_info(f"Launching {self._n} subagents for {self._dimension}")
@@ -225,27 +251,10 @@ class SubagentPool:
         self._finished.clear()
         self._futures.clear()
         self._next_idx = 0
-        pool_start = time.monotonic()
 
-        stop = threading.Event()
-        heartbeat = threading.Thread(
-            target=self._heartbeat_loop, args=(stop, self._finished), daemon=True,
-        )
-        heartbeat.start()
-
+        stop, heartbeat = self._start_heartbeat()
         try:
-            with ThreadPoolExecutor(max_workers=self._n) as pool:
-                for _ in range(self._n):
-                    self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
-                    self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
-                    self._next_idx += 1
-
-                while self._futures:
-                    done = self._collect_done(results)
-                    if not done:
-                        time.sleep(_FUTURE_POLL_INTERVAL_S)
-                        continue
-                    self._process_completed_futures(done, pool_start, max_duration, pool)
+            self._run_pool_loop(results, max_duration, time.monotonic())
         finally:
             stop.set()
             heartbeat.join(timeout=_HEARTBEAT_JOIN_TIMEOUT_S)

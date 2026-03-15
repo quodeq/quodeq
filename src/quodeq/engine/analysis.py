@@ -223,15 +223,7 @@ def _build_analysis_env(ai_cmd: str | None = None) -> dict[str, str]:
     return env
 
 
-_SENSITIVE_PATTERNS = re.compile(
-    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
-    re.IGNORECASE,
-)
-
-
-def _sanitize_stderr(text: str) -> str:
-    """Remove potential secrets from stderr output before including in errors."""
-    return _SENSITIVE_PATTERNS.sub(r"\1=***", text)
+from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
 
 
 def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:

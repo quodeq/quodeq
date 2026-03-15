@@ -20,6 +20,11 @@ from quodeq.shared.utils import ACTION_API_MODULE, IS_WIN32 as _IS_WIN32
 _HEALTH_CHECK_TIMEOUT_S = 0.5
 _HEALTH_POLL_INTERVAL_S = 0.2
 
+_ENV_ACTION_API_PORT = "QUODEQ_ACTION_API_PORT"
+_ENV_ACTION_API_HOST = "QUODEQ_ACTION_API_HOST"
+_ENV_STATIC_DIST = "QUODEQ_STATIC_DIST"
+_ENV_EVALUATIONS_DIR = "QUODEQ_EVALUATIONS_DIR"
+
 
 @dataclass(frozen=True)
 class ApiConfig:
@@ -43,7 +48,7 @@ def action_api_healthy(base_url: str) -> bool:
         with urllib.request.urlopen(url, timeout=_HEALTH_CHECK_TIMEOUT_S) as response:
             if response.status != 200:
                 return False
-            payload = json.loads(response.read().decode("utf-8"))
+            payload = json.loads(response.read().decode("utf-8"))  # health endpoint only
             return payload.get("ok") is True
     except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
         return False
@@ -75,11 +80,11 @@ def spawn_action_api(
 
     cfg = api_config or ApiConfig()
     env = os.environ.copy()
-    env["QUODEQ_ACTION_API_PORT"] = str(port)
-    env.setdefault("QUODEQ_ACTION_API_HOST", default_host)
+    env[_ENV_ACTION_API_PORT] = str(port)
+    env.setdefault(_ENV_ACTION_API_HOST, default_host)
     if cfg.static_dist:
-        env["QUODEQ_STATIC_DIST"] = str(cfg.static_dist)
-    env["QUODEQ_EVALUATIONS_DIR"] = cfg.evaluations_dir or get_evaluations_dir()
+        env[_ENV_STATIC_DIST] = str(cfg.static_dist)
+    env[_ENV_EVALUATIONS_DIR] = cfg.evaluations_dir or get_evaluations_dir()
     proc = subprocess.Popen(
         [sys.executable, "-m", ACTION_API_MODULE],
         env=env,

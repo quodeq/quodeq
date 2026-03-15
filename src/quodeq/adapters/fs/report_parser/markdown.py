@@ -30,19 +30,23 @@ def is_divider_row(line: str) -> bool:
     return _DIVIDER_RE.match(line) is not None
 
 
+_EXEC_SUMMARY_HEADER = "## executive summary"
+_SECTION_PREFIX = "## "
+
+
 def extract_exec_summary(markdown: str) -> list[str]:
     """Extract table lines from the '## Executive Summary' section of a markdown report."""
     lines = markdown.splitlines()
     start = -1
     for idx, line in enumerate(lines):
-        if line.strip().lower() == "## executive summary":
+        if line.strip().lower() == _EXEC_SUMMARY_HEADER:
             start = idx
             break
     if start < 0:
         return []
     result = []
     for line in lines[start + 1 :]:
-        if line.strip().startswith("## "):
+        if line.strip().startswith(_SECTION_PREFIX):
             break
         if "|" in line:
             result.append(line)

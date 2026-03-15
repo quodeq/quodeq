@@ -3,13 +3,7 @@ from pathlib import Path
 from quodeq.dashboard import _api_health, _build, runner
 from quodeq.dashboard._api_health import ApiConfig
 
-
-class _DummyProcess:
-    def poll(self):
-        return None
-
-    def terminate(self):
-        return None
+from tests.conftest import DummyProcess
 
 
 def test_spawn_action_api_sets_env(monkeypatch, tmp_path):
@@ -17,7 +11,7 @@ def test_spawn_action_api_sets_env(monkeypatch, tmp_path):
 
     def fake_popen(cmd, env=None, **kwargs):
         captured["env"] = env
-        return _DummyProcess()
+        return DummyProcess()
 
     monkeypatch.setattr(_api_health.subprocess, "Popen", fake_popen)
     _api_health.spawn_action_api(8001, tmp_path / "fake.pid", "127.0.0.1")
@@ -29,7 +23,7 @@ def test_spawn_action_api_sets_static_dist(monkeypatch, tmp_path):
 
     def fake_popen(cmd, env=None, **kwargs):
         captured["env"] = env
-        return _DummyProcess()
+        return DummyProcess()
 
     dist_path = tmp_path / "dist"
     monkeypatch.setattr(_api_health.subprocess, "Popen", fake_popen)

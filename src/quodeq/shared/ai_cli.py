@@ -2,15 +2,9 @@
 from __future__ import annotations
 
 import os
-import re
 import subprocess
 
-from quodeq.shared.utils import get_ai_cmd
-
-_SENSITIVE_PATTERNS = re.compile(
-    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
-    re.IGNORECASE,
-)
+from quodeq.shared.utils import get_ai_cmd, sanitize_sensitive
 _AI_CLI_FALLBACK_ERROR = (
     "AI command failed — check that the AI binary is installed, "
     "API key is set, and network is available"
@@ -41,7 +35,7 @@ def run_ai_cli(prompt: str, *, timeout: int | None = None) -> tuple[str | None, 
         return None, f"AI command not found: {cmd}"
     except subprocess.CalledProcessError as exc:
         raw = exc.stderr.strip() if exc.stderr else ""
-        return None, _SENSITIVE_PATTERNS.sub(r"\1=***", raw) or _AI_CLI_FALLBACK_ERROR
+        return None, sanitize_sensitive(raw) or _AI_CLI_FALLBACK_ERROR
     except subprocess.TimeoutExpired:
         return None, "AI command timed out"
 

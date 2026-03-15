@@ -8,6 +8,8 @@ from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_info, log_success
 from quodeq.shared.utils import get_ai_provider
 
+_AI_PROVIDER_EXPORT_PREFIX = "export AI_PROVIDER="
+
 PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
     "copilot": ("GITHUB_TOKEN", "copilot"),
@@ -33,7 +35,7 @@ def get_current_provider(
         return provider
     if paths.env_file.exists():
         for line in paths.env_file.read_text().splitlines():
-            if line.strip().startswith("export AI_PROVIDER="):
+            if line.strip().startswith(_AI_PROVIDER_EXPORT_PREFIX):
                 return line.split("=", 1)[1].strip()
     if default_provider is not None:
         return default_provider

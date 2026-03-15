@@ -17,6 +17,19 @@ _DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
 TEXT_ENCODING = "utf-8"
 """Standard text encoding used across the codebase for file I/O."""
 
+import re as _re
+
+SENSITIVE_PATTERNS = _re.compile(
+    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
+    _re.IGNORECASE,
+)
+"""Compiled regex for detecting secrets in log/error output."""
+
+
+def sanitize_sensitive(text: str) -> str:
+    """Mask potential secrets in *text* for safe logging/display."""
+    return SENSITIVE_PATTERNS.sub(r"\1=***", text)
+
 
 @dataclass
 class Config:

@@ -15,6 +15,10 @@ from quodeq.shared.utils import TEXT_ENCODING
 
 _logger = logging.getLogger(__name__)
 
+_TYPE_VIOLATION = "violation"
+_TYPE_COMPLIANCE = "compliance"
+_FINDING_TYPES = frozenset({_TYPE_VIOLATION, _TYPE_COMPLIANCE})
+
 
 @dataclass(frozen=True)
 class _ResponseOptions:
@@ -87,14 +91,14 @@ def _parse_jsonl_findings(
             obj = json.loads(raw)
         except json.JSONDecodeError:
             continue
-        if not obj.get("p") or obj.get("t") not in ("violation", "compliance"):
+        if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
             continue
         dedup_key = (obj.get("p"), obj.get("t"), obj.get("file"), obj.get("line"))
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
         entry = _build_finding_entry(obj, dimension, req_refs_lookup)
-        if obj["t"] == "violation":
+        if obj["t"] == _TYPE_VIOLATION:
             violations.append(entry)
         else:
             compliance.append(entry)
@@ -180,7 +184,7 @@ def _parse_entries_from_texts(
                 obj = json.loads(stripped_line)
             except json.JSONDecodeError:
                 continue
-            if not obj.get("p") or obj.get("t") not in ("violation", "compliance"):
+            if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
                 continue
             key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
             if key in seen:
@@ -190,7 +194,7 @@ def _parse_entries_from_texts(
             snippet = entry.get("snippet")
             if snippet:
                 entry["snippet"] = str(snippet).splitlines()[0].strip()
-            if obj["t"] == "violation":
+            if obj["t"] == _TYPE_VIOLATION:
                 violations.append(entry)
             else:
                 compliance.append(entry)

@@ -35,6 +35,7 @@ def _build_score_lookup(per_principle_scores: dict) -> dict:
 
 _VIOLATION_FIELDS = ("file", "line", "title", "reason", "snippet", "severity", "req", "req_refs")
 _COMPLIANCE_FIELDS = ("file", "line", "title", "reason", "snippet", "req", "req_refs")
+_GRADE_INSUFFICIENT = "Insufficient"
 
 
 def _flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[dict]:
@@ -65,7 +66,7 @@ def _build_principle_rows(
         grade = matched.get("grade")
         raw_final = matched.get("final_score")
         # Insufficient principles have no meaningful score — suppress "0.0/10".
-        if grade == "Insufficient":
+        if grade == _GRADE_INSUFFICIENT:
             formatted_score = None
         else:
             formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
