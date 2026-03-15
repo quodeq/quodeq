@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from quodeq.shared.types import JsonObject
+
 
 from quodeq.adapters.hybrid._hybrid_call import hybrid_call
 from quodeq.ports.evaluators import EvaluatorsRepository
@@ -24,7 +26,7 @@ class HybridEvaluatorsRepository:
         """
         return hybrid_call(self._web.list_evaluators, self._fs.list_evaluators, discipline)
 
-    def get_evaluator(self, discipline: str, dimension: str) -> dict[str, object]:
+    def get_evaluator(self, discipline: str, dimension: str) -> JsonObject:
         """Fetch a single evaluator definition, preferring the web source.
 
         Example::

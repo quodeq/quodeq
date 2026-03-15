@@ -8,7 +8,7 @@ import shutil
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.shared.types import ProjectEntry, ProjectListResponse, ProjectMetadata, ViolationSummary
+from quodeq.shared.types import JsonObject, ProjectEntry, ProjectListResponse, ProjectMetadata, ViolationSummary
 
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.jobs import JobManager
@@ -27,7 +27,7 @@ from quodeq.adapters.fs.report_parser import (
 )
 
 
-def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, object]:
+def _read_repo_info(reports_root: Path, entry_name: str) -> JsonObject:
     """Read repository_info.json for a project, returning an empty dict on failure."""
     info_path = reports_root / entry_name / "repository_info.json"
     if not info_path.exists():
@@ -60,7 +60,7 @@ def _check_path_exists(path: str | None, location: str | None) -> bool | None:
     return None
 
 
-def _extract_project_metadata(info: dict[str, object], entry_name: str) -> ProjectMetadata:
+def _extract_project_metadata(info: JsonObject, entry_name: str) -> ProjectMetadata:
     """Extract and normalize optional metadata fields from repository info."""
     return {
         "name": info.get("name") or entry_name,
@@ -255,7 +255,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return False
         return True
 
-    def get_project_info(self, reports_dir: str, project: str) -> dict[str, object] | None:
+    def get_project_info(self, reports_dir: str, project: str) -> JsonObject | None:
         """Return project metadata including discipline and available dimensions."""
         info_path = (Path(reports_dir) / project / "repository_info.json").resolve()
         if not info_path.is_relative_to(Path(reports_dir).resolve()):
@@ -271,15 +271,15 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         available_dimensions = _list_available_dimensions_for_discipline(discipline) if discipline else []
         return {**info, "discipline": discipline, "availableDimensions": available_dimensions}
 
-    def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, object]:
+    def get_dashboard(self, reports_dir: str, project: str, run: str) -> JsonObject:
         """Return the dashboard payload for a specific project run."""
         return build_dashboard(reports_dir, project, run)
 
-    def get_accumulated(self, reports_dir: str, project: str, as_of: str | None) -> dict[str, object] | None:
+    def get_accumulated(self, reports_dir: str, project: str, as_of: str | None) -> JsonObject | None:
         """Return accumulated dimension data across all runs up to as_of."""
         return compute_accumulated(reports_dir, project, as_of)
 
-    def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str) -> dict[str, object] | None:
+    def get_dimension_eval(self, reports_dir: str, project: str, run_id: str, dimension: str) -> JsonObject | None:
         """Return parsed evaluation data for a single dimension in a run."""
         from quodeq.config.paths import default_paths
         base = (Path(reports_dir) / project / run_id).resolve()

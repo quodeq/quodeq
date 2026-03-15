@@ -1,6 +1,8 @@
 """Base class for web API-backed repositories."""
 from __future__ import annotations
 
+from quodeq.shared.types import JsonObject
+
 from quodeq.adapters.web.http_client import HttpClient, check_response_status
 from quodeq.ports.data_errors import InvalidDataError
 
@@ -12,7 +14,7 @@ class WebRepository:
         self._base_url = base_url.rstrip("/")
         self._client = client or HttpClient()
 
-    def _get_dict(self, path: str) -> dict[str, object]:
+    def _get_dict(self, path: str) -> JsonObject:
         """GET *path*, validate the response is a dict, and return it."""
         response = self._client.get_json(f"{self._base_url}{path}", {})
         check_response_status(response)

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from quodeq.shared.types import JsonObject
+
 
 from quodeq.adapters.hybrid._hybrid_call import hybrid_call
 from quodeq.ports.evaluations import EvaluationsRepository
@@ -18,7 +20,7 @@ class HybridEvaluationsRepository:
         """Return all report IDs, preferring the web source."""
         return hybrid_call(self._web.list_reports, self._fs.list_reports)
 
-    def get_report(self, report_id: str) -> dict[str, object]:
+    def get_report(self, report_id: str) -> JsonObject:
         """Fetch a single evaluation report, preferring the web source.
 
         Args:

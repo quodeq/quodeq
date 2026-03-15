@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from quodeq.shared.types import ViolationSummary
+from quodeq.shared.types import JsonObject, ViolationSummary
 
 from quodeq.adapters.fs.report_parser import parse_eval_from_json, parse_eval_markdown
 from quodeq.shared.utils import TEXT_ENCODING
@@ -29,7 +29,7 @@ def _max_violation_files(override: int | None = None) -> int:
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     compiled_dir: Path | None = None,
-) -> dict[str, object] | None:
+) -> JsonObject | None:
     """Try successive file formats to load evaluation data for a dimension."""
 
     eval_path = base / "evaluation" / f"{dimension}.json"
@@ -61,9 +61,9 @@ def resolve_dimension_eval(
     return None
 
 
-def aggregate_violations(dashboard: dict[str, object]) -> ViolationSummary:
+def aggregate_violations(dashboard: JsonObject) -> ViolationSummary:
     """Aggregate violation counts and top files from dashboard dimensions."""
-    summary: dict[str, object] = {"total": 0, "critical": 0, "major": 0, "minor": 0, "byFile": {}}
+    summary: JsonObject = {"total": 0, "critical": 0, "major": 0, "minor": 0, "byFile": {}}
     for dim in dashboard.get("dimensions", []) or []:
         summary["total"] += dim.get("totals", {}).get("violationCount", 0)
         severity = dim.get("totals", {}).get("severity", {})

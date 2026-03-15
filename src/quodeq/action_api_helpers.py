@@ -1,13 +1,15 @@
 """Shared helpers for action API modules."""
 from __future__ import annotations
 
+from quodeq.shared.types import JsonObject
+
 
 def error_response(message: str, status: int, code: str) -> tuple[dict[str, str], int]:
     """Build a standardized error response tuple for Flask endpoints."""
     return {"error": message, "code": code}, status
 
 
-def validate_evaluation_payload(payload: dict[str, object]) -> str | None:
+def validate_evaluation_payload(payload: JsonObject) -> str | None:
     """Validate the evaluate request payload.
 
     Returns an error message string if validation fails, or ``None`` if valid.

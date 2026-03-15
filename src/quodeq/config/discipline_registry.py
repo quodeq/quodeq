@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from quodeq.shared.types import JsonObject
+
 import logging
 from dataclasses import dataclass
 from pathlib import Path
@@ -113,9 +115,9 @@ def _pad_and_finalize(files: list[str | None], contains: list[str | None], kwarg
     )
 
 
-def _parse_fields(lines: Iterable[tuple[str, str]]) -> dict[str, object]:
+def _parse_fields(lines: Iterable[tuple[str, str]]) -> JsonObject:
     """Parse key=value pairs into a kwargs dict for DisciplineRule construction."""
-    kwargs: dict[str, object] = {}
+    kwargs: JsonObject = {}
     files: list[str | None] = []
     contains: list[str | None] = []
     for key, value in lines:

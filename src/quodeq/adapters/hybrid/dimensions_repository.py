@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from quodeq.shared.types import JsonObject
+
 
 from quodeq.adapters.hybrid._hybrid_call import hybrid_call
 from quodeq.ports.dimensions import DimensionsRepository
@@ -24,7 +26,7 @@ class HybridDimensionsRepository:
         """
         return hybrid_call(self._web.list_dimensions, self._fs.list_dimensions)
 
-    def get_dimension(self, name: str) -> dict[str, object]:
+    def get_dimension(self, name: str) -> JsonObject:
         """Fetch a single dimension definition, preferring the web source.
 
         Example::

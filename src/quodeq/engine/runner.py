@@ -5,6 +5,8 @@ Merge per-dimension Evidence into a single Evidence object.
 """
 from __future__ import annotations
 
+from quodeq.shared.types import JsonObject
+
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -97,7 +99,7 @@ def _run_dimension_analysis(
     heartbeat = config.options.heartbeat_callback or make_heartbeat(dim_id, idx, ctx.total)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    ac_kwargs: dict[str, object] = dict(
+    ac_kwargs: JsonObject = dict(
         jsonl_file=jsonl_file,
         analysis_budget=config.options.analysis_budget,
         heartbeat_callback=heartbeat,

@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.shared.types import DimensionData, DimensionSummary
+from quodeq.shared.types import JsonObject, DimensionData, DimensionSummary
 
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
@@ -102,9 +102,9 @@ def _enrich_dimensions_with_trend(
 def _build_accumulated_trend(
     runs: list[RunInfo],
     get_run_dimensions: Callable[[str], list[DimensionData]],
-) -> list[dict[str, object]]:
+) -> list[JsonObject]:
     """Build trend using accumulated scores across all runs (oldest to newest)."""
-    trend: list[dict[str, object]] = []
+    trend: list[JsonObject] = []
     acc_by_dim: dict[str, DimensionData] = {}
     for item in reversed(runs):  # oldest -> newest
         run_dims = get_run_dimensions(item.run_id)
@@ -151,7 +151,7 @@ def _make_run_dimension_fetcher(
 class _DashboardPayload:
     """Pre-computed parts for the dashboard response."""
     selected_summary: DimensionSummary
-    trend: list[dict[str, object]]
+    trend: list[JsonObject]
     dimensions_with_trend: list[DimensionData]
     previous_by_dimension: dict[str, DimensionData]
     stale_previous_by_dimension: dict[str, DimensionData]
@@ -163,7 +163,7 @@ def _build_dashboard_result(
     runs: list[RunInfo],
     selected_run: RunInfo,
     payload: _DashboardPayload,
-) -> dict[str, object]:
+) -> JsonObject:
     """Assemble the final dashboard response dict from pre-computed parts."""
     return {
         "project": project,
@@ -237,7 +237,7 @@ def build_dashboard(
     run: str,
     *,
     cache_config: DashboardCacheConfig | None = None,
-) -> dict[str, object]:
+) -> JsonObject:
     """Build a full dashboard response for *project* at *run*.
 
     Pass *cache_config* to override the module-level LRU cache.

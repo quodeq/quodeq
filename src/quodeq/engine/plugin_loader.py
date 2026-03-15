@@ -1,5 +1,7 @@
 """Plugin loader — discovers and validates evaluator plugin directories."""
 from __future__ import annotations
+
+from quodeq.shared.types import JsonObject
 import json
 import logging
 from pathlib import Path
@@ -88,7 +90,7 @@ def load_plugin_full(plugin_dir: Path) -> dict:
     }
 
 
-def _try_load(plugin_dir: Path) -> dict[str, object] | None:
+def _try_load(plugin_dir: Path) -> JsonObject | None:
     """Try loading a plugin from *plugin_dir*, returning None on failure."""
     plugin_file = plugin_dir / "plugin.json"
     if not plugin_file.exists():

@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.shared.types import DimensionData
+from quodeq.shared.types import JsonObject, DimensionData
 
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
@@ -188,7 +188,7 @@ class _AccumulatedResult:
 def _build_accumulated_response(
     project: str,
     result: _AccumulatedResult,
-) -> dict[str, object]:
+) -> JsonObject:
     """Assemble the final accumulated response dict."""
     return {
         "project": project,
@@ -231,7 +231,7 @@ def compute_accumulated(
     as_of: str | None,
     *,
     cache_config: AccumulatedCacheConfig | None = None,
-) -> dict[str, object] | None:
+) -> JsonObject | None:
     """Compute the accumulated (cross-run) view for *project*.
 
     Optional *cache_config* overrides the module-level LRU cache, making

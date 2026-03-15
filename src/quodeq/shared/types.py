@@ -125,8 +125,8 @@ class ScoringResult(TypedDict):
     discipline: str
     date: str
     mode: str
-    principles: dict[str, dict[str, object]]
-    overall: dict[str, object]
+    principles: dict[str, JsonObject]
+    overall: JsonObject
     scale: ScaleInfo
 
 
