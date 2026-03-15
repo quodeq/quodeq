@@ -177,10 +177,10 @@ class TestApiRouteSubagentModel:
 
 class TestRunnerSubagentModelResolution:
     """The runner should pick subagent_model from options first, then
-    QUODEQ_SUBAGENT_MODEL env, then fall back to claude-haiku-4-5."""
+    QUODEQ_SUBAGENT_MODEL env, then fall back to None (client default)."""
 
     @staticmethod
-    def _resolve(opts: AnalysisOptions) -> str:
+    def _resolve(opts: AnalysisOptions) -> str | None:
         """Mirror the production resolution path in _subagent_runner."""
         from quodeq.engine._subagent_runner import _default_subagent_model
         return opts.subagent_model or _default_subagent_model()
@@ -194,10 +194,11 @@ class TestRunnerSubagentModelResolution:
         opts = AnalysisOptions()  # subagent_model is None
         assert self._resolve(opts) == "claude-sonnet-4-6"
 
-    def test_default_haiku(self, monkeypatch) -> None:
+    def test_default_uses_client_model(self, monkeypatch) -> None:
+        """No selection and no env var → None (AI CLI uses its own default model)."""
         monkeypatch.delenv("QUODEQ_SUBAGENT_MODEL", raising=False)
         opts = AnalysisOptions()
-        assert self._resolve(opts) == "claude-haiku-4-5"
+        assert self._resolve(opts) is None
 
     def test_options_beats_env(self, monkeypatch) -> None:
         monkeypatch.setenv("QUODEQ_SUBAGENT_MODEL", "claude-haiku-4-5")
@@ -205,7 +206,7 @@ class TestRunnerSubagentModelResolution:
         assert self._resolve(opts) == "claude-opus-4-6"
 
     def test_empty_string_falls_through(self, monkeypatch) -> None:
-        """Empty string in options is falsy → should fall through to env/default."""
+        """Empty string in options is falsy → should fall through to client default."""
         monkeypatch.delenv("QUODEQ_SUBAGENT_MODEL", raising=False)
         opts = AnalysisOptions(subagent_model="")
-        assert self._resolve(opts) == "claude-haiku-4-5"
+        assert self._resolve(opts) is None

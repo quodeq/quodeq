@@ -31,12 +31,14 @@ class DimensionCallbacks:
     parse_evidence: Callable[..., Evidence | None]
 
 
-_DEFAULT_SUBAGENT_MODEL = "claude-haiku-4-5"
+def _default_subagent_model() -> str | None:
+    """Return the subagent model override, or None to use the client's default.
 
-
-def _default_subagent_model() -> str:
-    """Return the subagent model, reading from env at call time (not import time)."""
-    return os.environ.get("QUODEQ_SUBAGENT_MODEL", _DEFAULT_SUBAGENT_MODEL)
+    When no model is configured (no env var, no CLI/API selection), returns
+    None so the AI CLI omits ``--model`` and uses its own default — the same
+    model used for the pre-analysis phase.
+    """
+    return os.environ.get("QUODEQ_SUBAGENT_MODEL") or None
 
 
 def _list_plugin_files(config: RunConfig, ctx_total: int, dim_id: str, idx: int) -> tuple[list[str], set[str]]:
@@ -72,6 +74,9 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
 def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    # Explicit selection (power selector / CLI) takes priority; otherwise
+    # fall back to env var; if neither is set, None lets the AI CLI use
+    # its own default model (same model as the pre-analysis phase).
     subagent_model = config.options.subagent_model or _default_subagent_model()
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
