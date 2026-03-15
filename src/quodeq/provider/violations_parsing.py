@@ -169,6 +169,29 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
     return _build_violation_response(ctx, violations, [], _ResponseOptions(partial=True))
 
 
+def _try_parse_text_line(
+    stripped_line: str, dimension: str, seen: set[str],
+) -> tuple[str, dict[str, Any]] | None:
+    """Parse a single JSON line from a text block, returning (type, entry) or None."""
+    if not stripped_line.startswith("{"):
+        return None
+    try:
+        obj = json.loads(stripped_line)
+    except json.JSONDecodeError:
+        return None
+    if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
+        return None
+    key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
+    if key in seen:
+        return None
+    seen.add(key)
+    entry = _build_finding_entry(obj, dimension)
+    snippet = entry.get("snippet")
+    if snippet:
+        entry["snippet"] = str(snippet).splitlines()[0].strip()
+    return obj["t"], entry
+
+
 def _parse_entries_from_texts(
     texts: list[str], dimension: str, seen: set[str]
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
@@ -177,24 +200,11 @@ def _parse_entries_from_texts(
     compliance: list[dict[str, Any]] = []
     for text in texts:
         for text_line in text.splitlines():
-            stripped_line = text_line.strip()
-            if not stripped_line.startswith("{"):
+            result = _try_parse_text_line(text_line.strip(), dimension, seen)
+            if result is None:
                 continue
-            try:
-                obj = json.loads(stripped_line)
-            except json.JSONDecodeError:
-                continue
-            if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
-                continue
-            key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
-            if key in seen:
-                continue
-            seen.add(key)
-            entry = _build_finding_entry(obj, dimension)
-            snippet = entry.get("snippet")
-            if snippet:
-                entry["snippet"] = str(snippet).splitlines()[0].strip()
-            if obj["t"] == _TYPE_VIOLATION:
+            finding_type, entry = result
+            if finding_type == _TYPE_VIOLATION:
                 violations.append(entry)
             else:
                 compliance.append(entry)

@@ -12,6 +12,8 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 from typing import Any, Callable, Protocol, runtime_checkable
 
 from quodeq.adapters.fs.report_parser._date_utils import find_date_in_dir, normalize_date
@@ -60,7 +62,7 @@ def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
         with os.scandir(path) as it:
             return list(it)
     except OSError as exc:
-        logging.getLogger(__name__).debug(
+        _logger.debug(
             "Could not list directory %s: %s. Check path exists and file permissions are correct",
             path.name,
             exc,
@@ -162,7 +164,7 @@ def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
             parsed_ev = parse_evidence_file(Path(entry.path))
             dimension = parsed_ev.get("dimension")
             if dimension is None:
-                logging.getLogger(__name__).warning(
+                _logger.warning(
                     "Evidence file %s missing 'dimension' key, skipping", entry.name,
                 )
                 continue

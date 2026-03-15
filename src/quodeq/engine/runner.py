@@ -186,7 +186,7 @@ def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
 
     ctx = _PluginContext(
         dimensions_data=full["dimensions"],
-        analysis_md=analysis_file.read_text() if analysis_file.exists() else "",
+        analysis_md=analysis_file.read_text(encoding="utf-8") if analysis_file.exists() else "",
         date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         template=load_template(config.options.template_path),
         plugin_name=full["plugin"].get("name", config.plugin_id),

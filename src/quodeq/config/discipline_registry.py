@@ -210,8 +210,13 @@ class DisciplineRegistry:
         return self._any_detect_file_matches(repo, rule)
 
     def detect_matches(self, repo: Path) -> list[str]:
-        """Return the names of all disciplines whose rules match the given repo."""
+        """Return the names of all disciplines whose rules match the given repo.
+
+        Fallback-only disciplines (``detect_fallback=True``) are only included
+        when no non-fallback discipline matched.
+        """
         matches: list[str] = []
+        fallback_matches: list[str] = []
         matched_names: set[str] = set()
         for rule in self.iter_disciplines():
             if rule.detect_excludes and any(
@@ -219,9 +224,12 @@ class DisciplineRegistry:
             ):
                 continue
             if self._matches_rule(repo, rule):
-                matches.append(rule.name)
-                matched_names.add(rule.name)
-        return matches
+                if rule.detect_fallback:
+                    fallback_matches.append(rule.name)
+                else:
+                    matches.append(rule.name)
+                    matched_names.add(rule.name)
+        return matches if matches else fallback_matches
 
     def choose_highest_priority(self, matches: list[str]) -> str:
         """Select the discipline with the lowest (highest-priority) detect_priority value."""

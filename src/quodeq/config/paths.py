@@ -67,15 +67,15 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
         target = os.environ
     if not paths.env_file.exists():
         return
-    for line in paths.env_file.read_text().splitlines():
-        line = line.strip()
-        if not line or line.startswith("#"):
+    for raw_line in paths.env_file.read_text().splitlines():
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
             continue
-        if line.startswith("export "):
-            line = line[len("export "):]
-        if "=" not in line:
+        if stripped.startswith("export "):
+            stripped = stripped[len("export "):]
+        if "=" not in stripped:
             continue
-        key, _, value = line.partition("=")
+        key, _, value = stripped.partition("=")
         key = key.strip()
         value = value.strip()
         if key and key not in target:

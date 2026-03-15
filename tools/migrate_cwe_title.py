@@ -24,7 +24,7 @@ def _build_cwe_name_lookup(compiled_dir: Path) -> dict[int, str]:
     lookup: dict[int, str] = {}
     for f in compiled_dir.glob("*.json"):
         try:
-            data = json.loads(f.read_text())
+            data = json.loads(f.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             print(f"  SKIP  cannot read {f}: {exc}")
             continue
@@ -59,7 +59,7 @@ def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[in
     Returns (violations_patched, compliance_patched).
     """
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {path}: {exc}")
         return 0, 0
@@ -68,7 +68,7 @@ def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[in
 
     if apply and (v_count or c_count):
         try:
-            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         except OSError as exc:
             print(f"  ERROR writing {path}: {exc}")
 

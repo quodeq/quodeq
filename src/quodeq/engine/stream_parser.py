@@ -58,12 +58,12 @@ def _collect_file_reads(data: dict) -> set[str]:
 
 def _process_texts(texts: list[str], out, stats: dict) -> None:
     """Write JSONL evidence from extracted text blocks, updating stats."""
-    for text in texts:
-        text = text.strip()
-        if not text:
+    for raw_text in texts:
+        stripped_text = raw_text.strip()
+        if not stripped_text:
             continue
         stats["text_blocks"] += 1
-        c, scanned = _extract_jsonl_from_text(text, out)
+        c, scanned = _extract_jsonl_from_text(stripped_text, out)
         stats["jsonl_lines"] += c
         stats["total_text_lines"] += scanned
 

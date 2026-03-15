@@ -27,7 +27,7 @@ _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
 def _load_fallback_claude_models() -> list[str]:
     """Load fallback Claude model list from config/ai_defaults.json."""
     try:
-        data = json.loads(_AI_DEFAULTS_PATH.read_text())
+        data = json.loads(_AI_DEFAULTS_PATH.read_text(encoding="utf-8"))
         return data.get("fallback_claude_models", [])
     except (OSError, json.JSONDecodeError):
         return []

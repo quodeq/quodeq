@@ -34,12 +34,12 @@ def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
     except (OSError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {jsonl_path}: {exc}")
         return lookup
-    for raw in lines:
-        raw = raw.strip()
-        if not raw:
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped:
             continue
         try:
-            obj = json.loads(raw)
+            obj = json.loads(stripped)
         except json.JSONDecodeError:
             continue
         cwe = obj.get("cwe")

@@ -24,13 +24,15 @@ GRADE_LADDER: list[str] = [
 # Asymmetric: max discount 15%, max penalty 30%.
 # Uses raw distinct type counts (no severity weighting) to avoid bias from
 # compliance findings that lack proper severity fields.
+_MAX_PENALTY_MULTIPLIER = 1.30
+
 _RATIO_DAMPENING_TABLE: list[tuple[float, float]] = [
     (3.0, 0.85),   # strong compliance evidence
     (2.0, 0.90),   # good compliance
     (1.0, 0.95),   # balanced
     (0.5, 1.00),   # neutral
     (0.0, 1.15),   # weak compliance (ratio > 0 but < 0.5)
-    (-1.0, 1.30),  # no compliance at all (sentinel, always matches)
+    (-1.0, _MAX_PENALTY_MULTIPLIER),  # no compliance at all (sentinel, always matches)
 ]
 
 # ---------------------------------------------------------------------------
@@ -145,7 +147,7 @@ def compliance_dampening(
         return 1.0  # no violations -> dampening is irrelevant
 
     if total_compliance == 0:
-        return 1.30  # no compliance at all -> max penalty
+        return _MAX_PENALTY_MULTIPLIER  # no compliance at all -> max penalty
 
     ratio = total_compliance / total_violations
     for threshold, multiplier in _RATIO_DAMPENING_TABLE:
