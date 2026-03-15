@@ -34,7 +34,18 @@ def normalize_date(raw: str) -> tuple[str, str] | None:
 def find_date_in_dir(
     directory: Path, suffix: str, safe_read_dir: Callable[[Path], list[os.DirEntry[str]]],
 ) -> tuple[str | None, str] | None:
-    """Scan JSON files in *directory* matching *suffix* for a parsable date field."""
+    """Scan JSON files in *directory* matching *suffix* for a parsable date field.
+
+    Args:
+        directory: Path to the directory to scan.
+        suffix: File-name suffix to filter on (e.g. ``"_evidence.json"``).
+        safe_read_dir: Callable that lists directory entries, returning an
+            empty list on OS errors.
+
+    Returns:
+        A ``(sortable_iso, human_label)`` tuple from the first file whose
+        ``"date"`` field is parsable, or ``None`` if no date is found.
+    """
     for entry in safe_read_dir(directory):
         if not entry.is_file() or not entry.name.endswith(suffix):
             continue

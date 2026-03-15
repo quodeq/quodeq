@@ -48,7 +48,7 @@ def action_api_healthy(base_url: str) -> bool:
         with urllib.request.urlopen(url, timeout=_HEALTH_CHECK_TIMEOUT_S) as response:
             if response.status != 200:
                 return False
-            payload = json.loads(response.read().decode("utf-8"))  # health endpoint only
+            payload = json.loads(response.read().decode("utf-8"))
             return payload.get("ok") is True
     except (OSError, urllib.error.URLError, ValueError, json.JSONDecodeError):
         return False

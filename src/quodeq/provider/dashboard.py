@@ -194,42 +194,35 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     return selected_run, selected_index
 
 
-def _resolve_dashboard_cache(
-    cache_config: DashboardCacheConfig | None,
-    cache: OrderedDict[tuple, list[dict[str, Any]]] | None,
-    lock: threading.Lock | None,
-    max_cache_size: int | None,
-) -> DashboardCacheConfig:
-    """Merge deprecated individual cache params into a DashboardCacheConfig."""
-    if cache_config is not None:
-        return cache_config
-    if cache is not None or lock is not None or max_cache_size is not None:
-        return DashboardCacheConfig(cache=cache, lock=lock, max_size=max_cache_size)
-    return DashboardCacheConfig()
+@dataclass(frozen=True)
+class _SelectedRunContext:
+    """Pre-resolved data for the selected run in a dashboard request."""
+    run: RunInfo
+    index: int
+    dimensions: list[dict[str, Any]]
+    summary: dict[str, Any]
 
 
 def _compute_dashboard_payload(
-    reports_root: Path, project: str,
-    runs: list[RunInfo], selected_run: RunInfo, selected_index: int,
-    selected_dimensions: list[dict[str, Any]], selected_summary: dict[str, Any],
-    cc: DashboardCacheConfig,
+    reports_root: Path, project: str, runs: list[RunInfo],
+    ctx: _SelectedRunContext, cc: DashboardCacheConfig,
 ) -> _DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
-    selected_dim_names = {d.get("dimension") for d in selected_dimensions}
-    history_runs = runs[:max(_MAX_HISTORY_RUNS, selected_index + 1)]
+    selected_dim_names = {d.get("dimension") for d in ctx.dimensions}
+    history_runs = runs[:max(_MAX_HISTORY_RUNS, ctx.index + 1)]
     get_run_dimensions = _make_run_dimension_fetcher(
         reports_root, project, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
     )
     previous_by_dimension = _collect_previous_scores(
-        history_runs, selected_index, selected_dim_names, get_run_dimensions,
+        history_runs, ctx.index, selected_dim_names, get_run_dimensions,
     )
     stale_dimensions, stale_previous_by_dimension = collect_stale_dimensions(
-        history_runs, selected_index, selected_dim_names, get_run_dimensions,
+        history_runs, ctx.index, selected_dim_names, get_run_dimensions,
     )
     return _DashboardPayload(
-        selected_summary=selected_summary,
+        selected_summary=ctx.summary,
         trend=_build_accumulated_trend(history_runs, get_run_dimensions),
-        dimensions_with_trend=_enrich_dimensions_with_trend(selected_dimensions, previous_by_dimension),
+        dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,
         stale_dimensions=stale_dimensions,
@@ -242,25 +235,24 @@ def build_dashboard(
     run: str,
     *,
     cache_config: DashboardCacheConfig | None = None,
-    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
-    lock: threading.Lock | None = None,
-    max_cache_size: int | None = None,
 ) -> dict[str, Any]:
     """Build a full dashboard response for *project* at *run*.
 
     Pass *cache_config* to override the module-level LRU cache.
     """
-    _cc = _resolve_dashboard_cache(cache_config, cache, lock, max_cache_size)
+    cc = cache_config or DashboardCacheConfig()
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
     if not runs:
         raise FileNotFoundError(f"No runs found for project: {project}")
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
-    selected_dimensions = read_run_data(reports_root, project, selected_run.run_id)
-    selected_summary = summarize_dimensions(selected_dimensions)
-    payload = _compute_dashboard_payload(
-        reports_root, project, runs, selected_run, selected_index,
-        selected_dimensions, selected_summary, _cc,
+    selected_dims = read_run_data(reports_root, project, selected_run.run_id)
+    ctx = _SelectedRunContext(
+        run=selected_run,
+        index=selected_index,
+        dimensions=selected_dims,
+        summary=summarize_dimensions(selected_dims),
     )
+    payload = _compute_dashboard_payload(reports_root, project, runs, ctx, cc)
     return _build_dashboard_result(project, runs, selected_run, payload)

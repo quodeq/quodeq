@@ -15,12 +15,15 @@ import subprocess
 import sys
 from pathlib import Path
 
-# Ensure tools/ is on sys.path so we can import sibling modules.
+# Ensure tools/ and src/ are on sys.path so we can import sibling modules.
 _tools_dir = str(Path(__file__).resolve().parent)
+_src_dir = str(Path(__file__).resolve().parents[1] / "src")
 if _tools_dir not in sys.path:
     sys.path.insert(0, _tools_dir)
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
 
-_TEXT_ENCODING = "utf-8"
+from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
 _SEPARATOR_WIDTH = 60
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 

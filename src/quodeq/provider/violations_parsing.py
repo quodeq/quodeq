@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterable
 
@@ -201,43 +201,47 @@ def _parse_entries_from_texts(
     return violations, compliance
 
 
-def _parse_stream_line(
-    stripped: str, dimension: str, seen: set[str],
-    violations: list[dict[str, Any]], compliance: list[dict[str, Any]], files_read: set[str],
-) -> None:
-    """Parse one non-empty stream line, appending findings in-place."""
+@dataclass
+class _StreamAccumulator:
+    """Mutable accumulator for stream-line parsing results."""
+    dimension: str
+    violations: list[dict[str, Any]] = field(default_factory=list)
+    compliance: list[dict[str, Any]] = field(default_factory=list)
+    seen: set[str] = field(default_factory=set)
+    files_read: set[str] = field(default_factory=set)
+
+
+def _parse_stream_line(stripped: str, acc: _StreamAccumulator) -> None:
+    """Parse one non-empty stream line, appending findings to *acc*."""
     try:
         event = json.loads(stripped)
     except json.JSONDecodeError:
         return
     extractor = TEXT_EXTRACTORS.get(event.get("type"))
     texts = extractor(event) if extractor else []
-    new_v, new_c = _parse_entries_from_texts(texts, dimension, seen)
-    violations.extend(new_v)
-    compliance.extend(new_c)
-    files_read.update(extract_files_from_event(event))
+    new_v, new_c = _parse_entries_from_texts(texts, acc.dimension, acc.seen)
+    acc.violations.extend(new_v)
+    acc.compliance.extend(new_c)
+    acc.files_read.update(extract_files_from_event(event))
 
 
 def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
     """Extract violations from a live-stream event log file."""
-    violations: list[dict[str, Any]] = []
-    compliance: list[dict[str, Any]] = []
-    seen: set[str] = set()
-    files_read: set[str] = set()
+    acc = _StreamAccumulator(dimension=ctx.dimension)
     try:
         with open(stream_path, encoding=TEXT_ENCODING) as _stream:
             for raw_line in _stream:
                 stripped = raw_line.strip()
                 if stripped:
-                    _parse_stream_line(stripped, ctx.dimension, seen, violations, compliance, files_read)
+                    _parse_stream_line(stripped, acc)
     except OSError as exc:
         _logger.warning("Failed to read stream file: %s", exc)
         return None
 
     return _build_violation_response(
-        ctx, violations, compliance,
+        ctx, acc.violations, acc.compliance,
         _ResponseOptions(
             partial=True,
-            progress={"filesRead": len(files_read), "violations": len(violations), "compliance": len(compliance)},
+            progress={"filesRead": len(acc.files_read), "violations": len(acc.violations), "compliance": len(acc.compliance)},
         ),
     )

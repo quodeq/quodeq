@@ -3,6 +3,8 @@ from __future__ import annotations
 import io
 import threading
 
+import pytest
+
 from quodeq.provider.jobs import JobManager
 
 
@@ -28,7 +30,9 @@ def _make_manager_with_event(spawn_impl, job_id_holder: list) -> tuple[JobManage
     return manager, done
 
 
-def test_job_manager_tracks_status_and_logs() -> None:
+@pytest.fixture()
+def completed_success_job() -> dict:
+    """Run a successful job and return the final result dict."""
     def spawn_impl(*_args, **_kwargs):
         return FakeProcess(
             stdout="Report path: /app/reports/sample-project/20260220/evaluation\nhello\n",
@@ -40,18 +44,30 @@ def test_job_manager_tracks_status_and_logs() -> None:
     manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["echo", "ok"])
     job_id_holder.append(job["jobId"])
-
-    assert job["status"] in {"running", "done", "failed"}
-
     done.wait(timeout=5.0)
     result = manager.get_job(job["jobId"])
     assert result is not None
+    return result
 
-    assert result["status"] == "done"
-    assert result["exitCode"] == 0
-    assert any("hello" in line for line in result["logs"])
-    assert result["outputProject"] == "sample-project"
-    assert result["outputRunId"] == "20260220"
+
+def test_successful_job_status(completed_success_job: dict) -> None:
+    assert completed_success_job["status"] == "done"
+
+
+def test_successful_job_exit_code(completed_success_job: dict) -> None:
+    assert completed_success_job["exitCode"] == 0
+
+
+def test_successful_job_captures_logs(completed_success_job: dict) -> None:
+    assert any("hello" in line for line in completed_success_job["logs"])
+
+
+def test_successful_job_parses_output_project(completed_success_job: dict) -> None:
+    assert completed_success_job["outputProject"] == "sample-project"
+
+
+def test_successful_job_parses_output_run_id(completed_success_job: dict) -> None:
+    assert completed_success_job["outputRunId"] == "20260220"
 
 
 def test_job_manager_handles_failure() -> None:

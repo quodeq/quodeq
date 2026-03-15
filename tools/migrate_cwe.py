@@ -21,7 +21,9 @@ import json
 import sys
 from pathlib import Path
 
-_TEXT_ENCODING = "utf-8"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
 
 
 def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
