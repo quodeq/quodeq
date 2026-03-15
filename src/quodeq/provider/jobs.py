@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 import json
 import os
@@ -16,6 +16,7 @@ from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 import logging
 import subprocess
 
+from quodeq.core.types import JobSnapshot
 from quodeq.engine.runner import CC_MARKER_KEY
 
 _logger = logging.getLogger(__name__)
@@ -45,22 +46,22 @@ class Job:
     current_dimension: str | None = None
     dimensions: list[str] | None = None
 
-    def to_dict(self) -> dict[str, Any]:
-        """Serialize the job state to a JSON-compatible dict."""
-        return {
-            "jobId": self.job_id,
-            "status": self.status,
-            "command": Path(self.command[0]).name if self.command else "",
-            "startedAt": self.started_at,
-            "endedAt": self.ended_at,
-            "exitCode": self.exit_code,
-            "logs": list(self.logs),
-            "outputProject": self.output_project,
-            "outputRunId": self.output_run_id,
-            "phase": self.phase,
-            "currentDimension": self.current_dimension,
-            "dimensions": self.dimensions,
-        }
+    def to_dict(self) -> JobSnapshot:
+        """Return a frozen snapshot of the current job state."""
+        return JobSnapshot(
+            job_id=self.job_id,
+            status=self.status,
+            command=Path(self.command[0]).name if self.command else "",
+            started_at=self.started_at,
+            ended_at=self.ended_at,
+            exit_code=self.exit_code,
+            logs=list(self.logs),
+            output_project=self.output_project,
+            output_run_id=self.output_run_id,
+            phase=self.phase,
+            current_dimension=self.current_dimension,
+            dimensions=self.dimensions,
+        )
 
 
 @runtime_checkable
@@ -150,7 +151,7 @@ class JobManager:
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
 
-    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> dict[str, Any]:
+    def start_job(self, cmd: list[str], *, cwd: str | None = None, env: dict[str, str] | None = None) -> JobSnapshot:
         """Spawn a subprocess and return its initial job state."""
         job_id = str(uuid.uuid4())
         job = Job(
@@ -180,8 +181,7 @@ class JobManager:
             with self._lock:
                 self._store.put(job)
             result = job.to_dict()
-            result["error"] = str(exc)
-            return result
+            return replace(result, error=str(exc))
 
         with self._lock:
             self._store.put(job)
@@ -207,7 +207,7 @@ class JobManager:
             process.terminate()
         return True
 
-    def get_job(self, job_id: str) -> dict[str, Any] | None:
+    def get_job(self, job_id: str) -> JobSnapshot | None:
         """Return the current state of a job, or None if not found."""
         with self._lock:
             job = self._store.get(job_id)
@@ -215,8 +215,8 @@ class JobManager:
                 return None
             return job.to_dict()
 
-    def list_jobs(self) -> list[dict[str, Any]]:
-        """Return all tracked jobs as serialized dicts."""
+    def list_jobs(self) -> list[JobSnapshot]:
+        """Return all tracked jobs as frozen snapshots."""
         with self._lock:
             return [job.to_dict() for job in self._store.list()]
 

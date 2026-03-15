@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
+from quodeq.core.types import JobSnapshot
 from quodeq.provider.base import EvaluationOptions
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import is_valid_repo_url
@@ -30,7 +31,7 @@ class EvaluationDispatcher(Protocol):
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> JobSnapshot:
         """Submit an evaluation command and return the initial job state."""
         ...
 
@@ -47,7 +48,7 @@ class SubprocessDispatcher:
         *,
         cwd: str | None = None,
         env: dict[str, str] | None = None,
-    ) -> dict[str, Any]:
+    ) -> JobSnapshot:
         return self._jobs.start_job(cmd, cwd=cwd, env=env)
 
 
@@ -111,7 +112,7 @@ class FsEvaluationMixin:
             env["SUBAGENT_MODEL"] = options.subagent_model
         return env
 
-    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict[str, Any]:
+    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
         """Start an asynchronous evaluation subprocess for a repository."""
         if is_repo_url(repo):
             if not is_valid_repo_url(repo):
@@ -127,7 +128,7 @@ class FsEvaluationMixin:
         cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
-    def get_evaluation_status(self, job_id: str) -> dict[str, Any] | None:
+    def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:
         """Return the current status of an evaluation job."""
         return self._jobs.get_job(job_id)
 
@@ -135,6 +136,6 @@ class FsEvaluationMixin:
         """Cancel a running evaluation job."""
         return self._jobs.cancel_job(job_id)
 
-    def list_evaluations(self) -> list[dict]:
+    def list_evaluations(self) -> list[JobSnapshot]:
         """Return all evaluation jobs (running, done, failed, cancelled)."""
         return self._jobs.list_jobs()

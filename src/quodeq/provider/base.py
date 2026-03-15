@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
+from quodeq.core.types import JobSnapshot, ViolationSummary
+
 
 @dataclass
 class EvaluationOptions:
@@ -52,7 +54,7 @@ class ReportActions(Protocol):
         """Return parsed evaluation data for a single dimension in a run."""
         ...
 
-    def get_violations(self, reports_dir: str, project: str, run_id: str) -> dict:
+    def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         """Return aggregated violation summary for a run."""
         ...
 
@@ -60,11 +62,11 @@ class ReportActions(Protocol):
 class EvaluationActions(Protocol):
     """Methods for running and managing evaluations."""
 
-    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict:
+    def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
         """Start an asynchronous evaluation job and return job metadata."""
         ...
 
-    def get_evaluation_status(self, job_id: str) -> dict:
+    def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:
         """Return current status of an evaluation job."""
         ...
 
@@ -72,7 +74,7 @@ class EvaluationActions(Protocol):
         """Cancel a running evaluation job. Return True on success."""
         ...
 
-    def list_evaluations(self) -> list[dict]:
+    def list_evaluations(self) -> list[JobSnapshot]:
         """Return all evaluation jobs (running, done, failed, cancelled)."""
         ...
 

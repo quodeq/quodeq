@@ -5,6 +5,7 @@ import json
 import re
 from pathlib import Path
 
+from quodeq.core.types import ScoringResult, to_camel_dict
 from quodeq.engine.evidence import Evidence
 from quodeq.engine.scoring_internals import score_to_grade_label
 
@@ -24,12 +25,17 @@ def grade_from_score(score: str | None) -> str | None:
 
 
 def _build_score_lookup(per_principle_scores: dict) -> dict:
-    """Index per-principle scores by display_name for joining against evidence."""
+    """Index per-principle scores by display_name for joining against evidence.
+
+    Values may be PrincipleScore dataclasses or plain dicts; we normalise to
+    dicts via ``to_camel_dict`` so downstream code can use uniform access.
+    """
     lookup: dict = {}
     for item in per_principle_scores.values():
-        key = item.get("display_name", "")
+        raw = to_camel_dict(item) if not isinstance(item, dict) else item
+        key = raw.get("displayName") or raw.get("display_name", "")
         if key:
-            lookup[key] = item
+            lookup[key] = raw
     return lookup
 
 
@@ -64,7 +70,8 @@ def _build_principle_rows(
         label = pdata.get("display_name", raw_key)
         matched = lookup.get(label, {})
         grade = matched.get("grade")
-        raw_final = matched.get("final_score")
+        # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
+        raw_final = matched.get("finalScore") or matched.get("final_score")
         # Insufficient principles have no meaningful score — suppress "0.0/10".
         if grade == _GRADE_INSUFFICIENT:
             formatted_score = None
@@ -75,10 +82,12 @@ def _build_principle_rows(
             "score": formatted_score,
             "grade": grade or grade_from_score(formatted_score),
         }
-        if matched.get("confidence_interval") is not None:
-            row["confidence_interval"] = matched["confidence_interval"]
-        if matched.get("grade_stability") is not None:
-            row["grade_stability"] = matched["grade_stability"]
+        ci = matched.get("confidenceInterval") or matched.get("confidence_interval")
+        gs = matched.get("gradeStability") or matched.get("grade_stability")
+        if ci is not None:
+            row["confidence_interval"] = ci
+        if gs is not None:
+            row["grade_stability"] = gs
         raw_metrics = pdata.get("metrics")
         if raw_metrics:
             row["metrics"] = raw_metrics
@@ -96,18 +105,23 @@ def _build_principle_rows(
     return principle_rows, flat_violations, flat_compliance, sev_tally
 
 
-def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> dict:
+def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
     """Build a complete JSON report dict from evidence and scoring data for one dimension."""
     per_principle_scores: dict = {}
     aggregate: dict = {}
     if scores:
-        per_principle_scores = scores.get("principles", {})
-        aggregate = scores.get("overall", {})
+        if isinstance(scores, dict):
+            per_principle_scores = scores.get("principles", {})
+            aggregate = scores.get("overall", {})
+        else:
+            per_principle_scores = scores.principles
+            aggregate = to_camel_dict(scores.overall) if scores.overall else {}
 
     lookup = _build_score_lookup(per_principle_scores)
     principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
 
-    weighted = aggregate.get("weighted_score")
+    # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
+    weighted = aggregate.get("weightedScore") or aggregate.get("weighted_score")
     if weighted is not None:
         top_score = f"{round(weighted, 1)}/10"
         top_grade = aggregate.get("grade") or grade_from_score(top_score)
@@ -146,7 +160,7 @@ def build_report_json(dimension: str, evidence: dict, scores: dict | None) -> di
     }
 
 
-def build_full_report(evidence: Evidence, scores: dict) -> dict:
+def build_full_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
     """Build report with engine metadata fields."""
     ev_dict = evidence.to_evidence_dict()
     base = build_report_json(evidence.plugin_id, ev_dict, scores)
@@ -155,13 +169,13 @@ def build_full_report(evidence: Evidence, scores: dict) -> dict:
     return base
 
 
-def build_dashboard_report(evidence: Evidence, scores: dict) -> dict:
+def build_dashboard_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
     """Build web dashboard report format."""
     ev_dict = evidence.to_evidence_dict()
     return build_report_json(evidence.plugin_id, ev_dict, scores)
 
 
-def write_reports(evidence: Evidence, scores: dict, output_dir: Path) -> None:
+def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: Path) -> None:
     """Write report files."""
     output_dir.mkdir(parents=True, exist_ok=True)
 
@@ -178,7 +192,7 @@ def write_reports(evidence: Evidence, scores: dict, output_dir: Path) -> None:
         raise OSError(f"Failed to write report files to {output_dir}: {exc}") from exc
 
 
-def write_dimension_report(evidence: Evidence, scores: dict, dimension: str, output_dir: Path) -> None:
+def write_dimension_report(evidence: Evidence, scores: ScoringResult | dict, dimension: str, output_dir: Path) -> None:
     """Write a per-dimension report file: <dimension>.json."""
     output_dir.mkdir(parents=True, exist_ok=True)
 

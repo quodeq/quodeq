@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import os
 
+from quodeq.core.types import Deductions
+
 # Progressive drop tables: (min_type_count_inclusive, levels_to_drop).
 # Checked top-to-bottom; first matching row wins.
 _CRITICAL_DROP_TABLE: list[tuple[int, int]] = [(12, 3), (4, 2), (1, 1)]
@@ -51,7 +53,7 @@ def build_deductions(
     critical_penalty: float | None = None,
     major_penalty: float | None = None,
     minor_penalty: float | None = None,
-) -> dict:
+) -> Deductions:
     """Compute point deductions for numerical mode.
 
     Rules:
@@ -84,17 +86,17 @@ def build_deductions(
     cap_from_critical = _CRITICAL_SCORE_CAP if n_critical >= critical_type_cap else _MAX_SCORE
     cap_from_major = _MAJOR_SCORE_CAP if n_major >= major_type_cap else _MAX_SCORE
 
-    return {
-        "critical_type_count": n_critical,
-        "major_type_count": n_major,
-        "minor_type_count": n_minor,
-        "critical_deduction": critical_deduction,
-        "major_deduction": major_deduction,
-        "minor_deduction": minor_deduction,
-        "total_deduction": critical_deduction + major_deduction + minor_deduction,
-        "critical_cap": cap_from_critical,
-        "major_cap": cap_from_major,
-    }
+    return Deductions(
+        critical_type_count=n_critical,
+        major_type_count=n_major,
+        minor_type_count=n_minor,
+        critical_deduction=critical_deduction,
+        major_deduction=major_deduction,
+        minor_deduction=minor_deduction,
+        total_deduction=critical_deduction + major_deduction + minor_deduction,
+        critical_cap=cap_from_critical,
+        major_cap=cap_from_major,
+    )
 
 
 def count_grade_drops(violation_type_counts: dict[str, int], scale_multiplier: int = 1) -> int:

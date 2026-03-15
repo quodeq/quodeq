@@ -26,11 +26,11 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
         write_dimension_report(evidence, scores, dimension, output_dir)
         # Clean up stream now that the eval JSON exists
         cleanup_stream(work_dir / f"{dimension}_live.stream")
-        overall = scores.get("overall", {})
+        overall = scores.overall
         if mode == _NUMERICAL_MODE:
-            val = overall.get("weighted_score")
+            val = overall.weighted_score if overall else None
             results[dimension] = f"{val}/10" if val is not None else _NA_LABEL
         else:
-            results[dimension] = overall.get("weighted_grade", _NA_LABEL)
+            results[dimension] = (overall.weighted_grade if overall else None) or _NA_LABEL
 
     return results

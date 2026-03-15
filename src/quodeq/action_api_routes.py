@@ -11,6 +11,7 @@ from flask import Flask, Response, jsonify, request, send_from_directory
 
 from quodeq.action_api_helpers import error_response, validate_evaluation_payload
 from quodeq.action_api_zip import export_project_zip
+from quodeq.core.types import to_camel_dict
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.shared.utils import get_evaluations_dir
@@ -147,7 +148,7 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         except FileNotFoundError:
             body, status = error_response("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        return jsonify(payload)
+        return jsonify(to_camel_dict(payload))
 
 
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> None:
@@ -156,7 +157,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
         """Return all evaluation jobs."""
-        return jsonify(provider.list_evaluations())
+        return jsonify([to_camel_dict(j) for j in provider.list_evaluations()])
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
@@ -195,7 +196,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
         except (FileNotFoundError, ValueError):
             body, status = error_response("Invalid repository", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
-        return jsonify(job), HTTPStatus.ACCEPTED
+        return jsonify(to_camel_dict(job)), HTTPStatus.ACCEPTED
 
 
 def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
@@ -208,7 +209,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if not job:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        return jsonify(job)
+        return jsonify(to_camel_dict(job))
 
     @app.delete("/api/evaluations/<job_id>")
     def cancel_evaluation(job_id: str) -> Response | tuple[Response, int]:
@@ -238,7 +239,7 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
     def plugins() -> Response:
         """Return installed evaluator plugins with their dimensions."""
         from quodeq.provider.plugin_discovery import discover_plugins
-        return jsonify(discover_plugins())
+        return jsonify([to_camel_dict(p) for p in discover_plugins()])
 
     @app.get("/api/browse")
     def browse() -> Response | tuple[Response, int]:

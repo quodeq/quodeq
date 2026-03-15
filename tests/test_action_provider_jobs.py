@@ -5,6 +5,7 @@ import threading
 
 import pytest
 
+from quodeq.core.types import JobSnapshot
 from quodeq.provider.jobs import JobManager
 
 
@@ -31,8 +32,8 @@ def _make_manager_with_event(spawn_impl, job_id_holder: list) -> tuple[JobManage
 
 
 @pytest.fixture()
-def completed_success_job() -> dict:
-    """Run a successful job and return the final result dict."""
+def completed_success_job() -> JobSnapshot:
+    """Run a successful job and return the final result snapshot."""
     def spawn_impl(*_args, **_kwargs):
         return FakeProcess(
             stdout="Report path: /app/reports/sample-project/20260220/evaluation\nhello\n",
@@ -43,31 +44,31 @@ def completed_success_job() -> dict:
     job_id_holder: list[str] = []
     manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["echo", "ok"])
-    job_id_holder.append(job["jobId"])
+    job_id_holder.append(job.job_id)
     done.wait(timeout=5.0)
-    result = manager.get_job(job["jobId"])
+    result = manager.get_job(job.job_id)
     assert result is not None
     return result
 
 
-def test_successful_job_status(completed_success_job: dict) -> None:
-    assert completed_success_job["status"] == "done"
+def test_successful_job_status(completed_success_job: JobSnapshot) -> None:
+    assert completed_success_job.status == "done"
 
 
-def test_successful_job_exit_code(completed_success_job: dict) -> None:
-    assert completed_success_job["exitCode"] == 0
+def test_successful_job_exit_code(completed_success_job: JobSnapshot) -> None:
+    assert completed_success_job.exit_code == 0
 
 
-def test_successful_job_captures_logs(completed_success_job: dict) -> None:
-    assert any("hello" in line for line in completed_success_job["logs"])
+def test_successful_job_captures_logs(completed_success_job: JobSnapshot) -> None:
+    assert any("hello" in line for line in completed_success_job.logs)
 
 
-def test_successful_job_parses_output_project(completed_success_job: dict) -> None:
-    assert completed_success_job["outputProject"] == "sample-project"
+def test_successful_job_parses_output_project(completed_success_job: JobSnapshot) -> None:
+    assert completed_success_job.output_project == "sample-project"
 
 
-def test_successful_job_parses_output_run_id(completed_success_job: dict) -> None:
-    assert completed_success_job["outputRunId"] == "20260220"
+def test_successful_job_parses_output_run_id(completed_success_job: JobSnapshot) -> None:
+    assert completed_success_job.output_run_id == "20260220"
 
 
 def test_job_manager_handles_failure() -> None:
@@ -77,12 +78,12 @@ def test_job_manager_handles_failure() -> None:
     job_id_holder: list[str] = []
     manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["false"])
-    job_id_holder.append(job["jobId"])
+    job_id_holder.append(job.job_id)
 
     done.wait(timeout=5.0)
-    result = manager.get_job(job["jobId"])
+    result = manager.get_job(job.job_id)
     assert result is not None
 
-    assert result["status"] == "failed"
-    assert result["exitCode"] == 2
-    assert any("boom" in line for line in result["logs"])
+    assert result.status == "failed"
+    assert result.exit_code == 2
+    assert any("boom" in line for line in result.logs)

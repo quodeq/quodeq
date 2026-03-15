@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser import parse_eval_from_json, parse_eval_markdown
-from quodeq.core.types import ViolationResponse
+from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.provider.violation_context import ViolationContext  # noqa: F401 — re-export
 from quodeq.provider.violations_parsing import (
@@ -60,19 +60,24 @@ def resolve_dimension_eval(
     return None
 
 
-def aggregate_violations(dashboard: dict[str, Any]) -> dict[str, Any]:
+def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
     """Aggregate violation counts and top files from dashboard dimensions."""
-    summary: dict[str, Any] = {"total": 0, "critical": 0, "major": 0, "minor": 0, "byFile": {}}
+    total = 0
+    critical = 0
+    major = 0
+    minor = 0
+    by_file: dict[str, dict[str, Any]] = {}
     for dim in dashboard.get("dimensions", []) or []:
-        summary["total"] += dim.get("totals", {}).get("violationCount", 0)
+        total += dim.get("totals", {}).get("violationCount", 0)
         severity = dim.get("totals", {}).get("severity", {})
-        for sev_key in ("critical", "major", "minor"):
-            summary[sev_key] += severity.get(sev_key, 0)
+        critical += severity.get("critical", 0)
+        major += severity.get("major", 0)
+        minor += severity.get("minor", 0)
         for violation in dim.get("violations", []) or []:
             file_path = violation.get("file")
             if not file_path:
                 continue
-            entry = summary["byFile"].setdefault(
+            entry = by_file.setdefault(
                 file_path, {"path": file_path, "count": 0, "critical": 0, "major": 0, "minor": 0}
             )
             entry["count"] += 1
@@ -80,8 +85,12 @@ def aggregate_violations(dashboard: dict[str, Any]) -> dict[str, Any]:
             if sev in entry:
                 entry[sev] += 1
     top_files = sorted(
-        summary["byFile"].values(), key=lambda item: item["count"], reverse=True,
+        by_file.values(), key=lambda item: item["count"], reverse=True,
+    )[:_max_violation_files()]
+    return ViolationSummary(
+        total=total,
+        critical=critical,
+        major=major,
+        minor=minor,
+        files=[ViolationFileEntry(**f) for f in top_files],
     )
-    summary["files"] = top_files[:_max_violation_files()]
-    summary.pop("byFile", None)
-    return summary

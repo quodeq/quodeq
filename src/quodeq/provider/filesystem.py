@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
 
@@ -14,7 +15,7 @@ from quodeq.provider.evaluation_mixin import FsEvaluationMixin
 from quodeq.provider.tooling_mixin import FsToolingMixin
 from quodeq.provider.violations import aggregate_violations, resolve_dimension_eval
 from quodeq.config.paths import default_paths
-from quodeq.core.types import DimensionResult, ViolationResponse, to_camel_dict
+from quodeq.core.types import DimensionResult, ProjectEntry, ViolationResponse, ViolationSummary, to_camel_dict
 from quodeq.provider.accumulated import compute_accumulated
 from quodeq.provider.dashboard import build_dashboard
 from quodeq.adapters.fs.report_parser import (
@@ -39,7 +40,7 @@ def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
 
 def _read_latest_run_summary(
     reports_root: Path, entry_name: str, run_id: str,
-) -> tuple[str | None, str | None, int | None]:
+) -> tuple[str | None, float | None, int | None]:
     """Read latest grade, score, and file count from a run. Returns (grade, score, files)."""
     try:
         dims = read_run_data(reports_root, entry_name, run_id)
@@ -71,38 +72,43 @@ def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str
     }
 
 
-def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, Any]:
-    """Build a single project dict from its directory and run list."""
+def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> ProjectEntry:
+    """Build a frozen ProjectEntry from its directory and run list."""
     info = _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
     latest_grade, latest_score, files_count = _read_latest_run_summary(
         reports_root, entry_name, runs[0].run_id,
     )
-    return {
-        "id": entry_name,
-        **meta,
-        "runsCount": len(runs),
-        "latestRunId": runs[0].run_id,
-        "latestDate": runs[0].date_iso,
-        "pathExists": _check_path_exists(meta["path"], meta["location"]),
-        "filesCount": files_count,
-        "latestGrade": latest_grade,
-        "latestScore": latest_score,
-    }
+    return ProjectEntry(
+        id=entry_name,
+        name=meta["name"],
+        parent=meta["parent"],
+        display_name=meta["displayName"],
+        discipline=meta["discipline"],
+        path=meta["path"],
+        location=meta["location"],
+        runs_count=len(runs),
+        latest_run_id=runs[0].run_id,
+        latest_date=runs[0].date_iso,
+        path_exists=_check_path_exists(meta["path"], meta["location"]),
+        files_count=files_count,
+        latest_grade=latest_grade,
+        latest_score=latest_score,
+    )
 
 
-def _find_best_parent(p_path: str, project_id: str, candidates: list[dict[str, Any]]) -> str | None:
+def _find_best_parent(p_path: str, project_id: str, candidates: list[ProjectEntry]) -> str | None:
     """Find the candidate whose path is the longest prefix of *p_path*.
 
     Candidates must be pre-sorted by descending path length so the first
     matching candidate is always the longest (best) prefix — O(1) average case.
     """
     for candidate in candidates:
-        if candidate["id"] == project_id:
+        if candidate.id == project_id:
             continue
-        c_path = candidate["path"].rstrip("/")
+        c_path = candidate.path.rstrip("/")
         if p_path.startswith(c_path + "/"):
-            return candidate["id"]
+            return candidate.id
     return None
 
 
@@ -116,19 +122,23 @@ def _max_projects_listed(override: int | None = None) -> int:
     return int(os.environ.get("QUODEQ_MAX_PROJECTS_LISTED", str(_DEFAULT_MAX_PROJECTS_LISTED)))
 
 
-def _auto_detect_parents(projects: list[dict[str, Any]]) -> None:
-    """Set parent for local projects that share a path prefix with another project."""
-    local_with_path = [p for p in projects if p.get("location") == "local" and p.get("path")]
+def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:
+    """Return projects with parent set for local projects sharing a path prefix."""
+    local_with_path = [p for p in projects if p.location == "local" and p.path]
     # Sort descending by path length so _find_best_parent returns on first match.
-    local_with_path.sort(key=lambda p: len(p["path"]), reverse=True)
+    local_with_path.sort(key=lambda p: len(p.path), reverse=True)
+    parent_map: dict[str, str] = {}
     for project in projects:
-        if project.get("parent") is not None:
+        if project.parent is not None:
             continue
-        if project.get("location") != "local" or not project.get("path"):
+        if project.location != "local" or not project.path:
             continue
-        best = _find_best_parent(project["path"].rstrip("/"), project["id"], local_with_path)
+        best = _find_best_parent(project.path.rstrip("/"), project.id, local_with_path)
         if best:
-            project["parent"] = best
+            parent_map[project.id] = best
+    if not parent_map:
+        return projects
+    return [replace(p, parent=parent_map[p.id]) if p.id in parent_map else p for p in projects]
 
 
 def _read_discipline_from_eval(eval_path: Path) -> str | None:
@@ -215,9 +225,9 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             projects.append(_build_project_entry(reports_root, entry.name, runs))
             if len(projects) >= _max_projects_listed():
                 break
-        projects.sort(key=lambda item: item["name"])
-        _auto_detect_parents(projects)
-        return {"projects": projects}
+        projects.sort(key=lambda p: p.name)
+        projects = _auto_detect_parents(projects)
+        return {"projects": [to_camel_dict(p) for p in projects]}
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         """Update the local filesystem path stored in a project's metadata."""
@@ -293,7 +303,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return {"waiting": True, "project": project, "runId": run_id, "dimension": dimension}
         return None
 
-    def get_violations(self, reports_dir: str, project: str, run_id: str) -> dict[str, Any]:
+    def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         """Return aggregated violation counts and top files for a run."""
         dashboard = self.get_dashboard(reports_dir, project, run_id)
         return aggregate_violations(dashboard)

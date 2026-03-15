@@ -26,9 +26,9 @@ class TestViolationContext:
 class TestAggregateViolations:
     def test_empty_dashboard(self):
         result = aggregate_violations({})
-        assert result["total"] == 0
-        assert result["critical"] == 0
-        assert result["files"] == []
+        assert result.total == 0
+        assert result.critical == 0
+        assert result.files == []
 
     def test_counts_severities(self):
         dashboard = {
@@ -44,14 +44,14 @@ class TestAggregateViolations:
             ]
         }
         result = aggregate_violations(dashboard)
-        assert result["total"] == 3
-        assert result["critical"] == 1
-        assert result["major"] == 1
-        assert result["minor"] == 1
-        assert len(result["files"]) == 2
-        top = result["files"][0]
-        assert top["path"] == "a.py"
-        assert top["count"] == 2
+        assert result.total == 3
+        assert result.critical == 1
+        assert result.major == 1
+        assert result.minor == 1
+        assert len(result.files) == 2
+        top = result.files[0]
+        assert top.path == "a.py"
+        assert top.count == 2
 
     def test_violations_without_file_skipped(self):
         dashboard = {
@@ -63,7 +63,7 @@ class TestAggregateViolations:
             ]
         }
         result = aggregate_violations(dashboard)
-        assert result["files"] == []
+        assert result.files == []
 
 
 class TestResolveDimensionEval:

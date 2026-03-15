@@ -30,9 +30,9 @@ def test_balanced_ratio_dampens_deductions():
         n_compliance=2,
     )
     scores = score_evidence(ev, mode="numerical")
-    ts001 = scores["principles"]["ts-001"]
-    assert ts001["dampening_multiplier"] == 0.90
-    assert ts001["final_score"] == 8.2
+    ts001 = scores.principles["ts-001"]
+    assert ts001.dampening_multiplier == 0.90
+    assert ts001.final_score == 8.2
 
 
 def test_strong_compliance_ratio_gives_max_discount():
@@ -54,9 +54,9 @@ def test_strong_compliance_ratio_gives_max_discount():
         n_compliance=4,
     )
     scores = score_evidence(ev, mode="numerical")
-    ts001 = scores["principles"]["ts-001"]
-    assert ts001["dampening_multiplier"] == 0.85
-    assert ts001["final_score"] == 9.2
+    ts001 = scores.principles["ts-001"]
+    assert ts001.dampening_multiplier == 0.85
+    assert ts001.final_score == 9.2
 
 
 def test_no_compliance_penalises_deductions():
@@ -73,9 +73,9 @@ def test_no_compliance_penalises_deductions():
         n_compliance=0,
     )
     scores = score_evidence(ev, mode="numerical")
-    ts001 = scores["principles"]["ts-001"]
-    assert ts001["dampening_multiplier"] == 1.30
-    assert ts001["final_score"] == 8.7
+    ts001 = scores.principles["ts-001"]
+    assert ts001.dampening_multiplier == 1.30
+    assert ts001.final_score == 8.7
 
 
 def test_weak_compliance_ratio_penalises():
@@ -97,9 +97,9 @@ def test_weak_compliance_ratio_penalises():
         n_compliance=1,
     )
     scores = score_evidence(ev, mode="numerical")
-    ts001 = scores["principles"]["ts-001"]
-    assert ts001["dampening_multiplier"] == 1.15
-    assert ts001["final_score"] == 8.8
+    ts001 = scores.principles["ts-001"]
+    assert ts001.dampening_multiplier == 1.15
+    assert ts001.final_score == 8.8
 
 
 def test_dampening_in_graded_mode():
@@ -122,10 +122,10 @@ def test_dampening_in_graded_mode():
         n_compliance=6,
     )
     scores = score_evidence(ev, mode="non-numerical")
-    ts001 = scores["principles"]["ts-001"]
-    assert ts001["dampening_multiplier"] == 0.95
-    assert ts001["severity_drops"] == 2
-    assert ts001["grade"] == "Proficient"
+    ts001 = scores.principles["ts-001"]
+    assert ts001.dampening_multiplier == 0.95
+    assert ts001.severity_drops == 2
+    assert ts001.grade == "Proficient"
 
 
 def test_overall_low_confidence_when_most_insufficient():
@@ -156,5 +156,5 @@ def test_overall_low_confidence_when_most_insufficient():
         principles={"p1": pe_low1, "p2": pe_low2, "p3": pe_high},
     )
     scores = score_evidence(ev, mode="numerical")
-    assert scores["overall"]["confidence"] == "low"
-    assert "1/3" in scores["overall"]["confidence_reason"]
+    assert scores.overall.confidence == "low"
+    assert "1/3" in scores.overall.confidence_reason
