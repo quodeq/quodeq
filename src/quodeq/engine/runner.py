@@ -21,6 +21,7 @@ from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_eviden
 from quodeq.engine.plugin_loader import load_plugin_full
 from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -186,7 +187,7 @@ def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
 
     ctx = _PluginContext(
         dimensions_data=full["dimensions"],
-        analysis_md=analysis_file.read_text(encoding="utf-8") if analysis_file.exists() else "",
+        analysis_md=analysis_file.read_text(encoding=TEXT_ENCODING) if analysis_file.exists() else "",
         date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         template=load_template(config.options.template_path),
         plugin_name=full["plugin"].get("name", config.plugin_id),

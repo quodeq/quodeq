@@ -7,6 +7,8 @@ from pathlib import Path
 
 import jsonschema
 
+from quodeq.shared.utils import TEXT_ENCODING
+
 _SCHEMAS_DIR = Path(__file__).parent / "schemas"
 _SCHEMA_CACHE_SIZE = 32
 
@@ -15,7 +17,7 @@ _SCHEMA_CACHE_SIZE = 32
 def _load_schema(name: str) -> dict:
     path = _SCHEMAS_DIR / name
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding=TEXT_ENCODING))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot load schema {path}: {exc}") from exc
 
@@ -55,7 +57,7 @@ def validate_plugin_dir(plugin_dir: Path) -> dict[str, list[str]]:
             errors[filename] = [f"{filename} not found"]
             continue
         try:
-            data = json.loads(filepath.read_text(encoding="utf-8"))
+            data = json.loads(filepath.read_text(encoding=TEXT_ENCODING))
         except (OSError, json.JSONDecodeError) as exc:
             errors[filename] = [f"Cannot read {filename}: {exc}"]
             continue

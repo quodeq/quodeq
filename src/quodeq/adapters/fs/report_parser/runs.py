@@ -12,9 +12,9 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any, Callable, Protocol, runtime_checkable
 
 _logger = logging.getLogger(__name__)
-from typing import Any, Callable, Protocol, runtime_checkable
 
 from quodeq.adapters.fs.report_parser._date_utils import find_date_in_dir, normalize_date
 from quodeq.adapters.fs.report_parser.json_parser import parse_evidence_file, parse_report_json

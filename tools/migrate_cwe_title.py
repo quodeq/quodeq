@@ -18,13 +18,17 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
+
 
 def _build_cwe_name_lookup(compiled_dir: Path) -> dict[int, str]:
     """Build CWE ID -> name from all compiled standards files."""
     lookup: dict[int, str] = {}
     for f in compiled_dir.glob("*.json"):
         try:
-            data = json.loads(f.read_text(encoding="utf-8"))
+            data = json.loads(f.read_text(encoding=_TEXT_ENCODING))
         except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             print(f"  SKIP  cannot read {f}: {exc}")
             continue
@@ -59,7 +63,7 @@ def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[in
     Returns (violations_patched, compliance_patched).
     """
     try:
-        data = json.loads(path.read_text(encoding="utf-8"))
+        data = json.loads(path.read_text(encoding=_TEXT_ENCODING))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {path}: {exc}")
         return 0, 0
@@ -68,7 +72,7 @@ def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[in
 
     if apply and (v_count or c_count):
         try:
-            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
         except OSError as exc:
             print(f"  ERROR writing {path}: {exc}")
 
