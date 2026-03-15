@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from quodeq.engine.evidence import DEFAULT_WEIGHT, Evidence
+from quodeq.shared.types import ScoringResult
 from quodeq.engine.scoring_internals import (
     GRADE_LADDER,
     SCALE_TIER_NAMES,
@@ -193,7 +194,7 @@ def _score_all_principles(
     return per_principle
 
 
-def run_scoring(evidence: dict, mode: str) -> dict:
+def run_scoring(evidence: dict, mode: str) -> ScoringResult:
     """Compute per-principle scores and return the full result dictionary.
 
     Args:

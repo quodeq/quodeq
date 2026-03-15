@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import logging
 import re
-from typing import Any
 
 from quodeq.engine.scoring_internals import GRADE_LADDER
+from quodeq.shared.types import DimensionSummary, GradeBreakdownEntry, TotalsDict
 
 _logger = logging.getLogger(__name__)
 
@@ -61,7 +61,7 @@ def most_frequent_grade(grades: list[str]) -> str | None:
     return max(counts, key=lambda g: (counts[g], _grade_rank(g)))
 
 
-def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, Any]]) -> dict[str, Any]:
+def build_totals(violations: list[dict[str, object]], compliance: list[dict[str, object]]) -> TotalsDict:
     """Aggregate violation and compliance counts grouped by severity.
 
     Example::
@@ -99,7 +99,7 @@ def calculate_trend(current_score: Any, previous_score: Any) -> str:
     return "same"
 
 
-def summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
+def summarize_dimensions(dimensions: list[dict[str, object]]) -> DimensionSummary:
     """Produce an aggregate summary across multiple dimension evaluation results.
 
     Example::

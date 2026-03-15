@@ -2,7 +2,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any
+
+from quodeq.shared.types import FindingDict
 
 
 @dataclass(frozen=True)
@@ -29,13 +30,13 @@ class FindingSpec:
     include_severity: bool = True
 
 
-def build_finding_base(spec: FindingSpec) -> dict[str, Any]:
+def build_finding_base(spec: FindingSpec) -> FindingDict:
     """Build the core fields shared by all finding/violation normalizers.
 
     Used by both ``violations_parsing`` (JSONL/stream) and ``json_parser``
     (evaluation JSON) to avoid duplicating the same field assembly (CWE-1041).
     """
-    entry: dict[str, Any] = {
+    entry: FindingDict = {
         "principle": spec.principle,
         "file": spec.file,
         "line": spec.line,

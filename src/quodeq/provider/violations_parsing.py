@@ -5,12 +5,13 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Iterable
 
 from quodeq.engine._event_text import TEXT_EXTRACTORS
 from quodeq.engine.analysis_stream import count_files_in_stream, extract_files_from_event
 from quodeq.engine.evidence_parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.provider.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
+from quodeq.shared.types import FindingDict, ViolationResponse
 from quodeq.shared.utils import TEXT_ENCODING
 
 _logger = logging.getLogger(__name__)
@@ -29,13 +30,13 @@ class _ResponseOptions:
 
 def _build_violation_response(
     ctx: ViolationContext,
-    violations: list[dict[str, Any]],
-    compliance: list[dict[str, Any]],
+    violations: list[FindingDict],
+    compliance: list[FindingDict],
     options: _ResponseOptions | None = None,
-) -> dict[str, Any]:
+) -> ViolationResponse:
     """Build the common response dict for violation/compliance parse results."""
     opts = options or _ResponseOptions()
-    result: dict[str, Any] = {
+    result: ViolationResponse = {
         "dimension": ctx.dimension,
         "runId": ctx.run_id,
         "project": ctx.project,
@@ -48,7 +49,7 @@ def _build_violation_response(
     return result
 
 
-def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None) -> dict[str, Any]:
+def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None) -> FindingDict:
     """Build a normalized finding dict from a raw JSON object."""
     req = obj.get("req")
     # Prefer MCP-enriched req_refs (already filtered to best-match);
@@ -78,10 +79,10 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
 
 def _parse_jsonl_findings(
     lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[FindingDict], list[FindingDict]]:
     """Parse raw JSONL lines into deduplicated violation and compliance lists."""
-    violations: list[dict[str, Any]] = []
-    compliance: list[dict[str, Any]] = []
+    violations: list[FindingDict] = []
+    compliance: list[FindingDict] = []
     seen: set[tuple] = set()
     for raw_line in lines:
         raw = raw_line.strip()
@@ -116,7 +117,7 @@ def _count_files_in_stream(stream_path: Path) -> int:
 def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
-) -> dict[str, Any] | None:
+) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
     try:
@@ -135,7 +136,7 @@ def parse_violations_from_jsonl(
     )
 
 
-def _build_violation_from_principle(violation: dict, label: str) -> dict[str, Any]:
+def _build_violation_from_principle(violation: dict, label: str) -> FindingDict:
     """Build a normalized violation dict from a principle's violation entry."""
     return build_finding_base(FindingSpec(
         principle=label,
@@ -149,9 +150,9 @@ def _build_violation_from_principle(violation: dict, label: str) -> dict[str, An
     ))
 
 
-def _extract_violations_from_principles(principles: dict) -> list[dict[str, Any]]:
+def _extract_violations_from_principles(principles: dict) -> list[FindingDict]:
     """Walk all principles and collect normalized violation dicts."""
-    violations: list[dict[str, Any]] = []
+    violations: list[FindingDict] = []
     for raw_key, pdata in principles.items():
         label = pdata.get("display_name") or raw_key
         for violation in pdata.get("violations") or []:
@@ -159,7 +160,7 @@ def _extract_violations_from_principles(principles: dict) -> list[dict[str, Any]
     return violations
 
 
-def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
+def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -> ViolationResponse | None:
     """Extract violations from a completed evidence JSON file."""
     try:
         data = json.loads(evidence_path.read_text(encoding=TEXT_ENCODING))
@@ -171,7 +172,7 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
 
 def _try_parse_text_line(
     stripped_line: str, dimension: str, seen: set[str],
-) -> tuple[str, dict[str, Any]] | None:
+) -> tuple[str, FindingDict] | None:
     """Parse a single JSON line from a text block, returning (type, entry) or None."""
     if not stripped_line.startswith("{"):
         return None
@@ -194,10 +195,10 @@ def _try_parse_text_line(
 
 def _parse_entries_from_texts(
     texts: list[str], dimension: str, seen: set[str]
-) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+) -> tuple[list[FindingDict], list[FindingDict]]:
     """Parse violation/compliance entries from a list of text blocks."""
-    violations: list[dict[str, Any]] = []
-    compliance: list[dict[str, Any]] = []
+    violations: list[FindingDict] = []
+    compliance: list[FindingDict] = []
     for text in texts:
         for text_line in text.splitlines():
             result = _try_parse_text_line(text_line.strip(), dimension, seen)
@@ -215,8 +216,8 @@ def _parse_entries_from_texts(
 class _StreamAccumulator:
     """Mutable accumulator for stream-line parsing results."""
     dimension: str
-    violations: list[dict[str, Any]] = field(default_factory=list)
-    compliance: list[dict[str, Any]] = field(default_factory=list)
+    violations: list[FindingDict] = field(default_factory=list)
+    compliance: list[FindingDict] = field(default_factory=list)
     seen: set[str] = field(default_factory=set)
     files_read: set[str] = field(default_factory=set)
 
@@ -235,7 +236,7 @@ def _parse_stream_line(stripped: str, acc: _StreamAccumulator) -> None:
     acc.files_read.update(extract_files_from_event(event))
 
 
-def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> dict[str, Any] | None:
+def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> ViolationResponse | None:
     """Extract violations from a live-stream event log file."""
     acc = _StreamAccumulator(dimension=ctx.dimension)
     try:

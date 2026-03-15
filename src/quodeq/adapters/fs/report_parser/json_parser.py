@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import build_totals
+from quodeq.shared.types import EvidenceFileMeta, FindingDict
 from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.provider.violation_context import FindingSpec, build_finding_base, format_file_line
 
@@ -71,7 +72,7 @@ def parse_report_json(json_path: Path) -> dict[str, Any] | None:
     }
 
 
-def parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
+def parse_evidence_file(evidence_path: Path) -> EvidenceFileMeta:
     """Extract dimension metadata from an evidence JSON file."""
     dimension = evidence_path.name.replace(_EVIDENCE_SUFFIX, "")
     try:
