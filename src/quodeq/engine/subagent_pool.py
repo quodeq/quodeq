@@ -20,9 +20,11 @@ from quodeq.engine._jsonl_utils import deduplicate_jsonl, dedup_jsonl_lines, mer
 from quodeq.engine.analysis import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.engine.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.utils import TEXT_ENCODING
 
 _HEARTBEAT_INTERVAL = 10
 _FUTURE_POLL_INTERVAL_S = 0.5
+_HEARTBEAT_JOIN_TIMEOUT_S = 2
 
 _DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
 
@@ -137,7 +139,7 @@ class SubagentPool:
         try:
             if jsonl.exists():
                 with self._jsonl_lock:
-                    with open(jsonl, encoding="utf-8") as f:
+                    with open(jsonl, encoding=TEXT_ENCODING) as f:
                         return sum(1 for line in f if line.strip())
         except OSError:
             pass
@@ -245,7 +247,7 @@ class SubagentPool:
                     self._process_completed_futures(done, pool_start, max_duration, pool)
         finally:
             stop.set()
-            heartbeat.join(timeout=2)
+            heartbeat.join(timeout=_HEARTBEAT_JOIN_TIMEOUT_S)
 
         succeeded = sum(1 for r in results if r.success)
         log_info(f"Subagent pool done: {succeeded}/{self._next_idx} agents ran, {succeeded} succeeded")

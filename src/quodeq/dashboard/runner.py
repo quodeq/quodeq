@@ -30,6 +30,7 @@ from quodeq.shared.config_loader import get_default_host as _get_default_host
 
 _LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
 _IS_WIN32 = sys.platform == "win32"
+_MAX_PORT_SCAN_TRIES = 20
 
 
 def _terminate_pid(pid: int) -> None:
@@ -115,7 +116,7 @@ def _allow_plaintext_http(override: bool | None = None) -> bool:
     return os.environ.get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
 
 
-def _ensure_action_api(host: str, start_port: int, max_tries: int = 20, static_dist: Path | None = None, evaluations_dir: str | None = None, allow_plaintext: bool | None = None) -> tuple[str, subprocess.Popen | None]:
+def _ensure_action_api(host: str, start_port: int, max_tries: int = _MAX_PORT_SCAN_TRIES, static_dist: Path | None = None, evaluations_dir: str | None = None, allow_plaintext: bool | None = None) -> tuple[str, subprocess.Popen | None]:
     if host not in _LOCAL_HOSTS:
         if _allow_plaintext_http(allow_plaintext):
             import logging

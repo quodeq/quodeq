@@ -13,6 +13,6 @@ class WebDimensionsRepository(WebRepository):
         """Retrieve all dimension names from the remote API."""
         return self._get_list("/dimensions", "dimensions")
 
-    def get_dimension(self, dimension_id: str) -> dict:
+    def get_dimension(self, dimension_id: str) -> dict[str, object]:
         """Fetch a single dimension definition by ID from the remote API."""
         return self._get_dict(f"/dimensions/{quote(dimension_id, safe='')}")

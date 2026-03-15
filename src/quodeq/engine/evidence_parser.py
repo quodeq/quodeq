@@ -12,7 +12,12 @@ from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 
 _logger = logging.getLogger(__name__)
 
-_CWE_URL_TEMPLATE = "https://cwe.mitre.org/data/definitions/{cwe_id}.html"
+import os as _os
+
+_CWE_URL_TEMPLATE = _os.environ.get(
+    "QUODEQ_CWE_URL_TEMPLATE",
+    "https://cwe.mitre.org/data/definitions/{cwe_id}.html",
+)
 
 
 def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:

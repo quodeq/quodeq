@@ -24,6 +24,14 @@ _collect_stale_dimensions = collect_stale_dimensions
 from quodeq.provider.accumulated import numeric_average
 
 
+@dataclass
+class DashboardCacheConfig:
+    """Optional cache overrides for build_dashboard (mirrors AccumulatedCacheConfig)."""
+    cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None
+    lock: threading.Lock | None = None
+    max_size: int | None = None
+
+
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 
 # Maximum number of historical runs scanned for trend, previous scores, and
@@ -186,16 +194,20 @@ def build_dashboard(
     project: str,
     run: str,
     *,
+    cache_config: DashboardCacheConfig | None = None,
+    # Deprecated — use cache_config instead:
     cache: OrderedDict[tuple, list[dict[str, Any]]] | None = None,
     lock: threading.Lock | None = None,
     max_cache_size: int | None = None,
 ) -> dict[str, Any]:
     """Build a full dashboard response for *project* at *run*.
 
-    Note: This function accepts 6 parameters (3 positional + 3 keyword-only
-    cache overrides).  Grouping the cache params into a dataclass was considered
-    but deemed over-engineering for an internal function.
+    Pass *cache_config* to override the module-level LRU cache.
+    The individual cache/lock/max_cache_size params are deprecated.
     """
+    # Merge deprecated params into cache_config
+    if cache_config is None and (cache is not None or lock is not None or max_cache_size is not None):
+        cache_config = DashboardCacheConfig(cache=cache, lock=lock, max_size=max_cache_size)
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
     if not runs:
@@ -210,8 +222,9 @@ def build_dashboard(
     # Cap runs scanned for history. Always include the selected run so
     # selected_index remains a valid index into history_runs.
     history_runs = runs[:max(_MAX_HISTORY_RUNS, selected_index + 1)]
+    _cc = cache_config or DashboardCacheConfig()
     get_run_dimensions = _make_run_dimension_fetcher(
-        reports_root, project, cache=cache, lock=lock, max_size=max_cache_size,
+        reports_root, project, cache=_cc.cache, lock=_cc.lock, max_size=_cc.max_size,
     )
     previous_by_dimension = _collect_previous_scores(history_runs, selected_index, selected_dim_names, get_run_dimensions)
     stale_dimensions, stale_previous_by_dimension = (

@@ -35,27 +35,30 @@ _PREFIX_MAP_PATH = Path(__file__).resolve().parent / "enrich_standards_prefix_ma
 
 # Lazily loaded at first use (avoids file reads at import time).
 _UNKNOWN_PREFIX = "X-XXX"
-_lazy_cache: dict[str, dict] = {}
 
 
-def _load_mapping() -> dict:
-    """Load and cache the enrichment mapping from disk."""
-    if "mapping" not in _lazy_cache:
-        try:
-            _lazy_cache["mapping"] = json.loads(_MAPPING_PATH.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            raise SystemExit(f"Cannot load mapping file {_MAPPING_PATH}: {exc}") from exc
-    return _lazy_cache["mapping"]
+def _load_mapping(path: Path | None = None) -> dict:
+    """Load the enrichment mapping from disk.
+
+    *path* overrides the default for testing.
+    """
+    target = path or _MAPPING_PATH
+    try:
+        return json.loads(target.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Cannot load mapping file {target}: {exc}") from exc
 
 
-def _load_prefix_map() -> dict:
-    """Load and cache the prefix map from disk."""
-    if "prefix_map" not in _lazy_cache:
-        try:
-            _lazy_cache["prefix_map"] = json.loads(_PREFIX_MAP_PATH.read_text())
-        except (OSError, json.JSONDecodeError) as exc:
-            raise SystemExit(f"Cannot load prefix map {_PREFIX_MAP_PATH}: {exc}") from exc
-    return _lazy_cache["prefix_map"]
+def _load_prefix_map(path: Path | None = None) -> dict:
+    """Load the prefix map from disk.
+
+    *path* overrides the default for testing.
+    """
+    target = path or _PREFIX_MAP_PATH
+    try:
+        return json.loads(target.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Cannot load prefix map {target}: {exc}") from exc
 
 
 def _get_existing_cwes(data: dict) -> set[int]:

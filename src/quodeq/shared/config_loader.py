@@ -101,12 +101,14 @@ def get_default_host() -> str:
 
 # Keep module-level names for backward compatibility, but now they are
 # computed lazily on first attribute access via __getattr__.
+_ATTR_MAP = {
+    "ANTHROPIC_API_URL": "anthropic_api_url",
+    "ANTHROPIC_API_VERSION": "anthropic_api_version",
+    "DEFAULT_HOST": "default_host",
+}
+
+
 def __getattr__(name: str) -> str:
-    _ATTR_MAP = {
-        "ANTHROPIC_API_URL": "anthropic_api_url",
-        "ANTHROPIC_API_VERSION": "anthropic_api_version",
-        "DEFAULT_HOST": "default_host",
-    }
     if name in _ATTR_MAP:
         return _lazy_constant(_ATTR_MAP[name])
     raise AttributeError(f"module {__name__!r} has no attribute {name!r}")

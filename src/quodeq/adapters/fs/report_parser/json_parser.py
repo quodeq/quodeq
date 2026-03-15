@@ -12,7 +12,9 @@ from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.provider.violation_context import FindingSpec, build_finding_base, format_file_line
 
 _logger = logging.getLogger(__name__)
-_SUPPORTED_SCHEMA_VERSIONS = frozenset({None, 1})
+_CURRENT_SCHEMA_VERSION = 1
+_DEFAULT_SEVERITY = "minor"
+_SUPPORTED_SCHEMA_VERSIONS = frozenset({None, _CURRENT_SCHEMA_VERSION})
 _FINDING_TYPE_VIOLATIONS = "violations"
 _FINDING_TYPE_COMPLIANCE = "compliance"
 _EVIDENCE_SUFFIX = "_evidence.json"
@@ -127,7 +129,7 @@ def _collect_findings(
             "reason": item.get("reason", ""),
         }
         if finding_type == _FINDING_TYPE_VIOLATIONS:
-            entry["severity"] = item.get("severity", "minor")
+            entry["severity"] = item.get("severity", _DEFAULT_SEVERITY)
         if item.get("cwe"):
             entry["cwe"] = item["cwe"]
         if item.get("req"):

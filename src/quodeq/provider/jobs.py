@@ -247,6 +247,16 @@ class JobManager:
             job.output_project = match.group(1)
             job.output_run_id = match.group(2)
 
+    def _flush_batch(self, job_id: str, batch: list[str]) -> bool:
+        """Write accumulated log lines to the job. Returns False if job disappeared."""
+        with self._lock:
+            job = self._store.get(job_id)
+            if not job:
+                return False
+            for stripped in batch:
+                self._append_log(job, stripped)
+        return True
+
     def _consume_stream(self, job_id: str, stream: Iterable[str] | None) -> None:
         if stream is None:
             return
@@ -254,20 +264,11 @@ class JobManager:
         for line in stream:
             batch.append(line.rstrip("\n"))
             if len(batch) >= _CONSUME_BATCH_SIZE:
-                with self._lock:
-                    job = self._store.get(job_id)
-                    if not job:
-                        return
-                    for stripped in batch:
-                        self._append_log(job, stripped)
+                if not self._flush_batch(job_id, batch):
+                    return
                 batch.clear()
         if batch:
-            with self._lock:
-                job = self._store.get(job_id)
-                if not job:
-                    return
-                for stripped in batch:
-                    self._append_log(job, stripped)
+            self._flush_batch(job_id, batch)
 
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""

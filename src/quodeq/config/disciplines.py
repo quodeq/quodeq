@@ -2,20 +2,19 @@
 
 from __future__ import annotations
 
-import os
-
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_warning
+
+_DEFAULT_CATEGORIES = "backend,frontend,mobile,infra"
+
 
 def get_valid_categories(categories: str | None = None) -> frozenset[str]:
     """Return the set of valid discipline categories.
 
-    *categories* overrides the env-var lookup when provided, making the
-    function testable without environment mutation.
+    *categories* must be provided by the caller; defaults to the built-in
+    list when ``None``.
     """
-    raw = categories if categories is not None else os.environ.get(
-        "QUODEQ_DISCIPLINE_CATEGORIES", "backend,frontend,mobile,infra"
-    )
+    raw = categories if categories is not None else _DEFAULT_CATEGORIES
     return frozenset(raw.split(","))
 
 

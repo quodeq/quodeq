@@ -46,8 +46,8 @@ def get_fetch_client(timeout_s: int = 15) -> FetchClient:
         return _fetch_client_instance
 
 
-def set_fetch_client(client: FetchClient) -> None:
-    """Replace the module-level fetch client (e.g. for testing)."""
+def set_fetch_client(client: FetchClient | None) -> None:
+    """Replace or clear the module-level fetch client (e.g. for testing)."""
     global _fetch_client_instance
     with _fetch_client_lock:
         _fetch_client_instance = client

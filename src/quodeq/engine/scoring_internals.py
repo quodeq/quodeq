@@ -175,6 +175,8 @@ _CI_UNBALANCED_PENALTY = 0.5
 _CI_SPARSITY_PENALTY = 0.5
 _SPARSITY_RATIO = 0.01
 _CI_UNSTABLE_THRESHOLD = 1.5
+_GRADE_UNSTABLE_LABEL = "+/- 1 level"
+_GRADE_STABLE_LABEL = "stable"
 
 
 def confidence_interval_for(
@@ -208,7 +210,7 @@ def confidence_interval_for(
 
     return {
         "confidence_interval": width,
-        "grade_stability": "+/- 1 level" if width > _CI_UNSTABLE_THRESHOLD else "stable",
+        "grade_stability": _GRADE_UNSTABLE_LABEL if width > _CI_UNSTABLE_THRESHOLD else _GRADE_STABLE_LABEL,
     }
 
 

@@ -9,7 +9,7 @@ from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
-from quodeq.action_api_helpers import _error, validate_evaluation_payload
+from quodeq.action_api_helpers import error_response, validate_evaluation_payload
 from quodeq.action_api_zip import export_project_zip
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
@@ -57,12 +57,12 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         data = request.get_json(silent=True) or {}
         new_path = data.get("path", "").strip()
         if not new_path:
-            body, status = _error("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
         ok = provider.update_project_path(_reports_dir(), project, new_path)
         if not ok:
-            body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify({"updated": project, "path": new_path})
 
@@ -75,7 +75,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     def delete_project(project: str) -> Response | tuple[Response, int]:
         """Delete a project and all its report data."""
         if request.args.get("confirm") != "true":
-            body, status = _error(
+            body, status = error_response(
                 "Use ?confirm=true to confirm deletion",
                 HTTPStatus.BAD_REQUEST,
                 "CONFIRMATION_REQUIRED",
@@ -84,7 +84,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
         ok = provider.delete_project(_reports_dir(), project)
         if not ok:
-            body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify({"deleted": project})
 
@@ -93,7 +93,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
         """Return metadata and available dimensions for a project."""
         info = provider.get_project_info(_reports_dir(), project)
         if not info:
-            body, status = _error("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(info)
 
@@ -108,7 +108,7 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         try:
             payload = provider.get_dashboard(_reports_dir(), project, run)
         except FileNotFoundError:
-            body, status = _error("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Dashboard data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(payload)
 
@@ -118,7 +118,7 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         as_of = request.args.get("asOf")
         payload = provider.get_accumulated(_reports_dir(), project, as_of)
         if payload is None:
-            body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(payload)
 
@@ -127,7 +127,7 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         """Return evaluation details for a single dimension in a run."""
         payload = provider.get_dimension_eval(_reports_dir(), project, run_id, dimension)
         if payload is None:
-            body, status = _error("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         if payload.get("waiting"):
             return jsonify(payload), HTTPStatus.ACCEPTED
@@ -139,7 +139,7 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         try:
             payload = provider.get_violations(_reports_dir(), project, run_id)
         except FileNotFoundError:
-            body, status = _error("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Violation data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(payload)
 
@@ -158,14 +158,14 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
         payload = request.get_json(silent=True) or {}
         validation_error = validate_evaluation_payload(payload)
         if validation_error:
-            body, status = _error(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         repo = payload.get("repo")
         ai_cmd = payload.get("aiCmd") or None
         allowed_cmds = _get_allowed_ai_cmds()
         if ai_cmd and ai_cmd not in allowed_cmds:
             allowed_list = ", ".join(sorted(allowed_cmds))
-            body, status = _error(
+            body, status = error_response(
                 f"Invalid AI command. Allowed: {allowed_list}",
                 HTTPStatus.BAD_REQUEST,
                 "INVALID_INPUT",
@@ -187,7 +187,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
                 ),
             )
         except (FileNotFoundError, ValueError):
-            body, status = _error("Invalid repository", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response("Invalid repository", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         return jsonify(job), HTTPStatus.ACCEPTED
 
@@ -200,7 +200,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         """Return current status of an evaluation job."""
         job = provider.get_evaluation_status(job_id)
         if not job:
-            body, status = _error("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify(job)
 
@@ -210,7 +210,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         _logger.info("cancel_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
         ok = provider.cancel_evaluation(job_id)
         if not ok:
-            body, status = _error("Job not found or not running", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            body, status = error_response("Job not found or not running", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         return jsonify({"ok": True})
 
@@ -239,12 +239,12 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         """List directories at a given path for repository browsing."""
         path = request.args.get("path")
         if path is None:
-            body, status = _error("Missing required 'path' query parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response("Missing required 'path' query parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
         payload = provider.browse_repo(path)
         if "error" in payload:
             browse_status = HTTPStatus.BAD_REQUEST if _BROWSE_NOT_A_DIR_KEYWORD in payload["error"].lower() else HTTPStatus.NOT_FOUND
-            body, status = _error(payload["error"], browse_status, "INVALID_INPUT")
+            body, status = error_response(payload["error"], browse_status, "INVALID_INPUT")
             return jsonify(body), status
         return jsonify(payload)
 

@@ -13,6 +13,7 @@ _logger = logging.getLogger(__name__)
 NUMERIC_GRADE_ORDER = ["Critical", "Poor", "Adequate", "Good", "Exemplary"]
 TEXT_GRADE_ORDER = GRADE_LADDER
 SEVERITIES = {"critical", "major", "minor", "unknown"}
+_SCORE_DECIMAL_PLACES = 1
 
 _SCORE_RE = re.compile(r"(\d+(?:\.\d+)?)")
 _NUMERIC_RANK: dict[str, int] = {g: i for i, g in enumerate(NUMERIC_GRADE_ORDER)}
@@ -67,7 +68,7 @@ def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, An
 
         build_totals([{"severity": "major"}], [{"severity": "minor"}])
     """
-    severity = {"critical": 0, "major": 0, "minor": 0, "unknown": 0}
+    severity = {k: 0 for k in SEVERITIES}
     for entry in violations:
         key = entry.get("severity", "unknown")
         if key not in SEVERITIES:
@@ -111,7 +112,7 @@ def summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
     ]
     numeric_average = None
     if numeric_scores:
-        numeric_average = round(sum(numeric_scores) / len(numeric_scores), 1)
+        numeric_average = round(sum(numeric_scores) / len(numeric_scores), _SCORE_DECIMAL_PLACES)
 
     grade_breakdown: dict[str, int] = {}
     for grade in overall_grades:

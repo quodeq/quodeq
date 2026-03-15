@@ -9,7 +9,7 @@ from pathlib import Path
 
 from flask import Response, after_this_request, jsonify, send_file
 
-from quodeq.action_api_helpers import _error
+from quodeq.action_api_helpers import error_response
 
 _DEFAULT_MAX_ZIP_SIZE_MB = 100
 
@@ -50,15 +50,15 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
     """Build and return a zip archive download response for a project directory."""
     project_path = (Path(reports_dir) / project).resolve()
     if not project_path.is_relative_to(Path(reports_dir).resolve()):
-        body, status = _error("Invalid project name", HTTPStatus.BAD_REQUEST, "BAD_REQUEST")
+        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "BAD_REQUEST")
         return jsonify(body), status
     if not project_path.exists() or not project_path.is_dir():
-        body, status = _error("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+        body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
         return jsonify(body), status
     try:
         tmp_path = _build_project_zip(project_path)
     except ValueError:
-        body, status = _error("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+        body, status = error_response("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
         return jsonify(body), status
 
     @after_this_request

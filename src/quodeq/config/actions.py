@@ -32,7 +32,9 @@ def resolve_parallel(parallel: str | None, sequential: bool) -> int:
     return int(parallel)
 
 
-def _generate_single_evaluator(discipline: str, dimension: str, paths: ConfigPaths) -> None:
+def _generate_single_evaluator(
+    discipline: str, dimension: str, paths: ConfigPaths, *, today: date | None = None,
+) -> None:
     """Generate a single evaluator JSON file for one dimension."""
     output_path = paths.evaluators_dir / discipline / f"{dimension}.json"
     prompt = build_evaluator_prompt(
@@ -43,7 +45,7 @@ def _generate_single_evaluator(discipline: str, dimension: str, paths: ConfigPat
             practices_dir=paths.practices_dir / discipline,
             dimensions_dir=paths.dimensions_dir,
             output_path=output_path,
-            date_value=date.today().isoformat(),
+            date_value=(today or date.today()).isoformat(),
         ),
     )
     stdout, err = run_ai_cli(prompt)

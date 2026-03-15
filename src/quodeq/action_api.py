@@ -176,7 +176,6 @@ def create_app(
             "Set QUODEQ_API_KEY for production use."
         )
         _logger.warning(_msg)
-        print(_msg, file=sys.stderr)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:

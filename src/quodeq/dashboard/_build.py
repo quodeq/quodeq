@@ -7,6 +7,7 @@ from pathlib import Path
 from quodeq.shared.logging import log_info
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
 _MIN_NPM_MAJOR = 8
+_WEB_SOURCE_DIR = "ui/web"
 _WATCH_DIRS = ("src", "public")
 _WATCH_FILES = ("package.json", "vite.config.js")
 
@@ -67,7 +68,6 @@ def maybe_build_ui(no_build: bool, reinstall: bool, static_dist: Path, repo_root
     if no_build:
         return
     # Skip build when serving pre-built bundled assets (pip install)
-    _WEB_SOURCE_DIR = "ui/web"
     web_source = repo_root / _WEB_SOURCE_DIR
     if not web_source.is_dir():
         log_info("Using bundled static assets (no ui/web source found).")

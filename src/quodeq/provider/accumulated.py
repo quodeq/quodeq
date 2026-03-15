@@ -173,28 +173,34 @@ def _resolve_cache(
     return _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max()
 
 
+@dataclass(frozen=True)
+class _AccumulatedResult:
+    """Pre-computed parts for the accumulated response."""
+    dimensions_with_trend: list[dict[str, Any]]
+    severity: dict[str, int]
+    avg_score: float | None
+    prev_avg_score: float | None
+
+
 def _build_accumulated_response(
     project: str,
     all_dimensions: list[dict[str, Any]],
-    dimensions_with_trend: list[dict[str, Any]],
-    severity: dict[str, int],
-    avg_score: float | None,
-    prev_avg_score: float | None,
+    result: _AccumulatedResult,
 ) -> dict[str, Any]:
     """Assemble the final accumulated response dict."""
     return {
         "project": project,
-        "dimensions": dimensions_with_trend,
+        "dimensions": result.dimensions_with_trend,
         "summary": {
             "overallGrade": most_frequent_grade(
                 [d.get("overallGrade") for d in all_dimensions if d.get("overallGrade")]
             ),
-            "numericAverage": avg_score,
-            "previousNumericAverage": prev_avg_score,
-            "totalViolations": severity["totalViolations"],
-            "totalCompliance": severity["totalCompliance"],
-            "dimensionCount": len(dimensions_with_trend),
-            "severity": {"critical": severity["critical"], "major": severity["major"], "minor": severity["minor"]},
+            "numericAverage": result.avg_score,
+            "previousNumericAverage": result.prev_avg_score,
+            "totalViolations": result.severity["totalViolations"],
+            "totalCompliance": result.severity["totalCompliance"],
+            "dimensionCount": len(result.dimensions_with_trend),
+            "severity": {"critical": result.severity["critical"], "major": result.severity["major"], "minor": result.severity["minor"]},
         },
     }
 
@@ -235,5 +241,6 @@ def compute_accumulated(
     avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, prev_run_latest)
 
     return _build_accumulated_response(
-        project, all_dimensions, dimensions_with_trend, severity, avg_score, prev_avg_score,
+        project, all_dimensions,
+        _AccumulatedResult(dimensions_with_trend, severity, avg_score, prev_avg_score),
     )
