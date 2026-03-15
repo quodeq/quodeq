@@ -8,6 +8,8 @@ import shutil
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.shared.types import ProjectEntry, ProjectListResponse, ProjectMetadata
+
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.jobs import JobManager
 from quodeq.provider.evaluation_mixin import FsEvaluationMixin
@@ -58,7 +60,7 @@ def _check_path_exists(path: str | None, location: str | None) -> bool | None:
     return None
 
 
-def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str, Any]:
+def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> ProjectMetadata:
     """Extract and normalize optional metadata fields from repository info."""
     return {
         "name": info.get("name") or entry_name,
@@ -70,7 +72,7 @@ def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str
     }
 
 
-def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, Any]:
+def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> ProjectEntry:
     """Build a single project dict from its directory and run list."""
     info = _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
@@ -201,7 +203,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             "claude": self._get_claude_models,
         }
 
-    def list_projects(self, reports_dir: str) -> dict[str, Any]:
+    def list_projects(self, reports_dir: str) -> ProjectListResponse:
         """Return all projects found under the reports directory."""
         reports_root = Path(reports_dir)
         projects = []

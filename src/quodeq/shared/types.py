@@ -115,3 +115,117 @@ class ScoringResult(TypedDict):
     principles: dict[str, dict[str, object]]
     overall: dict[str, object]
     scale: ScaleInfo
+
+
+# ---------------------------------------------------------------------------
+# Principle grade (used in parsed reports)
+# ---------------------------------------------------------------------------
+
+class PrincipleGradeEntry(TypedDict):
+    """One principle's name/score/grade from a parsed evaluation JSON."""
+    name: str | None
+    score: str | None
+    grade: str | None
+
+
+class PrincipleGradeWithOverall(TypedDict):
+    """Principle grade entry extended with isOverall flag."""
+    principle: str | None
+    score: str | None
+    grade: str | None
+    isOverall: bool
+
+
+# ---------------------------------------------------------------------------
+# Parsed report
+# ---------------------------------------------------------------------------
+
+class ParsedReport(TypedDict):
+    """Normalized report dict returned by ``parse_report_json``."""
+    dimension: str | None
+    overallScore: str | None
+    overallGrade: str | None
+    principles: list[PrincipleGradeEntry]
+    detailPrinciples: list[object]
+    violations: list[FindingDict]
+    compliance: list[FindingDict]
+    totals: TotalsDict
+
+
+# ---------------------------------------------------------------------------
+# Project entry (API)
+# ---------------------------------------------------------------------------
+
+class ProjectMetadata(TypedDict):
+    """Normalized project metadata from repository_info.json."""
+    name: str
+    parent: str | None
+    displayName: str | None
+    discipline: str | None
+    path: str | None
+    location: str | None
+
+
+class ProjectEntry(TypedDict, total=False):
+    """Single project dict in the list_projects response."""
+    id: str
+    name: str
+    parent: str | None
+    displayName: str | None
+    discipline: str | None
+    path: str | None
+    location: str | None
+    runsCount: int
+    latestRunId: str
+    latestDate: str | None
+    pathExists: bool | None
+    filesCount: int | None
+    latestGrade: str | None
+    latestScore: float | None
+
+
+class ProjectListResponse(TypedDict):
+    """Response from list_projects."""
+    projects: list[ProjectEntry]
+
+
+# ---------------------------------------------------------------------------
+# Job (serialized)
+# ---------------------------------------------------------------------------
+
+class JobDict(TypedDict, total=False):
+    """Serialized job state returned by ``Job.to_dict``."""
+    jobId: str
+    status: str
+    command: str
+    startedAt: str
+    endedAt: str | None
+    exitCode: int | None
+    logs: list[str]
+    outputProject: str | None
+    outputRunId: str | None
+    phase: str | None
+    currentDimension: str | None
+    dimensions: list[str] | None
+
+
+# ---------------------------------------------------------------------------
+# Violation summary (aggregate)
+# ---------------------------------------------------------------------------
+
+class FileViolationEntry(TypedDict):
+    """Per-file violation tally in the aggregate summary."""
+    path: str
+    count: int
+    critical: int
+    major: int
+    minor: int
+
+
+class ViolationSummary(TypedDict, total=False):
+    """Aggregated violation summary returned by ``aggregate_violations``."""
+    total: int
+    critical: int
+    major: int
+    minor: int
+    files: list[FileViolationEntry]

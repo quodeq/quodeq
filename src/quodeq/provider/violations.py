@@ -5,6 +5,8 @@ import os
 from pathlib import Path
 from typing import Any
 
+from quodeq.shared.types import ViolationSummary
+
 from quodeq.adapters.fs.report_parser import parse_eval_from_json, parse_eval_markdown
 from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.provider.violation_context import ViolationContext  # noqa: F401 — re-export
@@ -59,7 +61,7 @@ def resolve_dimension_eval(
     return None
 
 
-def aggregate_violations(dashboard: dict[str, Any]) -> dict[str, Any]:
+def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
     """Aggregate violation counts and top files from dashboard dimensions."""
     summary: dict[str, Any] = {"total": 0, "critical": 0, "major": 0, "minor": 0, "byFile": {}}
     for dim in dashboard.get("dimensions", []) or []:

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser.grades import build_totals
-from quodeq.shared.types import EvidenceFileMeta, FindingDict
+from quodeq.shared.types import EvidenceFileMeta, FindingDict, ParsedReport, PrincipleGradeWithOverall
 from quodeq.shared.utils import TEXT_ENCODING
 from quodeq.provider.violation_context import FindingSpec, build_finding_base, format_file_line
 
@@ -42,7 +42,7 @@ def _build_finding(item: dict, *, include_severity: bool) -> dict[str, Any]:
     ))
 
 
-def parse_report_json(json_path: Path) -> dict[str, Any] | None:
+def parse_report_json(json_path: Path) -> ParsedReport | None:
     """Parse a dimension evaluation JSON file into a normalized report dict."""
     try:
         data = json.loads(json_path.read_text(encoding=TEXT_ENCODING))

@@ -13,6 +13,8 @@ import threading
 import uuid
 from typing import Any, Callable, Iterable, Protocol, runtime_checkable
 
+from quodeq.shared.types import JobDict
+
 import logging
 import subprocess
 
@@ -45,7 +47,7 @@ class Job:
     current_dimension: str | None = None
     dimensions: list[str] | None = None
 
-    def to_dict(self) -> dict[str, Any]:
+    def to_dict(self) -> JobDict:
         """Serialize the job state to a JSON-compatible dict."""
         return {
             "jobId": self.job_id,
