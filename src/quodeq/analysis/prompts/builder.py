@@ -25,7 +25,7 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
         return _NO_STANDARDS_FOR_DIM
 
     try:
-        data = json.loads(compiled_file.read_text())
+        data = json.loads(compiled_file.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
         _logger.warning("Could not read compiled standards %s: %s", compiled_file, exc)
         return _STANDARDS_READ_ERROR

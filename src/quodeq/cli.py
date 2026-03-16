@@ -181,7 +181,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
             evidence = run(config)
             out_file = evidence_dir / f"{config.plugin_id}_evidence.json"
             try:
-                out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2))
+                out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2), encoding="utf-8")
             except OSError as exc:
                 print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
                 return 1

@@ -64,5 +64,6 @@ def count_jsonl_lines(jsonl_file: Path) -> int:
             return 0
         with open(jsonl_file, encoding=TEXT_ENCODING) as f:
             return sum(1 for line in f if line.strip())
-    except OSError:
+    except OSError as exc:
+        log_debug(f"Failed to count JSONL lines from {jsonl_file}: {exc}")
         return 0

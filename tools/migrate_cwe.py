@@ -41,6 +41,7 @@ def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
         try:
             obj = json.loads(stripped)
         except json.JSONDecodeError:
+            print(f"  WARN  malformed JSONL line in {jsonl_path}: {stripped[:80]}")
             continue
         cwe = obj.get("cwe")
         if not isinstance(cwe, int):

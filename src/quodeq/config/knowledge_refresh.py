@@ -228,7 +228,11 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
         future_to_repo = {executor.submit(_try_repo, repo): repo for repo in repos}
         for future in as_completed(future_to_repo):
             repo = future_to_repo[future]
-            result = future.result()
+            try:
+                result = future.result()
+            except Exception as exc:
+                log_warning(f"Failed to fetch from {repo.get('name', '?')}: {exc}")
+                continue
             if result:
                 results[repo["name"]] = result
 

@@ -97,8 +97,8 @@ def _kill_stale_action_api(host: str, port: int) -> None:
             log_debug(f"Could not kill stale action API (pid file): {exc}")
         try:
             pid_file.unlink(missing_ok=True)
-        except OSError:
-            pass
+        except OSError as exc:
+            log_debug(f"Could not remove stale PID file: {exc}")
     deadline = time.monotonic() + _STALE_KILL_DEADLINE_S
     while _is_port_open(host, port) and time.monotonic() < deadline:
         time.sleep(_POLL_INTERVAL_S)

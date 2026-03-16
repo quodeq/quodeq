@@ -20,25 +20,36 @@ _DEFAULT_MAJOR_PENALTY = 1.0
 _DEFAULT_MINOR_PENALTY = 0.25
 
 
+def _env_float(var: str, default: float) -> float:
+    """Read an env var as float, returning *default* if unset or non-numeric."""
+    raw = os.environ.get(var)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 def _critical_penalty(override: float | None = None) -> float:
     """Points deducted per critical violation type (default: 2.0)."""
     if override is not None:
         return override
-    return float(os.environ.get("QUODEQ_CRITICAL_PENALTY", str(_DEFAULT_CRITICAL_PENALTY)))
+    return _env_float("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
 
 
 def _major_penalty(override: float | None = None) -> float:
     """Points deducted per major violation type (default: 1.0)."""
     if override is not None:
         return override
-    return float(os.environ.get("QUODEQ_MAJOR_PENALTY", str(_DEFAULT_MAJOR_PENALTY)))
+    return _env_float("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
 
 
 def _minor_penalty(override: float | None = None) -> float:
     """Points deducted per minor violation type (default: 0.25)."""
     if override is not None:
         return override
-    return float(os.environ.get("QUODEQ_MINOR_PENALTY", str(_DEFAULT_MINOR_PENALTY)))
+    return _env_float("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
 
 
 _CRITICAL_SCORE_CAP = 3

@@ -5,6 +5,7 @@ import json
 import logging
 import os
 from collections import Counter
+from collections.abc import Iterator
 from pathlib import Path
 
 _logger = logging.getLogger(__name__)
@@ -17,7 +18,7 @@ _SKIP_DIRS = frozenset({
 })
 
 
-def _walk_source_files(src: Path, extensions: set[str]):
+def _walk_source_files(src: Path, extensions: set[str]) -> Iterator[tuple[str, str]]:
     """Yield (relative_path, suffix) for source files, pruning skip dirs."""
     for dirpath, dirnames, filenames in os.walk(src):
         dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
@@ -102,7 +103,7 @@ def detect_plugin(src: Path, evaluators_dir: Path) -> str:
             continue
         try:
             data = json.loads(pf.read_text())
-        except (json.JSONDecodeError, KeyError) as exc:
+        except (OSError, json.JSONDecodeError, KeyError) as exc:
             _logger.warning("Skipping malformed plugin.json in %s: %s", pf.parent.name, exc)
             continue
         plugins.append(data)

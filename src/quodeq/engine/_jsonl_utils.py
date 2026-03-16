@@ -39,11 +39,15 @@ def deduplicate_jsonl(jsonl_path: Path) -> int:
     """
     if not jsonl_path.exists():
         return 0
-    with open(jsonl_path, encoding=TEXT_ENCODING) as f:
-        unique_lines = dedup_jsonl_lines(f)
-    with open(jsonl_path, "w", encoding=TEXT_ENCODING) as f:
-        for line in unique_lines:
-            f.write(line + "\n")
+    try:
+        with open(jsonl_path, encoding=TEXT_ENCODING) as f:
+            unique_lines = dedup_jsonl_lines(f)
+        with open(jsonl_path, "w", encoding=TEXT_ENCODING) as f:
+            for line in unique_lines:
+                f.write(line + "\n")
+    except OSError as exc:
+        log_info(f"Failed to deduplicate {jsonl_path.name}: {exc}")
+        return 0
     log_info(f"Deduplicated {jsonl_path.name}: {len(unique_lines)} unique findings")
     return len(unique_lines)
 

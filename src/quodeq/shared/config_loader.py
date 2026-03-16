@@ -50,7 +50,12 @@ class Config:
     @classmethod
     def from_file(cls, path: Path) -> Config:
         obj = cls()
-        obj._data = json.loads(path.read_text(encoding="utf-8"))
+        try:
+            obj._data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            import logging
+            logging.getLogger(__name__).warning("Failed to load config from %s: %s", path, exc)
+            obj._data = {}
         return obj
 
 

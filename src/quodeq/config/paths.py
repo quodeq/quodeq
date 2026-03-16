@@ -67,7 +67,11 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
         target = os.environ
     if not paths.env_file.exists():
         return
-    for raw_line in paths.env_file.read_text().splitlines():
+    try:
+        lines = paths.env_file.read_text().splitlines()
+    except OSError:
+        return
+    for raw_line in lines:
         stripped = raw_line.strip()
         if not stripped or stripped.startswith("#"):
             continue

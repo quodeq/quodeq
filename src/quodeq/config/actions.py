@@ -166,7 +166,7 @@ def check_sources(discipline: str, paths: ConfigPaths) -> int:
         log_error(f"Practices directory not found: {practices_dir}")
         return 1
     for practice_file in practices_dir.glob("*.md"):
-        content = practice_file.read_text()
+        content = practice_file.read_text(encoding="utf-8")
         if not has_required_sources_table(content):
             log_error(f"Missing sources table in {practice_file}")
             return 1

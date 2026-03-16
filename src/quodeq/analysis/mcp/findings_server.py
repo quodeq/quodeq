@@ -128,7 +128,10 @@ def main() -> None:
                 msg = _read_message()
                 if msg is None:
                     break
-                _dispatch(msg, router, queue, sa.agent_id)
+                try:
+                    _dispatch(msg, router, queue, sa.agent_id)
+                except Exception as exc:
+                    sys.stderr.write(f"Dispatch error: {exc}\n")
     except OSError as exc:
         sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")
         sys.exit(1)

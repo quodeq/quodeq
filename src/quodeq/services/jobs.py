@@ -260,12 +260,15 @@ class JobManager:
         if stream is None:
             return
         batch: list[str] = []
-        for line in stream:
-            batch.append(line.rstrip("\n"))
-            if len(batch) >= _CONSUME_BATCH_SIZE:
-                if not self._flush_batch(job_id, batch):
-                    return
-                batch.clear()
+        try:
+            for line in stream:
+                batch.append(line.rstrip("\n"))
+                if len(batch) >= _CONSUME_BATCH_SIZE:
+                    if not self._flush_batch(job_id, batch):
+                        return
+                    batch.clear()
+        except (IOError, BrokenPipeError) as exc:
+            _logger.warning("Stream read error for job %s: %s", job_id, exc)
         if batch:
             self._flush_batch(job_id, batch)
 
@@ -291,4 +294,7 @@ class JobManager:
             self._store.put(job)
             self._evict_completed_jobs()
         if self._on_job_complete is not None:
-            self._on_job_complete(job_id, job)
+            try:
+                self._on_job_complete(job_id, job)
+            except Exception as exc:
+                _logger.error("on_job_complete callback failed for %s: %s", job_id, exc)

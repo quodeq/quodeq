@@ -20,7 +20,14 @@ def _max_zip_size_bytes(max_mb: int | None = None) -> int:
     *max_mb* overrides the env var for testing.
     """
     if max_mb is None:
-        max_mb = int(os.environ.get("QUODEQ_MAX_ZIP_SIZE_MB", str(_DEFAULT_MAX_ZIP_SIZE_MB)))
+        raw = os.environ.get("QUODEQ_MAX_ZIP_SIZE_MB")
+        if raw is not None:
+            try:
+                max_mb = int(raw)
+            except ValueError:
+                max_mb = _DEFAULT_MAX_ZIP_SIZE_MB
+        else:
+            max_mb = _DEFAULT_MAX_ZIP_SIZE_MB
     return max_mb * 1024 * 1024
 
 
@@ -59,6 +66,9 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
         tmp_path = _build_project_zip(project_path)
     except ValueError:
         body, status = error_response("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
+        return jsonify(body), status
+    except (OSError, zipfile.BadZipFile):
+        body, status = error_response("Failed to build project archive", HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR")
         return jsonify(body), status
 
     @after_this_request

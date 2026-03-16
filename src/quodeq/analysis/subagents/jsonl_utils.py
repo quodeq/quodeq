@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 from typing import Iterable
 
 from quodeq.shared.logging import log_info
 from quodeq.shared.utils import TEXT_ENCODING
+
+_logger = logging.getLogger(__name__)
 
 
 def dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:
@@ -23,6 +26,7 @@ def dedup_jsonl_lines(lines: Iterable[str]) -> list[str]:
         try:
             obj = json.loads(stripped)
         except json.JSONDecodeError:
+            _logger.debug("Skipping malformed JSONL line: %.100s", stripped)
             continue
         key = (obj.get("p"), obj.get("file"), obj.get("line"), obj.get("t"))
         if key in seen:

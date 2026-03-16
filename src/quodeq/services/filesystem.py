@@ -119,7 +119,13 @@ def _max_projects_listed(override: int | None = None) -> int:
     """Return the max number of projects to list. *override* bypasses env."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_MAX_PROJECTS_LISTED", str(_DEFAULT_MAX_PROJECTS_LISTED)))
+    raw = os.environ.get("QUODEQ_MAX_PROJECTS_LISTED")
+    if raw is None:
+        return _DEFAULT_MAX_PROJECTS_LISTED
+    try:
+        return int(raw)
+    except ValueError:
+        return _DEFAULT_MAX_PROJECTS_LISTED
 
 
 def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:
