@@ -197,7 +197,7 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
                   <>
                     <span className="file-detail-stat-sep">·</span>
                     <span className="file-detail-stat">
-                      <strong>1:{((r) => r % 1 === 0 ? r.toFixed(0) : r.toFixed(1))(totalCompliance / totalViolations)}</strong> ratio
+                      <strong>1:{Math.round(totalCompliance / totalViolations)}</strong> ratio
                     </span>
                   </>
                 )}

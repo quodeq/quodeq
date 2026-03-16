@@ -220,7 +220,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
               {violations.length > 0 && (
                 <>
                   <span className="file-detail-stat-sep">·</span>
-                  <span className="file-detail-stat"><strong>1:{((r) => r % 1 === 0 ? r.toFixed(0) : r.toFixed(1))(compliance.length / violations.length)}</strong> ratio</span>
+                  <span className="file-detail-stat"><strong>1:{Math.round(compliance.length / violations.length)}</strong> ratio</span>
                 </>
               )}
             </>
