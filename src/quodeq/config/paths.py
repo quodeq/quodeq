@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 
 # Bundled data directory shipped inside the package.
@@ -69,7 +72,8 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
         return
     try:
         lines = paths.env_file.read_text().splitlines()
-    except OSError:
+    except OSError as exc:
+        _logger.warning("Failed to read env file %s: %s", paths.env_file, exc)
         return
     for raw_line in lines:
         stripped = raw_line.strip()

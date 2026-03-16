@@ -230,7 +230,7 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
             repo = future_to_repo[future]
             try:
                 result = future.result()
-            except Exception as exc:
+            except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
                 log_warning(f"Failed to fetch from {repo.get('name', '?')}: {exc}")
                 continue
             if result:

@@ -1,13 +1,15 @@
 """Repository preparation utility — clones remote repos to temporary directories."""
 from __future__ import annotations
 
-import atexit
+import logging
 import os
 import re
 import shutil
 import subprocess
 import tempfile
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 _REPO_URL_RE = re.compile(
     r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?|git@[\w.\-]+:[\w.\-/]+(\.git)?)$"
@@ -49,5 +51,17 @@ def prepare_repository(repo_input: str) -> str:
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
         shutil.rmtree(tmp_dir, ignore_errors=True)
         raise
-    atexit.register(shutil.rmtree, tmp_dir, True)
     return str(dest.resolve())
+
+
+def cleanup_cloned_repo(repo_path: str) -> None:
+    """Remove the temporary clone directory for *repo_path*.
+
+    Call this after the evaluation completes to free disk space promptly
+    instead of accumulating temp directories until process exit.
+    """
+    parent = str(Path(repo_path).resolve().parent)
+    try:
+        shutil.rmtree(parent, ignore_errors=True)
+    except OSError as exc:
+        _logger.warning("Failed to clean up temp repo dir %s: %s", parent, exc)

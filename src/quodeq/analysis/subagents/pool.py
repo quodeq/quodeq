@@ -190,7 +190,19 @@ class SubagentPool:
         """
         done_futures = {f for f in self._futures if f.done()}
         for future in done_futures:
-            result = future.result()
+            idx = self._futures[future]
+            agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
+            try:
+                result = future.result()
+            except Exception as exc:
+                log_warning(f"  {agent_id} raised unexpected error: {exc}")
+                result = SubagentResult(
+                    agent_id=agent_id,
+                    jsonl_file=self._shared_jsonl_path(),
+                    stream_file=self._evidence_dir / f"{self._dimension}_{agent_id}.stream",
+                    success=False,
+                    error=str(exc),
+                )
             self._finished[result.agent_id] = True
             if result.success:
                 log_success(f"  {result.agent_id} finished")

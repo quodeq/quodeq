@@ -62,32 +62,38 @@ _BACKOFF_BASE = 2
 
 def _http_timeout_s(env: dict[str, str] | None = None) -> int:
     """Return HTTP timeout in seconds (reads env at call time). Must be > 0."""
-    return int((env or os.environ).get("QUODEQ_HTTP_TIMEOUT", str(_DEFAULT_HTTP_TIMEOUT)))
+    value = int((env or os.environ).get("QUODEQ_HTTP_TIMEOUT", str(_DEFAULT_HTTP_TIMEOUT)))
+    return max(1, value)
 
 
 def _max_retries(env: dict[str, str] | None = None) -> int:
     """Return max HTTP retries (reads env at call time). Must be >= 1."""
-    return int((env or os.environ).get("QUODEQ_HTTP_MAX_RETRIES", str(_DEFAULT_MAX_RETRIES)))
+    value = int((env or os.environ).get("QUODEQ_HTTP_MAX_RETRIES", str(_DEFAULT_MAX_RETRIES)))
+    return max(1, value)
 
 
 def _retry_base_delay_s(env: dict[str, str] | None = None) -> float:
     """Return retry base delay in seconds (reads env at call time). Must be >= 0."""
-    return float((env or os.environ).get("QUODEQ_HTTP_RETRY_DELAY", str(_DEFAULT_RETRY_BASE_DELAY)))
+    value = float((env or os.environ).get("QUODEQ_HTTP_RETRY_DELAY", str(_DEFAULT_RETRY_BASE_DELAY)))
+    return max(0.0, value)
 
 
 def _retry_jitter_s(env: dict[str, str] | None = None) -> float:
     """Return retry jitter in seconds (reads env at call time). Must be >= 0."""
-    return float((env or os.environ).get("QUODEQ_HTTP_RETRY_JITTER", str(_DEFAULT_RETRY_JITTER)))
+    value = float((env or os.environ).get("QUODEQ_HTTP_RETRY_JITTER", str(_DEFAULT_RETRY_JITTER)))
+    return max(0.0, value)
 
 
 def _circuit_breaker_threshold(env: dict[str, str] | None = None) -> int:
     """Return circuit breaker failure threshold (reads env at call time). Must be >= 1."""
-    return int((env or os.environ).get("QUODEQ_CB_THRESHOLD", str(_DEFAULT_CB_THRESHOLD)))
+    value = int((env or os.environ).get("QUODEQ_CB_THRESHOLD", str(_DEFAULT_CB_THRESHOLD)))
+    return max(1, value)
 
 
 def _circuit_breaker_reset_s(env: dict[str, str] | None = None) -> int:
     """Return circuit breaker reset seconds (reads env at call time). Must be > 0."""
-    return int((env or os.environ).get("QUODEQ_CB_RESET", str(_DEFAULT_CB_RESET)))
+    value = int((env or os.environ).get("QUODEQ_CB_RESET", str(_DEFAULT_CB_RESET)))
+    return max(1, value)
 
 
 @dataclass(frozen=True)

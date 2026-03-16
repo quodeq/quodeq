@@ -296,5 +296,5 @@ class JobManager:
         if self._on_job_complete is not None:
             try:
                 self._on_job_complete(job_id, job)
-            except Exception as exc:
+            except (OSError, ValueError, TypeError, RuntimeError, KeyError) as exc:
                 _logger.error("on_job_complete callback failed for %s: %s", job_id, exc)
