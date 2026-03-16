@@ -14,7 +14,7 @@ import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.shared.logging import log_warning
+from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import ACTION_API_MODULE, IS_WIN32 as _IS_WIN32
 
 _HEALTH_CHECK_TIMEOUT_S = 0.5
@@ -58,6 +58,7 @@ def action_api_healthy(base_url: str) -> bool:
 
 def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_S) -> None:
     """Block until the action API becomes healthy, or raise TimeoutError."""
+    log_info(f"Waiting for Action API at {base_url}...")
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
         if action_api_healthy(base_url):

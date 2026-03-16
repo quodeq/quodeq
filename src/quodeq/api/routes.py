@@ -245,9 +245,6 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
     def browse() -> Response | tuple[Response, int]:
         """List directories at a given path for repository browsing."""
         path = request.args.get("path")
-        if path is None:
-            body, status = error_response("Missing required 'path' query parameter", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
-            return jsonify(body), status
         payload = provider.browse_repo(path)
         if "error" in payload:
             browse_status = HTTPStatus.BAD_REQUEST if _BROWSE_NOT_A_DIR_KEYWORD in payload["error"].lower() else HTTPStatus.NOT_FOUND

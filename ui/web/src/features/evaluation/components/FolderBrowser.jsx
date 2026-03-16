@@ -43,10 +43,10 @@ export default function FolderBrowser({ onSelect, onClose }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal folder-browser-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal folder-browser-modal" role="dialog" aria-modal="true" aria-labelledby="folder-browser-title" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Select Repository Folder</h2>
-          <button className="modal-close" onClick={onClose}>&times;</button>
+          <h2 id="folder-browser-title">Select Repository Folder</h2>
+          <button className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
         </div>
 
         <div className="folder-browser-path">
@@ -65,6 +65,7 @@ export default function FolderBrowser({ onSelect, onClose }) {
             onChange={(e) => setPathInput(e.target.value)}
             onKeyDown={handlePathKeyDown}
             placeholder="Enter path and press Enter"
+            aria-label="Enter folder path"
           />
         </div>
 

@@ -55,7 +55,13 @@ function ViolationLiveRow({ violation, index }) {
       className={`vdetail-row vdetail-row--${v.severity}`}
       style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
     >
-      <div className="vdetail-row-main vlive-collapsible" onClick={() => setOpen(o => !o)}>
+      <div
+        className="vdetail-row-main vlive-collapsible"
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen(o => !o)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
+      >
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
         {v.principle && <span className="vrow-label">[{v.principle}]</span>}

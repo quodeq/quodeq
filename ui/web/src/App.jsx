@@ -174,7 +174,14 @@ export default function App() {
   }
 
   async function handleDeleteProject(projectId) {
-    await fetch(`/api/projects/${encodeURIComponent(projectId)}${_apiQs()}`, { method: 'DELETE' });
+    const qs = _apiQs();
+    const separator = qs ? '&' : '?';
+    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}${qs}${separator}confirm=true`, { method: 'DELETE' });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => res.statusText);
+      alert(`Failed to delete project: ${msg}`);
+      return;
+    }
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
     loadProjects();
   }

@@ -125,7 +125,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
   };
 
   return (
-    <section className="run-history-panel panel">
+    <section className="run-history-panel panel" aria-label="Dimension scores bar chart">
       <div className="run-history-header">
         <span className="run-history-title">Dimension Scores</span>
         {(runDate || runId) && (
