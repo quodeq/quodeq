@@ -21,9 +21,9 @@ _SECURITY_DIM_WEIGHT = 1.2
 _PERFORMANCE_DIM_WEIGHT = 0.8
 
 
-def _env_weight(env_var: str, default: float) -> float:
+def _env_weight(env_var: str, default: float, env: dict[str, str] | None = None) -> float:
     """Return a dimension weight from env var or *default*."""
-    raw = os.environ.get(env_var)
+    raw = (env or os.environ).get(env_var)
     if raw is None:
         return default
     try:

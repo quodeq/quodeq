@@ -42,11 +42,11 @@ suggested_topics=React Best Practices,Frontend Architecture,TypeScript Standards
     registry = DisciplineRegistry.from_file(conf)
     rule = registry.disciplines["frontend_react"]
     assert rule.detect_contains == ("react",)
-    assert rule.suggested_topics == [
+    assert rule.suggested_topics == (
         "React Best Practices",
         "Frontend Architecture",
         "TypeScript Standards",
-    ]
+    )
 
 
 def test_registry_detects_by_file_contains(tmp_path: Path):

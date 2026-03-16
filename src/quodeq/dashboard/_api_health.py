@@ -19,6 +19,7 @@ from quodeq.shared.utils import ACTION_API_MODULE, IS_WIN32 as _IS_WIN32
 
 _HEALTH_CHECK_TIMEOUT_S = 0.5
 _HEALTH_POLL_INTERVAL_S = 0.2
+_DEFAULT_WAIT_TIMEOUT_S = 10
 
 _ENV_ACTION_API_PORT = "QUODEQ_ACTION_API_PORT"
 _ENV_ACTION_API_HOST = "QUODEQ_ACTION_API_HOST"
@@ -28,10 +29,11 @@ _ENV_EVALUATIONS_DIR = "QUODEQ_EVALUATIONS_DIR"
 
 @dataclass(frozen=True)
 class ApiConfig:
-    """Grouping of optional API configuration paths (static_dist and evaluations_dir)."""
+    """Grouping of optional API configuration paths and flags."""
 
     static_dist: Path | None = None
     evaluations_dir: str | None = None
+    allow_plaintext: bool | None = None
 
 
 def _popen_platform_kwargs() -> dict:
@@ -54,7 +56,7 @@ def action_api_healthy(base_url: str) -> bool:
         return False
 
 
-def wait_for_action_api(base_url: str, timeout_s: float = 10) -> None:
+def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_S) -> None:
     """Block until the action API becomes healthy, or raise TimeoutError."""
     deadline = time.monotonic() + timeout_s
     while time.monotonic() < deadline:
@@ -69,6 +71,7 @@ def spawn_action_api(
     pid_file_path: Path,
     default_host: str,
     api_config: ApiConfig | None = None,
+    env: dict[str, str] | None = None,
 ) -> subprocess.Popen:
     """Spawn the action API subprocess and record its PID.
 
@@ -79,7 +82,7 @@ def spawn_action_api(
     from quodeq.shared.utils import get_evaluations_dir
 
     cfg = api_config or ApiConfig()
-    env = os.environ.copy()
+    env = (env or os.environ).copy()
     env[_ENV_ACTION_API_PORT] = str(port)
     env.setdefault(_ENV_ACTION_API_HOST, default_host)
     if cfg.static_dist:

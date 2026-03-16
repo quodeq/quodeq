@@ -33,11 +33,6 @@ def write_text(path: Path, content: str) -> None:
     path.write_text(content, encoding=TEXT_ENCODING)
 
 
-def read_json(path: Path) -> Any:
-    """Read and parse a JSON file with the standard encoding."""
-    return json.loads(path.read_text(encoding=TEXT_ENCODING))
-
-
 def open_text(path: str | Path, mode: str = "r") -> Any:
     """Open a text file with the standard encoding. Use as a context manager."""
     return open(path, mode, encoding=TEXT_ENCODING)

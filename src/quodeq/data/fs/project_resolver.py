@@ -5,6 +5,7 @@ import json
 import logging
 import os
 import tempfile
+import threading
 import uuid
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,12 +16,14 @@ _INDEX_FILE = "project_index.json"
 _MAX_LEGACY_SCAN = 500
 
 # mtime-based cache for _load_index to avoid re-reading on every call
+_index_lock = threading.Lock()
 _index_cache: dict[Path, tuple[float, dict[str, str]]] = {}
 
 
 def clear_index_cache() -> None:
     """Clear the mtime-based index cache (useful for testing and isolation)."""
-    _index_cache.clear()
+    with _index_lock:
+        _index_cache.clear()
 
 
 class ProjectRepository(Protocol):
@@ -64,21 +67,24 @@ def _load_index(reports_dir: Path) -> dict[str, str]:
         mtime = index_path.stat().st_mtime
     except OSError:
         return {}
-    cached = _index_cache.get(index_path)
-    if cached is not None and cached[0] == mtime:
-        return dict(cached[1])  # return a copy so callers can mutate safely
+    with _index_lock:
+        cached = _index_cache.get(index_path)
+        if cached is not None and cached[0] == mtime:
+            return dict(cached[1])  # return a copy so callers can mutate safely
     try:
         data = json.loads(index_path.read_text())
     except (OSError, json.JSONDecodeError):
         return {}
-    _index_cache[index_path] = (mtime, dict(data))
+    with _index_lock:
+        _index_cache[index_path] = (mtime, dict(data))
     return data
 
 
 def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
     """Write the project index file atomically."""
     index_path = reports_dir / _INDEX_FILE
-    _index_cache.pop(index_path, None)  # invalidate cache
+    with _index_lock:
+        _index_cache.pop(index_path, None)  # invalidate cache
     try:
         fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
         try:

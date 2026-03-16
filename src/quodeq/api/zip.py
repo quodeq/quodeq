@@ -14,13 +14,13 @@ from quodeq.api.helpers import error_response
 _DEFAULT_MAX_ZIP_SIZE_MB = 100
 
 
-def _max_zip_size_bytes(max_mb: int | None = None) -> int:
+def _max_zip_size_bytes(max_mb: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the max zip export size in bytes.
 
     *max_mb* overrides the env var for testing.
     """
     if max_mb is None:
-        raw = os.environ.get("QUODEQ_MAX_ZIP_SIZE_MB")
+        raw = (env or os.environ).get("QUODEQ_MAX_ZIP_SIZE_MB")
         if raw is not None:
             try:
                 max_mb = int(raw)

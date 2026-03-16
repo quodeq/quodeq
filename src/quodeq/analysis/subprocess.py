@@ -211,9 +211,9 @@ def _run_with_heartbeat(
     return timed_out
 
 
-def _build_analysis_env(ai_cmd: str | None = None) -> dict[str, str]:
+def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
     """Build the subprocess environment for the AI CLI."""
-    env = os.environ.copy()
+    env = (env or os.environ).copy()
     provider_cfg = _PROVIDER_CONFIGS.get(ai_cmd or "", {})
     for key, val in provider_cfg.get("env_set_if_missing", {}).items():
         if key not in env:
