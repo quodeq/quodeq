@@ -17,6 +17,7 @@ from quodeq.adapters.fs.report_parser import (
     read_run_data,
 )
 from quodeq.core.types import DimensionResult, to_camel_dict
+from quodeq.engine.scoring_internals import score_to_grade_label
 from quodeq.services._cache import make_lru_dimension_fetcher
 
 # Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
@@ -193,8 +194,9 @@ def _build_accumulated_response(
         "project": project,
         "dimensions": [to_camel_dict(d) for d in result.dimensions_with_trend],
         "summary": {
-            "overallGrade": most_frequent_grade(
-                [d.overall_grade for d in result.all_dimensions if d.overall_grade]
+            "overallGrade": (
+                score_to_grade_label(result.avg_score) if result.avg_score is not None
+                else most_frequent_grade([d.overall_grade for d in result.all_dimensions if d.overall_grade])
             ),
             "numericAverage": result.avg_score,
             "previousNumericAverage": result.prev_avg_score,

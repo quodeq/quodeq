@@ -23,6 +23,7 @@ from quodeq.services._dashboard_stale import collect_stale_dimensions
 
 # Re-export for backward compatibility (tests import this name)
 _collect_stale_dimensions = collect_stale_dimensions
+from quodeq.engine.scoring_internals import score_to_grade_label
 from quodeq.services.accumulated import numeric_average
 
 
@@ -121,8 +122,11 @@ def _build_accumulated_trend(
                 "dateISO": item.date_iso,
                 "dateLabel": item.date_label,
                 "dimensionsCount": len(acc_by_dim),
-                "overallGrade": most_frequent_grade(acc_grades) if acc_grades else None,
                 "numericAverage": numeric_average(acc_dims),
+                "overallGrade": (
+                    score_to_grade_label(numeric_average(acc_dims)) if numeric_average(acc_dims) is not None
+                    else (most_frequent_grade(acc_grades) if acc_grades else None)
+                ),
             }
         )
     trend.reverse()

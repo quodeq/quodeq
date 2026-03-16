@@ -277,12 +277,12 @@ export default function App() {
   const { selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
     if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
     const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
-    const parentName = data?.parent || null;
-    const parentData = parentName ? projects.find((p) => (p.name || p) === parentName) : null;
-    const parentId = parentData ? (parentData.id || parentData.name || parentName) : null;
+    const parentRef = data?.parent || null;
+    const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
+    const parentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
     return {
       selectedDisplayName: data?.displayName || data?.name || selectedProject,
-      selectedProjectParent: parentData?.displayName || parentData?.name || parentName,
+      selectedProjectParent: parentData?.displayName || parentData?.name || parentRef,
       selectedProjectParentId: parentId,
     };
   }, [selectedProject, projects]);
