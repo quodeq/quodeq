@@ -10,6 +10,7 @@ from typing import Any
 
 from quodeq.core.types import PluginDimension, PluginInfo
 from quodeq.engine.plugin_loader import scan_plugin_dirs
+from quodeq.config.paths import default_paths
 from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
@@ -52,7 +53,6 @@ def discover_plugins(evaluators_dir: Path | None = None) -> list[PluginInfo]:
         cached = _plugin_cache.get()
         if cached is not None:
             return cached
-    from quodeq.config.paths import default_paths
     evaluators_root = evaluators_dir or default_paths().evaluators_dir
     result: list[PluginInfo] = []
     for child in scan_plugin_dirs(evaluators_root):

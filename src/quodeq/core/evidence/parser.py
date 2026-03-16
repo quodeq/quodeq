@@ -6,7 +6,7 @@ import logging
 from dataclasses import dataclass
 from pathlib import Path
 
-import os as _os
+import os
 
 from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, compute_coverage_pct
 from quodeq.shared.utils import open_text
@@ -19,7 +19,7 @@ _CWE_URL_TEMPLATE_DEFAULT = "https://cwe.mitre.org/data/definitions/{cwe_id}.htm
 
 def _cwe_url_template(env: dict[str, str] | None = None) -> str:
     """Return the CWE URL template, reading from env lazily."""
-    return (env or _os.environ).get(
+    return (env or os.environ).get(
         "QUODEQ_CWE_URL_TEMPLATE",
         _CWE_URL_TEMPLATE_DEFAULT,
     )
@@ -201,19 +201,13 @@ def _read_judgments(
     return judgments
 
 
-def parse_jsonl_to_evidence(
-    jsonl_file: Path,
-    context: EvidenceContext,
-    compiled_dir: Path | None = None,
-) -> Evidence:
-    """Parse extracted JSONL file into a complete Evidence object."""
-    judgments = _read_judgments(jsonl_file, compiled_dir)
-    grouped = _group_judgments(judgments)
-    all_principles = set(grouped.violations.keys()) | set(grouped.compliance.keys())
+def _build_principles(
+    grouped: _GroupedJudgments, dimension_name: str,
+) -> dict[str, PrincipleEvidence]:
+    """Build scored PrincipleEvidence entries from grouped judgments."""
+    all_principle_keys = set(grouped.violations.keys()) | set(grouped.compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}
-    dimension_name = judgments[0].dimension if judgments else ""
-
-    for sc in sorted(all_principles):
+    for sc in sorted(all_principle_keys):
         pe = PrincipleEvidence(
             practice_id=sc,
             display_name=sc,
@@ -224,6 +218,19 @@ def parse_jsonl_to_evidence(
         )
         pe.compute_metrics()
         principles[sc] = pe
+    return principles
+
+
+def parse_jsonl_to_evidence(
+    jsonl_file: Path,
+    context: EvidenceContext,
+    compiled_dir: Path | None = None,
+) -> Evidence:
+    """Parse extracted JSONL file into a complete Evidence object."""
+    judgments = _read_judgments(jsonl_file, compiled_dir)
+    grouped = _group_judgments(judgments)
+    dimension_name = judgments[0].dimension if judgments else ""
+    principles = _build_principles(grouped, dimension_name)
 
     source_file_count = context.source_file_count
     files_read = context.files_read

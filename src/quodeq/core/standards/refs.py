@@ -12,6 +12,10 @@ from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
 
+_SOURCE_CWE = "cwe"
+_SOURCE_WCAG = "wcag22"
+_SOURCE_ASVS = "asvs"
+
 
 def ref_label(ref: dict) -> str:
     """Build a display label for a ref (e.g. 'CWE-396', 'ERR08-J', 'WCAG 1.1.1').
@@ -21,11 +25,11 @@ def ref_label(ref: dict) -> str:
     """
     source = ref.get("source", "")
     ref_id = ref.get("id")
-    if source == "cwe" and ref_id:
+    if source == _SOURCE_CWE and ref_id:
         return f"CWE-{ref_id}"
-    if source == "wcag22" and ref_id:
+    if source == _SOURCE_WCAG and ref_id:
         return f"WCAG {ref_id}"
-    if source == "asvs" and ref_id:
+    if source == _SOURCE_ASVS and ref_id:
         return f"ASVS {ref_id}"
     if ref_id:
         return ref_id

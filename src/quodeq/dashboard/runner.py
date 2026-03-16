@@ -26,16 +26,16 @@ from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
 from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
 from quodeq.shared.paths import resolve_path
 from quodeq.shared.config_loader import get_default_host as _get_default_host
+from quodeq.shared.utils import IS_WIN32
 
 
 _LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
-_IS_WIN32 = sys.platform == "win32"
 _MAX_PORT_SCAN_TRIES = 20
 
 
 def _terminate_pid(pid: int) -> None:
     """Send a termination signal to a process, platform-aware."""
-    os.kill(pid, signal.SIGTERM if not _IS_WIN32 else signal.CTRL_BREAK_EVENT)
+    os.kill(pid, signal.SIGTERM if not IS_WIN32 else signal.CTRL_BREAK_EVENT)
 
 
 def _get_pid_file(env: dict[str, str] | None = None) -> Path:
@@ -225,7 +225,7 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
     try:
         if action_api_process:
             _wait_for_process(action_api_process)
-        elif _IS_WIN32:
+        elif IS_WIN32:
             import threading
             threading.Event().wait()
         else:

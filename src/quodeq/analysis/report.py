@@ -11,6 +11,13 @@ from quodeq.engine.scoring_internals import score_to_grade_label
 
 _REPORT_SCHEMA_VERSION = 1
 
+_FIELD_FINAL_SCORE = "finalScore"
+_FIELD_FINAL_SCORE_SNAKE = "final_score"
+_FIELD_WEIGHTED_SCORE = "weightedScore"
+_FIELD_WEIGHTED_SCORE_SNAKE = "weighted_score"
+_FIELD_CONFIDENCE_INTERVAL = "confidenceInterval"
+_FIELD_CONFIDENCE_INTERVAL_SNAKE = "confidence_interval"
+
 
 def grade_from_score(score: str | None) -> str | None:
     """Convert a numeric score string (e.g. '7/10') to a letter grade (Critical..Exemplary)."""
@@ -71,7 +78,7 @@ def _build_principle_rows(
         matched = lookup.get(label, {})
         grade = matched.get("grade")
         # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
-        raw_final = matched.get("finalScore") or matched.get("final_score")
+        raw_final = matched.get(_FIELD_FINAL_SCORE) or matched.get(_FIELD_FINAL_SCORE_SNAKE)
         # Insufficient principles have no meaningful score — suppress "0.0/10".
         if grade == _GRADE_INSUFFICIENT:
             formatted_score = None
@@ -82,7 +89,7 @@ def _build_principle_rows(
             "score": formatted_score,
             "grade": grade or grade_from_score(formatted_score),
         }
-        ci = matched.get("confidenceInterval") or matched.get("confidence_interval")
+        ci = matched.get(_FIELD_CONFIDENCE_INTERVAL) or matched.get(_FIELD_CONFIDENCE_INTERVAL_SNAKE)
         gs = matched.get("gradeStability") or matched.get("grade_stability")
         if ci is not None:
             row["confidence_interval"] = ci
@@ -121,7 +128,7 @@ def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | di
     principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
 
     # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
-    weighted = aggregate.get("weightedScore") or aggregate.get("weighted_score")
+    weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
     if weighted is not None:
         top_score = f"{round(weighted, 1)}/10"
         top_grade = aggregate.get("grade") or grade_from_score(top_score)

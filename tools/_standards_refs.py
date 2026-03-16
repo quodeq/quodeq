@@ -14,6 +14,7 @@ from quodeq.shared.utils import read_json as _read_json
 _ASVS_MAIN_URL = "https://owasp.org/www-project-application-security-verification-standard/"
 _CISQ_MAIN_URL = "https://www.it-cisq.org/coding-rules/"
 _CERT_MAIN_URL = "https://wiki.sei.cmu.edu/confluence/display/seccode"
+_WCAG22_MAIN_URL = "https://www.w3.org/TR/WCAG22/"
 
 CISQ_DIMENSIONS = {"maintainability", "security", "reliability", "performance"}
 WCAG_DIMENSIONS = {"usability"}
@@ -177,5 +178,5 @@ def attach_wcag_refs(index: dict[str, list[dict]], standards_dir: Path, dimensio
                         "source": "wcag22",
                         "id": wcag_id,
                         "name": c["name"],
-                        "url": c.get("url", "https://www.w3.org/TR/WCAG22/"),
+                        "url": c.get("url", _WCAG22_MAIN_URL),
                     })

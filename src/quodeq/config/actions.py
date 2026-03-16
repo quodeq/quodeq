@@ -12,7 +12,10 @@ from quodeq.config.evaluators import EvaluatorContext, build_evaluator_prompt
 from quodeq.config.prompt_templates import render_template
 from quodeq.config.sources import has_required_sources_table
 
+from quodeq.config.knowledge_refresh import refresh_analysis, refresh_practices
 from quodeq.config.paths import ConfigPaths
+from quodeq.config.scaffold import scaffold_plugin
+from quodeq.config.standards_fetcher import fetch_asvs_l1
 from quodeq.shared.logging import log_error
 from quodeq.shared.utils import read_text, write_text
 
@@ -124,7 +127,6 @@ def run_refresh_practices(
     dry_run: bool = False,
 ) -> int:
     """Refresh practices data for a plugin runtime from GitHub cursor-rules."""
-    from quodeq.config.knowledge_refresh import refresh_practices
     evaluators_dir = paths.evaluators_dir
     return refresh_practices(runtime, evaluators_dir, min_stars=min_stars, dry_run=dry_run)
 
@@ -136,14 +138,12 @@ def run_refresh_analysis(
     dry_run: bool = False,
 ) -> int:
     """Refresh analysis data for a plugin runtime from linter documentation."""
-    from quodeq.config.knowledge_refresh import refresh_analysis
     evaluators_dir = paths.evaluators_dir
     return refresh_analysis(runtime, evaluators_dir, dry_run=dry_run)
 
 
 def run_refresh_standards(paths: ConfigPaths, *, dry_run: bool = False) -> int:
     """Re-fetch OWASP ASVS Level 1 requirements into the standards directory."""
-    from quodeq.config.standards_fetcher import fetch_asvs_l1
     standards_dir = paths.root / "standards"
     count = fetch_asvs_l1(standards_dir, dry_run=dry_run)
     if not dry_run:
@@ -153,7 +153,6 @@ def run_refresh_standards(paths: ConfigPaths, *, dry_run: bool = False) -> int:
 
 def run_scaffold_plugin(runtime: str, paths: ConfigPaths) -> int:
     """Create a new plugin skeleton directory for the given runtime."""
-    from quodeq.config.scaffold import scaffold_plugin
     evaluators_dir = paths.evaluators_dir
     try:
         plugin_dir = scaffold_plugin(runtime, evaluators_dir)

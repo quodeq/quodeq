@@ -105,11 +105,11 @@ def _find_best_parent(p_path: str, project_id: str, candidates: list[ProjectEntr
 _DEFAULT_MAX_PROJECTS_LISTED = 200
 
 
-def _max_projects_listed(override: int | None = None) -> int:
+def _max_projects_listed(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the max number of projects to list. *override* bypasses env."""
     if override is not None:
         return override
-    raw = os.environ.get("QUODEQ_MAX_PROJECTS_LISTED")
+    raw = (env or os.environ).get("QUODEQ_MAX_PROJECTS_LISTED")
     if raw is None:
         return _DEFAULT_MAX_PROJECTS_LISTED
     try:

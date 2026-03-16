@@ -7,6 +7,7 @@ from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
+from quodeq.config.paths import default_paths
 from quodeq.config.prompt_templates import render_template
 from quodeq.shared.utils import read_json
 
@@ -85,7 +86,6 @@ def load_template(
         except (OSError, UnicodeDecodeError) as exc:
             raise FileNotFoundError(f"Cannot read template {template_path}: {exc}") from exc
     if prompts_dir is None:
-        from quodeq.config.paths import default_paths
         prompts_dir = default_paths().prompts_dir
     path = prompts_dir / template_name
     try:

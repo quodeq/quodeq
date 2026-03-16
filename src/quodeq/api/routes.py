@@ -268,8 +268,9 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         payload = provider.browse_repo(path)
         if "error" in payload:
             raw_error = payload["error"]
-            browse_status = HTTPStatus.BAD_REQUEST if _BROWSE_NOT_A_DIR_KEYWORD in raw_error.lower() else HTTPStatus.NOT_FOUND
-            safe_msg = "Path is not a directory" if _BROWSE_NOT_A_DIR_KEYWORD in raw_error.lower() else "Path not found or not accessible"
+            is_not_dir = _BROWSE_NOT_A_DIR_KEYWORD in raw_error.lower()
+            browse_status = HTTPStatus.BAD_REQUEST if is_not_dir else HTTPStatus.NOT_FOUND
+            safe_msg = "Path is not a directory" if is_not_dir else "Path not found or not accessible"
             body, status = error_response(safe_msg, browse_status, "INVALID_INPUT")
             return jsonify(body), status
         return jsonify(payload)
