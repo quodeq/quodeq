@@ -1,3 +1,4 @@
+"""Dataclass-to-camelCase-dict serialization utilities."""
 from __future__ import annotations
 
 import dataclasses

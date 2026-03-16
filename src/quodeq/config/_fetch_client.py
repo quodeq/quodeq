@@ -37,11 +37,15 @@ class FetchClient:
 
     _CIRCUIT_THRESHOLD = 5
 
-    def __init__(self, timeout_s: int = 15, allow_private: bool | None = None) -> None:
+    def __init__(self, timeout_s: int = 15, allow_private: bool | None = None, env: dict[str, str] | None = None) -> None:
         self._lock = threading.Lock()
         self._failures = 0
         self._timeout = timeout_s
-        self._allow_private = allow_private
+        self._env = env
+        if allow_private is not None:
+            self._allow_private: bool = allow_private
+        else:
+            self._allow_private = (self._env or os.environ).get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
 
     def fetch(self, url: str, headers: dict | None = None) -> str | None:
         """Fetch *url* and return body text, or None on failure.
@@ -54,8 +58,7 @@ class FetchClient:
             _logger.warning("Blocked fetch with disallowed scheme: %s", parsed.scheme)
             return None
         hostname = parsed.hostname or ""
-        allow_private = self._allow_private if self._allow_private is not None else (os.environ.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1")
-        if hostname and _is_private_hostname(hostname) and not allow_private:
+        if hostname and _is_private_hostname(hostname) and not self._allow_private:
             _logger.warning("Blocked fetch to private/internal address: %s", hostname)
             return None
 

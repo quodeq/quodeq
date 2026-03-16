@@ -109,14 +109,6 @@ def _parse_jsonl_findings(
     return violations, compliance
 
 
-def _count_files_in_stream(stream_path: Path) -> int:
-    """Count unique file paths read by the AI in a stream file.
-
-    Delegates to :func:`quodeq.engine.analysis_stream.count_files_in_stream`.
-    """
-    return len(count_files_in_stream(stream_path))
-
-
 def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
@@ -129,7 +121,7 @@ def parse_violations_from_jsonl(
     except OSError as exc:
         _logger.warning("Failed to read findings file: %s", exc)
         return None
-    files_read = _count_files_in_stream(stream_path) if stream_path and stream_path.exists() else 0
+    files_read = len(count_files_in_stream(stream_path)) if stream_path and stream_path.exists() else 0
     return _build_violation_response(
         ctx, violations, compliance,
         _ResponseOptions(

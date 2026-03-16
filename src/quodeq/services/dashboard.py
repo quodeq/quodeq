@@ -64,9 +64,6 @@ def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]],
     return OrderedDict(), threading.Lock()
 
 
-_RUN_DIM_CACHE, _RUN_DIM_LOCK = create_dimension_cache()
-
-
 def _collect_previous_scores(
     runs: list[RunInfo], selected_index: int, selected_dim_names: set[str],
     get_run_dimensions: Callable[[str], list[DimensionResult]],

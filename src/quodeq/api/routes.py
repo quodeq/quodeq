@@ -1,6 +1,5 @@
 """Route registration helpers for the action API."""
 from __future__ import annotations
-
 import logging
 import re
 from http import HTTPStatus

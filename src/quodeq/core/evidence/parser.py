@@ -4,9 +4,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from pathlib import Path
-
 import os
+from pathlib import Path
 
 from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, compute_coverage_pct
 from quodeq.shared.utils import open_text

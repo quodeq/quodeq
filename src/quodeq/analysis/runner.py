@@ -171,7 +171,7 @@ def _process_dimension_with_subagents(
     )
 
 
-def _load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
+def load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
     """Load plugin data and resolve which dimensions to analyze."""
     validate_path_segment(config.plugin_id)
     plugin_dir = config.evaluators_dir / config.plugin_id
@@ -233,7 +233,7 @@ def _process_single_dimension(
 
 def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
-    dimensions, ctx = _load_plugin_context(config)
+    dimensions, ctx = load_plugin_context(config)
     result: dict[str, Evidence] = {}
     emit_marker("setup", dimensions=dimensions)
     skipped_count = 0

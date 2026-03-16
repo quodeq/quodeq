@@ -45,6 +45,16 @@ from ._mapper_entities import (
 # ---------------------------------------------------------------------------
 
 
+def _extract_totals(raw: dict[str, object]) -> Totals | None:
+    """Parse a 'totals' field that may be a Totals instance, a raw dict, or absent."""
+    totals_raw = raw.get("totals")
+    if isinstance(totals_raw, Totals):
+        return totals_raw
+    if isinstance(totals_raw, dict):
+        return parse_totals(totals_raw)
+    return None
+
+
 def parse_principle_grade(raw: dict[str, object]) -> PrincipleGrade:
     return PrincipleGrade(
         name=_opt_str(raw.get("name")),
@@ -67,13 +77,7 @@ def parse_parsed_report(raw: dict[str, object]) -> ParsedReport:
     if isinstance(detail_raw, list):
         detail_principles = list(detail_raw)
 
-    totals_raw = raw.get("totals")
-    if isinstance(totals_raw, Totals):
-        totals = totals_raw
-    elif isinstance(totals_raw, dict):
-        totals = parse_totals(totals_raw)
-    else:
-        totals = None
+    totals = _extract_totals(raw)
 
     return ParsedReport(
         dimension=_opt_str(raw.get("dimension")),
@@ -114,13 +118,7 @@ def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
     violations = _parse_finding_list(raw.get("violations"))
     compliance = _parse_finding_list(raw.get("compliance"))
 
-    totals_raw = raw.get("totals")
-    if isinstance(totals_raw, Totals):
-        totals = totals_raw
-    elif isinstance(totals_raw, dict):
-        totals = parse_totals(totals_raw)
-    else:
-        totals = None
+    totals = _extract_totals(raw)
 
     return DimensionResult(
         dimension=dim,
