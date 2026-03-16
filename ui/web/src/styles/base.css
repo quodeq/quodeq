@@ -1084,6 +1084,49 @@ textarea:focus {
   border-bottom: none;
 }
 
+.settings-model-overrides {
+  display: flex;
+  flex-direction: row;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.settings-model-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+  min-width: 160px;
+}
+
+.settings-model-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.settings-model-input {
+  padding: 6px 10px;
+  font-size: var(--text-sm);
+  font-family: var(--font-mono);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+}
+
+.settings-model-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.settings-model-input:focus {
+  outline: none;
+  border-color: var(--color-accent);
+}
+
 .settings-row-label {
   display: flex;
   flex-direction: column;

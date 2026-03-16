@@ -8,7 +8,7 @@ import EvaluationForm from './features/evaluation/components/EvaluationForm.jsx'
 import EvaluationStatus from './features/evaluation/components/EvaluationStatus.jsx';
 import ReEvaluateCard from './features/evaluation/components/ReEvaluateCard.jsx';
 import PowerSelector from './features/evaluation/components/PowerSelector.jsx';
-import { LEVELS, STORAGE_KEY as POWER_KEY } from './features/evaluation/components/powerLevels.js';
+import { getLevels, DEFAULT_MODELS, MODEL_STORAGE_PREFIX, STORAGE_KEY as POWER_KEY } from './features/evaluation/components/powerLevels.js';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
@@ -309,6 +309,9 @@ export default function App() {
   // AI settings
   // -------------------------------------------------------------------------
   const [aiCmd, setAiCmd] = useState(localStorage.getItem('cc-ai-cmd') || '');
+  const [modelFast, setModelFast] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}1`) || '');
+  const [modelBalanced, setModelBalanced] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}2`) || '');
+  const [modelThorough, setModelThorough] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}3`) || '');
   const [verifyFindings, setVerifyFindings] = useState(() => {
     try { return localStorage.getItem('cc-verify-findings') !== 'false'; } catch { return true; }
   });
@@ -377,7 +380,8 @@ export default function App() {
   }
 
   function handleStartEvaluation(payload) {
-    const subagentModel = LEVELS.find(l => l.level === analysisPower)?.model;
+    const levels = getLevels();
+    const subagentModel = levels.find(l => l.level === analysisPower)?.model;
     startEvaluation({ ...payload, aiCmd: aiCmd || undefined, subagentModel, verifyFindings });
   }
 
@@ -686,9 +690,37 @@ export default function App() {
                     <div className="settings-row-label">
                       <span className="settings-label">Model</span>
                       <span className="settings-description">
-                        Uses your client's default model. Run <code>{aiCmd} --help</code> to see how to change it.
+                        Override the AI model for each analysis power level. Leave blank to use the default.
                       </span>
                     </div>
+                  </div>
+                )}
+                {aiCmd && (
+                  <div className="settings-row settings-model-overrides">
+                    {[
+                      { label: 'Fast', value: modelFast, setter: setModelFast, level: 1, placeholder: DEFAULT_MODELS[1] },
+                      { label: 'Balanced', value: modelBalanced, setter: setModelBalanced, level: 2, placeholder: DEFAULT_MODELS[2] },
+                      { label: 'Thorough', value: modelThorough, setter: setModelThorough, level: 3, placeholder: DEFAULT_MODELS[3] },
+                    ].map(({ label, value, setter, level, placeholder }) => (
+                      <div key={level} className="settings-model-field">
+                        <label className="settings-model-label">{label}</label>
+                        <input
+                          type="text"
+                          className="settings-model-input"
+                          value={value}
+                          placeholder={placeholder}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setter(v);
+                            if (v) {
+                              localStorage.setItem(`${MODEL_STORAGE_PREFIX}${level}`, v);
+                            } else {
+                              localStorage.removeItem(`${MODEL_STORAGE_PREFIX}${level}`);
+                            }
+                          }}
+                        />
+                      </div>
+                    ))}
                   </div>
                 )}
                 <div className="settings-row">
