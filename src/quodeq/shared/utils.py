@@ -93,7 +93,15 @@ def __getattr__(name: str) -> str:
 
 
 def is_repo_url(repo_input: str) -> bool:
-    """Return True if the input looks like a remote repository URL."""
+    """Return True if the input looks like a remote repository URL.
+
+    .. warning:: Cleartext ``http://`` URLs are accepted but credentials
+       embedded in such URLs will be transmitted unencrypted.
+    """
+    if repo_input.startswith("http://"):
+        logging.getLogger(__name__).warning(
+            "Cleartext HTTP repository URL — credentials may be transmitted unencrypted"
+        )
     return repo_input.startswith(("http://", "https://", "git@"))
 
 

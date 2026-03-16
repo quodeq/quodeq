@@ -15,6 +15,11 @@ _REPO_URL_RE = re.compile(
     r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?|git@[\w.\-]+:[\w.\-/]+(\.git)?)$"
 )
 
+# IP-like hostnames that must be rejected to prevent SSRF via git clone.
+_PRIVATE_HOST_RE = re.compile(
+    r"^https?://(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|127\.\d+\.\d+\.\d+|localhost)[:/]"
+)
+
 
 _DEFAULT_CLONE_TIMEOUT_S = 300
 
@@ -39,6 +44,8 @@ def prepare_repository(repo_input: str) -> str:
     """
     if not _REPO_URL_RE.match(repo_input):
         raise ValueError(f"Invalid repository URL format: {repo_input}. Expected: https://github.com/user/repo or git@github.com:user/repo.git")
+    if _PRIVATE_HOST_RE.match(repo_input):
+        raise ValueError("Repository URLs pointing to private/internal addresses are not allowed")
     repo_name = repo_input.split("/")[-1].replace(".git", "")
     tmp_dir = tempfile.mkdtemp()
     dest = Path(tmp_dir) / repo_name

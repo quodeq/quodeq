@@ -48,6 +48,9 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
         f"export AI_PROVIDER={provider}",
     ]
     if api_key_value:
+        # SECURITY: API key stored as cleartext in a 0600 file. For production,
+        # prefer a platform keychain, secrets manager, or environment variable
+        # set via a secure mechanism (e.g. systemd EnvironmentFile).
         lines.append(f"export {api_key_var}={api_key_value}")
     paths.env_file.write_text("\n".join(lines) + "\n")
     os.chmod(paths.env_file, 0o600)
