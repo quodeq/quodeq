@@ -149,8 +149,8 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
               {(() => {
                 const v = allViolations.length;
                 const c = totalCompliant;
-                const total = v + c;
-                return total > 0 ? `${Math.round((v / total) * 100)}%` : '—';
+                if (v === 0) return '—';
+                return `1:${((r) => r % 1 === 0 ? r.toFixed(0) : r.toFixed(1))(c / v)}`;
               })()}
             </span>
           </div>

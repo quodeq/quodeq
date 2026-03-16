@@ -157,6 +157,7 @@ function ViolationCard({ v, principleName, index }) {
 
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
   const totalViolations = principle.total || 0;
+  const totalCompliance = principle.compliance?.length || 0;
 
   const violationsBySeverity = SEVERITY_ORDER.reduce((acc, sev) => {
     acc[sev] = (principle.violations || []).filter(
@@ -173,25 +174,33 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
       <section className="panel file-detail-summary-panel">
         <div className="file-detail-stats-row">
           <div className="file-detail-stats">
+            {principle.critical > 0 && (
+              <span className="file-detail-stat severity-tag critical">{principle.critical} critical</span>
+            )}
+            {principle.major > 0 && (
+              <span className="file-detail-stat severity-tag major">{principle.major} major</span>
+            )}
+            {principle.minor > 0 && (
+              <span className="file-detail-stat severity-tag minor">{principle.minor} minor</span>
+            )}
+            {(principle.critical > 0 || principle.major > 0 || principle.minor > 0) && <span className="file-detail-stat-sep">·</span>}
             <span className="file-detail-stat">
               <strong>{totalViolations}</strong> violations
             </span>
-            {principle.critical > 0 && (
+            {totalCompliance > 0 && (
               <>
                 <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat severity-tag critical">{principle.critical} critical</span>
-              </>
-            )}
-            {principle.major > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat severity-tag major">{principle.major} major</span>
-              </>
-            )}
-            {principle.minor > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat severity-tag minor">{principle.minor} minor</span>
+                <span className="file-detail-stat">
+                  <strong>{totalCompliance}</strong> compliance
+                </span>
+                {totalViolations > 0 && (
+                  <>
+                    <span className="file-detail-stat-sep">·</span>
+                    <span className="file-detail-stat">
+                      <strong>1:{((r) => r % 1 === 0 ? r.toFixed(0) : r.toFixed(1))(totalCompliance / totalViolations)}</strong> ratio
+                    </span>
+                  </>
+                )}
               </>
             )}
           </div>

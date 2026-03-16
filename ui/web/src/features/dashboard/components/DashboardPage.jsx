@@ -199,8 +199,8 @@ function AccumulatedOverviewPanel({
               {(() => {
                 const v = accumulated?.summary?.totalViolations || 0;
                 const c = accumulated?.summary?.totalCompliance || 0;
-                const total = v + c;
-                return total > 0 ? `${Math.round((v / total) * 100)}%` : '—';
+                if (v === 0) return '—';
+                return `1:${((r) => r % 1 === 0 ? r.toFixed(0) : r.toFixed(1))(c / v)}`;
               })()}
             </span>
           </div>
@@ -468,8 +468,8 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
               {(() => {
                 const v = runSummary.totalViolations || 0;
                 const c = runSummary.totalCompliance || 0;
-                const total = v + c;
-                return total > 0 ? `${Math.round((v / total) * 100)}%` : '—';
+                if (v === 0) return '—';
+                return `1:${((r) => r % 1 === 0 ? r.toFixed(0) : r.toFixed(1))(c / v)}`;
               })()}
             </span>
           </div>

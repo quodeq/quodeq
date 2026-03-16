@@ -168,32 +168,21 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
   return (
     <>
       <section className="panel file-detail-summary-panel">
-        <h3 className="file-detail-title">{principle}</h3>
         <div className="file-detail-stats-row">
           <div className="file-detail-stats">
+            <h3 className="file-detail-title" style={{ margin: 0 }}>{principle}</h3>
             {grade === 'Insufficient' ? (
               <span className="exec-summary-insufficient">Not enough evidence</span>
             ) : (
               <>
                 {score && (
                   <>
-                    <span className="file-detail-stat"><strong>{score}</strong></span>
                     <span className="file-detail-stat-sep">·</span>
+                    <span className="file-detail-stat" style={{ fontSize: '1.1rem' }}><strong>{score.replace('/10', '')}</strong></span>
                   </>
                 )}
+                <span className="file-detail-stat-sep">·</span>
                 <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
-              </>
-            )}
-            {violations.length > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
-              </>
-            )}
-            {compliance.length > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat"><strong>{compliance.length}</strong> compliant</span>
               </>
             )}
           </div>
@@ -202,6 +191,39 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
               label="Principle fix plan"
               onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText())}
             />
+          )}
+        </div>
+        <div className="file-detail-stats" style={{ marginTop: 6 }}>
+          {(() => {
+            const sevCounts = { critical: 0, major: 0, minor: 0 };
+            violations.forEach(v => { const s = (v.severity || 'minor').toLowerCase(); if (sevCounts[s] !== undefined) sevCounts[s]++; });
+            return (
+              <>
+                {sevCounts.critical > 0 && (
+                  <span className="file-detail-stat severity-tag critical">{sevCounts.critical} critical</span>
+                )}
+                {sevCounts.major > 0 && (
+                  <span className="file-detail-stat severity-tag major">{sevCounts.major} major</span>
+                )}
+                {sevCounts.minor > 0 && (
+                  <span className="file-detail-stat severity-tag minor">{sevCounts.minor} minor</span>
+                )}
+                {(sevCounts.critical > 0 || sevCounts.major > 0 || sevCounts.minor > 0) && <span className="file-detail-stat-sep">·</span>}
+              </>
+            );
+          })()}
+          <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
+          {compliance.length > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat"><strong>{compliance.length}</strong> compliance</span>
+              {violations.length > 0 && (
+                <>
+                  <span className="file-detail-stat-sep">·</span>
+                  <span className="file-detail-stat"><strong>1:{((r) => r % 1 === 0 ? r.toFixed(0) : r.toFixed(1))(compliance.length / violations.length)}</strong> ratio</span>
+                </>
+              )}
+            </>
           )}
         </div>
       </section>
