@@ -736,7 +736,7 @@ export default function App() {
                   <div className="settings-row-label">
                     <span className="settings-label">Verify findings</span>
                     <span className="settings-description">
-                      After analysis, run a verification pass that re-checks violations and hunts for compliance evidence. Improves grade accuracy at a small extra cost.
+                      After the analysis phase, run a verification agent that re-checks the findings from this run and actively looks for compliance evidence. Improves grade accuracy at a small extra cost.
                     </span>
                   </div>
                   <div className="theme-toggle">
