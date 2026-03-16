@@ -6,6 +6,7 @@ Merge per-dimension Evidence into a single Evidence object.
 from __future__ import annotations
 
 import json
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -237,17 +238,24 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     emit_marker("setup", dimensions=dimensions)
     skipped_count = 0
 
-    for idx, dimension in enumerate(dimensions, 1):
-        try:
-            ev = _process_single_dimension(config, dimension, idx, ctx)
-        except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} — failed: {exc}")
-            skipped_count += 1
-            continue
-        if ev is None:
-            skipped_count += 1
-            continue
-        result[dimension] = ev
+    max_workers = min(len(dimensions), 4)
+    with ThreadPoolExecutor(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_process_single_dimension, config, dim, idx, ctx): (dim, idx)
+            for idx, dim in enumerate(dimensions, 1)
+        }
+        for future in as_completed(futures):
+            dim, idx = futures[future]
+            try:
+                ev = future.result()
+            except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
+                log_warning(f"[{idx}/{ctx.total}] {dim} — failed: {exc}")
+                skipped_count += 1
+                continue
+            if ev is None:
+                skipped_count += 1
+                continue
+            result[dim] = ev
 
     if result and config.source_file_count > 0:
         total_findings = sum(

@@ -66,7 +66,7 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
         log_error("--generate-maps requires a dimension name")
         return 1
     dimensions = [p.stem for p in paths.dimensions_dir.glob("*.json")]
-    with ThreadPoolExecutor() as pool:
+    with ThreadPoolExecutor(max_workers=min(len(dimensions), 8)) as pool:
         futures = {
             pool.submit(_generate_single_evaluator, discipline, dim, paths): dim
             for dim in dimensions

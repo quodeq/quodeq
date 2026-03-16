@@ -12,9 +12,13 @@ _PLACEHOLDER_RE = re.compile(r"\{\{(\w+)\}\}")
 
 def render_template(template: str, values: dict[str, str]) -> str:
     """Replace ``{{KEY}}`` placeholders in a template string with the given values."""
-    rendered = template
-    for key, value in values.items():
-        rendered = rendered.replace(f"{{{{{key}}}}}", value)
+    def _replace(match: re.Match) -> str:
+        key = match.group(1)
+        if key in values:
+            return values[key]
+        return match.group(0)  # leave unmatched placeholders intact
+
+    rendered = _PLACEHOLDER_RE.sub(_replace, template)
 
     remaining = _PLACEHOLDER_RE.findall(rendered)
     if remaining:

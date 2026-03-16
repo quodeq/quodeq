@@ -89,9 +89,16 @@ def _get_highest_id(reqs: list[dict], prefix: str) -> int:
     return highest
 
 
-def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
+def enrich_dimension(
+    dimension: str,
+    dry_run: bool = True,
+    *,
+    mapping: dict | None = None,
+    prefix_map: dict | None = None,
+) -> int:
     """Add missing CWEs to one ISO 25010 dimension file. Returns count added."""
-    mapping = _load_mapping()
+    if mapping is None:
+        mapping = _load_mapping()
     if dimension not in mapping:
         return 0
 
@@ -102,7 +109,9 @@ def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
 
     data = json.loads(filepath.read_text(encoding=_TEXT_ENCODING))
     existing = _get_existing_cwes(data)
-    prefixes = _load_prefix_map().get(dimension, {})
+    if prefix_map is None:
+        prefix_map = _load_prefix_map()
+    prefixes = prefix_map.get(dimension, {})
     total_added = 0
 
     for sc in data["sub_characteristics"]:
@@ -151,12 +160,14 @@ def main() -> None:
 
     from compile_standards import ALL_DIMENSIONS
 
+    mapping = _load_mapping()
+    prefix_map = _load_prefix_map()
     grand_total = 0
     for dimension in ALL_DIMENSIONS:
         print(f"\n{'=' * _SEPARATOR_WIDTH}")
         print(f"  {dimension.upper()}")
         print(f"{'=' * _SEPARATOR_WIDTH}")
-        count = enrich_dimension(dimension, dry_run=dry_run)
+        count = enrich_dimension(dimension, dry_run=dry_run, mapping=mapping, prefix_map=prefix_map)
         grand_total += count
         print(f"  Total new CWEs for {dimension}: {count}")
 

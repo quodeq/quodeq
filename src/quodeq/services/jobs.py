@@ -241,10 +241,11 @@ class JobManager:
             self._apply_marker(job, line)
             return
         job.logs.append(_ANSI_RE.sub("", line))
-        match = REPORT_PATH_RE.search(line)
-        if match:
-            job.output_project = match.group(1)
-            job.output_run_id = match.group(2)
+        if "Report path:" in line:
+            match = REPORT_PATH_RE.search(line)
+            if match:
+                job.output_project = match.group(1)
+                job.output_run_id = match.group(2)
 
     def _flush_batch(self, job_id: str, batch: list[str]) -> bool:
         """Write accumulated log lines to the job. Returns False if job disappeared."""

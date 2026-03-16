@@ -207,6 +207,8 @@ def _fetch_cursor_rules_repos(runtime: str, min_stars: int) -> list[dict]:
 
 
 def _fetch_repo_content(repos: list[dict]) -> list[str]:
+    sample_limit = _content_sample_limit()
+
     def _try_repo(repo: dict) -> str | None:
         if not _validate_repo_field(repo['name'], 'repo name'):
             return None
@@ -220,7 +222,7 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
             content = _fetch_url(url)
             if content:
                 header = f"# Source: {repo['name']} ({repo['stars']} stars)\n\n"
-                return header + content[:_content_sample_limit()]
+                return header + content[:sample_limit]
         return None
 
     results: dict[str, str] = {}
