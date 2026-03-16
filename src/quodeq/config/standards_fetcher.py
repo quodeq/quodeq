@@ -18,6 +18,7 @@ _logger = logging.getLogger(__name__)
 
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
 _ASVS_DEFAULT_LEVEL = 1
+_ASVS_ALLOWED_HOSTS = frozenset({"raw.githubusercontent.com", "github.com", "owasp.org"})
 
 
 _DEFAULT_ASVS_VERSION = "4.0.3"
@@ -116,7 +117,15 @@ def fetch_asvs_l1(
     ``QUODEQ_ASVS_SKIP_INTEGRITY`` env var is no longer honored.
     Pass *skip_integrity* explicitly for programmatic use (e.g. tests).
     """
-    content = _fetch_with_retry(get_asvs_url())
+    url = get_asvs_url()
+    from urllib.parse import urlparse
+    parsed = urlparse(url)
+    if parsed.hostname not in _ASVS_ALLOWED_HOSTS:
+        raise ValueError(
+            f"ASVS URL host {parsed.hostname!r} is not in the allowlist. "
+            f"Allowed: {', '.join(sorted(_ASVS_ALLOWED_HOSTS))}"
+        )
+    content = _fetch_with_retry(url)
     _verify_integrity(content, expected_hash, skip_integrity)
     requirements = _parse_asvs_content(content)
 
