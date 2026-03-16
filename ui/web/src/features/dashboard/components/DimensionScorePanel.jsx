@@ -25,14 +25,20 @@ function scoreBarColor(score) {
   return cssVar('--color-grade-bottom-text');            // critical
 }
 
-const TREND_ARROW = { up: '↑', 'soft-up': '↗', same: '→', 'soft-down': '↘', down: '↓' };
-const TREND_COLOR = {
-  up:         cssVar('--color-trend-up'),
-  'soft-up':  cssVar('--color-trend-soft-up'),
-  same:       cssVar('--color-text-muted'),
-  'soft-down':cssVar('--color-trend-soft-down'),
-  down:       cssVar('--color-trend-down'),
-};
+// Rotation: 0° = straight up (↑), 90° = horizontal (→), 180° = straight down (↓)
+// sqrt curve: non-zero deltas always tilt; max arc 55° keeps small changes subtle
+function angleFromDelta(d) {
+  const clamped = Math.max(-4, Math.min(4, d));
+  return 90 - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / 4) * 55;
+}
+
+function trendColorClass(angle) {
+  if (angle <= 70)  return 'trend-up';
+  if (angle <= 88)  return 'trend-soft-up';
+  if (angle >= 110) return 'trend-down';
+  if (angle >= 92)  return 'trend-soft-down';
+  return 'trend-same';
+}
 
 // Shortcodes mirror src/quodeq/config/dimensions.py
 const DIM_CODE = {
@@ -58,13 +64,15 @@ function dimCode(name) {
   return (DIM_CODE[name.toLowerCase()] ?? name.slice(0, 4)).toUpperCase();
 }
 
-function trendDir(delta) {
-  if (delta === null || delta === undefined) return null;
-  if (delta > 1)    return 'up';
-  if (delta > 0.5)  return 'soft-up';
-  if (delta < -1)   return 'down';
-  if (delta < -0.5) return 'soft-down';
-  return 'same';
+function trendColorVar(colorClass) {
+  const map = {
+    'trend-up':        '--color-trend-up',
+    'trend-soft-up':   '--color-trend-soft-up',
+    'trend-same':      '--color-text-muted',
+    'trend-soft-down': '--color-trend-soft-down',
+    'trend-down':      '--color-trend-down',
+  };
+  return cssVar(map[colorClass] || '--color-text-muted');
 }
 
 function DimensionTooltip({ active, payload }) {
@@ -94,17 +102,23 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
 
   const renderTrendLabel = ({ x, y, width, index }) => {
     const entry = data[index];
-    const dir = trendDir(entry?.delta);
-    if (!dir) return null;
+    if (entry?.delta === null || entry?.delta === undefined) return null;
     const cx = x + width / 2;
+    const angle = angleFromDelta(entry.delta);
+    const colorCls = trendColorClass(angle);
+    const fill = trendColorVar(colorCls);
     const deltaStr = entry.delta > 0 ? `+${entry.delta.toFixed(1)}` : entry.delta.toFixed(1);
     return (
       <g>
-        <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={TREND_COLOR[dir]}>
+        <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={fill}>
           {deltaStr}
         </text>
-        <text x={cx} y={y - 14} textAnchor="middle" fontSize={11} fill={TREND_COLOR[dir]}>
-          {TREND_ARROW[dir]}
+        <text
+          x={cx} y={y - 14}
+          textAnchor="middle" fontSize={11} fill={fill}
+          transform={`rotate(${Math.round(angle)}, ${cx}, ${y - 14})`}
+        >
+          ↑
         </text>
       </g>
     );
