@@ -646,9 +646,9 @@ export default function App() {
                   </div>
                   {availableClients === null ? (
                     <span className="settings-description">Detecting…</span>
-                  ) : availableClients.length > 0 ? (
+                  ) : availableClients.filter((c) => c.id === 'claude').length > 0 ? (
                     <div className="theme-toggle">
-                      {availableClients.map(({ id, label }) => (
+                      {availableClients.filter((c) => c.id === 'claude').map(({ id, label }) => (
                         <button
                           key={id}
                           type="button"
@@ -661,26 +661,18 @@ export default function App() {
                     </div>
                   ) : null}
                 </div>
-                {availableClients !== null && availableClients.length === 0 && (
+                {availableClients !== null && !availableClients.some((c) => c.id === 'claude') && (
                   <div className="settings-row settings-row--last settings-install-guide">
                     <div className="settings-row-label">
-                      <span className="settings-label">No AI client detected</span>
+                      <span className="settings-label">Claude not detected</span>
                       <span className="settings-description">
-                        Install one of the supported CLI tools and restart Quodeq.
+                        Install Claude Code and restart Quodeq.
                       </span>
                     </div>
                     <div className="settings-install-options">
                       <div className="settings-install-item">
                         <span className="settings-install-name">Claude</span>
                         <code className="settings-install-cmd">npm i -g @anthropic-ai/claude-code</code>
-                      </div>
-                      <div className="settings-install-item">
-                        <span className="settings-install-name">Codex</span>
-                        <code className="settings-install-cmd">npm i -g @openai/codex</code>
-                      </div>
-                      <div className="settings-install-item">
-                        <span className="settings-install-name">Copilot</span>
-                        <code className="settings-install-cmd">gh extension install github/gh-copilot</code>
                       </div>
                     </div>
                   </div>
