@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 from quodeq.core.types import DimensionResult, DimensionSummary, Finding, GradeBreakdown, SeverityTally, Totals
-from quodeq.engine.scoring_internals import GRADE_LADDER
+from quodeq.engine.scoring_internals import GRADE_LADDER, score_to_grade_label
 
 _logger = logging.getLogger(__name__)
 
@@ -124,9 +124,16 @@ def summarize_dimensions(dimensions: list[DimensionResult]) -> DimensionSummary:
     for grade in overall_grades:
         grade_counts[grade] = grade_counts.get(grade, 0) + 1
 
+    # Derive overall grade from the numeric average when available,
+    # falling back to most-frequent vote when scores are absent.
+    if numeric_average is not None:
+        overall_grade = score_to_grade_label(numeric_average)
+    else:
+        overall_grade = most_frequent_grade(overall_grades)
+
     return DimensionSummary(
         dimensions_count=len(dimensions),
-        overall_grade=most_frequent_grade(overall_grades),
+        overall_grade=overall_grade,
         numeric_average=numeric_average,
         grade_breakdown=[
             GradeBreakdown(grade=grade, count=count)
