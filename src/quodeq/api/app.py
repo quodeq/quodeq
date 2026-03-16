@@ -28,6 +28,7 @@ from quodeq.api.routes import (
 )
 
 _HEALTH_PATH = "/api/health"
+_RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
 
 _RATE_LIMIT_WINDOW = 60  # seconds
 _RATE_LIMIT_MAX = 60  # max state-changing requests per window
@@ -133,7 +134,11 @@ _LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
     """Verify API key authentication when *api_key* is set.
 
-    When no API key is configured, only localhost requests are allowed.
+    Security model:
+    - With API key: Bearer token required on all non-health requests.
+    - Without API key: only localhost requests are permitted (defense-in-depth
+      with CSRF Origin check for state-changing methods).  Set
+      ``QUODEQ_API_KEY`` for any non-localhost deployment.
     """
     if request.path == _HEALTH_PATH:
         return None
@@ -165,8 +170,8 @@ def _check_csrf() -> Response | tuple[Response, int] | None:
 
 
 def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] | None:
-    """Enforce rate limiting on state-changing requests."""
-    if request.method in ("GET", "HEAD", "OPTIONS"):
+    """Enforce rate limiting on state-changing requests and sensitive GET endpoints."""
+    if request.method in ("GET", "HEAD", "OPTIONS") and request.path not in _RATE_LIMITED_GET_PATHS:
         return None
     ip = request.remote_addr or "unknown"
     now = time.monotonic()
@@ -228,6 +233,8 @@ def main() -> None:
     """Start the Flask development server using environment configuration."""
     import signal
 
+    # SECURITY: API key read from environment. For hardened deployments,
+    # consider a secrets manager or platform keychain instead.
     app = create_app(static_dist=get_static_dist(), api_key=os.environ.get("QUODEQ_API_KEY"))
 
     def _handle_shutdown(signum: int, frame: object) -> None:

@@ -177,7 +177,8 @@ def _resolve_cache(
             cache_config.cache_lock,
             cache_config.cache_max if cache_config.cache_max is not None else _acc_dim_cache_max(),
         )
-    return _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max()
+    cache, lock = create_accumulated_cache()
+    return cache, lock, _acc_dim_cache_max()
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from quodeq.core.types import Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
 from quodeq.engine.evidence import DEFAULT_WEIGHT, Evidence
@@ -281,8 +281,7 @@ def _weighted_overall(principles_scores: dict[str, PrincipleScore], mode: str) -
     if total > 0 and insuff > total * _INSUFFICIENT_MAJORITY_RATIO:
         scored = total - insuff
         # OverallScore is frozen, so we need to create a new instance
-        from dataclasses import replace as _replace
-        result = _replace(
+        result = replace(
             result,
             confidence="low",
             confidence_reason=f"Only {scored}/{total} principles had sufficient evidence",

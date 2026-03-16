@@ -231,9 +231,19 @@ def _run_with_heartbeat(
     return timed_out
 
 
+_SENSITIVE_ENV_KEYS = frozenset({
+    "QUODEQ_API_KEY", "DATABASE_URL", "SECRET_KEY",
+})
+
+
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
-    """Build the subprocess environment for the AI CLI."""
+    """Build the subprocess environment for the AI CLI.
+
+    Removes known sensitive variables that the child process does not need.
+    """
     env = (env or os.environ).copy()
+    for key in _SENSITIVE_ENV_KEYS:
+        env.pop(key, None)
     provider_cfg = _get_provider_configs().get(ai_cmd or "", {})
     for key, val in provider_cfg.get("env_set_if_missing", {}).items():
         if key not in env:

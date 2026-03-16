@@ -148,11 +148,12 @@ def _make_run_dimension_fetcher(
     max_size: int | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
     """Return a cached fetcher for run dimension data (LRU, bounded)."""
+    _default = create_dimension_cache()
     return make_lru_dimension_fetcher(
         reports_root,
         project,
-        cache if cache is not None else _RUN_DIM_CACHE,
-        lock if lock is not None else _RUN_DIM_LOCK,
+        cache if cache is not None else _default[0],
+        lock if lock is not None else _default[1],
         max_size if max_size is not None else _run_dim_cache_max(),
     )
 

@@ -97,6 +97,10 @@ class SubagentPool:
         jsonl_file = self._shared_jsonl_path()
         stream_file = self._evidence_dir / f"{self._dimension}_{agent_id}.stream"
 
+        # Per-agent timeout: use pool budget so individual agents can't run
+        # indefinitely after the queue is drained.
+        agent_max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
+
         ac = AnalysisConfig(
             jsonl_file=jsonl_file,
             analysis_budget=self._base_config.analysis_budget,
@@ -105,7 +109,7 @@ class SubagentPool:
             ai_cmd=self._base_config.ai_cmd,
             ai_model=self._base_config.ai_model,
             max_turns=self._base_config.max_turns,
-            max_duration=None,
+            max_duration=agent_max_duration,
             compiled_dir=self._base_config.compiled_dir,
             dimension=self._dimension,
             queue_path=self._queue_path,

@@ -177,7 +177,12 @@ class HttpClient:
                 self._circuit_opened_at = time.monotonic()
 
     def _validate_url(self, url: str) -> None:
-        """Validate URL scheme and check for private/plaintext restrictions."""
+        """Validate URL scheme and check for private/plaintext restrictions.
+
+        .. note:: DNS rebinding caveat — hostname is resolved here but
+           ``urlopen`` re-resolves independently.  For untrusted URLs in
+           high-security contexts, pin the resolved IP or use a SOCKS proxy.
+        """
         if not url.startswith(("http://", "https://")):
             raise ValueError(f"URL must use http or https scheme: {url!r}")
 

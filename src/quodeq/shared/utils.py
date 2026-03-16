@@ -93,7 +93,15 @@ def __getattr__(name: str) -> str:
 
 
 def is_repo_url(repo_input: str) -> bool:
-    """Return True if the input looks like a remote repository URL."""
+    """Return True if the input looks like a remote repository URL.
+
+    .. warning:: Cleartext ``http://`` URLs are accepted but credentials
+       embedded in such URLs will be transmitted unencrypted.
+    """
+    if repo_input.startswith("http://"):
+        logging.getLogger(__name__).warning(
+            "Cleartext HTTP repository URL — credentials may be transmitted unencrypted"
+        )
     return repo_input.startswith(("http://", "https://", "git@"))
 
 
@@ -155,9 +163,9 @@ def get_dashboard_port() -> int:
     return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"])
 
 
-def get_static_dist() -> str | None:
+def get_static_dist(env: dict[str, str] | None = None) -> str | None:
     """Return the static dist path from environment, or the bundled static dir."""
-    from_env = os.environ.get("QUODEQ_STATIC_DIST")
+    from_env = (env or os.environ).get("QUODEQ_STATIC_DIST")
     if from_env:
         return from_env
     # Fall back to static assets bundled inside the package
@@ -167,12 +175,12 @@ def get_static_dist() -> str | None:
     return None
 
 
-def get_evaluations_dir(default: str | None = None) -> str:
+def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None = None) -> str:
     """Return the evaluations directory from environment or user-level default.
 
     Priority: QUODEQ_EVALUATIONS_DIR env var > explicit *default* > ~/.quodeq/evaluations
     """
-    from_env = os.environ.get("QUODEQ_EVALUATIONS_DIR")
+    from_env = (env or os.environ).get("QUODEQ_EVALUATIONS_DIR")
     if from_env:
         return from_env
     if default is not None:
@@ -185,24 +193,24 @@ def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
     return (env or os.environ).get("ANTHROPIC_API_KEY") or None
 
 
-def get_asvs_url() -> str:
+def get_asvs_url(env: dict[str, str] | None = None) -> str:
     """Return the OWASP ASVS JSON URL from environment or default."""
-    return os.environ.get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
+    return (env or os.environ).get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
 
 
-def get_github_search_url() -> str:
+def get_github_search_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub repository search URL from environment or default."""
-    return os.environ.get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
+    return (env or os.environ).get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
 
 
-def get_github_raw_base_url() -> str:
+def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub raw content base URL from environment or default."""
-    return os.environ.get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
+    return (env or os.environ).get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
 
 
-def get_findings_file() -> str | None:
+def get_findings_file(env: dict[str, str] | None = None) -> str | None:
     """Return the findings file path from environment, or None."""
-    return os.environ.get("FINDINGS_FILE")
+    return (env or os.environ).get("FINDINGS_FILE")
 
 
 def show_diff(path: Path, new_content: str) -> None:
