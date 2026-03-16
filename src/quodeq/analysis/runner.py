@@ -37,6 +37,7 @@ class AnalysisOptions:
     max_duration: int | None = None
     n_subagents: int = 1
     subagent_model: str | None = None
+    verify_findings: bool = True
 
 
 @dataclass

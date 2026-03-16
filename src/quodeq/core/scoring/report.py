@@ -72,7 +72,7 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
     per_dim_evidence = run_per_dimension(config)
 
     # Verification pass: re-check violations + hunt for compliance evidence
-    if config.options.n_subagents > 1:
+    if config.options.verify_findings and config.options.n_subagents > 1:
         per_dim_evidence = _run_verification(config, per_dim_evidence)
 
     results: dict[str, str] = {}

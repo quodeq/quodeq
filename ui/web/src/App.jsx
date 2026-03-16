@@ -309,6 +309,9 @@ export default function App() {
   // AI settings
   // -------------------------------------------------------------------------
   const [aiCmd, setAiCmd] = useState(localStorage.getItem('cc-ai-cmd') || '');
+  const [verifyFindings, setVerifyFindings] = useState(() => {
+    try { return localStorage.getItem('cc-verify-findings') !== 'false'; } catch { return true; }
+  });
   const [availableClients, setAvailableClients] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
@@ -365,9 +368,14 @@ export default function App() {
     prevJobRef.current = job;
   }, [job]);
 
+  function applyVerifyFindings(value) {
+    setVerifyFindings(value);
+    localStorage.setItem('cc-verify-findings', value ? 'true' : 'false');
+  }
+
   function handleStartEvaluation(payload) {
     const subagentModel = LEVELS.find(l => l.level === analysisPower)?.model;
-    startEvaluation({ ...payload, aiCmd: aiCmd || undefined, subagentModel });
+    startEvaluation({ ...payload, aiCmd: aiCmd || undefined, subagentModel, verifyFindings });
   }
 
   function handleEvalDismiss(action) {
@@ -671,7 +679,7 @@ export default function App() {
                   </div>
                 )}
                 {aiCmd && (
-                  <div className="settings-row settings-row--last">
+                  <div className="settings-row">
                     <div className="settings-row-label">
                       <span className="settings-label">Model</span>
                       <span className="settings-description">
@@ -680,6 +688,26 @@ export default function App() {
                     </div>
                   </div>
                 )}
+                <div className="settings-row settings-row--last">
+                  <div className="settings-row-label">
+                    <span className="settings-label">Verify findings</span>
+                    <span className="settings-description">
+                      After analysis, run a verification pass that re-checks violations and hunts for compliance evidence. Improves grade accuracy at a small extra cost.
+                    </span>
+                  </div>
+                  <div className="theme-toggle">
+                    <button
+                      type="button"
+                      className={`theme-toggle-btn${verifyFindings ? ' active' : ''}`}
+                      onClick={() => applyVerifyFindings(true)}
+                    >On</button>
+                    <button
+                      type="button"
+                      className={`theme-toggle-btn${!verifyFindings ? ' active' : ''}`}
+                      onClick={() => applyVerifyFindings(false)}
+                    >Off</button>
+                  </div>
+                </div>
               </section>
               <section className="panel settings-section">
                 <div className="panel-header">

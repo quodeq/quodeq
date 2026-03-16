@@ -111,6 +111,8 @@ class FsEvaluationMixin:
             env["AI_MODEL"] = ai_model
         if options.subagent_model:
             env["SUBAGENT_MODEL"] = options.subagent_model
+        if not options.verify_findings:
+            env["QUODEQ_NO_VERIFY"] = "1"
         return env
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
