@@ -342,6 +342,9 @@ export default function App() {
           setAiCmd('');
           localStorage.removeItem('cc-ai-cmd');
         }
+        if (!aiCmd && clients.length > 0) {
+          applyAiCmd(clients[0].id);
+        }
       })
       .catch(() => setAvailableClients([]));
   }, [activePage]); // eslint-disable-line react-hooks/exhaustive-deps
