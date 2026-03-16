@@ -188,18 +188,29 @@ function AccumulatedOverviewPanel({
             </div>
           </div>
           <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Compliance</span>
+            <span className="acc-eval-stat-value">
+              {accumulated?.summary?.totalCompliance || 0}
+            </span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Ratio</span>
+            <span className="acc-eval-stat-value">
+              {(() => {
+                const v = accumulated?.summary?.totalViolations || 0;
+                const c = accumulated?.summary?.totalCompliance || 0;
+                const total = v + c;
+                return total > 0 ? `${Math.round((v / total) * 100)}%` : '—';
+              })()}
+            </span>
+          </div>
+          <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Files Affected</span>
             <span className="acc-eval-stat-value">{accumulatedTopFiles.length}</span>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Principles</span>
             <span className="acc-eval-stat-value">{accumulatedUniquePrinciples}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Compliant</span>
-            <span className="acc-eval-stat-value">
-              {accumulated?.summary?.totalCompliance || 0}
-            </span>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Dimensions</span>
@@ -448,16 +459,27 @@ function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileCl
             </div>
           </div>
           <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Compliance</span>
+            <span className="acc-eval-stat-value">{runSummary.totalCompliance || 0}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Ratio</span>
+            <span className="acc-eval-stat-value">
+              {(() => {
+                const v = runSummary.totalViolations || 0;
+                const c = runSummary.totalCompliance || 0;
+                const total = v + c;
+                return total > 0 ? `${Math.round((v / total) * 100)}%` : '—';
+              })()}
+            </span>
+          </div>
+          <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Files Affected</span>
             <span className="acc-eval-stat-value">{runTopFiles.length}</span>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Principles</span>
             <span className="acc-eval-stat-value">{runUniquePrinciples}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Compliant</span>
-            <span className="acc-eval-stat-value">{runSummary.totalCompliance || 0}</span>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Dimensions</span>

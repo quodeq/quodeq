@@ -78,7 +78,7 @@
 
 .acc-eval-stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
   gap: 12px;
   padding-top: 16px;
   border-top: 1px solid var(--color-border);
