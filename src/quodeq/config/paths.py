@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import logging
+import os
 from dataclasses import dataclass
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 
 # Bundled data directory shipped inside the package.
@@ -34,7 +38,7 @@ class ConfigPaths:
         return self.root / "config" / "disciplines.conf"
 
     @classmethod
-    def from_root(cls, root: Path, version: str | None = None) -> "ConfigPaths":
+    def from_root(cls, root: Path) -> "ConfigPaths":
         """Construct a ConfigPaths instance by deriving all paths from a root directory."""
         return cls(
             root=root,
@@ -53,6 +57,39 @@ class ConfigPaths:
         return cls.from_root(data_dir)
 
 
+def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> None:
+    """Source all ``export VAR=value`` lines from ``.quodeq.env`` into *target*.
+
+    *target* defaults to ``os.environ``.  Already-set keys are NOT
+    overwritten, so explicit env takes precedence over the file.
+
+    Pass an explicit *target* dict in tests to avoid mutating the real
+    environment.
+    """
+    if target is None:
+        target = os.environ
+    if not paths.env_file.exists():
+        return
+    try:
+        lines = paths.env_file.read_text().splitlines()
+    except OSError as exc:
+        _logger.warning("Failed to read env file %s: %s", paths.env_file, exc)
+        return
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped or stripped.startswith("#"):
+            continue
+        if stripped.startswith("export "):
+            stripped = stripped[len("export "):]
+        if "=" not in stripped:
+            continue
+        key, _, value = stripped.partition("=")
+        key = key.strip()
+        value = value.strip()
+        if key and key not in target:
+            target[key] = os.path.expanduser(value)
+
+
 def _looks_like_project_root(root: Path) -> bool:
     return (
         (root / "prompts").is_dir()
@@ -60,7 +97,7 @@ def _looks_like_project_root(root: Path) -> bool:
     )
 
 
-def default_paths(version: str | None = None) -> ConfigPaths:
+def default_paths() -> ConfigPaths:
     """Return ConfigPaths from the bundled data directory, or the project root in dev."""
     # Prefer bundled data directory (works when installed as a package)
     if _DATA_DIR.is_dir() and _looks_like_project_root(_DATA_DIR):
@@ -70,10 +107,12 @@ def default_paths(version: str | None = None) -> ConfigPaths:
     module_path = Path(__file__).resolve()
     for root in module_path.parent.parents:
         if _looks_like_project_root(root):
-            return ConfigPaths.from_root(root, version=version)
+            return ConfigPaths.from_root(root)
 
-    if len(module_path.parents) > 3:
-        root = module_path.parents[3]
+    # Walk up from src/quodeq/config/paths.py to project root (3 levels: config -> quodeq -> src)
+    _FALLBACK_PARENT_DEPTH = 3
+    if len(module_path.parents) > _FALLBACK_PARENT_DEPTH:
+        root = module_path.parents[_FALLBACK_PARENT_DEPTH]
     else:
         root = module_path.parent
-    return ConfigPaths.from_root(root, version=version)
+    return ConfigPaths.from_root(root)

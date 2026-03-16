@@ -1,3 +1,15 @@
+/**
+ * API client / repository layer.
+ *
+ * Every public function maps a raw JSON response to a typed model object
+ * (see ../models/) so components never see raw API shapes.
+ */
+
+import { createDashboard } from '../models/dashboard.js';
+import { createDimensionEval } from '../models/dimension.js';
+import { createJob } from '../models/job.js';
+import { createProject } from '../models/project.js';
+
 const BASE = import.meta.env.VITE_API_BASE || '/api';
 
 async function request(path, options = {}) {
@@ -18,52 +30,80 @@ async function request(path, options = {}) {
   return payload;
 }
 
+// ── Health ──────────────────────────────────────────────────────────────
+
 export function getHealth() {
   return request('/health');
 }
 
-export function listProjects() {
-  return request('/projects');
+// ── Projects ────────────────────────────────────────────────────────────
+
+/** @returns {Promise<import('../models/project.js').Project[]>} */
+export async function listProjects() {
+  const data = await request('/projects');
+  const list = data?.projects ?? data ?? [];
+  return Array.isArray(list) ? list.map(createProject) : [];
 }
 
-export function getProjectInfo(projectId) {
-  return request(`/projects/${encodeURIComponent(projectId)}/info`);
+/** @returns {Promise<import('../models/project.js').Project>} */
+export async function getProjectInfo(projectId) {
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/info`);
+  return createProject(data);
 }
 
-export function getDashboard(projectId, run = 'latest') {
+// ── Dashboard ───────────────────────────────────────────────────────────
+
+/** @returns {Promise<import('../models/dashboard.js').Dashboard>} */
+export async function getDashboard(projectId, run = 'latest') {
   const q = run ? `?run=${encodeURIComponent(run)}` : '';
-  return request(`/projects/${encodeURIComponent(projectId)}/dashboard${q}`);
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/dashboard${q}`);
+  return createDashboard(data);
 }
 
-export function listEvaluations() {
-  return request('/evaluations');
+/** @returns {Promise<Object>} */
+export async function getAccumulated(projectId, asOfRun = null) {
+  const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
+  return request(`/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
 }
 
-export function startEvaluation(input) {
-  return request('/evaluations', {
+// ── Evaluations / Jobs ──────────────────────────────────────────────────
+
+/** @returns {Promise<import('../models/job.js').Job[]>} */
+export async function listEvaluations() {
+  const data = await request('/evaluations');
+  return (data || []).map(createJob);
+}
+
+/** @returns {Promise<import('../models/job.js').Job>} */
+export async function startEvaluation(input) {
+  const data = await request('/evaluations', {
     method: 'POST',
     body: JSON.stringify(input),
   });
+  return createJob(data);
 }
 
-export function getEvaluation(jobId) {
-  return request(`/evaluations/${encodeURIComponent(jobId)}`);
+/** @returns {Promise<import('../models/job.js').Job>} */
+export async function getEvaluation(jobId) {
+  const data = await request(`/evaluations/${encodeURIComponent(jobId)}`);
+  return createJob(data);
 }
 
 export function cancelEvaluation(jobId) {
   return request(`/evaluations/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
 }
 
-export function getAccumulated(projectId, asOfRun = null) {
-  const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  return request(`/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
-}
+// ── Dimension Eval ──────────────────────────────────────────────────────
 
-export function getDimensionEval(projectId, runId, dimension) {
-  return request(
+/** @returns {Promise<import('../models/dimension.js').DimensionEval>} */
+export async function getDimensionEval(projectId, runId, dimension) {
+  const data = await request(
     `/projects/${encodeURIComponent(projectId)}/runs/${encodeURIComponent(runId)}/dimensions/${encodeURIComponent(dimension)}/eval`
   );
+  return createDimensionEval(data);
 }
+
+// ── Browse / Plugins / AI Clients ───────────────────────────────────────
 
 export function browseDirectory(dirPath = '') {
   const q = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';

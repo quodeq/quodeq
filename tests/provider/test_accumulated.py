@@ -7,7 +7,9 @@ from typing import Any
 
 import pytest
 
-from quodeq.provider.accumulated import (
+from quodeq.core.types import DimensionResult
+from quodeq.core.types.mappers import parse_dimension_result
+from quodeq.services.accumulated import (
     _aggregate_severity_counts,
     _compute_accumulated_scores,
     _compute_accumulated_trends,
@@ -21,9 +23,10 @@ from quodeq.provider.accumulated import (
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _dim(name: str, score: str = "7.5", grade: str = "B", **extra: Any) -> dict[str, Any]:
-    """Build a minimal dimension dict."""
-    return {"dimension": name, "overallScore": score, "overallGrade": grade, **extra}
+def _dim(name: str, score: str = "7.5", grade: str = "B", **extra: Any) -> DimensionResult:
+    """Build a minimal DimensionResult."""
+    raw: dict[str, Any] = {"dimension": name, "overallScore": score, "overallGrade": grade, **extra}
+    return parse_dimension_result(raw)
 
 
 def _write_eval(path: Path, dim_name: str, score: str = "7.5", grade: str = "B", **extra: Any) -> None:
@@ -39,18 +42,18 @@ def _write_evidence(path: Path, dim_name: str, discipline: str = "typescript") -
     (path / f"{dim_name}_evidence.json").write_text(json.dumps({"dimension": dim_name, "discipline": discipline}))
 
 
-def _setup_project(tmp_path: Path, project: str, runs: list[tuple[str, list[dict]]]) -> Path:
+def _setup_project(tmp_path: Path, project: str, runs: list[tuple[str, list[DimensionResult]]]) -> Path:
     """Set up a project directory with the given runs and dimensions.
 
-    *runs* is a list of (run_id, [dim_dict, ...]) pairs, newest first.
+    *runs* is a list of (run_id, [DimensionResult, ...]) pairs, newest first.
     Returns the reports root path.
     """
     reports_root = tmp_path / "evaluations"
     for run_id, dims in runs:
         for dim in dims:
-            dim_name = dim["dimension"]
+            dim_name = dim.dimension
             eval_dir = reports_root / project / run_id / "evaluation"
-            _write_eval(eval_dir, dim_name, dim.get("overallScore", "7.5"), dim.get("overallGrade", "B"))
+            _write_eval(eval_dir, dim_name, dim.overall_score or "7.5", dim.overall_grade or "B")
             evidence_dir = reports_root / project / run_id / "evidence"
             _write_evidence(evidence_dir, dim_name)
     return reports_root
@@ -69,7 +72,7 @@ class TestNumericAverage:
         assert numeric_average([]) is None
 
     def test_skips_none_scores(self):
-        dims = [_dim("a", "8.0"), {"dimension": "b", "overallScore": None}]
+        dims = [_dim("a", "8.0"), DimensionResult(dimension="b", overall_score=None)]
         assert numeric_average(dims) == 8.0
 
     def test_handles_grade_strings(self):

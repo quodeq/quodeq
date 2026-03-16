@@ -5,6 +5,10 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig({
   plugins: [react()],
+  build: {
+    outDir: '../../src/quodeq/static',
+    emptyOutDir: true,
+  },
   server: {
     port: Number(process.env.VITE_PORT) || 5173,
     proxy: {

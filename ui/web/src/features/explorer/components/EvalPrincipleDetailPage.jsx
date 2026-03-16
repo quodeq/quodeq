@@ -126,15 +126,13 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
       vs.forEach((v, i) => {
         const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
         lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
-        const reason = v.reason || v.findings;
-        if (reason) lines.push('', `**Why it's a violation:** ${reason}`);
-        const linkedRefs = (v.req_refs || []).filter(r => r.url);
+        if (v.reason) lines.push('', `**Why it's a violation:** ${v.reason}`);
+        const linkedRefs = (v.reqRefs || []).filter(r => r.url);
         if (linkedRefs.length > 0) lines.push('', `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
-        const code = v.code || v.snippet;
-        if (code) {
+        if (v.snippet) {
           lines.push('', '**Affected code:**');
           lines.push('```');
-          code.split('\n').forEach((l) => lines.push(l));
+          v.snippet.split('\n').forEach((l) => lines.push(l));
           lines.push('```');
         }
         lines.push('');
@@ -157,11 +155,9 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
       `**Severity:** ${v.severity || 'unknown'}`,
     ];
     if (loc) lines.push(`**File:** ${loc}`);
-    const code = v.code || v.snippet;
-    if (code) lines.push('', '## Affected Code', '```', code, '```');
-    const reason = v.reason || v.findings;
-    if (reason) lines.push('', "## Why It's a Violation", reason);
-    if (v.req_refs?.length > 0) lines.push('', `**References:** ${v.req_refs.map(r => `${r.label} (${r.url})`).join(', ')}`);
+    if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
+    if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
+    if (v.reqRefs?.length > 0) lines.push('', `**References:** ${v.reqRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
     else if (v.req) lines.push('', `**Requirement:** ${v.req}`);
     lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
     if (loc) lines.push(`Apply it to \`${loc}\`.`);
@@ -172,32 +168,21 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
   return (
     <>
       <section className="panel file-detail-summary-panel">
-        <h3 className="file-detail-title">{principle}</h3>
         <div className="file-detail-stats-row">
           <div className="file-detail-stats">
+            <h3 className="file-detail-title" style={{ margin: 0 }}>{principle}</h3>
             {grade === 'Insufficient' ? (
               <span className="exec-summary-insufficient">Not enough evidence</span>
             ) : (
               <>
                 {score && (
                   <>
-                    <span className="file-detail-stat"><strong>{score}</strong></span>
                     <span className="file-detail-stat-sep">·</span>
+                    <span className="file-detail-stat" style={{ fontSize: '1.1rem' }}><strong>{score.replace('/10', '')}</strong></span>
                   </>
                 )}
+                <span className="file-detail-stat-sep">·</span>
                 <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
-              </>
-            )}
-            {violations.length > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
-              </>
-            )}
-            {compliance.length > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat"><strong>{compliance.length}</strong> compliant</span>
               </>
             )}
           </div>
@@ -206,6 +191,39 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
               label="Principle fix plan"
               onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText())}
             />
+          )}
+        </div>
+        <div className="file-detail-stats" style={{ marginTop: 6 }}>
+          {(() => {
+            const sevCounts = { critical: 0, major: 0, minor: 0 };
+            violations.forEach(v => { const s = (v.severity || 'minor').toLowerCase(); if (sevCounts[s] !== undefined) sevCounts[s]++; });
+            return (
+              <>
+                {sevCounts.critical > 0 && (
+                  <span className="file-detail-stat severity-tag critical">{sevCounts.critical} critical</span>
+                )}
+                {sevCounts.major > 0 && (
+                  <span className="file-detail-stat severity-tag major">{sevCounts.major} major</span>
+                )}
+                {sevCounts.minor > 0 && (
+                  <span className="file-detail-stat severity-tag minor">{sevCounts.minor} minor</span>
+                )}
+                {(sevCounts.critical > 0 || sevCounts.major > 0 || sevCounts.minor > 0) && <span className="file-detail-stat-sep">·</span>}
+              </>
+            );
+          })()}
+          <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
+          {compliance.length > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat"><strong>{compliance.length}</strong> compliance</span>
+              {violations.length > 0 && (
+                <>
+                  <span className="file-detail-stat-sep">·</span>
+                  <span className="file-detail-stat"><strong>1:{Math.round(compliance.length / violations.length)}</strong> ratio</span>
+                </>
+              )}
+            </>
           )}
         </div>
       </section>
@@ -257,21 +275,21 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             <div className="vlive-detail-section">
                               <div className="vlive-detail-section-header">
                                 {v.title && <span className="vlive-detail-section-label">Reason</span>}
-                                {v.req_refs?.filter(r => r.url)?.length > 0 &&
-                                  <span className="cwe-link-group">{v.req_refs.filter(r => r.url).map((ref, i) => (
+                                {v.reqRefs?.filter(r => r.url)?.length > 0 &&
+                                  <span className="cwe-link-group">{v.reqRefs.filter(r => r.url).map((ref, i) => (
                                     <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                                   ))}</span>
                                 }
                               </div>
                               {v.title && <p className="vlive-detail-title">{v.title}</p>}
-                              {(v.reason || v.findings) && <>
+                              {v.reason && <>
                                 <span className="vlive-detail-section-label">Detail</span>
-                                <p className="vlive-detail-reason">{v.reason || v.findings}</p>
+                                <p className="vlive-detail-reason">{v.reason}</p>
                               </>}
                             </div>
                           )}
-                          {(v.code || v.snippet) && (
-                            <pre className="vlive-snippet">{(v.code || v.snippet).replace(/\\n/g, '\n')}</pre>
+                          {v.snippet && (
+                            <pre className="vlive-snippet">{v.snippet.replace(/\\n/g, '\n')}</pre>
                           )}
                         </div>
                       </>
@@ -312,8 +330,8 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           <div className="vlive-detail-section">
                             <div className="vlive-detail-section-header">
                               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-                              {c.req_refs?.filter(r => r.url)?.length > 0 &&
-                                <span className="cwe-link-group">{c.req_refs.filter(r => r.url).map((ref, i) => (
+                              {c.reqRefs?.filter(r => r.url)?.length > 0 &&
+                                <span className="cwe-link-group">{c.reqRefs.filter(r => r.url).map((ref, i) => (
                                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                                 ))}</span>
                               }
@@ -325,8 +343,8 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             </>}
                           </div>
                         )}
-                        {(c.code || c.snippet) && (
-                          <pre className="vlive-snippet">{(c.code || c.snippet).replace(/\\n/g, '\n')}</pre>
+                        {c.snippet && (
+                          <pre className="vlive-snippet">{c.snippet.replace(/\\n/g, '\n')}</pre>
                         )}
                       </div>
                     </>

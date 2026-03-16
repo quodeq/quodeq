@@ -7,27 +7,42 @@ import os
 import sys
 
 
-_USE_COLOR = (
-    not os.environ.get("NO_COLOR")
-    and os.environ.get("TERM") != "dumb"
-)
+def _should_use_color(env: dict[str, str] | None = None) -> bool:
+    """Determine whether ANSI color codes should be emitted.
 
-BLUE   = "\033[0;34m" if _USE_COLOR else ""
-GREEN  = "\033[0;32m" if _USE_COLOR else ""
-YELLOW = "\033[1;33m" if _USE_COLOR else ""
-GREY   = "\033[0;90m" if _USE_COLOR else ""
-RED    = "\033[0;31m" if _USE_COLOR else ""
-NC     = "\033[0m"    if _USE_COLOR else ""
+    *env* overrides ``os.environ`` when provided, making the check
+    testable without environment mutation.
+    """
+    environ = env if env is not None else os.environ
+    return not environ.get("NO_COLOR") and environ.get("TERM") != "dumb"
+
+
+def _use_color() -> bool:
+    """Return whether color output is currently enabled (evaluated on each call)."""
+    return _should_use_color()
+
+
+def _color(code: str) -> str:
+    """Return the ANSI *code* if color is enabled, else empty string."""
+    return code if _use_color() else ""
+
 
 _LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
 logging.addLevelName(_LOG_SUCCESS, "SUCCESS")
 
+_ANSI_GREY = "\033[0;90m"
+_ANSI_BLUE = "\033[0;34m"
+_ANSI_GREEN = "\033[0;32m"
+_ANSI_YELLOW = "\033[1;33m"
+_ANSI_RED = "\033[0;31m"
+_NC = "\033[0m"
+
 _STYLES: dict = {
-    logging.DEBUG: (GREY, "[DEBUG]"),
-    logging.INFO: (BLUE, "[INFO]"),
-    _LOG_SUCCESS: (GREEN, "[SUCCESS]"),
-    logging.WARNING: (YELLOW, "[WARNING]"),
-    logging.ERROR: (RED, "[ERROR]"),
+    logging.DEBUG: (_ANSI_GREY, "[DEBUG]"),
+    logging.INFO: (_ANSI_BLUE, "[INFO]"),
+    _LOG_SUCCESS: (_ANSI_GREEN, "[SUCCESS]"),
+    logging.WARNING: (_ANSI_YELLOW, "[WARNING]"),
+    logging.ERROR: (_ANSI_RED, "[ERROR]"),
 }
 
 
@@ -35,8 +50,10 @@ class _ColorFormatter(logging.Formatter):
     """Format log records with ANSI color codes based on severity level."""
 
     def format(self, record: logging.LogRecord) -> str:
-        color, prefix = _STYLES.get(record.levelno, (NC, f"[{record.levelname}]"))
-        return f"{color}{prefix}{NC} {record.getMessage()}"
+        raw_color, prefix = _STYLES.get(record.levelno, ("", f"[{record.levelname}]"))
+        if _use_color():
+            return f"{raw_color}{prefix}{_NC} {record.getMessage()}"
+        return f"{prefix} {record.getMessage()}"
 
 
 class _StderrHandler(logging.StreamHandler):
@@ -57,12 +74,12 @@ class _StderrHandler(logging.StreamHandler):
         pass
 
 
-# Module-level logger configuration is intentional — standard Python convention.
+# Module-level logger configuration is intentional -- standard Python convention.
 # The "quodeq" logger is set up once at import time so all log_* helpers work immediately.
 _logger = logging.getLogger("quodeq")
 _logger.addHandler(_StderrHandler())
 _logger.propagate = False
-_logger.setLevel(logging.DEBUG)
+_logger.setLevel(logging.INFO)
 
 def _apply_env_log_level(level: str | None = None) -> None:
     """Apply *level* (or LOG_LEVEL env var) to the logger. Injectable for testing."""

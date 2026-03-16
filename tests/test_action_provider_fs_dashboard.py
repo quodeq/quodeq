@@ -7,9 +7,10 @@ from typing import Any
 
 import pytest
 
-from quodeq.provider.dashboard import (
+from quodeq.core.types import DimensionResult
+from quodeq.services._dashboard_stale import collect_stale_dimensions as _collect_stale_dimensions
+from quodeq.services.dashboard import (
     _collect_previous_scores,
-    _collect_stale_dimensions,
     _enrich_dimensions_with_trend,
     _build_accumulated_trend,
     build_dashboard,
@@ -46,6 +47,10 @@ def _setup_run(reports_root: Path, project: str, run_id: str, dims: list[tuple[s
         _write_eval(eval_dir, dim_name, score, grade, date)
 
 
+def _dim(name: str, grade: str = "Good", score: str = "7/10") -> DimensionResult:
+    return DimensionResult(dimension=name, overall_grade=grade, overall_score=score)
+
+
 # ---------------------------------------------------------------------------
 # _collect_previous_scores
 # ---------------------------------------------------------------------------
@@ -59,14 +64,14 @@ class TestCollectPreviousScores:
         selected_index = 0
         selected_dim_names = {"maintainability"}
 
-        def get_run_dimensions(run_id: str) -> list[dict]:
+        def get_run_dimensions(run_id: str) -> list[DimensionResult]:
             if run_id == "run-1":
-                return [{"dimension": "maintainability", "overallGrade": "Good", "overallScore": "7/10"}]
+                return [_dim("maintainability", "Good", "7/10")]
             return []
 
         result = _collect_previous_scores(runs, selected_index, selected_dim_names, get_run_dimensions)
         assert "maintainability" in result
-        assert result["maintainability"]["overallGrade"] == "Good"
+        assert result["maintainability"].overall_grade == "Good"
 
     def test_no_previous_when_single_run(self):
         runs = [RunInfo("run-1", "2026-03-01", "Mar 01, 2026")]
@@ -85,15 +90,15 @@ class TestCollectStaleDimensions:
             RunInfo("run-1", "2026-03-01", "Mar 01, 2026"),
         ]
 
-        def get_run_dimensions(run_id: str) -> list[dict]:
+        def get_run_dimensions(run_id: str) -> list[DimensionResult]:
             if run_id == "run-1":
-                return [{"dimension": "security", "overallGrade": "Good", "overallScore": "7/10"}]
+                return [_dim("security", "Good", "7/10")]
             return []
 
         stale, _prev = _collect_stale_dimensions(runs, 0, {"maintainability"}, get_run_dimensions)
         assert len(stale) == 1
-        assert stale[0]["dimension"] == "security"
-        assert stale[0]["stale"] is True
+        assert stale[0].dimension == "security"
+        assert stale[0].stale is True
 
 
 # ---------------------------------------------------------------------------
@@ -102,16 +107,16 @@ class TestCollectStaleDimensions:
 
 class TestEnrichDimensionsWithTrend:
     def test_adds_trend_when_previous_exists(self):
-        selected = [{"dimension": "maintainability", "overallScore": "8/10"}]
-        previous = {"maintainability": {"overallScore": "6/10", "runId": "run-1"}}
+        selected = [_dim("maintainability", "Good", "8/10")]
+        previous = {"maintainability": DimensionResult(dimension="maintainability", overall_score="6/10", run_id="run-1")}
         result = _enrich_dimensions_with_trend(selected, previous)
-        assert result[0]["trend"] == "up"
-        assert result[0]["previousRunId"] == "run-1"
+        assert result[0].trend == "up"
+        assert result[0].previous_run_id == "run-1"
 
     def test_trend_none_without_previous(self):
-        selected = [{"dimension": "maintainability", "overallScore": "8/10"}]
+        selected = [_dim("maintainability", "Good", "8/10")]
         result = _enrich_dimensions_with_trend(selected, {})
-        assert result[0]["trend"] == "none"
+        assert result[0].trend == "none"
 
 
 # ---------------------------------------------------------------------------
@@ -125,10 +130,10 @@ class TestBuildAccumulatedTrend:
             RunInfo("run-1", "2026-03-01", "Mar 01, 2026"),
         ]
 
-        def get_run_dimensions(run_id: str) -> list[dict]:
+        def get_run_dimensions(run_id: str) -> list[DimensionResult]:
             if run_id == "run-1":
-                return [{"dimension": "maintainability", "overallScore": "6/10", "overallGrade": "Adequate"}]
-            return [{"dimension": "maintainability", "overallScore": "8/10", "overallGrade": "Good"}]
+                return [_dim("maintainability", "Adequate", "6/10")]
+            return [_dim("maintainability", "Good", "8/10")]
 
         trend = _build_accumulated_trend(runs, get_run_dimensions)
         assert len(trend) == 2

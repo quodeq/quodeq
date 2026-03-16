@@ -1,8 +1,4 @@
-"""Shared helpers for action API modules."""
-from __future__ import annotations
+"""Re-export shim — moved to quodeq.api.helpers."""
+from quodeq.api.helpers import error_response, validate_evaluation_payload
 
-from typing import Any
-
-
-def _error(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
-    return {"error": message, "code": code}, status
+__all__ = ["error_response", "validate_evaluation_payload"]

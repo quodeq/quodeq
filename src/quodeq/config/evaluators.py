@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.config.prompt_templates import render_template
+from quodeq.shared.utils import read_text
 
 
 @dataclass(frozen=True)
@@ -26,7 +27,7 @@ def build_evaluator_prompt(
 ) -> str:
     """Render an evaluator prompt by substituting context values into a template."""
     try:
-        template = template_path.read_text()
+        template = read_text(template_path)
     except (OSError, UnicodeDecodeError) as exc:
         raise FileNotFoundError(f"Cannot read template {template_path}: {exc}") from exc
     return render_template(

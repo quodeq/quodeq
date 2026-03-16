@@ -35,7 +35,7 @@ def _capture_popen_args(tmp_path: Path, ai_model: str | None) -> list[str]:
     mock_process.poll.return_value = 0
     mock_process.wait.return_value = 0
 
-    with patch("quodeq.engine.analysis.subprocess.Popen", return_value=mock_process) as mock_popen:
+    with patch("quodeq.analysis.subprocess.subprocess.Popen", return_value=mock_process) as mock_popen:
         try:
             run_analysis(
                 work_dir=tmp_path,
@@ -147,14 +147,21 @@ class TestRunnerModelResolution:
     """The runner builds AnalysisConfig.ai_model from options → env → default."""
 
     def _resolve(self, subagent_model: str | None = None, env_model: str | None = None) -> str:
-        """Replicate the runner's resolution logic."""
+        """Exercise the runner's resolution chain using the actual cli helper.
+
+        The env-based fallback delegates to ``quodeq.cli._subagent_model`` which
+        is the same function used by the real CLI (``cli.py`` line ~43).  The
+        option-level override (``subagent_model`` arg) and the final default are
+        handled here in the same order as the evaluate command.
+        """
+        from quodeq.cli import _subagent_model
         from quodeq.engine.runner import AnalysisOptions
         opts = AnalysisOptions(subagent_model=subagent_model)
-        # Mirror runner.py line 252
         with patch.dict(os.environ, {"SUBAGENT_MODEL": env_model} if env_model else {}, clear=False):
             if not env_model:
                 os.environ.pop("SUBAGENT_MODEL", None)
-            return opts.subagent_model or os.environ.get("SUBAGENT_MODEL") or "claude-haiku-4-5"
+            _FALLBACK_MODEL = "claude-haiku-4-5"
+            return opts.subagent_model or _subagent_model() or _FALLBACK_MODEL
 
     def test_level1_fast_haiku(self) -> None:
         assert self._resolve("claude-haiku-4-5") == "claude-haiku-4-5"
@@ -190,51 +197,51 @@ class _StubJobManager:
         return {"jobId": "test"}
 
 
+@pytest.fixture()
+def filesystem_provider_stub(tmp_path: Path):
+    """Return a (repo_path, reports_dir, stub_job_manager, provider) tuple."""
+    from quodeq.provider.filesystem import FilesystemActionProvider
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    stub = _StubJobManager()
+    provider = FilesystemActionProvider(job_manager=stub)
+    return repo, tmp_path / "reports", stub, provider
+
+
 class TestApiToSubprocessIntegration:
     """POST /api/evaluations with subagentModel should set SUBAGENT_MODEL
     in the env passed to the subprocess."""
 
-    def test_full_chain_sonnet(self, tmp_path: Path) -> None:
+    def test_full_chain_sonnet(self, filesystem_provider_stub) -> None:
         from quodeq.provider.base import EvaluationOptions
-        from quodeq.provider.filesystem import FilesystemActionProvider
 
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        stub = _StubJobManager()
-        provider = FilesystemActionProvider(job_manager=stub)
+        repo, reports_dir, stub, provider = filesystem_provider_stub
         provider.start_evaluation(
             repo=str(repo),
-            reports_dir=str(tmp_path / "reports"),
+            reports_dir=str(reports_dir),
             options=EvaluationOptions(subagent_model="claude-sonnet-4-6"),
         )
         assert stub.captured_env["SUBAGENT_MODEL"] == "claude-sonnet-4-6"
 
-    def test_full_chain_opus(self, tmp_path: Path) -> None:
+    def test_full_chain_opus(self, filesystem_provider_stub) -> None:
         from quodeq.provider.base import EvaluationOptions
-        from quodeq.provider.filesystem import FilesystemActionProvider
 
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        stub = _StubJobManager()
-        provider = FilesystemActionProvider(job_manager=stub)
+        repo, reports_dir, stub, provider = filesystem_provider_stub
         provider.start_evaluation(
             repo=str(repo),
-            reports_dir=str(tmp_path / "reports"),
+            reports_dir=str(reports_dir),
             options=EvaluationOptions(subagent_model="claude-opus-4-6"),
         )
         assert stub.captured_env["SUBAGENT_MODEL"] == "claude-opus-4-6"
 
-    def test_full_chain_no_model_no_env_key(self, tmp_path: Path) -> None:
+    def test_full_chain_no_model_no_env_key(self, filesystem_provider_stub) -> None:
         from quodeq.provider.base import EvaluationOptions
-        from quodeq.provider.filesystem import FilesystemActionProvider
 
-        repo = tmp_path / "repo"
-        repo.mkdir()
-        stub = _StubJobManager()
-        provider = FilesystemActionProvider(job_manager=stub)
+        repo, reports_dir, stub, provider = filesystem_provider_stub
         provider.start_evaluation(
             repo=str(repo),
-            reports_dir=str(tmp_path / "reports"),
+            reports_dir=str(reports_dir),
             options=EvaluationOptions(),
         )
         assert "SUBAGENT_MODEL" not in stub.captured_env

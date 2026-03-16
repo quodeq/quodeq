@@ -27,6 +27,8 @@ export default function TrendArrow({ trend, delta }) {
     <span
       className={`trend-arrow ${colorClass}`}
       style={{ display: 'inline-block', transform: `rotate(${Math.round(angle)}deg)` }}
+      role="img"
+      aria-label={title}
       title={title}
     >↑</span>
   );

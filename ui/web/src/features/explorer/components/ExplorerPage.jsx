@@ -140,16 +140,27 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
             </div>
           </div>
           <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Compliance</span>
+            <span className="acc-eval-stat-value">{totalCompliant}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Ratio</span>
+            <span className="acc-eval-stat-value">
+              {(() => {
+                const v = allViolations.length;
+                const c = totalCompliant;
+                if (v === 0) return '—';
+                return `1:${Math.round(c / v)}`;
+              })()}
+            </span>
+          </div>
+          <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Files Affected</span>
             <span className="acc-eval-stat-value">{topFiles.length}</span>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Principles</span>
             <span className="acc-eval-stat-value">{uniquePrinciples}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Compliant</span>
-            <span className="acc-eval-stat-value">{totalCompliant}</span>
           </div>
         </div>
       </section>

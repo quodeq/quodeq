@@ -55,7 +55,13 @@ function ViolationLiveRow({ violation, index }) {
       className={`vdetail-row vdetail-row--${v.severity}`}
       style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
     >
-      <div className="vdetail-row-main vlive-collapsible" onClick={() => setOpen(o => !o)}>
+      <div
+        className="vdetail-row-main vlive-collapsible"
+        role="button"
+        tabIndex={0}
+        onClick={() => setOpen(o => !o)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
+      >
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}
         {v.principle && <span className="vrow-label">[{v.principle}]</span>}
@@ -75,8 +81,8 @@ function ViolationLiveRow({ violation, index }) {
             <div className="vlive-detail-section">
               <div className="vlive-detail-section-header">
                 <span className="vlive-detail-section-label">Reason</span>
-                {v.req_refs?.filter(r => r.url)?.length > 0 &&
-                  <span className="cwe-link-group">{v.req_refs.filter(r => r.url).map((ref, i) => (
+                {v.reqRefs?.filter(r => r.url)?.length > 0 &&
+                  <span className="cwe-link-group">{v.reqRefs.filter(r => r.url).map((ref, i) => (
                     <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                   ))}</span>
                 }

@@ -8,7 +8,7 @@ import EvaluationForm from './features/evaluation/components/EvaluationForm.jsx'
 import EvaluationStatus from './features/evaluation/components/EvaluationStatus.jsx';
 import ReEvaluateCard from './features/evaluation/components/ReEvaluateCard.jsx';
 import PowerSelector from './features/evaluation/components/PowerSelector.jsx';
-import { LEVELS, STORAGE_KEY as POWER_KEY } from './features/evaluation/components/powerLevels.js';
+import { getLevels, DEFAULT_MODELS, MODEL_STORAGE_PREFIX, STORAGE_KEY as POWER_KEY } from './features/evaluation/components/powerLevels.js';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
@@ -140,7 +140,7 @@ export default function App() {
   function loadProjects() {
     listProjects()
       .then((data) => {
-        const list = data.projects || data || [];
+        const list = Array.isArray(data) ? data : (data?.projects || []);
         setProjects(list);
         if (list.length > 0) {
           const current = selectedProject || localStorage.getItem('quodeq_selected_project') || '';
@@ -174,7 +174,14 @@ export default function App() {
   }
 
   async function handleDeleteProject(projectId) {
-    await fetch(`/api/projects/${encodeURIComponent(projectId)}${_apiQs()}`, { method: 'DELETE' });
+    const qs = _apiQs();
+    const separator = qs ? '&' : '?';
+    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}${qs}${separator}confirm=true`, { method: 'DELETE' });
+    if (!res.ok) {
+      const msg = await res.text().catch(() => res.statusText);
+      alert(`Failed to delete project: ${msg}`);
+      return;
+    }
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
     loadProjects();
   }
@@ -270,12 +277,12 @@ export default function App() {
   const { selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
     if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
     const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
-    const parentName = data?.parent || null;
-    const parentData = parentName ? projects.find((p) => (p.name || p) === parentName) : null;
-    const parentId = parentData ? (parentData.id || parentData.name || parentName) : null;
+    const parentRef = data?.parent || null;
+    const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
+    const parentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
     return {
       selectedDisplayName: data?.displayName || data?.name || selectedProject,
-      selectedProjectParent: parentData?.displayName || parentData?.name || parentName,
+      selectedProjectParent: parentData?.displayName || parentData?.name || parentRef,
       selectedProjectParentId: parentId,
     };
   }, [selectedProject, projects]);
@@ -302,6 +309,13 @@ export default function App() {
   // AI settings
   // -------------------------------------------------------------------------
   const [aiCmd, setAiCmd] = useState(localStorage.getItem('cc-ai-cmd') || '');
+  const [aiModel, setAiModel] = useState(localStorage.getItem('cc-ai-model') || '');
+  const [modelFast, setModelFast] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}1`) || '');
+  const [modelBalanced, setModelBalanced] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}2`) || '');
+  const [modelThorough, setModelThorough] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}3`) || '');
+  const [verifyFindings, setVerifyFindings] = useState(() => {
+    try { return localStorage.getItem('cc-verify-findings') !== 'false'; } catch { return true; }
+  });
   const [availableClients, setAvailableClients] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
@@ -332,6 +346,9 @@ export default function App() {
           setAiCmd('');
           localStorage.removeItem('cc-ai-cmd');
         }
+        if (!aiCmd && clients.length > 0) {
+          applyAiCmd(clients[0].id);
+        }
       })
       .catch(() => setAvailableClients([]));
   }, [activePage]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -358,9 +375,15 @@ export default function App() {
     prevJobRef.current = job;
   }, [job]);
 
+  function applyVerifyFindings(value) {
+    setVerifyFindings(value);
+    localStorage.setItem('cc-verify-findings', value ? 'true' : 'false');
+  }
+
   function handleStartEvaluation(payload) {
-    const subagentModel = LEVELS.find(l => l.level === analysisPower)?.model;
-    startEvaluation({ ...payload, aiCmd: aiCmd || undefined, subagentModel });
+    const levels = getLevels();
+    const subagentModel = levels.find(l => l.level === analysisPower)?.model;
+    startEvaluation({ ...payload, aiCmd: aiCmd || undefined, aiModel: aiModel || undefined, subagentModel, verifyFindings });
   }
 
   function handleEvalDismiss(action) {
@@ -370,7 +393,7 @@ export default function App() {
       if (project) {
         listProjects()
           .then((data) => {
-            const list = data.projects || data || [];
+            const list = Array.isArray(data) ? data : (data?.projects || []);
             setProjects(list);
             setSelectedProject(project);
             setSelectedRun(runId || 'latest');
@@ -624,9 +647,9 @@ export default function App() {
                   </div>
                   {availableClients === null ? (
                     <span className="settings-description">Detecting…</span>
-                  ) : availableClients.length > 0 ? (
+                  ) : availableClients.filter((c) => c.id === 'claude').length > 0 ? (
                     <div className="theme-toggle">
-                      {availableClients.map(({ id, label }) => (
+                      {availableClients.filter((c) => c.id === 'claude').map(({ id, label }) => (
                         <button
                           key={id}
                           type="button"
@@ -639,12 +662,12 @@ export default function App() {
                     </div>
                   ) : null}
                 </div>
-                {availableClients !== null && availableClients.length === 0 && (
+                {availableClients !== null && !availableClients.some((c) => c.id === 'claude') && (
                   <div className="settings-row settings-row--last settings-install-guide">
                     <div className="settings-row-label">
-                      <span className="settings-label">No AI client detected</span>
+                      <span className="settings-label">Claude not detected</span>
                       <span className="settings-description">
-                        Install one of the supported CLI tools and restart Quodeq.
+                        Install Claude Code and restart Quodeq.
                       </span>
                     </div>
                     <div className="settings-install-options">
@@ -652,27 +675,99 @@ export default function App() {
                         <span className="settings-install-name">Claude</span>
                         <code className="settings-install-cmd">npm i -g @anthropic-ai/claude-code</code>
                       </div>
-                      <div className="settings-install-item">
-                        <span className="settings-install-name">Codex</span>
-                        <code className="settings-install-cmd">npm i -g @openai/codex</code>
-                      </div>
-                      <div className="settings-install-item">
-                        <span className="settings-install-name">Copilot</span>
-                        <code className="settings-install-cmd">gh extension install github/gh-copilot</code>
-                      </div>
                     </div>
                   </div>
                 )}
                 {aiCmd && (
-                  <div className="settings-row settings-row--last">
+                  <div className="settings-row">
                     <div className="settings-row-label">
                       <span className="settings-label">Model</span>
                       <span className="settings-description">
-                        Uses your client's default model. Run <code>{aiCmd} --help</code> to see how to change it.
+                        Override the default model for all operations. Leave blank to use your client's default.
                       </span>
+                    </div>
+                    <input
+                      type="text"
+                      className="settings-model-input"
+                      value={aiModel}
+                      placeholder="default"
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setAiModel(v);
+                        if (v) {
+                          localStorage.setItem('cc-ai-model', v);
+                        } else {
+                          localStorage.removeItem('cc-ai-model');
+                        }
+                      }}
+                    />
+                  </div>
+                )}
+                <div className="settings-row">
+                  <div className="settings-row-label">
+                    <span className="settings-label">Analysis power</span>
+                    <span className="settings-description">
+                      Controls the AI model used for analysis. Higher power gives more thorough results but takes longer.
+                    </span>
+                  </div>
+                  <PowerSelector value={analysisPower} onChange={setAnalysisPower} />
+                </div>
+                {aiCmd && (
+                  <div className="settings-row">
+                    <div className="settings-row-label">
+                      <span className="settings-label">Analysis models</span>
+                      <span className="settings-description">
+                        Override the AI model used by subagents during code evaluation. Leave blank to use the defaults.
+                      </span>
+                    </div>
+                    <div className="settings-model-overrides">
+                    {[
+                      { label: 'Fast', value: modelFast, setter: setModelFast, level: 1, placeholder: DEFAULT_MODELS[1] },
+                      { label: 'Balanced', value: modelBalanced, setter: setModelBalanced, level: 2, placeholder: DEFAULT_MODELS[2] },
+                      { label: 'Thorough', value: modelThorough, setter: setModelThorough, level: 3, placeholder: DEFAULT_MODELS[3] },
+                    ].map(({ label, value, setter, level, placeholder }) => (
+                      <div key={level} className="settings-model-field">
+                        <label className="settings-model-label">{label}</label>
+                        <input
+                          type="text"
+                          className="settings-model-input"
+                          value={value}
+                          placeholder={placeholder}
+                          onChange={(e) => {
+                            const v = e.target.value;
+                            setter(v);
+                            if (v) {
+                              localStorage.setItem(`${MODEL_STORAGE_PREFIX}${level}`, v);
+                            } else {
+                              localStorage.removeItem(`${MODEL_STORAGE_PREFIX}${level}`);
+                            }
+                          }}
+                        />
+                      </div>
+                    ))}
                     </div>
                   </div>
                 )}
+                <div className="settings-row settings-row--last">
+                  <div className="settings-row-label">
+                    <span className="settings-label">Verify findings</span>
+                    <span className="settings-description">
+                      After analysis, verify findings from the previous evaluation against the current code. Confirms which violations persist, detects fixes, and hunts for missing compliance evidence. Improves grade consistency across runs.
+                    </span>
+                  </div>
+                  <div className="theme-toggle">
+                    <button
+                      type="button"
+                      className={`theme-toggle-btn${verifyFindings ? ' active' : ''}`}
+                      onClick={() => applyVerifyFindings(true)}
+                    >On</button>
+                    <button
+                      type="button"
+                      className={`theme-toggle-btn${!verifyFindings ? ' active' : ''}`}
+                      onClick={() => applyVerifyFindings(false)}
+                    >Off</button>
+                  </div>
+                </div>
               </section>
               <section className="panel settings-section">
                 <div className="panel-header">

@@ -1,15 +1,28 @@
-"""Shared utilities, constants, and helpers for the Quodeq package."""
+"""Shared utilities: config loading, env-var accessors, and re-exports.
+
+I/O helpers live in ``_io.py``; security helpers in ``_security.py``.
+Both are re-exported here for backward compatibility.
+"""
 from __future__ import annotations
 
 import json
+import logging
 import os
+import sys
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
+# Re-export I/O helpers (canonical home: _io.py)
+from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text  # noqa: F401
+
+# Re-export security helpers (canonical home: _security.py)
+from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive  # noqa: F401
+
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
+_DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
 
 
 @dataclass
@@ -47,7 +60,7 @@ class Config:
     @classmethod
     def from_file(cls, path: Path) -> Config:
         obj = cls()
-        obj._data = json.loads(path.read_text())
+        obj._data = read_json(path)
         return obj
 
 
@@ -69,14 +82,26 @@ def _get_config() -> Config:
     return _config_instance
 
 
-# Public accessors for defaults used as constants by other modules.
-ANTHROPIC_API_URL: str = _get_config()["anthropic_api_url"]
-ANTHROPIC_API_VERSION: str = _get_config()["anthropic_api_version"]
-DEFAULT_HOST: str = _get_config()["default_host"]
+IS_WIN32: bool = sys.platform == "win32"
+"""True when the current platform is Windows (win32)."""
+
+
+def __getattr__(name: str) -> str:
+    """Lazy accessor for config-derived constants (ANTHROPIC_API_URL, etc.)."""
+    from quodeq.shared.config_loader import __getattr__ as _cl_getattr
+    return _cl_getattr(name)
 
 
 def is_repo_url(repo_input: str) -> bool:
-    """Return True if the input looks like a remote repository URL."""
+    """Return True if the input looks like a remote repository URL.
+
+    .. warning:: Cleartext ``http://`` URLs are accepted but credentials
+       embedded in such URLs will be transmitted unencrypted.
+    """
+    if repo_input.startswith("http://"):
+        logging.getLogger(__name__).warning(
+            "Cleartext HTTP repository URL — credentials may be transmitted unencrypted"
+        )
     return repo_input.startswith(("http://", "https://", "git@"))
 
 
@@ -87,24 +112,27 @@ def project_name_from_repo(repo: str) -> str:
     return Path(repo).name
 
 
-def read_json(path: Path) -> dict:
+def read_json(path: Path) -> dict[str, Any]:
     """Read and parse a JSON file, returning the parsed dict."""
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text(encoding=TEXT_ENCODING))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
 
 
-def get_ai_provider() -> str:
+def get_ai_provider(env: dict[str, str] | None = None) -> str:
     """Return the AI provider from environment or default."""
-    return os.environ.get("AI_PROVIDER", _get_config()["ai_provider_default"])
+    return (env or os.environ).get("AI_PROVIDER", _get_config()["ai_provider_default"])
 
 
-def get_ai_cmd() -> str:
+def get_ai_cmd(env: dict[str, str] | None = None) -> str:
     """Return the AI CLI command from environment or default."""
-    return os.environ.get("AI_CMD", _get_config()["ai_cmd_default"])
+    return (env or os.environ).get("AI_CMD", _get_config()["ai_cmd_default"])
 
 
-def get_ai_model() -> str | None:
+def get_ai_model(env: dict[str, str] | None = None) -> str | None:
     """Return the AI model from environment, or None."""
-    return os.environ.get("AI_MODEL") or None
+    return (env or os.environ).get("AI_MODEL") or None
 
 
 def _env_int(var: str, default: int) -> int:
@@ -114,7 +142,6 @@ def _env_int(var: str, default: int) -> int:
         try:
             return int(raw)
         except ValueError:
-            import logging
             logging.getLogger(__name__).warning(
                 "Invalid %s=%r, using default", var, raw,
             )
@@ -136,9 +163,9 @@ def get_dashboard_port() -> int:
     return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"])
 
 
-def get_static_dist() -> str | None:
+def get_static_dist(env: dict[str, str] | None = None) -> str | None:
     """Return the static dist path from environment, or the bundled static dir."""
-    from_env = os.environ.get("QUODEQ_STATIC_DIST")
+    from_env = (env or os.environ).get("QUODEQ_STATIC_DIST")
     if from_env:
         return from_env
     # Fall back to static assets bundled inside the package
@@ -148,42 +175,42 @@ def get_static_dist() -> str | None:
     return None
 
 
-def get_evaluations_dir(default: str | None = None) -> str:
+def get_evaluations_dir(default: str | None = None, env: dict[str, str] | None = None) -> str:
     """Return the evaluations directory from environment or user-level default.
 
     Priority: QUODEQ_EVALUATIONS_DIR env var > explicit *default* > ~/.quodeq/evaluations
     """
-    from_env = os.environ.get("QUODEQ_EVALUATIONS_DIR")
+    from_env = (env or os.environ).get("QUODEQ_EVALUATIONS_DIR")
     if from_env:
         return from_env
     if default is not None:
         return default
-    return str(Path.home() / ".quodeq" / "evaluations")
+    return str(_DEFAULT_EVALUATIONS_DIR)
 
 
-def get_anthropic_api_key() -> str | None:
+def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
     """Return the Anthropic API key from environment, or None."""
-    return os.environ.get("ANTHROPIC_API_KEY") or None
+    return (env or os.environ).get("ANTHROPIC_API_KEY") or None
 
 
-def get_asvs_url() -> str:
+def get_asvs_url(env: dict[str, str] | None = None) -> str:
     """Return the OWASP ASVS JSON URL from environment or default."""
-    return os.environ.get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
+    return (env or os.environ).get("QUODEQ_ASVS_URL", _get_config()["asvs_url"])
 
 
-def get_github_search_url() -> str:
+def get_github_search_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub repository search URL from environment or default."""
-    return os.environ.get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
+    return (env or os.environ).get("QUODEQ_GITHUB_SEARCH_URL", _get_config()["github_search_url"])
 
 
-def get_github_raw_base_url() -> str:
+def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
     """Return the GitHub raw content base URL from environment or default."""
-    return os.environ.get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
+    return (env or os.environ).get("QUODEQ_GITHUB_RAW_BASE_URL", _get_config()["github_raw_base_url"])
 
 
-def get_findings_file() -> str | None:
+def get_findings_file(env: dict[str, str] | None = None) -> str | None:
     """Return the findings file path from environment, or None."""
-    return os.environ.get("FINDINGS_FILE")
+    return (env or os.environ).get("FINDINGS_FILE")
 
 
 def show_diff(path: Path, new_content: str) -> None:

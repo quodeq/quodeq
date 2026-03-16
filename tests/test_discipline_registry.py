@@ -42,11 +42,11 @@ suggested_topics=React Best Practices,Frontend Architecture,TypeScript Standards
     registry = DisciplineRegistry.from_file(conf)
     rule = registry.disciplines["frontend_react"]
     assert rule.detect_contains == ("react",)
-    assert rule.suggested_topics == [
+    assert rule.suggested_topics == (
         "React Best Practices",
         "Frontend Architecture",
         "TypeScript Standards",
-    ]
+    )
 
 
 def test_registry_detects_by_file_contains(tmp_path: Path):
@@ -72,7 +72,8 @@ detect_fallback=true
     registry = DisciplineRegistry.from_file(conf)
     matches = registry.detect_matches(repo)
     assert "frontend_react" in matches
-    assert "nodejs" in matches
+    # nodejs has detect_fallback=true — excluded when a non-fallback matched
+    assert "nodejs" not in matches
 
 
 def test_choose_highest_priority(tmp_path: Path):

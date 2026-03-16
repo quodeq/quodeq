@@ -1,0 +1,12 @@
+{
+  "claude": {
+    "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
+    "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
+    "env_remove": ["CLAUDECODE"]
+  },
+  "codex": {
+    "mcp_permission_args": [],
+    "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
+    "env_remove": []
+  }
+}

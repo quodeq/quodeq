@@ -15,6 +15,16 @@ import subprocess
 import sys
 from pathlib import Path
 
+# Ensure tools/ and src/ are on sys.path so we can import sibling modules.
+_tools_dir = str(Path(__file__).resolve().parent)
+_src_dir = str(Path(__file__).resolve().parents[1] / "src")
+if _tools_dir not in sys.path:
+    sys.path.insert(0, _tools_dir)
+if _src_dir not in sys.path:
+    sys.path.insert(0, _src_dir)
+
+from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
+_SEPARATOR_WIDTH = 60
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 
 # ---------------------------------------------------------------------------
@@ -25,17 +35,34 @@ STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010
 # ---------------------------------------------------------------------------
 
 _MAPPING_PATH = Path(__file__).resolve().parent / "enrich_standards_mapping.json"
-try:
-    MAPPING: dict = json.loads(_MAPPING_PATH.read_text())
-except (OSError, json.JSONDecodeError) as _exc:
-    raise SystemExit(f"Cannot load mapping file {_MAPPING_PATH}: {_exc}") from _exc
-
-# Prefix map: dimension → principle → id prefix
 _PREFIX_MAP_PATH = Path(__file__).resolve().parent / "enrich_standards_prefix_map.json"
-try:
-    _PREFIX_MAP: dict = json.loads(_PREFIX_MAP_PATH.read_text())
-except (OSError, json.JSONDecodeError) as _exc:
-    raise SystemExit(f"Cannot load prefix map {_PREFIX_MAP_PATH}: {_exc}") from _exc
+
+# Lazily loaded at first use (avoids file reads at import time).
+_UNKNOWN_PREFIX = "X-XXX"
+
+
+def _load_mapping(path: Path | None = None) -> dict:
+    """Load the enrichment mapping from disk.
+
+    *path* overrides the default for testing.
+    """
+    target = path or _MAPPING_PATH
+    try:
+        return json.loads(target.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Cannot load mapping file {target}: {exc}") from exc
+
+
+def _load_prefix_map(path: Path | None = None) -> dict:
+    """Load the prefix map from disk.
+
+    *path* overrides the default for testing.
+    """
+    target = path or _PREFIX_MAP_PATH
+    try:
+        return json.loads(target.read_text())
+    except (OSError, json.JSONDecodeError) as exc:
+        raise SystemExit(f"Cannot load prefix map {target}: {exc}") from exc
 
 
 def _get_existing_cwes(data: dict) -> set[int]:
@@ -62,9 +89,17 @@ def _get_highest_id(reqs: list[dict], prefix: str) -> int:
     return highest
 
 
-def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
+def enrich_dimension(
+    dimension: str,
+    dry_run: bool = True,
+    *,
+    mapping: dict | None = None,
+    prefix_map: dict | None = None,
+) -> int:
     """Add missing CWEs to one ISO 25010 dimension file. Returns count added."""
-    if dimension not in MAPPING:
+    if mapping is None:
+        mapping = _load_mapping()
+    if dimension not in mapping:
         return 0
 
     filepath = STANDARDS_DIR / f"{dimension}.json"
@@ -72,20 +107,22 @@ def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
         print(f"  SKIP {dimension}: file not found")
         return 0
 
-    data = json.loads(filepath.read_text())
+    data = json.loads(filepath.read_text(encoding=_TEXT_ENCODING))
     existing = _get_existing_cwes(data)
-    prefixes = _PREFIX_MAP.get(dimension, {})
+    if prefix_map is None:
+        prefix_map = _load_prefix_map()
+    prefixes = prefix_map.get(dimension, {})
     total_added = 0
 
     for sc in data["sub_characteristics"]:
         sc_name = sc["name"]
-        if sc_name not in MAPPING[dimension]:
+        if sc_name not in mapping[dimension]:
             continue
 
-        prefix = prefixes.get(sc_name, "X-XXX")
+        prefix = prefixes.get(sc_name, _UNKNOWN_PREFIX)
         highest = _get_highest_id(sc["requirements"], prefix)
 
-        for req_text, cwe_ids in MAPPING[dimension][sc_name]:
+        for req_text, cwe_ids in mapping[dimension][sc_name]:
             # Filter out CWEs that already exist
             new_cwes = [c for c in cwe_ids if c not in existing]
             if not new_cwes:
@@ -105,7 +142,7 @@ def enrich_dimension(dimension: str, dry_run: bool = True) -> int:
                 print(f"  {new_req['id']}: {len(new_cwes)} CWEs → {sc_name}")
 
     if not dry_run and total_added > 0:
-        filepath.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+        filepath.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
         print(f"  Wrote {filepath.name} (+{total_added} CWEs)")
 
     return total_added
@@ -121,19 +158,22 @@ def main() -> None:
     if dry_run:
         print("DRY RUN — use --apply to write changes\n")
 
+    from compile_standards import ALL_DIMENSIONS
+
+    mapping = _load_mapping()
+    prefix_map = _load_prefix_map()
     grand_total = 0
-    # NOTE: this list is coupled with ALL_DIMENSIONS in tools/compile_standards.py
-    for dimension in ["security", "reliability", "maintainability", "performance"]:
-        print(f"\n{'='*60}")
+    for dimension in ALL_DIMENSIONS:
+        print(f"\n{'=' * _SEPARATOR_WIDTH}")
         print(f"  {dimension.upper()}")
-        print(f"{'='*60}")
-        count = enrich_dimension(dimension, dry_run=dry_run)
+        print(f"{'=' * _SEPARATOR_WIDTH}")
+        count = enrich_dimension(dimension, dry_run=dry_run, mapping=mapping, prefix_map=prefix_map)
         grand_total += count
         print(f"  Total new CWEs for {dimension}: {count}")
 
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * _SEPARATOR_WIDTH}")
     print(f"  GRAND TOTAL: {grand_total} new CWEs")
-    print(f"{'='*60}")
+    print(f"{'=' * _SEPARATOR_WIDTH}")
 
     if args.apply and args.compile:
         print("\nRecompiling standards...")

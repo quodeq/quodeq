@@ -62,7 +62,7 @@ function GradeChip({ grade, score }) {
 
 function DownloadIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
       <polyline points="7 10 12 15 17 10" />
       <line x1="12" y1="15" x2="12" y2="3" />
@@ -72,7 +72,7 @@ function DownloadIcon() {
 
 function TrashIcon() {
   return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <polyline points="3 6 5 6 21 6" />
       <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
       <path d="M10 11v6M14 11v6" />
@@ -83,13 +83,19 @@ function TrashIcon() {
 
 export default function ProjectsPage({ projects = [], selectedProject, onSelect, onDelete, onExport, onRelocate }) {
   const { children, roots } = useMemo(() => {
-    const nameToProject = Object.fromEntries(projects.map((p) => [p.name || p, p]));
+    const lookup = {};
+    for (const p of projects) {
+      const id = p.id || p.name || p;
+      const name = p.name || p;
+      lookup[id] = p;
+      lookup[name] = p;
+    }
     const children = {};
     const roots = [];
     for (const p of projects) {
       const parent = p.parent;
-      if (parent && nameToProject[parent]) {
-        const parentId = nameToProject[parent].id || nameToProject[parent].name || parent;
+      if (parent && lookup[parent]) {
+        const parentId = lookup[parent].id || lookup[parent].name || parent;
         if (!children[parentId]) children[parentId] = [];
         children[parentId].push(p);
       } else {
@@ -137,12 +143,14 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
           type="button"
           className="project-delete-btn"
           title="Download project reports"
+          aria-label="Download project reports"
           onClick={(e) => { e.stopPropagation(); onExport?.(name); }}
         ><DownloadIcon /></button>
         <button
           type="button"
           className="project-delete-btn"
           title="Delete project"
+          aria-label="Delete project"
           onClick={(e) => { e.stopPropagation(); setConfirming(name); }}
         ><TrashIcon /></button>
       </>

@@ -9,10 +9,12 @@ jobs:
   check-source:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify PR source is develop
+      - name: Verify PR source is develop or release
         run: |
-          if [ "${{ github.head_ref }}" != "develop" ]; then
-            echo "::error::PRs to main must come from the develop branch."
+          SOURCE="${{ github.head_ref }}"
+          if [ "$SOURCE" = "develop" ] || [[ "$SOURCE" == release/* ]]; then
+            echo "Source branch '$SOURCE' is allowed. OK."
+          else
+            echo "::error::PRs to main must come from develop or a release/* branch."
             exit 1
           fi
-          echo "Source branch is develop. OK."

@@ -91,7 +91,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
           <span className="job-meta-label">Job ID</span>
           <div className="job-meta-id-row">
             <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>
-            <CopyButton onClick={() => navigator.clipboard.writeText(job.jobId)} />
+            <CopyButton aria-label="Copy job ID" onClick={() => navigator.clipboard.writeText(job.jobId)} />
           </div>
         </div>
         {job.repo && (

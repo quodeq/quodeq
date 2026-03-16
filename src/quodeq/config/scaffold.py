@@ -1,24 +1,50 @@
 """Scaffold boilerplate plugin directories from runtime presets."""
 from __future__ import annotations
 
+import importlib.metadata
 import json
 import logging
+import os
+import shutil
 from pathlib import Path
 
-_DEFAULT_PLUGIN_VERSION = "1.0.0"
-_DEFAULT_DIMENSION_WEIGHT = 1.0
-_SECURITY_DIMENSION_WEIGHT = 1.2
-_PERFORMANCE_DIMENSION_WEIGHT = 0.8
+from quodeq import __version__
 
-_FALLBACK_ENGINE_VERSION = "==0.4.1"
+_DEFAULT_PLUGIN_VERSION = "1.0.0"
+
+# Canonical dimension IDs used in scaffold boilerplate
+_DIM_MAINTAINABILITY = "maintainability"
+_DIM_RELIABILITY = "reliability"
+_DIM_SECURITY = "security"
+_DIM_PERFORMANCE = "performance"
+_EXCLUDED_DIMS = ("usability", "flexibility")
+_DEFAULT_DIM_WEIGHT = 1.0
+_SECURITY_DIM_WEIGHT = 1.2
+_PERFORMANCE_DIM_WEIGHT = 0.8
+
+
+def _env_weight(env_var: str, default: float, env: dict[str, str] | None = None) -> float:
+    """Return a dimension weight from env var or *default*."""
+    raw = (env or os.environ).get(env_var)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
 
 _logger = logging.getLogger(__name__)
 
 
 def _min_engine_version() -> str:
     """Derive the engine_version constraint from the installed quodeq version."""
-    from quodeq import __version__
-    return f"=={__version__}" if __version__ else _FALLBACK_ENGINE_VERSION
+    if __version__:
+        return f"=={__version__}"
+    try:
+        return f"=={importlib.metadata.version('quodeq')}"
+    except importlib.metadata.PackageNotFoundError:
+        _logger.debug("Could not determine quodeq version for engine constraint")
+        return ">=0.4.0"
 
 
 def _load_runtime_presets() -> dict[str, dict]:
@@ -63,7 +89,15 @@ def _load_runtime_presets() -> dict[str, dict]:
         return _FALLBACK
 
 
-RUNTIME_PRESETS: dict[str, dict] = _load_runtime_presets()
+def get_runtime_presets() -> dict[str, dict]:
+    """Return runtime presets (loaded once, cached)."""
+    return _RUNTIME_PRESETS
+
+
+_RUNTIME_PRESETS: dict[str, dict] = _load_runtime_presets()
+
+# Backward-compatible alias
+RUNTIME_PRESETS = _RUNTIME_PRESETS
 
 
 def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:
@@ -82,14 +116,17 @@ def _write_plugin_json(plugin_dir: Path, runtime: str, preset: dict) -> None:
 
 def _write_dimensions_json(plugin_dir: Path) -> None:
     """Write dimensions.json with default dimension weights."""
+    default_w = _env_weight("QUODEQ_DEFAULT_DIM_WEIGHT", _DEFAULT_DIM_WEIGHT)
+    security_w = _env_weight("QUODEQ_SECURITY_DIM_WEIGHT", _SECURITY_DIM_WEIGHT)
+    perf_w = _env_weight("QUODEQ_PERFORMANCE_DIM_WEIGHT", _PERFORMANCE_DIM_WEIGHT)
     (plugin_dir / "dimensions.json").write_text(json.dumps({
         "applies": [
-            {"id": "maintainability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
-            {"id": "reliability", "weight": _DEFAULT_DIMENSION_WEIGHT, "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
-            {"id": "security", "weight": _SECURITY_DIMENSION_WEIGHT, "iso_25010": "Security", "source": "OWASP ASVS L1"},
-            {"id": "performance", "weight": _PERFORMANCE_DIMENSION_WEIGHT, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
+            {"id": _DIM_MAINTAINABILITY, "weight": default_w, "iso_25010": "Maintainability", "source": "ISO/IEC 25010:2023"},
+            {"id": _DIM_RELIABILITY, "weight": default_w, "iso_25010": "Reliability", "source": "ISO/IEC 25010:2023"},
+            {"id": _DIM_SECURITY, "weight": security_w, "iso_25010": "Security", "source": "OWASP ASVS L1"},
+            {"id": _DIM_PERFORMANCE, "weight": perf_w, "iso_25010": "Performance Efficiency", "source": "ISO/IEC 25010:2023"},
         ],
-        "excludes": ["usability", "flexibility"],
+        "excludes": _EXCLUDED_DIMS,
     }, indent=2) + "\n")
 
 
@@ -128,7 +165,6 @@ def scaffold_plugin(runtime: str, evaluators_dir: Path) -> Path:
             f"- Resource management\n"
         )
     except OSError:
-        import shutil
         shutil.rmtree(plugin_dir, ignore_errors=True)
         raise
 

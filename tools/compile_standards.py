@@ -24,6 +24,8 @@ from _standards_refs import (
 repo_root = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(repo_root / "src"))
 
+from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
+
 STANDARDS_DIR = repo_root / "standards"
 OUTPUT_DIR = STANDARDS_DIR / "compiled"
 
@@ -71,20 +73,32 @@ def _build_req_index(iso_data: dict) -> dict[str, list[dict]]:
     return index
 
 
+def _load_iso_data(standards_dir: Path, dimension: str) -> dict:
+    """Read and parse the ISO 25010 JSON file for *dimension*."""
+    iso_file = standards_dir / "iso25010" / f"{dimension}.json"
+    try:
+        return json.loads(iso_file.read_text(encoding=_TEXT_ENCODING))
+    except OSError as exc:
+        raise FileNotFoundError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
+
+
 def build_req_index(
     standards_dir: Path,
     dimension: str,
     cwe_db: object | None = None,
+    iso_data: dict | None = None,
 ) -> dict[str, list[dict]]:
     """Build a principle -> [requirement] index for a dimension.
 
+    *iso_data* may be passed to avoid re-reading the ISO file when the
+    caller already has it loaded.
+
     Returns: {"Fault Tolerance": [{"id": "R-FT-1", "source": "iso25010", "text": "...", "refs": [...]}]}
     """
-    iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    try:
-        iso_data = json.loads(iso_file.read_text())
-    except (OSError, json.JSONDecodeError) as exc:
-        raise SystemExit(f"Cannot read ISO 25010 file {iso_file}: {exc}") from exc
+    if iso_data is None:
+        iso_data = _load_iso_data(standards_dir, dimension)
     index = _build_req_index(iso_data)
     attach_cwe_refs(index, cwe_db, _get_cwe_name)
     attach_cisq_refs(index, standards_dir, dimension)
@@ -96,10 +110,9 @@ def build_req_index(
 
 def compile_dimension(standards_dir: Path, dimension: str, cwe_db=None) -> dict:
     """Compile a single dimension into the requirement-centric output format."""
-    iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    dim_name = json.loads(iso_file.read_text()).get("name", dimension.title())
-
-    index = build_req_index(standards_dir, dimension, cwe_db)
+    iso_data = _load_iso_data(standards_dir, dimension)
+    dim_name = iso_data.get("name", dimension.title())
+    index = build_req_index(standards_dir, dimension, cwe_db, iso_data=iso_data)
 
     sources = ["iso25010"]
     if dimension in CISQ_DIMENSIONS:
@@ -136,8 +149,7 @@ def report_gaps(standards_dir: Path, dimension: str) -> list[str]:
     if dimension not in CISQ_DIMENSIONS:
         return []
 
-    iso_file = standards_dir / "iso25010" / f"{dimension}.json"
-    iso_data = json.loads(iso_file.read_text())
+    iso_data = _load_iso_data(standards_dir, dimension)
     iso_cwes: set[int] = set()
     for sc in iso_data.get("sub_characteristics", []):
         for req in sc.get("requirements", []):
@@ -146,7 +158,12 @@ def report_gaps(standards_dir: Path, dimension: str) -> list[str]:
     cisq_file = standards_dir / "cisq" / f"{dimension}.json"
     if not cisq_file.exists():
         return []
-    cisq_data = json.loads(cisq_file.read_text())
+    try:
+        cisq_data = json.loads(cisq_file.read_text(encoding=_TEXT_ENCODING))
+    except OSError as exc:
+        raise FileNotFoundError(f"Cannot read CISQ file {cisq_file}: {exc}") from exc
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"Cannot read CISQ file {cisq_file}: {exc}") from exc
     cisq_lookup = {c["id"]: c["name"] for c in cisq_data.get("cwes", [])}
 
     warnings = []
@@ -182,11 +199,14 @@ def main() -> None:
     for dim in dimensions:
         compiled = compile_dimension(args.standards_dir, dim, cwe_db)
         out_file = args.output_dir / f"{dim}.json"
-        out_file.write_text(json.dumps(compiled, indent=2) + "\n")
+        out_file.write_text(json.dumps(compiled, indent=2) + "\n", encoding=_TEXT_ENCODING)
         n_principles = len(compiled["principles"])
         n_reqs = sum(len(p["requirements"]) for p in compiled["principles"])
         print(f"  {dim}: {n_principles} principles, {n_reqs} requirements -> {out_file}")
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except (ValueError, FileNotFoundError) as _exc:
+        raise SystemExit(str(_exc)) from _exc

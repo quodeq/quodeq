@@ -11,6 +11,7 @@ from quodeq.engine._runner_report import run_full
 from quodeq.engine.runner import run, RunConfig, EvaluationError
 from quodeq.engine._merge import merge_evidence
 from quodeq.engine.evidence import Evidence, PrincipleEvidence
+from tests.engine.conftest import _evidence_line
 
 
 def _make_plugin_dir(base: Path) -> Path:
@@ -22,7 +23,7 @@ def _make_plugin_dir(base: Path) -> Path:
         "id": "typescript",
         "name": "TypeScript",
         "version": "1.0.0",
-        "engine_version": "==0.4.1",
+        "engine_version": "==0.5.0",
         "detects": {"extensions": [".ts"]},
     }))
 
@@ -48,16 +49,6 @@ def _stream_event_with_evidence(*evidence_lines: str) -> str:
     return "\n".join(events) + "\n"
 
 
-def _evidence_line(**overrides) -> str:
-    obj = {
-        "p": "ts-001", "t": "violation", "d": "security",
-        "w": "eval usage", "file": "src/app.ts", "line": 10,
-        "severity": "high", "reason": "eval is dangerous",
-    }
-    obj.update(overrides)
-    return json.dumps(obj)
-
-
 def _mock_run_analysis_factory(stream_content: str):
     """Return a mock run_analysis that writes stream_content to the stream file."""
     def mock_run_analysis(work_dir, prompt, stream_file, **kwargs):
@@ -81,7 +72,7 @@ class TestRun:
         with pytest.raises(ValueError, match="not found"):
             run(config)
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_end_to_end_with_mock(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -110,7 +101,7 @@ class TestRun:
         assert len(pe.compliance) == 1
         assert pe.metrics["is_balanced"] is True
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_empty_project(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -130,7 +121,7 @@ class TestRun:
         assert evidence.principles == {}
         assert evidence.coverage_pct == 0.0
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_invalid_stream_skipped(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -150,7 +141,7 @@ class TestRun:
         evidence = run(config)
         assert evidence.principles == {}
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_zero_findings_raises_error(self, mock_analysis, tmp_path):
         """An evaluation with source files but 0 findings is broken, not successful."""
         evaluators_dir = _make_plugin_dir(tmp_path)
@@ -175,7 +166,7 @@ class TestRun:
         with pytest.raises(EvaluationError, match="0 findings"):
             run(config)
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_stream_files_created(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"

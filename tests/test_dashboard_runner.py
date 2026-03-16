@@ -5,6 +5,8 @@ import pytest
 from quodeq.dashboard import runner
 from quodeq.dashboard.runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard, validate_paths
 
+from tests.conftest import DummyProcess
+
 
 def _make_config(tmp_path: Path, **overrides) -> DashboardConfig:
     """Build a DashboardConfig with sensible test defaults, overridable by keyword."""
@@ -25,20 +27,6 @@ def test_validate_paths_missing_reports(tmp_path: Path):
         validate_paths(cfg)
 
 
-class DummyProcess:
-    def __init__(self):
-        self._returncode = 0
-
-    def wait(self):
-        return self._returncode
-
-    def poll(self):
-        return self._returncode
-
-    def terminate(self):
-        pass
-
-
 def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkeypatch):
     (tmp_path / "reports").mkdir()
     static_dist = tmp_path / "ui/web/dist"
@@ -48,7 +36,8 @@ def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkey
     captured = {}
 
     def fake_ensure(*args, **kwargs):
-        captured["static_dist"] = kwargs.get("static_dist")
+        api_config = kwargs.get("api_config")
+        captured["static_dist"] = api_config.static_dist if api_config else None
         return "http://127.0.0.1:4173", DummyProcess()
 
     monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
@@ -108,7 +97,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
 
     run_dashboard(config)
     # Original config is frozen; the resolved config inside run_dashboard picks 4174
-    assert config.port == 4173  # original unchanged
+    assert config.server.port == 4173  # original unchanged
 
 
 def test_validate_paths_missing_reports_custom_message(tmp_path: Path):

@@ -1,16 +1,4 @@
-"""Port interface for quality dimension definitions."""
-from __future__ import annotations
+"""Re-export shim — canonical location is quodeq.data.ports.dimensions."""
+from quodeq.data.ports.dimensions import DimensionsRepository
 
-from typing import Protocol
-
-
-class DimensionsRepository(Protocol):
-    """Repository for accessing evaluation dimension definitions."""
-
-    def list_dimensions(self) -> list[str]:
-        """Return all available dimension identifiers."""
-        ...
-
-    def get_dimension(self, name: str) -> dict:
-        """Return the full definition for a single dimension by name."""
-        ...
+__all__ = ["DimensionsRepository"]

@@ -21,22 +21,27 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+
+from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
+
 
 def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
     """Parse a JSONL evidence file into a (principle, file, line) -> cwe_id map."""
     lookup: dict[tuple[str, str, int], int] = {}
     try:
-        lines = jsonl_path.read_text().splitlines()
+        lines = jsonl_path.read_text(encoding=_TEXT_ENCODING).splitlines()
     except (OSError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {jsonl_path}: {exc}")
         return lookup
-    for raw in lines:
-        raw = raw.strip()
-        if not raw:
+    for raw_line in lines:
+        stripped = raw_line.strip()
+        if not stripped:
             continue
         try:
-            obj = json.loads(raw)
+            obj = json.loads(stripped)
         except json.JSONDecodeError:
+            print(f"  WARN  malformed JSONL line in {jsonl_path}: {stripped[:80]}")
             continue
         cwe = obj.get("cwe")
         if not isinstance(cwe, int):
@@ -48,7 +53,12 @@ def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
 
 
 def _patch_entries(entries: list[dict], lookup: dict[tuple[str, str, int], int]) -> int:
-    """Add missing 'cwe' to each entry. Returns count of entries patched."""
+    """Add missing 'cwe' to each entry. Returns count of entries patched.
+
+    NOTE: migrate_reason_title.py has a similarly-named concept (migrate_entry)
+    but operates on a different field ('reason'/'title') with different logic.
+    Extracting a shared helper would over-abstract two unrelated migration passes.
+    """
     patched = 0
     for entry in entries:
         if "cwe" in entry:
@@ -73,7 +83,7 @@ def migrate_file(eval_path: Path, apply: bool) -> tuple[int, int] | None:
         return None
 
     try:
-        data = json.loads(eval_path.read_text())
+        data = json.loads(eval_path.read_text(encoding=_TEXT_ENCODING))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {eval_path}: {exc}")
         return None
@@ -82,7 +92,7 @@ def migrate_file(eval_path: Path, apply: bool) -> tuple[int, int] | None:
 
     if apply and (v_count or c_count):
         try:
-            eval_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+            eval_path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
         except OSError as exc:
             print(f"  ERROR writing {eval_path}: {exc}")
 
