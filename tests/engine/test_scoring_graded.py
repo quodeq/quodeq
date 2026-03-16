@@ -12,46 +12,53 @@ from tests.engine.conftest import make_evidence_with_confidence
 # ---------------------------------------------------------------------------
 
 def test_balanced_ratio_dampens_deductions():
-    """Compliance/violation ratio >= 1.0 -> 0.95 dampening."""
+    """Severity-weighted compliance/violation ratio >= 1.0 -> 0.95 dampening.
+
+    1 critical violation (weight 8) needs >= 8 weighted compliance to reach 1.0.
+    1 critical compliance (weight 8) provides exactly that.
+    """
     violations = [
         {"file": "a.ts", "line": 1, "snippet": "eval(x)", "reason": "r",
          "severity": "critical", "vt": "code-injection"},
     ]
     compliance = [
-        {"file": f"c{i}.ts", "line": i, "snippet": "ok", "reason": f"r{i}",
-         "severity": "minor", "vt": f"comp-type-{i}"}
-        for i in range(2)
+        {"file": "c0.ts", "line": 1, "snippet": "ok", "reason": "r0",
+         "severity": "critical", "vt": "safe-eval"},
     ]
     ev = make_evidence_with_confidence(
         confidence_level="high",
         violations=violations,
         compliance=compliance,
         n_violations=1,
-        n_compliance=2,
+        n_compliance=1,
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.dampening_multiplier == 0.90
-    assert ts001.final_score == 8.2
+    assert ts001.dampening_multiplier == 0.95
+    assert ts001.final_score == 8.1
 
 
 def test_strong_compliance_ratio_gives_max_discount():
-    """Compliance/violation ratio >= 3.0 -> 0.85 dampening (max discount)."""
+    """Severity-weighted ratio >= 3.0 -> 0.85 dampening (max discount).
+
+    1 major violation (weight 4) needs >= 12 weighted compliance for 3.0 ratio.
+    3 major compliance types (weight 3×4=12) provide exactly that.
+    """
     violations = [
         {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
          "severity": "major", "vt": "bad-pattern"},
     ]
     compliance = [
         {"file": f"c{i}.ts", "line": i, "snippet": "ok", "reason": f"r{i}",
-         "severity": "minor", "vt": f"safe-{i}"}
-        for i in range(4)
+         "severity": "major", "vt": f"safe-{i}"}
+        for i in range(3)
     ]
     ev = make_evidence_with_confidence(
         confidence_level="high",
         violations=violations,
         compliance=compliance,
         n_violations=1,
-        n_compliance=4,
+        n_compliance=3,
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
@@ -103,7 +110,11 @@ def test_weak_compliance_ratio_penalises():
 
 
 def test_dampening_in_graded_mode():
-    """Dampening should reduce grade drops in non-numerical mode too."""
+    """Dampening should reduce grade drops in non-numerical mode too.
+
+    4 critical violations (weight 4×8=32) need >= 32 weighted compliance
+    for ratio 1.0 → 0.95x. 4 critical compliance types (4×8=32) provide exactly that.
+    """
     violations = [
         {"file": f"v{i}.ts", "line": i, "snippet": "x", "reason": f"r{i}",
          "severity": "critical", "vt": f"vt-{i}"}
@@ -111,15 +122,15 @@ def test_dampening_in_graded_mode():
     ]
     compliance = [
         {"file": f"c{i}.ts", "line": i, "snippet": "ok", "reason": f"r{i}",
-         "severity": "minor", "vt": f"comp-{i}"}
-        for i in range(6)
+         "severity": "critical", "vt": f"comp-{i}"}
+        for i in range(4)
     ]
     ev = make_evidence_with_confidence(
         confidence_level="high",
         violations=violations,
         compliance=compliance,
         n_violations=4,
-        n_compliance=6,
+        n_compliance=4,
     )
     scores = score_evidence(ev, mode="non-numerical")
     ts001 = scores.principles["ts-001"]

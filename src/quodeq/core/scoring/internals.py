@@ -22,8 +22,11 @@ GRADE_LADDER: list[str] = [
 # Ratio-based dampening table: (min_compliance_to_violation_ratio, multiplier).
 # Checked top-to-bottom; first matching row wins.
 # Asymmetric: max discount 15%, max penalty 30%.
-# Uses raw distinct type counts (no severity weighting) to avoid bias from
-# compliance findings that lack proper severity fields.
+# Severity weights for dampening ratio, aligned with deduction penalties
+# (critical=2.0, major=1.0, minor=0.25 → ratio 8:4:1).  This ensures
+# 1 critical compliance perfectly neutralizes the dampening impact of
+# 1 critical violation at the same severity level.
+_SEVERITY_WEIGHT = {"critical": 8, "major": 4, "minor": 1}
 _MAX_PENALTY_MULTIPLIER = 1.30
 
 _RATIO_DAMPENING_TABLE: list[tuple[float, float]] = [
@@ -128,28 +131,37 @@ def tally_compliance_types_by_reason(compliance: list[dict]) -> dict[str, int]:
     return _tally_types(compliance, "reason")
 
 
+def _weighted_sum(type_counts: dict[str, int]) -> float:
+    """Sum type counts weighted by severity (critical=4, major=2, minor=1)."""
+    return sum(
+        count * _SEVERITY_WEIGHT.get(sev, 1)
+        for sev, count in type_counts.items()
+    )
+
+
 def compliance_dampening(
     compliance_type_counts: dict[str, int],
     violation_type_counts: dict[str, int],
 ) -> float:
     """Compute the dampening multiplier from the compliance-to-violation ratio.
 
-    Uses raw distinct type counts (sum across all severities, no weighting)
-    to avoid bias from compliance findings that lack severity fields.
+    Uses severity-weighted type counts so critical compliance has more
+    impact than minor compliance, and minor compliance can't cheaply
+    offset critical violations.
 
     Asymmetric: max discount 15% (0.85x), max penalty 30% (1.30x).
     No compliance at all gets the full 1.30x penalty.
     """
-    total_compliance = sum(compliance_type_counts.values())
-    total_violations = sum(violation_type_counts.values())
+    weighted_compliance = _weighted_sum(compliance_type_counts)
+    weighted_violations = _weighted_sum(violation_type_counts)
 
-    if total_violations == 0:
+    if weighted_violations == 0:
         return 1.0  # no violations -> dampening is irrelevant
 
-    if total_compliance == 0:
+    if weighted_compliance == 0:
         return _MAX_PENALTY_MULTIPLIER  # no compliance at all -> max penalty
 
-    ratio = total_compliance / total_violations
+    ratio = weighted_compliance / weighted_violations
     for threshold, multiplier in _RATIO_DAMPENING_TABLE:
         if ratio >= threshold:
             return multiplier

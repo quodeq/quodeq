@@ -201,6 +201,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
                     ai_cmd=ai_cmd,
                     ai_model=payload.get("aiModel") or None,
                     subagent_model=payload.get("subagentModel") or None,
+                    verify_findings=bool(payload.get("verifyFindings", True)),
                 ),
             )
         except (FileNotFoundError, ValueError):

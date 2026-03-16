@@ -86,6 +86,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "--n-subagents", type=int, default=_DEFAULT_N_SUBAGENTS,
         help="Number of parallel subagents per dimension (default: %(default)s)",
     )
+    parser.add_argument(
+        "--no-verify", action="store_true",
+        help="Skip post-analysis verification pass",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -224,6 +228,7 @@ def _build_run_config(
             max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
             n_subagents=args.n_subagents,
             subagent_model=_subagent_model(),
+            verify_findings=not args.no_verify and os.environ.get("QUODEQ_NO_VERIFY") != "1",
         ),
     )
 

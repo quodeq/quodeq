@@ -17,6 +17,7 @@ class EvaluationOptions:
     ai_cmd: str | None = None
     ai_model: str | None = None
     subagent_model: str | None = None
+    verify_findings: bool = True
 
 
 class ProjectActions(Protocol):
