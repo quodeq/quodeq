@@ -151,6 +151,22 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(to_camel_dict(payload))
 
 
+def _validate_ai_cmd(ai_cmd: str | None) -> tuple[Response, int] | None:
+    """Return an error response if *ai_cmd* is not in the allow-list, or None if valid."""
+    if not ai_cmd:
+        return None
+    allowed_cmds = _get_allowed_ai_cmds()
+    if ai_cmd not in allowed_cmds:
+        allowed_list = ", ".join(sorted(allowed_cmds))
+        body, status = error_response(
+            f"Invalid AI command. Allowed: {allowed_list}",
+            HTTPStatus.BAD_REQUEST,
+            "INVALID_INPUT",
+        )
+        return jsonify(body), status
+    return None
+
+
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> None:
     """Register evaluation listing and creation routes."""
 
@@ -169,15 +185,9 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
             return jsonify(body), status
         repo = payload.get("repo")
         ai_cmd = payload.get("aiCmd") or None
-        allowed_cmds = _get_allowed_ai_cmds()
-        if ai_cmd and ai_cmd not in allowed_cmds:
-            allowed_list = ", ".join(sorted(allowed_cmds))
-            body, status = error_response(
-                f"Invalid AI command. Allowed: {allowed_list}",
-                HTTPStatus.BAD_REQUEST,
-                "INVALID_INPUT",
-            )
-            return jsonify(body), status
+        ai_cmd_error = _validate_ai_cmd(ai_cmd)
+        if ai_cmd_error is not None:
+            return ai_cmd_error
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
             from quodeq.provider.base import EvaluationOptions

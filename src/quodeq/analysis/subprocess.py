@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -113,6 +114,8 @@ def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
 
 _AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
 
+# Fallback provider configs used when the primary JSON file
+# (data/config/ai_providers.json) cannot be loaded.
 _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
     "claude": {
         "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
@@ -136,12 +139,15 @@ def _load_provider_configs() -> dict[str, dict]:
 
 
 _PROVIDER_CONFIGS: dict[str, dict] | None = None
+_PROVIDER_CONFIGS_LOCK = threading.Lock()
 
 
 def _get_provider_configs() -> dict[str, dict]:
     global _PROVIDER_CONFIGS
     if _PROVIDER_CONFIGS is None:
-        _PROVIDER_CONFIGS = _load_provider_configs()
+        with _PROVIDER_CONFIGS_LOCK:
+            if _PROVIDER_CONFIGS is None:
+                _PROVIDER_CONFIGS = _load_provider_configs()
     return _PROVIDER_CONFIGS
 
 

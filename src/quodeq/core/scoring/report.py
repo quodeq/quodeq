@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from quodeq.core.scoring.engine import score_evidence
+from quodeq.engine.report import write_dimension_report
 from quodeq.engine.runner import RunConfig, run_per_dimension, cleanup_stream
 
 _NUMERICAL_MODE = "numerical"
@@ -14,9 +16,6 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
 
     Returns dict of {dimension: overall_score_str}.
     """
-    from quodeq.core.scoring.engine import score_evidence
-    from quodeq.engine.report import write_dimension_report
-
     work_dir = config.work_dir or config.src
     per_dim_evidence = run_per_dimension(config)
     results: dict[str, str] = {}

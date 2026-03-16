@@ -147,7 +147,12 @@ def _ensure_action_api(
     raise RuntimeError("Unable to find a free port for Action API.")
 
 
-def _ensure_action_api_forced(host: str, port: int, static_dist: Path | None = None, evaluations_dir: str | None = None) -> tuple[str, subprocess.Popen | None]:
+def _ensure_action_api_forced(
+    host: str,
+    port: int,
+    static_dist: Path | None = None,
+    evaluations_dir: str | None = None,
+) -> tuple[str, subprocess.Popen | None]:
     base_url = f"http://{host}:{port}"
     if _is_port_open(host, port):
         if action_api_healthy(base_url):

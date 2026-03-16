@@ -20,6 +20,7 @@ from quodeq.engine._runner_markers import CC_MARKER_KEY, cleanup_stream, emit_ma
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.plugins.loader import load_plugin_full
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
+from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
 from quodeq.shared.logging import log_info, log_success, log_warning
 from quodeq.shared.utils import read_text
 from quodeq.shared.validation import validate_path_segment
@@ -159,7 +160,6 @@ def _process_dimension_with_subagents(
     config: RunConfig, dim_id: str, idx: int, ctx: _PluginContext,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents (delegates to _subagent_runner)."""
-    from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
     return process_dimension_with_subagents(
         config, dim_id, idx, ctx,
         callbacks=DimensionCallbacks(

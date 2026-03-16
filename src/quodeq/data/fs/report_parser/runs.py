@@ -14,14 +14,14 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Protocol, runtime_checkable
 
-_logger = logging.getLogger(__name__)
-
-from quodeq.data.fs.report_parser._date_utils import find_date_in_dir, normalize_date
-from quodeq.data.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
 from quodeq.core.types import DimensionResult
 from quodeq.core.types.mappers import parse_dimension_result
+from quodeq.data.fs.report_parser._date_utils import find_date_in_dir, normalize_date
+from quodeq.data.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_path_segment
+
+_logger = logging.getLogger(__name__)
 
 _GIT_SUFFIX = ".git"
 

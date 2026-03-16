@@ -19,6 +19,8 @@ _logger = logging.getLogger(__name__)
 _ASVS_SHA256_ENV = "QUODEQ_ASVS_SHA256"
 _ASVS_DEFAULT_LEVEL = 1
 _ASVS_ALLOWED_HOSTS = frozenset({"raw.githubusercontent.com", "github.com", "owasp.org"})
+_ASVS_OUTPUT_DIR = "asvs"
+_ASVS_OUTPUT_FILE = "level1.json"
 
 
 _DEFAULT_ASVS_VERSION = "4.0.3"
@@ -136,7 +138,7 @@ def fetch_asvs_l1(
         "requirements": requirements,
     }
 
-    out_path = standards_dir / "asvs" / "level1.json"
+    out_path = standards_dir / _ASVS_OUTPUT_DIR / _ASVS_OUTPUT_FILE
     if dry_run:
         show_diff(out_path, json.dumps(output, indent=2))
     else:

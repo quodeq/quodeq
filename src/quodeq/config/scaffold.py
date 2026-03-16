@@ -8,6 +8,8 @@ import os
 import shutil
 from pathlib import Path
 
+from quodeq import __version__
+
 _DEFAULT_PLUGIN_VERSION = "1.0.0"
 
 # Canonical dimension IDs used in scaffold boilerplate
@@ -30,8 +32,6 @@ def _env_weight(env_var: str, default: float, env: dict[str, str] | None = None)
         return float(raw)
     except ValueError:
         return default
-
-from quodeq import __version__
 
 _logger = logging.getLogger(__name__)
 

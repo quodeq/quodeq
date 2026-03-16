@@ -8,9 +8,9 @@ from typing import Any
 import pytest
 
 from quodeq.core.types import DimensionResult
+from quodeq.services._dashboard_stale import collect_stale_dimensions as _collect_stale_dimensions
 from quodeq.services.dashboard import (
     _collect_previous_scores,
-    _collect_stale_dimensions,
     _enrich_dimensions_with_trend,
     _build_accumulated_trend,
     build_dashboard,

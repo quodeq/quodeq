@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 
+from quodeq.config.discipline_registry import DisciplineRegistry
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_warning
 
@@ -50,8 +51,6 @@ def validate_new_discipline(
 
 def get_discipline_language(name: str, paths: ConfigPaths) -> str | None:
     """Look up the programming language configured for a discipline."""
-    from quodeq.config.discipline_registry import DisciplineRegistry
-
     conf = paths.disciplines_conf
     if not conf.exists():
         return None

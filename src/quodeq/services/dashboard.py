@@ -20,11 +20,11 @@ from quodeq.adapters.fs.report_parser import (
 )
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
+from quodeq.engine.scoring_internals import score_to_grade_label
+from quodeq.services.accumulated import numeric_average
 
 # Re-export for backward compatibility (tests import this name)
 _collect_stale_dimensions = collect_stale_dimensions
-from quodeq.engine.scoring_internals import score_to_grade_label
-from quodeq.services.accumulated import numeric_average
 
 
 @dataclass

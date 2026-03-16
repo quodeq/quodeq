@@ -10,6 +10,13 @@ _LOW_CONF_MAJORITY_DIVISOR = 2  # denominator for "low confidence majority" thre
 PERCENT_SCALE = 100
 
 
+def compute_coverage_pct(files_read: int, source_file_count: int) -> float:
+    """Return coverage percentage, or 0.0 when there are no source files."""
+    if source_file_count > 0:
+        return round(files_read / source_file_count * PERCENT_SCALE, 1)
+    return 0.0
+
+
 @dataclass
 class Judgment:
     """One LLM judgment per finding."""

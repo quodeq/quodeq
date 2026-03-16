@@ -7,6 +7,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+from typing import Callable
 
 from quodeq.shared.utils import read_json as _read_json
 
@@ -24,7 +25,7 @@ _WCAG_FILE = "wcag/level_a.json"
 _logger = logging.getLogger(__name__)
 
 
-def attach_cwe_refs(index: dict[str, list[dict]], cwe_db: object | None, get_cwe_name) -> None:
+def attach_cwe_refs(index: dict[str, list[dict]], cwe_db: object | None, get_cwe_name: Callable[..., str]) -> None:
     """Add a CWE ref for each CWE ID referenced by a requirement."""
     for reqs in index.values():
         for req in reqs:

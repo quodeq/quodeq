@@ -1,7 +1,7 @@
 """Evidence merging — combines per-dimension Evidence objects into one."""
 from __future__ import annotations
 
-from quodeq.core.evidence.model import Evidence, PrincipleEvidence, PERCENT_SCALE
+from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 
 def merge_evidence(evidence_list: list[Evidence], source_file_count: int, src: str, plugin_id: str) -> Evidence:
@@ -22,11 +22,7 @@ def merge_evidence(evidence_list: list[Evidence], source_file_count: int, src: s
             else:
                 merged_principles[pid] = pe
 
-    coverage_pct = (
-        round(total_files_read / source_file_count * PERCENT_SCALE, 1)
-        if source_file_count > 0
-        else 0.0
-    )
+    coverage_pct = compute_coverage_pct(total_files_read, source_file_count)
 
     merged = Evidence(
         repository=src,

@@ -42,11 +42,12 @@ def _build_project_zip(project_path: Path) -> Path:
             for file_entry in project_path.rglob("*"):
                 if file_entry.is_symlink():
                     continue
-                if file_entry.is_file():
-                    total_size += file_entry.stat().st_size
-                    if total_size > size_limit:
-                        raise ValueError("Project exceeds maximum export size")
-                    zf.write(file_entry, file_entry.relative_to(project_path.parent))
+                if not file_entry.is_file():
+                    continue
+                total_size += file_entry.stat().st_size
+                if total_size > size_limit:
+                    raise ValueError("Project exceeds maximum export size")
+                zf.write(file_entry, file_entry.relative_to(project_path.parent))
     except (OSError, zipfile.BadZipFile, ValueError):
         os.unlink(tmp_path)
         raise

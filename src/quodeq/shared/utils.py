@@ -112,19 +112,19 @@ def read_json(path: Path) -> dict[str, Any]:
         raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
 
 
-def get_ai_provider() -> str:
+def get_ai_provider(env: dict[str, str] | None = None) -> str:
     """Return the AI provider from environment or default."""
-    return os.environ.get("AI_PROVIDER", _get_config()["ai_provider_default"])
+    return (env or os.environ).get("AI_PROVIDER", _get_config()["ai_provider_default"])
 
 
-def get_ai_cmd() -> str:
+def get_ai_cmd(env: dict[str, str] | None = None) -> str:
     """Return the AI CLI command from environment or default."""
-    return os.environ.get("AI_CMD", _get_config()["ai_cmd_default"])
+    return (env or os.environ).get("AI_CMD", _get_config()["ai_cmd_default"])
 
 
-def get_ai_model() -> str | None:
+def get_ai_model(env: dict[str, str] | None = None) -> str | None:
     """Return the AI model from environment, or None."""
-    return os.environ.get("AI_MODEL") or None
+    return (env or os.environ).get("AI_MODEL") or None
 
 
 def _env_int(var: str, default: int) -> int:
@@ -180,9 +180,9 @@ def get_evaluations_dir(default: str | None = None) -> str:
     return str(_DEFAULT_EVALUATIONS_DIR)
 
 
-def get_anthropic_api_key() -> str | None:
+def get_anthropic_api_key(env: dict[str, str] | None = None) -> str | None:
     """Return the Anthropic API key from environment, or None."""
-    return os.environ.get("ANTHROPIC_API_KEY") or None
+    return (env or os.environ).get("ANTHROPIC_API_KEY") or None
 
 
 def get_asvs_url() -> str:

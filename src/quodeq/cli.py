@@ -30,6 +30,8 @@ from quodeq.shared.validation import validate_path_segment
 _DEFAULT_N_SUBAGENTS = 5
 _MODE_NUMERICAL = "numerical"
 _MODE_GRADES = "grades"
+_ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
+_ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 
 
 def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
@@ -218,8 +220,8 @@ def _build_run_config(
         work_dir=evidence_dir,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
-            max_turns=args.max_turns if args.max_turns is not None else _env_int("QUODEQ_MAX_TURNS", None),
-            max_duration=args.max_duration if args.max_duration is not None else _env_int("QUODEQ_MAX_DURATION", None),
+            max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
+            max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
             n_subagents=args.n_subagents,
             subagent_model=_subagent_model(),
         ),
