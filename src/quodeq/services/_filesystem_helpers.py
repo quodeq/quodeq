@@ -28,17 +28,26 @@ def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
         return {}
 
 
-def _read_latest_run_summary(
-    reports_root: Path, entry_name: str, run_id: str,
+def _read_accumulated_summary(
+    reports_root: Path, entry_name: str, runs: list[RunInfo],
 ) -> tuple[str | None, float | None, int | None]:
-    """Read latest grade, score, and file count from a run. Returns (grade, score, files)."""
+    """Compute accumulated grade and score across all runs. Returns (grade, score, files)."""
     try:
-        dims = read_run_data(reports_root, entry_name, run_id)
-        summary = summarize_dimensions(dims)
-        grade = summary.overall_grade
-        score = summary.numeric_average
-        files = next((d.source_file_count for d in dims if d.source_file_count), None)
-        return grade, score, files
+        # Build accumulated: latest value per dimension across all runs
+        latest_by_dim: dict[str, object] = {}
+        files_count: int | None = None
+        for run in runs:
+            dims = read_run_data(reports_root, entry_name, run.run_id)
+            for d in dims:
+                if d.dimension and d.dimension not in latest_by_dim:
+                    latest_by_dim[d.dimension] = d
+                if files_count is None and d.source_file_count:
+                    files_count = d.source_file_count
+        acc_dims = list(latest_by_dim.values())
+        if not acc_dims:
+            return None, None, files_count
+        summary = summarize_dimensions(acc_dims)
+        return summary.overall_grade, summary.numeric_average, files_count
     except (OSError, json.JSONDecodeError, KeyError):
         return None, None, None
 
@@ -66,8 +75,8 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
     """Build a frozen ProjectEntry from its directory and run list."""
     info = _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
-    latest_grade, latest_score, files_count = _read_latest_run_summary(
-        reports_root, entry_name, runs[0].run_id,
+    latest_grade, latest_score, files_count = _read_accumulated_summary(
+        reports_root, entry_name, runs,
     )
     return ProjectEntry(
         id=entry_name,
