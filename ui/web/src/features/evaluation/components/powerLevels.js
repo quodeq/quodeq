@@ -1,7 +1,7 @@
 export const DEFAULT_MODELS = {
-  1: 'claude-haiku-4-5',
-  2: 'claude-sonnet-4-6',
-  3: 'claude-opus-4-6',
+  1: 'haiku',
+  2: 'sonnet',
+  3: 'opus',
 };
 
 export const MODEL_STORAGE_PREFIX = 'cc-model-level-';
