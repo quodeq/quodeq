@@ -152,7 +152,7 @@ def _resolve_plugin(args: argparse.Namespace, src: Path, evaluators_dir: Path) -
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return None
-    print(f"Plugin: {plugin_id}")
+    print(f"Plugin: {plugin_id}", file=sys.stderr)
     plugin_dir = evaluators_dir / plugin_id
     if not plugin_dir.exists():
         print(f"Plugin directory not found: {plugin_dir}", file=sys.stderr)
@@ -188,8 +188,6 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
             print(f"Evidence written to {out_file}")
         else:
             print("Starting evaluation...", file=sys.stderr)
-            print("Scoring evidence...", file=sys.stderr)
-            print("Generating report...", file=sys.stderr)
             scores = run_full(config, evaluation_dir, mode=args.mode)
             print(f"Reports written to {evaluation_dir}/")
             for dim, score in scores.items():

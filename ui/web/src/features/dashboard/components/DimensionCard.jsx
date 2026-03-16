@@ -131,6 +131,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
                   key={sev}
                   type="button"
                   className={`pill-btn severity-pill ${sev} ${selectedSeverities.includes(sev) ? 'active' : ''}`}
+                  aria-pressed={selectedSeverities.includes(sev)}
                   onClick={() => setSelectedSeverities((prev) => toggleInList(prev, sev))}
                 >
                   {sev}
@@ -143,6 +144,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
                 className="file-filter-input"
                 type="text"
                 placeholder="Filter by file..."
+                aria-label="Filter by file"
                 value={fileFilter}
                 onChange={(e) => setFileFilter(e.target.value)}
               />

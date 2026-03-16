@@ -9,7 +9,7 @@ function CopyIcon() {
   );
 }
 
-export default function CopyButton({ onClick, label }) {
+export default function CopyButton({ onClick, label, 'aria-label': ariaLabel }) {
   const [copied, setCopied] = useState(false);
 
   const handleClick = () => {
@@ -19,7 +19,7 @@ export default function CopyButton({ onClick, label }) {
   };
 
   return (
-    <button className="detail-copy-btn" onClick={handleClick}>
+    <button className="detail-copy-btn" onClick={handleClick} aria-label={ariaLabel}>
       {copied ? 'Copied!' : label}
       <CopyIcon />
     </button>
