@@ -24,16 +24,19 @@ from quodeq.engine.runner import AnalysisOptions, RunConfig, run
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import prepare_repository
 from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo, write_text
+from quodeq.shared.validation import validate_path_segment
 
 
 _DEFAULT_N_SUBAGENTS = 5
 _MODE_NUMERICAL = "numerical"
 _MODE_GRADES = "grades"
+_ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
+_ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 
 
-def _env_int(var: str, default: int | None) -> int | None:
+def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
     """Read an environment variable as an int, returning *default* if unset or invalid."""
-    raw = os.environ.get(var)
+    raw = (env or os.environ).get(var)
     if raw is None:
         return default
     try:
@@ -42,9 +45,9 @@ def _env_int(var: str, default: int | None) -> int | None:
         return default
 
 
-def _subagent_model() -> str | None:
+def _subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override from the environment, or None."""
-    return os.environ.get("SUBAGENT_MODEL") or None
+    return (env or os.environ).get("SUBAGENT_MODEL") or None
 
 
 def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
@@ -152,6 +155,7 @@ def _resolve_plugin(args: argparse.Namespace, src: Path, evaluators_dir: Path) -
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return None
+    validate_path_segment(plugin_id)
     print(f"Plugin: {plugin_id}", file=sys.stderr)
     plugin_dir = evaluators_dir / plugin_id
     if not plugin_dir.exists():
@@ -169,7 +173,7 @@ def _prescan_sources(args: argparse.Namespace, plugin_dir: Path, src: Path) -> i
     if not extensions:
         return 0
     source_file_count = count_source_files(src, extensions)
-    print(f"Source files: {source_file_count}")
+    print(f"Source files: {source_file_count}", file=sys.stderr)
     return source_file_count
 
 
@@ -177,7 +181,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     """Execute the evidence/scoring pipeline and print results."""
     try:
         if args.evidence_only:
-            print("Starting evaluation...", file=sys.stderr)
+            print("Starting evidence collection (this may take several minutes per dimension)...", file=sys.stderr)
             evidence = run(config)
             out_file = evidence_dir / f"{config.plugin_id}_evidence.json"
             try:
@@ -185,11 +189,11 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
             except OSError as exc:
                 print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
                 return 1
-            print(f"Evidence written to {out_file}")
+            print(f"Evidence written to {out_file}", file=sys.stderr)
         else:
-            print("Starting evaluation...", file=sys.stderr)
+            print("Starting evaluation (this may take several minutes per dimension)...", file=sys.stderr)
             scores = run_full(config, evaluation_dir, mode=args.mode)
-            print(f"Reports written to {evaluation_dir}/")
+            print(f"Reports written to {evaluation_dir}/", file=sys.stderr)
             for dim, score in scores.items():
                 print(f"  {dim}: {score}")
     except (AnalysisError, EvaluationError) as exc:
@@ -205,7 +209,7 @@ def _build_run_config(
     """Assemble a RunConfig from CLI args and resolved paths."""
     standards_dir = default_paths().standards_dir
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
-    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
+    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
 
     return RunConfig(
         src=src,
@@ -216,8 +220,8 @@ def _build_run_config(
         work_dir=evidence_dir,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
-            max_turns=args.max_turns if args.max_turns is not None else _env_int("QUODEQ_MAX_TURNS", None),
-            max_duration=args.max_duration if args.max_duration is not None else _env_int("QUODEQ_MAX_DURATION", None),
+            max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
+            max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
             n_subagents=args.n_subagents,
             subagent_model=_subagent_model(),
         ),
@@ -240,7 +244,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
         return 1
 
     _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
-    print(f"Report path: {evaluation_dir}")
+    print(f"Report path: {evaluation_dir}", file=sys.stderr)
 
     config = _build_run_config(args, src, plugin_id, evaluators_dir, evidence_dir)
     return _execute_pipeline(args, config, evidence_dir, evaluation_dir)

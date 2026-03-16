@@ -17,7 +17,7 @@ def list_json_dir(directory: Path, not_found_label: str) -> list[str]:
         names = list_json_dir(root / "dimensions", "Dimensions directory not found")
     """
     if not directory.exists():
-        raise NotFoundError(f"{not_found_label}: {directory}")
+        raise NotFoundError(f"{not_found_label}: {directory.name}")
     return sorted(path.stem for path in directory.glob("*.json") if path.is_file())
 
 

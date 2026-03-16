@@ -9,7 +9,7 @@ import pytest
 
 from quodeq.core.types import DimensionResult
 from quodeq.core.types.mappers import parse_dimension_result
-from quodeq.provider.accumulated import (
+from quodeq.services.accumulated import (
     _aggregate_severity_counts,
     _compute_accumulated_scores,
     _compute_accumulated_trends,

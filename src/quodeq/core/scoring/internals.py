@@ -153,7 +153,7 @@ def compliance_dampening(
     for threshold, multiplier in _RATIO_DAMPENING_TABLE:
         if ratio >= threshold:
             return multiplier
-    return 1.30
+    return _MAX_PENALTY_MULTIPLIER
 
 
 def drop_grade(grade: str, drops: int) -> str:

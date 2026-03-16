@@ -7,11 +7,4 @@ from quodeq.analysis.mcp.dispatch import (  # noqa: F401
     GET_NEXT_FILES_DESC,
     GET_NEXT_FILES_SCHEMA,
     dispatch,
-    _read_message,
-    _send,
-    _ok,
-    _handle_initialize,
-    _handle_tools_list,
-    _handle_tools_call,
-    _handle_unknown_method,
 )

@@ -7,6 +7,7 @@ import re
 import subprocess
 import sys
 import tempfile
+import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
@@ -20,6 +21,13 @@ from quodeq.shared.logging import log_debug, log_warning
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, sanitize_sensitive as _sanitize_stderr
 
 HeartbeatCallback = Callable[[int, dict], None]
+
+
+@dataclass(frozen=True)
+class _SpawnPaths:
+    """Paths for the AI CLI subprocess stdout/stderr capture files."""
+    stream_file: Path
+    stream_err: Path
 
 
 _DEFAULT_MAX_TURNS = 200
@@ -106,6 +114,8 @@ def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
 
 _AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
 
+# Fallback provider configs used when the primary JSON file
+# (data/config/ai_providers.json) cannot be loaded.
 _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
     "claude": {
         "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
@@ -128,7 +138,17 @@ def _load_provider_configs() -> dict[str, dict]:
         return _PROVIDER_CONFIGS_FALLBACK
 
 
-_PROVIDER_CONFIGS: dict[str, dict] = _load_provider_configs()
+_PROVIDER_CONFIGS: dict[str, dict] | None = None
+_PROVIDER_CONFIGS_LOCK = threading.Lock()
+
+
+def _get_provider_configs() -> dict[str, dict]:
+    global _PROVIDER_CONFIGS
+    if _PROVIDER_CONFIGS is None:
+        with _PROVIDER_CONFIGS_LOCK:
+            if _PROVIDER_CONFIGS is None:
+                _PROVIDER_CONFIGS = _load_provider_configs()
+    return _PROVIDER_CONFIGS
 
 
 class AnalysisError(RuntimeError):
@@ -144,7 +164,7 @@ def _build_ai_cmd(
 
     args = [cmd, *_get_base_ai_args(), "--tools", _get_ai_tools()]
 
-    provider_cfg = _PROVIDER_CONFIGS.get(cmd, {})
+    provider_cfg = _get_provider_configs().get(cmd, {})
     mcp_config_path: Path | None = None
     if config.jsonl_file is not None:
         mcp_config_path = _create_mcp_config(
@@ -214,7 +234,7 @@ def _run_with_heartbeat(
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
     """Build the subprocess environment for the AI CLI."""
     env = (env or os.environ).copy()
-    provider_cfg = _PROVIDER_CONFIGS.get(ai_cmd or "", {})
+    provider_cfg = _get_provider_configs().get(ai_cmd or "", {})
     for key, val in provider_cfg.get("env_set_if_missing", {}).items():
         if key not in env:
             env[key] = val
@@ -240,15 +260,15 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
 
 def _spawn_and_monitor(
     args: list[str], work_dir: Path, env: dict,
-    stream_file: Path, stream_err: Path, cfg: AnalysisConfig,
+    paths: _SpawnPaths, cfg: AnalysisConfig,
 ) -> tuple[subprocess.Popen, bool]:
     """Spawn the AI CLI process, monitor with heartbeat, return (process, timed_out)."""
-    with open(stream_file, "w") as out, open(stream_err, "w") as err:
+    with open(paths.stream_file, "w") as out, open(paths.stream_err, "w") as err:
         process = subprocess.Popen(
             args, cwd=str(work_dir), env=env,
             stdout=out, stderr=err, stdin=subprocess.DEVNULL,
         )
-        timed_out = _run_with_heartbeat(process, cfg, stream_file)
+        timed_out = _run_with_heartbeat(process, cfg, paths.stream_file)
     return process, timed_out
 
 
@@ -263,7 +283,7 @@ def run_analysis(
     stream_err = Path(str(stream_file) + ".err")
 
     try:
-        process, timed_out = _spawn_and_monitor(args, work_dir, env, stream_file, stream_err, cfg)
+        process, timed_out = _spawn_and_monitor(args, work_dir, env, _SpawnPaths(stream_file, stream_err), cfg)
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)

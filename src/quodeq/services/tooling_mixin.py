@@ -113,6 +113,8 @@ class FsToolingMixin:
             "truncated": truncated,
         }
 
+    # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
+    # (comma-separated list of client IDs, e.g. "claude,codex").
     _CLI_CANDIDATES = [
         {"id": "claude", "label": "Claude"},
         {"id": "codex", "label": "Codex"},

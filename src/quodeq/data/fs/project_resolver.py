@@ -15,7 +15,9 @@ from typing import Protocol
 _INDEX_FILE = "project_index.json"
 _MAX_LEGACY_SCAN = 500
 
-# mtime-based cache for _load_index to avoid re-reading on every call
+# mtime-based cache for _load_index to avoid re-reading on every call.
+# Intentionally module-level for cross-request caching; use clear_index_cache()
+# for testing isolation.
 _index_lock = threading.Lock()
 _index_cache: dict[Path, tuple[float, dict[str, str]]] = {}
 

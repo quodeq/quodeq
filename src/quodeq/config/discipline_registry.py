@@ -14,6 +14,7 @@ _logger = logging.getLogger(__name__)
 
 
 _DEFAULT_DETECT_PRIORITY = 99  # lowest priority — used as fallback catch-all
+_FILE_CACHE_MAX = 256
 
 
 def _strip_quotes(value: str) -> str:
@@ -176,6 +177,8 @@ class DisciplineRegistry:
         try:
             content = self._file_cache.get(path)
             if content is None:
+                if len(self._file_cache) >= _FILE_CACHE_MAX:
+                    self._file_cache.pop(next(iter(self._file_cache)))
                 content = read_text(path, errors="ignore")
                 self._file_cache[path] = content
             return needle in content

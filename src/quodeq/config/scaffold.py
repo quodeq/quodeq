@@ -8,6 +8,8 @@ import os
 import shutil
 from pathlib import Path
 
+from quodeq import __version__
+
 _DEFAULT_PLUGIN_VERSION = "1.0.0"
 
 # Canonical dimension IDs used in scaffold boilerplate
@@ -15,7 +17,7 @@ _DIM_MAINTAINABILITY = "maintainability"
 _DIM_RELIABILITY = "reliability"
 _DIM_SECURITY = "security"
 _DIM_PERFORMANCE = "performance"
-_EXCLUDED_DIMS = ["usability", "flexibility"]
+_EXCLUDED_DIMS = ("usability", "flexibility")
 _DEFAULT_DIM_WEIGHT = 1.0
 _SECURITY_DIM_WEIGHT = 1.2
 _PERFORMANCE_DIM_WEIGHT = 0.8
@@ -36,12 +38,10 @@ _logger = logging.getLogger(__name__)
 
 def _min_engine_version() -> str:
     """Derive the engine_version constraint from the installed quodeq version."""
-    from quodeq import __version__
     if __version__:
         return f"=={__version__}"
     try:
-        from importlib.metadata import version as _pkg_version
-        return f"=={_pkg_version('quodeq')}"
+        return f"=={importlib.metadata.version('quodeq')}"
     except importlib.metadata.PackageNotFoundError:
         _logger.debug("Could not determine quodeq version for engine constraint")
         return ">=0.4.0"

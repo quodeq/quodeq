@@ -5,6 +5,7 @@ import json
 import logging
 import threading
 import time
+from pathlib import Path
 from typing import Any
 
 from quodeq.core.types import PluginDimension, PluginInfo
@@ -40,18 +41,19 @@ class _PluginCache:
 _plugin_cache = _PluginCache()
 
 
-def discover_plugins() -> list[PluginInfo]:
+def discover_plugins(evaluators_dir: Path | None = None) -> list[PluginInfo]:
     """Scan the evaluators directory and return plugin metadata.
 
     Results are cached for _PLUGIN_CACHE_TTL seconds so that plugins installed
     at runtime (without a process restart) are picked up on the next request
     after the TTL expires.
     """
-    cached = _plugin_cache.get()
-    if cached is not None:
-        return cached
+    if evaluators_dir is None:
+        cached = _plugin_cache.get()
+        if cached is not None:
+            return cached
     from quodeq.config.paths import default_paths
-    evaluators_root = default_paths().evaluators_dir
+    evaluators_root = evaluators_dir or default_paths().evaluators_dir
     result: list[PluginInfo] = []
     for child in scan_plugin_dirs(evaluators_root):
         try:

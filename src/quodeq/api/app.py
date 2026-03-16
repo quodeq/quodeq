@@ -103,13 +103,21 @@ class InMemoryRateLimitStore:
         return len(timestamps) >= self._max_requests
 
 
-def create_rate_limit_store() -> RateLimitStore:
+def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore:
     """Create the default rate-limit store.
 
-    Override this factory to plug in a shared backend for multi-worker
-    deployments (e.g. Redis).  The returned object must satisfy the
-    ``RateLimitStore`` protocol.
+    For multi-worker deployments, pass a ``RateLimitStore``-compatible
+    shared backend (e.g. Redis) to ``create_app(rate_limit_store=...)``,
+    or monkey-patch this factory.  Set ``QUODEQ_RATE_LIMIT_BACKEND`` to
+    signal the desired backend (only ``memory`` is built-in).
     """
+    backend = (env or os.environ).get("QUODEQ_RATE_LIMIT_BACKEND", "memory")
+    if backend != "memory":
+        _logger.warning(
+            "Unknown rate-limit backend %r — falling back to in-memory. "
+            "Pass a custom RateLimitStore to create_app() for shared backends.",
+            backend,
+        )
     return InMemoryRateLimitStore()
 
 
@@ -119,14 +127,27 @@ def _default_provider() -> ActionProvider:
     return FilesystemActionProvider()
 
 
+_LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
+
+
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
-    """Verify API key authentication when *api_key* is set."""
+    """Verify API key authentication when *api_key* is set.
+
+    When no API key is configured, only localhost requests are allowed.
+    """
     if request.path == _HEALTH_PATH:
         return None
     if api_key:
         auth = request.headers.get("Authorization", "")
         if not hmac.compare_digest(auth, f"Bearer {api_key}"):
             return jsonify({"error": "Unauthorized", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
+    else:
+        remote = request.remote_addr or ""
+        if remote not in _LOCALHOST_ADDRS:
+            return jsonify({
+                "error": "Set QUODEQ_API_KEY to allow remote access",
+                "code": "UNAUTHORIZED",
+            }), HTTPStatus.UNAUTHORIZED
     return None
 
 

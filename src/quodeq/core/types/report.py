@@ -26,7 +26,7 @@ class ParsedReport:
     overall_score: str | None = None
     overall_grade: str | None = None
     principles: list[PrincipleGrade] = field(default_factory=list)
-    detail_principles: list[object] = field(default_factory=list)
+    detail_principles: list[dict[str, object]] = field(default_factory=list)
     violations: list[Finding] = field(default_factory=list)
     compliance: list[Finding] = field(default_factory=list)
     totals: Totals | None = None

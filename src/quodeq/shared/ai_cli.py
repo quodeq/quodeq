@@ -13,11 +13,11 @@ _AI_CLI_FALLBACK_ERROR = (
 _DEFAULT_AI_CLI_TIMEOUT = 300
 
 
-def _ai_cli_timeout(override: int | None = None) -> int:
+def _ai_cli_timeout(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the AI CLI timeout in seconds. *override* bypasses env for testing."""
     if override is not None:
         return override
-    raw = os.environ.get("QUODEQ_AI_CLI_TIMEOUT")
+    raw = (env or os.environ).get("QUODEQ_AI_CLI_TIMEOUT")
     if raw is None:
         return _DEFAULT_AI_CLI_TIMEOUT
     try:

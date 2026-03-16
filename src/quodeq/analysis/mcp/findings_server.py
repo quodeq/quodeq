@@ -9,18 +9,30 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import TextIO
+from typing import Protocol, TextIO, runtime_checkable
 
 from quodeq.engine.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import (
-    _read_message,
+    read_message,
     dispatch as _dispatch,
 )
 from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs as _load_compiled_refs
 
 _FINDING_SCHEMA_VERSION = 1
 
+
+@runtime_checkable
+class DeduplicationStore(Protocol):
+    """Abstraction for finding deduplication state.
+
+    The default implementation uses a process-local ``set``.  For horizontal
+    scaling (multiple MCP server instances), implement this protocol with a
+    shared backend (e.g. Redis set) and pass it to ``FindingsRouter``.
+    """
+
+    def __contains__(self, key: tuple) -> bool: ...
+    def add(self, key: tuple) -> None: ...
 
 
 class FindingsRouter:
@@ -31,10 +43,15 @@ class FindingsRouter:
     - Returns feedback to the LLM so it can move on from duplicates
     """
 
-    def __init__(self, output_fh: TextIO, compiled_refs: dict[str, list[dict]] | None = None):
+    def __init__(
+        self,
+        output_fh: TextIO,
+        compiled_refs: dict[str, list[dict]] | None = None,
+        seen_store: DeduplicationStore | None = None,
+    ):
         self._fh = output_fh
         self._refs = compiled_refs or {}
-        self._seen: set[tuple] = set()
+        self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self.counter = 0
 
     def receive(self, args: dict) -> tuple[str, bool]:
@@ -119,12 +136,12 @@ def main() -> None:
         with open(sa.findings_file, "a") as findings_fh:
             router = FindingsRouter(findings_fh, compiled_refs)
             while True:
-                msg = _read_message()
+                msg = read_message()
                 if msg is None:
                     break
                 try:
                     _dispatch(msg, router, queue, sa.agent_id)
-                except Exception as exc:
+                except (KeyError, TypeError, ValueError, json.JSONDecodeError, OSError) as exc:
                     sys.stderr.write(f"Dispatch error: {exc}\n")
     except OSError as exc:
         sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")

@@ -8,7 +8,7 @@ from pathlib import Path
 
 import os as _os
 
-from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, _PERCENT_SCALE
+from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, compute_coverage_pct
 from quodeq.shared.utils import open_text
 from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 
@@ -227,7 +227,7 @@ def parse_jsonl_to_evidence(
 
     source_file_count = context.source_file_count
     files_read = context.files_read
-    coverage_pct = round(files_read / source_file_count * _PERCENT_SCALE, 1) if source_file_count > 0 else 0.0
+    coverage_pct = compute_coverage_pct(files_read, source_file_count)
 
     return Evidence(
         repository=context.repository,

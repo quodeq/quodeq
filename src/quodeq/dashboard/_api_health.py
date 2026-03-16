@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.shared.logging import log_info, log_warning
-from quodeq.shared.utils import ACTION_API_MODULE, IS_WIN32 as _IS_WIN32
+from quodeq.shared.utils import ACTION_API_MODULE, IS_WIN32 as _IS_WIN32, get_evaluations_dir
 
 _HEALTH_CHECK_TIMEOUT_S = 0.5
 _HEALTH_POLL_INTERVAL_S = 0.2
@@ -60,9 +60,14 @@ def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_
     """Block until the action API becomes healthy, or raise TimeoutError."""
     log_info(f"Waiting for Action API at {base_url}...")
     deadline = time.monotonic() + timeout_s
+    attempts = 0
     while time.monotonic() < deadline:
         if action_api_healthy(base_url):
             return None
+        attempts += 1
+        if attempts % 10 == 0:
+            elapsed = round(time.monotonic() + timeout_s - deadline, 1)
+            log_info(f"Still waiting for Action API ({elapsed:.0f}s elapsed)...")
         time.sleep(_HEALTH_POLL_INTERVAL_S)
     raise TimeoutError(f"Action API did not become ready within {timeout_s} seconds.")
 
@@ -74,14 +79,7 @@ def spawn_action_api(
     api_config: ApiConfig | None = None,
     env: dict[str, str] | None = None,
 ) -> subprocess.Popen:
-    """Spawn the action API subprocess and record its PID.
-
-    The ``get_evaluations_dir`` import is deferred to avoid a circular
-    dependency between ``dashboard._api_health`` and ``shared.utils``
-    (which imports logging, which may trigger dashboard config loading).
-    """
-    from quodeq.shared.utils import get_evaluations_dir
-
+    """Spawn the action API subprocess and record its PID."""
     cfg = api_config or ApiConfig()
     env = (env or os.environ).copy()
     env[_ENV_ACTION_API_PORT] = str(port)

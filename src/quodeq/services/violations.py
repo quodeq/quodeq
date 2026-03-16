@@ -18,11 +18,11 @@ from quodeq.services.violations_parsing import (
 _DEFAULT_MAX_VIOLATION_FILES = 20
 
 
-def _max_violation_files(override: int | None = None) -> int:
+def _max_violation_files(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the max number of violation files to include. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_MAX_VIOLATION_FILES", str(_DEFAULT_MAX_VIOLATION_FILES)))
+    return int((env or os.environ).get("QUODEQ_MAX_VIOLATION_FILES", str(_DEFAULT_MAX_VIOLATION_FILES)))
 
 
 def resolve_dimension_eval(

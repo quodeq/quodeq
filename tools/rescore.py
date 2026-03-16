@@ -25,6 +25,7 @@ sys.path.insert(0, str(repo_root / "src"))
 
 from quodeq.evaluate.lib.scoring import run_scoring
 from quodeq.evaluate.lib.report_json import write_report_json
+from quodeq.shared.validation import validate_path_segment
 
 # Content hashes that identify prompt versions — used to select the correct
 # scoring mode for evidence produced by different prompt revisions.
@@ -95,6 +96,12 @@ def rescore_evidence_file(evidence_path: Path, evaluators_root: Path, *, dry_run
         return False
     discipline = evidence.get("discipline", "")
     dimension = evidence_path.stem.replace(_EVIDENCE_STEM_SUFFIX, "")
+    try:
+        validate_path_segment(discipline)
+        validate_path_segment(dimension)
+    except ValueError as exc:
+        print(f"  SKIP  invalid path segment in evidence: {exc}")
+        return False
     mapping_path = evaluators_root / discipline / f"{dimension}.json"
 
     if not mapping_path.exists():

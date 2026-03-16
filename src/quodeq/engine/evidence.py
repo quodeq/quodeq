@@ -4,5 +4,5 @@ from quodeq.core.evidence.model import (  # noqa: F401
     Judgment,
     PrincipleEvidence,
     Evidence,
-    _PERCENT_SCALE,
+    PERCENT_SCALE,
 )

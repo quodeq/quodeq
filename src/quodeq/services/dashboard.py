@@ -20,11 +20,11 @@ from quodeq.adapters.fs.report_parser import (
 )
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
+from quodeq.engine.scoring_internals import score_to_grade_label
+from quodeq.services.accumulated import numeric_average
 
 # Re-export for backward compatibility (tests import this name)
 _collect_stale_dimensions = collect_stale_dimensions
-from quodeq.engine.scoring_internals import score_to_grade_label
-from quodeq.services.accumulated import numeric_average
 
 
 @dataclass
@@ -43,14 +43,6 @@ _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 _LATEST_RUN = "latest"
 _MAX_HISTORY_RUNS = 100
 
-# NOTE: Process-local cache; not shared across workers. Replace with Redis/memcached for multi-worker deployments.
-# Module-level LRU cache shared across requests; evicts least-recently-used
-# entries once the limit is reached, capping memory while providing cross-
-# request caching for hot-path dimension reads (P-TIM-6).
-_RUN_DIM_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
-_RUN_DIM_LOCK = threading.Lock()
-
-
 _DEFAULT_RUN_DIM_CACHE_MAX = 256
 
 
@@ -59,6 +51,20 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
     if override is not None:
         return override
     return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+
+
+def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
+    """Create the default run-dimension LRU cache and its lock.
+
+    Override this factory to plug in a shared backend (e.g. a Redis-backed
+    OrderedDict wrapper) for multi-worker deployments.  The returned
+    ordered-dict must support ``move_to_end``, ``popitem(last=False)``,
+    and standard ``__getitem__``/``__setitem__``/``__contains__``.
+    """
+    return OrderedDict(), threading.Lock()
+
+
+_RUN_DIM_CACHE, _RUN_DIM_LOCK = create_dimension_cache()
 
 
 def _collect_previous_scores(
@@ -116,15 +122,16 @@ def _build_accumulated_trend(
             continue
         acc_dims = list(acc_by_dim.values())
         acc_grades = [d.overall_grade for d in acc_dims if d.overall_grade]
+        avg = numeric_average(acc_dims)
         trend.append(
             {
                 "runId": item.run_id,
                 "dateISO": item.date_iso,
                 "dateLabel": item.date_label,
                 "dimensionsCount": len(acc_by_dim),
-                "numericAverage": numeric_average(acc_dims),
+                "numericAverage": avg,
                 "overallGrade": (
-                    score_to_grade_label(numeric_average(acc_dims)) if numeric_average(acc_dims) is not None
+                    score_to_grade_label(avg) if avg is not None
                     else (most_frequent_grade(acc_grades) if acc_grades else None)
                 ),
             }

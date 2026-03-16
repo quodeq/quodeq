@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import sys
 
+from quodeq.shared.utils import get_findings_file
+
 
 class ServerArgs:
     """Parsed CLI arguments for the MCP server."""
@@ -38,8 +40,6 @@ def parse_args(argv: list[str] | None = None) -> ServerArgs:
     *argv* overrides ``sys.argv[1:]`` when provided, making the parser
     testable without monkeypatching sys.argv.
     """
-    from quodeq.shared.utils import get_findings_file
-
     result = ServerArgs()
     args = argv if argv is not None else sys.argv[1:]
 
