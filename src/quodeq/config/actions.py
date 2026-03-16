@@ -17,6 +17,10 @@ from quodeq.shared.logging import log_error
 from quodeq.shared.utils import read_text, write_text
 
 _GENERATED_DIMS_FILENAME = "generated.json"
+_MAX_EVALUATOR_WORKERS = 8
+_TPL_DIMENSIONS = "DIMENSIONS"
+_TPL_OUTPUT_DIR = "OUTPUT_DIR"
+_TPL_DATE = "DATE"
 
 
 @dataclass(frozen=True)
@@ -66,7 +70,7 @@ def run_generate_evaluators(discipline: str, paths: ConfigPaths) -> int | None:
         log_error("--generate-maps requires a dimension name")
         return 1
     dimensions = [p.stem for p in paths.dimensions_dir.glob("*.json")]
-    with ThreadPoolExecutor(max_workers=min(len(dimensions), 8)) as pool:
+    with ThreadPoolExecutor(max_workers=min(len(dimensions), _MAX_EVALUATOR_WORKERS)) as pool:
         futures = {
             pool.submit(_generate_single_evaluator, discipline, dim, paths): dim
             for dim in dimensions
@@ -82,9 +86,9 @@ def run_generate_dimensions(paths: ConfigPaths, *, today: date | None = None) ->
     except (OSError, UnicodeDecodeError) as exc:
         raise RuntimeError(f"Failed to read dimensions template: {exc}") from exc
     prompt = render_template(template, {
-        "DIMENSIONS": ", ".join(DIMENSION_NAMES),
-        "OUTPUT_DIR": str(paths.dimensions_dir),
-        "DATE": (today or date.today()).isoformat(),
+        _TPL_DIMENSIONS: ", ".join(DIMENSION_NAMES),
+        _TPL_OUTPUT_DIR: str(paths.dimensions_dir),
+        _TPL_DATE: (today or date.today()).isoformat(),
     })
     stdout, err = run_ai_cli(prompt)
     if err:

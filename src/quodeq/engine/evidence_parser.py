@@ -5,4 +5,3 @@ from quodeq.core.evidence.parser import (  # noqa: F401
     resolve_llm_refs,
     parse_jsonl_to_evidence,
 )
-from quodeq.core.evidence.parser import _parse_jsonl_line  # noqa: F401

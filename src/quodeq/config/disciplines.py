@@ -10,7 +10,7 @@ from quodeq.shared.logging import log_error, log_warning
 _DEFAULT_CATEGORIES = frozenset({"backend", "frontend", "mobile", "infra"})
 
 
-def get_valid_categories(categories: str | None = None) -> frozenset[str]:
+def get_valid_categories(categories: str | None = None, env: dict[str, str] | None = None) -> frozenset[str]:
     """Return the set of valid discipline categories.
 
     *categories* can be provided explicitly, read from the
@@ -19,7 +19,7 @@ def get_valid_categories(categories: str | None = None) -> frozenset[str]:
     """
     if categories is not None:
         return frozenset(categories.split(","))
-    from_env = os.environ.get("QUODEQ_DISCIPLINE_CATEGORIES")
+    from_env = (env or os.environ).get("QUODEQ_DISCIPLINE_CATEGORIES")
     if from_env:
         return frozenset(c.strip() for c in from_env.split(",") if c.strip())
     return _DEFAULT_CATEGORIES

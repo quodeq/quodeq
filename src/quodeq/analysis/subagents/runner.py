@@ -41,7 +41,7 @@ def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
     return (env or os.environ).get("QUODEQ_SUBAGENT_MODEL") or None
 
 
-def _list_plugin_files(config: RunConfig, ctx_total: int, dim_id: str, idx: int) -> tuple[list[str], set[str]]:
+def _list_plugin_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[str]]:
     """List source files for the subagent queue.
 
     Returns (files, extensions) or ([], extensions) if none found.
@@ -136,7 +136,7 @@ def process_dimension_with_subagents(
     evidence_dir = config.work_dir or config.src
 
     # 1. List source files
-    files, extensions = _list_plugin_files(config, ctx.total, dim_id, idx)
+    files, extensions = _list_plugin_files(config, dim_id)
     if not files:
         log_warning(
             f"[{idx}/{ctx.total}] {dim_id} -- no source files for subagent queue"

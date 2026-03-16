@@ -63,7 +63,7 @@ def parse_parsed_report(raw: dict[str, object]) -> ParsedReport:
     compliance = _parse_finding_list(raw.get("compliance"))
 
     detail_raw = raw.get("detailPrinciples")
-    detail_principles: list[object] = []
+    detail_principles: list[dict[str, object]] = []
     if isinstance(detail_raw, list):
         detail_principles = list(detail_raw)
 
@@ -170,10 +170,6 @@ def parse_dimension_summary(raw: dict[str, object]) -> DimensionSummary:
 # ---------------------------------------------------------------------------
 
 __all__ = [
-    # helpers (private but re-exported for internal use)
-    "_parse_finding_list",
-    "_parse_progress_info",
-    "_parse_violation_file_entry",
     # findings
     "parse_finding",
     "parse_req_ref",

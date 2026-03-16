@@ -37,6 +37,7 @@ __all__ = [
 ]
 
 _logger = logging.getLogger(__name__)
+_REPORT_PATH_MARKER = "Report path:"
 
 
 class JobManager:
@@ -149,7 +150,7 @@ class JobManager:
             self._apply_marker(job, line)
             return
         job.logs.append(_ANSI_RE.sub("", line))
-        if "Report path:" in line:
+        if _REPORT_PATH_MARKER in line:
             match = REPORT_PATH_RE.search(line)
             if match:
                 job.output_project = match.group(1)

@@ -31,34 +31,25 @@ def _env_float(var: str, default: float, env: dict[str, str] | None = None) -> f
         return default
 
 
-_penalty_cache: dict[str, float] = {}
-
-
 def _critical_penalty(override: float | None = None) -> float:
     """Points deducted per critical violation type (default: 2.0)."""
     if override is not None:
         return override
-    if "critical" not in _penalty_cache:
-        _penalty_cache["critical"] = _env_float("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
-    return _penalty_cache["critical"]
+    return _env_float("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
 
 
 def _major_penalty(override: float | None = None) -> float:
     """Points deducted per major violation type (default: 1.0)."""
     if override is not None:
         return override
-    if "major" not in _penalty_cache:
-        _penalty_cache["major"] = _env_float("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
-    return _penalty_cache["major"]
+    return _env_float("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
 
 
 def _minor_penalty(override: float | None = None) -> float:
     """Points deducted per minor violation type (default: 0.25)."""
     if override is not None:
         return override
-    if "minor" not in _penalty_cache:
-        _penalty_cache["minor"] = _env_float("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
-    return _penalty_cache["minor"]
+    return _env_float("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
 
 
 _CRITICAL_SCORE_CAP = 3

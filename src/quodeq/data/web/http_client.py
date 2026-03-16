@@ -51,6 +51,7 @@ def _is_private_address(hostname: str) -> bool:
         pass
     return False
 
+_ENV_ALLOW_PLAINTEXT_HTTP = "QUODEQ_ALLOW_PLAINTEXT_HTTP"
 _DEFAULT_HTTP_TIMEOUT = 10
 _DEFAULT_MAX_RETRIES = 3
 _DEFAULT_RETRY_BASE_DELAY = 0.5
@@ -115,6 +116,7 @@ class HttpClientConfig:
     cb_threshold: int | None = None
     cb_reset: int | None = None
     allow_private_urls: bool | None = None
+    allow_plaintext_http: bool | None = None
 
 
 def check_response_status(response: HttpResponse) -> None:
@@ -148,6 +150,7 @@ class HttpClient:
         self._cb_threshold = cfg.cb_threshold if cfg.cb_threshold is not None else _circuit_breaker_threshold()
         self._cb_reset = cfg.cb_reset if cfg.cb_reset is not None else _circuit_breaker_reset_s()
         self._allow_private = cfg.allow_private_urls
+        self._allow_plaintext_http = cfg.allow_plaintext_http
         self._lock = threading.Lock()
         self._failure_count = 0
         self._circuit_opened_at: float | None = None
@@ -173,14 +176,18 @@ class HttpClient:
             if self._failure_count >= self._cb_threshold and self._circuit_opened_at is None:
                 self._circuit_opened_at = time.monotonic()
 
-    def get_json(self, url: str, headers: dict[str, str]) -> HttpResponse:
-        """Send a GET request with retry + circuit breaker and return parsed JSON."""
+    def _validate_url(self, url: str) -> None:
+        """Validate URL scheme and check for private/plaintext restrictions."""
         if not url.startswith(("http://", "https://")):
             raise ValueError(f"URL must use http or https scheme: {url!r}")
 
         parsed = urlparse(url)
         if parsed.scheme == "http":
-            if os.environ.get("QUODEQ_ALLOW_PLAINTEXT_HTTP") != "1":
+            if self._allow_plaintext_http is not None:
+                allow = self._allow_plaintext_http
+            else:
+                allow = os.environ.get(_ENV_ALLOW_PLAINTEXT_HTTP) == "1"
+            if not allow:
                 raise ValueError(
                     f"Cleartext HTTP to {parsed.hostname!r} is blocked — credentials would be "
                     "transmitted unencrypted. Use https:// or set QUODEQ_ALLOW_PLAINTEXT_HTTP=1."
@@ -192,6 +199,10 @@ class HttpClient:
                 f"Requests to private/internal addresses are blocked: {hostname!r}. "
                 "Set QUODEQ_ALLOW_PRIVATE_URLS=1 to allow."
             )
+
+    def get_json(self, url: str, headers: dict[str, str]) -> HttpResponse:
+        """Send a GET request with retry + circuit breaker and return parsed JSON."""
+        self._validate_url(url)
 
         if self._is_circuit_open():
             return HttpResponse(

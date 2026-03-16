@@ -135,7 +135,14 @@ def _load_provider_configs() -> dict[str, dict]:
         return _PROVIDER_CONFIGS_FALLBACK
 
 
-_PROVIDER_CONFIGS: dict[str, dict] = _load_provider_configs()
+_PROVIDER_CONFIGS: dict[str, dict] | None = None
+
+
+def _get_provider_configs() -> dict[str, dict]:
+    global _PROVIDER_CONFIGS
+    if _PROVIDER_CONFIGS is None:
+        _PROVIDER_CONFIGS = _load_provider_configs()
+    return _PROVIDER_CONFIGS
 
 
 class AnalysisError(RuntimeError):
@@ -151,7 +158,7 @@ def _build_ai_cmd(
 
     args = [cmd, *_get_base_ai_args(), "--tools", _get_ai_tools()]
 
-    provider_cfg = _PROVIDER_CONFIGS.get(cmd, {})
+    provider_cfg = _get_provider_configs().get(cmd, {})
     mcp_config_path: Path | None = None
     if config.jsonl_file is not None:
         mcp_config_path = _create_mcp_config(
@@ -221,7 +228,7 @@ def _run_with_heartbeat(
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
     """Build the subprocess environment for the AI CLI."""
     env = (env or os.environ).copy()
-    provider_cfg = _PROVIDER_CONFIGS.get(ai_cmd or "", {})
+    provider_cfg = _get_provider_configs().get(ai_cmd or "", {})
     for key, val in provider_cfg.get("env_set_if_missing", {}).items():
         if key not in env:
             env[key] = val

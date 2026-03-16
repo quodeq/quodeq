@@ -103,7 +103,7 @@ class InMemoryRateLimitStore:
         return len(timestamps) >= self._max_requests
 
 
-def create_rate_limit_store() -> RateLimitStore:
+def create_rate_limit_store(env: dict[str, str] | None = None) -> RateLimitStore:
     """Create the default rate-limit store.
 
     For multi-worker deployments, pass a ``RateLimitStore``-compatible
@@ -111,7 +111,7 @@ def create_rate_limit_store() -> RateLimitStore:
     or monkey-patch this factory.  Set ``QUODEQ_RATE_LIMIT_BACKEND`` to
     signal the desired backend (only ``memory`` is built-in).
     """
-    backend = os.environ.get("QUODEQ_RATE_LIMIT_BACKEND", "memory")
+    backend = (env or os.environ).get("QUODEQ_RATE_LIMIT_BACKEND", "memory")
     if backend != "memory":
         _logger.warning(
             "Unknown rate-limit backend %r — falling back to in-memory. "

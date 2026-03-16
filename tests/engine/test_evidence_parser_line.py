@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 
-from quodeq.engine.evidence_parser import _parse_jsonl_line
+from quodeq.core.evidence.parser import _parse_jsonl_line
 from tests.engine.conftest import _evidence_line
 
 

@@ -101,9 +101,10 @@ class FsEvaluationMixin:
         return SubprocessDispatcher(self._jobs)
 
     @staticmethod
-    def _build_eval_env(repo: str, options: EvaluationOptions) -> dict[str, str]:
+    def _build_eval_env(repo: str, options: EvaluationOptions, env: dict[str, str] | None = None) -> dict[str, str]:
         """Build the subprocess environment for an evaluation run."""
-        env = {**os.environ, "PYTHONUNBUFFERED": "1"}
+        base = env if env is not None else os.environ
+        env = {**base, "PYTHONUNBUFFERED": "1"}
         env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
         ai_model = options.ai_model or get_ai_model()
         if ai_model:

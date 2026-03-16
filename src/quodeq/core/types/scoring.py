@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
+_DEFAULT_GRADE = "Critical"
+
 
 @dataclass(frozen=True, slots=True)
 class ScaleInfo:
@@ -36,7 +38,7 @@ class PrincipleScore:
     deductions: Deductions | None = None
     dampening_multiplier: float | None = None
     final_score: float | None = None
-    grade: str = "Critical"
+    grade: str = _DEFAULT_GRADE
     base_grade: str | None = None
     severity_drops: int | None = None
 

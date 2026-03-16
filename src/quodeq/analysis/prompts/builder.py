@@ -116,6 +116,17 @@ def _template_hash(template: str) -> str:
     return hashlib.sha256(template.encode()).hexdigest()[:12]
 
 
+_TPL_DISCIPLINE = "DISCIPLINE"
+_TPL_REPO_NAME = "REPO_NAME"
+_TPL_DATE = "DATE"
+_TPL_DIMENSION = "DIMENSION"
+_TPL_SOURCE_FILE_COUNT = "SOURCE_FILE_COUNT"
+_TPL_STANDARDS_CHECKLIST = "STANDARDS_CHECKLIST"
+_TPL_ANALYSIS_GUIDANCE = "ANALYSIS_GUIDANCE"
+_TPL_DIMENSIONS = "DIMENSIONS"
+_TPL_PROMPT_HASH = "PROMPT_HASH"
+
+
 def build_analysis_prompt(template: str, context: PromptContext) -> str:
     """Build a complete per-dimension analysis prompt from the template."""
     dimensions_text = render_dimensions(context.dimensions_data, context.dimension)
@@ -130,14 +141,14 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
     return render_template(
         template,
         {
-            "DISCIPLINE": context.plugin_id,
-            "REPO_NAME": context.repo_name,
-            "DATE": context.date_str,
-            "DIMENSION": context.dimension,
-            "SOURCE_FILE_COUNT": str(context.source_file_count),
-            "STANDARDS_CHECKLIST": standards_checklist,
-            "ANALYSIS_GUIDANCE": context.analysis_md or _NO_GUIDANCE,
-            "DIMENSIONS": dimensions_text,
-            "PROMPT_HASH": prompt_hash,
+            _TPL_DISCIPLINE: context.plugin_id,
+            _TPL_REPO_NAME: context.repo_name,
+            _TPL_DATE: context.date_str,
+            _TPL_DIMENSION: context.dimension,
+            _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
+            _TPL_STANDARDS_CHECKLIST: standards_checklist,
+            _TPL_ANALYSIS_GUIDANCE: context.analysis_md or _NO_GUIDANCE,
+            _TPL_DIMENSIONS: dimensions_text,
+            _TPL_PROMPT_HASH: prompt_hash,
         },
     )

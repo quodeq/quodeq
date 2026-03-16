@@ -122,15 +122,16 @@ def _build_accumulated_trend(
             continue
         acc_dims = list(acc_by_dim.values())
         acc_grades = [d.overall_grade for d in acc_dims if d.overall_grade]
+        avg = numeric_average(acc_dims)
         trend.append(
             {
                 "runId": item.run_id,
                 "dateISO": item.date_iso,
                 "dateLabel": item.date_label,
                 "dimensionsCount": len(acc_by_dim),
-                "numericAverage": numeric_average(acc_dims),
+                "numericAverage": avg,
                 "overallGrade": (
-                    score_to_grade_label(numeric_average(acc_dims)) if numeric_average(acc_dims) is not None
+                    score_to_grade_label(avg) if avg is not None
                     else (most_frequent_grade(acc_grades) if acc_grades else None)
                 ),
             }

@@ -14,9 +14,6 @@ from quodeq.config.prompt_templates import render_template
 from quodeq.shared.logging import log_error, log_info, log_success, log_warning
 from quodeq.shared.utils import read_text, write_text, get_github_raw_base_url, get_github_search_url, show_diff
 
-# Re-export for backward compatibility
-_FetchClient = FetchClient
-
 # Per-runtime linter documentation sources
 _LINTER_SOURCES_PATH = Path(__file__).parent / "linter_sources.json"
 _REFRESH_TEMPLATES_DIR = Path(__file__).parent / "refresh_templates"
@@ -45,6 +42,7 @@ def _max_fetch_workers(override: int | None = None, env: dict[str, str] | None =
         return override
     return int((env or os.environ).get("QUODEQ_MAX_FETCH_WORKERS", str(_DEFAULT_MAX_FETCH_WORKERS)))
 
+_CURSOR_RULES_FILENAMES = (".cursorrules", "cursor-rules.md", ".cursor/rules/main.mdc")
 _GITHUB_SEARCH_PER_PAGE = 10
 _MAX_CONTENT_REPOS = 3
 _LINTER_DOCS_LIMIT = 6000
@@ -214,7 +212,7 @@ def _fetch_repo_content(repos: list[dict]) -> list[str]:
             return None
         if not _validate_repo_field(repo['default_branch'], 'default_branch'):
             return None
-        for filename in (".cursorrules", "cursor-rules.md", ".cursor/rules/main.mdc"):
+        for filename in _CURSOR_RULES_FILENAMES:
             url = (
                 f"{get_github_raw_base_url()}/{repo['name']}"
                 f"/{repo['default_branch']}/{filename}"

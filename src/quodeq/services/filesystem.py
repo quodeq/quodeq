@@ -44,9 +44,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     purely for composition.
     """
 
-    def __init__(self, job_manager: JobManager | None = None) -> None:
+    def __init__(self, job_manager: JobManager | None = None, compiled_dir: Path | None = None) -> None:
         super().__init__()
         self._jobs = job_manager or JobManager()
+        self._compiled_dir = compiled_dir
         self._model_fetchers: dict[str, Callable] = {
             "claude": self._get_claude_models,
         }
@@ -132,7 +133,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         base = (Path(reports_dir) / project / run_id).resolve()
         if not base.is_relative_to(Path(reports_dir).resolve()):
             return None
-        compiled_dir = default_paths().standards_dir / "compiled"
+        compiled_dir = self._compiled_dir or default_paths().standards_dir / "compiled"
         result = resolve_dimension_eval(base, project, run_id, dimension, compiled_dir=compiled_dir if compiled_dir.exists() else None)
         if result is not None:
             return to_camel_dict(result) if isinstance(result, ViolationResponse) else result
