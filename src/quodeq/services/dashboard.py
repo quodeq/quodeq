@@ -43,14 +43,6 @@ _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}
 _LATEST_RUN = "latest"
 _MAX_HISTORY_RUNS = 100
 
-# NOTE: Process-local cache; not shared across workers. Replace with Redis/memcached for multi-worker deployments.
-# Module-level LRU cache shared across requests; evicts least-recently-used
-# entries once the limit is reached, capping memory while providing cross-
-# request caching for hot-path dimension reads (P-TIM-6).
-_RUN_DIM_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
-_RUN_DIM_LOCK = threading.Lock()
-
-
 _DEFAULT_RUN_DIM_CACHE_MAX = 256
 
 
@@ -59,6 +51,20 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
     if override is not None:
         return override
     return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+
+
+def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
+    """Create the default run-dimension LRU cache and its lock.
+
+    Override this factory to plug in a shared backend (e.g. a Redis-backed
+    OrderedDict wrapper) for multi-worker deployments.  The returned
+    ordered-dict must support ``move_to_end``, ``popitem(last=False)``,
+    and standard ``__getitem__``/``__setitem__``/``__contains__``.
+    """
+    return OrderedDict(), threading.Lock()
+
+
+_RUN_DIM_CACHE, _RUN_DIM_LOCK = create_dimension_cache()
 
 
 def _collect_previous_scores(

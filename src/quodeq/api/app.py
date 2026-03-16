@@ -106,10 +106,18 @@ class InMemoryRateLimitStore:
 def create_rate_limit_store() -> RateLimitStore:
     """Create the default rate-limit store.
 
-    Override this factory to plug in a shared backend for multi-worker
-    deployments (e.g. Redis).  The returned object must satisfy the
-    ``RateLimitStore`` protocol.
+    For multi-worker deployments, pass a ``RateLimitStore``-compatible
+    shared backend (e.g. Redis) to ``create_app(rate_limit_store=...)``,
+    or monkey-patch this factory.  Set ``QUODEQ_RATE_LIMIT_BACKEND`` to
+    signal the desired backend (only ``memory`` is built-in).
     """
+    backend = os.environ.get("QUODEQ_RATE_LIMIT_BACKEND", "memory")
+    if backend != "memory":
+        _logger.warning(
+            "Unknown rate-limit backend %r — falling back to in-memory. "
+            "Pass a custom RateLimitStore to create_app() for shared backends.",
+            backend,
+        )
     return InMemoryRateLimitStore()
 
 
