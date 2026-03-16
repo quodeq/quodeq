@@ -695,6 +695,15 @@ export default function App() {
                     </div>
                   </div>
                 )}
+                <div className="settings-row">
+                  <div className="settings-row-label">
+                    <span className="settings-label">Analysis power</span>
+                    <span className="settings-description">
+                      Controls the AI model used for analysis. Higher power gives more thorough results but takes longer.
+                    </span>
+                  </div>
+                  <PowerSelector value={analysisPower} onChange={setAnalysisPower} />
+                </div>
                 {aiCmd && (
                   <div className="settings-row">
                     <div className="settings-row-label">
@@ -731,15 +740,6 @@ export default function App() {
                     </div>
                   </div>
                 )}
-                <div className="settings-row">
-                  <div className="settings-row-label">
-                    <span className="settings-label">Analysis power</span>
-                    <span className="settings-description">
-                      Controls the AI model used for analysis. Higher power gives more thorough results but takes longer.
-                    </span>
-                  </div>
-                  <PowerSelector value={analysisPower} onChange={setAnalysisPower} />
-                </div>
                 <div className="settings-row settings-row--last">
                   <div className="settings-row-label">
                     <span className="settings-label">Verify findings</span>
