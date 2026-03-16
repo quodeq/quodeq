@@ -119,14 +119,27 @@ def _default_provider() -> ActionProvider:
     return FilesystemActionProvider()
 
 
+_LOCALHOST_ADDRS = {"127.0.0.1", "::1"}
+
+
 def _check_auth(api_key: str | None) -> Response | tuple[Response, int] | None:
-    """Verify API key authentication when *api_key* is set."""
+    """Verify API key authentication when *api_key* is set.
+
+    When no API key is configured, only localhost requests are allowed.
+    """
     if request.path == _HEALTH_PATH:
         return None
     if api_key:
         auth = request.headers.get("Authorization", "")
         if not hmac.compare_digest(auth, f"Bearer {api_key}"):
             return jsonify({"error": "Unauthorized", "code": "UNAUTHORIZED"}), HTTPStatus.UNAUTHORIZED
+    else:
+        remote = request.remote_addr or ""
+        if remote not in _LOCALHOST_ADDRS:
+            return jsonify({
+                "error": "Set QUODEQ_API_KEY to allow remote access",
+                "code": "UNAUTHORIZED",
+            }), HTTPStatus.UNAUTHORIZED
     return None
 
 

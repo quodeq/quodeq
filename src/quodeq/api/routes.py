@@ -245,6 +245,16 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
     def browse() -> Response | tuple[Response, int]:
         """List directories at a given path for repository browsing."""
         path = request.args.get("path")
+        if path:
+            resolved = Path(path).resolve()
+            home = Path.home().resolve()
+            if not resolved.is_relative_to(home):
+                body, status = error_response(
+                    "Path must be within the user's home directory",
+                    HTTPStatus.FORBIDDEN,
+                    "FORBIDDEN",
+                )
+                return jsonify(body), status
         payload = provider.browse_repo(path)
         if "error" in payload:
             browse_status = HTTPStatus.BAD_REQUEST if _BROWSE_NOT_A_DIR_KEYWORD in payload["error"].lower() else HTTPStatus.NOT_FOUND

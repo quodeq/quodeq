@@ -174,7 +174,11 @@ class HttpClient:
 
         parsed = urlparse(url)
         if parsed.scheme == "http":
-            _logger.warning("Cleartext HTTP request to %s — consider using https://", parsed.hostname)
+            if os.environ.get("QUODEQ_ALLOW_PLAINTEXT_HTTP") != "1":
+                raise ValueError(
+                    f"Cleartext HTTP to {parsed.hostname!r} is blocked — credentials would be "
+                    "transmitted unencrypted. Use https:// or set QUODEQ_ALLOW_PLAINTEXT_HTTP=1."
+                )
 
         hostname = parsed.hostname or ""
         if _is_private_address(hostname) and not _allow_private_urls(self._allow_private):

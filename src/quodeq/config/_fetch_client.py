@@ -1,9 +1,35 @@
 """Thread-safe HTTP fetcher with circuit breaker for knowledge refresh."""
 from __future__ import annotations
 
+import ipaddress
+import logging
+import os
+import socket
 import threading
 import urllib.error
 import urllib.request
+from urllib.parse import urlparse
+
+_logger = logging.getLogger(__name__)
+
+
+def _is_private_hostname(hostname: str) -> bool:
+    """Return True if *hostname* resolves to a private/loopback/link-local address."""
+    if hostname in ("localhost", "localhost.localdomain"):
+        return True
+    try:
+        addr = ipaddress.ip_address(hostname)
+        return addr.is_private or addr.is_loopback or addr.is_link_local
+    except ValueError:
+        pass
+    try:
+        for _fam, _typ, _pro, _can, sockaddr in socket.getaddrinfo(hostname, None):
+            addr = ipaddress.ip_address(sockaddr[0])
+            if addr.is_private or addr.is_loopback or addr.is_link_local:
+                return True
+    except (socket.gaierror, OSError):
+        pass
+    return False
 
 
 class FetchClient:
@@ -17,7 +43,20 @@ class FetchClient:
         self._timeout = timeout_s
 
     def fetch(self, url: str, headers: dict | None = None) -> str | None:
-        """Fetch *url* and return body text, or None on failure."""
+        """Fetch *url* and return body text, or None on failure.
+
+        Validates URL scheme (http/https only) and blocks requests to
+        private/internal addresses unless QUODEQ_ALLOW_PRIVATE_URLS=1.
+        """
+        parsed = urlparse(url)
+        if parsed.scheme not in ("http", "https"):
+            _logger.warning("Blocked fetch with disallowed scheme: %s", parsed.scheme)
+            return None
+        hostname = parsed.hostname or ""
+        if hostname and _is_private_hostname(hostname) and os.environ.get("QUODEQ_ALLOW_PRIVATE_URLS") != "1":
+            _logger.warning("Blocked fetch to private/internal address: %s", hostname)
+            return None
+
         with self._lock:
             if self._failures >= self._CIRCUIT_THRESHOLD:
                 return None
