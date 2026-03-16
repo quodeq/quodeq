@@ -309,6 +309,7 @@ export default function App() {
   // AI settings
   // -------------------------------------------------------------------------
   const [aiCmd, setAiCmd] = useState(localStorage.getItem('cc-ai-cmd') || '');
+  const [aiModel, setAiModel] = useState(localStorage.getItem('cc-ai-model') || '');
   const [modelFast, setModelFast] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}1`) || '');
   const [modelBalanced, setModelBalanced] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}2`) || '');
   const [modelThorough, setModelThorough] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}3`) || '');
@@ -382,7 +383,7 @@ export default function App() {
   function handleStartEvaluation(payload) {
     const levels = getLevels();
     const subagentModel = levels.find(l => l.level === analysisPower)?.model;
-    startEvaluation({ ...payload, aiCmd: aiCmd || undefined, subagentModel, verifyFindings });
+    startEvaluation({ ...payload, aiCmd: aiCmd || undefined, aiModel: aiModel || undefined, subagentModel, verifyFindings });
   }
 
   function handleEvalDismiss(action) {
@@ -682,9 +683,24 @@ export default function App() {
                     <div className="settings-row-label">
                       <span className="settings-label">Model</span>
                       <span className="settings-description">
-                        Uses your client's default model. Run <code>{aiCmd} --help</code> to see how to change it.
+                        Override the default model for all operations. Leave blank to use your client's default.
                       </span>
                     </div>
+                    <input
+                      type="text"
+                      className="settings-model-input"
+                      value={aiModel}
+                      placeholder="default"
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setAiModel(v);
+                        if (v) {
+                          localStorage.setItem('cc-ai-model', v);
+                        } else {
+                          localStorage.removeItem('cc-ai-model');
+                        }
+                      }}
+                    />
                   </div>
                 )}
                 <div className="settings-row">
