@@ -169,7 +169,7 @@ def _prescan_sources(args: argparse.Namespace, plugin_dir: Path, src: Path) -> i
     if not extensions:
         return 0
     source_file_count = count_source_files(src, extensions)
-    print(f"Source files: {source_file_count}")
+    print(f"Source files: {source_file_count}", file=sys.stderr)
     return source_file_count
 
 
@@ -177,7 +177,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     """Execute the evidence/scoring pipeline and print results."""
     try:
         if args.evidence_only:
-            print("Starting evaluation...", file=sys.stderr)
+            print("Starting evidence collection (this may take several minutes per dimension)...", file=sys.stderr)
             evidence = run(config)
             out_file = evidence_dir / f"{config.plugin_id}_evidence.json"
             try:
@@ -185,11 +185,11 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
             except OSError as exc:
                 print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
                 return 1
-            print(f"Evidence written to {out_file}")
+            print(f"Evidence written to {out_file}", file=sys.stderr)
         else:
-            print("Starting evaluation...", file=sys.stderr)
+            print("Starting evaluation (this may take several minutes per dimension)...", file=sys.stderr)
             scores = run_full(config, evaluation_dir, mode=args.mode)
-            print(f"Reports written to {evaluation_dir}/")
+            print(f"Reports written to {evaluation_dir}/", file=sys.stderr)
             for dim, score in scores.items():
                 print(f"  {dim}: {score}")
     except (AnalysisError, EvaluationError) as exc:
@@ -205,7 +205,7 @@ def _build_run_config(
     """Assemble a RunConfig from CLI args and resolved paths."""
     standards_dir = default_paths().standards_dir
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
-    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
+    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
 
     return RunConfig(
         src=src,
@@ -240,7 +240,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
         return 1
 
     _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
-    print(f"Report path: {evaluation_dir}")
+    print(f"Report path: {evaluation_dir}", file=sys.stderr)
 
     config = _build_run_config(args, src, plugin_id, evaluators_dir, evidence_dir)
     return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
