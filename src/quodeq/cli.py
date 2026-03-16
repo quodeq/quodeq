@@ -31,9 +31,9 @@ _MODE_NUMERICAL = "numerical"
 _MODE_GRADES = "grades"
 
 
-def _env_int(var: str, default: int | None) -> int | None:
+def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
     """Read an environment variable as an int, returning *default* if unset or invalid."""
-    raw = os.environ.get(var)
+    raw = (env or os.environ).get(var)
     if raw is None:
         return default
     try:
@@ -42,9 +42,9 @@ def _env_int(var: str, default: int | None) -> int | None:
         return default
 
 
-def _subagent_model() -> str | None:
+def _subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override from the environment, or None."""
-    return os.environ.get("SUBAGENT_MODEL") or None
+    return (env or os.environ).get("SUBAGENT_MODEL") or None
 
 
 def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:

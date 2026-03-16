@@ -1,10 +1,13 @@
-"""Shared utilities, constants, and helpers for the Quodeq package."""
+"""Shared utilities: config loading, env-var accessors, and re-exports.
+
+I/O helpers live in ``_io.py``; security helpers in ``_security.py``.
+Both are re-exported here for backward compatibility.
+"""
 from __future__ import annotations
 
 import json
 import logging
 import os
-import re as _re
 import sys
 import threading
 from contextlib import contextmanager
@@ -12,42 +15,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
+# Re-export I/O helpers (canonical home: _io.py)
+from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text  # noqa: F401
+
+# Re-export security helpers (canonical home: _security.py)
+from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive  # noqa: F401
+
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
 _DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
-
-TEXT_ENCODING = "utf-8"
-"""Standard text encoding used across the codebase for file I/O."""
-
-
-# ── Centralized I/O helpers ─────────────────────────────────────────────
-# Every file read/write should go through these so encoding is handled once.
-
-
-def read_text(path: Path, *, errors: str = "strict") -> str:
-    """Read a text file with the standard encoding."""
-    return path.read_text(encoding=TEXT_ENCODING, errors=errors)
-
-
-def write_text(path: Path, content: str) -> None:
-    """Write a text file with the standard encoding."""
-    path.write_text(content, encoding=TEXT_ENCODING)
-
-
-def open_text(path: str | Path, mode: str = "r") -> Any:
-    """Open a text file with the standard encoding. Use as a context manager."""
-    return open(path, mode, encoding=TEXT_ENCODING)
-
-
-SENSITIVE_PATTERNS = _re.compile(
-    r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
-    _re.IGNORECASE,
-)
-"""Compiled regex for detecting secrets in log/error output."""
-
-
-def sanitize_sensitive(text: str) -> str:
-    """Mask potential secrets in *text* for safe logging/display."""
-    return SENSITIVE_PATTERNS.sub(r"\1=***", text)
 
 
 @dataclass

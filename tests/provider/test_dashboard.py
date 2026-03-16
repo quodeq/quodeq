@@ -8,7 +8,7 @@ import pytest
 
 from quodeq.adapters.fs.report_parser import RunInfo
 from quodeq.core.types import DimensionResult, DimensionSummary
-from quodeq.provider.dashboard import (
+from quodeq.services.dashboard import (
     _collect_previous_scores,
     _collect_stale_dimensions,
     _enrich_dimensions_with_trend,

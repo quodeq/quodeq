@@ -14,7 +14,7 @@ from typing import Protocol, TextIO, runtime_checkable
 from quodeq.engine.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import (
-    _read_message,
+    read_message,
     dispatch as _dispatch,
 )
 from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs as _load_compiled_refs
@@ -136,7 +136,7 @@ def main() -> None:
         with open(sa.findings_file, "a") as findings_fh:
             router = FindingsRouter(findings_fh, compiled_refs)
             while True:
-                msg = _read_message()
+                msg = read_message()
                 if msg is None:
                     break
                 try:

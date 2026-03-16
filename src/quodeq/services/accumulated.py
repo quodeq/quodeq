@@ -20,11 +20,16 @@ from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.engine.scoring_internals import score_to_grade_label
 from quodeq.services._cache import make_lru_dimension_fetcher
 
-# Module-level LRU cache for accumulated-view disk reads (bounded, cross-request).
-# For multi-worker deployments, override the cache via compute_accumulated(cache_config=...)
-# or supply a shared backend (e.g. Redis OrderedDict wrapper) through AccumulatedCacheConfig.
-_ACC_DIM_CACHE: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
-_ACC_DIM_LOCK = threading.Lock()
+def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
+    """Create the default accumulated-view LRU cache and its lock.
+
+    Override this factory to plug in a shared backend (e.g. a Redis-backed
+    OrderedDict wrapper) for multi-worker deployments.
+    """
+    return OrderedDict(), threading.Lock()
+
+
+_ACC_DIM_CACHE, _ACC_DIM_LOCK = create_accumulated_cache()
 
 
 _DEFAULT_ACC_CACHE_MAX = 256

@@ -71,7 +71,7 @@ def _ok(req_id: object, result: dict) -> dict:
     return {"jsonrpc": _JSONRPC_VERSION, "id": req_id, "result": result}
 
 
-def _read_message() -> dict | None:
+def read_message() -> dict | None:
     """Read one JSON-RPC message from stdin (newline-delimited)."""
     for raw in sys.stdin:
         line = raw.strip()

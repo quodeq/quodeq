@@ -22,6 +22,13 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model, sanitize_sensitive as 
 HeartbeatCallback = Callable[[int, dict], None]
 
 
+@dataclass(frozen=True)
+class _SpawnPaths:
+    """Paths for the AI CLI subprocess stdout/stderr capture files."""
+    stream_file: Path
+    stream_err: Path
+
+
 _DEFAULT_MAX_TURNS = 200
 _DEFAULT_MAX_DURATION = 1800  # 30 minutes
 _TERMINATE_TIMEOUT_S = 10
@@ -240,15 +247,15 @@ def _check_process_result(process: subprocess.Popen, stream_err: Path) -> None:
 
 def _spawn_and_monitor(
     args: list[str], work_dir: Path, env: dict,
-    stream_file: Path, stream_err: Path, cfg: AnalysisConfig,
+    paths: _SpawnPaths, cfg: AnalysisConfig,
 ) -> tuple[subprocess.Popen, bool]:
     """Spawn the AI CLI process, monitor with heartbeat, return (process, timed_out)."""
-    with open(stream_file, "w") as out, open(stream_err, "w") as err:
+    with open(paths.stream_file, "w") as out, open(paths.stream_err, "w") as err:
         process = subprocess.Popen(
             args, cwd=str(work_dir), env=env,
             stdout=out, stderr=err, stdin=subprocess.DEVNULL,
         )
-        timed_out = _run_with_heartbeat(process, cfg, stream_file)
+        timed_out = _run_with_heartbeat(process, cfg, paths.stream_file)
     return process, timed_out
 
 
@@ -263,7 +270,7 @@ def run_analysis(
     stream_err = Path(str(stream_file) + ".err")
 
     try:
-        process, timed_out = _spawn_and_monitor(args, work_dir, env, stream_file, stream_err, cfg)
+        process, timed_out = _spawn_and_monitor(args, work_dir, env, _SpawnPaths(stream_file, stream_err), cfg)
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)

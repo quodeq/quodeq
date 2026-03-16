@@ -231,6 +231,28 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
         _stop_children()
 
 
+def _start_action_api(
+    config: DashboardConfig,
+    action_api_host: str,
+    action_api_port: int,
+    api_config: ApiConfig,
+) -> tuple[str, subprocess.Popen | None]:
+    """Resolve and start the action API, returning (url, process).
+
+    Handles both forced-port and auto-scan modes, including killing stale
+    processes when not in forced mode.
+    """
+    if config.server.api_forced:
+        return _ensure_action_api_forced(
+            action_api_host, action_api_port, static_dist=api_config.static_dist,
+            evaluations_dir=api_config.evaluations_dir,
+        )
+    _kill_stale_action_api(action_api_host, action_api_port)
+    return _ensure_action_api(
+        action_api_host, action_api_port, api_config=api_config,
+    )
+
+
 def run_dashboard(config: DashboardConfig) -> int:
     """Start the dashboard: resolve paths, launch the action API, and serve until exit."""
     config = _resolve_paths_and_build(config)
@@ -244,16 +266,7 @@ def run_dashboard(config: DashboardConfig) -> int:
     action_api_host = config.server.api_host or _get_default_host()
     action_api_port = config.server.api_port or config.server.port
     api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
-    if config.server.api_forced:
-        action_api_url, action_api_process = _ensure_action_api_forced(
-            action_api_host, action_api_port, static_dist=api_config.static_dist,
-            evaluations_dir=api_config.evaluations_dir,
-        )
-    else:
-        _kill_stale_action_api(action_api_host, action_api_port)
-        action_api_url, action_api_process = _ensure_action_api(
-            action_api_host, action_api_port, api_config=api_config,
-        )
+    action_api_url, action_api_process = _start_action_api(config, action_api_host, action_api_port, api_config)
 
     _serve_and_wait(action_api_url, action_api_process, config)
     return 0

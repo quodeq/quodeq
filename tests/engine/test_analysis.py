@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.engine.analysis import AnalysisConfig, _build_ai_cmd
-from quodeq.engine.stream_parser import _extract_jsonl_from_text, extract_evidence_from_stream
+from quodeq.analysis.subprocess import AnalysisConfig, _build_ai_cmd
+from quodeq.analysis.stream.parser import _extract_jsonl_from_text, extract_evidence_from_stream
 from quodeq.engine.stream_validation import is_stream_valid
 from tests.engine.conftest import _evidence_line
 
