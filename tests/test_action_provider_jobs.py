@@ -10,9 +10,10 @@ from quodeq.provider.jobs import JobManager
 
 
 class FakeProcess:
+    """Simulate a subprocess with merged stdout/stderr (subprocess.STDOUT)."""
     def __init__(self, stdout: str = "", stderr: str = "", returncode: int = 0) -> None:
-        self.stdout = io.StringIO(stdout)
-        self.stderr = io.StringIO(stderr)
+        # Merge stderr into stdout to match real subprocess.STDOUT behaviour
+        self.stdout = io.StringIO(stdout + stderr)
         self._returncode = returncode
 
     def wait(self) -> int:
@@ -69,6 +70,30 @@ def test_successful_job_parses_output_project(completed_success_job: JobSnapshot
 
 def test_successful_job_parses_output_run_id(completed_success_job: JobSnapshot) -> None:
     assert completed_success_job.output_run_id == "20260220"
+
+
+def test_markers_parsed_from_merged_stream() -> None:
+    """Structured markers in stdout update job phase and dimensions."""
+    marker_setup = '{"_cc": "setup", "dimensions": ["security", "performance"]}\n'
+    marker_analyzing = '{"_cc": "analyzing", "dimension": "security"}\n'
+    def spawn_impl(*_args, **_kwargs):
+        return FakeProcess(
+            stdout=marker_setup + marker_analyzing + "Report path: /r/proj/run1/evaluation\n",
+            returncode=0,
+        )
+
+    job_id_holder: list[str] = []
+    manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
+    job = manager.start_job(["echo"])
+    job_id_holder.append(job.job_id)
+    done.wait(timeout=5.0)
+    result = manager.get_job(job.job_id)
+    assert result is not None
+    assert result.phase == "analyzing"
+    assert result.dimensions == ["security", "performance"]
+    assert result.current_dimension == "security"
+    # Markers should NOT appear in logs
+    assert not any("_cc" in line for line in result.logs)
 
 
 def test_job_manager_handles_failure() -> None:

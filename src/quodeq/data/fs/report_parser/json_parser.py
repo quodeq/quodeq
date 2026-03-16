@@ -38,6 +38,8 @@ def _build_finding(item: dict, *, include_severity: bool) -> Finding:
         snippet=item.get("snippet"),
         severity=item.get("severity"),
         cwe=item.get("cwe"),
+        req=item.get("req"),
+        req_refs=item.get("req_refs"),
         include_severity=include_severity,
     ))
 
