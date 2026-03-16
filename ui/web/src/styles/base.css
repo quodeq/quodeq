@@ -42,6 +42,75 @@ body {
   grid-template-columns: var(--sidebar-expanded-width) 1fr;
 }
 
+/* ── Server disconnected overlay ──────────────────────── */
+
+.server-disconnected-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.server-disconnected-card {
+  text-align: center;
+  max-width: 360px;
+  padding: var(--space-8);
+}
+
+.server-disconnected-icon {
+  color: var(--color-text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.server-disconnected-card h2 {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin: 0 0 var(--space-3);
+}
+
+.server-disconnected-card p {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4);
+  line-height: 1.5;
+}
+
+.server-disconnected-card code {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 6px 14px;
+  margin-bottom: var(--space-5);
+  color: var(--color-text);
+}
+
+.server-retry-btn {
+  display: inline-block;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-accent);
+  background: none;
+  border: 1px solid var(--color-accent);
+  border-radius: var(--radius-md);
+  padding: 8px 20px;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+
+.server-retry-btn:hover {
+  background: var(--color-accent);
+  color: white;
+}
+
 /* ── Sidebar ──────────────────────────────────────────── */
 
 .sidebar {

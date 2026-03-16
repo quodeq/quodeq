@@ -275,7 +275,7 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate subcommand handler."""
     load_env_file(default_paths())
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args, remaining = parser.parse_known_args(argv)
     if args.handler_command == "evaluate":
         return run_evaluate(args)
     handler = _COMMAND_HANDLERS.get(args.handler_command)

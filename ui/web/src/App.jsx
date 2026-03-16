@@ -59,6 +59,40 @@ const ICON_SETTINGS = (
 
 export default function App() {
   // -------------------------------------------------------------------------
+  // Server connection monitor
+  // -------------------------------------------------------------------------
+  const [serverConnected, setServerConnected] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const altPorts = [4180, 4181, 4182, 4183];
+
+    async function checkHealth() {
+      try {
+        await getHealth();
+        if (mounted) setServerConnected(true);
+      } catch {
+        // Server unreachable on current origin — check if it moved to another port
+        const currentPort = window.location.port;
+        for (const port of altPorts) {
+          if (String(port) === currentPort) continue;
+          try {
+            const res = await fetch(`http://127.0.0.1:${port}/api/health`, { timeout: 2000 });
+            if (res.ok) {
+              window.location.href = `http://127.0.0.1:${port}`;
+              return;
+            }
+          } catch { /* try next */ }
+        }
+        if (mounted) setServerConnected(false);
+      }
+    }
+    checkHealth();
+    const interval = setInterval(checkHealth, 5000);
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  // -------------------------------------------------------------------------
   // Nav stack
   // -------------------------------------------------------------------------
   const [navStack, setNavStack] = useState([{ page: 'overview' }]);
@@ -822,6 +856,29 @@ export default function App() {
   // -------------------------------------------------------------------------
   return (
     <div className="app-shell">
+      {!serverConnected && (
+        <div className="server-disconnected-overlay">
+          <div className="server-disconnected-card">
+            <div className="server-disconnected-icon">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                <line x1="1" y1="1" x2="23" y2="23" />
+                <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
+                <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
+                <path d="M10.71 5.05A16 16 0 0 1 22.56 9" />
+                <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88" />
+                <path d="M8.53 16.11a6 6 0 0 1 6.95 0" />
+                <line x1="12" y1="20" x2="12.01" y2="20" />
+              </svg>
+            </div>
+            <h2>Server disconnected</h2>
+            <p>The Quodeq server is not running. Start it from the menu bar icon or run:</p>
+            <code>quodeq dashboard</code>
+            <button type="button" className="server-retry-btn" onClick={() => getHealth().then(() => setServerConnected(true)).catch(() => {})}>
+              Retry connection
+            </button>
+          </div>
+        </div>
+      )}
       {/* Sidebar */}
       <aside className="sidebar">
         <div className="sidebar-header">
