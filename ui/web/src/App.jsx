@@ -690,13 +690,20 @@ export default function App() {
                     <div className="settings-row-label">
                       <span className="settings-label">Model</span>
                       <span className="settings-description">
-                        Override the AI model for each analysis power level. Leave blank to use the default.
+                        Uses your client's default model. Run <code>{aiCmd} --help</code> to see how to change it.
                       </span>
                     </div>
                   </div>
                 )}
                 {aiCmd && (
-                  <div className="settings-row settings-model-overrides">
+                  <div className="settings-row">
+                    <div className="settings-row-label">
+                      <span className="settings-label">Analysis models</span>
+                      <span className="settings-description">
+                        Override the AI model used by subagents during code evaluation. Leave blank to use the defaults.
+                      </span>
+                    </div>
+                    <div className="settings-model-overrides">
                     {[
                       { label: 'Fast', value: modelFast, setter: setModelFast, level: 1, placeholder: DEFAULT_MODELS[1] },
                       { label: 'Balanced', value: modelBalanced, setter: setModelBalanced, level: 2, placeholder: DEFAULT_MODELS[2] },
@@ -721,6 +728,7 @@ export default function App() {
                         />
                       </div>
                     ))}
+                    </div>
                   </div>
                 )}
                 <div className="settings-row">
