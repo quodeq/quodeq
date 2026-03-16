@@ -138,7 +138,7 @@ def _handle_tools_call(
         files = queue.take(count, agent_id=agent_id)
         if not files:
             return _ok(request_id, {
-                "content": [{"type": "text", "text": "Queue empty — no more files. You are done."}],
+                "content": [{"type": "text", "text": "DONE. Queue empty — no more files to analyse. Stop immediately and do not call any more tools."}],
             })
         file_list = "\n".join(files)
         return _ok(request_id, {
