@@ -167,6 +167,16 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
         <h3 className="file-detail-title">{file.file}</h3>
         <div className="file-detail-stats-row">
           <div className="file-detail-stats">
+            {file.critical > 0 && (
+              <span className="file-detail-stat severity-tag critical">{file.critical} critical</span>
+            )}
+            {file.major > 0 && (
+              <span className="file-detail-stat severity-tag major">{file.major} major</span>
+            )}
+            {file.minor > 0 && (
+              <span className="file-detail-stat severity-tag minor">{file.minor} minor</span>
+            )}
+            {(file.critical > 0 || file.major > 0 || file.minor > 0) && <span className="file-detail-stat-sep">·</span>}
             <span className="file-detail-stat">
               <strong>{totalViolations}</strong> violations
             </span>
@@ -174,24 +184,6 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
             <span className="file-detail-stat">
               <strong>{dimensionsCount}</strong> {dimensionsCount === 1 ? 'dimension' : 'dimensions'}
             </span>
-            {file.critical > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat severity-tag critical">{file.critical} critical</span>
-              </>
-            )}
-            {file.major > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat severity-tag major">{file.major} major</span>
-              </>
-            )}
-            {file.minor > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat severity-tag minor">{file.minor} minor</span>
-              </>
-            )}
           </div>
           <CopyButton
             label="File fix plan"

@@ -150,7 +150,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
                 const v = allViolations.length;
                 const c = totalCompliant;
                 if (v === 0) return '—';
-                return `1:${(c / v).toFixed(1)}`;
+                return `1:${((r) => r % 1 === 0 ? r.toFixed(0) : r.toFixed(1))(c / v)}`;
               })()}
             </span>
           </div>
