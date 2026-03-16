@@ -5,7 +5,7 @@
   </picture>
 </p>
 
-<h2 align="center">AI-powered code quality evaluation</h2>
+<h2 align="center">The quality code compass</h2>
 
 <p align="center">
   Evaluate any repository across six quality dimensions — <strong>Security</strong>, <strong>Reliability</strong>, <strong>Maintainability</strong>, <strong>Performance</strong>, <strong>Flexibility</strong>, and <strong>Usability</strong> — using LLM-driven analysis mapped to ISO 25010 and CWE classifications.
