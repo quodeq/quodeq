@@ -12,7 +12,7 @@ from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, l
 from quodeq.shared.logging import log_info, log_success
 from quodeq.shared.utils import open_text
 
-_DEFAULT_VERIFY_AGENTS = 2
+_DEFAULT_VERIFY_AGENTS = 1
 _DEFAULT_VERIFY_BUDGET = 300  # 5 minutes per verifier
 _VERIFY_TEMPLATE = "verify.md"
 
