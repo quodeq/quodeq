@@ -36,7 +36,8 @@ def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkey
     captured = {}
 
     def fake_ensure(*args, **kwargs):
-        captured["static_dist"] = kwargs.get("static_dist")
+        api_config = kwargs.get("api_config")
+        captured["static_dist"] = api_config.static_dist if api_config else None
         return "http://127.0.0.1:4173", DummyProcess()
 
     monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)

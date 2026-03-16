@@ -25,25 +25,25 @@ _DEFAULT_CONTENT_SAMPLE_LIMIT = 4000
 _DEFAULT_MAX_FETCH_WORKERS = 8
 
 
-def _fetch_timeout_s(override: int | None = None) -> int:
+def _fetch_timeout_s(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return fetch timeout in seconds. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_FETCH_TIMEOUT", str(_DEFAULT_FETCH_TIMEOUT)))
+    return int((env or os.environ).get("QUODEQ_FETCH_TIMEOUT", str(_DEFAULT_FETCH_TIMEOUT)))
 
 
-def _content_sample_limit(override: int | None = None) -> int:
+def _content_sample_limit(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return content sample character limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_CONTENT_SAMPLE_LIMIT", str(_DEFAULT_CONTENT_SAMPLE_LIMIT)))
+    return int((env or os.environ).get("QUODEQ_CONTENT_SAMPLE_LIMIT", str(_DEFAULT_CONTENT_SAMPLE_LIMIT)))
 
 
-def _max_fetch_workers(override: int | None = None) -> int:
+def _max_fetch_workers(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return max fetch worker threads. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_MAX_FETCH_WORKERS", str(_DEFAULT_MAX_FETCH_WORKERS)))
+    return int((env or os.environ).get("QUODEQ_MAX_FETCH_WORKERS", str(_DEFAULT_MAX_FETCH_WORKERS)))
 
 _GITHUB_SEARCH_PER_PAGE = 10
 _MAX_CONTENT_REPOS = 3

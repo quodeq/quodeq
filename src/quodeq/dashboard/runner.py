@@ -38,12 +38,12 @@ def _terminate_pid(pid: int) -> None:
     os.kill(pid, signal.SIGTERM if not _IS_WIN32 else signal.CTRL_BREAK_EVENT)
 
 
-def _get_pid_file() -> Path:
+def _get_pid_file(env: dict[str, str] | None = None) -> Path:
     """Return a PID file path in a user-private runtime directory.
 
     Override the default location via ``QUODEQ_RUN_DIR``.
     """
-    env_run_dir = os.environ.get("QUODEQ_RUN_DIR")
+    env_run_dir = (env or os.environ).get("QUODEQ_RUN_DIR")
     run_dir = Path(env_run_dir) if env_run_dir else Path.home() / ".quodeq" / "run"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir / "action_api.pid"
@@ -109,23 +109,22 @@ def _spawn_and_wait_local(port: int, base_url: str, api_config: ApiConfig | None
     return spawn_and_wait(port, base_url, _get_pid_file(), _get_default_host(), api_config)
 
 
-def _allow_plaintext_http(override: bool | None = None) -> bool:
+def _allow_plaintext_http(override: bool | None = None, env: dict[str, str] | None = None) -> bool:
     """Return True if plaintext HTTP to non-localhost is allowed."""
     if override is not None:
         return override
-    return os.environ.get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
+    return (env or os.environ).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
 
 
 def _ensure_action_api(
     host: str,
     start_port: int,
     max_tries: int = _MAX_PORT_SCAN_TRIES,
-    static_dist: Path | None = None,
-    evaluations_dir: str | None = None,
-    allow_plaintext: bool | None = None,
+    api_config: ApiConfig | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
+    cfg = api_config or ApiConfig()
     if host not in _LOCAL_HOSTS:
-        if _allow_plaintext_http(allow_plaintext):
+        if _allow_plaintext_http(cfg.allow_plaintext):
             import logging
             logging.getLogger(__name__).warning(
                 "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,
@@ -136,7 +135,6 @@ def _ensure_action_api(
                 "Set QUODEQ_ALLOW_PLAINTEXT_HTTP=1 to explicitly opt in, "
                 "or use a TLS reverse proxy."
             )
-    api_config = ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir)
     port = start_port
     for _ in range(max_tries):
         base_url = f"http://{host}:{port}"
@@ -145,7 +143,7 @@ def _ensure_action_api(
                 return base_url, None
             port += 1
             continue
-        return _spawn_and_wait_local(port, base_url, api_config)
+        return _spawn_and_wait_local(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
 
 
@@ -245,18 +243,16 @@ def run_dashboard(config: DashboardConfig) -> int:
 
     action_api_host = config.server.api_host or _get_default_host()
     action_api_port = config.server.api_port or config.server.port
-    static_dist = config.static_dist
-    evaluations_dir = str(config.reports_dir)
+    api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
     if config.server.api_forced:
         action_api_url, action_api_process = _ensure_action_api_forced(
-            action_api_host, action_api_port, static_dist=static_dist,
-            evaluations_dir=evaluations_dir,
+            action_api_host, action_api_port, static_dist=api_config.static_dist,
+            evaluations_dir=api_config.evaluations_dir,
         )
     else:
         _kill_stale_action_api(action_api_host, action_api_port)
         action_api_url, action_api_process = _ensure_action_api(
-            action_api_host, action_api_port, static_dist=static_dist,
-            evaluations_dir=evaluations_dir,
+            action_api_host, action_api_port, api_config=api_config,
         )
 
     _serve_and_wait(action_api_url, action_api_process, config)

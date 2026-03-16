@@ -12,14 +12,8 @@ from pathlib import Path
 from typing import TextIO
 
 from quodeq.engine.file_queue import FileQueue
-from quodeq.analysis.mcp.args import _ServerArgs, _parse_args
+from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import (
-    REPORT_FINDING_NAME,
-    REPORT_FINDING_DESC,
-    REPORT_FINDING_SCHEMA,
-    GET_NEXT_FILES_NAME,
-    GET_NEXT_FILES_DESC,
-    GET_NEXT_FILES_SCHEMA,
     _read_message,
     dispatch as _dispatch,
 )
@@ -108,7 +102,7 @@ def _select_best_refs(
 
 def main() -> None:
     """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
-    sa = _parse_args()
+    sa = parse_args()
     if not sa.findings_file:
         sys.stderr.write(
             "Usage: mcp_findings.py <findings_file> [--compiled-dir DIR --dimension DIM]"

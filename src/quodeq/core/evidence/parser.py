@@ -8,16 +8,21 @@ from pathlib import Path
 
 import os as _os
 
-from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence
+from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, _PERCENT_SCALE
 from quodeq.shared.utils import open_text
 from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 
 _logger = logging.getLogger(__name__)
 
-_CWE_URL_TEMPLATE = _os.environ.get(
-    "QUODEQ_CWE_URL_TEMPLATE",
-    "https://cwe.mitre.org/data/definitions/{cwe_id}.html",
-)
+_CWE_URL_TEMPLATE_DEFAULT = "https://cwe.mitre.org/data/definitions/{cwe_id}.html"
+
+
+def _cwe_url_template(env: dict[str, str] | None = None) -> str:
+    """Return the CWE URL template, reading from env lazily."""
+    return (env or _os.environ).get(
+        "QUODEQ_CWE_URL_TEMPLATE",
+        _CWE_URL_TEMPLATE_DEFAULT,
+    )
 
 
 def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
@@ -41,7 +46,7 @@ class EvidenceContext:
 def resolve_llm_refs(
     llm_refs: list[str] | None,
     all_req_refs: list[dict] | None,
-    cwe_url_template: str = _CWE_URL_TEMPLATE,
+    cwe_url_template: str | None = None,
 ) -> list[dict] | None:
     """Filter req_refs to only those the LLM selected, building URLs for unknown labels.
 
@@ -53,6 +58,8 @@ def resolve_llm_refs(
     """
     if not llm_refs:
         return None
+    if cwe_url_template is None:
+        cwe_url_template = _cwe_url_template()
     by_label = {r["label"]: r for r in (all_req_refs or [])}
     result = []
     upper_labels = {k.upper(): r for k, r in by_label.items()}
@@ -220,7 +227,7 @@ def parse_jsonl_to_evidence(
 
     source_file_count = context.source_file_count
     files_read = context.files_read
-    coverage_pct = round(files_read / source_file_count * 100, 1) if source_file_count > 0 else 0.0
+    coverage_pct = round(files_read / source_file_count * _PERCENT_SCALE, 1) if source_file_count > 0 else 0.0
 
     return Evidence(
         repository=context.repository,

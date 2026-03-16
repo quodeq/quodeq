@@ -105,18 +105,18 @@ def _build_principle_rows(
     return principle_rows, flat_violations, flat_compliance, sev_tally
 
 
+def _extract_scores(scores: ScoringResult | dict | None) -> tuple[dict, dict]:
+    """Extract per-principle scores and aggregate from a ScoringResult or dict."""
+    if not scores:
+        return {}, {}
+    if isinstance(scores, dict):
+        return scores.get("principles", {}), scores.get("overall", {})
+    return scores.principles, to_camel_dict(scores.overall) if scores.overall else {}
+
+
 def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
     """Build a complete JSON report dict from evidence and scoring data for one dimension."""
-    per_principle_scores: dict = {}
-    aggregate: dict = {}
-    if scores:
-        if isinstance(scores, dict):
-            per_principle_scores = scores.get("principles", {})
-            aggregate = scores.get("overall", {})
-        else:
-            per_principle_scores = scores.principles
-            aggregate = to_camel_dict(scores.overall) if scores.overall else {}
-
+    per_principle_scores, aggregate = _extract_scores(scores)
     lookup = _build_score_lookup(per_principle_scores)
     principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
 
@@ -134,7 +134,6 @@ def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | di
         "schema_version": _REPORT_SCHEMA_VERSION,
         "dimension": dimension,
         "project": evidence.get("repository", ""),
-        # runId is always empty here; write_report_json fills it in from the path
         "runId": "",
         "discipline": evidence.get("discipline", ""),
         "date": evidence.get("date", ""),

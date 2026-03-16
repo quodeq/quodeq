@@ -53,11 +53,11 @@ _RUN_DIM_LOCK = threading.Lock()
 _DEFAULT_RUN_DIM_CACHE_MAX = 256
 
 
-def _run_dim_cache_max(override: int | None = None) -> int:
+def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+    return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
 
 
 def _collect_previous_scores(

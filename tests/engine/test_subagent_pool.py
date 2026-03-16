@@ -54,7 +54,7 @@ class TestSubagentPool:
             dimension="maintainability",
         )
 
-        with patch("quodeq.engine.subagent_pool.run_analysis", _fake_run_analysis):
+        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
             results = pool.run()
 
         assert len(results) == 3
@@ -103,7 +103,7 @@ class TestSubagentPool:
             dimension="maint",
         )
 
-        with patch("quodeq.engine.subagent_pool.run_analysis", _mixed_run):
+        with patch("quodeq.analysis.subagents.pool.run_analysis", _mixed_run):
             results = pool.run()
 
         assert len(results) == 3
@@ -125,7 +125,7 @@ class TestSubagentPool:
             dimension="maint",
         )
 
-        with patch("quodeq.engine.subagent_pool.run_analysis", _fake_run_analysis):
+        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
             results = pool.run()
 
         assert len(results) == 1

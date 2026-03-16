@@ -1,6 +1,7 @@
 """Re-export for backward compatibility — moved to quodeq.analysis.mcp.findings_server."""
-from quodeq.analysis.mcp.findings_server import *  # noqa: F401,F403
 from quodeq.analysis.mcp.findings_server import (  # noqa: F401
+    FindingsRouter,
+    main,
     _FINDING_SCHEMA_VERSION,
     _STOP_WORDS,
     _text_overlap,

@@ -31,14 +31,14 @@ class DimensionCallbacks:
     parse_evidence: Callable[..., Evidence | None]
 
 
-def _default_subagent_model() -> str | None:
+def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
     """Return the subagent model override, or None to use the client's default.
 
     When no model is configured (no env var, no CLI/API selection), returns
     None so the AI CLI omits ``--model`` and uses its own default — the same
     model used for the pre-analysis phase.
     """
-    return os.environ.get("QUODEQ_SUBAGENT_MODEL") or None
+    return (env or os.environ).get("QUODEQ_SUBAGENT_MODEL") or None
 
 
 def _list_plugin_files(config: RunConfig, ctx_total: int, dim_id: str, idx: int) -> tuple[list[str], set[str]]:

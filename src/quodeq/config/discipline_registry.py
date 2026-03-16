@@ -37,9 +37,9 @@ class DisciplineRule:
     detect_dir: str | None = None
     detect_requires_file: str | None = None
     detect_priority: int = _DEFAULT_DETECT_PRIORITY
-    detect_excludes: list[str] | None = None
+    detect_excludes: tuple[str, ...] | None = None
     detect_fallback: bool = False
-    suggested_topics: list[str] | None = None
+    suggested_topics: tuple[str, ...] | None = None
 
 
 # Conf keys that map to indexed positions in detect_files / detect_contains
@@ -56,8 +56,8 @@ _SPECIAL_HANDLERS: dict[str, Callable[[str], int | bool]] = {
 }
 
 
-def _parse_csv(value: str) -> list[str]:
-    return [part.strip() for part in value.split(",") if part.strip()]
+def _parse_csv(value: str) -> tuple[str, ...]:
+    return tuple(part.strip() for part in value.split(",") if part.strip())
 
 
 def _set_indexed(lst: list[str | None], index: int, value: str) -> None:

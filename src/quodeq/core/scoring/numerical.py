@@ -20,9 +20,9 @@ _DEFAULT_MAJOR_PENALTY = 1.0
 _DEFAULT_MINOR_PENALTY = 0.25
 
 
-def _env_float(var: str, default: float) -> float:
+def _env_float(var: str, default: float, env: dict[str, str] | None = None) -> float:
     """Read an env var as float, returning *default* if unset or non-numeric."""
-    raw = os.environ.get(var)
+    raw = (env or os.environ).get(var)
     if raw is None:
         return default
     try:

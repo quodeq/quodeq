@@ -35,7 +35,7 @@ def _capture_popen_args(tmp_path: Path, ai_model: str | None) -> list[str]:
     mock_process.poll.return_value = 0
     mock_process.wait.return_value = 0
 
-    with patch("quodeq.engine.analysis.subprocess.Popen", return_value=mock_process) as mock_popen:
+    with patch("quodeq.analysis.subprocess.subprocess.Popen", return_value=mock_process) as mock_popen:
         try:
             run_analysis(
                 work_dir=tmp_path,

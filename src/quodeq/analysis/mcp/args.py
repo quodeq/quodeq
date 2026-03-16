@@ -4,7 +4,7 @@ from __future__ import annotations
 import sys
 
 
-class _ServerArgs:
+class ServerArgs:
     """Parsed CLI arguments for the MCP server."""
     findings_file: str = ""
     compiled_dir: str | None = None
@@ -32,7 +32,7 @@ Options:
 """
 
 
-def _parse_args(argv: list[str] | None = None) -> _ServerArgs:
+def parse_args(argv: list[str] | None = None) -> ServerArgs:
     """Parse CLI arguments for the MCP findings server.
 
     *argv* overrides ``sys.argv[1:]`` when provided, making the parser
@@ -40,7 +40,7 @@ def _parse_args(argv: list[str] | None = None) -> _ServerArgs:
     """
     from quodeq.shared.utils import get_findings_file
 
-    result = _ServerArgs()
+    result = ServerArgs()
     args = argv if argv is not None else sys.argv[1:]
 
     if "--help" in args or "-h" in args:

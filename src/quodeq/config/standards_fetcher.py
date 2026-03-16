@@ -57,6 +57,7 @@ def _verify_integrity(
     content: bytes,
     expected_hash: str | None = None,
     skip_integrity: bool | None = None,
+    env: dict[str, str] | None = None,
 ) -> None:
     """Verify SHA-256 integrity of downloaded ASVS content.
 
@@ -68,7 +69,7 @@ def _verify_integrity(
     """
     actual_hash = hashlib.sha256(content).hexdigest()
     if expected_hash is None:
-        expected_hash = os.environ.get("QUODEQ_ASVS_SHA256")
+        expected_hash = (env or os.environ).get("QUODEQ_ASVS_SHA256")
     if skip_integrity is None:
         skip_integrity = False
     if expected_hash and actual_hash != expected_hash:

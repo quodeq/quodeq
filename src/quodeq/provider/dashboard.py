@@ -1,6 +1,7 @@
 """Re-export for backward compatibility — moved to quodeq.services.dashboard."""
-from quodeq.services.dashboard import *  # noqa: F401,F403
-from quodeq.services.dashboard import (  # noqa: F401 — underscore names skipped by *
+from quodeq.services.dashboard import (  # noqa: F401
+    DashboardCacheConfig,
+    build_dashboard,
     _collect_previous_scores,
     _collect_stale_dimensions,
     _enrich_dimensions_with_trend,
