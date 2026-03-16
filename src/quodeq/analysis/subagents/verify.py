@@ -53,17 +53,14 @@ def _format_findings_summary(jsonl_path: Path) -> str:
 
     lines: list[str] = []
     for principle, findings in sorted(by_principle.items()):
-        violations = [f for f in findings if f.get("t") == "violation"]
-        compliances = [f for f in findings if f.get("t") == "compliance"]
-        lines.append(f"### {principle} ({len(violations)}v / {len(compliances)}c)")
-        for f in violations[:10]:  # cap to keep prompt manageable
+        lines.append(f"### {principle}")
+        for f in findings:
+            t = f.get("t", "?")
             file = f.get("file", "?")
             line_num = f.get("line", "?")
-            desc = f.get("w", "")
             severity = f.get("severity", "?")
-            lines.append(f"- **{severity}** `{file}:{line_num}` — {desc}")
-        if len(violations) > 10:
-            lines.append(f"- _...and {len(violations) - 10} more violations_")
+            desc = f.get("w", "")
+            lines.append(f"- {t} [{severity}] `{file}:{line_num}` — {desc}")
         lines.append("")
 
     return "\n".join(lines) if lines else "_No findings from previous evaluation._"
