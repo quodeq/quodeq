@@ -18,7 +18,7 @@ def _load_schema(name: str) -> dict:
     try:
         return read_json(path)
     except (OSError, ValueError) as exc:
-        raise ValueError(f"Cannot load schema {path}: {exc}") from exc
+        raise ValueError(f"Cannot load schema {path.name}") from exc
 
 
 @lru_cache(maxsize=_SCHEMA_CACHE_SIZE)

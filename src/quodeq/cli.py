@@ -24,6 +24,7 @@ from quodeq.engine.runner import AnalysisOptions, RunConfig, run
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import prepare_repository
 from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo, write_text
+from quodeq.shared.validation import validate_path_segment
 
 
 _DEFAULT_N_SUBAGENTS = 5
@@ -152,6 +153,7 @@ def _resolve_plugin(args: argparse.Namespace, src: Path, evaluators_dir: Path) -
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
             return None
+    validate_path_segment(plugin_id)
     print(f"Plugin: {plugin_id}", file=sys.stderr)
     plugin_dir = evaluators_dir / plugin_id
     if not plugin_dir.exists():
