@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any
 
 from quodeq.data.fs.report_parser.grades import build_totals
 from quodeq.core.types import Finding
-from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.core.types._serialization import to_camel_dict
+from quodeq.shared.utils import read_json
 from quodeq.core.finding_builder import FindingSpec, build_finding_base, format_file_line
 
 _logger = logging.getLogger(__name__)
@@ -47,8 +47,8 @@ def _build_finding(item: dict, *, include_severity: bool) -> Finding:
 def parse_report_json(json_path: Path) -> dict[str, Any] | None:
     """Parse a dimension evaluation JSON file into a normalized report dict."""
     try:
-        data = json.loads(json_path.read_text(encoding=TEXT_ENCODING))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        data = read_json(json_path)
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
         _logger.warning("Failed to parse report %s: %s", json_path.name, exc)
         return None
 
@@ -78,8 +78,8 @@ def parse_evidence_file(evidence_path: Path) -> dict[str, Any]:
     """Extract dimension metadata from an evidence JSON file."""
     dimension = evidence_path.name.replace(_EVIDENCE_SUFFIX, "")
     try:
-        data = json.loads(evidence_path.read_text(encoding=TEXT_ENCODING))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        data = read_json(evidence_path)
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
         _logger.warning("Failed to read evidence file %s: %s", evidence_path.name, exc)
         data = {}
     return {
@@ -126,7 +126,7 @@ def _collect_findings(
         if key not in principle_map:
             principle_map[key] = _empty_principle(key)
         entry: dict[str, Any] = {
-            "code": item.get("snippet", ""),
+            "snippet": item.get("snippet", ""),
             "file": format_file_line(item.get("file"), item.get("line")),
             "title": item.get("title", ""),
             "reason": item.get("reason", ""),
@@ -138,7 +138,7 @@ def _collect_findings(
         if item.get("req"):
             entry["req"] = item["req"]
         if item.get("req_refs"):
-            entry["req_refs"] = item["req_refs"]
+            entry["reqRefs"] = item["req_refs"]
         principle_map[key][finding_type].append(entry)
 
 
@@ -154,8 +154,8 @@ def _build_principle_map(data: dict[str, Any]) -> dict[str, Any]:
 def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: str) -> dict[str, Any] | None:
     """Parse a JSON evaluation file into a detailed report with principle breakdowns."""
     try:
-        data = json.loads(json_path.read_text(encoding=TEXT_ENCODING))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        data = read_json(json_path)
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
         _logger.warning("Failed to parse evaluation %s: %s", json_path.name, exc)
         return None
 
@@ -179,14 +179,17 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
 
     principle_map = _build_principle_map(data)
 
+    violations = [to_camel_dict(_build_finding(v, include_severity=True)) for v in data.get("violations", [])]
+    compliance = [to_camel_dict(_build_finding(c, include_severity=False)) for c in data.get("compliance", [])]
+
     return {
         "dimension": dimension,
         "runId": run_id,
         "project": project,
         "principleGrades": principle_grades,
         "principles": list(principle_map.values()),
-        "violations": data.get("violations", []),
-        "compliance": data.get("compliance", []),
+        "violations": violations,
+        "compliance": compliance,
         "priorityRemediation": empty_severity_buckets(),
         "rawContent": None,
     }

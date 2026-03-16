@@ -6,7 +6,7 @@ from pathlib import Path
 
 from quodeq.analysis.stream.event_text import TEXT_EXTRACTORS
 from quodeq.shared.logging import log_debug
-from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.shared.utils import open_text
 
 FINDING_TYPE_VIOLATION = "violation"
 FINDING_TYPE_COMPLIANCE = "compliance"
@@ -81,7 +81,7 @@ def extract_evidence_from_stream(stream_file: Path, jsonl_file: Path) -> int:
     stats: dict = {"text_blocks": 0, "jsonl_lines": 0, "total_text_lines": 0}
     files_read: set = set()
 
-    with open(stream_file, encoding=TEXT_ENCODING) as f, open(jsonl_file, "w", encoding=TEXT_ENCODING) as out:
+    with open_text(stream_file) as f, open_text(jsonl_file, "w") as out:
         for raw_line in f:
             line = raw_line.strip()
             if not line:

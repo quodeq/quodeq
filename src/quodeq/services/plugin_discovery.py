@@ -9,7 +9,7 @@ from typing import Any
 
 from quodeq.core.types import PluginDimension, PluginInfo
 from quodeq.engine.plugin_loader import scan_plugin_dirs
-from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
 
@@ -55,9 +55,9 @@ def discover_plugins() -> list[PluginInfo]:
     result: list[PluginInfo] = []
     for child in scan_plugin_dirs(evaluators_root):
         try:
-            plugin_data = json.loads((child / "plugin.json").read_text(encoding=TEXT_ENCODING))
+            plugin_data = read_json(child / "plugin.json")
             dims_file = child / "dimensions.json"
-            dims_data = json.loads(dims_file.read_text(encoding=TEXT_ENCODING)) if dims_file.exists() else {"applies": []}
+            dims_data = read_json(dims_file) if dims_file.exists() else {"applies": []}
             result.append(PluginInfo(
                 id=plugin_data.get("id", child.name),
                 name=plugin_data.get("name", child.name),

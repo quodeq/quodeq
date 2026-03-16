@@ -7,7 +7,7 @@ from typing import Any
 
 from quodeq.adapters.fs.report_parser import parse_eval_from_json, parse_eval_markdown
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
-from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.shared.utils import read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export
 from quodeq.services.violations_parsing import (
     parse_violations_from_evidence,
@@ -38,7 +38,7 @@ def resolve_dimension_eval(
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
     if markdown_path.exists():
         try:
-            content = markdown_path.read_text(encoding=TEXT_ENCODING)
+            content = read_text(markdown_path)
         except OSError:
             return None
         return parse_eval_markdown(content, project, run_id, dimension)

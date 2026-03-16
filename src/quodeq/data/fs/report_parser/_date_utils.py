@@ -1,14 +1,13 @@
 """Date parsing helpers for run directories."""
 from __future__ import annotations
 
-import json
 import os
 from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.shared.logging import log_debug
-from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.shared.utils import read_json
 
 
 def normalize_date(raw: str) -> tuple[str, str] | None:
@@ -50,12 +49,12 @@ def find_date_in_dir(
         if not entry.is_file() or not entry.name.endswith(suffix):
             continue
         try:
-            data = json.loads(Path(entry.path).read_text(encoding=TEXT_ENCODING))
+            data = read_json(Path(entry.path))
             raw = data.get("date")
             if raw:
                 result = normalize_date(str(raw))
                 if result:
                     return result
-        except (json.JSONDecodeError, OSError, UnicodeDecodeError) as exc:
+        except (ValueError, OSError, UnicodeDecodeError) as exc:
             log_debug(f"Failed to read date from {entry.name}: {exc}")
     return None

@@ -1,9 +1,8 @@
 """Standards loaders — read ISO 25010, ASVS, and CISQ standards from JSON files."""
 from __future__ import annotations
-import json
 from pathlib import Path
 
-from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.shared.utils import read_json
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -27,8 +26,8 @@ def _load_json(path: Path, label: str) -> dict:
     *label* is used in the error message to describe what could not be loaded.
     """
     try:
-        return json.loads(path.read_text(encoding=TEXT_ENCODING))
-    except (FileNotFoundError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        return read_json(path)
+    except (FileNotFoundError, ValueError, UnicodeDecodeError) as exc:
         raise FileNotFoundError(f"Cannot load {label}") from exc
 
 

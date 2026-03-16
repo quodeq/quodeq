@@ -23,7 +23,7 @@ from quodeq.engine._runner_report import run_full
 from quodeq.engine.runner import AnalysisOptions, RunConfig, run
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import prepare_repository
-from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo
+from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo, write_text
 
 
 _DEFAULT_N_SUBAGENTS = 5
@@ -181,7 +181,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
             evidence = run(config)
             out_file = evidence_dir / f"{config.plugin_id}_evidence.json"
             try:
-                out_file.write_text(json.dumps(evidence.to_evidence_dict(), indent=2), encoding="utf-8")
+                write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
             except OSError as exc:
                 print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
                 return 1

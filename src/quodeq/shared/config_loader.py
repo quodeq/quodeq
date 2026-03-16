@@ -5,7 +5,6 @@ read from ``defaults.json``.
 """
 from __future__ import annotations
 
-import json
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -51,8 +50,9 @@ class Config:
     def from_file(cls, path: Path) -> Config:
         obj = cls()
         try:
-            obj._data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+            from quodeq.shared.utils import read_json
+            obj._data = read_json(path)
+        except (OSError, ValueError) as exc:
             import logging
             logging.getLogger(__name__).warning("Failed to load config from %s: %s", path, exc)
             obj._data = {}

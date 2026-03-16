@@ -20,7 +20,7 @@ from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, dedup_jsonl
 from quodeq.engine.analysis import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
-from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.shared.utils import open_text
 
 _AGENT_ID_PREFIX = "agent"
 _HEARTBEAT_INTERVAL = 10
@@ -141,7 +141,7 @@ class SubagentPool:
         try:
             if jsonl.exists():
                 with self._jsonl_lock:
-                    with open(jsonl, encoding=TEXT_ENCODING) as f:
+                    with open_text(jsonl) as f:
                         return sum(1 for line in f if line.strip())
         except OSError:
             pass

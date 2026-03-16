@@ -12,7 +12,7 @@ from quodeq.config._fetch_client import FetchClient, fetch_url, get_fetch_client
 from quodeq.shared.ai_cli import run_ai_cli
 from quodeq.config.prompt_templates import render_template
 from quodeq.shared.logging import log_error, log_info, log_success, log_warning
-from quodeq.shared.utils import TEXT_ENCODING, get_github_raw_base_url, get_github_search_url, show_diff
+from quodeq.shared.utils import read_text, write_text, get_github_raw_base_url, get_github_search_url, show_diff
 
 # Re-export for backward compatibility
 _FetchClient = FetchClient
@@ -108,7 +108,7 @@ def _write_or_diff(out_path: Path, content: str, dry_run: bool, label: str) -> N
         show_diff(out_path, content)
     else:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(content, encoding=TEXT_ENCODING)
+        write_text(out_path, content)
         log_success(f"Written {label} to {out_path}")
 
 
@@ -174,7 +174,7 @@ def refresh_analysis(
         return 0
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
-    out_path.write_text(stdout, encoding=TEXT_ENCODING)
+    write_text(out_path, stdout)
     log_success(f"Written analysis.md to {out_path}")
     return 0
 
@@ -245,9 +245,9 @@ def _fetch_url(url: str, headers: dict | None = None, *, client: FetchClient | N
 
 def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: Path) -> str:
     combined = "\n\n---\n\n".join(content_samples)
-    existing = out_path.read_text(encoding=TEXT_ENCODING) if out_path.exists() else "none"
+    existing = read_text(out_path) if out_path.exists() else "none"
     try:
-        template = (_REFRESH_TEMPLATES_DIR / "practices.md").read_text(encoding=TEXT_ENCODING)
+        template = read_text(_REFRESH_TEMPLATES_DIR / "practices.md")
     except (OSError, UnicodeDecodeError) as exc:
         raise FileNotFoundError(f"Cannot read practices template: {exc}") from exc
     return render_template(template, {
@@ -258,9 +258,9 @@ def _build_practices_prompt(runtime: str, content_samples: list[str], out_path: 
 
 
 def _build_analysis_prompt(runtime: str, linter_docs: str, out_path: Path) -> str:
-    existing = out_path.read_text(encoding=TEXT_ENCODING) if out_path.exists() else "none"
+    existing = read_text(out_path) if out_path.exists() else "none"
     try:
-        template = (_REFRESH_TEMPLATES_DIR / "analysis.md").read_text(encoding=TEXT_ENCODING)
+        template = read_text(_REFRESH_TEMPLATES_DIR / "analysis.md")
     except (OSError, UnicodeDecodeError) as exc:
         raise FileNotFoundError(f"Cannot read analysis template: {exc}") from exc
     return render_template(template, {

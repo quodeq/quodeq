@@ -5,9 +5,10 @@ ref-label formatting and compiled-standards loading logic.
 """
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
+
+from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
 
@@ -39,8 +40,8 @@ def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -
     if not compiled_dir or not dimension:
         return {}
     try:
-        data = json.loads((Path(compiled_dir) / f"{dimension}.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
+        data = read_json(Path(compiled_dir) / f"{dimension}.json")
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
         _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
         return {}
     lookup: dict[str, list[dict]] = {}

@@ -191,11 +191,10 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
     lines.push('', `**Reference:** CWE-${v.cwe}`);
   }
 
-  const snippet = v.code || v.snippet;
-  if (snippet) {
+  if (v.snippet) {
     lines.push('', '**Affected code:**');
     lines.push('```');
-    snippet.split('\n').forEach((l) => lines.push(l));
+    v.snippet.split('\n').forEach((l) => lines.push(l));
     lines.push('```');
   }
 

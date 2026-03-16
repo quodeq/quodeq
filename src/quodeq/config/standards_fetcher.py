@@ -12,7 +12,7 @@ import urllib.request
 from datetime import date
 from pathlib import Path
 
-from quodeq.shared.utils import TEXT_ENCODING, get_asvs_url, show_diff
+from quodeq.shared.utils import write_text, get_asvs_url, show_diff
 
 _logger = logging.getLogger(__name__)
 
@@ -131,7 +131,7 @@ def fetch_asvs_l1(
         show_diff(out_path, json.dumps(output, indent=2))
     else:
         out_path.parent.mkdir(parents=True, exist_ok=True)
-        out_path.write_text(json.dumps(output, indent=2), encoding=TEXT_ENCODING)
+        write_text(out_path, json.dumps(output, indent=2))
 
     return len(requirements)
 

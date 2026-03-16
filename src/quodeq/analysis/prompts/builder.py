@@ -2,13 +2,13 @@
 from __future__ import annotations
 
 import hashlib
-import json
 import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 
 from quodeq.config.prompt_templates import render_template
+from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
 
@@ -25,8 +25,8 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
         return _NO_STANDARDS_FOR_DIM
 
     try:
-        data = json.loads(compiled_file.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        data = read_json(compiled_file)
+    except (OSError, ValueError) as exc:
         _logger.warning("Could not read compiled standards %s: %s", compiled_file, exc)
         return _STANDARDS_READ_ERROR
     lines = []

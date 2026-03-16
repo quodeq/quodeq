@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from quodeq.adapters.fs.report_parser import safe_read_dir
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
-from quodeq.shared.utils import TEXT_ENCODING, get_anthropic_api_key
+from quodeq.shared.utils import get_anthropic_api_key, read_json
 
 _CLI_MODEL_TIMEOUT_S = 8
 _CLI_OUTPUT_IGNORE_PREFIXES = {"#", "=", "-", "[", "("}
@@ -27,7 +27,7 @@ _AI_DEFAULTS_PATH = _PACKAGE_ROOT / "config" / "ai_defaults.json"
 def _load_fallback_claude_models() -> list[str]:
     """Load fallback Claude model list from config/ai_defaults.json."""
     try:
-        data = json.loads(_AI_DEFAULTS_PATH.read_text(encoding=TEXT_ENCODING))
+        data = read_json(_AI_DEFAULTS_PATH)
         return data.get("fallback_claude_models", [])
     except (OSError, json.JSONDecodeError):
         return []

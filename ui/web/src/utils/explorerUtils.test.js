@@ -238,14 +238,14 @@ const evalDataFull = {
       name: 'DRY',
       findings: 'Duplicate logic across modules.',
       violations: [
-        { severity: 'critical', file: 'src/a.js', code: 'const x = 1;\nconst y = 1;' },
+        { severity: 'critical', file: 'src/a.js', snippet: 'const x = 1;\nconst y = 1;' },
       ],
     },
     {
       name: 'SOLID',
       findings: 'Classes do too much.',
       violations: [
-        { severity: 'major', file: 'src/b.js', code: 'class God { ... }' },
+        { severity: 'major', file: 'src/b.js', snippet: 'class God { ... }' },
       ],
     },
     {
