@@ -12,34 +12,53 @@ _NUMERICAL_MODE = "numerical"
 _NA_LABEL = "N/A"
 
 
-def _run_verification(config: RunConfig, per_dim_evidence: dict) -> dict:
-    """Run verification pass on each dimension to re-check findings and add compliance."""
+def _verify_single_dimension(
+    config: RunConfig, dimension: str, files_read: int,
+    ctx: object, compiled_dir: Path | None,
+) -> tuple[str, object]:
+    """Run verification for one dimension and return (dimension, updated_evidence)."""
     from quodeq.analysis.subagents.verify import run_verification_pass
     from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
+
+    work_dir = config.work_dir or config.src
+    run_verification_pass(config, dimension, ctx, work_dir)
+    jsonl_path = work_dir / f"{dimension}_evidence.jsonl"
+    ev = parse_jsonl_to_evidence(
+        jsonl_path,
+        EvidenceContext(
+            plugin_id=config.plugin_id,
+            repository=str(config.src),
+            date_str=ctx.date_str,
+            source_file_count=config.source_file_count,
+            files_read=files_read,
+        ),
+        compiled_dir=compiled_dir,
+    )
+    ev.plugin_name = ctx.plugin_name
+    return dimension, ev
+
+
+def _run_verification(config: RunConfig, per_dim_evidence: dict) -> dict:
+    """Run verification pass on all dimensions in parallel."""
+    from concurrent.futures import ThreadPoolExecutor, as_completed
     from quodeq.engine.runner import _load_plugin_context
 
     work_dir = config.work_dir or config.src
     _dims, ctx = _load_plugin_context(config)
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
 
-    log_info("Starting verification pass...")
-    for dimension in per_dim_evidence:
-        run_verification_pass(config, dimension, ctx, work_dir)
-        # Re-parse evidence after verification added new findings
-        jsonl_path = work_dir / f"{dimension}_evidence.jsonl"
-        ev = parse_jsonl_to_evidence(
-            jsonl_path,
-            EvidenceContext(
-                plugin_id=config.plugin_id,
-                repository=str(config.src),
-                date_str=ctx.date_str,
-                source_file_count=config.source_file_count,
-                files_read=per_dim_evidence[dimension].files_read,
-            ),
-            compiled_dir=compiled_dir,
-        )
-        ev.plugin_name = ctx.plugin_name
-        per_dim_evidence[dimension] = ev
+    log_info("Starting verification pass (%d dimensions in parallel)...", len(per_dim_evidence))
+    with ThreadPoolExecutor(max_workers=len(per_dim_evidence)) as pool:
+        futures = {
+            pool.submit(
+                _verify_single_dimension,
+                config, dim, per_dim_evidence[dim].files_read, ctx, compiled_dir,
+            ): dim
+            for dim in per_dim_evidence
+        }
+        for future in as_completed(futures):
+            dim, ev = future.result()
+            per_dim_evidence[dim] = ev
 
     return per_dim_evidence
 
