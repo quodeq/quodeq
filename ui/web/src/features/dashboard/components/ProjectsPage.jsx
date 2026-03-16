@@ -83,13 +83,19 @@ function TrashIcon() {
 
 export default function ProjectsPage({ projects = [], selectedProject, onSelect, onDelete, onExport, onRelocate }) {
   const { children, roots } = useMemo(() => {
-    const nameToProject = Object.fromEntries(projects.map((p) => [p.name || p, p]));
+    const lookup = {};
+    for (const p of projects) {
+      const id = p.id || p.name || p;
+      const name = p.name || p;
+      lookup[id] = p;
+      lookup[name] = p;
+    }
     const children = {};
     const roots = [];
     for (const p of projects) {
       const parent = p.parent;
-      if (parent && nameToProject[parent]) {
-        const parentId = nameToProject[parent].id || nameToProject[parent].name || parent;
+      if (parent && lookup[parent]) {
+        const parentId = lookup[parent].id || lookup[parent].name || parent;
         if (!children[parentId]) children[parentId] = [];
         children[parentId].push(p);
       } else {
