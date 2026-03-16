@@ -18,6 +18,31 @@ _DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
 TEXT_ENCODING = "utf-8"
 """Standard text encoding used across the codebase for file I/O."""
 
+
+# ── Centralized I/O helpers ─────────────────────────────────────────────
+# Every file read/write should go through these so encoding is handled once.
+
+
+def read_text(path: Path, *, errors: str = "strict") -> str:
+    """Read a text file with the standard encoding."""
+    return path.read_text(encoding=TEXT_ENCODING, errors=errors)
+
+
+def write_text(path: Path, content: str) -> None:
+    """Write a text file with the standard encoding."""
+    path.write_text(content, encoding=TEXT_ENCODING)
+
+
+def read_json(path: Path) -> Any:
+    """Read and parse a JSON file with the standard encoding."""
+    return json.loads(path.read_text(encoding=TEXT_ENCODING))
+
+
+def open_text(path: str | Path, mode: str = "r") -> Any:
+    """Open a text file with the standard encoding. Use as a context manager."""
+    return open(path, mode, encoding=TEXT_ENCODING)
+
+
 SENSITIVE_PATTERNS = _re.compile(
     r"(api[_-]?key|token|secret|password|authorization)[=:\s]+\S+",
     _re.IGNORECASE,
@@ -65,7 +90,7 @@ class Config:
     @classmethod
     def from_file(cls, path: Path) -> Config:
         obj = cls()
-        obj._data = json.loads(path.read_text(encoding=TEXT_ENCODING))
+        obj._data = read_json(path)
         return obj
 
 

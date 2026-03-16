@@ -1,129 +1,22 @@
-"""Grade calculation, scoring, and dimension summary helpers."""
+"""Re-export shim — canonical location is quodeq.data.fs.report_parser.grades."""
+from quodeq.data.fs.report_parser.grades import (
+    NUMERIC_GRADE_ORDER,
+    SEVERITIES,
+    TEXT_GRADE_ORDER,
+    build_totals,
+    calculate_trend,
+    most_frequent_grade,
+    parse_numeric_score,
+    summarize_dimensions,
+)
 
-from __future__ import annotations
-
-import logging
-import re
-from typing import Any
-
-from quodeq.engine.scoring_internals import GRADE_LADDER
-
-_logger = logging.getLogger(__name__)
-
-NUMERIC_GRADE_ORDER = ["Critical", "Poor", "Adequate", "Good", "Exemplary"]
-TEXT_GRADE_ORDER = GRADE_LADDER
-SEVERITIES = {"critical", "major", "minor", "unknown"}
-_SCORE_DECIMAL_PLACES = 1
-
-_SCORE_RE = re.compile(r"(\d+(?:\.\d+)?)")
-_NUMERIC_RANK: dict[str, int] = {g: i for i, g in enumerate(NUMERIC_GRADE_ORDER)}
-_TEXT_RANK: dict[str, int] = {g: i for i, g in enumerate(TEXT_GRADE_ORDER)}
-
-
-def parse_numeric_score(score_text: str | None) -> float | None:
-    """Extract the first numeric value from a score string, or return None.
-
-    Example::
-
-        parse_numeric_score("7.5/10")  # -> 7.5
-        parse_numeric_score("no score")  # -> None
-    """
-    if not score_text:
-        return None
-    match = _SCORE_RE.search(str(score_text))
-    if not match:
-        _logger.debug("No numeric score found in %r; expected format like '7.5/10'", score_text)
-        return None
-    return float(match.group(1))
-
-
-def _grade_rank(grade: str) -> int:
-    """Return the ordinal rank of a grade (higher is better), or -1 if unknown."""
-    rank = _NUMERIC_RANK.get(grade)
-    if rank is not None:
-        return rank
-    return _TEXT_RANK.get(grade, -1)
-
-
-def most_frequent_grade(grades: list[str]) -> str | None:
-    """Return the most common grade, breaking ties by higher grade rank.
-
-    Example::
-
-        most_frequent_grade(["Good", "Good", "Poor"])  # -> "Good"
-    """
-    if not grades:
-        return None
-    counts: dict[str, int] = {}
-    for grade in grades:
-        counts[grade] = counts.get(grade, 0) + 1
-    # Sort by (-count, -rank) so the highest-count, highest-rank grade wins.
-    return max(counts, key=lambda g: (counts[g], _grade_rank(g)))
-
-
-def build_totals(violations: list[dict[str, Any]], compliance: list[dict[str, Any]]) -> dict[str, Any]:
-    """Aggregate violation and compliance counts grouped by severity.
-
-    Example::
-
-        build_totals([{"severity": "major"}], [{"severity": "minor"}])
-    """
-    severity = {k: 0 for k in SEVERITIES}
-    for entry in violations:
-        key = entry.get("severity", "unknown")
-        if key not in SEVERITIES:
-            key = "unknown"
-        severity[key] += 1
-    return {
-        "violationCount": len(violations),
-        "complianceCount": len(compliance),
-        "severity": severity,
-    }
-
-
-def calculate_trend(current_score: Any, previous_score: Any) -> str:
-    """Compare two scores and return a trend direction: 'up', 'down', 'same', or 'none'.
-
-    Example::
-
-        calculate_trend("8/10", "6/10")  # -> "up"
-    """
-    current = parse_numeric_score(str(current_score)) if current_score is not None else None
-    previous = parse_numeric_score(str(previous_score)) if previous_score is not None else None
-    if current is None or previous is None:
-        return "none"
-    if current > previous:
-        return "up"
-    if current < previous:
-        return "down"
-    return "same"
-
-
-def summarize_dimensions(dimensions: list[dict[str, Any]]) -> dict[str, Any]:
-    """Produce an aggregate summary across multiple dimension evaluation results.
-
-    Example::
-
-        summarize_dimensions([{"overallGrade": "Good", "overallScore": "8/10"}])
-    """
-    overall_grades = [d.get("overallGrade") for d in dimensions if d.get("overallGrade")]
-    numeric_scores = [
-        score for score in (parse_numeric_score(d.get("overallScore")) for d in dimensions) if score is not None
-    ]
-    numeric_average = None
-    if numeric_scores:
-        numeric_average = round(sum(numeric_scores) / len(numeric_scores), _SCORE_DECIMAL_PLACES)
-
-    grade_breakdown: dict[str, int] = {}
-    for grade in overall_grades:
-        grade_breakdown[grade] = grade_breakdown.get(grade, 0) + 1
-
-    return {
-        "dimensionsCount": len(dimensions),
-        "overallGrade": most_frequent_grade(overall_grades),
-        "numericAverage": numeric_average,
-        "gradeBreakdown": [
-            {"grade": grade, "count": count}
-            for grade, count in sorted(grade_breakdown.items(), key=lambda item: (-item[1], item[0]))
-        ],
-    }
+__all__ = [
+    "NUMERIC_GRADE_ORDER",
+    "SEVERITIES",
+    "TEXT_GRADE_ORDER",
+    "build_totals",
+    "calculate_trend",
+    "most_frequent_grade",
+    "parse_numeric_score",
+    "summarize_dimensions",
+]

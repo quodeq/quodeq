@@ -126,15 +126,13 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
       vs.forEach((v, i) => {
         const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
         lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
-        const reason = v.reason || v.findings;
-        if (reason) lines.push('', `**Why it's a violation:** ${reason}`);
-        const linkedRefs = (v.req_refs || []).filter(r => r.url);
+        if (v.reason) lines.push('', `**Why it's a violation:** ${v.reason}`);
+        const linkedRefs = (v.reqRefs || []).filter(r => r.url);
         if (linkedRefs.length > 0) lines.push('', `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
-        const code = v.code || v.snippet;
-        if (code) {
+        if (v.snippet) {
           lines.push('', '**Affected code:**');
           lines.push('```');
-          code.split('\n').forEach((l) => lines.push(l));
+          v.snippet.split('\n').forEach((l) => lines.push(l));
           lines.push('```');
         }
         lines.push('');
@@ -157,11 +155,9 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
       `**Severity:** ${v.severity || 'unknown'}`,
     ];
     if (loc) lines.push(`**File:** ${loc}`);
-    const code = v.code || v.snippet;
-    if (code) lines.push('', '## Affected Code', '```', code, '```');
-    const reason = v.reason || v.findings;
-    if (reason) lines.push('', "## Why It's a Violation", reason);
-    if (v.req_refs?.length > 0) lines.push('', `**References:** ${v.req_refs.map(r => `${r.label} (${r.url})`).join(', ')}`);
+    if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
+    if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
+    if (v.reqRefs?.length > 0) lines.push('', `**References:** ${v.reqRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
     else if (v.req) lines.push('', `**Requirement:** ${v.req}`);
     lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
     if (loc) lines.push(`Apply it to \`${loc}\`.`);
@@ -257,21 +253,21 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             <div className="vlive-detail-section">
                               <div className="vlive-detail-section-header">
                                 {v.title && <span className="vlive-detail-section-label">Reason</span>}
-                                {v.req_refs?.filter(r => r.url)?.length > 0 &&
-                                  <span className="cwe-link-group">{v.req_refs.filter(r => r.url).map((ref, i) => (
+                                {v.reqRefs?.filter(r => r.url)?.length > 0 &&
+                                  <span className="cwe-link-group">{v.reqRefs.filter(r => r.url).map((ref, i) => (
                                     <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                                   ))}</span>
                                 }
                               </div>
                               {v.title && <p className="vlive-detail-title">{v.title}</p>}
-                              {(v.reason || v.findings) && <>
+                              {v.reason && <>
                                 <span className="vlive-detail-section-label">Detail</span>
-                                <p className="vlive-detail-reason">{v.reason || v.findings}</p>
+                                <p className="vlive-detail-reason">{v.reason}</p>
                               </>}
                             </div>
                           )}
-                          {(v.code || v.snippet) && (
-                            <pre className="vlive-snippet">{(v.code || v.snippet).replace(/\\n/g, '\n')}</pre>
+                          {v.snippet && (
+                            <pre className="vlive-snippet">{v.snippet.replace(/\\n/g, '\n')}</pre>
                           )}
                         </div>
                       </>
@@ -312,8 +308,8 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                           <div className="vlive-detail-section">
                             <div className="vlive-detail-section-header">
                               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-                              {c.req_refs?.filter(r => r.url)?.length > 0 &&
-                                <span className="cwe-link-group">{c.req_refs.filter(r => r.url).map((ref, i) => (
+                              {c.reqRefs?.filter(r => r.url)?.length > 0 &&
+                                <span className="cwe-link-group">{c.reqRefs.filter(r => r.url).map((ref, i) => (
                                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                                 ))}</span>
                               }
@@ -325,8 +321,8 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
                             </>}
                           </div>
                         )}
-                        {(c.code || c.snippet) && (
-                          <pre className="vlive-snippet">{(c.code || c.snippet).replace(/\\n/g, '\n')}</pre>
+                        {c.snippet && (
+                          <pre className="vlive-snippet">{c.snippet.replace(/\\n/g, '\n')}</pre>
                         )}
                       </div>
                     </>

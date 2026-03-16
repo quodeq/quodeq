@@ -72,7 +72,7 @@ class TestRun:
         with pytest.raises(ValueError, match="not found"):
             run(config)
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_end_to_end_with_mock(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -101,7 +101,7 @@ class TestRun:
         assert len(pe.compliance) == 1
         assert pe.metrics["is_balanced"] is True
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_empty_project(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -121,7 +121,7 @@ class TestRun:
         assert evidence.principles == {}
         assert evidence.coverage_pct == 0.0
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_invalid_stream_skipped(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"
@@ -141,7 +141,7 @@ class TestRun:
         evidence = run(config)
         assert evidence.principles == {}
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_zero_findings_raises_error(self, mock_analysis, tmp_path):
         """An evaluation with source files but 0 findings is broken, not successful."""
         evaluators_dir = _make_plugin_dir(tmp_path)
@@ -166,7 +166,7 @@ class TestRun:
         with pytest.raises(EvaluationError, match="0 findings"):
             run(config)
 
-    @patch("quodeq.engine.runner.run_analysis")
+    @patch("quodeq.analysis.runner.run_analysis")
     def test_stream_files_created(self, mock_analysis, tmp_path):
         evaluators_dir = _make_plugin_dir(tmp_path)
         src = tmp_path / "src"

@@ -140,7 +140,7 @@ export default function App() {
   function loadProjects() {
     listProjects()
       .then((data) => {
-        const list = data.projects || data || [];
+        const list = Array.isArray(data) ? data : (data?.projects || []);
         setProjects(list);
         if (list.length > 0) {
           const current = selectedProject || localStorage.getItem('quodeq_selected_project') || '';
@@ -370,7 +370,7 @@ export default function App() {
       if (project) {
         listProjects()
           .then((data) => {
-            const list = data.projects || data || [];
+            const list = Array.isArray(data) ? data : (data?.projects || []);
             setProjects(list);
             setSelectedProject(project);
             setSelectedRun(runId || 'latest');

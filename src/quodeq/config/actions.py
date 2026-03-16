@@ -14,6 +14,7 @@ from quodeq.config.sources import has_required_sources_table
 
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error
+from quodeq.shared.utils import read_text, write_text
 
 _GENERATED_DIMS_FILENAME = "generated.json"
 
@@ -54,7 +55,7 @@ def _generate_single_evaluator(
     if err:
         raise RuntimeError(f"Evaluator generation failed for {dimension} → {output_path}: {err}")
     try:
-        output_path.write_text(stdout, encoding="utf-8")
+        write_text(output_path, stdout)
     except OSError as exc:
         raise RuntimeError(f"Failed to write evaluator {output_path}: {exc}") from exc
 
@@ -93,7 +94,7 @@ def run_generate_dimensions(paths: ConfigPaths, *, today: date | None = None) ->
         )
     output_path = paths.dimensions_dir / _GENERATED_DIMS_FILENAME
     try:
-        output_path.write_text(stdout, encoding="utf-8")
+        write_text(output_path, stdout)
     except OSError as exc:
         raise RuntimeError(f"Failed to write dimensions output to {output_path}: {exc}") from exc
 
@@ -166,7 +167,7 @@ def check_sources(discipline: str, paths: ConfigPaths) -> int:
         log_error(f"Practices directory not found: {practices_dir}")
         return 1
     for practice_file in practices_dir.glob("*.md"):
-        content = practice_file.read_text()
+        content = read_text(practice_file)
         if not has_required_sources_table(content):
             log_error(f"Missing sources table in {practice_file}")
             return 1

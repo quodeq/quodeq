@@ -8,7 +8,7 @@ from pathlib import Path
 from collections.abc import Callable
 from typing import Any, Iterable
 
-from quodeq.shared.utils import TEXT_ENCODING
+from quodeq.shared.utils import read_text
 
 _logger = logging.getLogger(__name__)
 
@@ -142,7 +142,7 @@ class DisciplineRegistry:
         sections: dict[str, list[tuple[str, str]]] = {}
         current_name: str | None = None
         try:
-            lines = path.read_text(encoding=TEXT_ENCODING).splitlines()
+            lines = read_text(path).splitlines()
         except (OSError, UnicodeDecodeError) as exc:
             raise ValueError(
                 f"Cannot read disciplines config {path}: {exc}. "
@@ -176,7 +176,7 @@ class DisciplineRegistry:
         try:
             content = self._file_cache.get(path)
             if content is None:
-                content = path.read_text(encoding=TEXT_ENCODING, errors="ignore")
+                content = read_text(path, errors="ignore")
                 self._file_cache[path] = content
             return needle in content
         except OSError as exc:

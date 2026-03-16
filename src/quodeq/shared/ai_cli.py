@@ -17,7 +17,13 @@ def _ai_cli_timeout(override: int | None = None) -> int:
     """Return the AI CLI timeout in seconds. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_AI_CLI_TIMEOUT", str(_DEFAULT_AI_CLI_TIMEOUT)))
+    raw = os.environ.get("QUODEQ_AI_CLI_TIMEOUT")
+    if raw is None:
+        return _DEFAULT_AI_CLI_TIMEOUT
+    try:
+        return int(raw)
+    except ValueError:
+        return _DEFAULT_AI_CLI_TIMEOUT
 
 
 def run_ai_cli(prompt: str, *, timeout: int | None = None) -> tuple[str | None, str | None]:

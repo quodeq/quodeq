@@ -23,7 +23,13 @@ _PERFORMANCE_DIM_WEIGHT = 0.8
 
 def _env_weight(env_var: str, default: float) -> float:
     """Return a dimension weight from env var or *default*."""
-    return float(os.environ.get(env_var, str(default)))
+    raw = os.environ.get(env_var)
+    if raw is None:
+        return default
+    try:
+        return float(raw)
+    except ValueError:
+        return default
 
 _logger = logging.getLogger(__name__)
 

@@ -1,27 +1,18 @@
-"""Domain-specific exception hierarchy for data access errors."""
+"""Re-export shim — canonical location is quodeq.data.ports.data_errors."""
+from quodeq.data.ports.data_errors import (
+    AuthError,
+    DataError,
+    InvalidDataError,
+    NetworkError,
+    NotFoundError,
+    ServerError,
+)
 
-from __future__ import annotations
-
-
-class DataError(Exception):
-    """Base exception for all data access errors."""
-
-
-class AuthError(DataError):
-    """Raised when authentication or authorization fails."""
-
-
-class NotFoundError(DataError):
-    """Raised when the requested resource does not exist."""
-
-
-class NetworkError(DataError):
-    """Raised when a network request fails."""
-
-
-class ServerError(DataError):
-    """Raised when the remote server returns an error."""
-
-
-class InvalidDataError(DataError):
-    """Raised when received data is malformed or invalid."""
+__all__ = [
+    "AuthError",
+    "DataError",
+    "InvalidDataError",
+    "NetworkError",
+    "NotFoundError",
+    "ServerError",
+]
