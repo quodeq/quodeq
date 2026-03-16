@@ -22,10 +22,11 @@ GRADE_LADDER: list[str] = [
 # Ratio-based dampening table: (min_compliance_to_violation_ratio, multiplier).
 # Checked top-to-bottom; first matching row wins.
 # Asymmetric: max discount 15%, max penalty 30%.
-# Severity weights for dampening ratio: critical compliance/violations count
-# more than minor ones, preventing cheap minor-compliance from offsetting
-# critical violations.  Findings without a severity field default to minor (1).
-_SEVERITY_WEIGHT = {"critical": 4, "major": 2, "minor": 1}
+# Severity weights for dampening ratio, aligned with deduction penalties
+# (critical=2.0, major=1.0, minor=0.25 → ratio 8:4:1).  This ensures
+# 1 critical compliance perfectly neutralizes the dampening impact of
+# 1 critical violation at the same severity level.
+_SEVERITY_WEIGHT = {"critical": 8, "major": 4, "minor": 1}
 _MAX_PENALTY_MULTIPLIER = 1.30
 
 _RATIO_DAMPENING_TABLE: list[tuple[float, float]] = [

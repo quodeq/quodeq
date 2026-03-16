@@ -14,8 +14,8 @@ from tests.engine.conftest import make_evidence_with_confidence
 def test_balanced_ratio_dampens_deductions():
     """Severity-weighted compliance/violation ratio >= 1.0 -> 0.95 dampening.
 
-    1 critical violation (weight 4) needs >= 4 weighted compliance to reach 1.0.
-    1 critical compliance (weight 4) provides exactly that.
+    1 critical violation (weight 8) needs >= 8 weighted compliance to reach 1.0.
+    1 critical compliance (weight 8) provides exactly that.
     """
     violations = [
         {"file": "a.ts", "line": 1, "snippet": "eval(x)", "reason": "r",
@@ -41,8 +41,8 @@ def test_balanced_ratio_dampens_deductions():
 def test_strong_compliance_ratio_gives_max_discount():
     """Severity-weighted ratio >= 3.0 -> 0.85 dampening (max discount).
 
-    1 major violation (weight 2) needs >= 6 weighted compliance for 3.0 ratio.
-    3 major compliance types (weight 3×2=6) provide exactly that.
+    1 major violation (weight 4) needs >= 12 weighted compliance for 3.0 ratio.
+    3 major compliance types (weight 3×4=12) provide exactly that.
     """
     violations = [
         {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
@@ -112,8 +112,8 @@ def test_weak_compliance_ratio_penalises():
 def test_dampening_in_graded_mode():
     """Dampening should reduce grade drops in non-numerical mode too.
 
-    4 critical violations (weight 4×4=16) need >= 16 weighted compliance
-    for ratio 1.0 → 0.95x. 4 critical compliance types provide exactly that.
+    4 critical violations (weight 4×8=32) need >= 32 weighted compliance
+    for ratio 1.0 → 0.95x. 4 critical compliance types (4×8=32) provide exactly that.
     """
     violations = [
         {"file": f"v{i}.ts", "line": i, "snippet": "x", "reason": f"r{i}",
