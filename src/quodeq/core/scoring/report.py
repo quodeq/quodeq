@@ -47,7 +47,7 @@ def _run_verification(config: RunConfig, per_dim_evidence: dict) -> dict:
     _dims, ctx = _load_plugin_context(config)
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
 
-    log_info("Starting verification pass (%d dimensions in parallel)...", len(per_dim_evidence))
+    log_info(f"Starting verification pass ({len(per_dim_evidence)} dimensions in parallel)...")
     with ThreadPoolExecutor(max_workers=len(per_dim_evidence)) as pool:
         futures = {
             pool.submit(
