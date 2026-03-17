@@ -109,7 +109,12 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
     repo_path = args.repo
     # NOTE: print() here uses plain text only.  If ANSI escapes are added in
     # the future, gate them on the NO_COLOR environment variable.
-    if is_repo_url(repo_path):
+    try:
+        is_remote = is_repo_url(repo_path)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return None
+    if is_remote:
         try:
             repo_path = prepare_repository(repo_path)
         except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as exc:
