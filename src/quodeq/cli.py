@@ -14,7 +14,6 @@ from typing import Callable
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 from quodeq.analysis.subprocess import AnalysisError
-from quodeq.analysis.manifest import AnalysisTarget
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.core.scoring.report import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
@@ -217,7 +216,6 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
 def _build_run_config(
     args: argparse.Namespace, src: Path, language: str,
     manifest, dims_data: dict, evidence_dir: Path,
-    target: AnalysisTarget | None = None,
 ) -> RunConfig:
     """Assemble a RunConfig from CLI args and resolved paths."""
     standards_dir = default_paths().standards_dir
@@ -231,7 +229,6 @@ def _build_run_config(
         work_dir=evidence_dir,
         manifest=manifest,
         dimensions_data=dims_data,
-        target=target,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
             max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
@@ -241,25 +238,6 @@ def _build_run_config(
             verify_findings=not _no_verify(args),
         ),
     )
-
-
-def _resolve_targets(args: argparse.Namespace, manifest) -> list[AnalysisTarget]:
-    """Return the list of targets to analyze, filtered by --language if set."""
-    if manifest is None or not manifest.targets:
-        return []
-    targets = manifest.targets
-    if args.language:
-        filtered = [t for t in targets if t.language == args.language]
-        if not filtered and targets:
-            available = ", ".join(t.language for t in targets)
-            print(
-                f"Warning: --language={args.language} not found in detected targets ({available}). "
-                f"Running with auto-detected language.",
-                file=sys.stderr,
-            )
-            return targets
-        return filtered
-    return targets
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
@@ -299,36 +277,10 @@ def run_evaluate(args: argparse.Namespace) -> int:
         except OSError:
             pass  # non-critical
 
-    targets = _resolve_targets(args, manifest)
-
-    if not targets:
-        # No manifest or no targets detected: legacy fallback (no target scoping)
-        config = _build_run_config(args, src, language, manifest, dims_data, evidence_dir)
-        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-
-    # Always run per-target: each target gets its own language-scoped analysis.
-    # 1 target → flat output dirs.  N targets → nested by target name.
-    nested = len(targets) > 1
-    print(f"Targets: {', '.join(t.name for t in targets)}", file=sys.stderr)
-    worst_rc = 0
-    for target in targets:
-        if nested:
-            target_evidence = evidence_dir / target.name
-            target_evaluation = evaluation_dir / target.name
-            target_evidence.mkdir(parents=True, exist_ok=True)
-            target_evaluation.mkdir(parents=True, exist_ok=True)
-        else:
-            target_evidence = evidence_dir
-            target_evaluation = evaluation_dir
-        print(f"\n=== Target: {target.name} ({target.project_description}) ===", file=sys.stderr)
-        config = _build_run_config(
-            args, src, target.language, manifest, dims_data,
-            target_evidence, target=target,
-        )
-        rc = _execute_pipeline(args, config, target_evidence, target_evaluation)
-        if rc != 0:
-            worst_rc = rc
-    return worst_rc
+    # Single-pass analysis: all files in one unified queue per dimension.
+    # The AI analyzes each file according to its language naturally.
+    config = _build_run_config(args, src, language, manifest, dims_data, evidence_dir)
+    return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
 
 
 def _run_dashboard(argv: list[str] | None) -> int:

@@ -176,14 +176,29 @@ class SourceManifest:
 
     def to_prompt_context(self) -> str:
         """Render manifest as context for inclusion in analysis prompts."""
-        if self.targets:
-            p = self._primary
-            others = [t for t in self.targets if t is not p]
-            return p.to_prompt_context(repo_total_files=self.total_files, other_targets=others or None)
-        lines = [
-            "**Project type:** Unknown",
-            f"**Source files:** {self.total_files}",
-        ]
+        if not self.targets:
+            lines = [
+                "**Project type:** Unknown",
+                f"**Source files:** {self.total_files}",
+            ]
+            if self.language_stats:
+                breakdown = ", ".join(
+                    f"{ext}: {count}" for ext, count in
+                    sorted(self.language_stats.items(), key=lambda x: -x[1])[:8]
+                )
+                lines.append(f"**Extension breakdown:** {breakdown}")
+            return "\n".join(lines)
+
+        if len(self.targets) == 1:
+            return self.targets[0].to_prompt_context(repo_total_files=self.total_files)
+
+        # Multi-language: describe all detected modules
+        lines = [f"**Source files:** {self.total_files}"]
+        lines.append("**Detected modules:**")
+        for t in self.targets:
+            lines.append(f"- {t.project_description} ({t.total_files} files)")
+        lines.append("")
+        lines.append("Analyze each file according to its language and project type.")
         if self.language_stats:
             breakdown = ", ".join(
                 f"{ext}: {count}" for ext, count in

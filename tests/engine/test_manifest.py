@@ -157,7 +157,7 @@ def test_with_disciplines_conf(tmp_path: Path, detection: dict) -> None:
 
 
 def test_multi_target_prompt_context() -> None:
-    """Multi-target manifest renders 'Other modules' in prompt context."""
+    """Multi-target manifest renders detected modules in prompt context."""
     rust = AnalysisTarget(
         name="rust_backend", language="rust", category="backend",
         total_files=85, source_files=["main.rs"],
@@ -169,13 +169,13 @@ def test_multi_target_prompt_context() -> None:
         language_stats={".dart": 235},
     )
     manifest = SourceManifest(targets=[dart, rust], total_files=320, language_stats={".rs": 85, ".dart": 235})
-    # Primary is dart (most files)
     text = manifest.to_prompt_context()
+    assert "320" in text
+    assert "Detected modules" in text
     assert "Dart mobile" in text
     assert "Flutter" in text
-    assert "320 total in repo" in text
-    assert "Other modules" in text
     assert "Rust backend" in text
+    assert "each file according to its language" in text
 
 
 def test_analysis_target_name_with_category() -> None:
