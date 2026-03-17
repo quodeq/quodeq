@@ -18,6 +18,7 @@ from quodeq.analysis.mcp.dispatch import (
     dispatch as _dispatch,
 )
 from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs as _load_compiled_refs
+from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
 
 _FINDING_SCHEMA_VERSION = 1
 
@@ -39,6 +40,7 @@ class FindingsRouter:
     """Deduplicates and enriches findings before writing to JSONL.
 
     - Dedup by (principle, file, line, type) -- skips duplicate findings
+    - Auto-fills principle name (p) and dimension (d) from req ID
     - Enriches req_refs from compiled standards -- LLM doesn't need to pick refs
     - Returns feedback to the LLM so it can move on from duplicates
     """
@@ -48,29 +50,48 @@ class FindingsRouter:
         output_fh: TextIO,
         compiled_refs: dict[str, list[dict]] | None = None,
         seen_store: DeduplicationStore | None = None,
+        compiled_reqs: dict[str, dict] | None = None,
+        dimension: str | None = None,
     ):
         self._fh = output_fh
         self._refs = compiled_refs or {}
+        self._reqs = compiled_reqs or {}
+        self._dimension = dimension
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self.counter = 0
 
+    def _enrich(self, args: dict, finding: dict) -> None:
+        """Auto-fill principle, dimension, and refs from compiled standards."""
+        req = args.get("req")
+        if not req:
+            return
+        # Auto-fill principle name from req ID
+        if not args.get("p") and req in self._reqs:
+            finding["p"] = self._reqs[req]["principle"]
+        # Auto-fill dimension from server config
+        if not args.get("d") and self._dimension:
+            finding["d"] = self._dimension
+        # Enrich with compiled standard refs
+        if req in self._refs:
+            finding["req_refs"] = _select_best_refs(
+                self._refs[req], args.get("w", ""), args.get("reason", ""),
+            )
+
     def receive(self, args: dict) -> tuple[str, bool]:
         """Process a finding. Returns (message, is_duplicate)."""
-        key = (args.get("p"), args.get("file"), args.get("line"), args.get("t"))
+        # Resolve principle name for dedup key (prefer explicit, fall back to lookup)
+        p = args.get("p")
+        req = args.get("req")
+        if not p and req and req in self._reqs:
+            p = self._reqs[req]["principle"]
+        key = (p, args.get("file"), args.get("line"), args.get("t"))
         if key in self._seen:
             return "Duplicate finding, already captured. Move on.", True
         self._seen.add(key)
 
         finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
         finding.update({k: v for k, v in args.items() if v is not None})
-
-        # Enrich with compiled standard refs -- server-side, zero LLM tokens
-        # Pick one ref per source type (e.g. one CWE, one CISQ) using best text match
-        req = args.get("req")
-        if req and req in self._refs:
-            finding["req_refs"] = _select_best_refs(
-                self._refs[req], args.get("w", ""), args.get("reason", ""),
-            )
+        self._enrich(args, finding)
 
         self._fh.write(json.dumps(finding) + "\n")
         self._fh.flush()
@@ -130,13 +151,17 @@ def main() -> None:
         sys.exit(1)
 
     compiled_refs = _load_compiled_refs(sa.compiled_dir, sa.dimension)
+    compiled_reqs = _load_compiled_requirements(sa.compiled_dir, sa.dimension)
     queue: FileQueue | None = None
     if sa.queue_path:
         queue = FileQueue(Path(sa.queue_path))
 
     try:
         with open(sa.findings_file, "a") as findings_fh:
-            router = FindingsRouter(findings_fh, compiled_refs)
+            router = FindingsRouter(
+                findings_fh, compiled_refs,
+                compiled_reqs=compiled_reqs, dimension=sa.dimension,
+            )
             while True:
                 msg = read_message()
                 if msg is None:

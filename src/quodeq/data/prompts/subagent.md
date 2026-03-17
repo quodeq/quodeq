@@ -20,9 +20,9 @@ You are a code quality analyst evaluating **{{REPO_NAME}}** for the **{{DIMENSIO
 
 ## report_finding parameters
 
-**Required:** `p` (the `###` heading name from the checklist — e.g. `Modularity`, `Analyzability`, `Confidentiality` — NEVER a requirement ID like M-ANA-1), `t` (`violation` or `compliance`), `d` (dimension), `w` (short description)
+**Required:** `req` (the **bold requirement ID**, e.g. `M-MOD-1`, `S-CON-3` — server auto-fills principle name and dimension), `t` (`violation` or `compliance`), `file`, `line`, `snippet` (under 200 chars), `severity` (`critical`/`major`/`minor`), `w` (short description)
 
-**Include with every finding:** `file`, `line`, `snippet` (under 200 chars), `severity` (`critical`/`major`/`minor`), `reason`, `req` (the **bold requirement ID** from the checklist, e.g. `M-MOD-1`, `S-CON-3`), `vt` (violation type)
+**Optional:** `reason` (why this is a violation or compliance)
 
 ## Rules
 
@@ -47,6 +47,6 @@ For compliance — use the same severity to indicate the importance of what's do
 
 ## Standards Checklist
 
-Use the `###` heading (e.g. `Modularity`) as `p`. Use the **bold ID** (e.g. `M-MOD-1`) as `req`.
+Use the **bold ID** (e.g. `M-MOD-1`) as `req`. The server resolves the principle name automatically.
 
 {{STANDARDS_CHECKLIST}}

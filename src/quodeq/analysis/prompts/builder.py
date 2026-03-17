@@ -23,17 +23,23 @@ _NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
 _STANDARDS_READ_ERROR = "_Could not read compiled standards._"
 
 
-def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
-    """Render compiled standards as a requirements checklist organized by principle."""
+def _load_dimension_data(compiled_dir: Path, dimension: str) -> dict | None:
+    """Load compiled standards JSON for a dimension, or None on error."""
     compiled_file = compiled_dir / f"{dimension}.json"
     if not compiled_file.exists():
-        return _NO_STANDARDS_FOR_DIM
-
+        return None
     try:
-        data = read_json(compiled_file)
+        return read_json(compiled_file)
     except (OSError, ValueError) as exc:
         _logger.warning("Could not read compiled standards %s: %s", compiled_file, exc)
-        return _STANDARDS_READ_ERROR
+        return None
+
+
+def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
+    """Render compiled standards as a requirements checklist organized by principle."""
+    data = _load_dimension_data(compiled_dir, dimension)
+    if data is None:
+        return _NO_STANDARDS_FOR_DIM
     lines = []
     for principle in data.get("principles", []):
         reqs = principle.get("requirements", [])
@@ -43,6 +49,23 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
         for req in reqs:
             lines.append(f"- **{req['id']}**: {req['text']}")
         lines.append("")
+    return "\n".join(lines)
+
+
+def render_compact_standards(compiled_dir: Path, dimension: str) -> str:
+    """Render a compact standards checklist for the AI analyzer.
+
+    One line per requirement: ``REQ-ID: text``.
+    No principle headings (server derives principle from req ID),
+    no markdown formatting, no CWE refs (server enriches at report time).
+    """
+    data = _load_dimension_data(compiled_dir, dimension)
+    if data is None:
+        return _NO_STANDARDS_FOR_DIM
+    lines = []
+    for principle in data.get("principles", []):
+        for req in principle.get("requirements", []):
+            lines.append(f"{req['id']}: {req['text']}")
     return "\n".join(lines)
 
 
@@ -111,6 +134,7 @@ class PromptContext:
     manifest: "SourceManifest | None" = None
     target: "AnalysisTarget | None" = None
     extra_vars: dict[str, str] = field(default_factory=dict)
+    work_dir: Path | None = None
 
 
 _TEMPLATE_HASH_CACHE_SIZE = 128
@@ -151,6 +175,28 @@ def _render_manifest_context(context: PromptContext) -> str:
     return _NO_GUIDANCE
 
 
+_STANDARDS_FILE_PREFIX = ".quodeq_standards_"
+
+
+def _write_standards_file(work_dir: Path, dimension: str, content: str) -> Path:
+    """Write standards checklist to a file in the work directory.
+
+    Returns the absolute path to the written file.
+    """
+    standards_path = work_dir / f"{_STANDARDS_FILE_PREFIX}{dimension}.md"
+    standards_path.write_text(content)
+    return standards_path
+
+
+def _standards_read_instruction(standards_path: Path) -> str:
+    """Return prompt text instructing the AI to read the standards file."""
+    return (
+        f"**FIRST ACTION:** Read the standards checklist from `{standards_path}`\n"
+        f"This file contains all requirements you must evaluate against. "
+        f"Read it before analyzing any source files."
+    )
+
+
 def build_analysis_prompt(template: str, context: PromptContext) -> str:
     """Build a complete per-dimension analysis prompt from the template."""
     dimensions_text = render_dimensions(context.dimensions_data, context.dimension)
@@ -160,7 +206,17 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
     if context.standards_dir:
         compiled_dir = context.standards_dir / "compiled"
         if compiled_dir.exists():
-            standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
+            if context.work_dir:
+                compact = render_compact_standards(compiled_dir, context.dimension)
+                if compact not in (_NO_STANDARDS_FOR_DIM,):
+                    standards_path = _write_standards_file(
+                        context.work_dir, context.dimension, compact,
+                    )
+                    standards_checklist = _standards_read_instruction(standards_path)
+                else:
+                    standards_checklist = compact
+            else:
+                standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
 
     manifest_context = _render_manifest_context(context)
 

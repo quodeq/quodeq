@@ -67,6 +67,7 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
             standards_dir=config.standards_dir,
             manifest=config.manifest,
             target=config.target,
+            work_dir=config.work_dir or config.src,
         ),
     )
 
