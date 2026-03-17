@@ -40,7 +40,7 @@ _ANSI_YELLOW = "\033[1;33m"
 _ANSI_RED = "\033[0;31m"
 _NC = "\033[0m"
 
-_STYLES: dict = {
+_STYLES: dict[int, tuple[str, str]] = {
     logging.DEBUG: (_ANSI_GREY, "[DEBUG]"),
     logging.INFO: (_ANSI_BLUE, "[INFO]"),
     _LOG_SUCCESS: (_ANSI_GREEN, "[SUCCESS]"),

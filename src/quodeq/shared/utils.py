@@ -163,9 +163,9 @@ def get_action_api_port() -> int:
     return _env_int("QUODEQ_ACTION_API_PORT", _get_config()["action_api_port"])
 
 
-def get_action_api_host() -> str:
+def get_action_api_host(env: dict[str, str] | None = None) -> str:
     """Return the action API host from environment or default."""
-    return os.environ.get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
+    return (env or os.environ).get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
 
 
 def get_dashboard_port() -> int:

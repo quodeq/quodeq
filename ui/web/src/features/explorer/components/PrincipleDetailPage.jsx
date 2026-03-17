@@ -1,24 +1,7 @@
 import { memo, useState } from 'react';
 import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
-
-const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
-
-function parseFileRef(rawFile, rawLine) {
-  if (!rawFile) return { filePath: null, line: rawLine ?? null };
-  const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
-  const filePath = m[1] || rawFile;
-  const line = rawLine ?? (m[2] ? parseInt(m[2], 10) : null);
-  return { filePath, line };
-}
-
-function CopyIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <rect x="9" y="9" width="13" height="13" rx="2"/>
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-    </svg>
-  );
-}
+import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
+import CopyButton, { CopyIcon } from '../../../components/CopyButton.jsx';
 
 function buildPrinciplePlanText(principle) {
   const totalViolations = principle.total || 0;
@@ -78,21 +61,6 @@ function buildViolationPlanText(v, principleName) {
   if (loc) lines.push(`Apply it to \`${loc}\`.`);
   lines.push(PLAN_TEST_INSTRUCTION_SINGLE);
   return lines.join('\n').trim();
-}
-
-function CopyButton({ onClick, label }) {
-  const [copied, setCopied] = useState(false);
-  const handleClick = () => {
-    onClick();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <button className="detail-copy-btn" onClick={handleClick}>
-      {copied ? 'Copied!' : label}
-      <CopyIcon />
-    </button>
-  );
 }
 
 function FileCopyBtn({ display, copyText }) {

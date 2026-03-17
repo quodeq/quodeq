@@ -182,6 +182,7 @@ def _list_available_dimensions_for_discipline(
     discipline: str,
 ) -> list[str]:
     """Resolve available dimensions from universal dimensions.json (cached after first read)."""
+    _ = discipline  # unused; kept for caller-facing API consistency
     global _cached_dimensions
     if _cached_dimensions is not None:
         return _cached_dimensions

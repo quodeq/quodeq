@@ -35,13 +35,6 @@ def _int(raw: dict[str, object], key: str, default: int = 0) -> int:
     return v if isinstance(v, int) else default
 
 
-def _float(raw: dict[str, object], key: str, default: float = 0.0) -> float:
-    v = raw.get(key, default)
-    if isinstance(v, bool):
-        return default
-    return float(v) if isinstance(v, (int, float)) else default
-
-
 def _bool(raw: dict[str, object], key: str, default: bool = False) -> bool:
     v = raw.get(key, default)
     return v if isinstance(v, bool) else default

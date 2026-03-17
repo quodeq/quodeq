@@ -107,14 +107,6 @@ export function capitalizeGrade(str) {
 }
 
 /**
- * Return the most frequently occurring grade in the array.
- * Ties are broken by first encountered order.
- * Grade strings are normalized to lowercase before counting.
- *
- * @param {string[]} grades
- * @returns {string|null}
- */
-/**
  * Strip leading "Principle — " or "Principle - " prefix from reason text
  * to avoid duplication when the principle is shown separately.
  */
@@ -127,6 +119,46 @@ export function stripPrinciplePrefix(reason, principle) {
   }
   return reason;
 }
+export const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
+
+export function parseFileRef(rawFile, rawLine) {
+  if (!rawFile) return { filePath: null, line: rawLine ?? null };
+  const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
+  const filePath = m[1] || rawFile;
+  const line = rawLine ?? (m[2] ? parseInt(m[2], 10) : null);
+  return { filePath, line };
+}
+
+export function angleFromDelta(d) {
+  const clamped = Math.max(-4, Math.min(4, d));
+  return 90 - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / 4) * 55;
+}
+
+export function scoreTierLabel(score) {
+  const n = parseFloat(score);
+  if (isNaN(n)) return '';
+  if (n >= 9) return 'A';
+  if (n >= 7) return 'B';
+  if (n >= 5) return 'C';
+  if (n >= 3) return 'D';
+  return 'F';
+}
+
+const GRADE_LABEL_MAP = { exemplary: 'A', good: 'B', proficient: 'B', adequate: 'C', developing: 'C', poor: 'D', insufficient: 'D', critical: 'F' };
+
+export function gradeLabel(grade) {
+  if (!grade) return null;
+  const k = grade.trim().toLowerCase();
+  if (GRADE_LABEL_MAP[k]) return GRADE_LABEL_MAP[k];
+  const firstChar = grade.trim().toUpperCase().charAt(0);
+  return ['A', 'B', 'C', 'D', 'F'].includes(firstChar) ? firstChar : null;
+}
+
+export function complianceRatio(violations, compliance) {
+  if (violations === 0) return '\u2014';
+  return `1:${Math.round(compliance / violations)}`;
+}
+
 export function mostFrequentGrade(grades) {
   if (!grades || grades.length === 0) return null;
   const counts = {};

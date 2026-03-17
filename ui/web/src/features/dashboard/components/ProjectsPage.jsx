@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
+import { gradeLabel } from '../../../utils/formatters.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -25,14 +26,6 @@ function disciplineLabel(d) {
   return DISCIPLINE_LABEL[d.toLowerCase()] ?? d.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function gradeLabel(grade) {
-  if (!grade) return null;
-  const k = grade.trim().toLowerCase();
-  const MAP = { exemplary: 'A', good: 'B', proficient: 'B', adequate: 'C', developing: 'C', poor: 'D', insufficient: 'D', critical: 'F' };
-  if (MAP[k]) return MAP[k];
-  const firstChar = grade.trim().toUpperCase().charAt(0);
-  return ['A', 'B', 'C', 'D', 'F'].includes(firstChar) ? firstChar : null;
-}
 
 function formatDate(iso) {
   if (!iso) return null;

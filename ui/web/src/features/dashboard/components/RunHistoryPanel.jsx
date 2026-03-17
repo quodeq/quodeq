@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatShortDate } from '../../../utils/formatters.js';
+import { formatShortDate, angleFromDelta, scoreTierLabel } from '../../../utils/formatters.js';
 import {
   ComposedChart,
   Bar,
@@ -28,22 +28,6 @@ function scoreBarColor(score) {
   if (n >= 5) return cssVar('--color-grade-mid-text');   // adequate
   if (n >= 3) return cssVar('--color-grade-low-text');   // poor
   return cssVar('--color-grade-bottom-text');            // critical
-}
-
-function scoreTierLabel(score) {
-  const n = parseFloat(score);
-  if (isNaN(n)) return '';
-  if (n >= 9) return 'A';
-  if (n >= 7) return 'B';
-  if (n >= 5) return 'C';
-  if (n >= 3) return 'D';
-  return 'F';
-}
-
-// Mirrors angleFromDelta in TrendArrow — sqrt curve, max arc 55°
-function angleFromDelta(d) {
-  const clamped = Math.max(-4, Math.min(4, d));
-  return 90 - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / 4) * 55;
 }
 
 // Trend direction — mirrors TrendBadge thresholds

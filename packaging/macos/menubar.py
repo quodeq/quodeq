@@ -292,7 +292,6 @@ class QuodeqApp(rumps.App):
                 pass
 
         self._port = None
-        self._browser_opened = False
         self._status_item.title = "Stopped"
         self._open_item.set_callback(None)
         self._open_item._menuitem.setEnabled_(False)
