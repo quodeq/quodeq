@@ -210,8 +210,6 @@ class SubagentPool:
                     error=str(exc),
                 )
             self._finished[result.agent_id] = True
-            if result.success:
-                log_success(f"  {result.agent_id} finished")
             results.append(result)
             del self._futures[future]
         return done_futures
@@ -227,7 +225,6 @@ class SubagentPool:
         for _ in done:
             remaining = self._should_respawn(pool_start, max_duration)
             if remaining:
-                log_info(f"  {remaining} files left -- spawning agent-{self._next_idx}")
                 self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
                 self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
                 self._next_idx += 1
