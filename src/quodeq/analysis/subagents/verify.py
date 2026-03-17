@@ -1,20 +1,25 @@
-"""Post-analysis verification pass — re-checks previous run's findings for consistency."""
+"""Mechanical verification — re-checks previous findings against current code.
+
+Instead of one big AI agent re-exploring the codebase, iterate over each
+previous finding mechanically:
+
+1. Read the finding (file, line, snippet, principle)
+2. Check if the file still exists and the code is still there
+3. If confirmed, copy the finding to the current run's JSONL
+
+Fast, zero AI tokens, runs in <1 second.
+"""
 from __future__ import annotations
 
 import json
 from pathlib import Path
 from typing import Any
 
-from quodeq.analysis.subprocess import AnalysisConfig, run_analysis
-from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
 from quodeq.data.fs.report_parser.runs import list_runs
-from quodeq.core.evidence.model import Evidence
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
-from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.logging import log_info, log_success
 from quodeq.shared.utils import open_text
 
-_DEFAULT_VERIFY_AGENTS = 1
-_DEFAULT_VERIFY_BUDGET = 300  # 5 minutes per verifier
 _VERIFY_TEMPLATE = "verify.md"
 
 
@@ -28,6 +33,79 @@ def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_i
         if prev_jsonl.exists() and prev_jsonl.stat().st_size > 0:
             return prev_jsonl
     return None
+
+
+def _load_previous_findings(jsonl_path: Path) -> list[dict]:
+    """Load all findings from a JSONL file."""
+    findings: list[dict] = []
+    if not jsonl_path.exists():
+        return findings
+    try:
+        with open_text(jsonl_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = json.loads(line)
+                    if entry.get("p") and entry.get("t") in ("violation", "compliance"):
+                        findings.append(entry)
+                except json.JSONDecodeError:
+                    continue
+    except OSError:
+        pass
+    return findings
+
+
+def _mechanical_check(finding: dict, src: Path) -> str:
+    """Check if a finding's code location still exists.
+
+    Returns:
+        "confirmed" — file and snippet still match
+        "gone" — file deleted or line changed completely
+        "ambiguous" — file exists but code changed, needs AI judgment
+    """
+    rel_path = finding.get("file", "")
+    if not rel_path:
+        return "gone"
+
+    file_path = src / rel_path
+    if not file_path.exists():
+        return "gone"
+
+    try:
+        lines = file_path.read_text(errors="ignore").splitlines()
+    except OSError:
+        return "gone"
+
+    target_line = finding.get("line", 0)
+    snippet = finding.get("snippet", "").strip()
+
+    if not snippet:
+        # No snippet to match — file exists, assume ambiguous
+        return "ambiguous"
+
+    # Check exact line match first
+    if 0 < target_line <= len(lines):
+        line_content = lines[target_line - 1]
+        if snippet in line_content or line_content.strip() in snippet:
+            return "confirmed"
+
+    # Check nearby lines (code may have shifted by a few lines)
+    search_start = max(0, target_line - 10)
+    search_end = min(len(lines), target_line + 10)
+    for i in range(search_start, search_end):
+        if snippet in lines[i] or lines[i].strip() in snippet:
+            return "confirmed"
+
+    # File exists but snippet not found nearby — code changed
+    return "ambiguous"
+
+
+def _write_finding(finding: dict, output_fh: Any) -> None:
+    """Append a finding to the JSONL output file."""
+    output_fh.write(json.dumps(finding) + "\n")
+    output_fh.flush()
 
 
 def _format_findings_summary(jsonl_path: Path) -> str:
@@ -90,91 +168,85 @@ def _build_verify_prompt(
     )
 
 
-def run_verification_pass(
-    config: Any,
-    dim_id: str,
-    ctx: Any,
-    evidence_dir: Path,
-    *,
-    n_agents: int = _DEFAULT_VERIFY_AGENTS,
-    max_duration: int = _DEFAULT_VERIFY_BUDGET,
-) -> int:
-    """Re-check the previous run's findings against the current code.
-
-    Reads violations/compliance from the most recent previous evaluation,
-    then launches verification agents that confirm which are still present
-    and hunt for missing compliance evidence. New findings are appended to
-    the current run's JSONL (dedup prevents duplicates).
-
-    Returns the number of new findings added, or 0 if no previous run exists.
-    """
-    # Find the previous run's evidence.
-    # Layout: reports_base / project_uuid / run_id / evidence[/target_name]
-    # Walk up from evidence_dir until we find the "evidence" directory name
-    # to locate the run directory reliably for both flat and multi-target.
+def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
+    """Walk up from evidence_dir to find run_id, project_uuid, reports_base."""
     edir = Path(evidence_dir)
     while edir.name != "evidence" and edir != edir.parent:
         edir = edir.parent
     if edir.name != "evidence":
+        return None
+    run_dir = edir.parent
+    return run_dir.name, run_dir.parent.name, run_dir.parent.parent
+
+
+def run_mechanical_verify(
+    src: Path,
+    prev_findings: list[dict],
+    output_jsonl: Path,
+) -> tuple[int, int, list[dict]]:
+    """Mechanically verify findings against current code.
+
+    Returns (confirmed_count, gone_count, ambiguous_findings).
+    """
+    confirmed = 0
+    gone = 0
+    ambiguous: list[dict] = []
+
+    with open(output_jsonl, "a") as fh:
+        for finding in prev_findings:
+            status = _mechanical_check(finding, src)
+            if status == "confirmed":
+                _write_finding(finding, fh)
+                confirmed += 1
+            elif status == "gone":
+                gone += 1
+            else:
+                ambiguous.append(finding)
+
+    return confirmed, gone, ambiguous
+
+
+def run_verify_for_dimension(
+    config: Any,
+    dim_id: str,
+    evidence_dir: Path,
+) -> int:
+    """Run mechanical verification for a dimension.
+
+    1. Find previous run's JSONL
+    2. For each finding: check if file/snippet still exists
+    3. Confirmed findings → copy to current JSONL
+    4. Gone findings → drop
+    5. Ambiguous findings → drop (conservative; analysis agents will re-discover if real)
+
+    Returns number of findings carried forward.
+    """
+    if not getattr(config, 'options', None) or not config.options.verify_findings:
+        return 0
+
+    paths = _resolve_evidence_paths(evidence_dir)
+    if paths is None:
         log_info(f"  [{dim_id}] Cannot locate evidence root — skipping verification")
         return 0
-    run_dir = edir.parent           # .../project_uuid/run_id
-    current_run_id = run_dir.name
-    project_uuid = run_dir.parent.name
-    reports_base = run_dir.parent.parent
+
+    current_run_id, project_uuid, reports_base = paths
 
     prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
     if prev_jsonl is None:
-        log_info(f"  [{dim_id}] No previous evaluation found — skipping verification")
+        log_info(f"  [{dim_id}] No previous evaluation — skipping verification")
         return 0
 
-    findings_summary = _format_findings_summary(prev_jsonl)
-    if "_No findings" in findings_summary:
+    prev_findings = _load_previous_findings(prev_jsonl)
+    if not prev_findings:
         return 0
 
-    jsonl_path = evidence_dir / f"{dim_id}_evidence.jsonl"
-    prompt = _build_verify_prompt(config, dim_id, ctx, findings_summary)
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    log_info(f"  [{dim_id}] Verifying {len(prev_findings)} previous findings mechanically")
 
-    # Count findings before verification
-    before_count = _count_findings(jsonl_path)
+    output_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
+    confirmed, gone, ambiguous = run_mechanical_verify(config.src, prev_findings, output_jsonl)
 
-    log_info(f"  [{dim_id}] Verifying previous run findings ({n_agents} agents)")
-
-    for i in range(n_agents):
-        stream_file = evidence_dir / f"{dim_id}_verify_{i}.stream"
-        ac = AnalysisConfig(
-            jsonl_file=jsonl_path,
-            compiled_dir=compiled_dir,
-            dimension=dim_id,
-            max_duration=max_duration,
-            agent_id=f"verify-{i}",
-        )
-        try:
-            run_analysis(
-                work_dir=config.src,
-                prompt=prompt,
-                stream_file=stream_file,
-                config=ac,
-            )
-        except Exception as exc:
-            log_info(f"  [{dim_id}] Verifier {i} finished with: {exc}")
-
-    # Deduplicate after all verifiers have appended
-    deduplicate_jsonl(jsonl_path)
-
-    after_count = _count_findings(jsonl_path)
-    new_findings = after_count - before_count
-    log_success(f"  [{dim_id}] Verification complete: +{new_findings} findings from previous run check")
-    return new_findings
-
-
-def _count_findings(jsonl_path: Path) -> int:
-    """Count non-empty lines in a JSONL file."""
-    if not jsonl_path.exists():
-        return 0
-    try:
-        with open_text(jsonl_path) as f:
-            return sum(1 for line in f if line.strip())
-    except OSError:
-        return 0
+    log_success(
+        f"  [{dim_id}] Verification: {confirmed} confirmed, "
+        f"{gone} gone, {len(ambiguous)} ambiguous (dropped)"
+    )
+    return confirmed
