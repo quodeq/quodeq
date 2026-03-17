@@ -151,17 +151,37 @@ def _load_json_only_evals(
 
 
 def _load_evaluations(evaluation_dir: Path) -> list[dict[str, Any]]:
-    """Load parsed evaluation dicts from a run's evaluation directory."""
+    """Load parsed evaluation dicts from a run's evaluation directory.
+
+    Supports both flat layouts (single-target) and nested layouts (multi-target)
+    where each subdirectory is a target module.
+    """
     entries = safe_read_dir(evaluation_dir)
     evaluations, seen = _load_markdown_backed_evals(entries, evaluation_dir)
     evaluations.extend(_load_json_only_evals(entries, seen))
+
+    # Scan target subdirectories for multi-target runs
+    for entry in entries:
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        target_dir = evaluation_dir / entry.name
+        sub_entries = safe_read_dir(target_dir)
+        sub_evals, sub_seen = _load_markdown_backed_evals(sub_entries, target_dir)
+        for ev in sub_evals:
+            ev.setdefault("module", entry.name)
+        evaluations.extend(sub_evals)
+        json_evals = _load_json_only_evals(sub_entries, sub_seen)
+        for ev in json_evals:
+            ev.setdefault("module", entry.name)
+        evaluations.extend(json_evals)
+
     return evaluations
 
 
-def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
-    """Load evidence files keyed by dimension name."""
+def _load_evidence_from_dir(directory: Path, module: str = "") -> dict[str, dict[str, Any]]:
+    """Load evidence files from a single directory, keyed by dimension name."""
     evidence_map: dict[str, dict[str, Any]] = {}
-    for entry in safe_read_dir(evidence_dir):
+    for entry in safe_read_dir(directory):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
             parsed_ev = parse_evidence_file(Path(entry.path))
             dimension = parsed_ev.get("dimension")
@@ -170,7 +190,25 @@ def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
                     "Evidence file %s missing 'dimension' key, skipping", entry.name,
                 )
                 continue
+            if module:
+                parsed_ev["module"] = module
             evidence_map[dimension] = parsed_ev
+    return evidence_map
+
+
+def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
+    """Load evidence files keyed by dimension name.
+
+    Supports both flat (single-target) and nested (multi-target) layouts.
+    """
+    evidence_map = _load_evidence_from_dir(evidence_dir)
+
+    # Scan target subdirectories
+    for entry in safe_read_dir(evidence_dir):
+        if entry.is_dir() and not entry.name.startswith("."):
+            sub_map = _load_evidence_from_dir(evidence_dir / entry.name, module=entry.name)
+            evidence_map.update(sub_map)
+
     return evidence_map
 
 

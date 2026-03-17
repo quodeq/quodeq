@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.engine.prompt_builder import (
+from quodeq.analysis.prompts.builder import (
     PromptContext,
     build_analysis_prompt,
     load_template,
@@ -120,6 +120,8 @@ def test_load_template_custom_path(tmp_path):
 
 class TestBuildAnalysisPrompt:
     def test_substitutes_all_variables(self, tmp_path):
+        from quodeq.analysis.manifest import SourceManifest
+
         # Create minimal compiled standards
         compiled_dir = tmp_path / "compiled"
         compiled_dir.mkdir()
@@ -138,50 +140,39 @@ class TestBuildAnalysisPrompt:
         }
         (compiled_dir / "security.json").write_text(json.dumps(compiled))
 
+        from quodeq.analysis.manifest import AnalysisTarget
+        target = AnalysisTarget(name="typescript", language="typescript", total_files=42)
+        manifest = SourceManifest(targets=[target], total_files=42)
         template = load_template()
         prompt = build_analysis_prompt(
             template,
             PromptContext(
-                plugin_id="typescript",
+                language="typescript",
                 repo_name="my-app",
                 date_str="2026-03-06",
                 dimension="security",
                 source_file_count=42,
                 dimensions_data=_sample_dimensions(),
                 standards_dir=tmp_path,
+                manifest=manifest,
             ),
         )
         assert "{{" not in prompt  # all placeholders resolved
         assert "my-app" in prompt
         assert "2026-03-06" in prompt
+        assert "Typescript" in prompt  # from manifest project_description
         assert "42" in prompt
         assert "Confidentiality" in prompt
         assert "S-CON-1" in prompt
         assert "Secrets MUST NOT be hardcoded" in prompt
         assert "security" in prompt
 
-    def test_includes_analysis_guidance(self):
+    def test_no_manifest_shows_no_guidance(self):
         template = load_template()
         prompt = build_analysis_prompt(
             template,
             PromptContext(
-                plugin_id="typescript",
-                repo_name="test",
-                date_str="2026-03-06",
-                dimension="security",
-                source_file_count=10,
-                dimensions_data=_sample_dimensions(),
-                analysis_md="Look for eval() calls in route handlers",
-            ),
-        )
-        assert "Look for eval() calls in route handlers" in prompt
-
-    def test_no_analysis_guidance_placeholder(self):
-        template = load_template()
-        prompt = build_analysis_prompt(
-            template,
-            PromptContext(
-                plugin_id="typescript",
+                language="typescript",
                 repo_name="test",
                 date_str="2026-03-06",
                 dimension="security",
@@ -196,7 +187,7 @@ class TestBuildAnalysisPrompt:
         prompt = build_analysis_prompt(
             template,
             PromptContext(
-                plugin_id="typescript",
+                language="typescript",
                 repo_name="test",
                 date_str="2026-03-06",
                 dimension="security",

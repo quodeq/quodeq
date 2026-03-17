@@ -11,14 +11,12 @@ import uuid
 from pathlib import Path
 from typing import Callable
 
-from quodeq.config.cli import build_parser as build_config_parser
-from quodeq.config.cli import main as configure_main
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
-from quodeq.engine.analysis import AnalysisError
-from quodeq.engine.runner import EvaluationError
-from quodeq.engine._runner_report import run_full
-from quodeq.engine.runner import AnalysisOptions, RunConfig, run
+from quodeq.analysis.subprocess import AnalysisError
+from quodeq.analysis.manifest import AnalysisTarget
+from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
+from quodeq.core.scoring.report import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import prepare_repository
 from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo, write_text
@@ -52,7 +50,7 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
     """Register arguments for the evaluate subcommand."""
     parser.add_argument("repo", help="Path or URL to the repository")
     parser.add_argument(
-        "-p", "--plugin", default=None, help="Plugin ID (overrides auto-detection)"
+        "-l", "--language", default=None, help="Language (overrides auto-detection)"
     )
     parser.add_argument(
         "-o", "--output", default=get_evaluations_dir(), help="Reports output directory"
@@ -66,7 +64,7 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "-d", "--dimensions", default=None,
-        help="Comma-separated dimensions to evaluate (default: all from plugin)",
+        help="Comma-separated dimensions to evaluate (default: all)",
     )
     parser.add_argument(
         "--evidence-only", action="store_true",
@@ -99,16 +97,10 @@ def build_parser() -> argparse.ArgumentParser:
     dashboard_parser.set_defaults(handler_command="dashboard")
 
     evaluate_parser = subparsers.add_parser(
-        "evaluate", help="Run evaluation (auto-detects plugin)"
+        "evaluate", help="Run evaluation (auto-detects language)"
     )
     _add_evaluate_args(evaluate_parser)
     evaluate_parser.set_defaults(handler_command="evaluate")
-
-    configure_parser = subparsers.add_parser(
-        "configure", help="Configure Quodeq",
-        parents=[build_config_parser()], add_help=False,
-    )
-    configure_parser.set_defaults(handler_command="configure")
 
     return parser
 
@@ -148,41 +140,22 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     return reports_root, evidence_dir, evaluation_dir
 
 
-def _resolve_plugin(args: argparse.Namespace, src: Path, evaluators_dir: Path) -> str | None:
-    """Detect or validate the plugin for a repo. Returns plugin_id or None on error."""
-    plugin_id = args.plugin
-    if plugin_id is None:
-        try:
-            from quodeq.engine.plugin_detector import detect_plugin
-            plugin_id = detect_plugin(src, evaluators_dir)
-        except ValueError as exc:
-            print(str(exc), file=sys.stderr)
-            return None
-    validate_path_segment(plugin_id)
-    print(f"Plugin: {plugin_id}", file=sys.stderr)
-    plugin_dir = evaluators_dir / plugin_id
-    if not plugin_dir.exists():
-        print(f"Plugin directory not found: {plugin_dir}", file=sys.stderr)
-        return None
-    return plugin_id
-
 
 def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
     """Detect or validate the language for a repo using universal detection.
 
     Returns language string or None on error.
     """
-    if args.plugin:
-        # Explicit plugin override — use as-is
-        validate_path_segment(args.plugin)
-        return args.plugin
+    if args.language:
+        validate_path_segment(args.language)
+        return args.language
 
     detection_file = paths.detection_file
     if not detection_file.exists():
         return None
 
     try:
-        from quodeq.analysis.plugins.detector import detect_language
+        from quodeq.analysis.manifest import detect_language
         language = detect_language(src, detection_file)
         print(f"Language: {language}", file=sys.stderr)
         return language
@@ -210,20 +183,6 @@ def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManife
     return manifest
 
 
-def _prescan_sources(args: argparse.Namespace, plugin_dir: Path, src: Path) -> int:
-    """Count source files for the plugin if prescan is not disabled (legacy path)."""
-    if args.no_prescan:
-        return 0
-    from quodeq.engine.plugin_loader import load_plugin
-    from quodeq.engine.plugin_detector import count_source_files
-    plugin_data = load_plugin(plugin_dir)
-    extensions = set(plugin_data.get("detects", {}).get("extensions", []))
-    if not extensions:
-        return 0
-    source_file_count = count_source_files(src, extensions)
-    print(f"Source files: {source_file_count}", file=sys.stderr)
-    return source_file_count
-
 
 def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
     """Execute the evidence/scoring pipeline and print results."""
@@ -231,7 +190,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
         if args.evidence_only:
             print("Starting evidence collection (this may take several minutes per dimension)...", file=sys.stderr)
             evidence = run(config)
-            out_file = evidence_dir / f"{config.plugin_id}_evidence.json"
+            out_file = evidence_dir / f"{config.language}_evidence.json"
             try:
                 write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
             except OSError as exc:
@@ -255,25 +214,24 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
     return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
 
 
-def _build_run_config_universal(
+def _build_run_config(
     args: argparse.Namespace, src: Path, language: str,
     manifest, dims_data: dict, evidence_dir: Path,
+    target: AnalysisTarget | None = None,
 ) -> RunConfig:
-    """Assemble a RunConfig using universal (manifest-based) mode."""
+    """Assemble a RunConfig from CLI args and resolved paths."""
     standards_dir = default_paths().standards_dir
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
     print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
 
-    source_file_count = manifest.total_files if manifest else 0
-
     return RunConfig(
         src=src,
-        plugin_id=language,
+        language=language,
         standards_dir=standards_dir if standards_dir.exists() else None,
-        source_file_count=source_file_count,
         work_dir=evidence_dir,
         manifest=manifest,
         dimensions_data=dims_data,
+        target=target,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
             max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
@@ -285,31 +243,23 @@ def _build_run_config_universal(
     )
 
 
-def _build_run_config(
-    args: argparse.Namespace, src: Path, plugin_id: str,
-    evaluators_dir: Path, evidence_dir: Path,
-) -> RunConfig:
-    """Assemble a RunConfig from CLI args and resolved paths (legacy mode)."""
-    standards_dir = default_paths().standards_dir
-    dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
-    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
-
-    return RunConfig(
-        src=src,
-        plugin_id=plugin_id,
-        evaluators_dir=evaluators_dir,
-        standards_dir=standards_dir if standards_dir.exists() else None,
-        source_file_count=_prescan_sources(args, evaluators_dir / plugin_id, src),
-        work_dir=evidence_dir,
-        options=AnalysisOptions(
-            dimensions=dimensions_filter,
-            max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
-            max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
-            n_subagents=args.n_subagents,
-            subagent_model=_subagent_model(),
-            verify_findings=not _no_verify(args),
-        ),
-    )
+def _resolve_targets(args: argparse.Namespace, manifest) -> list[AnalysisTarget]:
+    """Return the list of targets to analyze, filtered by --language if set."""
+    if manifest is None or not manifest.targets:
+        return []
+    targets = manifest.targets
+    if args.language:
+        filtered = [t for t in targets if t.language == args.language]
+        if not filtered and targets:
+            available = ", ".join(t.language for t in targets)
+            print(
+                f"Warning: --language={args.language} not found in detected targets ({available}). "
+                f"Running with auto-detected language.",
+                file=sys.stderr,
+            )
+            return targets
+        return filtered
+    return targets
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
@@ -320,49 +270,65 @@ def run_evaluate(args: argparse.Namespace) -> int:
 
     paths = default_paths()
 
-    # Try universal mode first (detection.json + manifest)
-    if paths.detection_file.exists() and paths.dimensions_file.exists():
-        language = _resolve_language(args, src, paths)
-        if language is not None:
-            from quodeq.analysis.plugins.loader import load_universal_dimensions
-            try:
-                dims_data = load_universal_dimensions(paths.dimensions_file)
-            except ValueError as exc:
-                print(f"Invalid dimensions config: {exc}", file=sys.stderr)
-                return 1
-
-            manifest = _build_manifest(args, src, paths)
-            _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
-            print(f"Report path: {evaluation_dir}", file=sys.stderr)
-
-            # Save manifest for debugging
-            if manifest and evidence_dir:
-                try:
-                    write_text(
-                        evidence_dir / "manifest.json",
-                        json.dumps(manifest.to_dict(), indent=2),
-                    )
-                except OSError:
-                    pass  # non-critical
-
-            config = _build_run_config_universal(args, src, language, manifest, dims_data, evidence_dir)
-            return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-
-    # Fallback: legacy evaluators_dir mode
-    evaluators_dir = paths.evaluators_dir
-    if not evaluators_dir.exists():
-        print(f"Evaluators directory not found: {evaluators_dir}. Run 'quodeq configure' to set up the configuration.", file=sys.stderr)
+    if not paths.detection_file.exists() or not paths.dimensions_file.exists():
+        print("Configuration not found: detection.json and dimensions.json are required.", file=sys.stderr)
         return 1
 
-    plugin_id = _resolve_plugin(args, src, evaluators_dir)
-    if plugin_id is None:
+    language = _resolve_language(args, src, paths)
+    if language is None:
         return 1
 
+    from quodeq.analysis.runner import load_universal_dimensions
+    try:
+        dims_data = load_universal_dimensions(paths.dimensions_file)
+    except ValueError as exc:
+        print(f"Invalid dimensions config: {exc}", file=sys.stderr)
+        return 1
+
+    manifest = _build_manifest(args, src, paths)
     _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
     print(f"Report path: {evaluation_dir}", file=sys.stderr)
 
-    config = _build_run_config(args, src, plugin_id, evaluators_dir, evidence_dir)
-    return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+    # Save manifest for debugging
+    if manifest and evidence_dir:
+        try:
+            write_text(
+                evidence_dir / "manifest.json",
+                json.dumps(manifest.to_dict(), indent=2),
+            )
+        except OSError:
+            pass  # non-critical
+
+    targets = _resolve_targets(args, manifest)
+
+    if not targets:
+        # No manifest or no targets detected: legacy fallback (no target scoping)
+        config = _build_run_config(args, src, language, manifest, dims_data, evidence_dir)
+        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+
+    # Always run per-target: each target gets its own language-scoped analysis.
+    # 1 target → flat output dirs.  N targets → nested by target name.
+    nested = len(targets) > 1
+    print(f"Targets: {', '.join(t.name for t in targets)}", file=sys.stderr)
+    worst_rc = 0
+    for target in targets:
+        if nested:
+            target_evidence = evidence_dir / target.name
+            target_evaluation = evaluation_dir / target.name
+            target_evidence.mkdir(parents=True, exist_ok=True)
+            target_evaluation.mkdir(parents=True, exist_ok=True)
+        else:
+            target_evidence = evidence_dir
+            target_evaluation = evaluation_dir
+        print(f"\n=== Target: {target.name} ({target.project_description}) ===", file=sys.stderr)
+        config = _build_run_config(
+            args, src, target.language, manifest, dims_data,
+            target_evidence, target=target,
+        )
+        rc = _execute_pipeline(args, config, target_evidence, target_evaluation)
+        if rc != 0:
+            worst_rc = rc
+    return worst_rc
 
 
 def _run_dashboard(argv: list[str] | None) -> int:
@@ -370,14 +336,8 @@ def _run_dashboard(argv: list[str] | None) -> int:
     return dashboard_main(sub_argv)
 
 
-def _run_configure(argv: list[str] | None) -> int:
-    sub_argv = argv[1:] if argv is not None else sys.argv[2:]
-    return configure_main(sub_argv)
-
-
 _COMMAND_HANDLERS: dict[str, Callable] = {
     "dashboard": _run_dashboard,
-    "configure": _run_configure,
 }
 
 

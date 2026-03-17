@@ -8,8 +8,8 @@ from typing import Any
 from quodeq.analysis.subprocess import AnalysisConfig, run_analysis
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
 from quodeq.data.fs.report_parser.runs import list_runs
-from quodeq.engine.evidence import Evidence
-from quodeq.engine.prompt_builder import PromptContext, build_analysis_prompt, load_template
+from quodeq.core.evidence.model import Evidence
+from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_success, log_warning
 from quodeq.shared.utils import open_text
 
@@ -77,14 +77,14 @@ def _build_verify_prompt(
     prompt = build_analysis_prompt(
         template,
         PromptContext(
-            plugin_id=config.plugin_id,
+            language=config.language,
             repo_name=str(config.src),
             date_str=ctx.date_str,
             dimension=dim_id,
             source_file_count=config.source_file_count,
             dimensions_data=ctx.dimensions_data,
-            analysis_md="",  # verifiers don't need analysis guidance
             standards_dir=config.standards_dir,
+            target=getattr(config, "target", None),
         ),
     )
     # Inject the findings summary (not a standard template var)
@@ -110,11 +110,20 @@ def run_verification_pass(
 
     Returns the number of new findings added, or 0 if no previous run exists.
     """
-    # Find the previous run's evidence
-    reports_root = Path(config.work_dir or evidence_dir).parent.parent
-    current_run_id = Path(config.work_dir or evidence_dir).parent.name
-    project_uuid = reports_root.name
-    reports_base = reports_root.parent
+    # Find the previous run's evidence.
+    # Layout: reports_base / project_uuid / run_id / evidence[/target_name]
+    # Walk up from evidence_dir until we find the "evidence" directory name
+    # to locate the run directory reliably for both flat and multi-target.
+    edir = Path(evidence_dir)
+    while edir.name != "evidence" and edir != edir.parent:
+        edir = edir.parent
+    if edir.name != "evidence":
+        log_info(f"  [{dim_id}] Cannot locate evidence root — skipping verification")
+        return 0
+    run_dir = edir.parent           # .../project_uuid/run_id
+    current_run_id = run_dir.name
+    project_uuid = run_dir.parent.name
+    reports_base = run_dir.parent.parent
 
     prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
     if prev_jsonl is None:

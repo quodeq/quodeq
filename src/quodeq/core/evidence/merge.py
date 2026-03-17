@@ -4,7 +4,10 @@ from __future__ import annotations
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence, compute_coverage_pct
 
 
-def merge_evidence(evidence_list: list[Evidence], source_file_count: int, src: str, plugin_id: str) -> Evidence:
+def merge_evidence(
+    evidence_list: list[Evidence], source_file_count: int, src: str, language: str,
+    module: str = "",
+) -> Evidence:
     """Merge per-dimension Evidence objects into a single Evidence."""
     merged_principles: dict[str, PrincipleEvidence] = {}
     total_files_read = 0
@@ -24,16 +27,19 @@ def merge_evidence(evidence_list: list[Evidence], source_file_count: int, src: s
 
     coverage_pct = compute_coverage_pct(total_files_read, source_file_count)
 
+    # Inherit module from the first evidence object if not explicitly provided
+    if not module and evidence_list:
+        module = evidence_list[0].module
+
     merged = Evidence(
         repository=src,
-        plugin_id=plugin_id,
+        language=language,
         date=evidence_list[0].date if evidence_list else "",
         source_file_count=source_file_count,
         files_read=total_files_read,
         coverage_pct=coverage_pct,
         principles=merged_principles,
         dismissed_count=total_dismissed,
+        module=module,
     )
-    if evidence_list:
-        merged.plugin_name = evidence_list[0].plugin_name
     return merged
