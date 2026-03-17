@@ -18,6 +18,7 @@ _PORTS = tuple(
 )
 _HEALTH_TIMEOUT = 1.0
 _POLL_INTERVAL = 5
+_MAX_START_RETRIES = 20
 
 
 _commands_cache: dict[str, str | None] | None = None
@@ -250,7 +251,7 @@ class QuodeqApp(rumps.App):
             return
 
         import time
-        for _ in range(20):
+        for _ in range(_MAX_START_RETRIES):
             time.sleep(0.5)
             port = _find_running_port()
             if port:

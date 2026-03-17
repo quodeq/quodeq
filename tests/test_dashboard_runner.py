@@ -89,7 +89,6 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     config = _make_config(tmp_path, static_dist=static_dist, reports_defaulted=True)
 
     captured = []
-    original_ensure = runner._ensure_action_api
     monkeypatch.setattr(
         runner, "_ensure_action_api",
         lambda *args, **kwargs: (captured.append(args) or ("http://127.0.0.1:4174", DummyProcess())),

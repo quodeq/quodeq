@@ -3,6 +3,8 @@ import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../..
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton, { CopyIcon } from '../../../components/CopyButton.jsx';
 
+const COPY_FEEDBACK_MS = 1500;
+
 function buildPrinciplePlanText(principle) {
   const totalViolations = principle.total || 0;
   const lines = [
@@ -72,7 +74,7 @@ function FileCopyBtn({ display, copyText }) {
       onClick={() => {
         navigator.clipboard.writeText(copyText);
         setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
       }}
     >
       {copied ? 'Copied!' : display}

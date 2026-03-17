@@ -13,7 +13,7 @@ export function getLevels() {
       const stored = localStorage.getItem(`${MODEL_STORAGE_PREFIX}${lvl}`);
       if (stored) overrides[lvl] = stored;
     }
-  } catch {}
+  } catch { /* localStorage unavailable (private browsing) */ }
   return [
     { level: 1, model: overrides[1] || DEFAULT_MODELS[1], label: 'Fast' },
     { level: 2, model: overrides[2] || DEFAULT_MODELS[2], label: 'Balanced' },

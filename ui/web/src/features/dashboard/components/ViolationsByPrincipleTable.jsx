@@ -45,7 +45,7 @@ const ViolationsByPrincipleTable = memo(function ViolationsByPrincipleTable({ vi
       <ul className="offending-file-list">
         {displayItems.map((p, idx) => (
           <li
-            key={idx}
+            key={p.principle || idx}
             className={`offending-file-row${onPrincipleClick ? ' offending-file-row--clickable' : ''}`}
             role={onPrincipleClick ? 'button' : undefined}
             tabIndex={onPrincipleClick ? 0 : undefined}

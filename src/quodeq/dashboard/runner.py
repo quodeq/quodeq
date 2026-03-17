@@ -11,6 +11,7 @@ Key functions and their contracts:
 """
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 import os
 import signal
@@ -125,7 +126,6 @@ def _ensure_action_api(
     cfg = api_config or ApiConfig()
     if host not in _LOCAL_HOSTS:
         if _allow_plaintext_http(cfg.allow_plaintext):
-            import logging
             logging.getLogger(__name__).warning(
                 "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,
             )

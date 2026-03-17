@@ -9,6 +9,15 @@ export default function PrincipleAccordion({ principle, onViolationClick }) {
   const [open, setOpen] = useState(false);
   const contentId = `pa-content-${(principle.name || '').replace(/[^a-zA-Z0-9]/g, '-')}`;
 
+  function handleViolationKeyDown(v) {
+    return (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onViolationClick(v, principle);
+      }
+    };
+  }
+
   return (
     <div className="principle-accordion">
       <button
@@ -44,7 +53,7 @@ export default function PrincipleAccordion({ principle, onViolationClick }) {
                     onClick={onViolationClick ? () => onViolationClick(v, principle) : undefined}
                     role={onViolationClick ? 'button' : undefined}
                     tabIndex={onViolationClick ? 0 : undefined}
-                    onKeyDown={onViolationClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onViolationClick(v, principle); } } : undefined}
+                    onKeyDown={onViolationClick ? handleViolationKeyDown(v) : undefined}
                   >
                     <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
                     <span className="violation-row-file">{v.file || '—'}</span>

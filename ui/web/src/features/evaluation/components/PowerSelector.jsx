@@ -10,7 +10,7 @@ export default function PowerSelector({ value, onChange }) {
 
   function handleClick(level) {
     onChange(level);
-    try { localStorage.setItem(STORAGE_KEY, String(level)); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, String(level)); } catch { /* localStorage unavailable (private browsing) */ }
   }
 
   return (

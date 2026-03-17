@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -29,7 +30,7 @@ _ALLOWED_USAGES = {"allowed", "allowed-with-review"}
 _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
 
 _DEFAULT_STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
-_DEFAULT_API_BASE = "https://cwe-api.mitre.org/api/v1/cwe"
+_DEFAULT_API_BASE = os.environ.get("CWE_API_BASE", "https://cwe-api.mitre.org/api/v1/cwe")
 
 
 def get_all_cwes(standards_dir: Path | None = None) -> dict[int, list[str]]:
