@@ -1,8 +1,8 @@
 """Compliance dampening and graded-mode scoring tests (split from test_scoring)."""
 from __future__ import annotations
 
-from quodeq.engine.evidence import Evidence, PrincipleEvidence
-from quodeq.engine.scoring import score_evidence
+from quodeq.core.evidence.model import Evidence, PrincipleEvidence
+from quodeq.core.scoring.engine import score_evidence
 
 from tests.engine.conftest import make_evidence_with_confidence
 
@@ -162,7 +162,7 @@ def test_overall_low_confidence_when_most_insufficient():
                  "compliance_percentage": 100.0, "confidence_level": "high", "is_balanced": False},
     )
     ev = Evidence(
-        repository="test", plugin_id="ts", date="2026-03-03",
+        repository="test", language="ts", date="2026-03-03",
         source_file_count=100, files_read=50, coverage_pct=50.0,
         principles={"p1": pe_low1, "p2": pe_low2, "p3": pe_high},
     )

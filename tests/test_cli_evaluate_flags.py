@@ -9,7 +9,7 @@ from quodeq.cli import build_parser
 def parsed_evaluate_args():
     """Parse the standard evaluate command and return the resulting namespace."""
     parser = build_parser()
-    return parser.parse_args(["evaluate", "tmp/repo", "-p", "python", "-m", "grades"])
+    return parser.parse_args(["evaluate", "tmp/repo", "-l", "python", "-m", "grades"])
 
 
 def test_evaluate_command(parsed_evaluate_args):
@@ -20,8 +20,8 @@ def test_evaluate_repo(parsed_evaluate_args):
     assert parsed_evaluate_args.repo == "tmp/repo"
 
 
-def test_evaluate_plugin(parsed_evaluate_args):
-    assert parsed_evaluate_args.plugin == "python"
+def test_evaluate_language(parsed_evaluate_args):
+    assert parsed_evaluate_args.language == "python"
 
 
 def test_evaluate_mode(parsed_evaluate_args):

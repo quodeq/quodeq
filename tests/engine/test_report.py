@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from quodeq.engine.evidence import Evidence, PrincipleEvidence
-from quodeq.engine.report import build_full_report, build_dashboard_report, write_reports
-from quodeq.engine.scoring import score_evidence
+from quodeq.core.evidence.model import Evidence, PrincipleEvidence
+from quodeq.analysis.report import build_full_report, build_dashboard_report, write_reports
+from quodeq.core.scoring.engine import score_evidence
 
 
 def _make_evidence() -> Evidence:
@@ -31,7 +31,7 @@ def _make_evidence() -> Evidence:
     )
     return Evidence(
         repository="test-repo",
-        plugin_id="typescript",
+        language="typescript",
         date="2026-03-03",
         source_file_count=100,
         files_read=50,

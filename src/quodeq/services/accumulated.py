@@ -17,7 +17,7 @@ from quodeq.adapters.fs.report_parser import (
     read_run_data,
 )
 from quodeq.core.types import DimensionResult, to_camel_dict
-from quodeq.engine.scoring_internals import score_to_grade_label
+from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services._cache import make_lru_dimension_fetcher
 
 def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:

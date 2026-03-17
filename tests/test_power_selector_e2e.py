@@ -16,7 +16,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from quodeq.engine.analysis import AnalysisConfig, run_analysis
+from quodeq.analysis.subprocess import AnalysisConfig, run_analysis
 
 
 # ---------------------------------------------------------------------------
@@ -155,7 +155,7 @@ class TestRunnerModelResolution:
         handled here in the same order as the evaluate command.
         """
         from quodeq.cli import _subagent_model
-        from quodeq.engine.runner import AnalysisOptions
+        from quodeq.analysis.runner import AnalysisOptions
         opts = AnalysisOptions(subagent_model=subagent_model)
         with patch.dict(os.environ, {"SUBAGENT_MODEL": env_model} if env_model else {}, clear=False):
             if not env_model:

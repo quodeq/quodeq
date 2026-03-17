@@ -23,6 +23,8 @@
     ".h": "c",
     ".scala": "scala",
     ".dart": "dart",
+    ".ex": "elixir",
+    ".exs": "elixir",
     ".r": "r",
     ".R": "r"
   },
@@ -37,6 +39,14 @@
     "build.gradle.kts": "kotlin",
     "Package.swift": "swift",
     "Podfile": "swift",
+    "go.mod": "go",
+    "Cargo.toml": "rust",
+    "Gemfile": "ruby",
+    "composer.json": "php",
+    "mix.exs": "elixir",
+    "pubspec.yaml": "dart",
+    "CMakeLists.txt": "cpp",
+    "build.sbt": "scala",
     ".bashrc": "bash",
     "Makefile": "bash"
   },

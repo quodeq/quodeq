@@ -7,7 +7,7 @@ import re
 from typing import Any
 
 from quodeq.core.types import DimensionResult, DimensionSummary, Finding, GradeBreakdown, SeverityTally, Totals
-from quodeq.engine.scoring_internals import GRADE_LADDER, score_to_grade_label
+from quodeq.core.scoring.internals import GRADE_LADDER, score_to_grade_label
 
 _logger = logging.getLogger(__name__)
 

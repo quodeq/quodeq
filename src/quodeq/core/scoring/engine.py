@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, replace
 
 from quodeq.core.types import Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
-from quodeq.engine.evidence import DEFAULT_WEIGHT, Evidence
+from quodeq.core.evidence.model import DEFAULT_WEIGHT, Evidence
 from quodeq.core.scoring.internals import (
     GRADE_LADDER,
     SCALE_TIER_NAMES,

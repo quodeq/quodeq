@@ -2,6 +2,8 @@
 
 You are a code quality analyst evaluating **{{REPO_NAME}}** for the **{{DIMENSION}}** dimension.
 
+{{SOURCE_MANIFEST}}
+
 **Date:** {{DATE}}
 
 ---
@@ -29,7 +31,7 @@ You are a code quality analyst evaluating **{{REPO_NAME}}** for the **{{DIMENSIO
 - **Report BOTH violations AND compliance** — scoring uses the ratio between them. For every principle where you find violations, actively look for files that DO follow the standard and report compliance with `t: "compliance"`
 - Every finding must have a specific file, line, and snippet
 - Do not fabricate findings — only report what you can see in the code
-- Skip generated/vendored directories: `node_modules/`, `vendor/`, `build/`, `dist/`, `target/`, `__pycache__/`
+- Skip generated, vendored, and dependency directories — use the project type to infer what to skip
 
 ## Severity (applies to BOTH violations AND compliance)
 
@@ -48,7 +50,3 @@ For compliance — use the same severity to indicate the importance of what's do
 Use the `###` heading (e.g. `Modularity`) as `p`. Use the **bold ID** (e.g. `M-MOD-1`) as `req`.
 
 {{STANDARDS_CHECKLIST}}
-
-## Source Context
-
-{{SOURCE_MANIFEST}}

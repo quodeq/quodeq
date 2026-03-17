@@ -10,7 +10,7 @@ from typing import Iterable
 from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
 from quodeq.engine._event_text import TEXT_EXTRACTORS
 from quodeq.engine.analysis_stream import count_files_in_stream, extract_files_from_event
-from quodeq.engine.evidence_parser import build_req_refs_lookup, resolve_llm_refs
+from quodeq.core.evidence.parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 from quodeq.shared.utils import open_text, read_json
 

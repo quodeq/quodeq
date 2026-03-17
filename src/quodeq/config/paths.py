@@ -22,9 +22,6 @@ class ConfigPaths:
     """Immutable set of resolved paths to all configuration directories and files."""
 
     root: Path
-    evaluators_dir: Path
-    practices_dir: Path
-    dimensions_dir: Path
     prompts_dir: Path
     standards_dir: Path
     env_file: Path
@@ -55,9 +52,6 @@ class ConfigPaths:
         """Construct a ConfigPaths instance by deriving all paths from a root directory."""
         return cls(
             root=root,
-            evaluators_dir=root / "evaluators",
-            practices_dir=root / "practices",
-            dimensions_dir=root / "dimensions",
             prompts_dir=root / "prompts",
             standards_dir=root / "standards",
             env_file=root / ".quodeq.env",
@@ -104,11 +98,9 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
 
 
 def _looks_like_project_root(root: Path) -> bool:
-    # Accept both legacy layout (evaluators/) and new layout (config/detection.json)
     has_prompts = (root / "prompts").is_dir()
-    has_evaluators = (root / "evaluators").is_dir()
     has_detection = (root / "config" / "detection.json").is_file()
-    return has_prompts and (has_evaluators or has_detection)
+    return has_prompts and has_detection
 
 
 def default_paths() -> ConfigPaths:

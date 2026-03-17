@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.plugins.loader import load_universal_dimensions
+from quodeq.analysis.runner import load_universal_dimensions
 from quodeq.config.paths import default_paths
 
 

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.plugins.detector import detect_language
+from quodeq.analysis.manifest import detect_language
 from quodeq.config.paths import default_paths
 
 
