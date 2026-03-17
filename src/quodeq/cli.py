@@ -156,7 +156,6 @@ def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
     try:
         from quodeq.analysis.manifest import detect_language
         language = detect_language(src, detection_file)
-        print(f"Language: {language}", file=sys.stderr)
         return language
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
@@ -178,6 +177,12 @@ def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManife
     detection = read_json(detection_file)
     disciplines_conf = paths.disciplines_conf if paths.disciplines_conf.exists() else None
     manifest = build_manifest(src, detection, disciplines_conf)
+    if manifest.targets:
+        langs = ", ".join(
+            f"{t.project_description} ({t.total_files})"
+            for t in manifest.targets
+        )
+        print(f"Detected: {langs}", file=sys.stderr)
     print(f"Source files: {manifest.total_files}", file=sys.stderr)
     return manifest
 
