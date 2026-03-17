@@ -18,8 +18,14 @@ _HEALTH_TIMEOUT = 1.0
 _POLL_INTERVAL = 5
 
 
+_commands_cache: dict[str, str | None] | None = None
+
+
 def _find_commands() -> dict[str, str | None]:
-    """Check which required commands are available."""
+    """Check which required commands are available (cached after first call)."""
+    global _commands_cache
+    if _commands_cache is not None:
+        return _commands_cache
     cmds = {}
     for name in ("python3", "node", "claude", "quodeq"):
         try:
@@ -29,6 +35,7 @@ def _find_commands() -> dict[str, str | None]:
             cmds[name] = result.stdout.strip() if result.returncode == 0 else None
         except (subprocess.TimeoutExpired, OSError):
             cmds[name] = None
+    _commands_cache = cmds
     return cmds
 
 

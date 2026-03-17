@@ -12,12 +12,13 @@ _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 
 # Per-type deduction constants for numerical mode.
 # Override via env vars; values must be > 0.
-# Read at call time (not import time) so env changes take effect without restart.
-
+# Cached on first call to avoid repeated os.environ lookups in hot scoring path.
 
 _DEFAULT_CRITICAL_PENALTY = 2.0
 _DEFAULT_MAJOR_PENALTY = 1.0
 _DEFAULT_MINOR_PENALTY = 0.25
+
+_cached_penalties: dict[str, float] = {}
 
 
 def _env_float(var: str, default: float, env: dict[str, str] | None = None) -> float:
@@ -35,21 +36,27 @@ def _critical_penalty(override: float | None = None) -> float:
     """Points deducted per critical violation type (default: 2.0)."""
     if override is not None:
         return override
-    return _env_float("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
+    if "critical" not in _cached_penalties:
+        _cached_penalties["critical"] = _env_float("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
+    return _cached_penalties["critical"]
 
 
 def _major_penalty(override: float | None = None) -> float:
     """Points deducted per major violation type (default: 1.0)."""
     if override is not None:
         return override
-    return _env_float("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
+    if "major" not in _cached_penalties:
+        _cached_penalties["major"] = _env_float("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
+    return _cached_penalties["major"]
 
 
 def _minor_penalty(override: float | None = None) -> float:
     """Points deducted per minor violation type (default: 0.25)."""
     if override is not None:
         return override
-    return _env_float("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
+    if "minor" not in _cached_penalties:
+        _cached_penalties["minor"] = _env_float("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
+    return _cached_penalties["minor"]
 
 
 _CRITICAL_SCORE_CAP = 3

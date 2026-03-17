@@ -345,11 +345,7 @@ function AccumulatedOverviewPanel({
           <div className="section-header">
             <h3 className="section-title">Violations by Principle</h3>
             <span className="section-count">
-              {
-                new Set(
-                  accumulatedViolationsByPrinciple.map((v) => v.principle).filter(Boolean)
-                ).size
-              }{' '}
+              {accumulatedUniquePrinciples}{' '}
               principles
             </span>
           </div>

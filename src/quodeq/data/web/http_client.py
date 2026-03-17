@@ -31,8 +31,12 @@ def _allow_private_urls(override: bool | None = None) -> bool:
     return os.environ.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
 
 
+from functools import lru_cache
+
+
+@lru_cache(maxsize=256)
 def _is_private_address(hostname: str) -> bool:
-    """Return True if *hostname* resolves to a private/loopback/link-local address."""
+    """Return True if *hostname* resolves to a private/loopback/link-local address (cached)."""
     # Check common private hostnames directly
     if hostname in ("localhost", "localhost.localdomain"):
         return True

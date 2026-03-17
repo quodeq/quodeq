@@ -159,12 +159,13 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
   const totalViolations = principle.total || 0;
   const totalCompliance = principle.compliance?.length || 0;
 
-  const violationsBySeverity = SEVERITY_ORDER.reduce((acc, sev) => {
-    acc[sev] = (principle.violations || []).filter(
-      (v) => (v.severity || 'minor').toLowerCase() === sev
-    );
-    return acc;
-  }, {});
+  const violationsBySeverity = {};
+  for (const sev of SEVERITY_ORDER) violationsBySeverity[sev] = [];
+  for (const v of (principle.violations || [])) {
+    const sev = (v.severity || 'minor').toLowerCase();
+    if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);
+    else violationsBySeverity['minor'].push(v);
+  }
 
   return (
     <>

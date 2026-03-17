@@ -15,8 +15,11 @@ from typing import Protocol
 _INDEX_FILE = "project_index.json"
 _MAX_LEGACY_SCAN = 500
 
+_INDEX_CACHE_MAX = 64
+
+
 class _IndexCache:
-    """Thread-safe mtime-based cache for the project index file."""
+    """Thread-safe mtime-based cache for the project index file (bounded)."""
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
@@ -28,6 +31,10 @@ class _IndexCache:
 
     def set(self, key: Path, value: tuple[float, dict[str, str]]) -> None:
         with self._lock:
+            if len(self._data) >= _INDEX_CACHE_MAX and key not in self._data:
+                # Evict oldest entry
+                oldest = next(iter(self._data))
+                del self._data[oldest]
             self._data[key] = value
 
     def pop(self, key: Path) -> None:

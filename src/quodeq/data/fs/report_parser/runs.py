@@ -263,11 +263,14 @@ def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunIn
     return run_infos
 
 
+_CACHING_FETCHER_MAX = 100
+
+
 def _make_caching_fetcher(
     reports_root: Path, project: str,
     data_cache: dict[str, list[DimensionResult]] | None = None,
 ) -> Callable[[str], list[DimensionResult]]:
-    """Return a fetcher that caches run data reads.
+    """Return a fetcher that caches run data reads (bounded to last 100 runs).
 
     *data_cache* is injectable for testing; defaults to a fresh dict.
     """
@@ -275,6 +278,9 @@ def _make_caching_fetcher(
 
     def _fetch(run_id: str) -> list[DimensionResult]:
         if run_id not in cache:
+            if len(cache) >= _CACHING_FETCHER_MAX:
+                oldest = next(iter(cache))
+                del cache[oldest]
             cache[run_id] = read_run_data(reports_root, project, run_id)
         return cache[run_id]
 

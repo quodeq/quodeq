@@ -11,8 +11,12 @@ import {
 } from 'recharts';
 import { formatShortDate } from '../../../utils/formatters.js';
 
+const _cssVarCache = {};
 function cssVar(name, fallback) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  if (!(name in _cssVarCache)) {
+    _cssVarCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  return _cssVarCache[name] || fallback;
 }
 
 function scoreBarColor(score) {
