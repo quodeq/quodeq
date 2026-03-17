@@ -59,6 +59,8 @@ function ViolationLiveRow({ violation, index }) {
         className="vdetail-row-main vlive-collapsible"
         role="button"
         tabIndex={0}
+        aria-expanded={open}
+        aria-label={`${v.severity} finding: ${v.title || v.file || 'details'}`}
         onClick={() => setOpen(o => !o)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >

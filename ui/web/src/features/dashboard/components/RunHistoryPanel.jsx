@@ -120,7 +120,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
   };
 
   return (
-    <section className="run-history-panel panel">
+    <section className="run-history-panel panel" aria-label="Score history chart">
       <div className="run-history-header">
         <span className="run-history-title">Score History</span>
       </div>

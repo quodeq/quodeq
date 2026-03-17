@@ -51,8 +51,9 @@ def prepare_repository(repo_input: str) -> str:
     dest = Path(tmp_dir) / repo_name
     env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
     try:
+        _logger.info("Cloning %s (timeout: %ds)...", repo_input, _get_clone_timeout())
         subprocess.run(
-            ["git", "clone", repo_input, str(dest)],
+            ["git", "clone", "--progress", repo_input, str(dest)],
             check=True, env=env, timeout=_get_clone_timeout(),
         )
     except (subprocess.CalledProcessError, subprocess.TimeoutExpired):

@@ -152,7 +152,7 @@ def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
             return int(raw)
         except ValueError:
             logging.getLogger(__name__).warning(
-                "Invalid %s=%r, using default", var, raw,
+                "Invalid %s=%r (expected integer), using default", var, raw,
             )
     return default
 

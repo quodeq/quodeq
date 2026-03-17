@@ -238,7 +238,8 @@ def _build_targets_from_disciplines(
 
         registry = DisciplineRegistry.from_file(disciplines_conf)
         matches = registry.detect_matches(src)
-    except (ValueError, OSError):
+    except (ValueError, OSError) as exc:
+        _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
         return []
 
     targets: list[AnalysisTarget] = []

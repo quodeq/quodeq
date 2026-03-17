@@ -151,7 +151,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
             ) : (
               <span className="active-filter-tag">
                 File: {fileFilter}
-                <button type="button" onClick={() => setFileFilter('')}>&times;</button>
+                <button type="button" onClick={() => setFileFilter('')} aria-label="Clear file filter">&times;</button>
               </span>
             )}
 
@@ -171,6 +171,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
                     key={name}
                     type="button"
                     className={`pill-btn ${selectedPrinciples.includes(name) ? 'active' : ''}`}
+                    aria-pressed={selectedPrinciples.includes(name)}
                     onClick={() => setSelectedPrinciples((prev) => toggleInList(prev, name))}
                   >
                     {name}

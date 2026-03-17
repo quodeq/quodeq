@@ -108,7 +108,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         tabIndex={0}
         onClick={() => setConsoleOpen(o => !o)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen(o => !o); } }}
-        title={consoleOpen ? 'Hide console' : 'Show console'}
+        aria-label={consoleOpen ? 'Hide console' : 'Show console'}
       >
         {isRunning && <span className="eval-status-phase">{phaseLabel(job)}</span>}
         {isFailed && <span className="eval-status-phase eval-status-phase--error">{lastRelevantLog(job.logs) || 'Analysis failed'}</span>}

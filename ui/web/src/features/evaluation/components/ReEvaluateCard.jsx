@@ -3,6 +3,7 @@ import { getProjectInfo, listPlugins } from '../../../api/index.js';
 
 export default function ReEvaluateCard({ project, onStart, disabled }) {
   const [info, setInfo] = useState(null);
+  const [error, setError] = useState(null);
   const [allDimensions, setAllDimensions] = useState([]);
   const [selectedDims, setSelectedDims] = useState(new Set());
 
@@ -11,7 +12,10 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
     setInfo(null);
     getProjectInfo(project)
       .then(setInfo)
-      .catch(() => setInfo(null));
+      .catch(() => {
+        setInfo(null);
+        setError('Could not load project info. The project may have been removed.');
+      });
   }, [project]);
 
   useEffect(() => {
@@ -30,6 +34,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
       .catch(() => setAllDimensions([]));
   }, []);
 
+  if (error) return <div className="inline-error">{error}</div>;
   if (!info) return null;
 
   function toggleDim(id) {
@@ -104,6 +109,9 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         >
           {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
         </button>
+        {!disabled && selectedDims.size === 0 && (
+          <p className="form-hint">Select at least one dimension to start evaluation.</p>
+        )}
       </div>
     </div>
   );
