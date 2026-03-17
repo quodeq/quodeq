@@ -10,11 +10,11 @@ from quodeq.adapters.fs.report_parser import RunInfo
 from quodeq.core.types import DimensionResult, DimensionSummary
 from quodeq.services.dashboard import (
     _collect_previous_scores,
-    _collect_stale_dimensions,
     _enrich_dimensions_with_trend,
     _build_accumulated_trend,
     build_dashboard,
 )
+from quodeq.services._dashboard_stale import collect_stale_dimensions as _collect_stale_dimensions
 
 
 def _make_run(run_id: str, date_iso: str = "2024-01-01") -> RunInfo:

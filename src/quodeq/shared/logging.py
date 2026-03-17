@@ -17,14 +17,17 @@ def _should_use_color(env: dict[str, str] | None = None) -> bool:
     return not environ.get("NO_COLOR") and environ.get("TERM") != "dumb"
 
 
+_USE_COLOR: bool = _should_use_color()
+
+
 def _use_color() -> bool:
-    """Return whether color output is currently enabled (evaluated on each call)."""
-    return _should_use_color()
+    """Return whether color output is enabled (cached at import time)."""
+    return _USE_COLOR
 
 
 def _color(code: str) -> str:
     """Return the ANSI *code* if color is enabled, else empty string."""
-    return code if _use_color() else ""
+    return code if _USE_COLOR else ""
 
 
 _LOG_SUCCESS = 25  # between INFO(20) and WARNING(30)
@@ -37,7 +40,7 @@ _ANSI_YELLOW = "\033[1;33m"
 _ANSI_RED = "\033[0;31m"
 _NC = "\033[0m"
 
-_STYLES: dict = {
+_STYLES: dict[int, tuple[str, str]] = {
     logging.DEBUG: (_ANSI_GREY, "[DEBUG]"),
     logging.INFO: (_ANSI_BLUE, "[INFO]"),
     _LOG_SUCCESS: (_ANSI_GREEN, "[SUCCESS]"),

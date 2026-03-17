@@ -1,7 +1,7 @@
 import pytest
 from quodeq.adapters.web.http_client import HttpResponse
 from quodeq.adapters.web.dimensions_repository import WebDimensionsRepository
-from quodeq.ports.data_errors import NotFoundError
+from quodeq.data.ports.data_errors import NotFoundError
 
 
 class FakeClient:

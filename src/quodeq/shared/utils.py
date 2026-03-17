@@ -5,6 +5,7 @@ Both are re-exported here for backward compatibility.
 """
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import os
@@ -104,14 +105,15 @@ def __getattr__(name: str) -> str:
 def is_repo_url(repo_input: str) -> bool:
     """Return True if the input looks like a remote repository URL.
 
-    .. warning:: Cleartext ``http://`` URLs are accepted but credentials
-       embedded in such URLs will be transmitted unencrypted.
+    Raises ValueError for cleartext ``http://`` URLs to enforce encrypted
+    transport for credential safety.
     """
     if repo_input.startswith("http://"):
-        logging.getLogger(__name__).warning(
-            "Cleartext HTTP repository URL — credentials may be transmitted unencrypted"
+        raise ValueError(
+            "Cleartext HTTP repository URLs are rejected to protect credentials. "
+            "Use https:// or git@ instead."
         )
-    return repo_input.startswith(("http://", "https://", "git@"))
+    return repo_input.startswith(("https://", "git@"))
 
 
 def project_name_from_repo(repo: str) -> str:
@@ -152,7 +154,7 @@ def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
             return int(raw)
         except ValueError:
             logging.getLogger(__name__).warning(
-                "Invalid %s=%r, using default", var, raw,
+                "Invalid %s=%r (expected integer), using default", var, raw,
             )
     return default
 
@@ -162,9 +164,9 @@ def get_action_api_port() -> int:
     return _env_int("QUODEQ_ACTION_API_PORT", _get_config()["action_api_port"])
 
 
-def get_action_api_host() -> str:
+def get_action_api_host(env: dict[str, str] | None = None) -> str:
     """Return the action API host from environment or default."""
-    return os.environ.get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
+    return (env or os.environ).get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
 
 
 def get_dashboard_port() -> int:
@@ -224,7 +226,6 @@ def get_findings_file(env: dict[str, str] | None = None) -> str | None:
 
 def show_diff(path: Path, new_content: str) -> None:
     """Print a unified diff between *path*'s current content and *new_content*."""
-    import difflib
     old_lines = path.read_text().splitlines(keepends=True) if path.exists() else []
     new_lines = new_content.splitlines(keepends=True)
     diff = list(difflib.unified_diff(old_lines, new_lines, fromfile=str(path), tofile="<new>"))

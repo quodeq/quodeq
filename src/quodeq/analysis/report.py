@@ -78,7 +78,9 @@ def _build_principle_rows(
         matched = lookup.get(label, {})
         grade = matched.get("grade")
         # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
-        raw_final = matched.get(_FIELD_FINAL_SCORE) or matched.get(_FIELD_FINAL_SCORE_SNAKE)
+        raw_final = matched.get(_FIELD_FINAL_SCORE)
+        if raw_final is None:
+            raw_final = matched.get(_FIELD_FINAL_SCORE_SNAKE)
         # Insufficient principles have no meaningful score — suppress "0.0/10".
         if grade == _GRADE_INSUFFICIENT:
             formatted_score = None

@@ -37,6 +37,7 @@ class _PluginCache:
             self._ts = time.monotonic()
 
 
+# Module-level singleton — injectable via cache parameter on discover_plugins().
 _plugin_cache = _PluginCache()
 
 

@@ -16,7 +16,7 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, dedup_jsonl_lines, merge_jsonl
+from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
@@ -210,8 +210,6 @@ class SubagentPool:
                     error=str(exc),
                 )
             self._finished[result.agent_id] = True
-            if result.success:
-                log_success(f"  {result.agent_id} finished")
             results.append(result)
             del self._futures[future]
         return done_futures
@@ -227,7 +225,6 @@ class SubagentPool:
         for _ in done:
             remaining = self._should_respawn(pool_start, max_duration)
             if remaining:
-                log_info(f"  {remaining} files left -- spawning agent-{self._next_idx}")
                 self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
                 self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
                 self._next_idx += 1

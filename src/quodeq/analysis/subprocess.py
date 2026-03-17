@@ -33,6 +33,8 @@ class _SpawnPaths:
 _DEFAULT_MAX_TURNS = 200
 _DEFAULT_MAX_DURATION = 1800  # 30 minutes
 _TERMINATE_TIMEOUT_S = 10
+_MCP_TOOL_REPORT_FINDING = "mcp__findings__report_finding"
+_MCP_TOOL_GET_NEXT_FILES = "mcp__findings__get_next_files"
 
 
 @dataclass(frozen=True)
@@ -169,9 +171,9 @@ def _build_ai_cmd(
             config.queue_path, config.agent_id,
         )
         args.extend(["--mcp-config", str(mcp_config_path)])
-        allowed = "mcp__findings__report_finding"
+        allowed = _MCP_TOOL_REPORT_FINDING
         if config.queue_path:
-            allowed += ",mcp__findings__get_next_files"
+            allowed += f",{_MCP_TOOL_GET_NEXT_FILES}"
         args.extend(["--allowedTools", allowed])
         # MCP servers require permission approval; in --print mode there is no
         # interactive prompt, so we must bypass permissions for the server to start.

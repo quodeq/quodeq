@@ -23,9 +23,6 @@ from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services.accumulated import numeric_average
 
-# Re-export for backward compatibility (tests import this name)
-_collect_stale_dimensions = collect_stale_dimensions
-
 
 @dataclass
 class DashboardCacheConfig:
@@ -184,7 +181,11 @@ def _build_dashboard_result(
             "dateISO": selected_run.date_iso,
             "dateLabel": selected_run.date_label,
         },
-        "summary": {**to_camel_dict(payload.selected_summary), "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
+        "summary": {
+            **to_camel_dict(payload.selected_summary),
+            "dateISO": selected_run.date_iso,
+            "dateLabel": selected_run.date_label,
+        },
         "trend": payload.trend,
         "dimensions": [to_camel_dict(d) for d in payload.dimensions_with_trend],
         "previousByDimension": {k: to_camel_dict(v) for k, v in payload.previous_by_dimension.items()},

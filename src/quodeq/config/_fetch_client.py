@@ -1,35 +1,16 @@
 """Thread-safe HTTP fetcher with circuit breaker for knowledge refresh."""
 from __future__ import annotations
 
-import ipaddress
 import logging
 import os
-import socket
 import threading
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+from quodeq.shared.ssrf import is_private_address as _is_private_hostname
+
 _logger = logging.getLogger(__name__)
-
-
-def _is_private_hostname(hostname: str) -> bool:
-    """Return True if *hostname* resolves to a private/loopback/link-local address."""
-    if hostname in ("localhost", "localhost.localdomain"):
-        return True
-    try:
-        addr = ipaddress.ip_address(hostname)
-        return addr.is_private or addr.is_loopback or addr.is_link_local
-    except ValueError:
-        pass
-    try:
-        for _fam, _typ, _pro, _can, sockaddr in socket.getaddrinfo(hostname, None):
-            addr = ipaddress.ip_address(sockaddr[0])
-            if addr.is_private or addr.is_loopback or addr.is_link_local:
-                return True
-    except (socket.gaierror, OSError):
-        pass
-    return False
 
 
 class FetchClient:
@@ -66,6 +47,11 @@ class FetchClient:
             if self._failures >= self._CIRCUIT_THRESHOLD:
                 return None
         try:
+            # Re-check DNS right before the request to mitigate DNS rebinding.
+            # The window between this check and urlopen is minimal.
+            if hostname and not self._allow_private and _is_private_hostname(hostname):
+                _logger.warning("Blocked fetch after DNS re-check: %s", hostname)
+                return None
             req = urllib.request.Request(url, headers=headers or {})
             with urllib.request.urlopen(req, timeout=self._timeout) as r:
                 with self._lock:
@@ -77,12 +63,16 @@ class FetchClient:
             return None
 
 
+# Module-level singleton — injectable via set_fetch_client() for testing.
 _fetch_client_lock = threading.Lock()
 _fetch_client_instance: FetchClient | None = None
 
 
 def get_fetch_client(timeout_s: int = 15) -> FetchClient:
-    """Return the module-level FetchClient, creating it lazily on first use."""
+    """Return the module-level FetchClient singleton, creating it lazily.
+
+    For tests, call ``set_fetch_client(mock)`` before the code under test.
+    """
     global _fetch_client_instance
     with _fetch_client_lock:
         if _fetch_client_instance is None:

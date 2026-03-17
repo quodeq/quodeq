@@ -76,8 +76,12 @@ class FileQueueError(RuntimeError):
 
 
 class FileQueue:
-    # NOTE: Single-node only. Replace with a distributed queue (Redis, SQS) for horizontal scaling.
     """Distributes files across N subagent processes.
+
+    **Scaling:** This is a single-node implementation using OS file locks.
+    For multi-machine deployments, implement the ``WorkQueue`` protocol
+    with a networked backend (Redis, SQS) and inject it at the
+    orchestration layer via dependency injection.
 
     The queue state lives in a JSON file::
 
@@ -146,12 +150,12 @@ class FileQueue:
         with self._locked():
             state = self._read_state()
 
-            # Enforce per-agent file limit for context rotation
+            # Enforce per-agent file limit for context rotation.
+            # Use agent_totals dict for O(1) lookup instead of scanning taken log.
             max_per_agent = state.get("max_files_per_agent", 0)
             if max_per_agent > 0 and agent_id:
-                agent_total = sum(
-                    len(e["files"]) for e in state["taken"] if e.get("agent") == agent_id
-                )
+                agent_totals = state.get("agent_totals", {})
+                agent_total = agent_totals.get(agent_id, 0)
                 remaining_budget = max_per_agent - agent_total
                 if remaining_budget <= 0:
                     return []
@@ -167,6 +171,10 @@ class FileQueue:
                 "agent": agent_id,
                 "ts": time.time(),
             })
+            # Maintain running total for O(1) per-agent limit checks
+            if agent_id:
+                totals = state.setdefault("agent_totals", {})
+                totals[agent_id] = totals.get(agent_id, 0) + len(batch)
             self._write_state(state)
         return batch
 

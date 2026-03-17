@@ -175,16 +175,25 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
     return None
 
 
+_cached_dimensions: list[str] | None = None
+
+
 def _list_available_dimensions_for_discipline(
     discipline: str,
 ) -> list[str]:
-    """Resolve available dimensions from universal dimensions.json."""
+    """Resolve available dimensions from universal dimensions.json (cached after first read)."""
+    _ = discipline  # unused; kept for caller-facing API consistency
+    global _cached_dimensions
+    if _cached_dimensions is not None:
+        return _cached_dimensions
     try:
         paths = default_paths()
         universal_dims = paths.dimensions_file
         if universal_dims.exists():
             data = json.loads(universal_dims.read_text())
-            return [d["id"] for d in data.get("applies", [])]
-        return []
+            _cached_dimensions = [d["id"] for d in data.get("applies", [])]
+            return _cached_dimensions
+        _cached_dimensions = []
+        return _cached_dimensions
     except (OSError, json.JSONDecodeError, KeyError, TypeError):
         return []

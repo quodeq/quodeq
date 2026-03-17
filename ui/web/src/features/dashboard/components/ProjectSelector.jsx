@@ -13,8 +13,9 @@ export default function ProjectSelector({ projects, selectedProject, selectedRun
   return (
     <div className="project-selector">
       <div className="sidebar-project-section">
-        <p className="sidebar-project-label">Project</p>
+        <label className="sidebar-project-label" htmlFor="project-select">Project</label>
         <select
+          id="project-select"
           className="project-select-styled"
           value={selectedProject}
           disabled={projectList.length === 0}
@@ -33,8 +34,9 @@ export default function ProjectSelector({ projects, selectedProject, selectedRun
 
       {runList.length > 0 && (
         <div className="sidebar-run-section">
-          <p className="sidebar-project-label">Run</p>
+          <label className="sidebar-project-label" htmlFor="run-select">Run</label>
           <select
+            id="run-select"
             className="project-select-styled"
             value={selectedRun}
             onChange={(e) => onRunChange(e.target.value)}

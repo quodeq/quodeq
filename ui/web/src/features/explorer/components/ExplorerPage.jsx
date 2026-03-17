@@ -77,7 +77,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
   }, [evalData]);
 
   if (loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
-  if (error) return <div className="inline-error">{error}</div>;
+  if (error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!evalData) return <div className="empty-state"><h2>No data found</h2></div>;
 
   function buildEvalPrincipal(principleId) {

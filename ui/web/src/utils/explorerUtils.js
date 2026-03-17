@@ -203,7 +203,7 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
 }
 
 export function buildDimensionPlanText(evalData) {
-  const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
+  const SEVERITY_ORDER = KNOWN_SEVERITIES;
 
   const bySeverity = {};
   let total = 0;
@@ -265,7 +265,7 @@ export function buildDimensionPlanText(evalData) {
 export function buildDimensionPlanFromViolations(dimName, violations) {
   if (!violations || violations.length === 0) return '';
 
-  const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
+  const SEVERITY_ORDER = KNOWN_SEVERITIES;
   const bySeverity = {};
 
   violations.forEach((v) => {

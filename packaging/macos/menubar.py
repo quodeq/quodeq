@@ -12,14 +12,23 @@ import webbrowser
 
 import rumps
 
-_APP_PORT = 4180  # dedicated port for menu bar app
-_PORTS = (4180, 4181, 4182, 4183)
+_APP_PORT = int(os.environ.get("QUODEQ_PORT", "4180"))
+_PORTS = tuple(
+    int(p) for p in os.environ.get("QUODEQ_PORTS", "4180,4181,4182,4183").split(",")
+)
 _HEALTH_TIMEOUT = 1.0
 _POLL_INTERVAL = 5
+_MAX_START_RETRIES = 20
+
+
+_commands_cache: dict[str, str | None] | None = None
 
 
 def _find_commands() -> dict[str, str | None]:
-    """Check which required commands are available."""
+    """Check which required commands are available (cached after first call)."""
+    global _commands_cache
+    if _commands_cache is not None:
+        return _commands_cache
     cmds = {}
     for name in ("python3", "node", "claude", "quodeq"):
         try:
@@ -29,6 +38,7 @@ def _find_commands() -> dict[str, str | None]:
             cmds[name] = result.stdout.strip() if result.returncode == 0 else None
         except (subprocess.TimeoutExpired, OSError):
             cmds[name] = None
+    _commands_cache = cmds
     return cmds
 
 
@@ -41,10 +51,19 @@ def _health_check(port: int) -> bool:
         return False
 
 
+_last_known_port: int | None = None
+
+
 def _find_running_port() -> int | None:
+    """Find the running dashboard port, checking last known port first."""
+    global _last_known_port
+    if _last_known_port is not None and _health_check(_last_known_port):
+        return _last_known_port
     for port in _PORTS:
         if _health_check(port):
+            _last_known_port = port
             return port
+    _last_known_port = None
     return None
 
 
@@ -58,8 +77,9 @@ def _source_user_path() -> None:
             'source ~/.bash_profile 2>/dev/null; '
             'echo $PATH'
         )
+        shell = os.environ.get("SHELL", "/bin/zsh")
         result = subprocess.run(
-            ["zsh", "-c", cmd],
+            [shell, "-c", cmd],
             capture_output=True, text=True, timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():
@@ -240,7 +260,7 @@ class QuodeqApp(rumps.App):
             return
 
         import time
-        for _ in range(20):
+        for _ in range(_MAX_START_RETRIES):
             time.sleep(0.5)
             port = _find_running_port()
             if port:
@@ -282,7 +302,6 @@ class QuodeqApp(rumps.App):
                 pass
 
         self._port = None
-        self._browser_opened = False
         self._status_item.title = "Stopped"
         self._open_item.set_callback(None)
         self._open_item._menuitem.setEnabled_(False)

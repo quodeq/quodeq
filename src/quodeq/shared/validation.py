@@ -8,7 +8,10 @@ def validate_path_segment(*segments: str) -> None:
     """Raise ValueError if any segment contains path traversal or separator characters."""
     for seg in segments:
         if ".." in seg or "/" in seg or "\\" in seg or "\0" in seg:
-            raise ValueError(f"Invalid path segment: {seg!r}")
+            raise ValueError(
+                f"Invalid path segment: {seg!r}. "
+                f"Use only alphanumeric characters, hyphens, underscores, and dots."
+            )
 
 
 def validate_resolved_within(path: Path, root: Path) -> None:

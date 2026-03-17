@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 
 from quodeq.config.paths import ConfigPaths
-from quodeq.shared.logging import log_error, log_info, log_success
+from quodeq.shared.logging import log_error, log_info, log_success, log_warning
 from quodeq.shared.utils import get_ai_provider
 
 _AI_PROVIDER_EXPORT_PREFIX = "export AI_PROVIDER="
@@ -52,6 +52,10 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
         # prefer a platform keychain, secrets manager, or environment variable
         # set via a secure mechanism (e.g. systemd EnvironmentFile).
         lines.append(f"export {api_key_var}={api_key_value}")
+        log_warning(
+            f"API key written to {paths.env_file} (mode 0600). For production, prefer a "
+            f"platform keychain or secrets manager instead of file storage."
+        )
     paths.env_file.write_text("\n".join(lines) + "\n")
     os.chmod(paths.env_file, 0o600)
 

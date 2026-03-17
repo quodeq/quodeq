@@ -1,71 +1,18 @@
 """Source manifest — rich prescan of a repository's source files."""
 from __future__ import annotations
 
-import json
 import logging
 import os
 from collections import Counter
-from collections.abc import Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from quodeq.shared.utils import read_json
+# Re-export for backward compatibility (callers import from manifest)
+from quodeq.analysis._detection import detect_language, list_source_files  # noqa: F401
 
 _logger = logging.getLogger(__name__)
 
 _MIN_FILES_PER_TARGET = 3
-
-
-def _walk_source_files(
-    src: Path, extensions: set[str], skip_dirs: frozenset[str],
-) -> Iterator[tuple[str, str]]:
-    """Yield (relative_path, suffix) for source files, pruning skip dirs."""
-    for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
-        for fname in filenames:
-            suffix = os.path.splitext(fname)[1]
-            if suffix in extensions:
-                yield os.path.relpath(os.path.join(dirpath, fname), src), suffix
-
-
-def list_source_files(src: Path, extensions: set[str], skip_dirs: frozenset[str] = frozenset()) -> list[str]:
-    """List source files under *src* as paths relative to *src*."""
-    files = [rel for rel, _ in _walk_source_files(src, extensions, skip_dirs)]
-    files.sort()
-    return files
-
-
-def detect_language(src: Path, detection_file: Path) -> str:
-    """Auto-detect the primary language for a repository using detection.json.
-
-    Uses a two-pass approach:
-    1. Check for config files at repo root (strong signal)
-    2. Fall back to counting source files by extension (weak signal)
-    """
-    detection = read_json(detection_file)
-    ext_map: dict[str, str] = detection.get("extensions", {})
-    config_map: dict[str, str] = detection.get("config_files", {})
-    skip_dirs = frozenset(detection.get("skip_dirs", []))
-
-    # Pass 1: config files
-    config_hits: Counter[str] = Counter()
-    for config_file, lang in config_map.items():
-        if (src / config_file).exists():
-            config_hits[lang] += 1
-    if config_hits:
-        return config_hits.most_common(1)[0][0]
-
-    # Pass 2: extension counts
-    all_exts = set(ext_map.keys())
-    lang_counts: Counter[str] = Counter()
-    for _rel, suffix in _walk_source_files(src, all_exts, skip_dirs):
-        lang = ext_map.get(suffix)
-        if lang:
-            lang_counts[lang] += 1
-    if lang_counts:
-        return lang_counts.most_common(1)[0][0]
-
-    raise ValueError(f"No language detected in {src} using {detection_file}")
 
 
 @dataclass
@@ -238,7 +185,8 @@ def _build_targets_from_disciplines(
 
         registry = DisciplineRegistry.from_file(disciplines_conf)
         matches = registry.detect_matches(src)
-    except (ValueError, OSError):
+    except (ValueError, OSError) as exc:
+        _logger.warning("Discipline detection failed for %s: %s", disciplines_conf, exc)
         return []
 
     targets: list[AnalysisTarget] = []
@@ -274,6 +222,27 @@ def _build_targets_from_disciplines(
     return targets
 
 
+def _walk_and_group(
+    src: Path, ext_map: dict[str, str], skip_dirs: set[str],
+) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter]]:
+    """Walk *src* once, grouping files by language."""
+    files_by_lang: dict[str, list[str]] = {}
+    ext_counts: Counter[str] = Counter()
+    ext_counts_by_lang: dict[str, Counter] = {}
+    all_extensions = set(ext_map.keys())
+    for dirpath, dirnames, filenames in os.walk(src):
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        for fname in filenames:
+            suffix = os.path.splitext(fname)[1]
+            if suffix in all_extensions:
+                rel = os.path.relpath(os.path.join(dirpath, fname), src)
+                lang = ext_map.get(suffix, "unknown")
+                files_by_lang.setdefault(lang, []).append(rel)
+                ext_counts[suffix] += 1
+                ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
+    return files_by_lang, ext_counts, ext_counts_by_lang
+
+
 def build_manifest(
     src: Path,
     detection: dict,
@@ -287,33 +256,14 @@ def build_manifest(
     """
     ext_map: dict[str, str] = detection.get("extensions", {})
     skip_dirs = set(detection.get("skip_dirs", []))
-    all_extensions = set(ext_map.keys())
-
-    # Single walk: collect all source files grouped by language
-    files_by_lang: dict[str, list[str]] = {}
-    ext_counts: Counter[str] = Counter()
-    ext_counts_by_lang: dict[str, Counter] = {}
-    for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
-        for fname in filenames:
-            suffix = os.path.splitext(fname)[1]
-            if suffix in all_extensions:
-                rel = os.path.relpath(os.path.join(dirpath, fname), src)
-                lang = ext_map.get(suffix, "unknown")
-                files_by_lang.setdefault(lang, []).append(rel)
-                ext_counts[suffix] += 1
-                ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1
-
+    files_by_lang, ext_counts, ext_counts_by_lang = _walk_and_group(src, ext_map, skip_dirs)
     all_source_files_count = sum(len(f) for f in files_by_lang.values())
 
-    # Build targets from discipline matches (mutates files_by_lang, claiming matched langs)
     targets: list[AnalysisTarget] = []
     if disciplines_conf and disciplines_conf.exists():
         targets = _build_targets_from_disciplines(
             src, disciplines_conf, files_by_lang, ext_counts_by_lang,
         )
-
-    # Remaining languages with no discipline match → bare targets
     for lang, lang_files in files_by_lang.items():
         if len(lang_files) < _MIN_FILES_PER_TARGET:
             continue
@@ -325,8 +275,6 @@ def build_manifest(
             total_files=len(lang_files),
             language_stats=dict(lang_ext_counts),
         ))
-
-    # Sort targets: largest first (primary target)
     targets.sort(key=lambda t: t.total_files, reverse=True)
 
     return SourceManifest(
@@ -334,24 +282,3 @@ def build_manifest(
         total_files=all_source_files_count,
         language_stats=dict(ext_counts),
     )
-
-
-def _detect_category(
-    src: Path, disciplines_conf: Path,
-) -> tuple[str | None, list[str]]:
-    """Use DisciplineRegistry to detect category and suggested topics."""
-    try:
-        from quodeq.config.discipline_registry import DisciplineRegistry
-
-        registry = DisciplineRegistry.from_file(disciplines_conf)
-        matches = registry.detect_matches(src)
-        if not matches:
-            return None, []
-        best = registry.choose_highest_priority(matches)
-        rule = registry.disciplines.get(best)
-        if rule is None:
-            return None, []
-        topics = list(rule.suggested_topics) if rule.suggested_topics else []
-        return rule.category, topics
-    except (ValueError, OSError):
-        return None, []

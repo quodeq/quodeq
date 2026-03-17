@@ -122,8 +122,10 @@ def main() -> None:
     sa = parse_args()
     if not sa.findings_file:
         sys.stderr.write(
+            "Error: findings output path is required.\n"
             "Usage: mcp_findings.py <findings_file> [--compiled-dir DIR --dimension DIM]"
             " [--queue PATH --agent-id ID]\n"
+            "Provide the path where findings JSONL should be written.\n"
         )
         sys.exit(1)
 

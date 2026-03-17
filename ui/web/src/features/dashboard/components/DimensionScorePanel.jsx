@@ -9,10 +9,14 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
-import { formatShortDate } from '../../../utils/formatters.js';
+import { formatShortDate, angleFromDelta } from '../../../utils/formatters.js';
 
+const _cssVarCache = {};
 function cssVar(name, fallback) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+  if (!(name in _cssVarCache)) {
+    _cssVarCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  }
+  return _cssVarCache[name] || fallback;
 }
 
 function scoreBarColor(score) {
@@ -23,13 +27,6 @@ function scoreBarColor(score) {
   if (n >= 5) return cssVar('--color-grade-mid-text');   // adequate
   if (n >= 3) return cssVar('--color-grade-low-text');   // poor
   return cssVar('--color-grade-bottom-text');            // critical
-}
-
-// Rotation: 0° = straight up (↑), 90° = horizontal (→), 180° = straight down (↓)
-// sqrt curve: non-zero deltas always tilt; max arc 55° keeps small changes subtle
-function angleFromDelta(d) {
-  const clamped = Math.max(-4, Math.min(4, d));
-  return 90 - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / 4) * 55;
 }
 
 function trendColorClass(angle) {

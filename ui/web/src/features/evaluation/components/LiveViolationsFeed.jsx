@@ -1,5 +1,9 @@
 import { useState } from 'react';
 
+const COPY_FEEDBACK_MS = 1500;
+const ANIM_DELAY_PER_ITEM_MS = 40;
+const ANIM_MAX_DELAY_MS = 400;
+
 function severityOrder(s) {
   return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
 }
@@ -23,7 +27,7 @@ function FileCopyBtn({ display, copyText }) {
         e.stopPropagation();
         navigator.clipboard.writeText(copyText);
         setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
       }}
     >
       {copied ? 'Copied!' : display}
@@ -53,12 +57,14 @@ function ViolationLiveRow({ violation, index }) {
   return (
     <div
       className={`vdetail-row vdetail-row--${v.severity}`}
-      style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
+      style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
     >
       <div
         className="vdetail-row-main vlive-collapsible"
         role="button"
         tabIndex={0}
+        aria-expanded={open}
+        aria-label={`${v.severity} finding: ${v.title || v.file || 'details'}`}
         onClick={() => setOpen(o => !o)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >

@@ -29,11 +29,15 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
+  function isRelevantLogLine(line) {
+    return line.startsWith('→') || line.startsWith('✓') || line.startsWith('Error:') || line.includes('failed');
+  }
+
   function lastRelevantLog(logs) {
     if (!logs?.length) return null;
     for (let i = logs.length - 1; i >= 0; i--) {
       const line = logs[i].trim();
-      if (line.startsWith('→') || line.startsWith('✓') || line.startsWith('Error:') || line.includes('failed')) return line;
+      if (isRelevantLogLine(line)) return line;
     }
     return null;
   }
@@ -108,7 +112,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         tabIndex={0}
         onClick={() => setConsoleOpen(o => !o)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen(o => !o); } }}
-        title={consoleOpen ? 'Hide console' : 'Show console'}
+        aria-label={consoleOpen ? 'Hide console' : 'Show console'}
       >
         {isRunning && <span className="eval-status-phase">{phaseLabel(job)}</span>}
         {isFailed && <span className="eval-status-phase eval-status-phase--error">{lastRelevantLog(job.logs) || 'Analysis failed'}</span>}

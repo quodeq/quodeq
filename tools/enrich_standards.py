@@ -158,6 +158,7 @@ def main() -> None:
     if dry_run:
         print("DRY RUN — use --apply to write changes\n")
 
+    # Deferred: depends on sys.path modification above
     from compile_standards import ALL_DIMENSIONS
 
     mapping = _load_mapping()

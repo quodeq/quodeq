@@ -1,55 +1,7 @@
 import { memo, useState } from 'react';
 import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
-
-const EVAL_SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
-
-const GRADE_TIERS = {
-  exemplary: 'grade-top',
-  good: 'grade-high',
-  proficient: 'grade-high',
-  adequate: 'grade-mid',
-  developing: 'grade-mid',
-  poor: 'grade-low',
-  insufficient: 'grade-low',
-  critical: 'grade-bottom',
-  a: 'grade-top',
-  b: 'grade-high',
-  c: 'grade-mid',
-  d: 'grade-low',
-  f: 'grade-bottom',
-};
-
-function gradeColorClass(grade) {
-  if (!grade) return 'grade-none';
-  const lower = grade.trim().toLowerCase();
-  if (GRADE_TIERS[lower]) return GRADE_TIERS[lower];
-  const first = lower.charAt(0);
-  return GRADE_TIERS[first] || 'grade-none';
-}
-
-function CopyIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <rect x="9" y="9" width="13" height="13" rx="2"/>
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-    </svg>
-  );
-}
-
-function CopyButton({ onClick, label }) {
-  const [copied, setCopied] = useState(false);
-  const handleClick = () => {
-    onClick();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <button className="detail-copy-btn" onClick={handleClick}>
-      {copied ? 'Copied!' : label}
-      <CopyIcon />
-    </button>
-  );
-}
+import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
+import CopyButton, { CopyIcon } from '../../../components/CopyButton.jsx';
 
 function FileCopyBtn({ display, copyText }) {
   const [copied, setCopied] = useState(false);

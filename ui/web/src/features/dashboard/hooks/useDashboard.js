@@ -35,8 +35,8 @@ export function useDashboard({ selectedProject, selectedRun }) {
       .then((payload) => {
         if (active) setDashboard(payload);
       })
-      .catch((err) => {
-        if (active) setError(err.message);
+      .catch(() => {
+        if (active) setError('Failed to load dashboard data. Please try again.');
       })
       .finally(() => {
         if (active) setLoading(false);

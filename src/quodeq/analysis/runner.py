@@ -9,8 +9,13 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, TypedDict
+from typing import Any
 
+from quodeq.analysis._dimensions import (
+    DimensionEntry as DimensionEntry,
+    DimensionsConfig as DimensionsConfig,
+    load_universal_dimensions as load_universal_dimensions,
+)
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subprocess import AnalysisConfig, HeartbeatCallback, count_files_from_stream, run_analysis
 from quodeq.analysis.stream.parser import extract_evidence_from_stream
@@ -19,39 +24,10 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.engine._runner_markers import CC_MARKER_KEY, cleanup_stream, emit_marker, make_heartbeat
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.analysis.plugins.schema_validator import validate_dimensions
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
 from quodeq.shared.logging import log_info, log_success, log_warning
-from quodeq.shared.utils import read_json
 from quodeq.shared.validation import validate_path_segment
-
-
-class DimensionEntry(TypedDict, total=False):
-    """Shape of one entry in dimensions.json ``applies`` list."""
-    id: str
-    weight: float
-    iso_25010: str
-    source: str
-
-
-class DimensionsConfig(TypedDict, total=False):
-    """Shape of a validated dimensions.json file."""
-    applies: list[DimensionEntry]
-    excludes: list[str]
-
-
-def load_universal_dimensions(dimensions_file: Path) -> DimensionsConfig:
-    """Load and validate the universal dimensions.json config.
-
-    Returns the parsed dimensions dict.
-    Raises ValueError on validation failure.
-    """
-    dims_data = read_json(dimensions_file)
-    errors = validate_dimensions(dims_data)
-    if errors:
-        raise ValueError(f"dimensions.json: {'; '.join(errors)}")
-    return dims_data
 
 
 @dataclass
