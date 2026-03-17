@@ -179,7 +179,7 @@ def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManife
     manifest = build_manifest(src, detection, disciplines_conf)
     if manifest.targets:
         langs = ", ".join(
-            f"{t.project_description} ({t.total_files})"
+            f"{t.language} ({t.total_files})"
             for t in manifest.targets
         )
         print(f"Detected: {langs}", file=sys.stderr)
