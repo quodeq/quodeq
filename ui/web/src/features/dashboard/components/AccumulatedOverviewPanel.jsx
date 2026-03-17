@@ -4,7 +4,7 @@ import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from './ViolationsByPrincipleTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
-import { formatRunId, gradeColorClass, scoreColorClass, splitScore } from '../../../utils/formatters.js';
+import { formatRunId, gradeColorClass, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 
@@ -112,11 +112,8 @@ export default function AccumulatedOverviewPanel({
         </div>
 
         <div className="acc-eval-hero">
-          <span
-            className={`acc-eval-grade-chip chip ${scoreColorClass(accumulated?.summary?.numericAverage)}`}
-          >
-            {accumulated?.summary?.overallGrade || '—'}
-          </span>
+          <span className={`acc-eval-grade-chip chip ${scoreColorClass(accumulated?.summary?.numericAverage)}`}>
+            {accumulated?.summary?.overallGrade || '—'}</span>
           <div className="acc-eval-score-row">
             <span className="acc-eval-score">{accumulated?.summary?.numericAverage || '—'}</span>
             <span className="acc-eval-score-denom">/10</span>
@@ -131,42 +128,21 @@ export default function AccumulatedOverviewPanel({
         <div className="acc-eval-stats-grid">
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Violations</span>
-            <span className="acc-eval-stat-value">
-              {accumulated?.summary?.totalViolations || 0}
-            </span>
+            <span className="acc-eval-stat-value">{accumulated?.summary?.totalViolations || 0}</span>
             <div className="acc-eval-tags">
-              {(accumulated?.summary?.severity?.critical || 0) > 0 && (
-                <span className="severity-tag critical">
-                  {accumulated.summary.severity.critical} critical
-                </span>
-              )}
-              {(accumulated?.summary?.severity?.major || 0) > 0 && (
-                <span className="severity-tag major">
-                  {accumulated.summary.severity.major} major
-                </span>
-              )}
-              {(accumulated?.summary?.severity?.minor || 0) > 0 && (
-                <span className="severity-tag minor">
-                  {accumulated.summary.severity.minor} minor
-                </span>
-              )}
+              {(accumulated?.summary?.severity?.critical || 0) > 0 && <span className="severity-tag critical">{accumulated.summary.severity.critical} critical</span>}
+              {(accumulated?.summary?.severity?.major || 0) > 0 && <span className="severity-tag major">{accumulated.summary.severity.major} major</span>}
+              {(accumulated?.summary?.severity?.minor || 0) > 0 && <span className="severity-tag minor">{accumulated.summary.severity.minor} minor</span>}
             </div>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Compliance</span>
-            <span className="acc-eval-stat-value">
-              {accumulated?.summary?.totalCompliance || 0}
-            </span>
+            <span className="acc-eval-stat-value">{accumulated?.summary?.totalCompliance || 0}</span>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Ratio</span>
             <span className="acc-eval-stat-value">
-              {(() => {
-                const v = accumulated?.summary?.totalViolations || 0;
-                const c = accumulated?.summary?.totalCompliance || 0;
-                if (v === 0) return '—';
-                return `1:${Math.round(c / v)}`;
-              })()}
+              {complianceRatio(accumulated?.summary?.totalViolations || 0, accumulated?.summary?.totalCompliance || 0)}
             </span>
           </div>
           <div className="acc-eval-stat-block">
@@ -179,9 +155,7 @@ export default function AccumulatedOverviewPanel({
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Dimensions</span>
-            <span className="acc-eval-stat-value">
-              {accumulated?.summary?.dimensionCount || 0}
-            </span>
+            <span className="acc-eval-stat-value">{accumulated?.summary?.dimensionCount || 0}</span>
           </div>
         </div>
       </section>
@@ -309,10 +283,7 @@ export default function AccumulatedOverviewPanel({
         <>
           <div className="section-header">
             <h3 className="section-title">Violations by Principle</h3>
-            <span className="section-count">
-              {accumulatedUniquePrinciples}{' '}
-              principles
-            </span>
+            <span className="section-count">{accumulatedUniquePrinciples} principles</span>
           </div>
           <section className="panel wide-panel offending-panel">
             <div className="trend-table-wrap">

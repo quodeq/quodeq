@@ -7,6 +7,8 @@ from .dimension import GradeBreakdown
 
 @dataclass(frozen=True, slots=True)
 class TrendPoint:
+    """A single data point in the historical score trend line."""
+
     run_id: str
     date_iso: str | None = None
     date_label: str = ""
@@ -17,6 +19,8 @@ class TrendPoint:
 
 @dataclass(frozen=True, slots=True)
 class DashboardSummary:
+    """Aggregate summary for a single evaluation run displayed on the dashboard."""
+
     dimensions_count: int = 0
     overall_grade: str | None = None
     numeric_average: float | None = None
@@ -27,6 +31,8 @@ class DashboardSummary:
 
 @dataclass(frozen=True, slots=True)
 class AccumulatedSummary:
+    """Accumulated scores across all runs for a project."""
+
     overall_grade: str | None = None
     numeric_average: float | None = None
     previous_numeric_average: float | None = None

@@ -27,11 +27,11 @@ _ASVS_OUTPUT_FILE = "level1.json"
 _DEFAULT_ASVS_VERSION = "4.0.3"
 
 
-def _asvs_version(override: str | None = None) -> str:
+def _asvs_version(override: str | None = None, env: dict[str, str] | None = None) -> str:
     """Return the ASVS version string. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return os.environ.get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
+    return (env or os.environ).get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
 
 _DEFAULT_FETCH_TIMEOUT_S = 30
 _RETRY_BASE_DELAY_S = 0.5

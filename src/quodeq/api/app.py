@@ -30,9 +30,19 @@ from quodeq.api.routes import (
 _HEALTH_PATH = "/api/health"
 _RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
 
-_RATE_LIMIT_WINDOW = int(os.environ.get("QUODEQ_RATE_LIMIT_WINDOW", "60"))
-_RATE_LIMIT_MAX = int(os.environ.get("QUODEQ_RATE_LIMIT_MAX", "60"))
+_DEFAULT_RATE_LIMIT_WINDOW = 60
+_DEFAULT_RATE_LIMIT_MAX = 60
 _RATE_STORE_MAX_IPS = 10_000  # max tracked IPs to prevent unbounded memory growth
+
+
+def _rate_limit_window(env: dict[str, str] | None = None) -> int:
+    """Return the rate-limit window in seconds."""
+    return int((env or os.environ).get("QUODEQ_RATE_LIMIT_WINDOW", str(_DEFAULT_RATE_LIMIT_WINDOW)))
+
+
+def _rate_limit_max(env: dict[str, str] | None = None) -> int:
+    """Return the maximum number of requests per window."""
+    return int((env or os.environ).get("QUODEQ_RATE_LIMIT_MAX", str(_DEFAULT_RATE_LIMIT_MAX)))
 
 
 @runtime_checkable
@@ -64,13 +74,13 @@ class InMemoryRateLimitStore:
 
     def __init__(
         self,
-        window: float = _RATE_LIMIT_WINDOW,
-        max_requests: int = _RATE_LIMIT_MAX,
+        window: float | None = None,
+        max_requests: int | None = None,
         max_ips: int = _RATE_STORE_MAX_IPS,
     ) -> None:
         self._store: OrderedDict[str, list[float]] = OrderedDict()
-        self._window = window
-        self._max_requests = max_requests
+        self._window = window if window is not None else _rate_limit_window()
+        self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
         self._max_ips = max_ips
 
     def _evict_stale(self, now: float) -> None:

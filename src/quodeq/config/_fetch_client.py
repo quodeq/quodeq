@@ -63,7 +63,10 @@ class FetchClient:
             return None
 
 
-# Module-level singleton — injectable via set_fetch_client() for testing.
+# Module-level singleton with thread-safe lazy initialization.
+# Global state is used here because the FetchClient carries mutable circuit-breaker
+# counters that must be shared across all callers within a process.  Injectable
+# via set_fetch_client() for testing.
 _fetch_client_lock = threading.Lock()
 _fetch_client_instance: FetchClient | None = None
 

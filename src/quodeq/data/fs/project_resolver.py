@@ -46,7 +46,10 @@ class _IndexCache:
             self._data.clear()
 
 
-# Module-level singleton — call _index_cache.clear() in tests for isolation.
+# Module-level singleton for mtime-based project index caching.
+# Thread-safe via internal locking (_IndexCache._lock).  Bounded to
+# _INDEX_CACHE_MAX entries to prevent unbounded memory growth.
+# Call _index_cache.clear() (or clear_index_cache()) in tests for isolation.
 _index_cache = _IndexCache()
 
 

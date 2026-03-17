@@ -30,6 +30,7 @@ _ALLOWED_USAGES = {"allowed", "allowed-with-review"}
 _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
 
 _DEFAULT_STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
+# Overridable via --api-base CLI argument or CWE_API_BASE env var
 _DEFAULT_API_BASE = os.environ.get("CWE_API_BASE", "https://cwe-api.mitre.org/api/v1/cwe")
 
 
@@ -173,15 +174,15 @@ def _print_results(results: list[dict], *, problems_only: bool) -> None:
         print(f"  Unknown/Other:    {len(unknown)}")
 
     if prohibited:
-        _print_category(f"PROHIBITED ({len(prohibited)}) — Must be removed", prohibited, show_rationale=True)
+        _print_category(f"PROHIBITED ({len(prohibited)}) \u2014 Must be removed", prohibited, show_rationale=True)
     if discouraged:
-        _print_category(f"DISCOURAGED ({len(discouraged)}) — Should use more specific children", discouraged)
+        _print_category(f"DISCOURAGED ({len(discouraged)}) \u2014 Should use more specific children", discouraged)
     if unknown and not problems_only:
         print(f"\n{'=' * _TERMINAL_WIDTH}")
         print(f"UNKNOWN/OTHER ({len(unknown)})")
         print(f"{'=' * _TERMINAL_WIDTH}")
         for r in unknown:
-            print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} — {r['name']}")
+            print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} \u2014 {r['name']}")
 
 
 def main() -> None:

@@ -3,7 +3,7 @@
 // projects: array of { name } or strings
 // runs: array of { runId, dateLabel }
 
-export default function ProjectSelector({ projects, selectedProject, selectedRun, runs, onProjectChange, onRunChange }) {
+export default function ProjectSelector({ projects, selectedProject, selectedRun, runs, onChange: { onProjectChange, onRunChange } = {} }) {
   const projectList = (projects || []).map((p) =>
     typeof p === 'string' ? { name: p } : p
   );

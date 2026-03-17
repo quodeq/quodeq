@@ -18,6 +18,8 @@ _DEFAULT_CRITICAL_PENALTY = 2.0
 _DEFAULT_MAJOR_PENALTY = 1.0
 _DEFAULT_MINOR_PENALTY = 0.25
 
+# Module-level penalty cache — avoids repeated os.environ lookups in the hot
+# scoring path.  Values are populated lazily by _critical_penalty() et al.
 _cached_penalties: dict[str, float] = {}
 
 

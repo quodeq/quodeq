@@ -12,14 +12,15 @@ Key functions and their contracts:
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 import os
 import signal
 import socket
 import subprocess
 import sys
+import threading
 import time
 import webbrowser
+from pathlib import Path
 
 from quodeq.dashboard._api_health import ApiConfig, action_api_healthy, spawn_and_wait
 from quodeq.dashboard._build import maybe_build_ui
@@ -135,13 +136,11 @@ def _ensure_action_api(
                 "Set QUODEQ_ALLOW_PLAINTEXT_HTTP=1 to explicitly opt in, "
                 "or use a TLS reverse proxy."
             )
-    port = start_port
-    for _ in range(max_tries):
+    for port in range(start_port, start_port + max_tries):
         base_url = f"http://{host}:{port}"
         if _is_port_open(host, port):
             if action_api_healthy(base_url):
                 return base_url, None
-            port += 1
             continue
         return _spawn_and_wait_local(port, base_url, cfg)
     raise RuntimeError("Unable to find a free port for Action API.")
@@ -226,7 +225,6 @@ def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | 
         if action_api_process:
             _wait_for_process(action_api_process)
         elif IS_WIN32:
-            import threading
             threading.Event().wait()
         else:
             signal.pause()

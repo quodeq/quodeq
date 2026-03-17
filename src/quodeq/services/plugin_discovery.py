@@ -37,7 +37,9 @@ class _PluginCache:
             self._ts = time.monotonic()
 
 
-# Module-level singleton — injectable via cache parameter on discover_plugins().
+# Module-level singleton for plugin metadata caching (TTL-based).
+# Thread-safe via internal locking.  Override by passing *cache* to
+# discover_plugins() for testing or alternative backends.
 _plugin_cache = _PluginCache()
 
 

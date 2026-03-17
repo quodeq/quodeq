@@ -220,9 +220,12 @@ export default function App() {
           <ProjectHeader
             selectedDisplayName={selectedDisplayName} selectedProjectParent={selectedProjectParent}
             selectedProjectParentId={selectedProjectParentId} onProjectChange={handleProjectChange}
-            headerMeta={headerMeta} showRunNav={showRunNav} currentOverviewRun={currentOverviewRun}
-            overviewRunIndex={overviewRunIndex} availableRuns={availableRuns}
-            onRunPrev={handleRunPrev} onRunNext={handleRunNext} onRunLatest={handleRunLatest} onViewRun={onViewRun}
+            headerMeta={headerMeta} showRunNav={showRunNav}
+            runNavProps={{
+              currentOverviewRun, overviewRunIndex, availableRuns,
+              onRunPrev: handleRunPrev, onRunNext: handleRunNext,
+              onRunLatest: handleRunLatest, onViewRun: onViewRun,
+            }}
           />
         )}
         {navStack.length > 1 && <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} />}

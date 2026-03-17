@@ -23,7 +23,7 @@ _BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
 
 
 def _sanitize_url(url: str) -> str:
-    """Remove embedded credentials from a URL for safe logging."""
+    """Remove embedded credentials from a URL for safe logging/error messages."""
     return _CREDENTIALS_RE.sub(r"\1***@", url)
 
 
@@ -166,11 +166,11 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(to_camel_dict(payload))
 
 
-def _validate_ai_cmd(ai_cmd: str | None) -> tuple[Response, int] | None:
+def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:
     """Return an error response if *ai_cmd* is not in the allow-list, or None if valid."""
     if not ai_cmd:
         return None
-    allowed_cmds = _get_allowed_ai_cmds()
+    allowed_cmds = _get_allowed_ai_cmds(env=env)
     if ai_cmd not in allowed_cmds:
         allowed_list = ", ".join(sorted(allowed_cmds))
         body, status = error_response(

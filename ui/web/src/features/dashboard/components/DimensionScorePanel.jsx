@@ -11,13 +11,15 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta } from '../../../utils/formatters.js';
 
-const _cssVarCache = {};
-function cssVar(name, fallback) {
-  if (!(name in _cssVarCache)) {
-    _cssVarCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
-  return _cssVarCache[name] || fallback;
-}
+const cssVar = (() => {
+  const cache = {};
+  return (name, fallback) => {
+    if (!(name in cache)) {
+      cache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+    return cache[name] || fallback;
+  };
+})();
 
 function scoreBarColor(score) {
   const n = parseFloat(score);

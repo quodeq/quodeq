@@ -1,5 +1,7 @@
 import { useState } from 'react';
 
+const COPY_FEEDBACK_MS = 1500;
+
 export function CopyIcon() {
   return (
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
@@ -15,7 +17,7 @@ export default function CopyButton({ onClick, label, 'aria-label': ariaLabel }) 
   const handleClick = () => {
     onClick();
     setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+    setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
   };
 
   return (

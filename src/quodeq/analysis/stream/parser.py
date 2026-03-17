@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from quodeq.analysis.stream.counters import extract_files_from_blocks
 from quodeq.analysis.stream.event_text import TEXT_EXTRACTORS
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import open_text
@@ -38,21 +39,10 @@ def _extract_jsonl_from_text(text: str, out) -> tuple[int, int]:
     return count, lines
 
 
-def _extract_read_paths(blocks: list) -> set[str]:
-    """Extract file paths from Read tool_use blocks in a content list."""
-    files: set[str] = set()
-    for block in blocks:
-        if isinstance(block, dict) and block.get("type") == "tool_use" and block.get("name") == "Read":
-            fp = block.get("input", {}).get("file_path")
-            if fp:
-                files.add(fp)
-    return files
-
-
 def _collect_file_reads(data: dict) -> set[str]:
-    """Extract file paths from Read tool_use blocks in an event."""
-    files = _extract_read_paths(data.get("message", {}).get("content", []))
-    files |= _extract_read_paths(data.get("item", {}).get("content", []))
+    """Extract file paths from Read/Grep tool_use blocks in an event."""
+    files = extract_files_from_blocks(data.get("message", {}).get("content", []))
+    files |= extract_files_from_blocks(data.get("item", {}).get("content", []))
     return files
 
 

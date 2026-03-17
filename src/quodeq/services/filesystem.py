@@ -128,7 +128,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return None
 
         discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
-        available_dimensions = _list_available_dimensions_for_discipline(discipline) if discipline else []
+        available_dimensions = _list_available_dimensions_for_discipline() if discipline else []
         return {**info, "discipline": discipline, "availableDimensions": available_dimensions}
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
