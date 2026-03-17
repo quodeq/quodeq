@@ -168,22 +168,6 @@ class SubagentPool:
                 mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
                 total_findings, new_lines = self._read_new_findings(last_finding_count)
 
-                # Print each new finding live
-                for line in new_lines:
-                    try:
-                        f = _json.loads(line)
-                        key = (f.get("p", ""), f.get("file", ""), f.get("line", 0), f.get("t", ""))
-                        if key in seen_keys:
-                            continue
-                        seen_keys.add(key)
-                        verdict = f.get("t", "?")
-                        sev = f.get("severity", "")
-                        path = f.get("file", "?")
-                        title = f.get("w", "")
-                        tag = f"[{sev}]" if sev else ""
-                        log_info(f"    {verdict} {tag} {path} — {title}")
-                    except (_json.JSONDecodeError, AttributeError):
-                        pass
                 last_finding_count = total_findings
 
                 remaining, taken = FileQueue(self._queue_path).stats()
