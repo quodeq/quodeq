@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import ipaddress
 import logging
 import os
 import random
@@ -17,6 +16,7 @@ from urllib.error import URLError
 from urllib.parse import urlparse
 
 from quodeq.data.ports.data_errors import AuthError, NotFoundError, ServerError
+from quodeq.shared.ssrf import is_private_address as _is_private_address
 
 _logger = logging.getLogger(__name__)
 
@@ -29,31 +29,6 @@ def _allow_private_urls(override: bool | None = None) -> bool:
     if override is not None:
         return override
     return os.environ.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
-
-
-from functools import lru_cache
-
-
-@lru_cache(maxsize=256)
-def _is_private_address(hostname: str) -> bool:
-    """Return True if *hostname* resolves to a private/loopback/link-local address (cached)."""
-    # Check common private hostnames directly
-    if hostname in ("localhost", "localhost.localdomain"):
-        return True
-    try:
-        addr = ipaddress.ip_address(hostname)
-        return addr.is_private or addr.is_loopback or addr.is_link_local
-    except ValueError:
-        pass
-    # Hostname — resolve and check all addresses
-    try:
-        for family, _type, _proto, _canonname, sockaddr in socket.getaddrinfo(hostname, None):
-            addr = ipaddress.ip_address(sockaddr[0])
-            if addr.is_private or addr.is_loopback or addr.is_link_local:
-                return True
-    except (socket.gaierror, OSError):
-        pass
-    return False
 
 _ENV_ALLOW_PLAINTEXT_HTTP = "QUODEQ_ALLOW_PLAINTEXT_HTTP"
 _DEFAULT_HTTP_TIMEOUT = 10

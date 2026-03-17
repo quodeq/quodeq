@@ -11,6 +11,7 @@ import urllib.error
 import urllib.request
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 from quodeq.shared.utils import write_text, get_asvs_url, show_diff
 
@@ -115,7 +116,6 @@ def fetch_asvs_l1(
     Pass *skip_integrity* explicitly for programmatic use (e.g. tests).
     """
     url = get_asvs_url()
-    from urllib.parse import urlparse
     parsed = urlparse(url)
     if parsed.hostname not in _ASVS_ALLOWED_HOSTS:
         raise ValueError(

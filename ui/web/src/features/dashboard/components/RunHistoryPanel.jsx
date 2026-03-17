@@ -12,6 +12,12 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
+
+const MAX_CHART_RUNS = 20;
+const CHART_HEIGHT = 160;
+const REF_LINE_LOW = 2.5;
+const REF_LINE_MID = 5;
+const REF_LINE_HIGH = 7.5;
 const _cssVarCache = {};
 function cssVar(name, fallback) {
   if (!(name in _cssVarCache)) {
@@ -60,7 +66,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
 
   // Take the 20 most recent runs (trend is newest-first), then display oldest→newest.
   // For the selected run, use the accumulated score so the bar matches the acc-eval-hero.
-  const data = [...trend].slice(0, 20).reverse().map((row, i, arr) => {
+  const data = [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
     const isSelected = row.runId === selectedRunId;
     const numericAverage = isSelected && selectedRunScore != null
       ? parseFloat(selectedRunScore)
@@ -112,7 +118,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
       <div className="run-history-header">
         <span className="run-history-title">Score History</span>
       </div>
-      <ResponsiveContainer width="100%" height={160}>
+      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
           <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
           <XAxis
@@ -124,7 +130,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
           />
           <YAxis
             domain={[0, 10]}
-            ticks={[0, 2.5, 5, 7.5, 10]}
+            ticks={[0, REF_LINE_LOW, REF_LINE_MID, REF_LINE_HIGH, 10]}
             tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             axisLine={false}
             tickLine={false}
@@ -146,9 +152,9 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
               );
             }}
           />
-          <ReferenceLine y={2.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
-          <ReferenceLine y={5}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-          <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+          <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <Bar
             dataKey="numericAverage"
             radius={[3, 3, 0, 0]}

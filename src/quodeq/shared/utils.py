@@ -5,6 +5,7 @@ Both are re-exported here for backward compatibility.
 """
 from __future__ import annotations
 
+import difflib
 import json
 import logging
 import os
@@ -225,7 +226,6 @@ def get_findings_file(env: dict[str, str] | None = None) -> str | None:
 
 def show_diff(path: Path, new_content: str) -> None:
     """Print a unified diff between *path*'s current content and *new_content*."""
-    import difflib
     old_lines = path.read_text().splitlines(keepends=True) if path.exists() else []
     new_lines = new_content.splitlines(keepends=True)
     diff = list(difflib.unified_diff(old_lines, new_lines, fromfile=str(path), tofile="<new>"))
