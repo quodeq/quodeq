@@ -12,8 +12,10 @@ import webbrowser
 
 import rumps
 
-_APP_PORT = 4180  # dedicated port for menu bar app
-_PORTS = (4180, 4181, 4182, 4183)
+_APP_PORT = int(os.environ.get("QUODEQ_PORT", "4180"))
+_PORTS = tuple(
+    int(p) for p in os.environ.get("QUODEQ_PORTS", "4180,4181,4182,4183").split(",")
+)
 _HEALTH_TIMEOUT = 1.0
 _POLL_INTERVAL = 5
 
@@ -65,8 +67,9 @@ def _source_user_path() -> None:
             'source ~/.bash_profile 2>/dev/null; '
             'echo $PATH'
         )
+        shell = os.environ.get("SHELL", "/bin/zsh")
         result = subprocess.run(
-            ["zsh", "-c", cmd],
+            [shell, "-c", cmd],
             capture_output=True, text=True, timeout=5,
         )
         if result.returncode == 0 and result.stdout.strip():

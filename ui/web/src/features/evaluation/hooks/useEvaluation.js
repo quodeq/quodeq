@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } from '../../../api/index.js';
 
+const DIMENSION_POLL_MS = 2000;
+const JOB_POLL_MS = 1500;
+
 export function useEvaluation() {
   const [job, setJob] = useState(null);
   const [jobError, setJobError] = useState('');
@@ -76,7 +79,7 @@ export function useEvaluation() {
           }
         })
       );
-    }, 2000);
+    }, DIMENSION_POLL_MS);
   }
 
   function startPolling(jobId) {
@@ -113,7 +116,7 @@ export function useEvaluation() {
         stopPolling();
         stopDimensionPolling();
       }
-    }, 1500);
+    }, JOB_POLL_MS);
   }
 
   async function startEvaluationJob(payload) {

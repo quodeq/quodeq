@@ -76,8 +76,12 @@ class FileQueueError(RuntimeError):
 
 
 class FileQueue:
-    # NOTE: Single-node only. Replace with a distributed queue (Redis, SQS) for horizontal scaling.
     """Distributes files across N subagent processes.
+
+    **Scaling:** This is a single-node implementation using OS file locks.
+    For multi-machine deployments, implement the ``WorkQueue`` protocol
+    with a networked backend (Redis, SQS) and inject it at the
+    orchestration layer via dependency injection.
 
     The queue state lives in a JSON file::
 

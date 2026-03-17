@@ -8,7 +8,8 @@ if [ -f "$HOME/.bash_profile" ]; then source "$HOME/.bash_profile" 2>/dev/null; 
 export PATH="$PATH:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin"
 
 # If dashboard is already running, just open the browser
-for PORT in 4173 4174 4175; do
+QUODEQ_PORTS="${QUODEQ_PORTS:-4173 4174 4175}"
+for PORT in $QUODEQ_PORTS; do
     if curl -s "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q '"ok"'; then
         open "http://127.0.0.1:$PORT"
         exit 0

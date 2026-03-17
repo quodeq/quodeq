@@ -30,8 +30,8 @@ from quodeq.api.routes import (
 _HEALTH_PATH = "/api/health"
 _RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
 
-_RATE_LIMIT_WINDOW = 60  # seconds
-_RATE_LIMIT_MAX = 60  # max state-changing requests per window
+_RATE_LIMIT_WINDOW = int(os.environ.get("QUODEQ_RATE_LIMIT_WINDOW", "60"))
+_RATE_LIMIT_MAX = int(os.environ.get("QUODEQ_RATE_LIMIT_MAX", "60"))
 _RATE_STORE_MAX_IPS = 10_000  # max tracked IPs to prevent unbounded memory growth
 
 
@@ -56,10 +56,10 @@ class RateLimitStore(Protocol):
 class InMemoryRateLimitStore:
     """Process-local rate-limit store backed by an LRU OrderedDict.
 
-    For multi-worker deployments, implement the ``RateLimitStore`` protocol
-    with a shared backend (e.g. Redis) and pass it to ``create_app`` via
-    the ``rate_limit_store`` parameter, or register a factory via
-    ``create_rate_limit_store``.
+    **Scaling:** This store is per-process. In multi-worker deployments,
+    implement ``RateLimitStore`` with a shared backend (e.g. Redis) and
+    pass it to ``create_app(rate_limit_store=...)``.
+    Set ``QUODEQ_RATE_LIMIT_STORE=redis`` to opt in (requires custom wiring).
     """
 
     def __init__(
