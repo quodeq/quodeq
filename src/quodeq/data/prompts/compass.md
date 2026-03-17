@@ -15,22 +15,17 @@ Analyse the codebase for the **{{DIMENSION}}** quality dimension. Use the tools 
 
 ## Reporting Findings
 
-For EVERY finding (violation or compliance), call the `report_finding` tool with these parameters:
+For EVERY finding (violation or compliance), call `report_finding` with:
 
-**Required:**
-- `p` — the **section header** (### heading) from the standards checklist, i.e. the ISO 25010 sub-characteristic name. Examples: `Modularity`, `Analyzability`, `Confidentiality`, `Fault Tolerance`. **NEVER** put a requirement ID (like M-ANA-1) here.
+- `req` — the **bold requirement ID** from the checklist (e.g. `M-MOD-1`, `S-CON-3`). The server auto-fills principle name and dimension from this.
 - `t` — `violation` or `compliance`
-- `d` — dimension being evaluated
-- `w` — short description of what you found
-
-**Include with every finding:**
 - `file` — file path relative to repo root
 - `line` — line number
-- `snippet` — the relevant code (keep under 200 chars)
+- `snippet` — the relevant code (under 200 chars)
 - `severity` — `critical`, `major`, or `minor`
-- `reason` — brief explanation of why this is a violation or compliance
-- `req` — the **bold requirement ID** from the checklist (e.g. `M-ANA-1`, `S-CON-3`, `R-FT-1`). Always include this.
-- `vt` — violation type (e.g. "hardcoded-secret", "missing-error-handler")
+- `w` — short description of what you found
+
+**Optional:** `reason` — why this is a violation or compliance
 
 ## Severity Definitions
 
@@ -85,10 +80,7 @@ Focus on the project's **own source code** — skip generated, vendored, compile
 
 ## Standards Checklist
 
-This checklist is organized by ISO 25010 sub-characteristic (the `###` headings). Each heading contains numbered requirements (the **bold IDs**).
-
-- `p` field = the **### heading name** (e.g. `Modularity`, `Analyzability`) — NEVER a requirement ID
-- `req` field = the **bold requirement ID** (e.g. `M-MOD-1`, `M-ANA-2`)
+The checklist is organized by ISO 25010 sub-characteristic (`###` headings) with numbered requirements (**bold IDs**). Use the **bold ID** as the `req` field (e.g. `M-MOD-1`, `S-CON-3`).
 
 {{STANDARDS_CHECKLIST}}
 

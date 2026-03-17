@@ -90,6 +90,7 @@ def _build_dimension_prompt(
             standards_dir=config.standards_dir,
             manifest=config.manifest,
             target=config.target,
+            work_dir=config.work_dir or config.src,
         ),
     )
 

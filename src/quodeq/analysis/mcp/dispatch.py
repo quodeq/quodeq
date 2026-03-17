@@ -27,19 +27,18 @@ REPORT_FINDING_DESC = (
 REPORT_FINDING_SCHEMA = {
     "type": "object",
     "properties": {
-        "p": {"type": "string", "description": "Sub-characteristic name (the ### heading from the checklist, e.g. 'Modularity', 'Analyzability'). NEVER a requirement ID."},
+        "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'M-MOD-1', 'S-CON-3'). Server auto-fills principle name and dimension from this."},
         "t": {"type": "string", "enum": ["violation", "compliance"], "description": "Finding type"},
-        "d": {"type": "string", "description": "Dimension being evaluated"},
-        "w": {"type": "string", "description": "Short description of the finding"},
         "file": {"type": "string", "description": "File path relative to repo root"},
         "line": {"type": "integer", "description": "Line number"},
         "snippet": {"type": "string", "description": "Relevant code snippet (under 200 chars)"},
         "severity": {"type": "string", "enum": ["critical", "major", "minor"], "description": "Severity level"},
-        "vt": {"type": "string", "description": "Violation type identifier"},
+        "w": {"type": "string", "description": "Short description of the finding"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
-        "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'R-FT-1', 'S-CON-3')"},
+        "p": {"type": "string", "description": "Sub-characteristic name — auto-filled from req if omitted"},
+        "d": {"type": "string", "description": "Dimension — auto-filled from server config if omitted"},
     },
-    "required": ["p", "t", "d", "w"],
+    "required": ["req", "t", "file", "line", "snippet", "severity", "w"],
 }
 
 _DEFAULT_FILE_BATCH_SIZE = 5

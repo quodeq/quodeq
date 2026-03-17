@@ -36,17 +36,24 @@ def ref_label(ref: dict) -> str:
     return source.upper() if source else "REF"
 
 
+def _load_compiled_data(compiled_dir: str | Path | None, dimension: str | None) -> dict | None:
+    """Load raw compiled standards JSON. Returns None on error."""
+    if not compiled_dir or not dimension:
+        return None
+    try:
+        return read_json(Path(compiled_dir) / f"{dimension}.json")
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
+        _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
+        return None
+
+
 def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, list[dict]]:
     """Load {req_id: [{label, url, ...}, ...]} from compiled standards.
 
     Returns an empty dict on any I/O or parse error (logged as a warning).
     """
-    if not compiled_dir or not dimension:
-        return {}
-    try:
-        data = read_json(Path(compiled_dir) / f"{dimension}.json")
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
+    data = _load_compiled_data(compiled_dir, dimension)
+    if not data:
         return {}
     lookup: dict[str, list[dict]] = {}
     for principle in data.get("principles", []):
@@ -60,4 +67,27 @@ def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -
             ]
             if refs:
                 lookup[req_id] = refs
+    return lookup
+
+
+def load_compiled_requirements(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, dict]:
+    """Load {req_id: {principle, text}} from compiled standards.
+
+    Used by the MCP server to auto-fill principle name and requirement text
+    from the requirement ID, so the AI doesn't need to send them.
+    """
+    data = _load_compiled_data(compiled_dir, dimension)
+    if not data:
+        return {}
+    lookup: dict[str, dict] = {}
+    for principle in data.get("principles", []):
+        principle_name = principle.get("name", "")
+        for req in principle.get("requirements", []):
+            req_id = req.get("id")
+            if not req_id:
+                continue
+            lookup[req_id] = {
+                "principle": principle_name,
+                "text": req.get("text", ""),
+            }
     return lookup
