@@ -198,10 +198,10 @@ def create_app(
     store = rate_limit_store or create_rate_limit_store()
     if api_key is None:
         _msg = (
-            "QUODEQ_API_KEY is not set — API endpoints are unauthenticated. "
-            "Set QUODEQ_API_KEY for production use."
+            "QUODEQ_API_KEY is not set — API restricted to localhost only. "
+            "Set QUODEQ_API_KEY to enable authenticated remote access."
         )
-        _logger.warning(_msg)
+        _logger.error(_msg)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:

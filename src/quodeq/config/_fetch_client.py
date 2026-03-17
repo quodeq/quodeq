@@ -66,6 +66,11 @@ class FetchClient:
             if self._failures >= self._CIRCUIT_THRESHOLD:
                 return None
         try:
+            # Re-check DNS right before the request to mitigate DNS rebinding.
+            # The window between this check and urlopen is minimal.
+            if hostname and not self._allow_private and _is_private_hostname(hostname):
+                _logger.warning("Blocked fetch after DNS re-check: %s", hostname)
+                return None
             req = urllib.request.Request(url, headers=headers or {})
             with urllib.request.urlopen(req, timeout=self._timeout) as r:
                 with self._lock:

@@ -62,7 +62,12 @@ def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Respons
 
 
 def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
-    """Register project listing, mutation, and export routes."""
+    """Register project listing, mutation, and export routes.
+
+    Authentication is enforced by ``app.before_request`` (see ``create_app``
+    in ``app.py``), not per-route decorators. All routes require either a
+    valid ``QUODEQ_API_KEY`` Bearer token or a localhost origin.
+    """
 
     @app.get("/api/projects")
     def list_projects() -> Response:

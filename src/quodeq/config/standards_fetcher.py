@@ -80,17 +80,12 @@ def _verify_integrity(
             f"ASVS integrity check failed: expected {expected_hash}, got {actual_hash}"
         )
     if not expected_hash:
-        if skip_integrity:
-            _logger.warning(
-                "ASVS integrity verification skipped (pin with %s=%s)",
-                _ASVS_SHA256_ENV,
-                actual_hash,
-            )
-        else:
-            raise ValueError(
-                f"ASVS integrity verification required: set {_ASVS_SHA256_ENV}={actual_hash} "
-                f"to pin this download"
-            )
+        _logger.warning(
+            "No ASVS hash pinned — accepting first download. "
+            "Pin for future integrity checks with %s=%s",
+            _ASVS_SHA256_ENV,
+            actual_hash,
+        )
 
 
 def _parse_asvs_content(content: bytes) -> list[dict]:

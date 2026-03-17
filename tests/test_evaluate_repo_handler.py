@@ -8,7 +8,8 @@ from quodeq.shared.utils import is_repo_url
 
 
 def test_is_repo_url():
-    assert is_repo_url("http://example.com/repo.git")
+    with pytest.raises(ValueError, match="Cleartext HTTP"):
+        is_repo_url("http://example.com/repo.git")
     assert is_repo_url("https://example.com/repo.git")
     assert is_repo_url("git@example.com:repo.git")
     assert not is_repo_url("/local/path/to/repo")

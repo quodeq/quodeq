@@ -187,7 +187,7 @@ class QuodeqApp(rumps.App):
             self._prereq_items["quodeq"].title = "  Quodeq — installing..."
             try:
                 subprocess.run(
-                    ["python3", "-m", "pip", "install", "--user", "quodeq"],
+                    ["python3", "-m", "pip", "install", "--user", "quodeq==0.5.0"],
                     capture_output=True, timeout=120,
                 )
                 site_bin = subprocess.run(

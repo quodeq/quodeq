@@ -13,8 +13,9 @@ class TestIsRepoUrl:
     def test_https_url(self):
         assert utils.is_repo_url("https://github.com/org/repo") is True
 
-    def test_http_url(self):
-        assert utils.is_repo_url("http://github.com/org/repo") is True
+    def test_http_url_rejected(self):
+        with pytest.raises(ValueError, match="Cleartext HTTP"):
+            utils.is_repo_url("http://github.com/org/repo")
 
     def test_git_ssh_url(self):
         assert utils.is_repo_url("git@github.com:org/repo.git") is True

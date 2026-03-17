@@ -16,8 +16,13 @@ _REPO_URL_RE = re.compile(
 )
 
 # IP-like hostnames that must be rejected to prevent SSRF via git clone.
+# Covers IPv4 private ranges, IPv6 loopback (::1), IPv6 ULA (fc00::/7), and localhost.
 _PRIVATE_HOST_RE = re.compile(
-    r"^https?://(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|127\.\d+\.\d+\.\d+|localhost)[:/]"
+    r"^https?://"
+    r"(10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+|192\.168\.\d+\.\d+|169\.254\.\d+\.\d+|127\.\d+\.\d+\.\d+"
+    r"|localhost"
+    r"|\[::1\]|\[fc[0-9a-fA-F]{2}:.*\]|\[fd[0-9a-fA-F]{2}:.*\]|\[fe80:.*\]"
+    r")[:/]"
 )
 
 
