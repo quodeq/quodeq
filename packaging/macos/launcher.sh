@@ -36,7 +36,7 @@ fi
 # Auto-install quodeq if missing (all prerequisites are present)
 QUODEQ=$(command -v quodeq 2>/dev/null)
 if [ -z "$QUODEQ" ]; then
-    python3 -m pip install --user "quodeq==0.5.0" 2>&1
+    python3 -m pip install --user quodeq 2>&1
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)
     if [ -z "$QUODEQ" ]; then
