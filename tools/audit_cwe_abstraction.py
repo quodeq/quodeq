@@ -147,8 +147,15 @@ def _print_category(label: str, entries: list[dict], *, show_rationale: bool = F
             print(f"           Rationale: {r['mapping_rationale'][:_MAX_RATIONALE_DISPLAY]}")
 
 
+def _write_results_json(results: list[dict]) -> Path:
+    """Write the full audit results to a JSON file and return the output path."""
+    output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe" / "audit.json"
+    output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
+    return output_path
+
+
 def _print_results(results: list[dict], *, problems_only: bool) -> None:
-    """Print categorized audit results to stdout and write JSON output."""
+    """Print categorized audit results to stdout."""
     categorized = _categorize_results(results)
     prohibited = categorized["prohibited"]
     discouraged = categorized["discouraged"]
@@ -174,10 +181,6 @@ def _print_results(results: list[dict], *, problems_only: bool) -> None:
         print(f"{'=' * _TERMINAL_WIDTH}")
         for r in unknown:
             print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} — {r['name']}")
-
-    output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe" / "audit.json"
-    output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
-    print(f"\nFull results written to {output_path}")
 
 
 def main() -> None:
@@ -213,6 +216,8 @@ def main() -> None:
         time.sleep(_RATE_LIMIT_SLEEP_S)
 
     _print_results(results, problems_only=args.problems)
+    output_path = _write_results_json(results)
+    print(f"\nFull results written to {output_path}")
 
 
 if __name__ == "__main__":

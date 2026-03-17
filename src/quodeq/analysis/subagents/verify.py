@@ -54,12 +54,12 @@ def _format_findings_summary(jsonl_path: Path) -> str:
     lines: list[str] = []
     for principle, findings in sorted(by_principle.items()):
         lines.append(f"### {principle}")
-        for f in findings:
-            t = f.get("t", "?")
-            file = f.get("file", "?")
-            line_num = f.get("line", "?")
-            severity = f.get("severity", "?")
-            desc = f.get("w", "")
+        for finding in findings:
+            t = finding.get("t", "?")
+            file = finding.get("file", "?")
+            line_num = finding.get("line", "?")
+            severity = finding.get("severity", "?")
+            desc = finding.get("w", "")
             lines.append(f"- {t} [{severity}] `{file}:{line_num}` — {desc}")
         lines.append("")
 

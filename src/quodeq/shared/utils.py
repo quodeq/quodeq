@@ -68,18 +68,27 @@ class Config:
 ACTION_API_MODULE = "quodeq.action_api"
 
 
-_config_lock = threading.Lock()
-_config_instance: Config | None = None
+class _ConfigHolder:
+    """Thread-safe lazy holder for the singleton Config instance."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._instance: Config | None = None
+
+    def get(self) -> Config:
+        if self._instance is None:
+            with self._lock:
+                if self._instance is None:
+                    self._instance = Config.from_file(_DEFAULTS_PATH)
+        return self._instance
+
+
+_config_holder = _ConfigHolder()
 
 
 def _get_config() -> Config:
     """Return the lazily-loaded singleton Config instance (thread-safe)."""
-    global _config_instance
-    if _config_instance is None:
-        with _config_lock:
-            if _config_instance is None:
-                _config_instance = Config.from_file(_DEFAULTS_PATH)
-    return _config_instance
+    return _config_holder.get()
 
 
 IS_WIN32: bool = sys.platform == "win32"
@@ -135,9 +144,9 @@ def get_ai_model(env: dict[str, str] | None = None) -> str | None:
     return (env or os.environ).get("AI_MODEL") or None
 
 
-def _env_int(var: str, default: int) -> int:
+def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
     """Read an environment variable as an int, warn and return *default* on failure."""
-    raw = os.environ.get(var)
+    raw = (env or os.environ).get(var)
     if raw is not None:
         try:
             return int(raw)

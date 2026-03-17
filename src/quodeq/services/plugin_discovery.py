@@ -42,15 +42,18 @@ class _PluginCache:
 _plugin_cache = _PluginCache()
 
 
-def discover_plugins(evaluators_dir: Path | None = None) -> list[PluginInfo]:
+def discover_plugins(evaluators_dir: Path | None = None, *, cache: _PluginCache | None = None) -> list[PluginInfo]:
     """Scan the evaluators directory and return plugin metadata.
 
     Results are cached for _PLUGIN_CACHE_TTL seconds so that plugins installed
     at runtime (without a process restart) are picked up on the next request
     after the TTL expires.
+
+    Pass *cache* to override the module-level cache (useful for testing).
     """
+    _cache = cache if cache is not None else _plugin_cache
     if evaluators_dir is None:
-        cached = _plugin_cache.get()
+        cached = _cache.get()
         if cached is not None:
             return cached
     evaluators_root = evaluators_dir or default_paths().evaluators_dir
@@ -72,5 +75,5 @@ def discover_plugins(evaluators_dir: Path | None = None) -> list[PluginInfo]:
         except (KeyError, ValueError, OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
             _logger.warning("Skipping plugin %s: %s", child.name, exc)
             continue
-    _plugin_cache.set(result)
+    _cache.set(result)
     return result

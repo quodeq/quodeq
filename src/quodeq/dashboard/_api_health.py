@@ -59,14 +59,14 @@ def action_api_healthy(base_url: str) -> bool:
 def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_S) -> None:
     """Block until the action API becomes healthy, or raise TimeoutError."""
     log_info(f"Waiting for Action API at {base_url}...")
-    deadline = time.monotonic() + timeout_s
+    start = time.monotonic()
     attempts = 0
-    while time.monotonic() < deadline:
+    while time.monotonic() - start < timeout_s:
         if action_api_healthy(base_url):
             return None
         attempts += 1
         if attempts % 10 == 0:
-            elapsed = round(time.monotonic() + timeout_s - deadline, 1)
+            elapsed = round(time.monotonic() - start, 1)
             log_info(f"Still waiting for Action API ({elapsed:.0f}s elapsed)...")
         time.sleep(_HEALTH_POLL_INTERVAL_S)
     raise TimeoutError(f"Action API did not become ready within {timeout_s} seconds.")

@@ -97,19 +97,12 @@ _DEFAULT_BASE_AI_ARGS = "--print --output-format stream-json --verbose"
 
 
 def _get_ai_tools(env: dict[str, str] | None = None) -> str:
-    """Return the comma-separated list of AI tools to enable.
-
-    Reads QUODEQ_AI_TOOLS from the environment (default: "Glob,Grep,Read").
-    """
+    """Return AI tools from QUODEQ_AI_TOOLS env var (default: "Glob,Grep,Read")."""
     return (env or os.environ).get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
 
 
 def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
-    """Return base CLI arguments for the AI subprocess.
-
-    Reads QUODEQ_AI_BASE_ARGS from the environment
-    (default: "--print --output-format stream-json --verbose").
-    """
+    """Return base AI CLI args from QUODEQ_AI_BASE_ARGS env var."""
     return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
 
 _AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
@@ -130,25 +123,29 @@ _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
 }
 
 
-def _load_provider_configs() -> dict[str, dict]:
-    """Load AI provider configs from external JSON, falling back to built-in defaults."""
-    try:
-        return json.loads(_AI_PROVIDERS_PATH.read_text())
-    except (OSError, json.JSONDecodeError):
-        return _PROVIDER_CONFIGS_FALLBACK
+class _ProviderConfigCache:
+    """Thread-safe lazy cache for provider configurations."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._configs: dict[str, dict] | None = None
+
+    def get(self) -> dict[str, dict]:
+        if self._configs is None:
+            with self._lock:
+                if self._configs is None:
+                    try:
+                        self._configs = json.loads(_AI_PROVIDERS_PATH.read_text())
+                    except (OSError, json.JSONDecodeError):
+                        self._configs = _PROVIDER_CONFIGS_FALLBACK
+        return self._configs
 
 
-_PROVIDER_CONFIGS: dict[str, dict] | None = None
-_PROVIDER_CONFIGS_LOCK = threading.Lock()
+_provider_config_cache = _ProviderConfigCache()
 
 
 def _get_provider_configs() -> dict[str, dict]:
-    global _PROVIDER_CONFIGS
-    if _PROVIDER_CONFIGS is None:
-        with _PROVIDER_CONFIGS_LOCK:
-            if _PROVIDER_CONFIGS is None:
-                _PROVIDER_CONFIGS = _load_provider_configs()
-    return _PROVIDER_CONFIGS
+    return _provider_config_cache.get()
 
 
 class AnalysisError(RuntimeError):

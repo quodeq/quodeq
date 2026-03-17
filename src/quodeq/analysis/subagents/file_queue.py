@@ -202,6 +202,9 @@ class FileQueue:
             state = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise FileQueueError(f"Queue file is corrupted: {exc}") from exc
+        version = state.get("version")
+        if version != _QUEUE_VERSION:
+            raise FileQueueError(f"Unsupported queue version: {version} (expected {_QUEUE_VERSION})")
         if not isinstance(state.get("pending"), list):
             raise FileQueueError("Queue file missing 'pending' list")
         if not isinstance(state.get("taken"), list):

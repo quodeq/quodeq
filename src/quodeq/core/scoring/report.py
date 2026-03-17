@@ -41,10 +41,10 @@ def _verify_single_dimension(
 def _run_verification(config: RunConfig, per_dim_evidence: dict) -> dict:
     """Run verification pass on all dimensions in parallel."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from quodeq.analysis.runner import _load_plugin_context
+    from quodeq.analysis.runner import load_plugin_context
 
     work_dir = config.work_dir or config.src
-    _dims, ctx = _load_plugin_context(config)
+    _dims, ctx = load_plugin_context(config)
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
 
     log_info(f"Starting verification pass ({len(per_dim_evidence)} dimensions in parallel)...")

@@ -206,6 +206,11 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     return 0
 
 
+def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
+    """Return True if verification should be skipped (CLI flag or env var)."""
+    return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
+
+
 def _build_run_config(
     args: argparse.Namespace, src: Path, plugin_id: str,
     evaluators_dir: Path, evidence_dir: Path,
@@ -228,7 +233,7 @@ def _build_run_config(
             max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
             n_subagents=args.n_subagents,
             subagent_model=_subagent_model(),
-            verify_findings=not args.no_verify and os.environ.get("QUODEQ_NO_VERIFY") != "1",
+            verify_findings=not _no_verify(args),
         ),
     )
 

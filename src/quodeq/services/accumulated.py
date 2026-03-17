@@ -29,9 +29,6 @@ def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]
     return OrderedDict(), threading.Lock()
 
 
-_ACC_DIM_CACHE, _ACC_DIM_LOCK = create_accumulated_cache()
-
-
 _DEFAULT_ACC_CACHE_MAX = 256
 
 
@@ -40,15 +37,6 @@ def _acc_dim_cache_max(override: int | None = None) -> int:
     if override is not None:
         return override
     return int(os.environ.get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
-
-
-def _make_acc_dimension_fetcher(
-    reports_root: Path, project: str,
-) -> Callable[[str], list[DimensionResult]]:
-    """Return a cached fetcher for run dimension data (LRU, bounded)."""
-    return make_lru_dimension_fetcher(
-        reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max(),
-    )
 
 
 def _read_all_run_data(
