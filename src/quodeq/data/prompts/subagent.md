@@ -49,4 +49,6 @@ Use the `###` heading (e.g. `Modularity`) as `p`. Use the **bold ID** (e.g. `M-M
 
 {{STANDARDS_CHECKLIST}}
 
-{{ANALYSIS_GUIDANCE}}
+## Source Context
+
+{{SOURCE_MANIFEST}}

@@ -44,13 +44,26 @@ def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
 def _list_plugin_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[str]]:
     """List source files for the subagent queue.
 
+    In universal mode, uses manifest.source_files directly.
+    In legacy mode, reads from plugin.json extensions.
     Returns (files, extensions) or ([], extensions) if none found.
     """
-    plugin_dir = config.evaluators_dir / config.plugin_id
-    plugin_data = load_plugin(plugin_dir)
-    extensions = set(plugin_data.get("detects", {}).get("extensions", []))
-    files = list_source_files(config.src, extensions) if extensions else []
-    return files, extensions
+    # Universal mode: use manifest directly
+    if config.manifest is not None and config.manifest.source_files:
+        # Derive extensions from manifest language_stats
+        extensions = set(config.manifest.language_stats.keys()) if config.manifest.language_stats else set()
+        return config.manifest.source_files, extensions
+
+    # Legacy mode: read from plugin directory
+    if config.evaluators_dir is not None:
+        plugin_dir = config.evaluators_dir / config.plugin_id
+        if plugin_dir.exists():
+            plugin_data = load_plugin(plugin_dir)
+            extensions = set(plugin_data.get("detects", {}).get("extensions", []))
+            files = list_source_files(config.src, extensions) if extensions else []
+            return files, extensions
+
+    return [], set()
 
 
 def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:

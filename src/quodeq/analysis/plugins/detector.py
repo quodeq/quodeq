@@ -1,4 +1,4 @@
-"""Plugin detection — select the best evaluator plugin for a repository."""
+"""Plugin detection — select the best language for a repository."""
 from __future__ import annotations
 
 import json
@@ -8,20 +8,32 @@ from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 
+from quodeq.shared.utils import read_json
+
 _logger = logging.getLogger(__name__)
 
 
-_SKIP_DIRS = frozenset({
+_LEGACY_SKIP_DIRS = frozenset({
     "node_modules", "vendor", "venv", ".venv", "__pycache__",
     "dist", "build", "out", ".next", "target",
     ".git", ".svn", ".hg",
 })
 
 
-def _walk_source_files(src: Path, extensions: set[str]) -> Iterator[tuple[str, str]]:
+def _load_skip_dirs(detection: dict | None) -> frozenset[str]:
+    """Return skip dirs from detection config or legacy default."""
+    if detection and "skip_dirs" in detection:
+        return frozenset(detection["skip_dirs"])
+    return _LEGACY_SKIP_DIRS
+
+
+def _walk_source_files(
+    src: Path, extensions: set[str], skip_dirs: frozenset[str] | None = None,
+) -> Iterator[tuple[str, str]]:
     """Yield (relative_path, suffix) for source files, pruning skip dirs."""
+    skip = skip_dirs if skip_dirs is not None else _LEGACY_SKIP_DIRS
     for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in _SKIP_DIRS]
+        dirnames[:] = [d for d in dirnames if d not in skip]
         for fname in filenames:
             suffix = os.path.splitext(fname)[1]
             if suffix in extensions:
@@ -63,9 +75,6 @@ def _detect_by_extension_count(plugins: list[dict], src: Path) -> str | None:
     Performs a single rglob traversal to collect suffix counts, then scores each
     plugin in O(1) per extension -- O(n) total regardless of plugin count.
     """
-    # Collect all extensions present in the source tree -- reuse _walk_source_files
-    # logic but we need all extensions, so we pass a permissive set. Instead,
-    # iterate directly to count every suffix.
     all_exts: set[str] = set()
     for data in plugins:
         all_exts.update(data.get("detects", {}).get("extensions", []))
@@ -112,3 +121,36 @@ def detect_plugin(src: Path, evaluators_dir: Path) -> str:
     if plugin_id is None:
         raise ValueError(f"No plugin in {evaluators_dir} matched any file in {src}")
     return plugin_id
+
+
+def detect_language(src: Path, detection_file: Path) -> str:
+    """Auto-detect the primary language for a repository using detection.json.
+
+    Uses a two-pass approach:
+    1. Check for config files at repo root (strong signal)
+    2. Fall back to counting source files by extension (weak signal)
+    """
+    detection = read_json(detection_file)
+    ext_map: dict[str, str] = detection.get("extensions", {})
+    config_map: dict[str, str] = detection.get("config_files", {})
+    skip_dirs = _load_skip_dirs(detection)
+
+    # Pass 1: config files
+    config_hits: Counter[str] = Counter()
+    for config_file, lang in config_map.items():
+        if (src / config_file).exists():
+            config_hits[lang] += 1
+    if config_hits:
+        return config_hits.most_common(1)[0][0]
+
+    # Pass 2: extension counts
+    all_exts = set(ext_map.keys())
+    lang_counts: Counter[str] = Counter()
+    for _rel, suffix in _walk_source_files(src, all_exts, skip_dirs):
+        lang = ext_map.get(suffix)
+        if lang:
+            lang_counts[lang] += 1
+    if lang_counts:
+        return lang_counts.most_common(1)[0][0]
+
+    raise ValueError(f"No language detected in {src} using {detection_file}")

@@ -88,6 +88,19 @@ def load_plugin_full(plugin_dir: Path) -> dict:
     }
 
 
+def load_universal_dimensions(dimensions_file: Path) -> dict:
+    """Load and validate the universal dimensions.json config.
+
+    Returns the parsed dimensions dict.
+    Raises ValueError on validation failure.
+    """
+    dims_data = read_json(dimensions_file)
+    errors = validate_dimensions(dims_data)
+    if errors:
+        raise ValueError(f"dimensions.json: {'; '.join(errors)}")
+    return dims_data
+
+
 def _try_load(plugin_dir: Path) -> dict[str, object] | None:
     """Try loading a plugin from *plugin_dir*, returning None on failure."""
     plugin_file = plugin_dir / "plugin.json"

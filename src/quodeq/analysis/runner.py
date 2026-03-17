@@ -11,6 +11,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from quodeq.analysis.manifest import SourceManifest
 from quodeq.analysis.subprocess import AnalysisConfig, HeartbeatCallback, count_files_from_stream, run_analysis
 from quodeq.analysis.stream.parser import extract_evidence_from_stream
 from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
@@ -18,7 +19,7 @@ from quodeq.engine.evidence import Evidence
 from quodeq.engine._merge import merge_evidence
 from quodeq.engine._runner_markers import CC_MARKER_KEY, cleanup_stream, emit_marker, make_heartbeat
 from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.analysis.plugins.loader import load_plugin_full
+from quodeq.analysis.plugins.loader import load_plugin_full, load_universal_dimensions
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
 from quodeq.shared.logging import log_info, log_success, log_warning
@@ -42,14 +43,22 @@ class AnalysisOptions:
 
 @dataclass
 class RunConfig:
-    """Configuration for a single evaluation run (source path, plugin, options)."""
+    """Configuration for a single evaluation run (source path, plugin, options).
+
+    Supports two modes:
+    - Legacy: ``evaluators_dir`` + ``plugin_id`` + ``source_file_count``
+    - Universal: ``manifest`` + ``dimensions_data`` (no evaluators_dir needed)
+    """
     src: Path
     plugin_id: str
-    evaluators_dir: Path
+    evaluators_dir: Path = None  # type: ignore[assignment]  # legacy, optional in universal mode
     standards_dir: Path | None = None
     source_file_count: int = 0
     work_dir: Path | None = None
     options: AnalysisOptions = field(default_factory=AnalysisOptions)
+    # Universal mode fields
+    manifest: SourceManifest | None = None
+    dimensions_data: dict | None = None
 
 
 
@@ -80,6 +89,7 @@ def _build_dimension_prompt(
             dimensions_data=ctx.dimensions_data,
             analysis_md=ctx.analysis_md,
             standards_dir=config.standards_dir,
+            manifest=config.manifest,
         ),
     )
 
@@ -171,8 +181,8 @@ def _process_dimension_with_subagents(
     )
 
 
-def load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
-    """Load plugin data and resolve which dimensions to analyze."""
+def _load_plugin_context_legacy(config: RunConfig) -> tuple[list[str], _PluginContext]:
+    """Load plugin context from per-plugin evaluator directories (legacy path)."""
     validate_path_segment(config.plugin_id)
     plugin_dir = config.evaluators_dir / config.plugin_id
     if not plugin_dir.exists():
@@ -195,6 +205,41 @@ def load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
         total=len(dimensions),
     )
     return dimensions, ctx
+
+
+def _load_plugin_context_universal(config: RunConfig) -> tuple[list[str], _PluginContext]:
+    """Load plugin context from universal dimensions + manifest (new path)."""
+    dims_data = config.dimensions_data
+    if dims_data is None:
+        raise ValueError("RunConfig.dimensions_data is required in universal mode")
+
+    all_dims_raw = [d.get("id") for d in dims_data.get("applies", []) if d.get("id")]
+    if config.options.dimensions:
+        dimensions = [d for d in all_dims_raw if d in config.options.dimensions]
+    else:
+        dimensions = all_dims_raw
+
+    # In universal mode, the LLM uses its own knowledge — no analysis.md
+    ctx = _PluginContext(
+        dimensions_data=dims_data,
+        analysis_md="",
+        date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        template=load_template(config.options.template_path),
+        plugin_name=config.plugin_id.title(),
+        total=len(dimensions),
+    )
+    return dimensions, ctx
+
+
+def load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
+    """Load plugin data and resolve which dimensions to analyze.
+
+    Automatically uses universal mode when manifest/dimensions_data are set,
+    otherwise falls back to legacy evaluators_dir mode.
+    """
+    if config.manifest is not None and config.dimensions_data is not None:
+        return _load_plugin_context_universal(config)
+    return _load_plugin_context_legacy(config)
 
 
 class EvaluationError(RuntimeError):

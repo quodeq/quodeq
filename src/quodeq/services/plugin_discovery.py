@@ -42,6 +42,38 @@ class _PluginCache:
 _plugin_cache = _PluginCache()
 
 
+def _discover_from_detection(detection_file: Path, dimensions_file: Path) -> list[PluginInfo]:
+    """Build plugin info from universal detection.json + dimensions.json."""
+    detection = read_json(detection_file)
+    ext_map: dict[str, str] = detection.get("extensions", {})
+
+    # Group extensions by language
+    lang_extensions: dict[str, list[str]] = {}
+    for ext, lang in ext_map.items():
+        lang_extensions.setdefault(lang, []).append(ext)
+
+    # Load universal dimensions
+    dims: list[PluginDimension] = []
+    try:
+        dims_data = read_json(dimensions_file)
+        dims = [
+            PluginDimension(id=d["id"], weight=d.get("weight", 1), iso_25010=d.get("iso_25010"))
+            for d in dims_data.get("applies", [])
+        ]
+    except (OSError, json.JSONDecodeError, KeyError, ValueError):
+        pass
+
+    result: list[PluginInfo] = []
+    for lang, exts in sorted(lang_extensions.items()):
+        result.append(PluginInfo(
+            id=lang,
+            name=lang.title(),
+            extensions=sorted(exts),
+            dimensions=dims,
+        ))
+    return result
+
+
 def discover_plugins(evaluators_dir: Path | None = None, *, cache: _PluginCache | None = None) -> list[PluginInfo]:
     """Scan the evaluators directory and return plugin metadata.
 
@@ -56,7 +88,16 @@ def discover_plugins(evaluators_dir: Path | None = None, *, cache: _PluginCache 
         cached = _cache.get()
         if cached is not None:
             return cached
-    evaluators_root = evaluators_dir or default_paths().evaluators_dir
+
+    # Try universal mode first
+    paths = default_paths()
+    if evaluators_dir is None and paths.detection_file.exists() and paths.dimensions_file.exists():
+        result = _discover_from_detection(paths.detection_file, paths.dimensions_file)
+        _cache.set(result)
+        return result
+
+    # Legacy mode: scan evaluator directories
+    evaluators_root = evaluators_dir or paths.evaluators_dir
     result: list[PluginInfo] = []
     for child in scan_plugin_dirs(evaluators_root):
         try:

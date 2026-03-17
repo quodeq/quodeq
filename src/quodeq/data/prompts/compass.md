@@ -95,9 +95,9 @@ This checklist is organized by ISO 25010 sub-characteristic (the `###` headings)
 
 {{STANDARDS_CHECKLIST}}
 
-## Analysis Guidance
+## Source Context
 
-{{ANALYSIS_GUIDANCE}}
+{{SOURCE_MANIFEST}}
 
 ## Dimensions & Standards
 

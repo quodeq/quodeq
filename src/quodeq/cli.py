@@ -17,8 +17,6 @@ from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 from quodeq.engine.analysis import AnalysisError
 from quodeq.engine.runner import EvaluationError
-from quodeq.engine.plugin_loader import load_plugin
-from quodeq.engine.plugin_detector import count_source_files, detect_plugin
 from quodeq.engine._runner_report import run_full
 from quodeq.engine.runner import AnalysisOptions, RunConfig, run
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
@@ -155,6 +153,7 @@ def _resolve_plugin(args: argparse.Namespace, src: Path, evaluators_dir: Path) -
     plugin_id = args.plugin
     if plugin_id is None:
         try:
+            from quodeq.engine.plugin_detector import detect_plugin
             plugin_id = detect_plugin(src, evaluators_dir)
         except ValueError as exc:
             print(str(exc), file=sys.stderr)
@@ -168,10 +167,55 @@ def _resolve_plugin(args: argparse.Namespace, src: Path, evaluators_dir: Path) -
     return plugin_id
 
 
+def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
+    """Detect or validate the language for a repo using universal detection.
+
+    Returns language string or None on error.
+    """
+    if args.plugin:
+        # Explicit plugin override — use as-is
+        validate_path_segment(args.plugin)
+        return args.plugin
+
+    detection_file = paths.detection_file
+    if not detection_file.exists():
+        return None
+
+    try:
+        from quodeq.analysis.plugins.detector import detect_language
+        language = detect_language(src, detection_file)
+        print(f"Language: {language}", file=sys.stderr)
+        return language
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return None
+
+
+def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManifest | None":
+    """Build a source manifest for the repository."""
+    if args.no_prescan:
+        return None
+
+    from quodeq.analysis.manifest import SourceManifest, build_manifest
+    from quodeq.shared.utils import read_json
+
+    detection_file = paths.detection_file
+    if not detection_file.exists():
+        return None
+
+    detection = read_json(detection_file)
+    disciplines_conf = paths.disciplines_conf if paths.disciplines_conf.exists() else None
+    manifest = build_manifest(src, detection, disciplines_conf)
+    print(f"Source files: {manifest.total_files}", file=sys.stderr)
+    return manifest
+
+
 def _prescan_sources(args: argparse.Namespace, plugin_dir: Path, src: Path) -> int:
-    """Count source files for the plugin if prescan is not disabled."""
+    """Count source files for the plugin if prescan is not disabled (legacy path)."""
     if args.no_prescan:
         return 0
+    from quodeq.engine.plugin_loader import load_plugin
+    from quodeq.engine.plugin_detector import count_source_files
     plugin_data = load_plugin(plugin_dir)
     extensions = set(plugin_data.get("detects", {}).get("extensions", []))
     if not extensions:
@@ -211,11 +255,41 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
     return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
 
 
+def _build_run_config_universal(
+    args: argparse.Namespace, src: Path, language: str,
+    manifest, dims_data: dict, evidence_dir: Path,
+) -> RunConfig:
+    """Assemble a RunConfig using universal (manifest-based) mode."""
+    standards_dir = default_paths().standards_dir
+    dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
+    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
+
+    source_file_count = manifest.total_files if manifest else 0
+
+    return RunConfig(
+        src=src,
+        plugin_id=language,
+        standards_dir=standards_dir if standards_dir.exists() else None,
+        source_file_count=source_file_count,
+        work_dir=evidence_dir,
+        manifest=manifest,
+        dimensions_data=dims_data,
+        options=AnalysisOptions(
+            dimensions=dimensions_filter,
+            max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
+            max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
+            n_subagents=args.n_subagents,
+            subagent_model=_subagent_model(),
+            verify_findings=not _no_verify(args),
+        ),
+    )
+
+
 def _build_run_config(
     args: argparse.Namespace, src: Path, plugin_id: str,
     evaluators_dir: Path, evidence_dir: Path,
 ) -> RunConfig:
-    """Assemble a RunConfig from CLI args and resolved paths."""
+    """Assemble a RunConfig from CLI args and resolved paths (legacy mode)."""
     standards_dir = default_paths().standards_dir
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
     print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
@@ -244,7 +318,38 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if src is None:
         return 1
 
-    evaluators_dir = default_paths().evaluators_dir
+    paths = default_paths()
+
+    # Try universal mode first (detection.json + manifest)
+    if paths.detection_file.exists() and paths.dimensions_file.exists():
+        language = _resolve_language(args, src, paths)
+        if language is not None:
+            from quodeq.analysis.plugins.loader import load_universal_dimensions
+            try:
+                dims_data = load_universal_dimensions(paths.dimensions_file)
+            except ValueError as exc:
+                print(f"Invalid dimensions config: {exc}", file=sys.stderr)
+                return 1
+
+            manifest = _build_manifest(args, src, paths)
+            _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
+            print(f"Report path: {evaluation_dir}", file=sys.stderr)
+
+            # Save manifest for debugging
+            if manifest and evidence_dir:
+                try:
+                    write_text(
+                        evidence_dir / "manifest.json",
+                        json.dumps(manifest.to_dict(), indent=2),
+                    )
+                except OSError:
+                    pass  # non-critical
+
+            config = _build_run_config_universal(args, src, language, manifest, dims_data, evidence_dir)
+            return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+
+    # Fallback: legacy evaluators_dir mode
+    evaluators_dir = paths.evaluators_dir
     if not evaluators_dir.exists():
         print(f"Evaluators directory not found: {evaluators_dir}. Run 'quodeq configure' to set up the configuration.", file=sys.stderr)
         return 1

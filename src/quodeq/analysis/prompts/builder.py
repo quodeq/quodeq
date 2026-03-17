@@ -3,13 +3,17 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.config.paths import default_paths
 from quodeq.config.prompt_templates import render_template
 from quodeq.shared.utils import read_json
+
+if TYPE_CHECKING:
+    from quodeq.analysis.manifest import SourceManifest
 
 _logger = logging.getLogger(__name__)
 
@@ -105,6 +109,7 @@ class PromptContext:
     dimensions_data: dict
     analysis_md: str = ""
     standards_dir: Path | None = None
+    manifest: "SourceManifest | None" = None
 
 
 _TEMPLATE_HASH_CACHE_SIZE = 128
@@ -125,6 +130,14 @@ _TPL_STANDARDS_CHECKLIST = "STANDARDS_CHECKLIST"
 _TPL_ANALYSIS_GUIDANCE = "ANALYSIS_GUIDANCE"
 _TPL_DIMENSIONS = "DIMENSIONS"
 _TPL_PROMPT_HASH = "PROMPT_HASH"
+_TPL_SOURCE_MANIFEST = "SOURCE_MANIFEST"
+
+
+def _render_manifest_or_guidance(context: PromptContext) -> str:
+    """Render either the source manifest context (universal) or analysis guidance (legacy)."""
+    if context.manifest is not None:
+        return context.manifest.to_prompt_context()
+    return context.analysis_md or _NO_GUIDANCE
 
 
 def build_analysis_prompt(template: str, context: PromptContext) -> str:
@@ -138,6 +151,8 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
         if compiled_dir.exists():
             standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
 
+    manifest_or_guidance = _render_manifest_or_guidance(context)
+
     return render_template(
         template,
         {
@@ -147,8 +162,9 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
             _TPL_DIMENSION: context.dimension,
             _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
             _TPL_STANDARDS_CHECKLIST: standards_checklist,
-            _TPL_ANALYSIS_GUIDANCE: context.analysis_md or _NO_GUIDANCE,
+            _TPL_ANALYSIS_GUIDANCE: manifest_or_guidance,
             _TPL_DIMENSIONS: dimensions_text,
             _TPL_PROMPT_HASH: prompt_hash,
+            _TPL_SOURCE_MANIFEST: manifest_or_guidance,
         },
     )
