@@ -16,11 +16,8 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.data.fs.report_parser.runs import list_runs
-from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.shared.logging import log_info, log_success
 from quodeq.shared.utils import open_text
-
-_VERIFY_TEMPLATE = "verify.md"
 
 
 def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_id: str, dim_id: str) -> Path | None:
@@ -106,66 +103,6 @@ def _write_finding(finding: dict, output_fh: Any) -> None:
     """Append a finding to the JSONL output file."""
     output_fh.write(json.dumps(finding) + "\n")
     output_fh.flush()
-
-
-def _format_findings_summary(jsonl_path: Path) -> str:
-    """Format findings from a JSONL file into a readable summary for verifiers."""
-    if not jsonl_path.exists():
-        return "_No findings from previous evaluation._"
-
-    by_principle: dict[str, list[dict]] = {}
-    try:
-        with open_text(jsonl_path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                principle = entry.get("p", "unknown")
-                by_principle.setdefault(principle, []).append(entry)
-    except OSError:
-        return "_Could not read previous findings._"
-
-    lines: list[str] = []
-    for principle, findings in sorted(by_principle.items()):
-        lines.append(f"### {principle}")
-        for finding in findings:
-            t = finding.get("t", "?")
-            file = finding.get("file", "?")
-            line_num = finding.get("line", "?")
-            severity = finding.get("severity", "?")
-            desc = finding.get("w", "")
-            lines.append(f"- {t} [{severity}] `{file}:{line_num}` — {desc}")
-        lines.append("")
-
-    return "\n".join(lines) if lines else "_No findings from previous evaluation._"
-
-
-def _build_verify_prompt(
-    config: Any,
-    dim_id: str,
-    ctx: Any,
-    findings_summary: str,
-) -> str:
-    """Build a verification prompt from the verify.md template."""
-    template = load_template(template_name=_VERIFY_TEMPLATE)
-    return build_analysis_prompt(
-        template,
-        PromptContext(
-            language=config.language,
-            repo_name=str(config.src),
-            date_str=ctx.date_str,
-            dimension=dim_id,
-            source_file_count=config.source_file_count,
-            dimensions_data=ctx.dimensions_data,
-            standards_dir=config.standards_dir,
-            target=getattr(config, "target", None),
-            extra_vars={"FINDINGS_SUMMARY": findings_summary},
-        ),
-    )
 
 
 def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
