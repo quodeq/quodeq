@@ -51,10 +51,19 @@ def _health_check(port: int) -> bool:
         return False
 
 
+_last_known_port: int | None = None
+
+
 def _find_running_port() -> int | None:
+    """Find the running dashboard port, checking last known port first."""
+    global _last_known_port
+    if _last_known_port is not None and _health_check(_last_known_port):
+        return _last_known_port
     for port in _PORTS:
         if _health_check(port):
+            _last_known_port = port
             return port
+    _last_known_port = None
     return None
 
 

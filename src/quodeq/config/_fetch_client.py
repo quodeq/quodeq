@@ -63,12 +63,16 @@ class FetchClient:
             return None
 
 
+# Module-level singleton — injectable via set_fetch_client() for testing.
 _fetch_client_lock = threading.Lock()
 _fetch_client_instance: FetchClient | None = None
 
 
 def get_fetch_client(timeout_s: int = 15) -> FetchClient:
-    """Return the module-level FetchClient, creating it lazily on first use."""
+    """Return the module-level FetchClient singleton, creating it lazily.
+
+    For tests, call ``set_fetch_client(mock)`` before the code under test.
+    """
     global _fetch_client_instance
     with _fetch_client_lock:
         if _fetch_client_instance is None:

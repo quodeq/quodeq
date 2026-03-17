@@ -46,6 +46,7 @@ class _IndexCache:
             self._data.clear()
 
 
+# Module-level singleton — call _index_cache.clear() in tests for isolation.
 _index_cache = _IndexCache()
 
 

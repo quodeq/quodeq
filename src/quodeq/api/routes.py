@@ -71,8 +71,19 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects")
     def list_projects() -> Response:
-        """Return all projects in the reports directory."""
-        return jsonify(provider.list_projects(_reports_dir()))
+        """Return all projects in the reports directory.
+
+        Supports optional ``?limit=N&offset=M`` query parameters for pagination.
+        """
+        result = provider.list_projects(_reports_dir())
+        projects = result.get("projects", [])
+        offset = request.args.get("offset", 0, type=int)
+        limit = request.args.get("limit", 0, type=int)
+        if offset > 0:
+            projects = projects[offset:]
+        if limit > 0:
+            projects = projects[:limit]
+        return jsonify({**result, "projects": projects})
 
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
