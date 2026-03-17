@@ -20,6 +20,8 @@ from quodeq.shared.logging import log_info, log_warning
 if TYPE_CHECKING:
     from quodeq.analysis.runner import RunConfig
 
+_MAX_FILES_PER_AGENT = 30
+
 
 @dataclass
 class DimensionCallbacks:
@@ -141,14 +143,18 @@ def process_dimension_with_subagents(
         stream_file, jsonl_file = callbacks.run_analysis(config, dim_id, prompt, idx, ctx)
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
-    # 2. Create queue
+    # 2. Run mechanical verification (fast, no AI — copies confirmed previous findings)
+    from quodeq.analysis.subagents.verify import run_verify_for_dimension
+    run_verify_for_dimension(config, dim_id, evidence_dir)
+
+    # 3. Create queue with per-agent file limit for context rotation
     queue_path = evidence_dir / f"{dim_id}_queue.json"
-    FileQueue(queue_path, files)
+    FileQueue(queue_path, files, max_files_per_agent=_MAX_FILES_PER_AGENT)
     log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued for {config.options.n_subagents} subagents")
 
-    # 3. Build prompt and launch pool
+    # 4. Build prompt and launch pool
     prompt = _build_subagent_prompt(config, dim_id, ctx)
     pool, results = _launch_pool(config, dim_id, evidence_dir, queue_path, prompt)
 
-    # 4. Collect and return evidence
+    # 5. Collect and return evidence
     return _collect_evidence(config, dim_id, evidence_dir, results, ctx)
