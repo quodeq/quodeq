@@ -6,8 +6,8 @@ import re
 from pathlib import Path
 
 from quodeq.core.types import ScoringResult, to_camel_dict
-from quodeq.engine.evidence import Evidence
-from quodeq.engine.scoring_internals import score_to_grade_label
+from quodeq.core.evidence.model import Evidence
+from quodeq.core.scoring.internals import score_to_grade_label
 
 _REPORT_SCHEMA_VERSION = 1
 
@@ -137,7 +137,7 @@ def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | di
         top_grade = None
 
     raw_meta = evidence.get("meta", {})
-    return {
+    report: dict = {
         "schema_version": _REPORT_SCHEMA_VERSION,
         "dimension": dimension,
         "project": evidence.get("repository", ""),
@@ -164,12 +164,16 @@ def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | di
             "severity": sev_tally,
         },
     }
+    module = evidence.get("module")
+    if module:
+        report["module"] = module
+    return report
 
 
 def build_full_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
     """Build report with engine metadata fields."""
     ev_dict = evidence.to_evidence_dict()
-    base = build_report_json(evidence.plugin_id, ev_dict, scores)
+    base = build_report_json(evidence.language, ev_dict, scores)
     base["dismissed_count"] = evidence.dismissed_count
     base["evidence_summary"] = evidence.summary()
     return base
@@ -178,7 +182,7 @@ def build_full_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
 def build_dashboard_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
     """Build web dashboard report format."""
     ev_dict = evidence.to_evidence_dict()
-    return build_report_json(evidence.plugin_id, ev_dict, scores)
+    return build_report_json(evidence.language, ev_dict, scores)
 
 
 def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: Path) -> None:
@@ -188,9 +192,9 @@ def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: 
     full_report = build_full_report(evidence, scores)
     dashboard_report = build_dashboard_report(evidence, scores)
 
-    dim = evidence.plugin_id
+    dim = evidence.language
     if ".." in dim or "/" in dim or "\\" in dim:
-        raise ValueError(f"Invalid plugin_id for report output: {dim!r}")
+        raise ValueError(f"Invalid language for report output: {dim!r}")
     try:
         (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
         (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))

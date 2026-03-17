@@ -176,19 +176,14 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
 
 
 def _list_available_dimensions_for_discipline(
-    discipline: str, evaluators_dir: Path | None = None,
+    discipline: str,
 ) -> list[str]:
-    """Resolve available dimensions for a plugin via its dimensions.json.
-
-    *evaluators_dir* overrides the default path lookup, making the function
-    testable without relying on the global config.
-    """
+    """Resolve available dimensions from universal dimensions.json."""
     try:
-        base = evaluators_dir if evaluators_dir is not None else default_paths().evaluators_dir
-        plugin_dir = base / discipline
-        dims_file = plugin_dir / "dimensions.json"
-        if dims_file.exists():
-            data = json.loads(dims_file.read_text())
+        paths = default_paths()
+        universal_dims = paths.dimensions_file
+        if universal_dims.exists():
+            data = json.loads(universal_dims.read_text())
             return [d["id"] for d in data.get("applies", [])]
         return []
     except (OSError, json.JSONDecodeError, KeyError, TypeError):

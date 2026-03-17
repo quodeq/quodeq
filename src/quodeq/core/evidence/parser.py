@@ -35,11 +35,12 @@ def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[
 @dataclass
 class EvidenceContext:
     """Metadata needed to construct an Evidence object from parsed JSONL."""
-    plugin_id: str
+    language: str
     repository: str
     date_str: str
     source_file_count: int
     files_read: int
+    module: str = ""
 
 
 def resolve_llm_refs(
@@ -237,11 +238,12 @@ def parse_jsonl_to_evidence(
 
     return Evidence(
         repository=context.repository,
-        plugin_id=context.plugin_id,
+        language=context.language,
         date=context.date_str,
         source_file_count=source_file_count,
         files_read=files_read,
         coverage_pct=coverage_pct,
         principles=principles,
         dismissed_count=0,
+        module=context.module,
     )

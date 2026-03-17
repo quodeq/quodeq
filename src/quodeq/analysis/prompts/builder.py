@@ -3,13 +3,17 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.config.paths import default_paths
 from quodeq.config.prompt_templates import render_template
 from quodeq.shared.utils import read_json
+
+if TYPE_CHECKING:
+    from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 
 _logger = logging.getLogger(__name__)
 
@@ -97,14 +101,16 @@ def load_template(
 @dataclass
 class PromptContext:
     """Parameters for rendering a per-dimension analysis prompt."""
-    plugin_id: str
+    language: str
     repo_name: str
     date_str: str
     dimension: str
     source_file_count: int
     dimensions_data: dict
-    analysis_md: str = ""
     standards_dir: Path | None = None
+    manifest: "SourceManifest | None" = None
+    target: "AnalysisTarget | None" = None
+    extra_vars: dict[str, str] = field(default_factory=dict)
 
 
 _TEMPLATE_HASH_CACHE_SIZE = 128
@@ -125,6 +131,24 @@ _TPL_STANDARDS_CHECKLIST = "STANDARDS_CHECKLIST"
 _TPL_ANALYSIS_GUIDANCE = "ANALYSIS_GUIDANCE"
 _TPL_DIMENSIONS = "DIMENSIONS"
 _TPL_PROMPT_HASH = "PROMPT_HASH"
+_TPL_SOURCE_MANIFEST = "SOURCE_MANIFEST"
+
+
+def _render_manifest_context(context: PromptContext) -> str:
+    """Render the source manifest context for the prompt.
+
+    When a target is set, renders target-specific context (with other-module info).
+    Otherwise falls back to the whole-repo manifest context.
+    """
+    if context.target is not None and context.manifest is not None:
+        other_targets = [t for t in context.manifest.targets if t.name != context.target.name]
+        return context.target.to_prompt_context(
+            repo_total_files=context.manifest.total_files,
+            other_targets=other_targets or None,
+        )
+    if context.manifest is not None:
+        return context.manifest.to_prompt_context()
+    return _NO_GUIDANCE
 
 
 def build_analysis_prompt(template: str, context: PromptContext) -> str:
@@ -138,17 +162,20 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
         if compiled_dir.exists():
             standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
 
-    return render_template(
-        template,
-        {
-            _TPL_DISCIPLINE: context.plugin_id,
-            _TPL_REPO_NAME: context.repo_name,
-            _TPL_DATE: context.date_str,
-            _TPL_DIMENSION: context.dimension,
-            _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
-            _TPL_STANDARDS_CHECKLIST: standards_checklist,
-            _TPL_ANALYSIS_GUIDANCE: context.analysis_md or _NO_GUIDANCE,
-            _TPL_DIMENSIONS: dimensions_text,
-            _TPL_PROMPT_HASH: prompt_hash,
-        },
-    )
+    manifest_context = _render_manifest_context(context)
+
+    values = {
+        _TPL_DISCIPLINE: context.language,
+        _TPL_REPO_NAME: context.repo_name,
+        _TPL_DATE: context.date_str,
+        _TPL_DIMENSION: context.dimension,
+        _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
+        _TPL_STANDARDS_CHECKLIST: standards_checklist,
+        _TPL_ANALYSIS_GUIDANCE: manifest_context,
+        _TPL_DIMENSIONS: dimensions_text,
+        _TPL_PROMPT_HASH: prompt_hash,
+        _TPL_SOURCE_MANIFEST: manifest_context,
+    }
+    if context.extra_vars:
+        values.update(context.extra_vars)
+    return render_template(template, values)

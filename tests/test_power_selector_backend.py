@@ -10,7 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.provider.base import EvaluationOptions
-from quodeq.engine.runner import AnalysisOptions
+from quodeq.analysis.runner import AnalysisOptions
 
 
 # ---------------------------------------------------------------------------

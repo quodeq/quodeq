@@ -7,35 +7,36 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.engine._runner_report import run_full
-from quodeq.engine.runner import run, RunConfig, EvaluationError
-from quodeq.engine._merge import merge_evidence
-from quodeq.engine.evidence import Evidence, PrincipleEvidence
+from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
+from quodeq.core.scoring.report import run_full
+from quodeq.analysis.runner import run, RunConfig, EvaluationError
+from quodeq.core.evidence.merge import merge_evidence
+from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from tests.engine.conftest import _evidence_line
 
 
-def _make_plugin_dir(base: Path) -> Path:
-    """Create a minimal valid typescript plugin in a temp dir."""
-    plugin_dir = base / "evaluators" / "typescript"
-    plugin_dir.mkdir(parents=True)
+def _make_universal_config(base: Path) -> dict:
+    """Create minimal universal config files (detection.json + dimensions.json) in a temp dir.
 
-    (plugin_dir / "plugin.json").write_text(json.dumps({
-        "id": "typescript",
-        "name": "TypeScript",
-        "version": "1.0.0",
-        "engine_version": "==0.5.0",
-        "detects": {"extensions": [".ts"]},
+    Returns the parsed dimensions data.
+    """
+    config_dir = base / "config"
+    config_dir.mkdir(parents=True, exist_ok=True)
+
+    (config_dir / "detection.json").write_text(json.dumps({
+        "extensions": {".ts": "typescript", ".tsx": "typescript"},
+        "config_files": {"tsconfig.json": "typescript"},
+        "skip_dirs": ["node_modules", ".git"],
     }))
 
-    (plugin_dir / "dimensions.json").write_text(json.dumps({
-        "applies": [{"id": "security", "weight": 1.2}],
-    }))
+    dims_data = {"applies": [{"id": "security", "weight": 1.2}]}
+    (config_dir / "dimensions.json").write_text(json.dumps(dims_data))
+    return dims_data
 
-    knowledge = plugin_dir / "knowledge"
-    knowledge.mkdir()
-    (knowledge / "analysis.md").write_text("# Analysis\nLook for eval().\n")
 
-    return base / "evaluators"
+def _manifest(total_files: int = 0) -> SourceManifest:
+    target = AnalysisTarget(name="typescript", language="typescript", total_files=total_files)
+    return SourceManifest(targets=[target], total_files=total_files)
 
 
 def _stream_event_with_evidence(*evidence_lines: str) -> str:
@@ -61,20 +62,9 @@ def _mock_run_analysis_factory(stream_content: str):
 # ---------------------------------------------------------------------------
 
 class TestRun:
-    def test_unknown_plugin_error(self, tmp_path):
-        evaluators_dir = tmp_path / "evaluators"
-        evaluators_dir.mkdir()
-        config = RunConfig(
-            src=tmp_path / "src",
-            plugin_id="nonexistent",
-            evaluators_dir=evaluators_dir,
-        )
-        with pytest.raises(ValueError, match="not found"):
-            run(config)
-
     @patch("quodeq.analysis.runner.run_analysis")
     def test_end_to_end_with_mock(self, mock_analysis, tmp_path):
-        evaluators_dir = _make_plugin_dir(tmp_path)
+        dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"
         src.mkdir()
         (src / "app.ts").write_text("const x = eval(input);\n")
@@ -87,14 +77,14 @@ class TestRun:
 
         config = RunConfig(
             src=src,
-            plugin_id="typescript",
-            evaluators_dir=evaluators_dir,
-            source_file_count=2,
+            language="typescript",
             work_dir=tmp_path,
+            manifest=_manifest(2),
+            dimensions_data=dims_data,
         )
         evidence = run(config)
 
-        assert evidence.plugin_id == "typescript"
+        assert evidence.language == "typescript"
         assert "ts-001" in evidence.principles
         pe = evidence.principles["ts-001"]
         assert len(pe.violations) == 1
@@ -103,7 +93,7 @@ class TestRun:
 
     @patch("quodeq.analysis.runner.run_analysis")
     def test_empty_project(self, mock_analysis, tmp_path):
-        evaluators_dir = _make_plugin_dir(tmp_path)
+        dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"
         src.mkdir()
 
@@ -112,10 +102,9 @@ class TestRun:
 
         config = RunConfig(
             src=src,
-            plugin_id="typescript",
-            evaluators_dir=evaluators_dir,
-            source_file_count=0,
+            language="typescript",
             work_dir=tmp_path,
+            dimensions_data=dims_data,
         )
         evidence = run(config)
         assert evidence.principles == {}
@@ -123,7 +112,7 @@ class TestRun:
 
     @patch("quodeq.analysis.runner.run_analysis")
     def test_invalid_stream_skipped(self, mock_analysis, tmp_path):
-        evaluators_dir = _make_plugin_dir(tmp_path)
+        dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"
         src.mkdir()
 
@@ -133,10 +122,10 @@ class TestRun:
 
         config = RunConfig(
             src=src,
-            plugin_id="typescript",
-            evaluators_dir=evaluators_dir,
-            source_file_count=1,
+            language="typescript",
             work_dir=tmp_path,
+            manifest=_manifest(1),
+            dimensions_data=dims_data,
         )
         evidence = run(config)
         assert evidence.principles == {}
@@ -144,7 +133,7 @@ class TestRun:
     @patch("quodeq.analysis.runner.run_analysis")
     def test_zero_findings_raises_error(self, mock_analysis, tmp_path):
         """An evaluation with source files but 0 findings is broken, not successful."""
-        evaluators_dir = _make_plugin_dir(tmp_path)
+        dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"
         src.mkdir()
         (src / "app.ts").write_text("const x = 1;\n")
@@ -158,17 +147,17 @@ class TestRun:
 
         config = RunConfig(
             src=src,
-            plugin_id="typescript",
-            evaluators_dir=evaluators_dir,
-            source_file_count=5,
+            language="typescript",
             work_dir=tmp_path,
+            manifest=_manifest(5),
+            dimensions_data=dims_data,
         )
         with pytest.raises(EvaluationError, match="0 findings"):
             run(config)
 
     @patch("quodeq.analysis.runner.run_analysis")
     def test_stream_files_created(self, mock_analysis, tmp_path):
-        evaluators_dir = _make_plugin_dir(tmp_path)
+        dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"
         src.mkdir()
 
@@ -178,10 +167,10 @@ class TestRun:
 
         config = RunConfig(
             src=src,
-            plugin_id="typescript",
-            evaluators_dir=evaluators_dir,
-            source_file_count=1,
+            language="typescript",
             work_dir=tmp_path,
+            manifest=_manifest(1),
+            dimensions_data=dims_data,
         )
         run(config)
 
@@ -195,8 +184,7 @@ class TestRun:
 
 class TestMergeEvidence:
     def test_merge_empty(self, tmp_path):
-        config = RunConfig(src=tmp_path, plugin_id="ts", evaluators_dir=tmp_path)
-        merged = merge_evidence([], config.source_file_count, str(config.src), config.plugin_id)
+        merged = merge_evidence([], source_file_count=0, src=str(tmp_path), language="ts")
         assert merged.principles == {}
         assert merged.files_read == 0
 
@@ -208,12 +196,11 @@ class TestMergeEvidence:
         )
         pe.compute_metrics()
         ev = Evidence(
-            repository="test", plugin_id="ts", date="2026-03-06",
+            repository="test", language="ts", date="2026-03-06",
             source_file_count=10, files_read=5, coverage_pct=50.0,
             principles={"ts-001": pe},
         )
-        config = RunConfig(src=tmp_path, plugin_id="ts", evaluators_dir=tmp_path, source_file_count=10)
-        merged = merge_evidence([ev], config.source_file_count, str(config.src), config.plugin_id)
+        merged = merge_evidence([ev], source_file_count=10, src=str(tmp_path), language="ts")
         assert "ts-001" in merged.principles
         assert merged.files_read == 5
 
@@ -232,18 +219,17 @@ class TestMergeEvidence:
         pe2.compute_metrics()
 
         ev1 = Evidence(
-            repository="test", plugin_id="ts", date="2026-03-06",
+            repository="test", language="ts", date="2026-03-06",
             source_file_count=10, files_read=5, coverage_pct=50.0,
             principles={"ts-001": pe1},
         )
         ev2 = Evidence(
-            repository="test", plugin_id="ts", date="2026-03-06",
+            repository="test", language="ts", date="2026-03-06",
             source_file_count=10, files_read=8, coverage_pct=80.0,
             principles={"ts-002": pe2},
         )
 
-        config = RunConfig(src=tmp_path, plugin_id="ts", evaluators_dir=tmp_path, source_file_count=10)
-        merged = merge_evidence([ev1, ev2], config.source_file_count, str(config.src), config.plugin_id)
+        merged = merge_evidence([ev1, ev2], source_file_count=10, src=str(tmp_path), language="ts")
         assert "ts-001" in merged.principles
         assert "ts-002" in merged.principles
         assert merged.files_read == 8  # max
@@ -263,18 +249,17 @@ class TestMergeEvidence:
         pe2.compute_metrics()
 
         ev1 = Evidence(
-            repository="test", plugin_id="ts", date="2026-03-06",
+            repository="test", language="ts", date="2026-03-06",
             source_file_count=10, files_read=3, coverage_pct=30.0,
             principles={"ts-001": pe1},
         )
         ev2 = Evidence(
-            repository="test", plugin_id="ts", date="2026-03-06",
+            repository="test", language="ts", date="2026-03-06",
             source_file_count=10, files_read=5, coverage_pct=50.0,
             principles={"ts-001": pe2},
         )
 
-        config = RunConfig(src=tmp_path, plugin_id="ts", evaluators_dir=tmp_path, source_file_count=10)
-        merged = merge_evidence([ev1, ev2], config.source_file_count, str(config.src), config.plugin_id)
+        merged = merge_evidence([ev1, ev2], source_file_count=10, src=str(tmp_path), language="ts")
         pe = merged.principles["ts-001"]
         assert len(pe.violations) == 2
         assert len(pe.compliance) == 1

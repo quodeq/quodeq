@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from quodeq.engine.evidence import Evidence, Judgment, PrincipleEvidence
+from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence
 
 
 def test_judgment_defaults():
@@ -59,7 +59,7 @@ def test_evidence_summary():
     )
     ev = Evidence(
         repository="test-repo",
-        plugin_id="typescript",
+        language="typescript",
         date="2026-03-03",
         source_file_count=100,
         files_read=50,
@@ -88,7 +88,7 @@ def test_evidence_to_v1_dict():
     )
     ev = Evidence(
         repository="test-repo",
-        plugin_id="typescript",
+        language="typescript",
         date="2026-03-03",
         source_file_count=100,
         files_read=50,
@@ -97,7 +97,7 @@ def test_evidence_to_v1_dict():
     )
     d = ev.to_evidence_dict()
     assert d["repository"] == "test-repo"
-    assert d["discipline"] == "typescript"
+    assert d["discipline"] == "Typescript"
     assert "ts-001" in d["principles"]
     assert d["principles"]["ts-001"]["violations"][0]["severity"] == "high"
     assert d["source_file_count"] == 100

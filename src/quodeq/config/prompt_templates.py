@@ -22,9 +22,10 @@ def render_template(template: str, values: dict[str, str]) -> str:
 
     remaining = _PLACEHOLDER_RE.findall(rendered)
     if remaining:
-        _logger.warning(
-            "Unreplaced template placeholders: %s",
-            ", ".join(f"{{{{{p}}}}}" for p in remaining),
+        placeholders = ", ".join(f"{{{{{p}}}}}" for p in remaining)
+        raise ValueError(
+            f"Unresolved template placeholders: {placeholders}. "
+            f"Check template file matches expected variable names."
         )
 
     return rendered

@@ -9,21 +9,49 @@ import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 
+from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subprocess import AnalysisConfig, HeartbeatCallback, count_files_from_stream, run_analysis
 from quodeq.analysis.stream.parser import extract_evidence_from_stream
 from quodeq.analysis.stream.validation import get_mcp_status, is_stream_valid
-from quodeq.engine.evidence import Evidence
-from quodeq.engine._merge import merge_evidence
+from quodeq.core.evidence.model import Evidence
+from quodeq.core.evidence.merge import merge_evidence
 from quodeq.engine._runner_markers import CC_MARKER_KEY, cleanup_stream, emit_marker, make_heartbeat
-from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.analysis.plugins.loader import load_plugin_full
+from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.analysis.plugins.schema_validator import validate_dimensions
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
 from quodeq.shared.logging import log_info, log_success, log_warning
-from quodeq.shared.utils import read_text
+from quodeq.shared.utils import read_json
 from quodeq.shared.validation import validate_path_segment
+
+
+class DimensionEntry(TypedDict, total=False):
+    """Shape of one entry in dimensions.json ``applies`` list."""
+    id: str
+    weight: float
+    iso_25010: str
+    source: str
+
+
+class DimensionsConfig(TypedDict, total=False):
+    """Shape of a validated dimensions.json file."""
+    applies: list[DimensionEntry]
+    excludes: list[str]
+
+
+def load_universal_dimensions(dimensions_file: Path) -> DimensionsConfig:
+    """Load and validate the universal dimensions.json config.
+
+    Returns the parsed dimensions dict.
+    Raises ValueError on validation failure.
+    """
+    dims_data = read_json(dimensions_file)
+    errors = validate_dimensions(dims_data)
+    if errors:
+        raise ValueError(f"dimensions.json: {'; '.join(errors)}")
+    return dims_data
 
 
 @dataclass
@@ -42,51 +70,57 @@ class AnalysisOptions:
 
 @dataclass
 class RunConfig:
-    """Configuration for a single evaluation run (source path, plugin, options)."""
+    """Configuration for a single evaluation run."""
     src: Path
-    plugin_id: str
-    evaluators_dir: Path
+    language: str
     standards_dir: Path | None = None
-    source_file_count: int = 0
     work_dir: Path | None = None
     options: AnalysisOptions = field(default_factory=AnalysisOptions)
+    manifest: SourceManifest | None = None
+    dimensions_data: DimensionsConfig | None = None
+    target: AnalysisTarget | None = None
 
-
+    @property
+    def source_file_count(self) -> int:
+        """Derive source file count from the target or manifest."""
+        if self.target:
+            return self.target.total_files
+        return self.manifest.total_files if self.manifest else 0
 
 
 @dataclass(frozen=True)
-class _PluginContext:
-    """Pre-loaded plugin data reused across dimensions."""
-    dimensions_data: dict
-    analysis_md: str
+class _AnalysisContext:
+    """Pre-loaded data reused across dimensions."""
+    dimensions_data: DimensionsConfig
     date_str: str
     template: str
-    plugin_name: str
+    subagent_template: str
     total: int
 
 
 def _build_dimension_prompt(
-    config: RunConfig, dim_id: str, ctx: _PluginContext,
+    config: RunConfig, dim_id: str, ctx: _AnalysisContext,
 ) -> str:
     """Build the analysis prompt for a single dimension."""
     return build_analysis_prompt(
         ctx.template,
         PromptContext(
-            plugin_id=config.plugin_id,
+            language=config.language,
             repo_name=str(config.src),
             date_str=ctx.date_str,
             dimension=dim_id,
             source_file_count=config.source_file_count,
             dimensions_data=ctx.dimensions_data,
-            analysis_md=ctx.analysis_md,
             standards_dir=config.standards_dir,
+            manifest=config.manifest,
+            target=config.target,
         ),
     )
 
 
 def _run_dimension_analysis(
     config: RunConfig, dim_id: str, prompt: str,
-    idx: int, ctx: _PluginContext,
+    idx: int, ctx: _AnalysisContext,
 ) -> tuple[Path, Path]:
     """Run the AI analysis subprocess for a single dimension.
 
@@ -121,7 +155,7 @@ def _run_dimension_analysis(
 
 def _parse_dimension_evidence(
     config: RunConfig, dim_id: str, stream_file: Path, jsonl_file: Path,
-    ctx: _PluginContext,
+    ctx: _AnalysisContext,
 ) -> Evidence | None:
     """Extract and parse evidence from stream/JSONL files for a single dimension.
 
@@ -145,20 +179,20 @@ def _parse_dimension_evidence(
     ev = parse_jsonl_to_evidence(
         jsonl_file,
         EvidenceContext(
-            plugin_id=config.plugin_id,
+            language=config.language,
             repository=str(config.src),
             date_str=ctx.date_str,
             source_file_count=config.source_file_count,
             files_read=files_read,
+            module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
     )
-    ev.plugin_name = ctx.plugin_name
     return ev
 
 
 def _process_dimension_with_subagents(
-    config: RunConfig, dim_id: str, idx: int, ctx: _PluginContext,
+    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
 ) -> Evidence | None:
     """Run dimension analysis using N parallel subagents (delegates to _subagent_runner)."""
     return process_dimension_with_subagents(
@@ -171,27 +205,34 @@ def _process_dimension_with_subagents(
     )
 
 
-def load_plugin_context(config: RunConfig) -> tuple[list[str], _PluginContext]:
-    """Load plugin data and resolve which dimensions to analyze."""
-    validate_path_segment(config.plugin_id)
-    plugin_dir = config.evaluators_dir / config.plugin_id
-    if not plugin_dir.exists():
-        raise ValueError(f"Plugin directory not found: {plugin_dir}")
+def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
+    """Load dimensions data and resolve which dimensions to analyze."""
+    dims_data = config.dimensions_data
+    if dims_data is None:
+        raise ValueError("RunConfig.dimensions_data is required")
 
-    full = load_plugin_full(plugin_dir)
-    analysis_file = plugin_dir / "knowledge" / "analysis.md"
-    all_dims_raw = [d.get("id") for d in full["dimensions"].get("applies", []) if d.get("id")]
+    all_dims_raw = [d.get("id") for d in dims_data.get("applies", []) if d.get("id")]
     if config.options.dimensions:
+        all_dims_set = set(all_dims_raw)
+        unknown = [d for d in config.options.dimensions if d not in all_dims_set]
+        if unknown:
+            log_warning(f"Unknown dimensions ignored: {', '.join(unknown)}. "
+                        f"Available: {', '.join(all_dims_raw)}")
         dimensions = [d for d in all_dims_raw if d in config.options.dimensions]
+        if not dimensions:
+            raise ValueError(
+                f"No valid dimensions selected. "
+                f"Requested: {', '.join(config.options.dimensions)}. "
+                f"Available: {', '.join(all_dims_raw)}"
+            )
     else:
         dimensions = all_dims_raw
 
-    ctx = _PluginContext(
-        dimensions_data=full["dimensions"],
-        analysis_md=read_text(analysis_file) if analysis_file.exists() else "",
+    ctx = _AnalysisContext(
+        dimensions_data=dims_data,
         date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         template=load_template(config.options.template_path),
-        plugin_name=full["plugin"].get("name", config.plugin_id),
+        subagent_template=load_template(template_name="subagent.md"),
         total=len(dimensions),
     )
     return dimensions, ctx
@@ -210,7 +251,7 @@ def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) ->
 
 
 def _process_single_dimension(
-    config: RunConfig, dimension: str, idx: int, ctx: _PluginContext,
+    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
 ) -> Evidence | None:
     """Analyze a single dimension: build prompt, run AI, parse evidence."""
     emit_marker("analyzing", dimension=dimension)
@@ -233,7 +274,7 @@ def _process_single_dimension(
 
 def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
-    dimensions, ctx = load_plugin_context(config)
+    dimensions, ctx = load_analysis_context(config)
     result: dict[str, Evidence] = {}
     emit_marker("setup", dimensions=dimensions)
     skipped_count = 0
@@ -266,12 +307,12 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
 
 
 def run(config: RunConfig) -> Evidence:
-    """Orchestrate: load plugin → per-dimension AI analysis → merged Evidence."""
+    """Orchestrate: load dimensions → per-dimension AI analysis → merged Evidence."""
     return merge_evidence(
         list(_run_dimensions(config).values()),
         source_file_count=config.source_file_count,
         src=str(config.src),
-        plugin_id=config.plugin_id,
+        language=config.language,
     )
 
 

@@ -7,7 +7,7 @@ from io import StringIO
 from unittest.mock import patch
 
 from quodeq.engine import mcp_findings
-from quodeq.engine.evidence import Evidence, PrincipleEvidence
+from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 
 
 def _make_request(method: str, req_id: int = 1, params: dict | None = None) -> str:
@@ -84,7 +84,7 @@ def make_evidence_with_confidence(
     )
     return Evidence(
         repository="test-repo",
-        plugin_id="typescript",
+        language="typescript",
         date="2026-03-03",
         source_file_count=100,
         files_read=50,

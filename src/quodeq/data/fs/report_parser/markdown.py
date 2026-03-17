@@ -7,7 +7,7 @@ from typing import Any
 
 from quodeq.data.fs.report_parser.grades import parse_numeric_score
 from quodeq.data.fs.report_parser.json_parser import empty_severity_buckets
-from quodeq.engine.scoring_internals import score_to_grade_label
+from quodeq.core.scoring.internals import score_to_grade_label
 
 _DIVIDER_RE = re.compile(r"^\s*\|?\s*[-:]+(\s*\|\s*[-:]+)+\s*\|?\s*$")
 _GRADE_SCORE_RE = re.compile(r"^(\d+(?:\.\d+)?/10)(?:\s+(\w+))?$")

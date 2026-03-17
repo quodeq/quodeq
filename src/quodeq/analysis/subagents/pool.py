@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, dedup_jsonl_lines, merge_jsonl
-from quodeq.engine.analysis import AnalysisConfig, AnalysisError, run_analysis
+from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
 from quodeq.shared.utils import open_text
@@ -139,33 +139,44 @@ class SubagentPool:
                 stream_file=stream_file, success=False, error=str(exc),
             )
 
-    def _count_total_findings(self) -> int:
-        """Count findings in the shared JSONL file."""
+    def _read_new_findings(self, last_count: int) -> tuple[int, list[str]]:
+        """Read new finding lines from the shared JSONL since last_count.
+
+        Returns (new_count, list_of_new_lines).
+        """
         jsonl = self._shared_jsonl_path()
         try:
-            if jsonl.exists():
-                with self._jsonl_lock:
-                    with open_text(jsonl) as f:
-                        return sum(1 for line in f if line.strip())
+            if not jsonl.exists():
+                return 0, []
+            with self._jsonl_lock:
+                with open_text(jsonl) as f:
+                    lines = [line.strip() for line in f if line.strip()]
+            new_lines = lines[last_count:]
+            return len(lines), new_lines
         except OSError:
-            pass
-        return 0
+            return last_count, []
 
     def _heartbeat_loop(self, stop: threading.Event, finished: dict[str, bool]) -> None:
-        """Emit periodic progress lines until stopped."""
+        """Emit periodic progress lines and print new findings as they appear."""
+        import json as _json
         start = time.monotonic()
+        last_finding_count = 0
+        seen_keys: set[tuple] = set()
         while not stop.wait(_HEARTBEAT_INTERVAL):
             try:
                 elapsed = int(time.monotonic() - start)
                 mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
-                findings = self._count_total_findings()
+                total_findings, new_lines = self._read_new_findings(last_finding_count)
+
+                last_finding_count = total_findings
+
                 remaining, taken = FileQueue(self._queue_path).stats()
                 done = sum(1 for v in finished.values() if v)
                 log_info(
                     f"  [{self._dimension}] {mins}m{secs:02d}s | "
                     f"{done}/{self._n} agents done | "
                     f"{taken} files taken ({remaining} left) | "
-                    f"{findings} findings"
+                    f"{total_findings} findings"
                 )
             except (OSError, ValueError, RuntimeError) as exc:
                 log_warning(f"Heartbeat error: {exc}")

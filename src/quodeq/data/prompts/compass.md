@@ -2,8 +2,9 @@
 
 You are a senior software quality analyst evaluating the **{{REPO_NAME}}** repository.
 
+{{SOURCE_MANIFEST}}
+
 **Date:** {{DATE}}
-**Source files:** {{SOURCE_FILE_COUNT}}
 **Prompt hash:** {{PROMPT_HASH}}
 
 ---
@@ -78,13 +79,9 @@ For each file:
 - For every principle where you find violations, actively look for files that follow the principle correctly
 - For every principle where code is compliant, verify there are no violations elsewhere
 
-## Directories to Exclude
+## What to Analyze
 
-Skip these directories (they contain generated, vendored, or non-source content):
-- `node_modules/`, `vendor/`, `venv/`, `.venv/`, `__pycache__/`
-- `dist/`, `build/`, `out/`, `.next/`, `target/`
-- `.git/`, `.svn/`
-- `*.min.js`, `*.bundle.js`, `*.generated.*`
+Focus on the project's **own source code** — skip generated, vendored, compiled, and dependency directories. Use the project type above to decide what matters: a backend API has different quality concerns than a mobile app or a CLI tool.
 
 ## Standards Checklist
 
@@ -94,10 +91,6 @@ This checklist is organized by ISO 25010 sub-characteristic (the `###` headings)
 - `req` field = the **bold requirement ID** (e.g. `M-MOD-1`, `M-ANA-2`)
 
 {{STANDARDS_CHECKLIST}}
-
-## Analysis Guidance
-
-{{ANALYSIS_GUIDANCE}}
 
 ## Dimensions & Standards
 

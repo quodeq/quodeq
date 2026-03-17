@@ -4,8 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 
 from quodeq.core.scoring.engine import score_evidence
-from quodeq.engine.report import write_dimension_report
-from quodeq.engine.runner import RunConfig, run_per_dimension, cleanup_stream
+from quodeq.analysis.report import write_dimension_report
+from quodeq.analysis.runner import RunConfig, run_per_dimension
+from quodeq.engine._runner_markers import cleanup_stream
 from quodeq.shared.logging import log_info
 
 _NUMERICAL_MODE = "numerical"
@@ -18,7 +19,7 @@ def _verify_single_dimension(
 ) -> tuple[str, object]:
     """Run verification for one dimension and return (dimension, updated_evidence)."""
     from quodeq.analysis.subagents.verify import run_verification_pass
-    from quodeq.engine.evidence_parser import EvidenceContext, parse_jsonl_to_evidence
+    from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 
     work_dir = config.work_dir or config.src
     run_verification_pass(config, dimension, ctx, work_dir)
@@ -26,25 +27,25 @@ def _verify_single_dimension(
     ev = parse_jsonl_to_evidence(
         jsonl_path,
         EvidenceContext(
-            plugin_id=config.plugin_id,
+            language=config.language,
             repository=str(config.src),
             date_str=ctx.date_str,
             source_file_count=config.source_file_count,
             files_read=files_read,
+            module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
     )
-    ev.plugin_name = ctx.plugin_name
     return dimension, ev
 
 
 def _run_verification(config: RunConfig, per_dim_evidence: dict) -> dict:
     """Run verification pass on all dimensions in parallel."""
     from concurrent.futures import ThreadPoolExecutor, as_completed
-    from quodeq.analysis.runner import load_plugin_context
+    from quodeq.analysis.runner import load_analysis_context
 
     work_dir = config.work_dir or config.src
-    _dims, ctx = load_plugin_context(config)
+    _dims, ctx = load_analysis_context(config)
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
 
     log_info(f"Starting verification pass ({len(per_dim_evidence)} dimensions in parallel)...")

@@ -22,9 +22,6 @@ class ConfigPaths:
     """Immutable set of resolved paths to all configuration directories and files."""
 
     root: Path
-    evaluators_dir: Path
-    practices_dir: Path
-    dimensions_dir: Path
     prompts_dir: Path
     standards_dir: Path
     env_file: Path
@@ -40,14 +37,21 @@ class ConfigPaths:
         """Return the path to the disciplines configuration file."""
         return self.root / "config" / "disciplines.conf"
 
+    @property
+    def detection_file(self) -> Path:
+        """Return the path to the universal detection.json config."""
+        return self.root / "config" / "detection.json"
+
+    @property
+    def dimensions_file(self) -> Path:
+        """Return the path to the universal dimensions.json config."""
+        return self.root / "config" / "dimensions.json"
+
     @classmethod
     def from_root(cls, root: Path) -> "ConfigPaths":
         """Construct a ConfigPaths instance by deriving all paths from a root directory."""
         return cls(
             root=root,
-            evaluators_dir=root / "evaluators",
-            practices_dir=root / "practices",
-            dimensions_dir=root / "dimensions",
             prompts_dir=root / "prompts",
             standards_dir=root / "standards",
             env_file=root / ".quodeq.env",
@@ -94,10 +98,9 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
 
 
 def _looks_like_project_root(root: Path) -> bool:
-    return (
-        (root / "prompts").is_dir()
-        and (root / "evaluators").is_dir()
-    )
+    has_prompts = (root / "prompts").is_dir()
+    has_detection = (root / "config" / "detection.json").is_file()
+    return has_prompts and has_detection
 
 
 def default_paths() -> ConfigPaths:

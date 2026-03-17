@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from quodeq.engine.evidence import Evidence, PrincipleEvidence
-from quodeq.engine.scoring import score_evidence
+from quodeq.core.evidence.model import Evidence, PrincipleEvidence
+from quodeq.core.scoring.engine import score_evidence
 
 from tests.engine.conftest import make_evidence_with_confidence
 
@@ -30,7 +30,7 @@ def _make_evidence(violations=None, compliance=None) -> Evidence:
     )
     return Evidence(
         repository="test-repo",
-        plugin_id="typescript",
+        language="typescript",
         date="2026-03-03",
         source_file_count=100,
         files_read=50,
@@ -63,7 +63,7 @@ def test_non_numerical_grading():
 def test_empty_evidence():
     ev = Evidence(
         repository="test",
-        plugin_id="typescript",
+        language="typescript",
         date="2026-03-03",
         source_file_count=0,
         files_read=0,
@@ -161,7 +161,7 @@ def test_weighted_overall_excludes_insufficient():
                  "compliance_percentage": 90.0, "confidence_level": "high", "is_balanced": True},
     )
     ev = Evidence(
-        repository="test", plugin_id="ts", date="2026-03-03",
+        repository="test", language="ts", date="2026-03-03",
         source_file_count=100, files_read=50, coverage_pct=50.0,
         principles={"p-low": pe_low, "p-high": pe_high},
     )
