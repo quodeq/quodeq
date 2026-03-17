@@ -74,7 +74,7 @@ def _build_verify_prompt(
 ) -> str:
     """Build a verification prompt from the verify.md template."""
     template = load_template(template_name=_VERIFY_TEMPLATE)
-    prompt = build_analysis_prompt(
+    return build_analysis_prompt(
         template,
         PromptContext(
             language=config.language,
@@ -85,11 +85,9 @@ def _build_verify_prompt(
             dimensions_data=ctx.dimensions_data,
             standards_dir=config.standards_dir,
             target=getattr(config, "target", None),
+            extra_vars={"FINDINGS_SUMMARY": findings_summary},
         ),
     )
-    # Inject the findings summary (not a standard template var)
-    prompt = prompt.replace("{{FINDINGS_SUMMARY}}", findings_summary)
-    return prompt
 
 
 def run_verification_pass(

@@ -110,6 +110,7 @@ class PromptContext:
     standards_dir: Path | None = None
     manifest: "SourceManifest | None" = None
     target: "AnalysisTarget | None" = None
+    extra_vars: dict[str, str] = field(default_factory=dict)
 
 
 _TEMPLATE_HASH_CACHE_SIZE = 128
@@ -163,18 +164,18 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
 
     manifest_context = _render_manifest_context(context)
 
-    return render_template(
-        template,
-        {
-            _TPL_DISCIPLINE: context.language,
-            _TPL_REPO_NAME: context.repo_name,
-            _TPL_DATE: context.date_str,
-            _TPL_DIMENSION: context.dimension,
-            _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
-            _TPL_STANDARDS_CHECKLIST: standards_checklist,
-            _TPL_ANALYSIS_GUIDANCE: manifest_context,
-            _TPL_DIMENSIONS: dimensions_text,
-            _TPL_PROMPT_HASH: prompt_hash,
-            _TPL_SOURCE_MANIFEST: manifest_context,
-        },
-    )
+    values = {
+        _TPL_DISCIPLINE: context.language,
+        _TPL_REPO_NAME: context.repo_name,
+        _TPL_DATE: context.date_str,
+        _TPL_DIMENSION: context.dimension,
+        _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
+        _TPL_STANDARDS_CHECKLIST: standards_checklist,
+        _TPL_ANALYSIS_GUIDANCE: manifest_context,
+        _TPL_DIMENSIONS: dimensions_text,
+        _TPL_PROMPT_HASH: prompt_hash,
+        _TPL_SOURCE_MANIFEST: manifest_context,
+    }
+    if context.extra_vars:
+        values.update(context.extra_vars)
+    return render_template(template, values)

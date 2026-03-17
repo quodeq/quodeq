@@ -213,7 +213,18 @@ def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContex
 
     all_dims_raw = [d.get("id") for d in dims_data.get("applies", []) if d.get("id")]
     if config.options.dimensions:
+        all_dims_set = set(all_dims_raw)
+        unknown = [d for d in config.options.dimensions if d not in all_dims_set]
+        if unknown:
+            log_warning(f"Unknown dimensions ignored: {', '.join(unknown)}. "
+                        f"Available: {', '.join(all_dims_raw)}")
         dimensions = [d for d in all_dims_raw if d in config.options.dimensions]
+        if not dimensions:
+            raise ValueError(
+                f"No valid dimensions selected. "
+                f"Requested: {', '.join(config.options.dimensions)}. "
+                f"Available: {', '.join(all_dims_raw)}"
+            )
     else:
         dimensions = all_dims_raw
 
