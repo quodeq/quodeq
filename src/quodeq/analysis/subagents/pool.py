@@ -139,42 +139,33 @@ class SubagentPool:
                 stream_file=stream_file, success=False, error=str(exc),
             )
 
-    def _read_new_findings(self, last_count: int) -> tuple[int, list[str]]:
-        """Read new finding lines from the shared JSONL since last_count.
-
-        Returns (new_count, list_of_new_lines).
-        """
+    def _count_findings(self) -> int:
+        """Count findings in the shared JSONL file."""
         jsonl = self._shared_jsonl_path()
         try:
             if not jsonl.exists():
-                return 0, []
+                return 0
             with self._jsonl_lock:
                 with open_text(jsonl) as f:
-                    lines = [line.strip() for line in f if line.strip()]
-            new_lines = lines[last_count:]
-            return len(lines), new_lines
+                    return sum(1 for line in f if line.strip())
         except OSError:
-            return last_count, []
+            return 0
 
     def _heartbeat_loop(self, stop: threading.Event, finished: dict[str, bool]) -> None:
-        """Emit periodic progress lines and print new findings as they appear."""
-        import json as _json
+        """Emit periodic progress lines."""
         start = time.monotonic()
-        last_finding_count = 0
-        seen_keys: set[tuple] = set()
         while not stop.wait(_HEARTBEAT_INTERVAL):
             try:
                 elapsed = int(time.monotonic() - start)
                 mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
-                total_findings, new_lines = self._read_new_findings(last_finding_count)
-
-                last_finding_count = total_findings
+                total_findings = self._count_findings()
 
                 remaining, taken = FileQueue(self._queue_path).stats()
-                done = sum(1 for v in finished.values() if v)
+                total_agents = len(finished)
+                active = sum(1 for v in finished.values() if not v)
                 log_info(
                     f"  [{self._dimension}] {mins}m{secs:02d}s | "
-                    f"{done}/{self._n} agents done | "
+                    f"{active} active ({total_agents} total) | "
                     f"{taken} files taken ({remaining} left) | "
                     f"{total_findings} findings"
                 )
