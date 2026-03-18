@@ -22,7 +22,7 @@ export function useProjectState({ onNoProjects }) {
         setProjects(list);
         return list;
       })
-      .catch(() => []);
+      .catch((err) => { console.warn('Failed to load projects:', err); return []; });
   }, []);
 
   useEffect(() => {

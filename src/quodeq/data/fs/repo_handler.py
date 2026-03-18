@@ -61,7 +61,7 @@ def prepare_repository(repo_input: str) -> str:
             ["git", "clone", "--progress", repo_input, str(dest)],
             check=True, env=env, timeout=_get_clone_timeout(),
         )
-    except BaseException:
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError):
         shutil.rmtree(tmp_dir, ignore_errors=True)
         raise
     return str(dest.resolve())

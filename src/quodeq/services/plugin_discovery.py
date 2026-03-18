@@ -61,8 +61,8 @@ def _discover_from_detection(detection_file: Path, dimensions_file: Path) -> lis
             PluginDimension(id=d["id"], weight=d.get("weight", 1), iso_25010=d.get("iso_25010"))
             for d in dims_data.get("applies", [])
         ]
-    except (OSError, json.JSONDecodeError, KeyError, ValueError):
-        pass
+    except (OSError, json.JSONDecodeError, KeyError, ValueError) as exc:
+        _logger.warning("Failed to parse dimensions.json: %s", exc)
 
     result: list[PluginInfo] = []
     for lang, exts in sorted(lang_extensions.items()):

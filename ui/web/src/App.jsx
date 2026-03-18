@@ -66,11 +66,16 @@ export default function App() {
   }
 
   async function handleRelocateProject(projectId, newPath) {
-    await fetch(`/api/projects/${encodeURIComponent(projectId)}/path${_apiQs()}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: newPath }),
-    }).catch((err) => console.error('Relocate failed:', err));
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/path${_apiQs()}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: newPath }),
+      });
+      if (!res.ok) console.error('Relocate failed:', res.status);
+    } catch (err) {
+      console.error('Relocate failed:', err);
+    }
     loadProjects();
   }
 
@@ -122,7 +127,7 @@ export default function App() {
   // Evaluation
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
   const [analysisPower, setAnalysisPower] = useState(() => {
-    try { return Number(localStorage.getItem(POWER_KEY)) || 2; } catch { return 2; }
+    try { return Number(localStorage.getItem(POWER_KEY)) || 2; } catch (e) { console.warn('localStorage unavailable:', e); return 2; }
   });
 
   const prevJobRef = useRef(null);

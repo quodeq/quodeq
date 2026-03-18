@@ -49,8 +49,8 @@ def npm_build(path: Path) -> None:
     """Run npm install and build in the given directory."""
     _check_npm()
     npm = _npm_cmd()
-    subprocess.run([npm, "install"], cwd=str(path), check=True)
-    subprocess.run([npm, "run", "build"], cwd=str(path), check=True)
+    subprocess.run([npm, "install"], cwd=str(path), check=True, timeout=300)
+    subprocess.run([npm, "run", "build"], cwd=str(path), check=True, timeout=600)
 
 
 def sources_newer_than_dist(web_root: Path, dist_index: Path) -> bool:

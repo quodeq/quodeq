@@ -197,8 +197,16 @@ class JobManager:
             for jid in completed[:excess]:
                 self._store.delete(jid)
 
+    _JOB_TIMEOUT_S = 7200  # 2 hours max per evaluation job
+
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
-        exit_code = process.wait()
+        try:
+            exit_code = process.wait(timeout=self._JOB_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._JOB_TIMEOUT_S)
+            process.kill()
+            process.wait(timeout=30)
+            exit_code = -9
         with self._lock:
             self._processes.pop(job_id, None)
             job = self._store.get(job_id)
