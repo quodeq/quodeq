@@ -1,13 +1,12 @@
-"""Mechanical verification — re-checks previous findings against current code.
+"""Finding verification — re-checks previous findings using a fast AI pool.
 
-Instead of one big AI agent re-exploring the codebase, iterate over each
-previous finding mechanically:
+Two-phase approach:
+1. Mechanical pre-filter: drop findings whose files no longer exist (instant)
+2. AI verification pool: dispatch remaining findings to fast model subagents
+   grouped by file, each agent reads the current code and confirms/drops
 
-1. Read the finding (file, line, snippet, principle)
-2. Check if the file still exists and the code is still there
-3. If confirmed, copy the finding to the current run's JSONL
-
-Fast, zero AI tokens, runs in <1 second.
+Confirmed findings are written to the evidence JSONL via MCP (same as
+main analysis), so they appear on the dashboard immediately.
 """
 from __future__ import annotations
 
@@ -54,55 +53,76 @@ def _load_previous_findings(jsonl_path: Path) -> list[dict]:
     return findings
 
 
-def _mechanical_check(finding: dict, src: Path) -> str:
-    """Check if a finding's code location still exists.
+def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
+    """Fast pre-filter: drop findings whose files no longer exist.
 
-    Returns:
-        "confirmed" — file and snippet still match
-        "gone" — file deleted or line changed completely
-        "ambiguous" — file exists but code changed, needs AI judgment
+    Returns (surviving_findings, gone_count).
     """
-    rel_path = finding.get("file", "")
-    if not rel_path:
-        return "gone"
-
-    file_path = src / rel_path
-    if not file_path.exists():
-        return "gone"
-
-    try:
-        lines = file_path.read_text(errors="ignore").splitlines()
-    except OSError:
-        return "gone"
-
-    target_line = finding.get("line", 0)
-    snippet = finding.get("snippet", "").strip()
-
-    if not snippet:
-        # No snippet to match — file exists, assume ambiguous
-        return "ambiguous"
-
-    # Check exact line match first
-    if 0 < target_line <= len(lines):
-        line_content = lines[target_line - 1]
-        if snippet in line_content or line_content.strip() in snippet:
-            return "confirmed"
-
-    # Check nearby lines (code may have shifted by a few lines)
-    search_start = max(0, target_line - 10)
-    search_end = min(len(lines), target_line + 10)
-    for i in range(search_start, search_end):
-        if snippet in lines[i] or lines[i].strip() in snippet:
-            return "confirmed"
-
-    # File exists but snippet not found nearby — code changed
-    return "ambiguous"
+    surviving: list[dict] = []
+    gone = 0
+    for finding in findings:
+        rel_path = finding.get("file", "")
+        if not rel_path or not (src / rel_path).exists():
+            gone += 1
+        else:
+            surviving.append(finding)
+    return surviving, gone
 
 
-def _write_finding(finding: dict, output_fh: Any) -> None:
-    """Append a finding to the JSONL output file."""
-    output_fh.write(json.dumps(finding) + "\n")
-    output_fh.flush()
+def _group_by_file(findings: list[dict]) -> dict[str, list[dict]]:
+    """Group findings by their source file path."""
+    groups: dict[str, list[dict]] = {}
+    for finding in findings:
+        file_path = finding.get("file", "")
+        if file_path:
+            groups.setdefault(file_path, []).append(finding)
+    return groups
+
+
+def _write_verify_manifest(
+    grouped: dict[str, list[dict]],
+    output_path: Path,
+) -> None:
+    """Write the verification manifest — a JSON file mapping files to findings.
+
+    Each verification subagent reads this to know which findings to re-check.
+    """
+    output_path.write_text(json.dumps(grouped, indent=2))
+
+
+_VERIFY_PROMPT_TEMPLATE = """\
+You are re-verifying previous evaluation findings against the current codebase.
+This is a quick verification pass — be fast and decisive.
+
+## Task
+
+For each file in the verification manifest at `{manifest_path}`:
+1. Read the file from the queue
+2. Look up its findings in the manifest
+3. For each finding, check if the violation/compliance condition **still applies**
+   to the current code — not just whether the line exists, but whether the
+   underlying issue is still present
+4. If the finding still applies, report it using the `report_finding` tool
+   with the same fields (principle, type, severity, file, line, reason, snippet)
+5. If the issue has been fixed or no longer applies, skip it silently
+
+## Important
+
+- Do NOT discover new findings — only verify existing ones
+- Do NOT modify any files
+- Read each file, check the findings, report confirmed ones, move on
+- Be fast — this should take seconds per file
+
+Dimension: {dimension}
+"""
+
+
+def build_verify_prompt(manifest_path: Path, dimension: str) -> str:
+    """Build the prompt for verification subagents."""
+    return _VERIFY_PROMPT_TEMPLATE.format(
+        manifest_path=manifest_path,
+        dimension=dimension,
+    )
 
 
 def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
@@ -116,67 +136,24 @@ def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
     return run_dir.name, run_dir.parent.name, run_dir.parent.parent
 
 
-def run_mechanical_verify(
-    src: Path,
-    prev_findings: list[dict],
-) -> tuple[list[dict], int, list[dict]]:
-    """Mechanically verify findings against current code.
-
-    Returns (confirmed_findings, gone_count, ambiguous_findings).
-    Confirmed findings are returned in memory — the caller decides
-    when to write them (e.g., after subagent analysis completes).
-    """
-    confirmed: list[dict] = []
-    gone = 0
-    ambiguous: list[dict] = []
-
-    for finding in prev_findings:
-        status = _mechanical_check(finding, src)
-        if status == "confirmed":
-            confirmed.append(finding)
-        elif status == "gone":
-            gone += 1
-        else:
-            ambiguous.append(finding)
-
-    return confirmed, gone, ambiguous
-
-
-def write_verified_findings(findings: list[dict], output_jsonl: Path) -> None:
-    """Write verified findings to the JSONL evidence file.
-
-    Called after subagent analysis completes so the dashboard doesn't
-    show stale findings before fresh analysis is done.
-    """
-    if not findings:
-        return
-    with open(output_jsonl, "a") as fh:
-        for finding in findings:
-            _write_finding(finding, fh)
-
-
-def run_verify_for_dimension(
+def load_previous_findings_for_dimension(
     config: Any,
     dim_id: str,
     evidence_dir: Path,
 ) -> list[dict]:
-    """Run mechanical verification for a dimension.
+    """Load and pre-filter previous findings for a dimension.
 
     1. Find previous run's JSONL
-    2. For each finding: check if file/snippet still exists
-    3. Confirmed findings → return in memory (NOT written to JSONL yet)
-    4. Gone findings → drop
-    5. Ambiguous findings → drop (conservative; analysis agents will re-discover if real)
+    2. Pre-filter: drop findings whose files no longer exist
+    3. Return surviving findings for AI verification
 
-    Returns list of confirmed findings. The caller is responsible for writing
-    them to the JSONL after subagent analysis completes.
+    Returns list of findings to verify (may be empty).
     """
     if not getattr(config, 'options', None) or not config.options.verify_findings:
         return []
 
     paths = _resolve_evidence_paths(evidence_dir)
     if paths is None:
-        log_info(f"  [{dim_id}] Cannot locate evidence root — skipping verification")
         return []
 
     current_run_id, project_uuid, reports_base = paths
@@ -190,12 +167,51 @@ def run_verify_for_dimension(
     if not prev_findings:
         return []
 
-    log_info(f"  [{dim_id}] Verifying {len(prev_findings)} previous findings mechanically")
-
-    confirmed, gone, ambiguous = run_mechanical_verify(config.src, prev_findings)
-
-    log_success(
-        f"  [{dim_id}] Verification: {len(confirmed)} confirmed, "
-        f"{gone} gone, {len(ambiguous)} ambiguous (dropped)"
+    surviving, gone = _pre_filter_gone(prev_findings, config.src)
+    log_info(
+        f"  [{dim_id}] {len(prev_findings)} previous findings: "
+        f"{gone} files gone, {len(surviving)} to verify"
     )
-    return confirmed
+    return surviving
+
+
+# ---------------------------------------------------------------------------
+# Legacy helpers — kept for backward compatibility with tests
+# ---------------------------------------------------------------------------
+
+def _mechanical_check(finding: dict, src: Path) -> str:
+    """Check if a finding's file still exists. Used by pre-filter."""
+    rel_path = finding.get("file", "")
+    if not rel_path:
+        return "gone"
+    if not (src / rel_path).exists():
+        return "gone"
+    return "ambiguous"  # needs AI verification
+
+
+def run_mechanical_verify(
+    src: Path,
+    prev_findings: list[dict],
+) -> tuple[list[dict], int, list[dict]]:
+    """Pre-filter findings by file existence.
+
+    Returns (surviving, gone_count, []) — all surviving findings
+    are treated as needing AI verification (ambiguous).
+    """
+    surviving, gone = _pre_filter_gone(prev_findings, src)
+    return [], gone, surviving  # none confirmed mechanically, all ambiguous
+
+
+def _write_finding(finding: dict, output_fh: Any) -> None:
+    """Append a finding to the JSONL output file."""
+    output_fh.write(json.dumps(finding) + "\n")
+    output_fh.flush()
+
+
+def write_verified_findings(findings: list[dict], output_jsonl: Path) -> None:
+    """Write verified findings to the JSONL evidence file."""
+    if not findings:
+        return
+    with open(output_jsonl, "a") as fh:
+        for finding in findings:
+            _write_finding(finding, fh)
