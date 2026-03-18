@@ -8,6 +8,7 @@ from pathlib import Path
 from quodeq.core.types import ScoringResult, to_camel_dict
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.scoring.internals import score_to_grade_label
+from quodeq.shared.validation import validate_path_segment
 
 _REPORT_SCHEMA_VERSION = 1
 
@@ -210,6 +211,7 @@ def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: 
 
 def write_dimension_report(evidence: Evidence, scores: ScoringResult | dict, dimension: str, output_dir: Path) -> None:
     """Write a per-dimension report file: <dimension>.json."""
+    validate_path_segment(dimension)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     report = build_dashboard_report(evidence, scores)

@@ -82,8 +82,9 @@ def _verify_integrity(
         )
     if not expected_hash:
         _logger.warning(
-            "No ASVS hash pinned — accepting first download. "
-            "Pin for future integrity checks with %s=%s",
+            "SECURITY: No ASVS hash configured — downloaded content is NOT verified. "
+            "An attacker could tamper with the download. Pin the hash to enable "
+            "integrity verification: %s=%s",
             _ASVS_SHA256_ENV,
             actual_hash,
         )

@@ -186,6 +186,9 @@ class QuodeqApp(rumps.App):
         if not cmds.get("quodeq"):
             self._prereq_items["quodeq"].title = "  Quodeq \u2014 installing..."
             try:
+                # Security: pip install over PyPI uses TLS for transport integrity.
+                # For stronger supply-chain guarantees, use a requirements file with
+                # --require-hashes (e.g. pip install --require-hashes -r requirements.txt).
                 subprocess.run(
                     ["python3", "-m", "pip", "install", "--user", "quodeq"],
                     capture_output=True, timeout=120,

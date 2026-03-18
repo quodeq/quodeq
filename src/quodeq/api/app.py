@@ -214,6 +214,10 @@ def create_app(
         _logger.error(_msg)
 
     @app.before_request
+    def _audit_log() -> None:
+        _logger.info("API: %s %s (remote_addr=%s)", request.method, request.path, request.remote_addr)
+
+    @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
         return _check_auth(api_key) or _check_csrf() or _check_rate_limit(store)
 

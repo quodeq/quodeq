@@ -38,6 +38,9 @@ fi
 # Auto-install quodeq if missing (all prerequisites are present)
 QUODEQ=$(command -v quodeq 2>/dev/null)
 if [ -z "$QUODEQ" ]; then
+    # Security: pip install over PyPI uses TLS for transport integrity.
+    # For stronger supply-chain guarantees, use a requirements file with
+    # --require-hashes (e.g. pip install --require-hashes -r requirements.txt).
     python3 -m pip install --user quodeq 2>&1
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)
