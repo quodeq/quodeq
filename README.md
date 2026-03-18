@@ -10,10 +10,10 @@
 <p align="center"><strong>v0.6.0</strong></p>
 
 <p align="center">
-  Quodeq uses AI to scan any codebase and score it across
+  Quodeq scans any codebase with AI and scores it across six quality dimensions —
   <strong>Security</strong>, <strong>Reliability</strong>, <strong>Maintainability</strong>,
-  <strong>Performance</strong>, <strong>Flexibility</strong>, and <strong>Usability</strong>
-  (ISO 25010 standards). Get grades, violations, and a clear path to better code.
+  <strong>Performance</strong>, <strong>Flexibility</strong>, and <strong>Usability</strong> —
+  based on ISO 25010. Get grades, find violations, fix what matters.
 </p>
 
 ---
