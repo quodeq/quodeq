@@ -5,14 +5,15 @@
   </picture>
 </p>
 
-<h3 align="center">AI-powered code quality analysis mapped to ISO 25010 & CWE</h3>
+<h2 align="center">The quality code compass</h2>
+<p align="center"><em>Your guide to drive any codebase to excellence.</em></p>
 <p align="center"><strong>v0.6.0</strong></p>
 
 <p align="center">
-  Point Quodeq at any repo and get a full quality breakdown across
+  Quodeq uses AI to scan any codebase and score it across
   <strong>Security</strong>, <strong>Reliability</strong>, <strong>Maintainability</strong>,
-  <strong>Performance</strong>, <strong>Flexibility</strong>, and <strong>Usability</strong> —
-  with grades, scores, violations, and actionable findings.
+  <strong>Performance</strong>, <strong>Flexibility</strong>, and <strong>Usability</strong>
+  (ISO 25010 standards). Get grades, violations, and a clear path to better code.
 </p>
 
 ---
