@@ -126,12 +126,12 @@ def test_numerical_high_confidence_with_violations():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.base_score == 10
-    # 1 critical type (-2.0) + 1 major type (-1.0) = 3.0 raw deduction
-    # compliance has no vt → 0 types via taxonomy → 1.30× penalty
-    # 3.0 × 1.30 = 3.90 → 10 - 3.9 = 6.1
-    assert ts001.dampening_multiplier == 1.30
-    assert ts001.final_score == 6.1
+    # New model: base = 10/(1+0.12*5.5) ≈ 6.0 (1 crit @ 4.0 + 1 major @ 1.5)
+    # Compliance has no vt → 0 types via taxonomy → lift = 0
+    # Score = base, capped by ceiling
+    assert ts001.base_score == 6.0
+    assert ts001.dampening_multiplier == 0.0  # lift factor (no compliance types)
+    assert ts001.final_score == 6.0
 
 
 def test_graded_high_confidence_no_violations():

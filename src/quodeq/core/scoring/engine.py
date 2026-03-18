@@ -10,15 +10,19 @@ from quodeq.core.scoring.internals import (
     scale_multiplier,
     build_deductions,
     compliance_dampening,
+    compliance_lift,
     confidence_interval_for,
     count_grade_drops,
     drop_grade,
     evidence_has_taxonomy,
     score_to_grade_label,
+    severity_grade_floor,
     tally_compliance_types_by_reason,
     tally_compliance_types_by_taxonomy,
     tally_types_by_reason,
     tally_types_by_taxonomy,
+    violation_base,
+    violation_ceiling,
     weight_as_multiplier,
 )
 
@@ -66,6 +70,7 @@ class _PrincipleContext:
     pdata: dict
     pct: float
     vt_counts: dict[str, int]
+    ct_counts: dict[str, int]
     dampening: float
     using_taxonomy: bool
     conf_level: str
@@ -87,7 +92,14 @@ def _base_principle_kwargs(ctx: _PrincipleContext) -> dict:
 
 
 def _score_principle_numerical(ctx: _PrincipleContext) -> PrincipleScore:
-    """Score a single principle in numerical mode."""
+    """Score a single principle in numerical mode.
+
+    Uses a three-constraint model:
+    1. BASE:    Violation severity determines the starting score.
+    2. LIFT:    Compliance evidence fills the gap toward 10.
+    3. CEILING: Weighted violation count caps the maximum achievable score.
+    4. FLOOR:   Grade cannot be worse than the violation severities justify.
+    """
     kwargs = _base_principle_kwargs(ctx)
     if ctx.conf_level == "low":
         return PrincipleScore(
@@ -98,19 +110,29 @@ def _score_principle_numerical(ctx: _PrincipleContext) -> PrincipleScore:
             grade="Insufficient",
         )
 
-    base_pts = _BASE_SCORE
-    deductions = build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
+    # Stage 1: base from violation severity
+    base = violation_base(ctx.vt_counts)
 
-    dampened_deduction = round(deductions.total_deduction * ctx.dampening, 2)
-    effective_cap = min(deductions.critical_cap, deductions.major_cap)
-    adjusted = min(effective_cap, round(base_pts - dampened_deduction, 1))
-    final_pts = max(0.0, min(float(_BASE_SCORE), adjusted))
+    # Stage 2: compliance lifts toward 10
+    lift = compliance_lift(ctx.ct_counts, ctx.vt_counts)
+    raw_score = base + (_BASE_SCORE - base) * lift
+
+    # Stage 3: ceiling from weighted violation count
+    ceiling = violation_ceiling(ctx.vt_counts)
+
+    # Stage 4: severity grade floor
+    floor = severity_grade_floor(ctx.vt_counts)
+
+    final_pts = round(max(floor, min(ceiling, raw_score)), 1)
+
+    # Build legacy Deductions for backward compat with report serialization
+    deductions = build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
 
     return PrincipleScore(
         **kwargs,
-        base_score=base_pts,
+        base_score=round(base, 1),
         deductions=deductions,
-        dampening_multiplier=ctx.dampening,
+        dampening_multiplier=lift,
         final_score=final_pts,
         grade=score_to_grade_label(final_pts),
     )
@@ -177,7 +199,7 @@ def _build_principle_context(
     )
     return _PrincipleContext(
         key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
-        dampening=dampen, using_taxonomy=using_taxonomy,
+        ct_counts=ct_counts, dampening=dampen, using_taxonomy=using_taxonomy,
         conf_level=conf_level, ci=ci, scale_mult=scale_mult,
     )
 

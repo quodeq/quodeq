@@ -11,11 +11,10 @@ from tests.engine.conftest import make_evidence_with_confidence
 # Compliance dampening tests
 # ---------------------------------------------------------------------------
 
-def test_balanced_ratio_dampens_deductions():
-    """Severity-weighted compliance/violation ratio >= 1.0 -> 0.95 dampening.
+def test_balanced_ratio_lifts_score():
+    """1 critical violation + 1 critical compliance: compliance lifts the base.
 
-    1 critical violation (weight 8) needs >= 8 weighted compliance to reach 1.0.
-    1 critical compliance (weight 8) provides exactly that.
+    base = 10/(1+0.12*4.0) = 6.8, lift from 1 compliance type is small.
     """
     violations = [
         {"file": "a.ts", "line": 1, "snippet": "eval(x)", "reason": "r",
@@ -34,15 +33,13 @@ def test_balanced_ratio_dampens_deductions():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.dampening_multiplier == 0.95
-    assert ts001.final_score == 8.1
+    assert ts001.final_score == 6.9
 
 
-def test_strong_compliance_ratio_gives_max_discount():
-    """Severity-weighted ratio >= 3.0 -> 0.85 dampening (max discount).
+def test_strong_compliance_lifts_toward_ceiling():
+    """1 major violation + 3 major compliance types: strong lift.
 
-    1 major violation (weight 4) needs >= 12 weighted compliance for 3.0 ratio.
-    3 major compliance types (weight 3×4=12) provide exactly that.
+    base = 10/(1+0.12*1.5) = 8.5, lift pushes toward ceiling of 9.3.
     """
     violations = [
         {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
@@ -62,12 +59,11 @@ def test_strong_compliance_ratio_gives_max_discount():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.dampening_multiplier == 0.85
     assert ts001.final_score == 9.2
 
 
-def test_no_compliance_penalises_deductions():
-    """No compliance at all -> 1.30x penalty on deductions."""
+def test_no_compliance_gives_base_only():
+    """No compliance → score equals the violation base, no lift."""
     violations = [
         {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
          "severity": "major", "vt": "bad"},
@@ -81,12 +77,12 @@ def test_no_compliance_penalises_deductions():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.dampening_multiplier == 1.30
-    assert ts001.final_score == 8.7
+    assert ts001.dampening_multiplier == 0.0  # lift = 0 (no compliance)
+    assert ts001.final_score == 8.5
 
 
-def test_weak_compliance_ratio_penalises():
-    """Compliance/violation ratio < 0.5 but > 0 -> 1.15x penalty."""
+def test_weak_compliance_small_lift():
+    """4 minor violations + 1 minor compliance: small lift above base."""
     violations = [
         {"file": f"v{i}.ts", "line": i, "snippet": "x", "reason": f"r{i}",
          "severity": "minor", "vt": f"vt-{i}"}
@@ -105,8 +101,7 @@ def test_weak_compliance_ratio_penalises():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.dampening_multiplier == 1.15
-    assert ts001.final_score == 8.8
+    assert ts001.final_score == 9.2
 
 
 def test_dampening_in_graded_mode():
