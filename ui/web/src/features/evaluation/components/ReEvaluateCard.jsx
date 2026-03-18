@@ -32,7 +32,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         }
         setAllDimensions([...seen.values()]);
       })
-      .catch(() => setAllDimensions([]));
+      .catch((err) => { console.warn('Failed to load dimensions:', err); setAllDimensions([]); });
   }, []);
 
   if (error) return <div className="inline-error">{error}</div>;

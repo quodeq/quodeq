@@ -110,7 +110,11 @@ def main():
     files_changed = 0
 
     for path in sorted(eval_files):
-        v, c = migrate_file(path, args.apply)
+        try:
+            v, c = migrate_file(path, args.apply)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"  ERROR processing {path}: {exc}")
+            continue
         if v or c:
             files_changed += 1
             total_v += v

@@ -187,7 +187,11 @@ class QuodeqApp(rumps.App):
                 self._prereq_items["quodeq"].title = "  Quodeq \u2014 installing..."
                 try:
                     req_file = os.path.join(os.path.dirname(__file__), "requirements.txt")
-                    if os.path.isfile(req_file) and "--hash" in open(req_file).read():
+                    has_hashes = False
+                    if os.path.isfile(req_file):
+                        with open(req_file) as f:
+                            has_hashes = "--hash" in f.read()
+                    if has_hashes:
                         pip_cmd = ["python3", "-m", "pip", "install", "--user", "--require-hashes", "-r", req_file]
                     else:
                         # Fallback: no pinned hashes — install from PyPI over TLS.

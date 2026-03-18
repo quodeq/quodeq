@@ -16,7 +16,7 @@ class FakeProcess:
         self.stdout = io.StringIO(stdout + stderr)
         self._returncode = returncode
 
-    def wait(self) -> int:
+    def wait(self, timeout=None) -> int:
         return self._returncode
 
 
