@@ -21,6 +21,10 @@ if TYPE_CHECKING:
     from quodeq.analysis.runner import RunConfig
 
 _MAX_FILES_PER_AGENT = 30
+_VERIFY_MAX_FILES_PER_AGENT = 20  # verification is lighter, can handle more files
+_VERIFY_MAX_TURNS = 50            # verification tasks are quick
+_VERIFY_MAX_DURATION = 120        # 2 minutes max for verification pool
+_VERIFY_N_AGENTS = 3              # fewer agents needed for verification
 
 
 @dataclass
@@ -93,6 +97,48 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
     return pool, pool.run()
 
 
+def _fast_model(env: dict[str, str] | None = None) -> str:
+    """Return the fast/verification model. Defaults to 'haiku'."""
+    return (env or os.environ).get("QUODEQ_FAST_MODEL", "haiku")
+
+
+def _run_verification_pool(
+    config: RunConfig, dim_id: str, evidence_dir: Path,
+    files_to_verify: list[str], manifest_path: Path,
+) -> list[Any]:
+    """Launch a fast verification pool to re-check previous findings.
+
+    Uses the fast model (haiku by default) with a smaller pool.
+    Confirmed findings are written to JSONL via MCP → appear on dashboard.
+    """
+    from quodeq.analysis.subagents.verify import build_verify_prompt
+
+    queue_path = evidence_dir / f"{dim_id}_verify_queue.json"
+    FileQueue(queue_path, files_to_verify, max_files_per_agent=_VERIFY_MAX_FILES_PER_AGENT)
+
+    prompt = build_verify_prompt(manifest_path, dim_id)
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+    fast = _fast_model()
+
+    ac = AnalysisConfig(
+        compiled_dir=compiled_dir,
+        max_turns=_VERIFY_MAX_TURNS,
+        max_duration=_VERIFY_MAX_DURATION,
+        ai_model=fast,
+        dimension=dim_id,
+    )
+
+    n_agents = min(_VERIFY_N_AGENTS, len(files_to_verify))
+    pool = SubagentPool(
+        n_agents=n_agents,
+        paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
+        prompt=prompt,
+        dimension=dim_id,
+        config=ac,
+    )
+    return pool.run()
+
+
 def _collect_evidence(config: RunConfig, dim_id: str, evidence_dir: Path, results: list[Any], ctx: Any) -> Evidence:
     """Deduplicate JSONL, count files read, and parse into Evidence."""
     from quodeq.engine._runner_markers import cleanup_stream
@@ -144,23 +190,32 @@ def process_dimension_with_subagents(
         stream_file, jsonl_file = callbacks.run_analysis(config, dim_id, prompt, idx, ctx)
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
-    # 2. Run mechanical verification (fast, no AI — returns findings in memory)
-    from quodeq.analysis.subagents.verify import run_verify_for_dimension, write_verified_findings
-    verified_findings = run_verify_for_dimension(config, dim_id, evidence_dir)
+    # 2. Load and pre-filter previous findings for AI verification
+    from quodeq.analysis.subagents.verify import (
+        load_previous_findings_for_dimension, _group_by_file, _write_verify_manifest,
+    )
+    prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)
 
-    # 3. Create queue with per-agent file limit for context rotation
+    # 3. Run AI verification pool (fast model) if there are findings to verify
+    verify_results: list = []
+    if prev_findings:
+        grouped = _group_by_file(prev_findings)
+        manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
+        _write_verify_manifest(grouped, manifest_path)
+        files_to_verify = list(grouped.keys())
+        log_info(f"  [{dim_id}] Launching fast verification pool for {len(prev_findings)} findings across {len(files_to_verify)} files")
+        verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
+        log_success(f"  [{dim_id}] Verification pool complete")
+
+    # 4. Create queue with per-agent file limit for context rotation
     queue_path = evidence_dir / f"{dim_id}_queue.json"
     FileQueue(queue_path, files, max_files_per_agent=_MAX_FILES_PER_AGENT)
     log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued for {config.options.n_subagents} subagents")
 
-    # 4. Build prompt and launch pool
+    # 5. Build prompt and launch main analysis pool
     prompt = _build_subagent_prompt(config, dim_id, ctx)
     pool, results = _launch_pool(config, dim_id, evidence_dir, queue_path, prompt)
 
-    # 5. Write verified findings now that subagents are done
-    if verified_findings:
-        merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
-        write_verified_findings(verified_findings, merged_jsonl)
-
-    # 6. Collect and return evidence
-    return _collect_evidence(config, dim_id, evidence_dir, results, ctx)
+    # 6. Collect and return evidence (includes both verified + new findings)
+    all_results = verify_results + results
+    return _collect_evidence(config, dim_id, evidence_dir, all_results, ctx)
