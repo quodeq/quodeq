@@ -30,9 +30,19 @@ from quodeq.api.routes import (
 _HEALTH_PATH = "/api/health"
 _RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
 
-_RATE_LIMIT_WINDOW = 60  # seconds
-_RATE_LIMIT_MAX = 60  # max state-changing requests per window
+_DEFAULT_RATE_LIMIT_WINDOW = 60
+_DEFAULT_RATE_LIMIT_MAX = 60
 _RATE_STORE_MAX_IPS = 10_000  # max tracked IPs to prevent unbounded memory growth
+
+
+def _rate_limit_window(env: dict[str, str] | None = None) -> int:
+    """Return the rate-limit window in seconds."""
+    return int((env or os.environ).get("QUODEQ_RATE_LIMIT_WINDOW", str(_DEFAULT_RATE_LIMIT_WINDOW)))
+
+
+def _rate_limit_max(env: dict[str, str] | None = None) -> int:
+    """Return the maximum number of requests per window."""
+    return int((env or os.environ).get("QUODEQ_RATE_LIMIT_MAX", str(_DEFAULT_RATE_LIMIT_MAX)))
 
 
 @runtime_checkable
@@ -56,21 +66,21 @@ class RateLimitStore(Protocol):
 class InMemoryRateLimitStore:
     """Process-local rate-limit store backed by an LRU OrderedDict.
 
-    For multi-worker deployments, implement the ``RateLimitStore`` protocol
-    with a shared backend (e.g. Redis) and pass it to ``create_app`` via
-    the ``rate_limit_store`` parameter, or register a factory via
-    ``create_rate_limit_store``.
+    **Scaling:** This store is per-process. In multi-worker deployments,
+    implement ``RateLimitStore`` with a shared backend (e.g. Redis) and
+    pass it to ``create_app(rate_limit_store=...)``.
+    Set ``QUODEQ_RATE_LIMIT_STORE=redis`` to opt in (requires custom wiring).
     """
 
     def __init__(
         self,
-        window: float = _RATE_LIMIT_WINDOW,
-        max_requests: int = _RATE_LIMIT_MAX,
+        window: float | None = None,
+        max_requests: int | None = None,
         max_ips: int = _RATE_STORE_MAX_IPS,
     ) -> None:
         self._store: OrderedDict[str, list[float]] = OrderedDict()
-        self._window = window
-        self._max_requests = max_requests
+        self._window = window if window is not None else _rate_limit_window()
+        self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
         self._max_ips = max_ips
 
     def _evict_stale(self, now: float) -> None:
@@ -89,7 +99,10 @@ class InMemoryRateLimitStore:
 
     def record(self, ip: str, now: float) -> None:
         """Record a state-changing request from *ip* at time *now*."""
-        self._store.setdefault(ip, []).append(now)
+        timestamps = self._store.setdefault(ip, [])
+        timestamps.append(now)
+        if len(timestamps) > self._max_requests * 2:
+            self._store[ip] = [t for t in timestamps if now - t < self._window]
         self._store.move_to_end(ip)
 
     def check(self, ip: str, now: float) -> bool:
@@ -198,10 +211,14 @@ def create_app(
     store = rate_limit_store or create_rate_limit_store()
     if api_key is None:
         _msg = (
-            "QUODEQ_API_KEY is not set — API endpoints are unauthenticated. "
-            "Set QUODEQ_API_KEY for production use."
+            "QUODEQ_API_KEY is not set — API restricted to localhost only. "
+            "Set QUODEQ_API_KEY to enable authenticated remote access."
         )
         _logger.warning(_msg)
+
+    @app.before_request
+    def _audit_log() -> None:
+        _logger.info("API: %s %s (remote_addr=%s)", request.method, request.path, request.remote_addr)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:

@@ -54,7 +54,7 @@ export default function FolderBrowser({ onSelect, onClose }) {
             className="folder-nav-btn"
             disabled={!data?.parent || loading}
             onClick={() => data?.parent && navigate(data.parent)}
-            title="Go to parent folder"
+            aria-label="Go to parent folder"
           >
             ↑
           </button>

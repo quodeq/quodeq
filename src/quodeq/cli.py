@@ -11,25 +11,17 @@ import uuid
 from pathlib import Path
 from typing import Callable
 
-from quodeq.config.cli import build_parser as build_config_parser
-from quodeq.config.cli import main as configure_main
+from quodeq.cli_parser import build_parser as build_parser  # re-export
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
-from quodeq.engine.analysis import AnalysisError
-from quodeq.engine.runner import EvaluationError
-from quodeq.engine.plugin_loader import load_plugin
-from quodeq.engine.plugin_detector import count_source_files, detect_plugin
-from quodeq.engine._runner_report import run_full
-from quodeq.engine.runner import AnalysisOptions, RunConfig, run
+from quodeq.analysis.subprocess import AnalysisError
+from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
+from quodeq.core.scoring.report import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import prepare_repository
-from quodeq.shared.utils import get_evaluations_dir, is_repo_url, project_name_from_repo, write_text
+from quodeq.shared.utils import is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.validation import validate_path_segment
 
-
-_DEFAULT_N_SUBAGENTS = 5
-_MODE_NUMERICAL = "numerical"
-_MODE_GRADES = "grades"
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 
@@ -50,77 +42,17 @@ def _subagent_model(env: dict[str, str] | None = None) -> str | None:
     return (env or os.environ).get("SUBAGENT_MODEL") or None
 
 
-def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
-    """Register arguments for the evaluate subcommand."""
-    parser.add_argument("repo", help="Path or URL to the repository")
-    parser.add_argument(
-        "-p", "--plugin", default=None, help="Plugin ID (overrides auto-detection)"
-    )
-    parser.add_argument(
-        "-o", "--output", default=get_evaluations_dir(), help="Reports output directory"
-    )
-    parser.add_argument(
-        "-m", "--mode", default=_MODE_NUMERICAL,
-        choices=[_MODE_NUMERICAL, _MODE_GRADES], help="Scoring mode",
-    )
-    parser.add_argument(
-        "--no-prescan", action="store_true", help="Skip source-file counting"
-    )
-    parser.add_argument(
-        "-d", "--dimensions", default=None,
-        help="Comma-separated dimensions to evaluate (default: all from plugin)",
-    )
-    parser.add_argument(
-        "--evidence-only", action="store_true",
-        help="Produce evidence JSON only (skip scoring)",
-    )
-    parser.add_argument(
-        "--max-turns", type=int, default=None,
-        help="Max AI conversation turns per dimension (default: 200)",
-    )
-    parser.add_argument(
-        "--max-duration", type=int, default=None,
-        help="Max seconds per dimension before terminating (default: 1800)",
-    )
-    parser.add_argument(
-        "--n-subagents", type=int, default=_DEFAULT_N_SUBAGENTS,
-        help="Number of parallel subagents per dimension (default: %(default)s)",
-    )
-    parser.add_argument(
-        "--no-verify", action="store_true",
-        help="Skip post-analysis verification pass",
-    )
-
-
-def build_parser() -> argparse.ArgumentParser:
-    """Build the top-level argument parser with all subcommands."""
-    parser = argparse.ArgumentParser(prog="quodeq")
-    subparsers = parser.add_subparsers(dest="command", required=True)
-
-    dashboard_parser = subparsers.add_parser("dashboard", help="Run the dashboard")
-    dashboard_parser.set_defaults(handler_command="dashboard")
-
-    evaluate_parser = subparsers.add_parser(
-        "evaluate", help="Run evaluation (auto-detects plugin)"
-    )
-    _add_evaluate_args(evaluate_parser)
-    evaluate_parser.set_defaults(handler_command="evaluate")
-
-    configure_parser = subparsers.add_parser(
-        "configure", help="Configure Quodeq",
-        parents=[build_config_parser()], add_help=False,
-    )
-    configure_parser.set_defaults(handler_command="configure")
-
-    return parser
-
-
 def _resolve_repo(args: argparse.Namespace) -> Path | None:
     """Resolve the repo argument to a local path (cloning if needed)."""
     repo_path = args.repo
     # NOTE: print() here uses plain text only.  If ANSI escapes are added in
     # the future, gate them on the NO_COLOR environment variable.
-    if is_repo_url(repo_path):
+    try:
+        is_remote = is_repo_url(repo_path)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return None
+    if is_remote:
         try:
             repo_path = prepare_repository(repo_path)
         except (OSError, subprocess.CalledProcessError, subprocess.TimeoutExpired, ValueError) as exc:
@@ -150,35 +82,53 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     return reports_root, evidence_dir, evaluation_dir
 
 
-def _resolve_plugin(args: argparse.Namespace, src: Path, evaluators_dir: Path) -> str | None:
-    """Detect or validate the plugin for a repo. Returns plugin_id or None on error."""
-    plugin_id = args.plugin
-    if plugin_id is None:
-        try:
-            plugin_id = detect_plugin(src, evaluators_dir)
-        except ValueError as exc:
-            print(str(exc), file=sys.stderr)
-            return None
-    validate_path_segment(plugin_id)
-    print(f"Plugin: {plugin_id}", file=sys.stderr)
-    plugin_dir = evaluators_dir / plugin_id
-    if not plugin_dir.exists():
-        print(f"Plugin directory not found: {plugin_dir}", file=sys.stderr)
+
+def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
+    """Detect or validate the language for a repo using universal detection.
+
+    Returns language string or None on error.
+    """
+    if args.language:
+        validate_path_segment(args.language)
+        return args.language
+
+    detection_file = paths.detection_file
+    if not detection_file.exists():
         return None
-    return plugin_id
+
+    try:
+        from quodeq.analysis.manifest import detect_language
+        language = detect_language(src, detection_file)
+        return language
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return None
 
 
-def _prescan_sources(args: argparse.Namespace, plugin_dir: Path, src: Path) -> int:
-    """Count source files for the plugin if prescan is not disabled."""
+def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManifest | None":
+    """Build a source manifest for the repository."""
     if args.no_prescan:
-        return 0
-    plugin_data = load_plugin(plugin_dir)
-    extensions = set(plugin_data.get("detects", {}).get("extensions", []))
-    if not extensions:
-        return 0
-    source_file_count = count_source_files(src, extensions)
-    print(f"Source files: {source_file_count}", file=sys.stderr)
-    return source_file_count
+        return None
+
+    from quodeq.analysis.manifest import SourceManifest, build_manifest
+    from quodeq.shared.utils import read_json
+
+    detection_file = paths.detection_file
+    if not detection_file.exists():
+        return None
+
+    detection = read_json(detection_file)
+    disciplines_conf = paths.disciplines_conf if paths.disciplines_conf.exists() else None
+    manifest = build_manifest(src, detection, disciplines_conf)
+    if manifest.targets:
+        langs = ", ".join(
+            f"{t.language} ({t.total_files})"
+            for t in manifest.targets
+        )
+        print(f"Detected: {langs}", file=sys.stderr)
+    print(f"Source files: {manifest.total_files}", file=sys.stderr)
+    return manifest
+
 
 
 def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
@@ -187,7 +137,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
         if args.evidence_only:
             print("Starting evidence collection (this may take several minutes per dimension)...", file=sys.stderr)
             evidence = run(config)
-            out_file = evidence_dir / f"{config.plugin_id}_evidence.json"
+            out_file = evidence_dir / f"{config.language}_evidence.json"
             try:
                 write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
             except OSError as exc:
@@ -206,10 +156,12 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     return 0
 
 
-def _build_run_config(
-    args: argparse.Namespace, src: Path, plugin_id: str,
-    evaluators_dir: Path, evidence_dir: Path,
-) -> RunConfig:
+def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> bool:
+    """Return True if verification should be skipped (CLI flag or env var)."""
+    return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
+
+
+def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, manifest, dims_data: dict, evidence_dir: Path) -> RunConfig:
     """Assemble a RunConfig from CLI args and resolved paths."""
     standards_dir = default_paths().standards_dir
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
@@ -217,18 +169,18 @@ def _build_run_config(
 
     return RunConfig(
         src=src,
-        plugin_id=plugin_id,
-        evaluators_dir=evaluators_dir,
+        language=language,
         standards_dir=standards_dir if standards_dir.exists() else None,
-        source_file_count=_prescan_sources(args, evaluators_dir / plugin_id, src),
         work_dir=evidence_dir,
+        manifest=manifest,
+        dimensions_data=dims_data,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
             max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
             max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
             n_subagents=args.n_subagents,
             subagent_model=_subagent_model(),
-            verify_findings=not args.no_verify and os.environ.get("QUODEQ_NO_VERIFY") != "1",
+            verify_findings=not _no_verify(args),
         ),
     )
 
@@ -239,19 +191,40 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if src is None:
         return 1
 
-    evaluators_dir = default_paths().evaluators_dir
-    if not evaluators_dir.exists():
-        print(f"Evaluators directory not found: {evaluators_dir}. Run 'quodeq configure' to set up the configuration.", file=sys.stderr)
+    paths = default_paths()
+
+    if not paths.detection_file.exists() or not paths.dimensions_file.exists():
+        print("Configuration not found: detection.json and dimensions.json are required.", file=sys.stderr)
         return 1
 
-    plugin_id = _resolve_plugin(args, src, evaluators_dir)
-    if plugin_id is None:
+    language = _resolve_language(args, src, paths)
+    if language is None:
         return 1
 
+    from quodeq.analysis.runner import load_universal_dimensions
+    try:
+        dims_data = load_universal_dimensions(paths.dimensions_file)
+    except ValueError as exc:
+        print(f"Invalid dimensions config: {exc}", file=sys.stderr)
+        return 1
+
+    manifest = _build_manifest(args, src, paths)
     _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
     print(f"Report path: {evaluation_dir}", file=sys.stderr)
 
-    config = _build_run_config(args, src, plugin_id, evaluators_dir, evidence_dir)
+    # Save manifest for debugging
+    if manifest and evidence_dir:
+        try:
+            write_text(
+                evidence_dir / "manifest.json",
+                json.dumps(manifest.to_dict(), indent=2),
+            )
+        except OSError:
+            pass  # non-critical
+
+    # Single-pass analysis: all files in one unified queue per dimension.
+    # The AI analyzes each file according to its language naturally.
+    config = _build_run_config(args, src=src, language=language, manifest=manifest, dims_data=dims_data, evidence_dir=evidence_dir)
     return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
 
 
@@ -260,14 +233,8 @@ def _run_dashboard(argv: list[str] | None) -> int:
     return dashboard_main(sub_argv)
 
 
-def _run_configure(argv: list[str] | None) -> int:
-    sub_argv = argv[1:] if argv is not None else sys.argv[2:]
-    return configure_main(sub_argv)
-
-
 _COMMAND_HANDLERS: dict[str, Callable] = {
     "dashboard": _run_dashboard,
-    "configure": _run_configure,
 }
 
 
@@ -275,7 +242,7 @@ def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate subcommand handler."""
     load_env_file(default_paths())
     parser = build_parser()
-    args = parser.parse_args(argv)
+    args, remaining = parser.parse_known_args(argv)
     if args.handler_command == "evaluate":
         return run_evaluate(args)
     handler = _COMMAND_HANDLERS.get(args.handler_command)

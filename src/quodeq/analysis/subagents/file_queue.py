@@ -76,8 +76,12 @@ class FileQueueError(RuntimeError):
 
 
 class FileQueue:
-    # NOTE: Single-node only. Replace with a distributed queue (Redis, SQS) for horizontal scaling.
     """Distributes files across N subagent processes.
+
+    **Scaling:** This is a single-node implementation using OS file locks.
+    For multi-machine deployments, implement the ``WorkQueue`` protocol
+    with a networked backend (Redis, SQS) and inject it at the
+    orchestration layer via dependency injection.
 
     The queue state lives in a JSON file::
 
@@ -102,13 +106,20 @@ class FileQueue:
       so files can be accounted for even after a crash.
     """
 
-    def __init__(self, queue_path: Path, files: list[str] | None = None):
+    def __init__(
+        self, queue_path: Path, files: list[str] | None = None,
+        max_files_per_agent: int = 0,
+    ):
         """Create or open a file queue.
 
         Args:
             queue_path: Path to the queue JSON file.
             files: If provided, initialise the queue with this file list.
                    If *None*, the queue must already exist on disk.
+            max_files_per_agent: When > 0, each agent (by agent_id) can take
+                at most this many files before ``take()`` returns empty.
+                The agent finishes, and the pool spawns a fresh one with
+                clean context. 0 means unlimited.
 
         Raises:
             FileQueueError: If *files* is None and the queue file doesn't exist.
@@ -117,7 +128,10 @@ class FileQueue:
         self._lock_path = self._path.with_suffix(".lock")
 
         if files is not None:
-            self._write_state({"version": _QUEUE_VERSION, "pending": list(files), "taken": []})
+            state: dict = {"version": _QUEUE_VERSION, "pending": list(files), "taken": []}
+            if max_files_per_agent > 0:
+                state["max_files_per_agent"] = max_files_per_agent
+            self._write_state(state)
         elif not self._path.exists():
             raise FileQueueError(f"Queue file not found: {self._path}")
 
@@ -128,12 +142,25 @@ class FileQueue:
     def take(self, count: int = 5, agent_id: str = "") -> list[str]:
         """Atomically remove and return the next *count* files.
 
-        Returns an empty list when the queue is drained.
+        Returns an empty list when the queue is drained or the agent has
+        reached its ``max_files_per_agent`` limit.
         """
         if count < 1:
             return []
         with self._locked():
             state = self._read_state()
+
+            # Enforce per-agent file limit for context rotation.
+            # Use agent_totals dict for O(1) lookup instead of scanning taken log.
+            max_per_agent = state.get("max_files_per_agent", 0)
+            if max_per_agent > 0 and agent_id:
+                agent_totals = state.get("agent_totals", {})
+                agent_total = agent_totals.get(agent_id, 0)
+                remaining_budget = max_per_agent - agent_total
+                if remaining_budget <= 0:
+                    return []
+                count = min(count, remaining_budget)
+
             pending = state["pending"]
             batch = pending[:count]
             if not batch:
@@ -144,6 +171,10 @@ class FileQueue:
                 "agent": agent_id,
                 "ts": time.time(),
             })
+            # Maintain running total for O(1) per-agent limit checks
+            if agent_id:
+                totals = state.setdefault("agent_totals", {})
+                totals[agent_id] = totals.get(agent_id, 0) + len(batch)
             self._write_state(state)
         return batch
 
@@ -202,6 +233,9 @@ class FileQueue:
             state = json.loads(raw)
         except json.JSONDecodeError as exc:
             raise FileQueueError(f"Queue file is corrupted: {exc}") from exc
+        version = state.get("version")
+        if version != _QUEUE_VERSION:
+            raise FileQueueError(f"Unsupported queue version: {version} (expected {_QUEUE_VERSION})")
         if not isinstance(state.get("pending"), list):
             raise FileQueueError("Queue file missing 'pending' list")
         if not isinstance(state.get("taken"), list):

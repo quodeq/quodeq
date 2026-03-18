@@ -1,7 +1,7 @@
 """Port interface for stored evaluation reports."""
 from __future__ import annotations
 
-from typing import Protocol
+from typing import Any, Protocol
 
 
 class EvaluationsRepository(Protocol):
@@ -11,6 +11,6 @@ class EvaluationsRepository(Protocol):
         """Return identifiers for all available evaluation reports."""
         ...
 
-    def get_report(self, report_id: str) -> dict:
+    def get_report(self, report_id: str) -> dict[str, Any]:
         """Return the full report data for a given report identifier."""
         ...

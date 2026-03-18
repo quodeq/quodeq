@@ -6,8 +6,9 @@ import re
 from pathlib import Path
 
 from quodeq.core.types import ScoringResult, to_camel_dict
-from quodeq.engine.evidence import Evidence
-from quodeq.engine.scoring_internals import score_to_grade_label
+from quodeq.core.evidence.model import Evidence
+from quodeq.core.scoring.internals import score_to_grade_label
+from quodeq.shared.validation import validate_path_segment
 
 _REPORT_SCHEMA_VERSION = 1
 
@@ -61,6 +62,35 @@ def _flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[
     return result
 
 
+def _build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
+    """Build a single principle row dict from evidence and score lookup."""
+    label = pdata.get("display_name", raw_key)
+    matched = lookup.get(label, {})
+    grade = matched.get("grade")
+    raw_final = matched.get(_FIELD_FINAL_SCORE)
+    if raw_final is None:
+        raw_final = matched.get(_FIELD_FINAL_SCORE_SNAKE)
+    if grade == _GRADE_INSUFFICIENT:
+        formatted_score = None
+    else:
+        formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
+    row: dict = {
+        "name": label,
+        "score": formatted_score,
+        "grade": grade or grade_from_score(formatted_score),
+    }
+    ci = matched.get(_FIELD_CONFIDENCE_INTERVAL) or matched.get(_FIELD_CONFIDENCE_INTERVAL_SNAKE)
+    gs = matched.get("gradeStability") or matched.get("grade_stability")
+    if ci is not None:
+        row["confidence_interval"] = ci
+    if gs is not None:
+        row["grade_stability"] = gs
+    raw_metrics = pdata.get("metrics")
+    if raw_metrics:
+        row["metrics"] = raw_metrics
+    return row
+
+
 def _build_principle_rows(
     evidence: dict, lookup: dict
 ) -> tuple[list, list, list, dict]:
@@ -75,30 +105,7 @@ def _build_principle_rows(
 
     for raw_key, pdata in evidence.get("principles", {}).items():
         label = pdata.get("display_name", raw_key)
-        matched = lookup.get(label, {})
-        grade = matched.get("grade")
-        # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
-        raw_final = matched.get(_FIELD_FINAL_SCORE) or matched.get(_FIELD_FINAL_SCORE_SNAKE)
-        # Insufficient principles have no meaningful score — suppress "0.0/10".
-        if grade == _GRADE_INSUFFICIENT:
-            formatted_score = None
-        else:
-            formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
-        row: dict = {
-            "name": label,
-            "score": formatted_score,
-            "grade": grade or grade_from_score(formatted_score),
-        }
-        ci = matched.get(_FIELD_CONFIDENCE_INTERVAL) or matched.get(_FIELD_CONFIDENCE_INTERVAL_SNAKE)
-        gs = matched.get("gradeStability") or matched.get("grade_stability")
-        if ci is not None:
-            row["confidence_interval"] = ci
-        if gs is not None:
-            row["grade_stability"] = gs
-        raw_metrics = pdata.get("metrics")
-        if raw_metrics:
-            row["metrics"] = raw_metrics
-        principle_rows.append(row)
+        principle_rows.append(_build_principle_row(raw_key, pdata, lookup))
 
         viols = _flatten_findings(pdata.get("violations", []), label, _VIOLATION_FIELDS)
         flat_violations.extend(viols)
@@ -137,7 +144,7 @@ def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | di
         top_grade = None
 
     raw_meta = evidence.get("meta", {})
-    return {
+    report: dict = {
         "schema_version": _REPORT_SCHEMA_VERSION,
         "dimension": dimension,
         "project": evidence.get("repository", ""),
@@ -164,12 +171,16 @@ def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | di
             "severity": sev_tally,
         },
     }
+    module = evidence.get("module")
+    if module:
+        report["module"] = module
+    return report
 
 
 def build_full_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
     """Build report with engine metadata fields."""
     ev_dict = evidence.to_evidence_dict()
-    base = build_report_json(evidence.plugin_id, ev_dict, scores)
+    base = build_report_json(evidence.language, ev_dict, scores)
     base["dismissed_count"] = evidence.dismissed_count
     base["evidence_summary"] = evidence.summary()
     return base
@@ -178,7 +189,7 @@ def build_full_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
 def build_dashboard_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
     """Build web dashboard report format."""
     ev_dict = evidence.to_evidence_dict()
-    return build_report_json(evidence.plugin_id, ev_dict, scores)
+    return build_report_json(evidence.language, ev_dict, scores)
 
 
 def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: Path) -> None:
@@ -188,9 +199,9 @@ def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: 
     full_report = build_full_report(evidence, scores)
     dashboard_report = build_dashboard_report(evidence, scores)
 
-    dim = evidence.plugin_id
+    dim = evidence.language
     if ".." in dim or "/" in dim or "\\" in dim:
-        raise ValueError(f"Invalid plugin_id for report output: {dim!r}")
+        raise ValueError(f"Invalid language for report output: {dim!r}")
     try:
         (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
         (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))
@@ -200,6 +211,7 @@ def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: 
 
 def write_dimension_report(evidence: Evidence, scores: ScoringResult | dict, dimension: str, output_dir: Path) -> None:
     """Write a per-dimension report file: <dimension>.json."""
+    validate_path_segment(dimension)
     output_dir.mkdir(parents=True, exist_ok=True)
 
     report = build_dashboard_report(evidence, scores)

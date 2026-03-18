@@ -20,11 +20,8 @@ from quodeq.adapters.fs.report_parser import (
 )
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
-from quodeq.engine.scoring_internals import score_to_grade_label
+from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services.accumulated import numeric_average
-
-# Re-export for backward compatibility (tests import this name)
-_collect_stale_dimensions = collect_stale_dimensions
 
 
 @dataclass
@@ -50,7 +47,10 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+    try:
+        return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+    except (ValueError, TypeError):
+        return _DEFAULT_RUN_DIM_CACHE_MAX
 
 
 def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
@@ -62,9 +62,6 @@ def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]],
     and standard ``__getitem__``/``__setitem__``/``__contains__``.
     """
     return OrderedDict(), threading.Lock()
-
-
-_RUN_DIM_CACHE, _RUN_DIM_LOCK = create_dimension_cache()
 
 
 def _collect_previous_scores(
@@ -187,7 +184,11 @@ def _build_dashboard_result(
             "dateISO": selected_run.date_iso,
             "dateLabel": selected_run.date_label,
         },
-        "summary": {**to_camel_dict(payload.selected_summary), "dateISO": selected_run.date_iso, "dateLabel": selected_run.date_label},
+        "summary": {
+            **to_camel_dict(payload.selected_summary),
+            "dateISO": selected_run.date_iso,
+            "dateLabel": selected_run.date_label,
+        },
         "trend": payload.trend,
         "dimensions": [to_camel_dict(d) for d in payload.dimensions_with_trend],
         "previousByDimension": {k: to_camel_dict(v) for k, v in payload.previous_by_dimension.items()},

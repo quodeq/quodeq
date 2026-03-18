@@ -161,6 +161,9 @@ def main():
 
     evaluators_root = repo_root / _EVALUATORS_DIR
     evidence_files = sorted(project_dir.glob("*/evidence/*_evidence.json"))
+    if not evidence_files:
+        print(f"No evidence files found in {project_dir}")
+        sys.exit(1)
 
     mode_label = "DRY-RUN" if dry_run else "APPLY"
     print(f"Found {len(evidence_files)} evidence files in {project_dir}  [{mode_label}]\n")

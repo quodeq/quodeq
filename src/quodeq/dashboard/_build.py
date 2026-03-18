@@ -36,12 +36,21 @@ def _check_npm() -> None:
         )
 
 
+def _npm_cmd() -> str:
+    """Resolve the npm executable path, preferring .cmd on Windows to avoid shell=True."""
+    import shutil
+    npm = shutil.which("npm")
+    if npm is None:
+        raise FileNotFoundError("npm not found on PATH")
+    return npm
+
+
 def npm_build(path: Path) -> None:
     """Run npm install and build in the given directory."""
     _check_npm()
-    use_shell = _IS_WIN32
-    subprocess.run(["npm", "install"], cwd=str(path), check=True, shell=use_shell)
-    subprocess.run(["npm", "run", "build"], cwd=str(path), check=True, shell=use_shell)
+    npm = _npm_cmd()
+    subprocess.run([npm, "install"], cwd=str(path), check=True, timeout=300)
+    subprocess.run([npm, "run", "build"], cwd=str(path), check=True, timeout=600)
 
 
 def sources_newer_than_dist(web_root: Path, dist_index: Path) -> bool:

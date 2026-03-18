@@ -1,31 +1,39 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from quodeq.core.types import Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
-from quodeq.engine.evidence import DEFAULT_WEIGHT, Evidence
+from quodeq.core.evidence.model import DEFAULT_WEIGHT, Evidence
+from quodeq.core.scoring.overall import (
+    _accumulate_weights,
+    _build_overall_result,
+    _weighted_overall,
+    MODE_NUMERICAL,
+)
 from quodeq.core.scoring.internals import (
     GRADE_LADDER,
     SCALE_TIER_NAMES,
     scale_multiplier,
     build_deductions,
     compliance_dampening,
+    compliance_lift,
     confidence_interval_for,
     count_grade_drops,
     drop_grade,
     evidence_has_taxonomy,
     score_to_grade_label,
+    severity_grade_floor,
     tally_compliance_types_by_reason,
     tally_compliance_types_by_taxonomy,
     tally_types_by_reason,
     tally_types_by_taxonomy,
+    violation_base,
+    violation_ceiling,
     weight_as_multiplier,
 )
 
 # Re-export public API symbols that other modules may import from here.
 _BASE_SCORE = 10
-_INSUFFICIENT_MAJORITY_RATIO = 0.5
-MODE_NUMERICAL = "numerical"
 
 __all__ = [
     "DEFAULT_WEIGHT",
@@ -66,6 +74,7 @@ class _PrincipleContext:
     pdata: dict
     pct: float
     vt_counts: dict[str, int]
+    ct_counts: dict[str, int]
     dampening: float
     using_taxonomy: bool
     conf_level: str
@@ -87,7 +96,14 @@ def _base_principle_kwargs(ctx: _PrincipleContext) -> dict:
 
 
 def _score_principle_numerical(ctx: _PrincipleContext) -> PrincipleScore:
-    """Score a single principle in numerical mode."""
+    """Score a single principle in numerical mode.
+
+    Uses a three-constraint model:
+    1. BASE:    Violation severity determines the starting score.
+    2. LIFT:    Compliance evidence fills the gap toward 10.
+    3. CEILING: Weighted violation count caps the maximum achievable score.
+    4. FLOOR:   Grade cannot be worse than the violation severities justify.
+    """
     kwargs = _base_principle_kwargs(ctx)
     if ctx.conf_level == "low":
         return PrincipleScore(
@@ -98,19 +114,29 @@ def _score_principle_numerical(ctx: _PrincipleContext) -> PrincipleScore:
             grade="Insufficient",
         )
 
-    base_pts = _BASE_SCORE
-    deductions = build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
+    # Stage 1: base from violation severity
+    base = violation_base(ctx.vt_counts)
 
-    dampened_deduction = round(deductions.total_deduction * ctx.dampening, 2)
-    effective_cap = min(deductions.critical_cap, deductions.major_cap)
-    adjusted = min(effective_cap, round(base_pts - dampened_deduction, 1))
-    final_pts = max(0.0, min(float(_BASE_SCORE), adjusted))
+    # Stage 2: compliance lifts toward 10
+    lift = compliance_lift(ctx.ct_counts, ctx.vt_counts)
+    raw_score = base + (_BASE_SCORE - base) * lift
+
+    # Stage 3: ceiling from weighted violation count
+    ceiling = violation_ceiling(ctx.vt_counts)
+
+    # Stage 4: severity grade floor
+    floor = severity_grade_floor(ctx.vt_counts)
+
+    final_pts = round(max(floor, min(ceiling, raw_score)), 1)
+
+    # Build legacy Deductions for backward compat with report serialization
+    deductions = build_deductions(ctx.vt_counts, scale_multiplier=ctx.scale_mult)
 
     return PrincipleScore(
         **kwargs,
-        base_score=base_pts,
+        base_score=round(base, 1),
         deductions=deductions,
-        dampening_multiplier=ctx.dampening,
+        dampening_multiplier=lift,
         final_score=final_pts,
         grade=score_to_grade_label(final_pts),
     )
@@ -177,7 +203,7 @@ def _build_principle_context(
     )
     return _PrincipleContext(
         key=key, pdata=pdata, pct=pct, vt_counts=vt_counts,
-        dampening=dampen, using_taxonomy=using_taxonomy,
+        ct_counts=ct_counts, dampening=dampen, using_taxonomy=using_taxonomy,
         conf_level=conf_level, ci=ci, scale_mult=scale_mult,
     )
 
@@ -226,67 +252,6 @@ def run_scoring(evidence: dict, mode: str) -> ScoringResult:
             files_read=files_read,
         ),
     )
-
-
-def _accumulate_weights(
-    principles_scores: dict[str, PrincipleScore], mode: str,
-) -> tuple[int, float, int, int]:
-    """Sum weighted values across scorable principles.
-
-    Returns (total_weight, total_value, total_count, insufficient_count).
-    """
-    total_count = len(principles_scores)
-    insufficient_count = sum(
-        1 for p in principles_scores.values() if p.grade == "Insufficient"
-    )
-    total_weight = 0
-    total_value = 0.0
-    for pdata in principles_scores.values():
-        if pdata.grade == "Insufficient":
-            continue
-        multiplier = weight_as_multiplier(pdata.weight)
-        total_weight += multiplier
-        if mode == MODE_NUMERICAL:
-            total_value += (pdata.final_score or 0.0) * multiplier
-        else:
-            total_value += GRADE_LADDER.index(pdata.grade) * multiplier
-    return total_weight, total_value, total_count, insufficient_count
-
-
-def _build_overall_result(mode: str, total_weight: int, total_value: float) -> OverallScore:
-    """Build the overall result from aggregated weights."""
-    if mode == MODE_NUMERICAL:
-        mean_score = round(total_value / total_weight, 1)
-        return OverallScore(
-            weighted_score=mean_score,
-            grade=score_to_grade_label(mean_score),
-            total_weight=total_weight,
-        )
-    mean_index = total_value / total_weight
-    ladder_pos = min(len(GRADE_LADDER) - 1, round(mean_index))
-    return OverallScore(weighted_grade=GRADE_LADDER[ladder_pos], total_weight=total_weight)
-
-
-def _weighted_overall(principles_scores: dict[str, PrincipleScore], mode: str) -> OverallScore:
-    """Compute a weighted overall score or grade from per-principle results."""
-    tw, tv, total, insuff = _accumulate_weights(principles_scores, mode)
-
-    if tw == 0:
-        if mode == MODE_NUMERICAL:
-            return OverallScore(weighted_score=0.0, grade="Insufficient")
-        return OverallScore(weighted_grade="Insufficient")
-
-    result = _build_overall_result(mode, tw, tv)
-
-    if total > 0 and insuff > total * _INSUFFICIENT_MAJORITY_RATIO:
-        scored = total - insuff
-        # OverallScore is frozen, so we need to create a new instance
-        result = replace(
-            result,
-            confidence="low",
-            confidence_reason=f"Only {scored}/{total} principles had sufficient evidence",
-        )
-    return result
 
 
 def score_evidence(evidence: Evidence, mode: str = "numerical") -> ScoringResult:

@@ -8,9 +8,9 @@ from pathlib import Path
 from typing import Iterable
 
 from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
-from quodeq.engine._event_text import TEXT_EXTRACTORS
+from quodeq.analysis.stream.event_text import TEXT_EXTRACTORS
 from quodeq.engine.analysis_stream import count_files_in_stream, extract_files_from_event
-from quodeq.engine.evidence_parser import build_req_refs_lookup, resolve_llm_refs
+from quodeq.core.evidence.parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 from quodeq.shared.utils import open_text, read_json
 
@@ -109,14 +109,6 @@ def _parse_jsonl_findings(
     return violations, compliance
 
 
-def _count_files_in_stream(stream_path: Path) -> int:
-    """Count unique file paths read by the AI in a stream file.
-
-    Delegates to :func:`quodeq.engine.analysis_stream.count_files_in_stream`.
-    """
-    return len(count_files_in_stream(stream_path))
-
-
 def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
@@ -129,7 +121,7 @@ def parse_violations_from_jsonl(
     except OSError as exc:
         _logger.warning("Failed to read findings file: %s", exc)
         return None
-    files_read = _count_files_in_stream(stream_path) if stream_path and stream_path.exists() else 0
+    files_read = len(count_files_in_stream(stream_path)) if stream_path and stream_path.exists() else 0
     return _build_violation_response(
         ctx, violations, compliance,
         _ResponseOptions(

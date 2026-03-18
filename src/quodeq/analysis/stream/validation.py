@@ -32,12 +32,16 @@ def is_stream_valid(stream_file: Path) -> bool:
     """Return True if stream exists, is non-empty, and has no error events."""
     if not stream_file.exists() or stream_file.stat().st_size == 0:
         return False
-    with open_text(stream_file) as f:
-        for line in f:
-            try:
-                d = json.loads(line.strip())
-                if d.get("type") == "result" and d.get("is_error"):
-                    return False
-            except json.JSONDecodeError as exc:
-                log_debug(f"Skipping malformed stream line in {stream_file}: {exc}")
+    try:
+        with open_text(stream_file) as f:
+            for line in f:
+                try:
+                    d = json.loads(line.strip())
+                    if d.get("type") == "result" and d.get("is_error"):
+                        return False
+                except json.JSONDecodeError as exc:
+                    log_debug(f"Skipping malformed stream line in {stream_file}: {exc}")
+    except OSError as exc:
+        log_debug(f"Cannot read stream file {stream_file}: {exc}")
+        return False
     return True

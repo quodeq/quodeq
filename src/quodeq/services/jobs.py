@@ -39,6 +39,12 @@ __all__ = [
 _logger = logging.getLogger(__name__)
 _REPORT_PATH_MARKER = "Report path:"
 
+# Canonical job status strings.
+STATUS_RUNNING = "running"
+STATUS_CANCELLED = "cancelled"
+STATUS_DONE = "done"
+STATUS_FAILED = "failed"
+
 
 class JobManager:
     """Thread-safe manager for spawning and tracking evaluation subprocesses.
@@ -65,7 +71,7 @@ class JobManager:
         job_id = str(uuid.uuid4())
         job = Job(
             job_id=job_id,
-            status="running",
+            status=STATUS_RUNNING,
             command=cmd,
             started_at=datetime.now(timezone.utc).isoformat(),
             ended_at=None,
@@ -83,7 +89,7 @@ class JobManager:
             )
         except (OSError, subprocess.SubprocessError) as exc:
             _logger.error("Failed to start job subprocess: %s", exc)
-            job.status = "failed"
+            job.status = STATUS_FAILED
             job.ended_at = datetime.now(timezone.utc).isoformat()
             job.exit_code = -1
             job.logs.append(f"Failed to start process: {exc}")
@@ -106,9 +112,9 @@ class JobManager:
         with self._lock:
             job = self._store.get(job_id)
             process = self._processes.get(job_id)
-            if not job or job.status != "running":
+            if not job or job.status != STATUS_RUNNING:
                 return False
-            job.status = "cancelled"
+            job.status = STATUS_CANCELLED
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
@@ -185,22 +191,30 @@ class JobManager:
     def _evict_completed_jobs(self) -> None:
         """Remove oldest completed/failed/cancelled jobs beyond _MAX_COMPLETED_JOBS."""
         all_jobs = self._store.list()
-        completed = [j.job_id for j in all_jobs if j.status != "running"]
+        completed = [j.job_id for j in all_jobs if j.status != STATUS_RUNNING]
         excess = len(completed) - _MAX_COMPLETED_JOBS
         if excess > 0:
             for jid in completed[:excess]:
                 self._store.delete(jid)
 
+    _JOB_TIMEOUT_S = 7200  # 2 hours max per evaluation job
+
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
-        exit_code = process.wait()
+        try:
+            exit_code = process.wait(timeout=self._JOB_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._JOB_TIMEOUT_S)
+            process.kill()
+            process.wait(timeout=30)
+            exit_code = -9
         with self._lock:
             self._processes.pop(job_id, None)
             job = self._store.get(job_id)
-            if not job or job.status == "cancelled":
+            if not job or job.status == STATUS_CANCELLED:
                 return
             job.exit_code = exit_code
             job.ended_at = datetime.now(timezone.utc).isoformat()
-            job.status = "done" if exit_code == 0 else "failed"
+            job.status = STATUS_DONE if exit_code == 0 else STATUS_FAILED
             self._store.put(job)
             self._evict_completed_jobs()
         if self._on_job_complete is not None:

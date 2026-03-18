@@ -3,8 +3,9 @@ import { useState } from 'react';
 export default function FilePickerDialog({ files, selectedFile, onSelect, onClose }) {
   const [search, setSearch] = useState('');
 
-  const filtered = search.trim()
-    ? files.filter((f) => f.toLowerCase().includes(search.trim().toLowerCase()))
+  const needle = search.trim().toLowerCase();
+  const filtered = needle
+    ? files.filter((f) => f.toLowerCase().includes(needle))
     : files;
 
   return (

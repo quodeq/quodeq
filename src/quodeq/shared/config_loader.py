@@ -85,7 +85,13 @@ def _lazy_constant(key: str) -> str:
     if key not in _lazy_cache:
         with _lazy_lock:
             if key not in _lazy_cache:
-                _lazy_cache[key] = _get_config()[key]
+                try:
+                    _lazy_cache[key] = _get_config()[key]
+                except KeyError:
+                    raise KeyError(
+                        f"Config key {key!r} not found in defaults.json "
+                        f"({_DEFAULTS_PATH}); the file may be missing or corrupt"
+                    ) from None
     return _lazy_cache[key]
 
 

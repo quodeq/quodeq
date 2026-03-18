@@ -1,4 +1,10 @@
 import { useState } from 'react';
+import { copyToClipboard } from '../../../utils/clipboard.js';
+import { parseFileRef } from '../../../utils/formatters.js';
+
+const COPY_FEEDBACK_MS = 1500;
+const ANIM_DELAY_PER_ITEM_MS = 40;
+const ANIM_MAX_DELAY_MS = 400;
 
 function severityOrder(s) {
   return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
@@ -21,25 +27,15 @@ function FileCopyBtn({ display, copyText }) {
       className="vlive-detail-file-btn"
       onClick={(e) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(copyText);
+        copyToClipboard(copyText);
         setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
+        setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
       }}
     >
       {copied ? 'Copied!' : display}
       <CopyIcon />
     </button>
   );
-}
-
-// Parse a raw file string that may or may not carry a trailing :line.
-// Returns { filePath, line } where filePath has no line suffix.
-function parseFileRef(rawFile, rawLine) {
-  if (!rawFile) return { filePath: null, line: rawLine ?? null };
-  const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
-  const filePath = m[1] || rawFile;
-  const line = rawLine ?? (m[2] ? parseInt(m[2], 10) : null);
-  return { filePath, line };
 }
 
 function ViolationLiveRow({ violation, index }) {
@@ -53,12 +49,14 @@ function ViolationLiveRow({ violation, index }) {
   return (
     <div
       className={`vdetail-row vdetail-row--${v.severity}`}
-      style={{ animationDelay: `${Math.min(index * 40, 400)}ms` }}
+      style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}
     >
       <div
         className="vdetail-row-main vlive-collapsible"
         role="button"
         tabIndex={0}
+        aria-expanded={open}
+        aria-label={`${v.severity} finding: ${v.title || v.file || 'details'}`}
         onClick={() => setOpen(o => !o)}
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(o => !o); } }}
       >
@@ -81,8 +79,8 @@ function ViolationLiveRow({ violation, index }) {
             <div className="vlive-detail-section">
               <div className="vlive-detail-section-header">
                 <span className="vlive-detail-section-label">Reason</span>
-                {v.reqRefs?.filter(r => r.url)?.length > 0 &&
-                  <span className="cwe-link-group">{v.reqRefs.filter(r => r.url).map((ref, i) => (
+                {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
+                  <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
                     <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                   ))}</span>
                 }

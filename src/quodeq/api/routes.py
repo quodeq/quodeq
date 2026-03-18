@@ -1,6 +1,5 @@
 """Route registration helpers for the action API."""
 from __future__ import annotations
-
 import logging
 import re
 from http import HTTPStatus
@@ -24,7 +23,7 @@ _BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
 
 
 def _sanitize_url(url: str) -> str:
-    """Remove embedded credentials from a URL for safe logging."""
+    """Remove embedded credentials from a URL for safe logging/error messages."""
     return _CREDENTIALS_RE.sub(r"\1***@", url)
 
 
@@ -48,11 +47,7 @@ def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Respons
     """Handle DELETE /api/projects/<project>."""
     project = request.view_args["project"]
     if request.args.get("confirm") != "true":
-        body, status = error_response(
-            "Use ?confirm=true to confirm deletion",
-            HTTPStatus.BAD_REQUEST,
-            "CONFIRMATION_REQUIRED",
-        )
+        body, status = error_response("Use ?confirm=true to confirm deletion", HTTPStatus.BAD_REQUEST, "CONFIRMATION_REQUIRED")
         return jsonify(body), status
     _logger.info("delete_project: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.delete_project(_reports_dir(), project)
@@ -67,12 +62,19 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects")
     def list_projects() -> Response:
-        """Return all projects in the reports directory."""
-        return jsonify(provider.list_projects(_reports_dir()))
+        """Return all projects with optional ``?limit=N&offset=M`` pagination."""
+        result = provider.list_projects(_reports_dir())
+        projects = result.get("projects", [])
+        offset = request.args.get("offset", 0, type=int)
+        limit = request.args.get("limit", 0, type=int)
+        if offset > 0:
+            projects = projects[offset:]
+        if limit > 0:
+            projects = projects[:limit]
+        return jsonify({**result, "projects": projects})
 
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
-        """Update the local filesystem path for a project."""
         data = request.get_json(silent=True) or {}
         new_path = data.get("path", "").strip()
         if not new_path:
@@ -87,17 +89,14 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
-        """Download a project's report directory as a zip archive."""
         return export_project_zip(project, _reports_dir())
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
-        """Delete a project and all its report data."""
         return _handle_delete_project(provider)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:
-        """Return metadata and available dimensions for a project."""
         info = provider.get_project_info(_reports_dir(), project)
         if not info:
             body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -110,7 +109,6 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects/<project>/dashboard")
     def dashboard(project: str) -> Response | tuple[Response, int]:
-        """Return the dashboard payload for a project run."""
         run = request.args.get("run", "latest")
         try:
             payload = provider.get_dashboard(_reports_dir(), project, run)
@@ -121,7 +119,6 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects/<project>/accumulated")
     def accumulated(project: str) -> Response | tuple[Response, int]:
-        """Return accumulated dimension scores across all runs."""
         as_of = request.args.get("asOf")
         payload = provider.get_accumulated(_reports_dir(), project, as_of)
         if payload is None:
@@ -131,7 +128,6 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects/<project>/runs/<run_id>/dimensions/<dimension>/eval")
     def dimension_eval(project: str, run_id: str, dimension: str) -> Response | tuple[Response, int]:
-        """Return evaluation details for a single dimension in a run."""
         payload = provider.get_dimension_eval(_reports_dir(), project, run_id, dimension)
         if payload is None:
             body, status = error_response("Eval file not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -142,7 +138,6 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/projects/<project>/runs/<run_id>/violations")
     def run_violations(project: str, run_id: str) -> Response | tuple[Response, int]:
-        """Return aggregated violation summary for a run."""
         try:
             payload = provider.get_violations(_reports_dir(), project, run_id)
         except FileNotFoundError:
@@ -151,11 +146,11 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(to_camel_dict(payload))
 
 
-def _validate_ai_cmd(ai_cmd: str | None) -> tuple[Response, int] | None:
+def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> tuple[Response, int] | None:
     """Return an error response if *ai_cmd* is not in the allow-list, or None if valid."""
     if not ai_cmd:
         return None
-    allowed_cmds = _get_allowed_ai_cmds()
+    allowed_cmds = _get_allowed_ai_cmds(env=env)
     if ai_cmd not in allowed_cmds:
         allowed_list = ", ".join(sorted(allowed_cmds))
         body, status = error_response(
@@ -172,12 +167,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
 
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
-        """Return all evaluation jobs."""
         return jsonify([to_camel_dict(j) for j in provider.list_evaluations()])
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
-        """Start a new evaluation job for a repository."""
         payload = request.get_json(silent=True) or {}
         validation_error = validate_evaluation_payload(payload)
         if validation_error:
@@ -201,7 +194,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
                     ai_cmd=ai_cmd,
                     ai_model=payload.get("aiModel") or None,
                     subagent_model=payload.get("subagentModel") or None,
-                    verify_findings=bool(payload.get("verifyFindings", True)),
+                    verify_findings=bool(payload.get("verifyFindings", False)),
                 ),
             )
         except (FileNotFoundError, ValueError):
@@ -215,7 +208,6 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
 
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
-        """Return current status of an evaluation job."""
         job = provider.get_evaluation_status(job_id)
         if not job:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -224,7 +216,6 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
 
     @app.delete("/api/evaluations/<job_id>")
     def cancel_evaluation(job_id: str) -> Response | tuple[Response, int]:
-        """Cancel a running evaluation job."""
         _logger.info("cancel_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
         ok = provider.cancel_evaluation(job_id)
         if not ok:
@@ -238,23 +229,19 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/ai-clients")
     def ai_clients() -> Response:
-        """Return available AI CLI clients."""
         return jsonify(provider.get_ai_clients())
 
     @app.get("/api/ai-clients/<client_id>/models")
     def client_models(client_id: str) -> Response:
-        """Return available models for a specific AI client."""
         return jsonify(provider.get_client_models(client_id))
 
     @app.get("/api/plugins")
     def plugins() -> Response:
-        """Return installed evaluator plugins with their dimensions."""
         from quodeq.provider.plugin_discovery import discover_plugins
         return jsonify([to_camel_dict(p) for p in discover_plugins()])
 
     @app.get("/api/browse")
     def browse() -> Response | tuple[Response, int]:
-        """List directories at a given path for repository browsing."""
         path = request.args.get("path")
         if path:
             resolved = Path(path).resolve()

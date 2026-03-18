@@ -1,35 +1,16 @@
 """Thread-safe HTTP fetcher with circuit breaker for knowledge refresh."""
 from __future__ import annotations
 
-import ipaddress
 import logging
 import os
-import socket
 import threading
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
 
+from quodeq.shared.ssrf import is_private_address as _is_private_hostname
+
 _logger = logging.getLogger(__name__)
-
-
-def _is_private_hostname(hostname: str) -> bool:
-    """Return True if *hostname* resolves to a private/loopback/link-local address."""
-    if hostname in ("localhost", "localhost.localdomain"):
-        return True
-    try:
-        addr = ipaddress.ip_address(hostname)
-        return addr.is_private or addr.is_loopback or addr.is_link_local
-    except ValueError:
-        pass
-    try:
-        for _fam, _typ, _pro, _can, sockaddr in socket.getaddrinfo(hostname, None):
-            addr = ipaddress.ip_address(sockaddr[0])
-            if addr.is_private or addr.is_loopback or addr.is_link_local:
-                return True
-    except (socket.gaierror, OSError):
-        pass
-    return False
 
 
 class FetchClient:
@@ -37,11 +18,15 @@ class FetchClient:
 
     _CIRCUIT_THRESHOLD = 5
 
-    def __init__(self, timeout_s: int = 15, allow_private: bool | None = None) -> None:
+    def __init__(self, timeout_s: int = 15, allow_private: bool | None = None, env: dict[str, str] | None = None) -> None:
         self._lock = threading.Lock()
         self._failures = 0
         self._timeout = timeout_s
-        self._allow_private = allow_private
+        self._env = env
+        if allow_private is not None:
+            self._allow_private: bool = allow_private
+        else:
+            self._allow_private = (self._env or os.environ).get("QUODEQ_ALLOW_PRIVATE_URLS") == "1"
 
     def fetch(self, url: str, headers: dict | None = None) -> str | None:
         """Fetch *url* and return body text, or None on failure.
@@ -54,8 +39,7 @@ class FetchClient:
             _logger.warning("Blocked fetch with disallowed scheme: %s", parsed.scheme)
             return None
         hostname = parsed.hostname or ""
-        allow_private = self._allow_private if self._allow_private is not None else (os.environ.get("QUODEQ_ALLOW_PRIVATE_URLS") == "1")
-        if hostname and _is_private_hostname(hostname) and not allow_private:
+        if hostname and _is_private_hostname(hostname) and not self._allow_private:
             _logger.warning("Blocked fetch to private/internal address: %s", hostname)
             return None
 
@@ -63,6 +47,11 @@ class FetchClient:
             if self._failures >= self._CIRCUIT_THRESHOLD:
                 return None
         try:
+            # Re-check DNS right before the request to mitigate DNS rebinding.
+            # The window between this check and urlopen is minimal.
+            if hostname and not self._allow_private and _is_private_hostname(hostname):
+                _logger.warning("Blocked fetch after DNS re-check: %s", hostname)
+                return None
             req = urllib.request.Request(url, headers=headers or {})
             with urllib.request.urlopen(req, timeout=self._timeout) as r:
                 with self._lock:
@@ -74,12 +63,19 @@ class FetchClient:
             return None
 
 
+# Module-level singleton with thread-safe lazy initialization.
+# Global state is used here because the FetchClient carries mutable circuit-breaker
+# counters that must be shared across all callers within a process.  Injectable
+# via set_fetch_client() for testing.
 _fetch_client_lock = threading.Lock()
 _fetch_client_instance: FetchClient | None = None
 
 
 def get_fetch_client(timeout_s: int = 15) -> FetchClient:
-    """Return the module-level FetchClient, creating it lazily on first use."""
+    """Return the module-level FetchClient singleton, creating it lazily.
+
+    For tests, call ``set_fetch_client(mock)`` before the code under test.
+    """
     global _fetch_client_instance
     with _fetch_client_lock:
         if _fetch_client_instance is None:

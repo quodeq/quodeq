@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react';
 import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } from '../../../api/index.js';
 
+const DIMENSION_POLL_MS = 2000;
+const JOB_POLL_MS = 1500;
+const MAX_DIM_POLL_FAILURES = 10;
+
 export function useEvaluation() {
   const [job, setJob] = useState(null);
   const [jobError, setJobError] = useState('');
@@ -23,7 +27,7 @@ export function useEvaluation() {
           startPolling(running.jobId);
         }
       })
-      .catch(() => {});
+      .catch((err) => console.warn('Failed to fetch running evaluations:', err));
     return () => {
       stopPolling();
       stopDimensionPolling();
@@ -72,11 +76,11 @@ export function useEvaluation() {
           } catch {
             const fails = (dimFailCountRef.current[dim] || 0) + 1;
             dimFailCountRef.current[dim] = fails;
-            if (fails > 10) partialDimensionsRef.current.delete(dim);
+            if (fails > MAX_DIM_POLL_FAILURES) partialDimensionsRef.current.delete(dim);
           }
         })
       );
-    }, 2000);
+    }, DIMENSION_POLL_MS);
   }
 
   function startPolling(jobId) {
@@ -113,7 +117,7 @@ export function useEvaluation() {
         stopPolling();
         stopDimensionPolling();
       }
-    }, 1500);
+    }, JOB_POLL_MS);
   }
 
   async function startEvaluationJob(payload) {

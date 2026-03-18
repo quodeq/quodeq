@@ -12,11 +12,16 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Protocol, runtime_checkable
 
 from quodeq.core.types import DimensionResult
 from quodeq.core.types.mappers import parse_dimension_result
 from quodeq.data.fs.report_parser._date_utils import find_date_in_dir, normalize_date
+from quodeq.data.fs.report_parser._run_lookup import (
+    RunLookupCache as RunLookupCache,
+    _get_previous_run_for_dimension as _get_previous_run_for_dimension,
+    _make_caching_fetcher as _make_caching_fetcher,
+)
 from quodeq.data.fs.report_parser.json_parser import parse_evidence_file, parse_report_json
 from quodeq.shared.utils import is_repo_url
 from quodeq.shared.validation import validate_path_segment
@@ -151,17 +156,37 @@ def _load_json_only_evals(
 
 
 def _load_evaluations(evaluation_dir: Path) -> list[dict[str, Any]]:
-    """Load parsed evaluation dicts from a run's evaluation directory."""
+    """Load parsed evaluation dicts from a run's evaluation directory.
+
+    Supports both flat layouts (single-target) and nested layouts (multi-target)
+    where each subdirectory is a target module.
+    """
     entries = safe_read_dir(evaluation_dir)
     evaluations, seen = _load_markdown_backed_evals(entries, evaluation_dir)
     evaluations.extend(_load_json_only_evals(entries, seen))
+
+    # Scan target subdirectories for multi-target runs
+    for entry in entries:
+        if not entry.is_dir() or entry.name.startswith("."):
+            continue
+        target_dir = evaluation_dir / entry.name
+        sub_entries = safe_read_dir(target_dir)
+        sub_evals, sub_seen = _load_markdown_backed_evals(sub_entries, target_dir)
+        for ev in sub_evals:
+            ev.setdefault("module", entry.name)
+        evaluations.extend(sub_evals)
+        json_evals = _load_json_only_evals(sub_entries, sub_seen)
+        for ev in json_evals:
+            ev.setdefault("module", entry.name)
+        evaluations.extend(json_evals)
+
     return evaluations
 
 
-def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
-    """Load evidence files keyed by dimension name."""
+def _load_evidence_from_dir(directory: Path, module: str = "") -> dict[str, dict[str, Any]]:
+    """Load evidence files from a single directory, keyed by dimension name."""
     evidence_map: dict[str, dict[str, Any]] = {}
-    for entry in safe_read_dir(evidence_dir):
+    for entry in safe_read_dir(directory):
         if entry.is_file() and entry.name.endswith("_evidence.json"):
             parsed_ev = parse_evidence_file(Path(entry.path))
             dimension = parsed_ev.get("dimension")
@@ -170,7 +195,25 @@ def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
                     "Evidence file %s missing 'dimension' key, skipping", entry.name,
                 )
                 continue
+            if module:
+                parsed_ev["module"] = module
             evidence_map[dimension] = parsed_ev
+    return evidence_map
+
+
+def _load_evidence_map(evidence_dir: Path) -> dict[str, dict[str, Any]]:
+    """Load evidence files keyed by dimension name.
+
+    Supports both flat (single-target) and nested (multi-target) layouts.
+    """
+    evidence_map = _load_evidence_from_dir(evidence_dir)
+
+    # Scan target subdirectories
+    for entry in safe_read_dir(evidence_dir):
+        if entry.is_dir() and not entry.name.startswith("."):
+            sub_map = _load_evidence_from_dir(evidence_dir / entry.name, module=entry.name)
+            evidence_map.update(sub_map)
+
     return evidence_map
 
 
@@ -225,65 +268,3 @@ def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunIn
     return run_infos
 
 
-def _make_caching_fetcher(
-    reports_root: Path, project: str,
-    data_cache: dict[str, list[DimensionResult]] | None = None,
-) -> Callable[[str], list[DimensionResult]]:
-    """Return a fetcher that caches run data reads.
-
-    *data_cache* is injectable for testing; defaults to a fresh dict.
-    """
-    cache = data_cache if data_cache is not None else {}
-
-    def _fetch(run_id: str) -> list[DimensionResult]:
-        if run_id not in cache:
-            cache[run_id] = read_run_data(reports_root, project, run_id)
-        return cache[run_id]
-
-    return _fetch
-
-
-@dataclass(frozen=True)
-class RunLookupCache:
-    """Pre-computed data to avoid repeated I/O when looking up previous runs."""
-
-    runs: list[RunInfo]
-    get_run_data: Callable[[str], list[DimensionResult]]
-
-
-def _get_previous_run_for_dimension(
-    reports_root: Path,
-    project: str,
-    current_run_id: str,
-    dimension: str,
-    *,
-    cache: RunLookupCache | None = None,
-) -> dict[str, Any] | None:
-    """Return the most recent run data for *dimension* before *current_run_id*, or None.
-
-    Callers processing multiple dimensions for the same project should pass
-    a *cache* (built from a single ``list_runs`` call and a dict-backed
-    callable) to share I/O across calls rather than repeating the directory
-    scan and file reads for each dimension.
-    """
-    validate_path_segment(project, current_run_id)
-    project_path = reports_root / project
-    if not project_path.exists():
-        return None
-    if cache is None:
-        all_runs = list_runs(reports_root, project)
-        cache = RunLookupCache(
-            runs=all_runs,
-            get_run_data=_make_caching_fetcher(reports_root, project),
-        )
-    all_runs = cache.runs
-    current_idx = next((i for i, r in enumerate(all_runs) if r.run_id == current_run_id), -1)
-    if current_idx < 0:
-        return None
-
-    for run_info in all_runs[current_idx + 1:]:
-        dims = cache.get_run_data(run_info.run_id)
-        dim = next((d for d in dims if d.dimension == dimension), None)
-        if dim:
-            return {"runId": run_info.run_id, "dimension": dim}
-    return None

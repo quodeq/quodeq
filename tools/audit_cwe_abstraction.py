@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -29,7 +30,13 @@ _ALLOWED_USAGES = {"allowed", "allowed-with-review"}
 _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
 
 _DEFAULT_STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
-_DEFAULT_API_BASE = "https://cwe-api.mitre.org/api/v1/cwe"
+# Overridable via --api-base CLI argument or CWE_API_BASE env var
+_CWE_API_URL = "https://cwe-api.mitre.org/api/v1/cwe"
+
+
+def _default_api_base() -> str:
+    """Return CWE API base URL, reading env lazily at call time."""
+    return os.environ.get("CWE_API_BASE", _CWE_API_URL)
 
 
 def get_all_cwes(standards_dir: Path | None = None) -> dict[int, list[str]]:
@@ -61,8 +68,9 @@ def _fetch_cwe_endpoint(
         return None
 
 
-def fetch_cwe_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | None:
+def fetch_cwe_info(cwe_id: int, api_base: str | None = None) -> dict | None:
     """Fetch abstraction and mapping info from CWE API."""
+    api_base = api_base or _default_api_base()
     w = _fetch_cwe_endpoint("weakness", "Weaknesses", cwe_id, api_base)
     if w is not None:
         mapping_notes = w.get("MappingNotes", {})
@@ -147,8 +155,15 @@ def _print_category(label: str, entries: list[dict], *, show_rationale: bool = F
             print(f"           Rationale: {r['mapping_rationale'][:_MAX_RATIONALE_DISPLAY]}")
 
 
+def _write_results_json(results: list[dict]) -> Path:
+    """Write the full audit results to a JSON file and return the output path."""
+    output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe" / "audit.json"
+    output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
+    return output_path
+
+
 def _print_results(results: list[dict], *, problems_only: bool) -> None:
-    """Print categorized audit results to stdout and write JSON output."""
+    """Print categorized audit results to stdout."""
     categorized = _categorize_results(results)
     prohibited = categorized["prohibited"]
     discouraged = categorized["discouraged"]
@@ -165,19 +180,15 @@ def _print_results(results: list[dict], *, problems_only: bool) -> None:
         print(f"  Unknown/Other:    {len(unknown)}")
 
     if prohibited:
-        _print_category(f"PROHIBITED ({len(prohibited)}) — Must be removed", prohibited, show_rationale=True)
+        _print_category(f"PROHIBITED ({len(prohibited)}) \u2014 Must be removed", prohibited, show_rationale=True)
     if discouraged:
-        _print_category(f"DISCOURAGED ({len(discouraged)}) — Should use more specific children", discouraged)
+        _print_category(f"DISCOURAGED ({len(discouraged)}) \u2014 Should use more specific children", discouraged)
     if unknown and not problems_only:
         print(f"\n{'=' * _TERMINAL_WIDTH}")
         print(f"UNKNOWN/OTHER ({len(unknown)})")
         print(f"{'=' * _TERMINAL_WIDTH}")
         for r in unknown:
-            print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} — {r['name']}")
-
-    output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe" / "audit.json"
-    output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
-    print(f"\nFull results written to {output_path}")
+            print(f"  CWE-{r['id']:4d} [{r['abstraction']:10s}] Usage={r['mapping_usage']} \u2014 {r['name']}")
 
 
 def main() -> None:
@@ -189,8 +200,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--api-base",
-        default=_DEFAULT_API_BASE,
-        help=f"CWE REST API base URL (default: {_DEFAULT_API_BASE})",
+        default=None,
+        help=f"CWE REST API base URL (default: {_CWE_API_URL})",
     )
     args = parser.parse_args()
     api_base: str = args.api_base
@@ -213,6 +224,8 @@ def main() -> None:
         time.sleep(_RATE_LIMIT_SLEEP_S)
 
     _print_results(results, problems_only=args.problems)
+    output_path = _write_results_json(results)
+    print(f"\nFull results written to {output_path}")
 
 
 if __name__ == "__main__":

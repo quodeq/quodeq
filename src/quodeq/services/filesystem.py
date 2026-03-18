@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import shutil
+import time
 from pathlib import Path
 from typing import Any, Callable
+
+_PROJECT_CACHE_TTL_S = 5  # seconds before project list is re-read
 
 from quodeq.services.base import ActionProvider
 from quodeq.services.jobs import JobManager
@@ -51,9 +54,14 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         self._model_fetchers: dict[str, Callable] = {
             "claude": self._get_claude_models,
         }
+        self._project_cache: dict[str, Any] | None = None
+        self._project_cache_time: float = 0
 
     def list_projects(self, reports_dir: str) -> dict[str, Any]:
-        """Return all projects found under the reports directory."""
+        """Return all projects found under the reports directory (TTL-cached)."""
+        now = time.monotonic()
+        if self._project_cache is not None and (now - self._project_cache_time) < _PROJECT_CACHE_TTL_S:
+            return self._project_cache
         reports_root = Path(reports_dir)
         projects = []
         for entry in safe_read_dir(reports_root):
@@ -67,7 +75,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 break
         projects.sort(key=lambda p: p.name)
         projects = _auto_detect_parents(projects)
-        return {"projects": [to_camel_dict(p) for p in projects]}
+        result = {"projects": [to_camel_dict(p) for p in projects]}
+        self._project_cache = result
+        self._project_cache_time = now
+        return result
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
         """Update the local filesystem path stored in a project's metadata."""
@@ -117,7 +128,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return None
 
         discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
-        available_dimensions = _list_available_dimensions_for_discipline(discipline) if discipline else []
+        available_dimensions = _list_available_dimensions_for_discipline() if discipline else []
         return {**info, "discipline": discipline, "availableDimensions": available_dimensions}
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:

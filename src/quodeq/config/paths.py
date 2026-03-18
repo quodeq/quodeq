@@ -9,6 +9,9 @@ from pathlib import Path
 
 _logger = logging.getLogger(__name__)
 
+# Number of parent directory levels from this module to the project root
+# (config -> quodeq -> src).
+_FALLBACK_PARENT_DEPTH = 3
 
 # Bundled data directory shipped inside the package.
 _DATA_DIR = Path(__file__).resolve().parent.parent / "data"
@@ -19,9 +22,6 @@ class ConfigPaths:
     """Immutable set of resolved paths to all configuration directories and files."""
 
     root: Path
-    evaluators_dir: Path
-    practices_dir: Path
-    dimensions_dir: Path
     prompts_dir: Path
     standards_dir: Path
     env_file: Path
@@ -37,14 +37,21 @@ class ConfigPaths:
         """Return the path to the disciplines configuration file."""
         return self.root / "config" / "disciplines.conf"
 
+    @property
+    def detection_file(self) -> Path:
+        """Return the path to the universal detection.json config."""
+        return self.root / "config" / "detection.json"
+
+    @property
+    def dimensions_file(self) -> Path:
+        """Return the path to the universal dimensions.json config."""
+        return self.root / "config" / "dimensions.json"
+
     @classmethod
     def from_root(cls, root: Path) -> "ConfigPaths":
         """Construct a ConfigPaths instance by deriving all paths from a root directory."""
         return cls(
             root=root,
-            evaluators_dir=root / "evaluators",
-            practices_dir=root / "practices",
-            dimensions_dir=root / "dimensions",
             prompts_dir=root / "prompts",
             standards_dir=root / "standards",
             env_file=root / ".quodeq.env",
@@ -91,10 +98,10 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
 
 
 def _looks_like_project_root(root: Path) -> bool:
-    return (
-        (root / "prompts").is_dir()
-        and (root / "evaluators").is_dir()
-    )
+    """Return True if *root* contains the expected quodeq data layout (prompts/ + config/detection.json)."""
+    has_prompts = (root / "prompts").is_dir()
+    has_detection = (root / "config" / "detection.json").is_file()
+    return has_prompts and has_detection
 
 
 def default_paths() -> ConfigPaths:
@@ -110,7 +117,6 @@ def default_paths() -> ConfigPaths:
             return ConfigPaths.from_root(root)
 
     # Walk up from src/quodeq/config/paths.py to project root (3 levels: config -> quodeq -> src)
-    _FALLBACK_PARENT_DEPTH = 3
     if len(module_path.parents) > _FALLBACK_PARENT_DEPTH:
         root = module_path.parents[_FALLBACK_PARENT_DEPTH]
     else:

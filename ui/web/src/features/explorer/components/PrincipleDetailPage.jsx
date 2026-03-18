@@ -1,24 +1,9 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
-
-const SEVERITY_ORDER = ['critical', 'major', 'minor', 'unknown'];
-
-function parseFileRef(rawFile, rawLine) {
-  if (!rawFile) return { filePath: null, line: rawLine ?? null };
-  const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
-  const filePath = m[1] || rawFile;
-  const line = rawLine ?? (m[2] ? parseInt(m[2], 10) : null);
-  return { filePath, line };
-}
-
-function CopyIcon() {
-  return (
-    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <rect x="9" y="9" width="13" height="13" rx="2"/>
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-    </svg>
-  );
-}
+import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
+import CopyButton from '../../../components/CopyButton.jsx';
+import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function buildPrinciplePlanText(principle) {
   const totalViolations = principle.total || 0;
@@ -80,39 +65,6 @@ function buildViolationPlanText(v, principleName) {
   return lines.join('\n').trim();
 }
 
-function CopyButton({ onClick, label }) {
-  const [copied, setCopied] = useState(false);
-  const handleClick = () => {
-    onClick();
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  };
-  return (
-    <button className="detail-copy-btn" onClick={handleClick}>
-      {copied ? 'Copied!' : label}
-      <CopyIcon />
-    </button>
-  );
-}
-
-function FileCopyBtn({ display, copyText }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="vlive-detail-file-btn"
-      onClick={() => {
-        navigator.clipboard.writeText(copyText);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 1500);
-      }}
-    >
-      {copied ? 'Copied!' : display}
-      <CopyIcon />
-    </button>
-  );
-}
-
 function ViolationCard({ v, principleName, index }) {
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
@@ -128,7 +80,7 @@ function ViolationCard({ v, principleName, index }) {
         )}
         <CopyButton
           label="Fix plan"
-          onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v, principleName))}
+          onClick={() => copyToClipboard(buildViolationPlanText(v, principleName))}
         />
       </div>
       <div className="vlive-detail">
@@ -136,8 +88,8 @@ function ViolationCard({ v, principleName, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              {v.reqRefs?.filter(r => r.url)?.length > 0 &&
-                <span className="cwe-link-group">{v.reqRefs.filter(r => r.url).map((ref, i) => (
+              {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
+                <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                 ))}</span>
               }
@@ -159,12 +111,13 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
   const totalViolations = principle.total || 0;
   const totalCompliance = principle.compliance?.length || 0;
 
-  const violationsBySeverity = SEVERITY_ORDER.reduce((acc, sev) => {
-    acc[sev] = (principle.violations || []).filter(
-      (v) => (v.severity || 'minor').toLowerCase() === sev
-    );
-    return acc;
-  }, {});
+  const violationsBySeverity = {};
+  for (const sev of SEVERITY_ORDER) violationsBySeverity[sev] = [];
+  for (const v of (principle.violations || [])) {
+    const sev = (v.severity || 'minor').toLowerCase();
+    if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);
+    else violationsBySeverity['minor'].push(v);
+  }
 
   return (
     <>
@@ -206,7 +159,7 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
           </div>
           <CopyButton
             label="Principle fix plan"
-            onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText(principle))}
+            onClick={() => copyToClipboard(buildPrinciplePlanText(principle))}
           />
         </div>
       </section>

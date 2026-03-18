@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.engine.analysis import AnalysisConfig, AnalysisError
+from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError
 from quodeq.engine.file_queue import FileQueue
 from quodeq.engine.subagent_pool import PoolPaths, SubagentPool, SubagentResult
 
@@ -63,6 +63,8 @@ class TestSubagentPool:
         assert agents == {"agent-0", "agent-1", "agent-2"}
 
     def test_agent_configs_have_queue_and_agent_id(self, tmp_path: Path) -> None:
+        # NOTE: Directly tests private method _build_agent_config for coverage of
+        # per-agent configuration wiring.  Known coupling to internal implementation.
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["a.py"])
 

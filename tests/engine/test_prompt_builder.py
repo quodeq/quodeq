@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.engine.prompt_builder import (
+from quodeq.analysis.prompts.builder import (
     PromptContext,
     build_analysis_prompt,
     load_template,
@@ -120,6 +120,8 @@ def test_load_template_custom_path(tmp_path):
 
 class TestBuildAnalysisPrompt:
     def test_substitutes_all_variables(self, tmp_path):
+        from quodeq.analysis.manifest import SourceManifest
+
         # Create minimal compiled standards
         compiled_dir = tmp_path / "compiled"
         compiled_dir.mkdir()
@@ -138,50 +140,39 @@ class TestBuildAnalysisPrompt:
         }
         (compiled_dir / "security.json").write_text(json.dumps(compiled))
 
+        from quodeq.analysis.manifest import AnalysisTarget
+        target = AnalysisTarget(name="typescript", language="typescript", total_files=42)
+        manifest = SourceManifest(targets=[target], total_files=42)
         template = load_template()
         prompt = build_analysis_prompt(
             template,
             PromptContext(
-                plugin_id="typescript",
+                language="typescript",
                 repo_name="my-app",
                 date_str="2026-03-06",
                 dimension="security",
                 source_file_count=42,
                 dimensions_data=_sample_dimensions(),
                 standards_dir=tmp_path,
+                manifest=manifest,
             ),
         )
         assert "{{" not in prompt  # all placeholders resolved
         assert "my-app" in prompt
         assert "2026-03-06" in prompt
+        assert "Typescript" in prompt  # from manifest project_description
         assert "42" in prompt
         assert "Confidentiality" in prompt
         assert "S-CON-1" in prompt
         assert "Secrets MUST NOT be hardcoded" in prompt
         assert "security" in prompt
 
-    def test_includes_analysis_guidance(self):
+    def test_no_manifest_shows_no_guidance(self):
         template = load_template()
         prompt = build_analysis_prompt(
             template,
             PromptContext(
-                plugin_id="typescript",
-                repo_name="test",
-                date_str="2026-03-06",
-                dimension="security",
-                source_file_count=10,
-                dimensions_data=_sample_dimensions(),
-                analysis_md="Look for eval() calls in route handlers",
-            ),
-        )
-        assert "Look for eval() calls in route handlers" in prompt
-
-    def test_no_analysis_guidance_placeholder(self):
-        template = load_template()
-        prompt = build_analysis_prompt(
-            template,
-            PromptContext(
-                plugin_id="typescript",
+                language="typescript",
                 repo_name="test",
                 date_str="2026-03-06",
                 dimension="security",
@@ -191,12 +182,65 @@ class TestBuildAnalysisPrompt:
         )
         assert "No additional guidance" in prompt
 
+    def test_standards_written_to_file_when_work_dir_set(self, tmp_path):
+        """When work_dir is provided, standards are written to a file and the
+        prompt contains a read instruction instead of inline content."""
+        from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
+
+        compiled_dir = tmp_path / "standards" / "compiled"
+        compiled_dir.mkdir(parents=True)
+        compiled = {
+            "id": "security",
+            "principles": [
+                {
+                    "name": "Confidentiality",
+                    "source": "iso25010",
+                    "requirements": [
+                        {"id": "S-CON-1", "source": "iso25010",
+                         "text": "Secrets MUST NOT be hardcoded in source", "refs": []}
+                    ],
+                },
+            ],
+        }
+        (compiled_dir / "security.json").write_text(json.dumps(compiled))
+
+        work_dir = tmp_path / "work"
+        work_dir.mkdir()
+        target = AnalysisTarget(name="typescript", language="typescript", total_files=42)
+        manifest = SourceManifest(targets=[target], total_files=42)
+        template = load_template()
+        prompt = build_analysis_prompt(
+            template,
+            PromptContext(
+                language="typescript",
+                repo_name="my-app",
+                date_str="2026-03-06",
+                dimension="security",
+                source_file_count=42,
+                dimensions_data=_sample_dimensions(),
+                standards_dir=tmp_path / "standards",
+                manifest=manifest,
+                work_dir=work_dir,
+            ),
+        )
+        # Standards NOT inline — replaced by read instruction
+        assert "Secrets MUST NOT be hardcoded" not in prompt
+        assert "FIRST ACTION" in prompt
+        assert ".quodeq_standards_security.md" in prompt
+
+        # Standards file was written (compact format: no headings, just ID: text)
+        standards_file = work_dir / ".quodeq_standards_security.md"
+        assert standards_file.exists()
+        content = standards_file.read_text()
+        assert "### Confidentiality" not in content  # no principle headings
+        assert "S-CON-1: Secrets MUST NOT be hardcoded" in content
+
     def test_prompt_hash_present(self):
         template = load_template()
         prompt = build_analysis_prompt(
             template,
             PromptContext(
-                plugin_id="typescript",
+                language="typescript",
                 repo_name="test",
                 date_str="2026-03-06",
                 dimension="security",

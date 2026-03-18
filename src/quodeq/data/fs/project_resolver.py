@@ -15,17 +15,47 @@ from typing import Protocol
 _INDEX_FILE = "project_index.json"
 _MAX_LEGACY_SCAN = 500
 
-# mtime-based cache for _load_index to avoid re-reading on every call.
-# Intentionally module-level for cross-request caching; use clear_index_cache()
-# for testing isolation.
-_index_lock = threading.Lock()
-_index_cache: dict[Path, tuple[float, dict[str, str]]] = {}
+_INDEX_CACHE_MAX = 64
+
+
+class _IndexCache:
+    """Thread-safe mtime-based cache for the project index file (bounded)."""
+
+    def __init__(self) -> None:
+        self._lock = threading.Lock()
+        self._data: dict[Path, tuple[float, dict[str, str]]] = {}
+
+    def get(self, key: Path) -> tuple[float, dict[str, str]] | None:
+        with self._lock:
+            return self._data.get(key)
+
+    def set(self, key: Path, value: tuple[float, dict[str, str]]) -> None:
+        with self._lock:
+            if len(self._data) >= _INDEX_CACHE_MAX and key not in self._data:
+                # Evict oldest entry
+                oldest = next(iter(self._data))
+                del self._data[oldest]
+            self._data[key] = value
+
+    def pop(self, key: Path) -> None:
+        with self._lock:
+            self._data.pop(key, None)
+
+    def clear(self) -> None:
+        with self._lock:
+            self._data.clear()
+
+
+# Module-level singleton for mtime-based project index caching.
+# Thread-safe via internal locking (_IndexCache._lock).  Bounded to
+# _INDEX_CACHE_MAX entries to prevent unbounded memory growth.
+# Call _index_cache.clear() (or clear_index_cache()) in tests for isolation.
+_index_cache = _IndexCache()
 
 
 def clear_index_cache() -> None:
     """Clear the mtime-based index cache (useful for testing and isolation)."""
-    with _index_lock:
-        _index_cache.clear()
+    _index_cache.clear()
 
 
 class ProjectRepository(Protocol):
@@ -69,24 +99,21 @@ def _load_index(reports_dir: Path) -> dict[str, str]:
         mtime = index_path.stat().st_mtime
     except OSError:
         return {}
-    with _index_lock:
-        cached = _index_cache.get(index_path)
-        if cached is not None and cached[0] == mtime:
-            return dict(cached[1])  # return a copy so callers can mutate safely
+    cached = _index_cache.get(index_path)
+    if cached is not None and cached[0] == mtime:
+        return dict(cached[1])  # return a copy so callers can mutate safely
     try:
         data = json.loads(index_path.read_text())
     except (OSError, json.JSONDecodeError):
         return {}
-    with _index_lock:
-        _index_cache[index_path] = (mtime, dict(data))
+    _index_cache.set(index_path, (mtime, dict(data)))
     return data
 
 
 def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
     """Write the project index file atomically."""
     index_path = reports_dir / _INDEX_FILE
-    with _index_lock:
-        _index_cache.pop(index_path, None)  # invalidate cache
+    _index_cache.pop(index_path)  # invalidate cache
     try:
         fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
         try:

@@ -17,7 +17,7 @@ from quodeq.adapters.fs.report_parser import (
     read_run_data,
 )
 from quodeq.core.types import DimensionResult, to_camel_dict
-from quodeq.engine.scoring_internals import score_to_grade_label
+from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services._cache import make_lru_dimension_fetcher
 
 def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
@@ -29,26 +29,17 @@ def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]
     return OrderedDict(), threading.Lock()
 
 
-_ACC_DIM_CACHE, _ACC_DIM_LOCK = create_accumulated_cache()
-
-
 _DEFAULT_ACC_CACHE_MAX = 256
 
 
-def _acc_dim_cache_max(override: int | None = None) -> int:
+def _acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the accumulated-view cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
-
-
-def _make_acc_dimension_fetcher(
-    reports_root: Path, project: str,
-) -> Callable[[str], list[DimensionResult]]:
-    """Return a cached fetcher for run dimension data (LRU, bounded)."""
-    return make_lru_dimension_fetcher(
-        reports_root, project, _ACC_DIM_CACHE, _ACC_DIM_LOCK, _acc_dim_cache_max(),
-    )
+    try:
+        return int((env or os.environ).get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
+    except (ValueError, TypeError):
+        return _DEFAULT_ACC_CACHE_MAX
 
 
 def _read_all_run_data(

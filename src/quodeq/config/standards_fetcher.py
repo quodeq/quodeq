@@ -11,6 +11,7 @@ import urllib.error
 import urllib.request
 from datetime import date
 from pathlib import Path
+from urllib.parse import urlparse
 
 from quodeq.shared.utils import write_text, get_asvs_url, show_diff
 
@@ -26,11 +27,11 @@ _ASVS_OUTPUT_FILE = "level1.json"
 _DEFAULT_ASVS_VERSION = "4.0.3"
 
 
-def _asvs_version(override: str | None = None) -> str:
+def _asvs_version(override: str | None = None, env: dict[str, str] | None = None) -> str:
     """Return the ASVS version string. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return os.environ.get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
+    return (env or os.environ).get("QUODEQ_ASVS_VERSION", _DEFAULT_ASVS_VERSION)
 
 _DEFAULT_FETCH_TIMEOUT_S = 30
 _RETRY_BASE_DELAY_S = 0.5
@@ -82,14 +83,16 @@ def _verify_integrity(
     if not expected_hash:
         if skip_integrity:
             _logger.warning(
-                "ASVS integrity verification skipped (pin with %s=%s)",
+                "SECURITY: Integrity check skipped — downloaded content is NOT verified. "
+                "Pin the hash for production use: %s=%s",
                 _ASVS_SHA256_ENV,
                 actual_hash,
             )
         else:
             raise ValueError(
-                f"ASVS integrity verification required: set {_ASVS_SHA256_ENV}={actual_hash} "
-                f"to pin this download"
+                f"No ASVS hash configured — refusing unverified download. "
+                f"Set {_ASVS_SHA256_ENV}={actual_hash} to pin the expected hash, "
+                f"or pass skip_integrity=True to bypass."
             )
 
 
@@ -120,7 +123,6 @@ def fetch_asvs_l1(
     Pass *skip_integrity* explicitly for programmatic use (e.g. tests).
     """
     url = get_asvs_url()
-    from urllib.parse import urlparse
     parsed = urlparse(url)
     if parsed.hostname not in _ASVS_ALLOWED_HOSTS:
         raise ValueError(

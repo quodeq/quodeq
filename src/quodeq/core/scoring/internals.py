@@ -1,6 +1,7 @@
 """Internal constants and helper functions for the scoring engine."""
 from __future__ import annotations
 
+from quodeq.core.scoring.confidence import confidence_interval_for  # noqa: F401 — re-export
 from quodeq.core.scoring.numerical import (  # noqa: F401 — re-export
     build_deductions,
     count_grade_drops,
@@ -19,23 +20,44 @@ GRADE_LADDER: list[str] = [
     "Exemplary",
 ]
 
-# Ratio-based dampening table: (min_compliance_to_violation_ratio, multiplier).
-# Checked top-to-bottom; first matching row wins.
-# Asymmetric: max discount 15%, max penalty 30%.
-# Severity weights for dampening ratio, aligned with deduction penalties
-# (critical=2.0, major=1.0, minor=0.25 → ratio 8:4:1).  This ensures
-# 1 critical compliance perfectly neutralizes the dampening impact of
-# 1 critical violation at the same severity level.
-_SEVERITY_WEIGHT = {"critical": 8, "major": 4, "minor": 1}
-_MAX_PENALTY_MULTIPLIER = 1.30
+# ---------------------------------------------------------------------------
+# Violation severity weights (for weighted violation count)
+# ---------------------------------------------------------------------------
+_SEVERITY_WEIGHT = {"critical": 4.0, "major": 1.5, "minor": 0.25}
 
+# Base score curve: base = 10 / (1 + K * weighted_violations)
+# K controls how fast violations pull the score down.
+# K=0.12: 3 critical (wv=12) → base 4.1, 5 major (wv=7.5) → base 5.3
+_BASE_K = 0.12
+
+# Compliance lift curve: lift = (compliance_count / (compliance_count + wv))^COMPRESS
+# Higher COMPRESS → harder to reach Exemplary via compliance alone.
+_LIFT_COMPRESS = 1.8
+
+# Violation ceiling: ceiling = 10 - log2(1 + wv) * CEIL_SCALE
+# Uses weighted violations so minor violations barely affect the ceiling
+# while major/critical violations bring it down properly.
+_CEIL_SCALE = 0.5
+
+# Severity grade floor: grade cannot be worse than the severities present.
+# Only-minor violations → floor at Adequate (5.0)
+# Has-major (no critical) → floor at Poor (3.0)
+# Has-critical → no floor (score can reach Critical grade)
+_SEVERITY_GRADE_FLOOR: dict[str, float] = {
+    "critical": 0.0,
+    "major": 3.0,
+    "minor": 5.0,
+}
+
+# Legacy: kept for non-numerical (graded) mode compatibility
+_MAX_PENALTY_MULTIPLIER = 1.30
 _RATIO_DAMPENING_TABLE: list[tuple[float, float]] = [
-    (3.0, 0.85),   # strong compliance evidence
-    (2.0, 0.90),   # good compliance
-    (1.0, 0.95),   # balanced
-    (0.5, 1.00),   # neutral
-    (0.0, 1.15),   # weak compliance (ratio > 0 but < 0.5)
-    (-1.0, _MAX_PENALTY_MULTIPLIER),  # no compliance at all (sentinel, always matches)
+    (3.0, 0.85),
+    (2.0, 0.90),
+    (1.0, 0.95),
+    (0.5, 1.00),
+    (0.0, 1.15),
+    (-1.0, _MAX_PENALTY_MULTIPLIER),
 ]
 
 # ---------------------------------------------------------------------------
@@ -132,34 +154,96 @@ def tally_compliance_types_by_reason(compliance: list[dict]) -> dict[str, int]:
 
 
 def _weighted_sum(type_counts: dict[str, int]) -> float:
-    """Sum type counts weighted by severity (critical=4, major=2, minor=1)."""
+    """Sum type counts weighted by severity."""
     return sum(
-        count * _SEVERITY_WEIGHT.get(sev, 1)
+        count * _SEVERITY_WEIGHT.get(sev, 0.25)
         for sev, count in type_counts.items()
     )
+
+
+def violation_base(violation_type_counts: dict[str, int]) -> float:
+    """Compute the base score from violations alone (ignoring compliance).
+
+    Uses a hyperbolic curve with diminishing returns:
+    ``base = 10 / (1 + K * weighted_violations)``
+
+    Returns a value in [0, 10].
+    """
+    wv = _weighted_sum(violation_type_counts)
+    if wv == 0:
+        return 10.0
+    return 10.0 / (1.0 + _BASE_K * wv)
+
+
+def compliance_lift(
+    compliance_type_counts: dict[str, int],
+    violation_type_counts: dict[str, int],
+) -> float:
+    """Compute the lift factor from compliance evidence.
+
+    Compliance fills the gap between the violation base and 10.
+    Uses uniform compliance count (each item = 1) with a compressed
+    power curve so reaching the top requires a strong ratio.
+
+    Returns a value in [0, 1] representing the fraction of the gap filled.
+    """
+    wv = _weighted_sum(violation_type_counts)
+    cc = sum(compliance_type_counts.get(sev, 0) for sev in compliance_type_counts)
+    if cc == 0 or wv == 0:
+        return 0.0
+    raw_lift = cc / (cc + wv)
+    return raw_lift ** _LIFT_COMPRESS
+
+
+def violation_ceiling(violation_type_counts: dict[str, int]) -> float:
+    """Compute the maximum achievable score given the violation weight.
+
+    Uses a log2 curve on weighted violations so minor violations barely
+    affect the ceiling while major/critical bring it down.
+
+    ``ceiling = 10 - log2(1 + wv) * CEIL_SCALE``
+    """
+    import math
+    wv = _weighted_sum(violation_type_counts)
+    if wv == 0:
+        return 10.0
+    return 10.0 - math.log2(1.0 + wv) * _CEIL_SCALE
+
+
+def severity_grade_floor(violation_type_counts: dict[str, int]) -> float:
+    """Return the minimum score based on the worst violation severity present.
+
+    - Only minor violations -> floor at 5.0 (Adequate)
+    - Has major (no critical) -> floor at 3.0 (Poor)
+    - Has critical -> floor at 0.0 (no protection)
+    - No violations -> floor at 10.0
+    """
+    if violation_type_counts.get("critical", 0) > 0:
+        return _SEVERITY_GRADE_FLOOR["critical"]
+    if violation_type_counts.get("major", 0) > 0:
+        return _SEVERITY_GRADE_FLOOR["major"]
+    if violation_type_counts.get("minor", 0) > 0:
+        return _SEVERITY_GRADE_FLOOR["minor"]
+    return 10.0
 
 
 def compliance_dampening(
     compliance_type_counts: dict[str, int],
     violation_type_counts: dict[str, int],
 ) -> float:
-    """Compute the dampening multiplier from the compliance-to-violation ratio.
+    """Legacy dampening multiplier — used by the non-numerical (graded) mode.
 
-    Uses severity-weighted type counts so critical compliance has more
-    impact than minor compliance, and minor compliance can't cheaply
-    offset critical violations.
-
-    Asymmetric: max discount 15% (0.85x), max penalty 30% (1.30x).
-    No compliance at all gets the full 1.30x penalty.
+    Uses severity-weighted type counts to compute a compliance-to-violation
+    ratio, then maps it to a multiplier via the dampening table.
     """
     weighted_compliance = _weighted_sum(compliance_type_counts)
     weighted_violations = _weighted_sum(violation_type_counts)
 
     if weighted_violations == 0:
-        return 1.0  # no violations -> dampening is irrelevant
+        return 1.0
 
     if weighted_compliance == 0:
-        return _MAX_PENALTY_MULTIPLIER  # no compliance at all -> max penalty
+        return _MAX_PENALTY_MULTIPLIER
 
     ratio = weighted_compliance / weighted_violations
     for threshold, multiplier in _RATIO_DAMPENING_TABLE:
@@ -177,60 +261,6 @@ def drop_grade(grade: str, drops: int) -> str:
     new_position = max(0, position - drops)
     return GRADE_LADDER[new_position]
 
-
-# ---------------------------------------------------------------------------
-# Confidence interval
-# ---------------------------------------------------------------------------
-
-_CI_BASE_WIDTH = 1.0
-_CI_LOW_CONFIDENCE_PENALTY = 1.0
-_CI_MEDIUM_CONFIDENCE_PENALTY = 0.5
-_CI_UNBALANCED_PENALTY = 0.5
-_CI_SPARSITY_PENALTY = 0.5
-_SPARSITY_RATIO = 0.01
-_CI_UNSTABLE_THRESHOLD = 1.5
-_GRADE_UNSTABLE_LABEL = "+/- 1 level"
-_GRADE_STABLE_LABEL = "stable"
-
-
-def confidence_interval_for(
-    confidence_level: str,
-    is_balanced: bool,
-    total_instances: int,
-    files_read: int = 0,
-) -> dict:
-    """Estimate the uncertainty width for a principle score.
-
-    Starting width is 1.0. Additional half-points are added when:
-    - confidence_level is 'low' (+1.0) or 'medium' (+0.5)
-    - the sample is unbalanced (+0.5)
-    - the instance count is sparse relative to files actually read (+0.5)
-
-    grade_stability is 'stable' unless the interval exceeds 1.5.
-    """
-    width = _CI_BASE_WIDTH
-
-    if confidence_level == "low":
-        width += _CI_LOW_CONFIDENCE_PENALTY
-    elif confidence_level == "medium":
-        width += _CI_MEDIUM_CONFIDENCE_PENALTY
-
-    if not is_balanced:
-        width += _CI_UNBALANCED_PENALTY
-
-    sparsity_floor = _SPARSITY_RATIO * files_read if files_read > 0 else 0
-    if sparsity_floor > 0 and total_instances < sparsity_floor:
-        width += _CI_SPARSITY_PENALTY
-
-    return {
-        "confidence_interval": width,
-        "grade_stability": _GRADE_UNSTABLE_LABEL if width > _CI_UNSTABLE_THRESHOLD else _GRADE_STABLE_LABEL,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Numerical score -> grade label
-# ---------------------------------------------------------------------------
 
 _GRADE_THRESHOLDS: list[tuple[int, str]] = [
     (9, "Exemplary"),

@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.engine.evidence_parser import (
+from quodeq.core.evidence.parser import (
     EvidenceContext,
     parse_jsonl_to_evidence,
 )
@@ -31,7 +31,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test-repo",
                 date_str="2026-03-06",
                 source_file_count=50,
@@ -40,7 +40,7 @@ class TestParseJsonlToEvidence:
         )
 
         assert ev.repository == "test-repo"
-        assert ev.plugin_id == "typescript"
+        assert ev.language == "typescript"
         assert ev.source_file_count == 50
         assert ev.files_read == 10
         assert ev.coverage_pct == 20.0
@@ -58,7 +58,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test",
                 date_str="2026-03-06",
                 source_file_count=10,
@@ -82,7 +82,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test",
                 date_str="2026-03-06",
                 source_file_count=10,
@@ -99,7 +99,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test",
                 date_str="2026-03-06",
                 source_file_count=10,
@@ -116,7 +116,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test",
                 date_str="2026-03-06",
                 source_file_count=10,
@@ -134,7 +134,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test",
                 date_str="2026-03-06",
                 source_file_count=10,
@@ -161,7 +161,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="python", repository="test", date_str="2026-03-11",
+                language="python", repository="test", date_str="2026-03-11",
                 source_file_count=10, files_read=5,
             ),
         )
@@ -179,7 +179,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript", repository="test", date_str="2026-03-11",
+                language="typescript", repository="test", date_str="2026-03-11",
                 source_file_count=10, files_read=5,
             ),
         )
@@ -192,7 +192,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test",
                 date_str="2026-03-06",
                 source_file_count=10,
@@ -209,7 +209,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test",
                 date_str="2026-03-06",
                 source_file_count=0,
@@ -232,7 +232,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="python", repository="test", date_str="2026-03-11",
+                language="python", repository="test", date_str="2026-03-11",
                 source_file_count=10, files_read=5,
             ),
             compiled_dir=None,  # no compiled dir — refs come from JSONL
@@ -252,7 +252,7 @@ class TestParseJsonlToEvidence:
         ev = parse_jsonl_to_evidence(
             jsonl,
             EvidenceContext(
-                plugin_id="typescript",
+                language="typescript",
                 repository="test",
                 date_str="2026-03-06",
                 source_file_count=10,
@@ -262,7 +262,7 @@ class TestParseJsonlToEvidence:
 
         d = ev.to_evidence_dict()
         assert d["repository"] == "test"
-        assert d["discipline"] == "typescript"
+        assert d["discipline"] == "Typescript"
         assert "ts-001" in d["principles"]
         assert "violations" in d["principles"]["ts-001"]
         assert "compliance" in d["principles"]["ts-001"]

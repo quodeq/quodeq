@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from quodeq.engine.evidence import Evidence, PrincipleEvidence
-from quodeq.engine.scoring import score_evidence
+from quodeq.core.evidence.model import Evidence, PrincipleEvidence
+from quodeq.core.scoring.engine import score_evidence
 
 from tests.engine.conftest import make_evidence_with_confidence
 
@@ -30,7 +30,7 @@ def _make_evidence(violations=None, compliance=None) -> Evidence:
     )
     return Evidence(
         repository="test-repo",
-        plugin_id="typescript",
+        language="typescript",
         date="2026-03-03",
         source_file_count=100,
         files_read=50,
@@ -63,7 +63,7 @@ def test_non_numerical_grading():
 def test_empty_evidence():
     ev = Evidence(
         repository="test",
-        plugin_id="typescript",
+        language="typescript",
         date="2026-03-03",
         source_file_count=0,
         files_read=0,
@@ -126,12 +126,12 @@ def test_numerical_high_confidence_with_violations():
     )
     scores = score_evidence(ev, mode="numerical")
     ts001 = scores.principles["ts-001"]
-    assert ts001.base_score == 10
-    # 1 critical type (-2.0) + 1 major type (-1.0) = 3.0 raw deduction
-    # compliance has no vt → 0 types via taxonomy → 1.30× penalty
-    # 3.0 × 1.30 = 3.90 → 10 - 3.9 = 6.1
-    assert ts001.dampening_multiplier == 1.30
-    assert ts001.final_score == 6.1
+    # New model: base = 10/(1+0.12*5.5) ≈ 6.0 (1 crit @ 4.0 + 1 major @ 1.5)
+    # Compliance has no vt → 0 types via taxonomy → lift = 0
+    # Score = base, capped by ceiling
+    assert ts001.base_score == 6.0
+    assert ts001.dampening_multiplier == 0.0  # lift factor (no compliance types)
+    assert ts001.final_score == 6.0
 
 
 def test_graded_high_confidence_no_violations():
@@ -161,7 +161,7 @@ def test_weighted_overall_excludes_insufficient():
                  "compliance_percentage": 90.0, "confidence_level": "high", "is_balanced": True},
     )
     ev = Evidence(
-        repository="test", plugin_id="ts", date="2026-03-03",
+        repository="test", language="ts", date="2026-03-03",
         source_file_count=100, files_read=50, coverage_pct=50.0,
         principles={"p-low": pe_low, "p-high": pe_high},
     )

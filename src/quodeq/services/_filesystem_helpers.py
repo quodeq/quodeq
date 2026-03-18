@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -28,17 +29,26 @@ def _read_repo_info(reports_root: Path, entry_name: str) -> dict[str, Any]:
         return {}
 
 
-def _read_latest_run_summary(
-    reports_root: Path, entry_name: str, run_id: str,
+def _read_accumulated_summary(
+    reports_root: Path, entry_name: str, runs: list[RunInfo],
 ) -> tuple[str | None, float | None, int | None]:
-    """Read latest grade, score, and file count from a run. Returns (grade, score, files)."""
+    """Compute accumulated grade and score across all runs. Returns (grade, score, files)."""
     try:
-        dims = read_run_data(reports_root, entry_name, run_id)
-        summary = summarize_dimensions(dims)
-        grade = summary.overall_grade
-        score = summary.numeric_average
-        files = next((d.source_file_count for d in dims if d.source_file_count), None)
-        return grade, score, files
+        # Build accumulated: latest value per dimension across all runs
+        latest_by_dim: dict[str, object] = {}
+        files_count: int | None = None
+        for run in runs:
+            dims = read_run_data(reports_root, entry_name, run.run_id)
+            for d in dims:
+                if d.dimension and d.dimension not in latest_by_dim:
+                    latest_by_dim[d.dimension] = d
+                if files_count is None and d.source_file_count:
+                    files_count = d.source_file_count
+        acc_dims = list(latest_by_dim.values())
+        if not acc_dims:
+            return None, None, files_count
+        summary = summarize_dimensions(acc_dims)
+        return summary.overall_grade, summary.numeric_average, files_count
     except (OSError, json.JSONDecodeError, KeyError):
         return None, None, None
 
@@ -66,8 +76,8 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
     """Build a frozen ProjectEntry from its directory and run list."""
     info = _read_repo_info(reports_root, entry_name)
     meta = _extract_project_metadata(info, entry_name)
-    latest_grade, latest_score, files_count = _read_latest_run_summary(
-        reports_root, entry_name, runs[0].run_id,
+    latest_grade, latest_score, files_count = _read_accumulated_summary(
+        reports_root, entry_name, runs,
     )
     return ProjectEntry(
         id=entry_name,
@@ -78,8 +88,8 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
         path=meta["path"],
         location=meta["location"],
         runs_count=len(runs),
-        latest_run_id=runs[0].run_id,
-        latest_date=runs[0].date_iso,
+        latest_run_id=runs[0].run_id if runs else None,
+        latest_date=runs[0].date_iso if runs else None,
         path_exists=_check_path_exists(meta["path"], meta["location"]),
         files_count=files_count,
         latest_grade=latest_grade,
@@ -166,21 +176,29 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
     return None
 
 
-def _list_available_dimensions_for_discipline(
-    discipline: str, evaluators_dir: Path | None = None,
-) -> list[str]:
-    """Resolve available dimensions for a plugin via its dimensions.json.
+# Module-level cache for available dimension IDs from dimensions.json.
+# Populated lazily on first call; avoids repeated disk I/O on every request.
+# Safe for concurrent reads after initial population (immutable list value).
+_cached_dimensions: list[str] | None = None
+_cached_dimensions_lock = threading.Lock()
 
-    *evaluators_dir* overrides the default path lookup, making the function
-    testable without relying on the global config.
-    """
-    try:
-        base = evaluators_dir if evaluators_dir is not None else default_paths().evaluators_dir
-        plugin_dir = base / discipline
-        dims_file = plugin_dir / "dimensions.json"
-        if dims_file.exists():
-            data = json.loads(dims_file.read_text())
-            return [d["id"] for d in data.get("applies", [])]
-        return []
-    except (OSError, json.JSONDecodeError, KeyError, TypeError):
-        return []
+
+def _list_available_dimensions_for_discipline() -> list[str]:
+    """Resolve available dimensions from universal dimensions.json (cached after first read)."""
+    global _cached_dimensions
+    if _cached_dimensions is not None:
+        return _cached_dimensions
+    with _cached_dimensions_lock:
+        if _cached_dimensions is not None:
+            return _cached_dimensions
+        try:
+            paths = default_paths()
+            universal_dims = paths.dimensions_file
+            if universal_dims.exists():
+                data = json.loads(universal_dims.read_text())
+                _cached_dimensions = [d["id"] for d in data.get("applies", [])]
+                return _cached_dimensions
+            _cached_dimensions = []
+            return _cached_dimensions
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            return []

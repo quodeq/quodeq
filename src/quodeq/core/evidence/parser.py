@@ -4,9 +4,8 @@ from __future__ import annotations
 import json
 import logging
 from dataclasses import dataclass
-from pathlib import Path
-
 import os
+from pathlib import Path
 
 from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, compute_coverage_pct
 from quodeq.shared.utils import open_text
@@ -18,8 +17,12 @@ _CWE_URL_TEMPLATE_DEFAULT = "https://cwe.mitre.org/data/definitions/{cwe_id}.htm
 
 
 def _cwe_url_template(env: dict[str, str] | None = None) -> str:
-    """Return the CWE URL template, reading from env lazily."""
-    return (env or os.environ).get(
+    """Return the CWE URL template, reading from env lazily.
+
+    *env* overrides ``os.environ`` when provided (e.g. for testing).
+    When ``None``, falls back to ``os.environ``.
+    """
+    return (env if env is not None else os.environ).get(
         "QUODEQ_CWE_URL_TEMPLATE",
         _CWE_URL_TEMPLATE_DEFAULT,
     )
@@ -36,11 +39,12 @@ def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[
 @dataclass
 class EvidenceContext:
     """Metadata needed to construct an Evidence object from parsed JSONL."""
-    plugin_id: str
+    language: str
     repository: str
     date_str: str
     source_file_count: int
     files_read: int
+    module: str = ""
 
 
 def resolve_llm_refs(
@@ -238,11 +242,12 @@ def parse_jsonl_to_evidence(
 
     return Evidence(
         repository=context.repository,
-        plugin_id=context.plugin_id,
+        language=context.language,
         date=context.date_str,
         source_file_count=source_file_count,
         files_read=files_read,
         coverage_pct=coverage_pct,
         principles=principles,
         dismissed_count=0,
+        module=context.module,
     )

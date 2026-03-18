@@ -75,9 +75,9 @@ class PrincipleEvidence:
 
 @dataclass
 class Evidence:
-    """Complete evaluation output for one plugin run."""
+    """Complete evaluation output for one run."""
     repository: str
-    plugin_id: str
+    language: str
     date: str
     source_file_count: int
     files_read: int
@@ -85,7 +85,7 @@ class Evidence:
     principles: dict[str, PrincipleEvidence] = field(default_factory=dict)
     dismissed_count: int = 0
     meta: dict = field(default_factory=dict)
-    plugin_name: str = ""
+    module: str = ""
 
     def summary(self) -> dict:
         """Return an aggregate summary of findings, confidence, and balance across all principles."""
@@ -116,9 +116,9 @@ class Evidence:
                 "compliance": pe.compliance,
                 "metrics": pe.metrics,
             }
-        return {
+        result = {
             "repository": self.repository,
-            "discipline": self.plugin_name or self.plugin_id,
+            "discipline": self.language.title(),
             "date": self.date,
             "source_file_count": self.source_file_count,
             "files_read": self.files_read,
@@ -127,3 +127,6 @@ class Evidence:
             "principles": principles,
             "evidence_summary": self.summary(),
         }
+        if self.module:
+            result["module"] = self.module
+        return result

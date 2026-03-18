@@ -27,8 +27,11 @@ from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING
 _SEPARATOR_WIDTH = 60
 STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 
+# compile_standards is a sibling script that relies on the sys.path set above;
+# it must be imported after the sys.path manipulation, so we defer it to main().
+
 # ---------------------------------------------------------------------------
-# Mapping: dimension → principle → [[requirement_text, [cwe_ids]]]
+# Mapping: dimension -> principle -> [[requirement_text, [cwe_ids]]]
 #
 # Loaded from the companion JSON file. Each [text, cwes] pair becomes one
 # requirement entry. CWE IDs already present in the file are silently skipped.
@@ -139,7 +142,7 @@ def enrich_dimension(
             total_added += len(new_cwes)
 
             if dry_run:
-                print(f"  {new_req['id']}: {len(new_cwes)} CWEs → {sc_name}")
+                print(f"  {new_req['id']}: {len(new_cwes)} CWEs \u2192 {sc_name}")
 
     if not dry_run and total_added > 0:
         filepath.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding=_TEXT_ENCODING)
@@ -156,8 +159,10 @@ def main() -> None:
 
     dry_run = not args.apply
     if dry_run:
-        print("DRY RUN — use --apply to write changes\n")
+        print("DRY RUN \u2014 use --apply to write changes\n")
 
+    # Deferred import: compile_standards is a sibling script that requires the
+    # sys.path modifications performed at the top of this module.
     from compile_standards import ALL_DIMENSIONS
 
     mapping = _load_mapping()

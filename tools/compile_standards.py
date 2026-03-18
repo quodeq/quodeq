@@ -22,6 +22,7 @@ from _standards_refs import (
 )
 
 repo_root = Path(__file__).resolve().parents[1]
+# sys.path must be set before importing quodeq modules below
 sys.path.insert(0, str(repo_root / "src"))
 
 from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING

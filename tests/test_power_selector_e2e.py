@@ -16,7 +16,12 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from quodeq.engine.analysis import AnalysisConfig, run_analysis
+from quodeq.analysis.subprocess import AnalysisConfig, run_analysis
+
+# Model name constants used across test methods.
+_MODEL_HAIKU = "claude-haiku-4-5"
+_MODEL_SONNET = "claude-sonnet-4-6"
+_MODEL_OPUS = "claude-opus-4-6"
 
 
 # ---------------------------------------------------------------------------
@@ -67,19 +72,19 @@ class TestModelReachesSubprocess:
     """The --model flag in the spawned CLI must match the configured ai_model."""
 
     def test_haiku_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, "claude-haiku-4-5")
+        args = _capture_popen_args(tmp_path, _MODEL_HAIKU)
         model = _extract_model_from_args(args)
-        assert model == "claude-haiku-4-5"
+        assert model == _MODEL_HAIKU
 
     def test_sonnet_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, "claude-sonnet-4-6")
+        args = _capture_popen_args(tmp_path, _MODEL_SONNET)
         model = _extract_model_from_args(args)
-        assert model == "claude-sonnet-4-6"
+        assert model == _MODEL_SONNET
 
     def test_opus_reaches_cli(self, tmp_path: Path) -> None:
-        args = _capture_popen_args(tmp_path, "claude-opus-4-6")
+        args = _capture_popen_args(tmp_path, _MODEL_OPUS)
         model = _extract_model_from_args(args)
-        assert model == "claude-opus-4-6"
+        assert model == _MODEL_OPUS
 
     def test_no_model_flag_when_none(self, tmp_path: Path) -> None:
         """When ai_model is None and no env, --model should not appear (uses provider default)."""
@@ -104,7 +109,7 @@ class TestSubagentPoolModelPropagation:
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["a.py", "b.py"])
 
-        base = AnalysisConfig(ai_model="claude-opus-4-6")
+        base = AnalysisConfig(ai_model=_MODEL_OPUS)
         pool = SubagentPool(
             n_agents=2,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
@@ -115,8 +120,8 @@ class TestSubagentPoolModelPropagation:
 
         for idx in range(2):
             ac, _, _ = pool._build_agent_config(idx)
-            assert ac.ai_model == "claude-opus-4-6", (
-                f"agent-{idx} got ai_model={ac.ai_model!r}, expected 'claude-opus-4-6'"
+            assert ac.ai_model == _MODEL_OPUS, (
+                f"agent-{idx} got ai_model={ac.ai_model!r}, expected {_MODEL_OPUS!r}"
             )
 
     def test_pool_agents_inherit_haiku(self, tmp_path: Path) -> None:
@@ -126,7 +131,7 @@ class TestSubagentPoolModelPropagation:
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["x.py"])
 
-        base = AnalysisConfig(ai_model="claude-haiku-4-5")
+        base = AnalysisConfig(ai_model=_MODEL_HAIKU)
         pool = SubagentPool(
             n_agents=1,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
@@ -136,7 +141,7 @@ class TestSubagentPoolModelPropagation:
         )
 
         ac, _, _ = pool._build_agent_config(0)
-        assert ac.ai_model == "claude-haiku-4-5"
+        assert ac.ai_model == _MODEL_HAIKU
 
 
 # ---------------------------------------------------------------------------
@@ -155,31 +160,31 @@ class TestRunnerModelResolution:
         handled here in the same order as the evaluate command.
         """
         from quodeq.cli import _subagent_model
-        from quodeq.engine.runner import AnalysisOptions
+        from quodeq.analysis.runner import AnalysisOptions
         opts = AnalysisOptions(subagent_model=subagent_model)
         with patch.dict(os.environ, {"SUBAGENT_MODEL": env_model} if env_model else {}, clear=False):
             if not env_model:
                 os.environ.pop("SUBAGENT_MODEL", None)
-            _FALLBACK_MODEL = "claude-haiku-4-5"
+            _FALLBACK_MODEL = _MODEL_HAIKU
             return opts.subagent_model or _subagent_model() or _FALLBACK_MODEL
 
     def test_level1_fast_haiku(self) -> None:
-        assert self._resolve("claude-haiku-4-5") == "claude-haiku-4-5"
+        assert self._resolve(_MODEL_HAIKU) == _MODEL_HAIKU
 
     def test_level2_balanced_sonnet(self) -> None:
-        assert self._resolve("claude-sonnet-4-6") == "claude-sonnet-4-6"
+        assert self._resolve(_MODEL_SONNET) == _MODEL_SONNET
 
     def test_level3_thorough_opus(self) -> None:
-        assert self._resolve("claude-opus-4-6") == "claude-opus-4-6"
+        assert self._resolve(_MODEL_OPUS) == _MODEL_OPUS
 
     def test_env_fallback_when_no_option(self) -> None:
-        assert self._resolve(None, "claude-sonnet-4-6") == "claude-sonnet-4-6"
+        assert self._resolve(None, _MODEL_SONNET) == _MODEL_SONNET
 
     def test_default_is_haiku_when_nothing_set(self) -> None:
-        assert self._resolve(None, None) == "claude-haiku-4-5"
+        assert self._resolve(None, None) == _MODEL_HAIKU
 
     def test_option_overrides_env(self) -> None:
-        assert self._resolve("claude-opus-4-6", "claude-haiku-4-5") == "claude-opus-4-6"
+        assert self._resolve(_MODEL_OPUS, _MODEL_HAIKU) == _MODEL_OPUS
 
 
 # ---------------------------------------------------------------------------
@@ -220,9 +225,9 @@ class TestApiToSubprocessIntegration:
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(reports_dir),
-            options=EvaluationOptions(subagent_model="claude-sonnet-4-6"),
+            options=EvaluationOptions(subagent_model=_MODEL_SONNET),
         )
-        assert stub.captured_env["SUBAGENT_MODEL"] == "claude-sonnet-4-6"
+        assert stub.captured_env["SUBAGENT_MODEL"] == _MODEL_SONNET
 
     def test_full_chain_opus(self, filesystem_provider_stub) -> None:
         from quodeq.provider.base import EvaluationOptions
@@ -231,9 +236,9 @@ class TestApiToSubprocessIntegration:
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(reports_dir),
-            options=EvaluationOptions(subagent_model="claude-opus-4-6"),
+            options=EvaluationOptions(subagent_model=_MODEL_OPUS),
         )
-        assert stub.captured_env["SUBAGENT_MODEL"] == "claude-opus-4-6"
+        assert stub.captured_env["SUBAGENT_MODEL"] == _MODEL_OPUS
 
     def test_full_chain_no_model_no_env_key(self, filesystem_provider_stub) -> None:
         from quodeq.provider.base import EvaluationOptions

@@ -36,7 +36,8 @@ export function useDashboard({ selectedProject, selectedRun }) {
         if (active) setDashboard(payload);
       })
       .catch((err) => {
-        if (active) setError(err.message);
+        console.warn('Dashboard load failed:', err);
+        if (active) setError('Failed to load dashboard data. Please try again.');
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -64,7 +65,8 @@ export function useDashboard({ selectedProject, selectedRun }) {
         if (active) setAccumulated(data);
       })
       .catch((err) => {
-        if (active) setError(err.message || 'Failed to load accumulated data');
+        console.error('Dashboard load failed:', err);
+        if (active) setError('Failed to load accumulated data');
       });
 
     return () => {

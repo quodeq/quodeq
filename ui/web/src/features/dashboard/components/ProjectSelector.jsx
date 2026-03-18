@@ -3,7 +3,7 @@
 // projects: array of { name } or strings
 // runs: array of { runId, dateLabel }
 
-export default function ProjectSelector({ projects, selectedProject, selectedRun, runs, onProjectChange, onRunChange }) {
+export default function ProjectSelector({ projects, selectedProject, selectedRun, runs, onChange: { onProjectChange, onRunChange } = {} }) {
   const projectList = (projects || []).map((p) =>
     typeof p === 'string' ? { name: p } : p
   );
@@ -13,12 +13,13 @@ export default function ProjectSelector({ projects, selectedProject, selectedRun
   return (
     <div className="project-selector">
       <div className="sidebar-project-section">
-        <p className="sidebar-project-label">Project</p>
+        <label className="sidebar-project-label" htmlFor="project-select">Project</label>
         <select
+          id="project-select"
           className="project-select-styled"
           value={selectedProject}
           disabled={projectList.length === 0}
-          onChange={(e) => onProjectChange(e.target.value)}
+          onChange={(e) => onProjectChange?.(e.target.value)}
         >
           {projectList.length === 0 ? (
             <option value="">No analyzed project</option>
@@ -33,11 +34,12 @@ export default function ProjectSelector({ projects, selectedProject, selectedRun
 
       {runList.length > 0 && (
         <div className="sidebar-run-section">
-          <p className="sidebar-project-label">Run</p>
+          <label className="sidebar-project-label" htmlFor="run-select">Run</label>
           <select
+            id="run-select"
             className="project-select-styled"
             value={selectedRun}
-            onChange={(e) => onRunChange(e.target.value)}
+            onChange={(e) => onRunChange?.(e.target.value)}
           >
             {runList.map((run) => (
               <option key={run.runId} value={run.runId}>

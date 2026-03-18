@@ -73,7 +73,7 @@ def migrate_entry(entry: dict) -> bool:
 def migrate_file(path: Path, apply: bool) -> tuple[int, int]:
     """Migrate a single evaluation JSON. Returns (violations_updated, compliance_updated)."""
     try:
-        data = json.loads(path.read_text())
+        data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {path}: {exc}")
         return 0, 0
@@ -82,7 +82,7 @@ def migrate_file(path: Path, apply: bool) -> tuple[int, int]:
 
     if apply and (v_count or c_count):
         try:
-            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n")
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
         except OSError as exc:
             print(f"  ERROR writing {path}: {exc}")
 
@@ -110,7 +110,11 @@ def main():
     files_changed = 0
 
     for path in sorted(eval_files):
-        v, c = migrate_file(path, args.apply)
+        try:
+            v, c = migrate_file(path, args.apply)
+        except (OSError, json.JSONDecodeError) as exc:
+            print(f"  ERROR processing {path}: {exc}")
+            continue
         if v or c:
             files_changed += 1
             total_v += v

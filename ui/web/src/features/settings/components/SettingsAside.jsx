@@ -14,6 +14,14 @@ const PHRASES = [
 const AUTO_ADVANCE_MS = 7000;
 const TRANSITION_MS = 180;
 
+function SafePhrase({ html }) {
+  const parts = html.split(/(<b>.*?<\/b>)/g);
+  return parts.map((part, i) => {
+    const bold = part.match(/^<b>(.*)<\/b>$/);
+    return bold ? <strong key={i}>{bold[1]}</strong> : part;
+  });
+}
+
 export default function SettingsAside() {
   const [index, setIndex] = useState(0);
   const [changing, setChanging] = useState(false);
@@ -145,10 +153,9 @@ export default function SettingsAside() {
         <span className="sa-wordmark">quodeq</span>
 
         <p className="sa-phrase-wrap">
-          <span
-            className={changing ? 'sa-phrase sa-phrase--changing' : 'sa-phrase'}
-            dangerouslySetInnerHTML={{ __html: PHRASES[index] }}
-          />
+          <span className={changing ? 'sa-phrase sa-phrase--changing' : 'sa-phrase'}>
+            <SafePhrase html={PHRASES[index]} />
+          </span>
         </p>
       </div>
     </div>

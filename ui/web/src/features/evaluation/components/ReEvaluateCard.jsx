@@ -1,8 +1,10 @@
 import { useState, useEffect } from 'react';
 import { getProjectInfo, listPlugins } from '../../../api/index.js';
+import { ISO_25010_URL } from '../../../constants.js';
 
 export default function ReEvaluateCard({ project, onStart, disabled }) {
   const [info, setInfo] = useState(null);
+  const [error, setError] = useState(null);
   const [allDimensions, setAllDimensions] = useState([]);
   const [selectedDims, setSelectedDims] = useState(new Set());
 
@@ -11,7 +13,10 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
     setInfo(null);
     getProjectInfo(project)
       .then(setInfo)
-      .catch(() => setInfo(null));
+      .catch(() => {
+        setInfo(null);
+        setError('Could not load project info. The project may have been removed.');
+      });
   }, [project]);
 
   useEffect(() => {
@@ -27,9 +32,10 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         }
         setAllDimensions([...seen.values()]);
       })
-      .catch(() => setAllDimensions([]));
+      .catch((err) => { console.warn('Failed to load dimensions:', err); setAllDimensions([]); });
   }, []);
 
+  if (error) return <div className="inline-error">{error}</div>;
   if (!info) return null;
 
   function toggleDim(id) {
@@ -74,14 +80,14 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         {allDimensions.length > 0 && (
           <div className="form-group">
             <div className="dimension-label-row">
-              <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
+              <label><a className="iso-link" href={ISO_25010_URL} target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
               <div className="dimension-chip-actions">
                 <button type="button" className="dim-action-btn" onClick={selectAll}>All</button>
                 <button type="button" className="dim-action-btn" onClick={clearAll}>Clear</button>
               </div>
             </div>
             <div className="dimension-grid">
-              {allDimensions.map((dim) => (
+              {[...allDimensions].sort((a, b) => a.id.localeCompare(b.id)).map((dim) => (
                 <button
                   key={dim.id}
                   type="button"
@@ -104,6 +110,9 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         >
           {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
         </button>
+        {!disabled && selectedDims.size === 0 && (
+          <p className="form-hint">Select at least one dimension to start evaluation.</p>
+        )}
       </div>
     </div>
   );

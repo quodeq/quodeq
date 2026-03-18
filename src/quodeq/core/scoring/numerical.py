@@ -12,13 +12,11 @@ _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 
 # Per-type deduction constants for numerical mode.
 # Override via env vars; values must be > 0.
-# Read at call time (not import time) so env changes take effect without restart.
-
+# Cached on first call to avoid repeated os.environ lookups in hot scoring path.
 
 _DEFAULT_CRITICAL_PENALTY = 2.0
 _DEFAULT_MAJOR_PENALTY = 1.0
 _DEFAULT_MINOR_PENALTY = 0.25
-
 
 def _env_float(var: str, default: float, env: dict[str, str] | None = None) -> float:
     """Read an env var as float, returning *default* if unset or non-numeric."""
@@ -31,25 +29,22 @@ def _env_float(var: str, default: float, env: dict[str, str] | None = None) -> f
         return default
 
 
-def _critical_penalty(override: float | None = None) -> float:
-    """Points deducted per critical violation type (default: 2.0)."""
-    if override is not None:
-        return override
-    return _env_float("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
+def _penalty_reader(env_var: str, default: float):
+    """Create a lazy-cached penalty reader for a severity level."""
+    _cache: list[float] = []  # mutable container avoids nonlocal/global
+
+    def read(override: float | None = None) -> float:
+        if override is not None:
+            return override
+        if not _cache:
+            _cache.append(_env_float(env_var, default))
+        return _cache[0]
+    return read
 
 
-def _major_penalty(override: float | None = None) -> float:
-    """Points deducted per major violation type (default: 1.0)."""
-    if override is not None:
-        return override
-    return _env_float("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
-
-
-def _minor_penalty(override: float | None = None) -> float:
-    """Points deducted per minor violation type (default: 0.25)."""
-    if override is not None:
-        return override
-    return _env_float("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
+_critical_penalty = _penalty_reader("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
+_major_penalty = _penalty_reader("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
+_minor_penalty = _penalty_reader("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
 
 
 _CRITICAL_SCORE_CAP = 3

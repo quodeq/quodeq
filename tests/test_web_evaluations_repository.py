@@ -1,3 +1,5 @@
+import pytest
+
 from quodeq.adapters.web.http_client import HttpResponse
 from quodeq.adapters.web.evaluations_repository import WebEvaluationsRepository
 
@@ -16,3 +18,9 @@ def test_web_evaluations_repository_reads_report():
     assert repo.list_reports() == ["run-1"]
     payload = repo.get_report("run-1")
     assert payload["id"] == "run-1"
+
+
+def test_web_evaluations_repository_404_raises():
+    repo = WebEvaluationsRepository(base_url="https://api.example.com", client=FakeClient())
+    with pytest.raises(Exception):
+        repo.get_report("nonexistent")

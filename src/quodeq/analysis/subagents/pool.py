@@ -16,8 +16,8 @@ from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 
-from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, dedup_jsonl_lines, merge_jsonl
-from quodeq.engine.analysis import AnalysisConfig, AnalysisError, run_analysis
+from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
+from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.shared.logging import log_info, log_success, log_warning
 from quodeq.shared.utils import open_text
@@ -139,33 +139,35 @@ class SubagentPool:
                 stream_file=stream_file, success=False, error=str(exc),
             )
 
-    def _count_total_findings(self) -> int:
+    def _count_findings(self) -> int:
         """Count findings in the shared JSONL file."""
         jsonl = self._shared_jsonl_path()
         try:
-            if jsonl.exists():
-                with self._jsonl_lock:
-                    with open_text(jsonl) as f:
-                        return sum(1 for line in f if line.strip())
+            if not jsonl.exists():
+                return 0
+            with self._jsonl_lock:
+                with open_text(jsonl) as f:
+                    return sum(1 for line in f if line.strip())
         except OSError:
-            pass
-        return 0
+            return 0
 
     def _heartbeat_loop(self, stop: threading.Event, finished: dict[str, bool]) -> None:
-        """Emit periodic progress lines until stopped."""
+        """Emit periodic progress lines."""
         start = time.monotonic()
         while not stop.wait(_HEARTBEAT_INTERVAL):
             try:
                 elapsed = int(time.monotonic() - start)
                 mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
-                findings = self._count_total_findings()
+                total_findings = self._count_findings()
+
                 remaining, taken = FileQueue(self._queue_path).stats()
-                done = sum(1 for v in finished.values() if v)
+                total_agents = len(finished)
+                active = sum(1 for v in finished.values() if not v)
                 log_info(
                     f"  [{self._dimension}] {mins}m{secs:02d}s | "
-                    f"{done}/{self._n} agents done | "
+                    f"{active} active ({total_agents} total) | "
                     f"{taken} files taken ({remaining} left) | "
-                    f"{findings} findings"
+                    f"{total_findings} findings"
                 )
             except (OSError, ValueError, RuntimeError) as exc:
                 log_warning(f"Heartbeat error: {exc}")
@@ -199,7 +201,7 @@ class SubagentPool:
             try:
                 result = future.result()
             except Exception as exc:
-                log_warning(f"  {agent_id} raised unexpected error: {exc}")
+                log_warning(f"  {agent_id} raised {type(exc).__name__}: {exc}")
                 result = SubagentResult(
                     agent_id=agent_id,
                     jsonl_file=self._shared_jsonl_path(),
@@ -208,8 +210,6 @@ class SubagentPool:
                     error=str(exc),
                 )
             self._finished[result.agent_id] = True
-            if result.success:
-                log_success(f"  {result.agent_id} finished")
             results.append(result)
             del self._futures[future]
         return done_futures
@@ -225,7 +225,6 @@ class SubagentPool:
         for _ in done:
             remaining = self._should_respawn(pool_start, max_duration)
             if remaining:
-                log_info(f"  {remaining} files left -- spawning agent-{self._next_idx}")
                 self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
                 self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
                 self._next_idx += 1

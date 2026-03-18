@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.engine import mcp_findings
+from quodeq.engine._ref_utils import load_compiled_refs
 
 from tests.engine.conftest import _make_request, _run_server
 
@@ -179,7 +180,7 @@ class TestLoadCompiledRefs:
             ]},
         ]}]}
         (compiled_dir / "reliability.json").write_text(json.dumps(data))
-        result = mcp_findings.load_compiled_refs(str(compiled_dir), "reliability")
+        result = load_compiled_refs(str(compiled_dir), "reliability")
         assert "R-FT-1" in result
         assert result["R-FT-1"][0]["label"] == "CWE-391"
         assert "R-FT-2" in result
@@ -195,16 +196,16 @@ class TestLoadCompiledRefs:
             ]},
         ]}]}
         (compiled_dir / "maintainability.json").write_text(json.dumps(data))
-        result = mcp_findings.load_compiled_refs(str(compiled_dir), "maintainability")
+        result = load_compiled_refs(str(compiled_dir), "maintainability")
         assert len(result["R-1"]) == 1
         assert result["R-1"][0]["label"] == "CWE-123"
 
     def test_returns_empty_for_missing_file(self, tmp_path: Path) -> None:
-        result = mcp_findings.load_compiled_refs(str(tmp_path / "missing"), "security")
+        result = load_compiled_refs(str(tmp_path / "missing"), "security")
         assert result == {}
 
     def test_returns_empty_without_args(self) -> None:
-        assert mcp_findings.load_compiled_refs(None, None) == {}
+        assert load_compiled_refs(None, None) == {}
 
 
 class TestMainEntryPoint:

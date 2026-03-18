@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function deriveProjectName(repo) {
   if (!repo) return null;
@@ -25,15 +26,21 @@ function phaseLabel(job) {
   }
 }
 
+const STATUS_MARKERS = { arrow: '\u2192', check: '\u2713', error: 'Error:', failed: 'failed' };
+
 export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel }) {
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
+
+  function isRelevantLogLine(line) {
+    return line.startsWith(STATUS_MARKERS.arrow) || line.startsWith(STATUS_MARKERS.check) || line.startsWith(STATUS_MARKERS.error) || line.includes(STATUS_MARKERS.failed);
+  }
 
   function lastRelevantLog(logs) {
     if (!logs?.length) return null;
     for (let i = logs.length - 1; i >= 0; i--) {
       const line = logs[i].trim();
-      if (line.startsWith('→') || line.startsWith('✓') || line.startsWith('Error:') || line.includes('failed')) return line;
+      if (isRelevantLogLine(line)) return line;
     }
     return null;
   }
@@ -91,7 +98,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
           <span className="job-meta-label">Job ID</span>
           <div className="job-meta-id-row">
             <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>
-            <CopyButton aria-label="Copy job ID" onClick={() => navigator.clipboard.writeText(job.jobId)} />
+            <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(job.jobId)} />
           </div>
         </div>
         {job.repo && (
@@ -108,7 +115,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         tabIndex={0}
         onClick={() => setConsoleOpen(o => !o)}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen(o => !o); } }}
-        title={consoleOpen ? 'Hide console' : 'Show console'}
+        aria-label={consoleOpen ? 'Hide console' : 'Show console'}
       >
         {isRunning && <span className="eval-status-phase">{phaseLabel(job)}</span>}
         {isFailed && <span className="eval-status-phase eval-status-phase--error">{lastRelevantLog(job.logs) || 'Analysis failed'}</span>}

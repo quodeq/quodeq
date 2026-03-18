@@ -3,13 +3,17 @@ from __future__ import annotations
 
 import hashlib
 import logging
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import lru_cache
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from quodeq.config.paths import default_paths
 from quodeq.config.prompt_templates import render_template
 from quodeq.shared.utils import read_json
+
+if TYPE_CHECKING:
+    from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 
 _logger = logging.getLogger(__name__)
 
@@ -19,17 +23,23 @@ _NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
 _STANDARDS_READ_ERROR = "_Could not read compiled standards._"
 
 
-def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
-    """Render compiled standards as a requirements checklist organized by principle."""
+def _load_dimension_data(compiled_dir: Path, dimension: str) -> dict | None:
+    """Load compiled standards JSON for a dimension, or None on error."""
     compiled_file = compiled_dir / f"{dimension}.json"
     if not compiled_file.exists():
-        return _NO_STANDARDS_FOR_DIM
-
+        return None
     try:
-        data = read_json(compiled_file)
+        return read_json(compiled_file)
     except (OSError, ValueError) as exc:
         _logger.warning("Could not read compiled standards %s: %s", compiled_file, exc)
-        return _STANDARDS_READ_ERROR
+        return None
+
+
+def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
+    """Render compiled standards as a requirements checklist organized by principle."""
+    data = _load_dimension_data(compiled_dir, dimension)
+    if data is None:
+        return _NO_STANDARDS_FOR_DIM
     lines = []
     for principle in data.get("principles", []):
         reqs = principle.get("requirements", [])
@@ -39,6 +49,23 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
         for req in reqs:
             lines.append(f"- **{req['id']}**: {req['text']}")
         lines.append("")
+    return "\n".join(lines)
+
+
+def render_compact_standards(compiled_dir: Path, dimension: str) -> str:
+    """Render a compact standards checklist for the AI analyzer.
+
+    One line per requirement: ``REQ-ID: text``.
+    No principle headings (server derives principle from req ID),
+    no markdown formatting, no CWE refs (server enriches at report time).
+    """
+    data = _load_dimension_data(compiled_dir, dimension)
+    if data is None:
+        return _NO_STANDARDS_FOR_DIM
+    lines = []
+    for principle in data.get("principles", []):
+        for req in principle.get("requirements", []):
+            lines.append(f"{req['id']}: {req['text']}")
     return "\n".join(lines)
 
 
@@ -97,14 +124,17 @@ def load_template(
 @dataclass
 class PromptContext:
     """Parameters for rendering a per-dimension analysis prompt."""
-    plugin_id: str
+    language: str
     repo_name: str
     date_str: str
     dimension: str
     source_file_count: int
     dimensions_data: dict
-    analysis_md: str = ""
     standards_dir: Path | None = None
+    manifest: "SourceManifest | None" = None
+    target: "AnalysisTarget | None" = None
+    extra_vars: dict[str, str] = field(default_factory=dict)
+    work_dir: Path | None = None
 
 
 _TEMPLATE_HASH_CACHE_SIZE = 128
@@ -125,6 +155,46 @@ _TPL_STANDARDS_CHECKLIST = "STANDARDS_CHECKLIST"
 _TPL_ANALYSIS_GUIDANCE = "ANALYSIS_GUIDANCE"
 _TPL_DIMENSIONS = "DIMENSIONS"
 _TPL_PROMPT_HASH = "PROMPT_HASH"
+_TPL_SOURCE_MANIFEST = "SOURCE_MANIFEST"
+
+
+def _render_manifest_context(context: PromptContext) -> str:
+    """Render the source manifest context for the prompt.
+
+    When a target is set, renders target-specific context (with other-module info).
+    Otherwise falls back to the whole-repo manifest context.
+    """
+    if context.target is not None and context.manifest is not None:
+        other_targets = [t for t in context.manifest.targets if t.name != context.target.name]
+        return context.target.to_prompt_context(
+            repo_total_files=context.manifest.total_files,
+            other_targets=other_targets or None,
+        )
+    if context.manifest is not None:
+        return context.manifest.to_prompt_context()
+    return _NO_GUIDANCE
+
+
+_STANDARDS_FILE_PREFIX = ".quodeq_standards_"
+
+
+def _write_standards_file(work_dir: Path, dimension: str, content: str) -> Path:
+    """Write standards checklist to a file in the work directory.
+
+    Returns the absolute path to the written file.
+    """
+    standards_path = work_dir / f"{_STANDARDS_FILE_PREFIX}{dimension}.md"
+    standards_path.write_text(content)
+    return standards_path
+
+
+def _standards_read_instruction(standards_path: Path) -> str:
+    """Return prompt text instructing the AI to read the standards file."""
+    return (
+        f"**FIRST ACTION:** Read the standards checklist from `{standards_path}`\n"
+        f"This file contains all requirements you must evaluate against. "
+        f"Read it before analyzing any source files."
+    )
 
 
 def build_analysis_prompt(template: str, context: PromptContext) -> str:
@@ -136,19 +206,32 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
     if context.standards_dir:
         compiled_dir = context.standards_dir / "compiled"
         if compiled_dir.exists():
-            standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
+            if context.work_dir:
+                compact = render_compact_standards(compiled_dir, context.dimension)
+                if compact not in (_NO_STANDARDS_FOR_DIM,):
+                    standards_path = _write_standards_file(
+                        context.work_dir, context.dimension, compact,
+                    )
+                    standards_checklist = _standards_read_instruction(standards_path)
+                else:
+                    standards_checklist = compact
+            else:
+                standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
 
-    return render_template(
-        template,
-        {
-            _TPL_DISCIPLINE: context.plugin_id,
-            _TPL_REPO_NAME: context.repo_name,
-            _TPL_DATE: context.date_str,
-            _TPL_DIMENSION: context.dimension,
-            _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
-            _TPL_STANDARDS_CHECKLIST: standards_checklist,
-            _TPL_ANALYSIS_GUIDANCE: context.analysis_md or _NO_GUIDANCE,
-            _TPL_DIMENSIONS: dimensions_text,
-            _TPL_PROMPT_HASH: prompt_hash,
-        },
-    )
+    manifest_context = _render_manifest_context(context)
+
+    values = {
+        _TPL_DISCIPLINE: context.language,
+        _TPL_REPO_NAME: context.repo_name,
+        _TPL_DATE: context.date_str,
+        _TPL_DIMENSION: context.dimension,
+        _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
+        _TPL_STANDARDS_CHECKLIST: standards_checklist,
+        _TPL_ANALYSIS_GUIDANCE: manifest_context,
+        _TPL_DIMENSIONS: dimensions_text,
+        _TPL_PROMPT_HASH: prompt_hash,
+        _TPL_SOURCE_MANIFEST: manifest_context,
+    }
+    if context.extra_vars:
+        values.update(context.extra_vars)
+    return render_template(template, values)

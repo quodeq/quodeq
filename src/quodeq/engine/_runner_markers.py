@@ -9,6 +9,7 @@ from typing import Any, Callable
 from quodeq.shared.logging import log_info
 
 CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
+_SECONDS_PER_MINUTE = 60
 
 
 def emit_marker(phase: str, **kwargs: Any) -> None:
@@ -28,8 +29,8 @@ def cleanup_stream(stream_file: Path) -> None:
 def make_heartbeat(dim_name: str, idx: int, total: int) -> Callable[[int, dict], None]:
     """Return a heartbeat callback that prints progress to stdout."""
     def _cb(elapsed: int, progress: dict) -> None:
-        secs = elapsed % 60
-        mins = elapsed // 60
+        secs = elapsed % _SECONDS_PER_MINUTE
+        mins = elapsed // _SECONDS_PER_MINUTE
         evidence = progress.get("evidence", 0)
         log_info(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {evidence} findings")
     return _cb

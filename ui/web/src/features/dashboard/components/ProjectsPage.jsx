@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
+import { gradeLabel } from '../../../utils/formatters.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -25,14 +26,6 @@ function disciplineLabel(d) {
   return DISCIPLINE_LABEL[d.toLowerCase()] ?? d.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-function gradeLabel(grade) {
-  if (!grade) return null;
-  const k = grade.trim().toLowerCase();
-  const MAP = { exemplary: 'A', good: 'B', proficient: 'B', adequate: 'C', developing: 'C', poor: 'D', insufficient: 'D', critical: 'F' };
-  if (MAP[k]) return MAP[k];
-  const firstChar = grade.trim().toUpperCase().charAt(0);
-  return ['A', 'B', 'C', 'D', 'F'].includes(firstChar) ? firstChar : null;
-}
 
 function formatDate(iso) {
   if (!iso) return null;
@@ -57,6 +50,42 @@ function GradeChip({ grade, score }) {
     <span className={`projects-grade ${cls}`}>
       {grade}{score != null ? ` ${score}` : ''}
     </span>
+  );
+}
+
+function ProjectCard({ project, isSelected, onSelect, footer, isChild = false, children: cardChildren }) {
+  const id = project.id || project.name || project;
+  const name = project.name || project;
+  const grade = gradeLabel(project.overallGrade ?? project.latestGrade);
+  const score = project.latestScore != null ? parseFloat(project.latestScore).toFixed(1) : null;
+  const date = formatDate(project.latestDate);
+  const discipline = disciplineLabel(project.discipline);
+
+  return (
+    <div className={`project-card${isChild ? ' project-card--child' : ''} panel${isSelected ? ' project-card--selected' : ''}`}>
+      <div
+        className="project-card-main"
+        role="button"
+        tabIndex={0}
+        onClick={() => onSelect?.(id)}
+        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
+      >
+        <div className="project-card-top">
+          <span className="project-card-name">{project.displayName || name}</span>
+          <GradeChip grade={grade} score={score} />
+        </div>
+        <div className="project-card-meta">
+          {discipline && <span className="project-meta-tag">{discipline}</span>}
+          {project.filesCount != null && (
+            <span className="project-meta-item">{project.filesCount.toLocaleString()} files</span>
+          )}
+          <span className="project-meta-item">{project.runsCount} {project.runsCount === 1 ? 'run' : 'runs'}</span>
+          {date && <span className="project-meta-date">{date}</span>}
+        </div>
+        {cardChildren}
+      </div>
+      {footer && <div className={`project-card-footer${isChild ? '' : ''}`} onClick={isChild ? (e) => e.stopPropagation() : undefined}>{footer}</div>}
+    </div>
   );
 }
 
@@ -170,119 +199,56 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
         <div className="projects-cards">
           {roots.map((p) => {
             const id = p.id || p.name || p;
-            const name = p.name || p;
             const isSelected = id === selectedProject;
             const hasChildren = !!(children[id]?.length);
-            const grade = gradeLabel(p.overallGrade ?? p.latestGrade);
-            const score = p.latestScore != null ? parseFloat(p.latestScore).toFixed(1) : null;
-            const date = formatDate(p.latestDate);
-            const discipline = disciplineLabel(p.discipline);
             const path = formatPath(p.path);
             const pathMissing = p.location === 'local' && p.pathExists === false;
             const childSelected = hasChildren && children[id].some((c) => (c.id || c.name || c) === selectedProject);
 
             return (
-              <div key={id} className="project-card-group">
-                <div
-                  className={`project-card panel${isSelected ? ' project-card--selected' : ''}${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}
-                >
-                  <div
-                    className="project-card-main"
-                    role="button"
-                    tabIndex={0}
-                    onClick={() => onSelect?.(id)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
-                  >
-                    <div className="project-card-top">
-                      <span className="project-card-name">{p.displayName || name}</span>
-                      <GradeChip grade={grade} score={score} />
+              <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
+                <ProjectCard project={p} isSelected={isSelected} onSelect={onSelect} footer={renderCardFooter(id)}>
+                  {relocating === id ? (
+                    <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        className="project-relocate-input"
+                        value={relocatePath}
+                        onChange={(e) => setRelocatePath(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }}
+                        placeholder="/new/path/to/repo"
+                        autoFocus
+                      />
+                      <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>Save</button>
+                      <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>Cancel</button>
                     </div>
-                    <div className="project-card-meta">
-                      {discipline && <span className="project-meta-tag">{discipline}</span>}
-                      {p.filesCount != null && (
-                        <span className="project-meta-item">{p.filesCount.toLocaleString()} files</span>
+                  ) : (
+                    <div className="project-path-row">
+                      {pathMissing && <span className="project-path-missing">Path not found</span>}
+                      {p.location === 'online' && p.path ? (
+                        <span onClick={(e) => e.stopPropagation()}>
+                          <CopyButton label={path} onClick={() => navigator.clipboard?.writeText(p.path)} />
+                        </span>
+                      ) : (
+                        path && <div className="project-card-path">{path}</div>
                       )}
-                      <span className="project-meta-item">{p.runsCount} {p.runsCount === 1 ? 'run' : 'runs'}</span>
-                      {date && <span className="project-meta-date">{date}</span>}
+                      {pathMissing && (
+                        <button
+                          type="button"
+                          className="project-path-action project-path-action--warn"
+                          onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}
+                        >Relocate</button>
+                      )}
                     </div>
-                    {relocating === id ? (
-                      <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          className="project-relocate-input"
-                          value={relocatePath}
-                          onChange={(e) => setRelocatePath(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }}
-                          placeholder="/new/path/to/repo"
-                          autoFocus
-                        />
-                        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>Save</button>
-                        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>Cancel</button>
-                      </div>
-                    ) : (
-                      <div className="project-path-row">
-                        {pathMissing && <span className="project-path-missing">Path not found</span>}
-                        {p.location === 'online' && p.path ? (
-                          <span onClick={(e) => e.stopPropagation()}>
-                            <CopyButton label={path} onClick={() => navigator.clipboard?.writeText(p.path)} />
-                          </span>
-                        ) : (
-                          path && <div className="project-card-path">{path}</div>
-                        )}
-                        {pathMissing && (
-                          <button
-                            type="button"
-                            className="project-path-action project-path-action--warn"
-                            onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}
-                          >Relocate</button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  <div className="project-card-footer">
-                    {renderCardFooter(id)}
-                  </div>
-                </div>
+                  )}
+                </ProjectCard>
 
                 {hasChildren && (
                   <div className="project-children-outer">
                     {children[id].map((child) => {
                       const childId = child.id || child.name || child;
-                      const childName = child.name || child;
-                      const isChildSelected = childId === selectedProject;
-                      const cGrade = gradeLabel(child.overallGrade ?? child.latestGrade);
-                      const cScore = child.latestScore != null ? parseFloat(child.latestScore).toFixed(1) : null;
-                      const cDate = formatDate(child.latestDate);
-                      const cDiscipline = disciplineLabel(child.discipline);
-
                       return (
                         <div key={childId} className="project-child-entry">
-                          <div
-                            className={`project-card project-card--child panel${isChildSelected ? ' project-card--selected' : ''}`}
-                          >
-                            <div
-                              className="project-card-main"
-                              role="button"
-                              tabIndex={0}
-                              onClick={() => onSelect?.(childId)}
-                              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(childId); } }}
-                            >
-                              <div className="project-card-top">
-                                <span className="project-card-name">{child.displayName || childName}</span>
-                                <GradeChip grade={cGrade} score={cScore} />
-                              </div>
-                              <div className="project-card-meta">
-                                {cDiscipline && <span className="project-meta-tag">{cDiscipline}</span>}
-                                {child.filesCount != null && (
-                                  <span className="project-meta-item">{child.filesCount.toLocaleString()} files</span>
-                                )}
-                                <span className="project-meta-item">{child.runsCount} {child.runsCount === 1 ? 'run' : 'runs'}</span>
-                                {cDate && <span className="project-meta-date">{cDate}</span>}
-                              </div>
-                            </div>
-                            <div className="project-card-footer" onClick={(e) => e.stopPropagation()}>
-                              {renderCardFooter(childId)}
-                            </div>
-                          </div>
+                          <ProjectCard project={child} isSelected={childId === selectedProject} onSelect={onSelect} isChild footer={renderCardFooter(childId)} />
                         </div>
                       );
                     })}

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatShortDate } from '../../../utils/formatters.js';
+import { formatShortDate, angleFromDelta, scoreTierLabel } from '../../../utils/formatters.js';
 import {
   ComposedChart,
   Bar,
@@ -12,9 +12,21 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
-function cssVar(name, fallback) {
-  return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-}
+
+const MAX_CHART_RUNS = 20;
+const CHART_HEIGHT = 160;
+const REF_LINE_LOW = 2.5;
+const REF_LINE_MID = 5;
+const REF_LINE_HIGH = 7.5;
+const cssVar = (() => {
+  const cache = {};
+  return (name, fallback) => {
+    if (!(name in cache)) {
+      cache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+    return cache[name] || fallback;
+  };
+})();
 
 function scoreBarColor(score) {
   const n = parseFloat(score);
@@ -24,22 +36,6 @@ function scoreBarColor(score) {
   if (n >= 5) return cssVar('--color-grade-mid-text');   // adequate
   if (n >= 3) return cssVar('--color-grade-low-text');   // poor
   return cssVar('--color-grade-bottom-text');            // critical
-}
-
-function scoreTierLabel(score) {
-  const n = parseFloat(score);
-  if (isNaN(n)) return '';
-  if (n >= 9) return 'A';
-  if (n >= 7) return 'B';
-  if (n >= 5) return 'C';
-  if (n >= 3) return 'D';
-  return 'F';
-}
-
-// Mirrors angleFromDelta in TrendArrow — sqrt curve, max arc 55°
-function angleFromDelta(d) {
-  const clamped = Math.max(-4, Math.min(4, d));
-  return 90 - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / 4) * 55;
 }
 
 // Trend direction — mirrors TrendBadge thresholds
@@ -72,7 +68,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
 
   // Take the 20 most recent runs (trend is newest-first), then display oldest→newest.
   // For the selected run, use the accumulated score so the bar matches the acc-eval-hero.
-  const data = [...trend].slice(0, 20).reverse().map((row, i, arr) => {
+  const data = [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
     const isSelected = row.runId === selectedRunId;
     const numericAverage = isSelected && selectedRunScore != null
       ? parseFloat(selectedRunScore)
@@ -120,11 +116,11 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
   };
 
   return (
-    <section className="run-history-panel panel">
+    <section className="run-history-panel panel" aria-label="Score history chart">
       <div className="run-history-header">
         <span className="run-history-title">Score History</span>
       </div>
-      <ResponsiveContainer width="100%" height={160}>
+      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
           <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
           <XAxis
@@ -136,7 +132,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
           />
           <YAxis
             domain={[0, 10]}
-            ticks={[0, 2.5, 5, 7.5, 10]}
+            ticks={[0, REF_LINE_LOW, REF_LINE_MID, REF_LINE_HIGH, 10]}
             tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             axisLine={false}
             tickLine={false}
@@ -158,9 +154,9 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
               );
             }}
           />
-          <ReferenceLine y={2.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
-          <ReferenceLine y={5}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-          <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+          <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+          <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <Bar
             dataKey="numericAverage"
             radius={[3, 3, 0, 0]}
