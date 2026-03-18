@@ -84,6 +84,8 @@ def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:
             sev = violation.get("severity", "minor")
             if sev in entry:
                 entry[sev] += 1
+    # _max_violation_files() reads from env at call time; the env injection
+    # parameter exists for unit-testing _max_violation_files directly.
     top_files = sorted(
         by_file.values(), key=lambda item: item["count"], reverse=True,
     )[:_max_violation_files()]

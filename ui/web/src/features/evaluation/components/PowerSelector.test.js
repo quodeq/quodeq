@@ -1,9 +1,31 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { LEVELS, STORAGE_KEY } from './powerLevels.js';
+import { DEFAULT_MODELS, getLevels, LEVELS, STORAGE_KEY, MODEL_STORAGE_PREFIX } from './powerLevels.js';
 
 // ---------------------------------------------------------------------------
-// LEVELS mapping
+// getLevels with injectable storage
+// ---------------------------------------------------------------------------
+
+test('getLevels with null storage returns defaults', () => {
+  const levels = getLevels(null);
+  assert.equal(levels.length, 3);
+  assert.equal(levels[0].model, DEFAULT_MODELS[1]);
+  assert.equal(levels[1].model, DEFAULT_MODELS[2]);
+  assert.equal(levels[2].model, DEFAULT_MODELS[3]);
+});
+
+test('getLevels with mock storage returns overrides', () => {
+  const mockStorage = {
+    _data: { [`${MODEL_STORAGE_PREFIX}1`]: 'custom-haiku' },
+    getItem(key) { return this._data[key] || null; },
+  };
+  const levels = getLevels(mockStorage);
+  assert.equal(levels[0].model, 'custom-haiku');
+  assert.equal(levels[1].model, DEFAULT_MODELS[2]);
+});
+
+// ---------------------------------------------------------------------------
+// LEVELS mapping (uses runtime defaults, no localStorage dependency)
 // ---------------------------------------------------------------------------
 
 test('LEVELS has exactly 3 entries', () => {
@@ -14,21 +36,21 @@ test('LEVELS are ordered 1, 2, 3', () => {
   assert.deepEqual(LEVELS.map(l => l.level), [1, 2, 3]);
 });
 
-test('level 1 maps to haiku', () => {
-  const l = LEVELS.find(l => l.level === 1);
-  assert.equal(l.model, 'claude-haiku-4-5');
+test('level 1 maps to haiku default', () => {
+  const l = getLevels(null).find(l => l.level === 1);
+  assert.equal(l.model, 'haiku');
   assert.equal(l.label, 'Fast');
 });
 
-test('level 2 maps to sonnet', () => {
-  const l = LEVELS.find(l => l.level === 2);
-  assert.equal(l.model, 'claude-sonnet-4-6');
+test('level 2 maps to sonnet default', () => {
+  const l = getLevels(null).find(l => l.level === 2);
+  assert.equal(l.model, 'sonnet');
   assert.equal(l.label, 'Balanced');
 });
 
-test('level 3 maps to opus', () => {
-  const l = LEVELS.find(l => l.level === 3);
-  assert.equal(l.model, 'claude-opus-4-6');
+test('level 3 maps to opus default', () => {
+  const l = getLevels(null).find(l => l.level === 3);
+  assert.equal(l.model, 'opus');
   assert.equal(l.label, 'Thorough');
 });
 
@@ -117,7 +139,7 @@ test('at level 3, all bars are filled', () => {
 
 test('default power level 2 resolves to sonnet', () => {
   const defaultLevel = 2;
-  const entry = LEVELS.find(l => l.level === defaultLevel);
+  const entry = getLevels(null).find(l => l.level === defaultLevel);
   assert.ok(entry);
-  assert.equal(entry.model, 'claude-sonnet-4-6');
+  assert.equal(entry.model, DEFAULT_MODELS[2]);
 });

@@ -175,14 +175,14 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
     return None
 
 
+# Module-level cache for available dimension IDs from dimensions.json.
+# Populated lazily on first call; avoids repeated disk I/O on every request.
+# Safe for concurrent reads after initial population (immutable list value).
 _cached_dimensions: list[str] | None = None
 
 
-def _list_available_dimensions_for_discipline(
-    discipline: str,
-) -> list[str]:
+def _list_available_dimensions_for_discipline() -> list[str]:
     """Resolve available dimensions from universal dimensions.json (cached after first read)."""
-    _ = discipline  # unused; kept for caller-facing API consistency
     global _cached_dimensions
     if _cached_dimensions is not None:
         return _cached_dimensions

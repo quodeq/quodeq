@@ -8,12 +8,14 @@ import { getHealth } from '../api/index.js';
  *
  * Returns [serverConnected, setServerConnected].
  */
-export function useServerHealth() {
+const DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183];
+const DEFAULT_BASE_URL = 'http://127.0.0.1';
+
+export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAULT_BASE_URL } = {}) {
   const [serverConnected, setServerConnected] = useState(true);
 
   useEffect(() => {
     let mounted = true;
-    const altPorts = [4180, 4181, 4182, 4183];
 
     async function checkHealth() {
       try {
@@ -25,9 +27,9 @@ export function useServerHealth() {
         for (const port of altPorts) {
           if (String(port) === currentPort) continue;
           try {
-            const res = await fetch(`http://127.0.0.1:${port}/api/health`, { timeout: 2000 });
+            const res = await fetch(`${baseUrl}:${port}/api/health`, { timeout: 2000 });
             if (res.ok) {
-              window.location.href = `http://127.0.0.1:${port}`;
+              window.location.href = `${baseUrl}:${port}`;
               return;
             }
           } catch { /* try next */ }

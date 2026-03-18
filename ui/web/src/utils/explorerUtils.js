@@ -21,18 +21,13 @@ const PLAN_SYSTEM_PREAMBLE = [
 ];
 
 const PLAN_OUTPUT_INSTRUCTIONS = [
-  '---',
-  '',
-  '## How to apply these fixes',
-  '',
+  '---', '', '## How to apply these fixes', '',
   '**For each violation above:**',
   '1. Read the affected file(s) in full.',
   '2. Identify the minimal change that resolves the stated violation.',
   '3. Apply the fix as an exact replacement block (showing before → after) or a unified diff.',
   '4. State a one-line verification step (e.g., `wc -l file.py` should be ≤ 300, `grep -c "except Exception.*pass" file.py` should be 0).',
-  '',
-  '**Sequencing:** If multiple violations touch the same file or one fix creates infrastructure for another, group them and apply in dependency order — foundational changes first.',
-  '',
+  '', '**Sequencing:** If multiple violations touch the same file or one fix creates infrastructure for another, group them and apply in dependency order — foundational changes first.', '',
 ];
 
 function normalizeSeverity(value) {
@@ -160,21 +155,14 @@ export function pickValidProject(projects = [], selectedProject = '') {
   return names[0];
 }
 
-/**
- * Collect all unique files touched by a list of violations.
- * Used to generate the "files you will modify" summary.
- */
+/** Collect unique files touched by violations. */
 function collectAffectedFiles(violations) {
   const files = new Set();
-  violations.forEach((v) => {
-    if (v.file) files.add(v.file);
-  });
+  violations.forEach((v) => { if (v.file) files.add(v.file); });
   return Array.from(files).sort();
 }
 
-/**
- * Render a single violation entry as markdown lines.
- */
+/** Render a single violation entry as markdown lines. */
 function renderViolationEntry(v, index, { principleKey, reasonKey }) {
   const lines = [];
   const loc = v.file ? ` — \`${v.file}${v.line ? `:${v.line}` : ''}\`` : '';
@@ -203,8 +191,6 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
 }
 
 export function buildDimensionPlanText(evalData) {
-  const SEVERITY_ORDER = KNOWN_SEVERITIES;
-
   const bySeverity = {};
   let total = 0;
 
@@ -222,7 +208,7 @@ export function buildDimensionPlanText(evalData) {
   const dimName = evalData.dimension || 'dimension';
 
   // Collect all violations flat for the affected-files summary
-  const allViolations = SEVERITY_ORDER.flatMap((sev) => bySeverity[sev] || []);
+  const allViolations = KNOWN_SEVERITIES.flatMap((sev) => bySeverity[sev] || []);
   const affectedFiles = collectAffectedFiles(allViolations);
 
   const lines = [
@@ -242,7 +228,7 @@ export function buildDimensionPlanText(evalData) {
 
   lines.push('', '---', '');
 
-  SEVERITY_ORDER.forEach((sev) => {
+  KNOWN_SEVERITIES.forEach((sev) => {
     const vs = bySeverity[sev];
     if (!vs || vs.length === 0) return;
     lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);
@@ -265,7 +251,6 @@ export function buildDimensionPlanText(evalData) {
 export function buildDimensionPlanFromViolations(dimName, violations) {
   if (!violations || violations.length === 0) return '';
 
-  const SEVERITY_ORDER = KNOWN_SEVERITIES;
   const bySeverity = {};
 
   violations.forEach((v) => {
@@ -292,7 +277,7 @@ export function buildDimensionPlanFromViolations(dimName, violations) {
 
   lines.push('', '---', '');
 
-  SEVERITY_ORDER.forEach((sev) => {
+  KNOWN_SEVERITIES.forEach((sev) => {
     const vs = bySeverity[sev];
     if (!vs || vs.length === 0) return;
     lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);

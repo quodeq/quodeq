@@ -6,14 +6,16 @@ export const DEFAULT_MODELS = {
 
 export const MODEL_STORAGE_PREFIX = 'cc-model-level-';
 
-export function getLevels() {
+export function getLevels(storage = typeof localStorage !== 'undefined' ? localStorage : null) {
   const overrides = {};
   try {
-    for (const lvl of [1, 2, 3]) {
-      const stored = localStorage.getItem(`${MODEL_STORAGE_PREFIX}${lvl}`);
-      if (stored) overrides[lvl] = stored;
+    if (storage) {
+      for (const lvl of [1, 2, 3]) {
+        const stored = storage.getItem(`${MODEL_STORAGE_PREFIX}${lvl}`);
+        if (stored) overrides[lvl] = stored;
+      }
     }
-  } catch { /* localStorage unavailable (private browsing) */ }
+  } catch { /* storage unavailable (private browsing) */ }
   return [
     { level: 1, model: overrides[1] || DEFAULT_MODELS[1], label: 'Fast' },
     { level: 2, model: overrides[2] || DEFAULT_MODELS[2], label: 'Balanced' },

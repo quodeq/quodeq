@@ -92,6 +92,10 @@ def _get_config() -> Config:
     return _config_holder.get()
 
 
+# ---------------------------------------------------------------------------
+# Platform detection
+# ---------------------------------------------------------------------------
+
 IS_WIN32: bool = sys.platform == "win32"
 """True when the current platform is Windows (win32)."""
 
@@ -100,6 +104,11 @@ def __getattr__(name: str) -> str:
     """Lazy accessor for config-derived constants (ANTHROPIC_API_URL, etc.)."""
     from quodeq.shared.config_loader import __getattr__ as _cl_getattr
     return _cl_getattr(name)
+
+
+# ---------------------------------------------------------------------------
+# Repository URL helpers
+# ---------------------------------------------------------------------------
 
 
 def is_repo_url(repo_input: str) -> bool:
@@ -123,12 +132,22 @@ def project_name_from_repo(repo: str) -> str:
     return Path(repo).name
 
 
+# ---------------------------------------------------------------------------
+# JSON / file I/O
+# ---------------------------------------------------------------------------
+
+
 def read_json(path: Path) -> dict[str, Any]:
     """Read and parse a JSON file, returning the parsed dict."""
     try:
         return json.loads(path.read_text(encoding=TEXT_ENCODING))
     except (OSError, json.JSONDecodeError) as exc:
         raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
+
+
+# ---------------------------------------------------------------------------
+# Environment-based configuration accessors
+# ---------------------------------------------------------------------------
 
 
 def get_ai_provider(env: dict[str, str] | None = None) -> str:
@@ -222,6 +241,11 @@ def get_github_raw_base_url(env: dict[str, str] | None = None) -> str:
 def get_findings_file(env: dict[str, str] | None = None) -> str | None:
     """Return the findings file path from environment, or None."""
     return (env or os.environ).get("FINDINGS_FILE")
+
+
+# ---------------------------------------------------------------------------
+# Diff display
+# ---------------------------------------------------------------------------
 
 
 def show_diff(path: Path, new_content: str) -> None:

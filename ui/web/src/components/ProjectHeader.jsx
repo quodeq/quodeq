@@ -8,13 +8,7 @@ export default function ProjectHeader({
   onProjectChange,
   headerMeta,
   showRunNav,
-  currentOverviewRun,
-  overviewRunIndex,
-  availableRuns,
-  onRunPrev,
-  onRunNext,
-  onRunLatest,
-  onViewRun,
+  runNavProps,
 }) {
   return (
     <header className="content-header">
@@ -57,15 +51,17 @@ export default function ProjectHeader({
           </div>
         )}
       </div>
-      {showRunNav && (
+      {showRunNav && runNavProps && (
         <RunNavigator
-          currentRun={formatRunId(currentOverviewRun, availableRuns[overviewRunIndex]?.dateLabel)}
-          isLatest={overviewRunIndex === 0}
-          isOldest={overviewRunIndex >= availableRuns.length - 1}
-          onPrev={onRunPrev}
-          onNext={onRunNext}
-          onLatest={onRunLatest}
-          onView={onViewRun}
+          currentRun={formatRunId(runNavProps.currentOverviewRun, runNavProps.availableRuns[runNavProps.overviewRunIndex]?.dateLabel)}
+          isLatest={runNavProps.overviewRunIndex === 0}
+          isOldest={runNavProps.overviewRunIndex >= runNavProps.availableRuns.length - 1}
+          actions={{
+            onPrev: runNavProps.onRunPrev,
+            onNext: runNavProps.onRunNext,
+            onLatest: runNavProps.onRunLatest,
+            onView: runNavProps.onViewRun,
+          }}
         />
       )}
     </header>

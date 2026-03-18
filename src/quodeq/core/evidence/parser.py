@@ -17,8 +17,12 @@ _CWE_URL_TEMPLATE_DEFAULT = "https://cwe.mitre.org/data/definitions/{cwe_id}.htm
 
 
 def _cwe_url_template(env: dict[str, str] | None = None) -> str:
-    """Return the CWE URL template, reading from env lazily."""
-    return (env or os.environ).get(
+    """Return the CWE URL template, reading from env lazily.
+
+    *env* overrides ``os.environ`` when provided (e.g. for testing).
+    When ``None``, falls back to ``os.environ``.
+    """
+    return (env if env is not None else os.environ).get(
         "QUODEQ_CWE_URL_TEMPLATE",
         _CWE_URL_TEMPLATE_DEFAULT,
     )

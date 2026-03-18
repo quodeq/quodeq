@@ -2,7 +2,7 @@
 // Prev/next/latest navigation buttons + current run display + optional "View run" button
 // currentRun: string (e.g. '20260228' or 'latest')
 
-export default function RunNavigator({ currentRun, isLatest, isOldest, onPrev, onNext, onLatest, onView }) {
+export default function RunNavigator({ currentRun, isLatest, isOldest, actions: { onPrev, onNext, onLatest, onView } = {} }) {
   return (
     <div className="run-navigator">
       <button

@@ -18,13 +18,15 @@ const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
-const _cssVarCache = {};
-function cssVar(name, fallback) {
-  if (!(name in _cssVarCache)) {
-    _cssVarCache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  }
-  return _cssVarCache[name] || fallback;
-}
+const cssVar = (() => {
+  const cache = {};
+  return (name, fallback) => {
+    if (!(name in cache)) {
+      cache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    }
+    return cache[name] || fallback;
+  };
+})();
 
 function scoreBarColor(score) {
   const n = parseFloat(score);

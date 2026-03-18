@@ -5,6 +5,7 @@
 if [ -f "$HOME/.zprofile" ]; then source "$HOME/.zprofile" 2>/dev/null; fi
 if [ -f "$HOME/.zshrc" ]; then source "$HOME/.zshrc" 2>/dev/null; fi
 if [ -f "$HOME/.bash_profile" ]; then source "$HOME/.bash_profile" 2>/dev/null; fi
+# Homebrew paths are macOS-specific; this script only runs inside a .app bundle.
 export PATH="$PATH:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin"
 
 # If dashboard is already running, just open the browser

@@ -1,9 +1,8 @@
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
-import CopyButton, { CopyIcon } from '../../../components/CopyButton.jsx';
-
-const COPY_FEEDBACK_MS = 1500;
+import CopyButton from '../../../components/CopyButton.jsx';
+import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 
 function buildFilePlanText(file) {
   const totalViolations = SEVERITY_ORDER.reduce(
@@ -64,24 +63,6 @@ function buildViolationPlanText(v) {
   if (loc) lines.push(`Apply it to \`${loc}\`.`);
   lines.push(PLAN_TEST_INSTRUCTION_SINGLE);
   return lines.join('\n').trim();
-}
-
-function FileCopyBtn({ display, copyText }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="vlive-detail-file-btn"
-      onClick={() => {
-        navigator.clipboard.writeText(copyText);
-        setCopied(true);
-        setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-      }}
-    >
-      {copied ? 'Copied!' : display}
-      <CopyIcon />
-    </button>
-  );
 }
 
 function ViolationCard({ v, index }) {

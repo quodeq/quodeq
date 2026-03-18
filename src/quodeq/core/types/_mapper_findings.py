@@ -1,4 +1,8 @@
-"""Mapper functions for finding-related dataclasses."""
+"""Mapper functions for finding-related dataclasses.
+
+Converts raw dict payloads (from JSON) into typed Finding, ReqRef,
+SeverityTally, and Totals instances.
+"""
 
 from __future__ import annotations
 

@@ -98,6 +98,7 @@ def load_env_file(paths: ConfigPaths, target: dict[str, str] | None = None) -> N
 
 
 def _looks_like_project_root(root: Path) -> bool:
+    """Return True if *root* contains the expected quodeq data layout (prompts/ + config/detection.json)."""
     has_prompts = (root / "prompts").is_dir()
     has_detection = (root / "config" / "detection.json").is_file()
     return has_prompts and has_detection
