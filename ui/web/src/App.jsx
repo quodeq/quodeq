@@ -221,7 +221,7 @@ export default function App() {
           />
         );
       case 'projects':
-        return <ProjectsPage projects={projects} selectedProject={selectedProject} onSelect={handleProjectChange} onDelete={handleDeleteProject} onExport={handleExportProject} onRelocate={handleRelocateProject} />;
+        return <ProjectsPage projects={projects} selectedProject={selectedProject} onSelect={(id) => { handleProjectChange(id); navTab('overview'); }} onDelete={handleDeleteProject} onExport={handleExportProject} onRelocate={handleRelocateProject} />;
       default:
         return <div className="empty-state"><p>Page not found: {page}</p></div>;
     }

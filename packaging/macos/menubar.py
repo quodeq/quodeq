@@ -5,7 +5,9 @@ import json
 import os
 import signal
 import subprocess
+import tempfile
 import threading
+import time
 import urllib.error
 import urllib.request
 import webbrowser
@@ -16,15 +18,14 @@ _HEALTH_TIMEOUT = 1.0
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
-# macOS-specific paths for Homebrew and user-local binaries
 _EXTRA_PATH_DIRS = "/usr/local/bin:/opt/homebrew/bin"
 
 
 def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
     env = env or os.environ
-    app_port = int(env.get("QUODEQ_PORT", "4180"))
-    ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", "4180,4181,4182,4183").split(","))
+    app_port = int(env.get("QUODEQ_PORT", "4173"))
+    ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", "4173,4174,4175,4180,4181,4182,4183").split(","))
     return app_port, ports
 
 
@@ -73,16 +74,28 @@ def _is_evaluating(port: int) -> bool:
         return False
 
 
+def _find_commands() -> dict[str, str | None]:
+    """Check which required commands are available."""
+    cmds = {}
+    for name in ("python3", "node", "claude", "quodeq"):
+        try:
+            result = subprocess.run(
+                ["which", name], capture_output=True, text=True, timeout=5,
+            )
+            cmds[name] = result.stdout.strip() if result.returncode == 0 else None
+        except (subprocess.TimeoutExpired, OSError):
+            cmds[name] = None
+    return cmds
+
+
 class QuodeqApp(rumps.App):
     def __init__(self):
         super().__init__("Quodeq", icon=_find_icon("menubar_iconTemplate.png"), template=True)
         self._app_port, self._ports = _load_config()
-        self._commands_cache: dict[str, str | None] | None = None
         self._last_known_port: int | None = None
         self._process: subprocess.Popen | None = None
         self._port: int | None = None
         self._starting = False
-        self._starting_lock = threading.Lock()
         self._icon_stopped = _find_icon("menubar_iconTemplate.png")
         self._icon_running = _find_icon("menubar_icon_running.png")
         self._icon_evaluating = _find_icon("menubar_icon_evaluating.png")
@@ -90,28 +103,33 @@ class QuodeqApp(rumps.App):
         self._open_item = rumps.MenuItem("Open Dashboard", callback=None)
         self._start_item = rumps.MenuItem("Start", callback=self._on_start)
         self._stop_item = rumps.MenuItem("Stop", callback=None)
-        self._prereq_items: dict[str, rumps.MenuItem] = {}
-        self.menu = [
-            self._open_item, None, self._status_item, None,
-            self._start_item, self._stop_item, None,
-        ]
-        threading.Thread(target=self._check_prereqs_and_start, daemon=True).start()
+        self._error_item = rumps.MenuItem("")
 
-    def _find_commands(self) -> dict[str, str | None]:
-        """Check which required commands are available (cached after first call)."""
-        if self._commands_cache is not None:
-            return self._commands_cache
-        cmds = {}
-        for name in ("python3", "node", "claude", "quodeq"):
-            try:
-                result = subprocess.run(
-                    ["which", name], capture_output=True, text=True, timeout=5,
-                )
-                cmds[name] = result.stdout.strip() if result.returncode == 0 else None
-            except (subprocess.TimeoutExpired, OSError):
-                cmds[name] = None
-        self._commands_cache = cmds
-        return cmds
+        # Check prereqs on main thread so menu items render correctly
+        cmds = _find_commands()
+        self._prereq_items = {}
+        for label, cmd in [("Python", "python3"), ("Node.js", "node"), ("Claude", "claude"), ("Quodeq", "quodeq")]:
+            path = cmds.get(cmd)
+            if path:
+                item = rumps.MenuItem(f"  {label} \u2713", callback=None)
+            else:
+                item = rumps.MenuItem(f"  {label} \u2717 not found", callback=None)
+            self._prereq_items[cmd] = item
+
+        self.menu = [
+            self._open_item, None, self._status_item, self._error_item, None,
+            self._start_item, self._stop_item, None,
+            *self._prereq_items.values(),
+        ]
+        # Auto-start in background
+        threading.Thread(target=self._auto_start, daemon=True).start()
+
+    def _set_error(self, msg: str) -> None:
+        """Show an error in the menu (thread-safe — menu title updates work from any thread)."""
+        self._error_item.title = msg
+
+    def _clear_error(self) -> None:
+        self._error_item.title = ""
 
     def _find_running_port(self) -> int | None:
         """Find the running dashboard port, checking last known port first."""
@@ -147,6 +165,7 @@ class QuodeqApp(rumps.App):
         port = self._find_running_port()
         if port:
             self._port = port
+            self._clear_error()
             if _is_evaluating(port):
                 self._status_item.title = "Evaluating..."
                 self.icon = self._icon_evaluating
@@ -157,65 +176,15 @@ class QuodeqApp(rumps.App):
             self._set_ui_state(running=True)
         else:
             self._port = None
-            self._status_item.title = "Stopped"
+            if not self._starting:
+                self._status_item.title = "Stopped"
             self.icon = self._icon_stopped
             self.template = True
             self._set_ui_state(running=False)
 
-    def _check_prereqs_and_start(self):
-        """Check prerequisites, show status in menu, then auto-start."""
-        import time
-        time.sleep(1.0)
-        cmds = self._find_commands()
-        prereqs = [
-            ("Python", "python3", cmds.get("python3")),
-            ("Node.js", "node", cmds.get("node")),
-            ("Claude", "claude", cmds.get("claude")),
-            ("Quodeq", "quodeq", cmds.get("quodeq")),
-        ]
-        all_ok = True
-        for label, cmd, path in prereqs:
-            if not path:
-                item = rumps.MenuItem(f"  {label} \u2717 not found", callback=None)
-                self._prereq_items[cmd] = item
-                self.menu.add(item)
-                all_ok = False
-        if not all_ok:
-            self._start_item.set_callback(None)
-            self._start_item._menuitem.setEnabled_(False)
-            if not cmds.get("quodeq"):
-                self._prereq_items["quodeq"].title = "  Quodeq \u2014 installing..."
-                try:
-                    req_file = os.path.join(os.path.dirname(__file__), "requirements.txt")
-                    has_hashes = False
-                    if os.path.isfile(req_file):
-                        with open(req_file) as f:
-                            has_hashes = "--hash" in f.read()
-                    if has_hashes:
-                        pip_cmd = ["python3", "-m", "pip", "install", "--user", "--require-hashes", "-r", req_file]
-                    else:
-                        # Fallback: no pinned hashes — install from PyPI over TLS.
-                        pip_cmd = ["python3", "-m", "pip", "install", "--user", "quodeq"]
-                    pip_result = subprocess.run(
-                        pip_cmd,
-                        capture_output=True, timeout=120,
-                    )
-                    if pip_result.returncode != 0:
-                        self._prereq_items["quodeq"].title = "  Quodeq \u2717 pip install failed"
-                        return
-                    site_result = subprocess.run(
-                        ["python3", "-m", "site", "--user-base"],
-                        capture_output=True, text=True, timeout=5,
-                    )
-                    if site_result.returncode == 0 and site_result.stdout.strip():
-                        os.environ["PATH"] += f":{site_result.stdout.strip()}/bin"
-                    self._prereq_items["quodeq"].title = "  Quodeq \u2713"
-                except (subprocess.TimeoutExpired, OSError):
-                    self._prereq_items["quodeq"].title = "  Quodeq \u2717 install failed"
-                    return
-            else:
-                return
-        time.sleep(0.5)
+    def _auto_start(self):
+        """Auto-start the dashboard if not already running."""
+        time.sleep(1.5)
         if self._find_running_port() is None:
             self._do_start()
 
@@ -228,38 +197,73 @@ class QuodeqApp(rumps.App):
         threading.Thread(target=self._do_start, daemon=True).start()
 
     def _do_start(self):
-        with self._starting_lock:
-            if self._starting or self._find_running_port():
-                return
-            self._starting = True
+        if self._starting:
+            return
+        if self._find_running_port():
+            return
+        self._starting = True
+        self._clear_error()
         try:
             self._do_start_inner()
+        except Exception as e:
+            self._set_error(f"Error: {e}")
+            self._status_item.title = "Stopped"
         finally:
-            with self._starting_lock:
-                self._starting = False
+            self._starting = False
 
     def _do_start_inner(self):
-        quodeq_cmd = self._find_commands().get("quodeq")
+        cmds = _find_commands()
+        quodeq_cmd = cmds.get("quodeq")
         if not quodeq_cmd:
+            self._set_error(f"quodeq not in PATH")
+            self._status_item.title = "Stopped"
             return
         self._status_item.title = "Starting..."
+        stderr_log = tempfile.NamedTemporaryFile(
+            prefix="quodeq-dashboard-", suffix=".log", delete=False, mode="w",
+        )
         try:
+            cmd = [quodeq_cmd, "dashboard"]
+            # Pass flags only if the CLI supports them
+            try:
+                help_out = subprocess.run(
+                    [quodeq_cmd, "dashboard", "--help"],
+                    capture_output=True, text=True, timeout=5,
+                ).stdout
+                if "--no-open" in help_out:
+                    cmd.append("--no-open")
+                if "--port" in help_out:
+                    cmd.extend(["--port", str(self._app_port)])
+            except (subprocess.TimeoutExpired, OSError):
+                pass
             self._process = subprocess.Popen(
-                [quodeq_cmd, "dashboard", "--no-open", "--port", str(self._app_port)],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                cmd,
+                stdout=subprocess.DEVNULL, stderr=stderr_log,
                 start_new_session=True,
             )
         except OSError as e:
-            rumps.alert("Failed to start", str(e))
+            self._set_error(f"Failed: {e}")
+            self._status_item.title = "Stopped"
             return
-        import time
         for _ in range(_MAX_START_RETRIES):
             time.sleep(0.5)
+            if self._process.poll() is not None:
+                stderr_log.close()
+                try:
+                    with open(stderr_log.name) as f:
+                        err = f.read(500).strip()
+                except OSError:
+                    err = "unknown error"
+                self._set_error(f"Crashed (exit {self._process.returncode}): {err[:200]}")
+                self._status_item.title = "Stopped"
+                return
             port = self._find_running_port()
             if port:
                 self._port = port
+                self._clear_error()
                 return
-        rumps.alert("Timeout", "Dashboard did not start in time.")
+        self._set_error("Timeout: dashboard did not respond")
+        self._status_item.title = "Stopped"
 
     @staticmethod
     def _kill_port_processes(port: int) -> None:
