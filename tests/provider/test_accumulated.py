@@ -81,6 +81,14 @@ class TestNumericAverage:
         result = numeric_average(dims)
         assert result == 9.0
 
+    def test_all_non_numeric_returns_none(self):
+        dims = [_dim("a", "A"), _dim("b", "B+")]
+        assert numeric_average(dims) is None
+
+    def test_single_dimension(self):
+        dims = [_dim("a", "10.0")]
+        assert numeric_average(dims) == 10.0
+
 
 # ---------------------------------------------------------------------------
 # _aggregate_severity_counts

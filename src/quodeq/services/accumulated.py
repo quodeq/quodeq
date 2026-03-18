@@ -36,7 +36,10 @@ def _acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
     """Return the accumulated-view cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int((env or os.environ).get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
+    try:
+        return int((env or os.environ).get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
+    except (ValueError, TypeError):
+        return _DEFAULT_ACC_CACHE_MAX
 
 
 def _read_all_run_data(

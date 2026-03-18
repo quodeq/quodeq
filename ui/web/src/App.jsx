@@ -43,7 +43,10 @@ export default function App() {
   async function handleDeleteProject(projectId) {
     const qs = _apiQs();
     const separator = qs ? '&' : '?';
-    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}${qs}${separator}confirm=true`, { method: 'DELETE' });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}${qs}${separator}confirm=true`, { method: 'DELETE', signal: controller.signal });
+    clearTimeout(timeoutId);
     if (!res.ok) {
       const msg = await res.text().catch(() => res.statusText);
       alert(`Failed to delete project: ${msg}`);
@@ -72,9 +75,15 @@ export default function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ path: newPath }),
       });
-      if (!res.ok) console.error('Relocate failed:', res.status);
+      if (!res.ok) {
+        console.error('Relocate failed:', res.status);
+        alert('Failed to relocate project. Please try again.');
+        return;
+      }
     } catch (err) {
       console.error('Relocate failed:', err);
+      alert('Failed to relocate project. Please try again.');
+      return;
     }
     loadProjects();
   }

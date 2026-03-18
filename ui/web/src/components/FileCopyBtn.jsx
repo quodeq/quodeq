@@ -9,9 +9,10 @@ export default function FileCopyBtn({ display, copyText }) {
       type="button"
       className="vlive-detail-file-btn"
       onClick={() => {
-        copyToClipboard(copyText);
-        setCopied(true);
-        setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+        copyToClipboard(copyText).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
+        });
       }}
     >
       {copied ? 'Copied!' : display}
