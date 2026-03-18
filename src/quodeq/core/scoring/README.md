@@ -1,4 +1,4 @@
-# Scoring Methodology
+# The Quodeq Evaluation Q² Formula
 
 ## Overview
 
