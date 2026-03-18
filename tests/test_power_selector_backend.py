@@ -147,7 +147,7 @@ class TestApiRouteSubagentModel:
         from quodeq.action_api import create_app
 
         captured = {}
-        app = create_app(self._make_capturing_provider(captured), api_key="")
+        app = create_app(self._make_capturing_provider(captured))
         client = app.test_client()
 
         response = client.post("/api/evaluations", json={
@@ -161,7 +161,7 @@ class TestApiRouteSubagentModel:
         from quodeq.action_api import create_app
 
         captured = {}
-        app = create_app(self._make_capturing_provider(captured), api_key="")
+        app = create_app(self._make_capturing_provider(captured))
         client = app.test_client()
 
         response = client.post("/api/evaluations", json={

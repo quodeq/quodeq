@@ -5,7 +5,6 @@ from __future__ import annotations
 import hmac
 import logging
 import os
-import secrets
 import sys
 import time
 from collections import OrderedDict
@@ -211,10 +210,11 @@ def create_app(
     provider = provider or _default_provider()
     store = rate_limit_store or create_rate_limit_store()
     if api_key is None:
-        api_key = secrets.token_urlsafe(32)
-        _logger.info(
-            "QUODEQ_API_KEY not set — auto-generated session token for localhost auth."
+        _msg = (
+            "QUODEQ_API_KEY is not set — API restricted to localhost only. "
+            "Set QUODEQ_API_KEY to enable authenticated remote access."
         )
+        _logger.warning(_msg)
 
     @app.before_request
     def _audit_log() -> None:
@@ -242,7 +242,7 @@ def create_app(
     register_evaluation_list_routes(app, provider)
     register_evaluation_item_routes(app, provider)
     register_discovery_routes(app, provider)
-    register_static_routes(app, static_dist, session_token=api_key)
+    register_static_routes(app, static_dist)
     return app
 
 

@@ -264,12 +264,7 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(payload)
 
 
-def register_static_routes(
-    app: Flask,
-    static_dist: str | None,
-    *,
-    session_token: str | None = None,
-) -> None:
+def register_static_routes(app: Flask, static_dist: str | None) -> None:
     """Register static file serving routes."""
     if not static_dist:
         return
@@ -277,19 +272,10 @@ def register_static_routes(
     if not dist.is_dir():
         return
 
-    def _inject_token(html: str) -> str:
-        """Inject session token as a meta tag so the SPA can authenticate."""
-        if not session_token:
-            return html
-        import html as html_mod
-        tag = f'<meta name="quodeq-token" content="{html_mod.escape(session_token)}">'
-        return html.replace("</head>", f"  {tag}\n  </head>", 1)
-
     @app.route('/')
     def serve_root() -> Response:
-        """Serve the SPA index page with injected session token."""
-        raw = (dist / 'index.html').read_text()
-        return Response(_inject_token(raw), content_type='text/html')
+        """Serve the SPA index page."""
+        return send_from_directory(str(dist), 'index.html')
 
     @app.route('/<path:path>')
     def serve_static_or_spa(path: str) -> Response | tuple[Response, int]:
@@ -298,5 +284,5 @@ def register_static_routes(
             return send_from_directory(str(dist), path)
         if path.startswith('api/'):
             return jsonify({"error": "Not found", "code": "NOT_FOUND"}), HTTPStatus.NOT_FOUND
-        raw = (dist / 'index.html').read_text()
+        return send_from_directory(str(dist), 'index.html')
         return Response(_inject_token(raw), content_type='text/html')

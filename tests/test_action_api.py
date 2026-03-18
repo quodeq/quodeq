@@ -64,7 +64,7 @@ class StubProvider(ActionProvider):
 @pytest.fixture()
 def client():
     """Flask test client backed by a StubProvider."""
-    return create_app(StubProvider(), api_key="").test_client()
+    return create_app(StubProvider()).test_client()
 
 
 def test_list_projects_endpoint(client):
