@@ -39,10 +39,14 @@ fi
 # Auto-install quodeq if missing (all prerequisites are present)
 QUODEQ=$(command -v quodeq 2>/dev/null)
 if [ -z "$QUODEQ" ]; then
-    # Security: pip install over PyPI uses TLS for transport integrity.
-    # For stronger supply-chain guarantees, use a requirements file with
-    # --require-hashes (e.g. pip install --require-hashes -r requirements.txt).
-    python3 -m pip install --user quodeq 2>&1
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+    REQ_FILE="$SCRIPT_DIR/requirements.txt"
+    if [ -f "$REQ_FILE" ] && grep -q -- '--hash' "$REQ_FILE"; then
+        python3 -m pip install --user --require-hashes -r "$REQ_FILE" 2>&1
+    else
+        # Fallback: no pinned hashes available — install from PyPI over TLS.
+        python3 -m pip install --user quodeq 2>&1
+    fi
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)
     if [ -z "$QUODEQ" ]; then

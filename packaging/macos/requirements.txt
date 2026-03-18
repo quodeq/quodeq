@@ -1,0 +1,5 @@
+# Pinned quodeq package with hash for integrity verification (CWE-345).
+# Update this file on every release:
+#   pip download quodeq==<version> --no-deps -d /tmp/qdl \
+#     && pip hash /tmp/qdl/quodeq-*.whl
+quodeq
