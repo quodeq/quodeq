@@ -75,8 +75,8 @@ class TestFetchAsvsL1:
         from quodeq.config.standards_fetcher import _DEFAULT_FETCH_TIMEOUT_S
         assert mock_urlopen.call_args.kwargs.get("timeout") == _DEFAULT_FETCH_TIMEOUT_S
 
-    def test_first_download_accepted_with_warning(self, tmp_path: Path, monkeypatch) -> None:
-        """Without QUODEQ_ASVS_SHA256, first download is accepted with a warning."""
+    def test_first_download_rejected_without_hash(self, tmp_path: Path, monkeypatch) -> None:
+        """Without QUODEQ_ASVS_SHA256, first download is rejected (CWE-353)."""
         monkeypatch.delenv("QUODEQ_ASVS_SKIP_INTEGRITY", raising=False)
         monkeypatch.delenv("QUODEQ_ASVS_SHA256", raising=False)
         content = json.dumps(_asvs_payload()).encode()
@@ -85,4 +85,17 @@ class TestFetchAsvsL1:
         response.__enter__ = lambda self: self
         response.__exit__ = MagicMock(return_value=False)
         with patch("quodeq.config.standards_fetcher.urllib.request.urlopen", return_value=response):
-            fetch_asvs_l1(tmp_path)  # should not raise
+            with pytest.raises(ValueError, match="No ASVS hash configured"):
+                fetch_asvs_l1(tmp_path)
+
+    def test_first_download_accepted_with_skip_integrity(self, tmp_path: Path, monkeypatch) -> None:
+        """With skip_integrity=True, download proceeds without hash."""
+        monkeypatch.delenv("QUODEQ_ASVS_SKIP_INTEGRITY", raising=False)
+        monkeypatch.delenv("QUODEQ_ASVS_SHA256", raising=False)
+        content = json.dumps(_asvs_payload()).encode()
+        response = MagicMock()
+        response.read.return_value = content
+        response.__enter__ = lambda self: self
+        response.__exit__ = MagicMock(return_value=False)
+        with patch("quodeq.config.standards_fetcher.urllib.request.urlopen", return_value=response):
+            fetch_asvs_l1(tmp_path, skip_integrity=True)  # should not raise

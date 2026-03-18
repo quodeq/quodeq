@@ -81,13 +81,19 @@ def _verify_integrity(
             f"ASVS integrity check failed: expected {expected_hash}, got {actual_hash}"
         )
     if not expected_hash:
-        _logger.warning(
-            "SECURITY: No ASVS hash configured — downloaded content is NOT verified. "
-            "An attacker could tamper with the download. Pin the hash to enable "
-            "integrity verification: %s=%s",
-            _ASVS_SHA256_ENV,
-            actual_hash,
-        )
+        if skip_integrity:
+            _logger.warning(
+                "SECURITY: Integrity check skipped — downloaded content is NOT verified. "
+                "Pin the hash for production use: %s=%s",
+                _ASVS_SHA256_ENV,
+                actual_hash,
+            )
+        else:
+            raise ValueError(
+                f"No ASVS hash configured — refusing unverified download. "
+                f"Set {_ASVS_SHA256_ENV}={actual_hash} to pin the expected hash, "
+                f"or pass skip_integrity=True to bypass."
+            )
 
 
 def _parse_asvs_content(content: bytes) -> list[dict]:

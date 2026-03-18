@@ -25,8 +25,8 @@ function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              {v.reqRefs?.filter(r => r.url)?.length > 0 &&
-                <span className="cwe-link-group">{v.reqRefs.filter(r => r.url).map((ref, i) => (
+              {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
+                <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                 ))}</span>
               }
@@ -61,8 +61,8 @@ function ComplianceCard({ c, principle, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-              {c.reqRefs?.filter(r => r.url)?.length > 0 &&
-                <span className="cwe-link-group">{c.reqRefs.filter(r => r.url).map((ref, i) => (
+              {c.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
+                <span className="cwe-link-group">{c.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                 ))}</span>
               }
@@ -128,7 +128,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
         lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
         if (v.reason) lines.push('', `**Why it's a violation:** ${v.reason}`);
-        const linkedRefs = (v.reqRefs || []).filter(r => r.url);
+        const linkedRefs = (v.reqRefs || []).filter(r => r.url && /^https?:\/\//.test(r.url));
         if (linkedRefs.length > 0) lines.push('', `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
         if (v.snippet) {
           lines.push('', '**Affected code:**');
