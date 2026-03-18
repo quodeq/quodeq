@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.data.fs.report_parser.runs import list_runs
-from quodeq.shared.logging import log_info, log_success
+from quodeq.shared.logging import log_debug, log_info, log_success
 from quodeq.shared.utils import open_text
 
 
@@ -48,8 +48,8 @@ def _load_previous_findings(jsonl_path: Path) -> list[dict]:
                         findings.append(entry)
                 except json.JSONDecodeError:
                     continue
-    except OSError:
-        pass
+    except OSError as exc:
+        log_debug(f"Cannot read findings JSONL {jsonl_path}: {exc}")
     return findings
 
 

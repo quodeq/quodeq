@@ -19,7 +19,7 @@ export default function ProjectSelector({ projects, selectedProject, selectedRun
           className="project-select-styled"
           value={selectedProject}
           disabled={projectList.length === 0}
-          onChange={(e) => onProjectChange(e.target.value)}
+          onChange={(e) => onProjectChange?.(e.target.value)}
         >
           {projectList.length === 0 ? (
             <option value="">No analyzed project</option>
@@ -39,7 +39,7 @@ export default function ProjectSelector({ projects, selectedProject, selectedRun
             id="run-select"
             className="project-select-styled"
             value={selectedRun}
-            onChange={(e) => onRunChange(e.target.value)}
+            onChange={(e) => onRunChange?.(e.target.value)}
           >
             {runList.map((run) => (
               <option key={run.runId} value={run.runId}>

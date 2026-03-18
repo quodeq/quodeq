@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 import { parseFileRef } from '../../../utils/formatters.js';
 
 const COPY_FEEDBACK_MS = 1500;
@@ -26,7 +27,7 @@ function FileCopyBtn({ display, copyText }) {
       className="vlive-detail-file-btn"
       onClick={(e) => {
         e.stopPropagation();
-        navigator.clipboard.writeText(copyText);
+        copyToClipboard(copyText);
         setCopied(true);
         setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
       }}

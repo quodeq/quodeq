@@ -99,7 +99,10 @@ class InMemoryRateLimitStore:
 
     def record(self, ip: str, now: float) -> None:
         """Record a state-changing request from *ip* at time *now*."""
-        self._store.setdefault(ip, []).append(now)
+        timestamps = self._store.setdefault(ip, [])
+        timestamps.append(now)
+        if len(timestamps) > self._max_requests * 2:
+            self._store[ip] = [t for t in timestamps if now - t < self._window]
         self._store.move_to_end(ip)
 
     def check(self, ip: str, now: float) -> bool:

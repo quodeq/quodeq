@@ -70,7 +70,7 @@ export default function App() {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: newPath }),
-    });
+    }).catch((err) => console.error('Relocate failed:', err));
     loadProjects();
   }
 
@@ -144,7 +144,7 @@ export default function App() {
       if (project) {
         loadProjects()
           .then((list) => setProjects(list))
-          .catch(() => {});
+          .catch((err) => console.error('Operation failed:', err));
         selectProjectAndRun(project, runId);
       }
       navReset();

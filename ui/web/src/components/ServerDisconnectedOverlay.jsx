@@ -18,7 +18,7 @@ export default function ServerDisconnectedOverlay({ onReconnect }) {
         <h2>Server disconnected</h2>
         <p>The Quodeq server is not running. Start it from the menu bar icon or run:</p>
         <code>quodeq dashboard</code>
-        <button type="button" className="server-retry-btn" onClick={() => getHealth().then(() => onReconnect()).catch(() => {})}>
+        <button type="button" className="server-retry-btn" onClick={() => getHealth().then(() => onReconnect()).catch((err) => console.error('Reconnect failed:', err))}>
           Retry connection
         </button>
       </div>

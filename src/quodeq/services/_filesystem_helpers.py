@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -179,6 +180,7 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
 # Populated lazily on first call; avoids repeated disk I/O on every request.
 # Safe for concurrent reads after initial population (immutable list value).
 _cached_dimensions: list[str] | None = None
+_cached_dimensions_lock = threading.Lock()
 
 
 def _list_available_dimensions_for_discipline() -> list[str]:
@@ -186,14 +188,17 @@ def _list_available_dimensions_for_discipline() -> list[str]:
     global _cached_dimensions
     if _cached_dimensions is not None:
         return _cached_dimensions
-    try:
-        paths = default_paths()
-        universal_dims = paths.dimensions_file
-        if universal_dims.exists():
-            data = json.loads(universal_dims.read_text())
-            _cached_dimensions = [d["id"] for d in data.get("applies", [])]
+    with _cached_dimensions_lock:
+        if _cached_dimensions is not None:
             return _cached_dimensions
-        _cached_dimensions = []
-        return _cached_dimensions
-    except (OSError, json.JSONDecodeError, KeyError, TypeError):
-        return []
+        try:
+            paths = default_paths()
+            universal_dims = paths.dimensions_file
+            if universal_dims.exists():
+                data = json.loads(universal_dims.read_text())
+                _cached_dimensions = [d["id"] for d in data.get("applies", [])]
+                return _cached_dimensions
+            _cached_dimensions = []
+            return _cached_dimensions
+        except (OSError, json.JSONDecodeError, KeyError, TypeError):
+            return []

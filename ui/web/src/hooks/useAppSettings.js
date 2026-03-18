@@ -7,14 +7,15 @@ const AI_MODEL_KEY = 'cc-ai-model';
 const VERIFY_FINDINGS_KEY = 'cc-verify-findings';
 
 export function useAppSettings() {
-  const [themePreference, setThemePreference] = useState(
-    localStorage.getItem(THEME_KEY) || 'system'
-  );
-  const [aiCmd, setAiCmd] = useState(localStorage.getItem(AI_CMD_KEY) || '');
-  const [aiModel, setAiModel] = useState(localStorage.getItem(AI_MODEL_KEY) || '');
-  const [modelFast, setModelFast] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}1`) || '');
-  const [modelBalanced, setModelBalanced] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}2`) || '');
-  const [modelThorough, setModelThorough] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}3`) || '');
+  function safeGet(key, fallback = '') {
+    try { return localStorage.getItem(key) || fallback; } catch (e) { console.warn('localStorage unavailable:', e); return fallback; }
+  }
+  const [themePreference, setThemePreference] = useState(safeGet(THEME_KEY, 'system'));
+  const [aiCmd, setAiCmd] = useState(safeGet(AI_CMD_KEY));
+  const [aiModel, setAiModel] = useState(safeGet(AI_MODEL_KEY));
+  const [modelFast, setModelFast] = useState(safeGet(`${MODEL_STORAGE_PREFIX}1`));
+  const [modelBalanced, setModelBalanced] = useState(safeGet(`${MODEL_STORAGE_PREFIX}2`));
+  const [modelThorough, setModelThorough] = useState(safeGet(`${MODEL_STORAGE_PREFIX}3`));
   const [verifyFindings, setVerifyFindings] = useState(() => {
     try { return localStorage.getItem(VERIFY_FINDINGS_KEY) === 'true'; } catch { return false; }
   });

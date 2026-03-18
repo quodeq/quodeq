@@ -3,6 +3,7 @@ import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../..
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 
 const PAGE_SIZE = 20;
 
@@ -17,7 +18,7 @@ function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
-        <CopyButton label="Fix plan" onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v))} />
+        <CopyButton label="Fix plan" onClick={() => copyToClipboard(buildViolationPlanText(v))} />
       </div>
       <div className="vlive-detail">
         {(v.title || v.reason || v.findings) && (
@@ -192,7 +193,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
           {violations.length > 0 && (
             <CopyButton
               label="Principle fix plan"
-              onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText())}
+              onClick={() => copyToClipboard(buildPrinciplePlanText())}
             />
           )}
         </div>

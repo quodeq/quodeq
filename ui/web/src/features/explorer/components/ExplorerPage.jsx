@@ -4,6 +4,7 @@ import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFiles
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { gradeColorClass, scoreColorClass } from '../../../utils/formatters.js';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 
 export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate }) {
@@ -104,7 +105,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
           {allViolations.length > 0 && (
             <CopyButton
               label="Fix plan"
-              onClick={() => navigator.clipboard.writeText(
+              onClick={() => copyToClipboard(
                 buildDimensionPlanFromViolations(evalData.dimension, allViolations)
               )}
             />

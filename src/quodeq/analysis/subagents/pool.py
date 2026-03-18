@@ -201,7 +201,7 @@ class SubagentPool:
             try:
                 result = future.result()
             except Exception as exc:
-                log_warning(f"  {agent_id} raised unexpected error: {exc}")
+                log_warning(f"  {agent_id} raised {type(exc).__name__}: {exc}")
                 result = SubagentResult(
                     agent_id=agent_id,
                     jsonl_file=self._shared_jsonl_path(),

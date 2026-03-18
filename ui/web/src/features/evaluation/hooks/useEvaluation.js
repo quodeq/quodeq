@@ -27,7 +27,7 @@ export function useEvaluation() {
           startPolling(running.jobId);
         }
       })
-      .catch(() => {});
+      .catch((err) => console.warn('Failed to fetch running evaluations:', err));
     return () => {
       stopPolling();
       stopDimensionPolling();

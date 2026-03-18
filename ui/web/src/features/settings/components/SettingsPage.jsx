@@ -30,7 +30,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
   useEffect(() => {
     setSettingsPhrase(_SETTINGS_PHRASES[Math.floor(Math.random() * _SETTINGS_PHRASES.length)]);
     if (appVersion === null) {
-      getHealth().then((d) => setAppVersion(d.version || null)).catch(() => {});
+      getHealth().then((d) => setAppVersion(d.version || null)).catch((err) => console.warn('Failed to fetch app version:', err));
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 

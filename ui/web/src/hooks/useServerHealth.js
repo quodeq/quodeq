@@ -28,7 +28,10 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAUL
         for (const port of altPorts) {
           if (String(port) === currentPort) continue;
           try {
-            const res = await fetch(`${baseUrl}:${port}/api/health`, { timeout: HEALTH_CHECK_TIMEOUT_MS });
+            const ac = new AbortController();
+            const tid = setTimeout(() => ac.abort(), HEALTH_CHECK_TIMEOUT_MS);
+            const res = await fetch(`${baseUrl}:${port}/api/health`, { signal: ac.signal });
+            clearTimeout(tid);
             if (res.ok) {
               window.location.href = `${baseUrl}:${port}`;
               return;

@@ -30,6 +30,9 @@ def make_lru_dimension_fetcher(
                 return cache[key]
         data = read_run_data(reports_root, project, run_id)
         with lock:
+            if key in cache:
+                cache.move_to_end(key)
+                return cache[key]
             cache[key] = data
             cache.move_to_end(key)
             if len(cache) > max_size:

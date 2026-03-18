@@ -82,6 +82,7 @@ class QuodeqApp(rumps.App):
         self._process: subprocess.Popen | None = None
         self._port: int | None = None
         self._starting = False
+        self._starting_lock = threading.Lock()
         self._icon_stopped = _find_icon("menubar_iconTemplate.png")
         self._icon_running = _find_icon("menubar_icon_running.png")
         self._icon_evaluating = _find_icon("menubar_icon_evaluating.png")
@@ -182,25 +183,29 @@ class QuodeqApp(rumps.App):
         if not all_ok:
             self._start_item.set_callback(None)
             self._start_item._menuitem.setEnabled_(False)
-            return
-        if not cmds.get("quodeq"):
-            self._prereq_items["quodeq"].title = "  Quodeq \u2014 installing..."
-            try:
-                # Security: pip install over PyPI uses TLS for transport integrity.
-                # For stronger supply-chain guarantees, use a requirements file with
-                # --require-hashes (e.g. pip install --require-hashes -r requirements.txt).
-                subprocess.run(
-                    ["python3", "-m", "pip", "install", "--user", "quodeq"],
-                    capture_output=True, timeout=120,
-                )
-                site_bin = subprocess.run(
-                    ["python3", "-m", "site", "--user-base"],
-                    capture_output=True, text=True, timeout=5,
-                ).stdout.strip()
-                os.environ["PATH"] += f":{site_bin}/bin"
-                self._prereq_items["quodeq"].title = "  Quodeq \u2713"
-            except (subprocess.TimeoutExpired, OSError):
-                self._prereq_items["quodeq"].title = "  Quodeq \u2717 install failed"
+            if not cmds.get("quodeq"):
+                self._prereq_items["quodeq"].title = "  Quodeq \u2014 installing..."
+                try:
+                    # Security: pip install over PyPI uses TLS for transport integrity.
+                    # For stronger supply-chain guarantees, use a requirements file with
+                    # --require-hashes (e.g. pip install --require-hashes -r requirements.txt).
+                    pip_result = subprocess.run(
+                        ["python3", "-m", "pip", "install", "--user", "quodeq"],
+                        capture_output=True, timeout=120,
+                    )
+                    if pip_result.returncode != 0:
+                        self._prereq_items["quodeq"].title = "  Quodeq \u2717 pip install failed"
+                        return
+                    site_bin = subprocess.run(
+                        ["python3", "-m", "site", "--user-base"],
+                        capture_output=True, text=True, timeout=5,
+                    ).stdout.strip()
+                    os.environ["PATH"] += f":{site_bin}/bin"
+                    self._prereq_items["quodeq"].title = "  Quodeq \u2713"
+                except (subprocess.TimeoutExpired, OSError):
+                    self._prereq_items["quodeq"].title = "  Quodeq \u2717 install failed"
+                    return
+            else:
                 return
         time.sleep(0.5)
         if self._find_running_port() is None:
@@ -215,13 +220,15 @@ class QuodeqApp(rumps.App):
         threading.Thread(target=self._do_start, daemon=True).start()
 
     def _do_start(self):
-        if self._starting or self._find_running_port():
-            return
-        self._starting = True
+        with self._starting_lock:
+            if self._starting or self._find_running_port():
+                return
+            self._starting = True
         try:
             self._do_start_inner()
         finally:
-            self._starting = False
+            with self._starting_lock:
+                self._starting = False
 
     def _do_start_inner(self):
         quodeq_cmd = self._find_commands().get("quodeq")

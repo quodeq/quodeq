@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import tempfile
 
 from quodeq.config.paths import ConfigPaths
 from quodeq.shared.logging import log_error, log_info, log_success, log_warning
@@ -57,8 +58,22 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
             f"API key ({masked}) written to {paths.env_file} (mode 0600). "
             f"For production, prefer a platform keychain or secrets manager."
         )
-    paths.env_file.write_text("\n".join(lines) + "\n")
-    os.chmod(paths.env_file, 0o600)
+    fd, tmp_path = tempfile.mkstemp(dir=str(paths.env_file.parent), suffix=".tmp")
+    closed = False
+    try:
+        os.fchmod(fd, 0o600)
+        os.write(fd, ("\n".join(lines) + "\n").encode())
+        os.close(fd)
+        closed = True
+        os.replace(tmp_path, str(paths.env_file))
+    except BaseException:
+        if not closed:
+            os.close(fd)
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _ensure_gitignore(paths: ConfigPaths) -> None:

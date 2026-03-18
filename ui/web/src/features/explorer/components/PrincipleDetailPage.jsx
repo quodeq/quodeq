@@ -3,6 +3,7 @@ import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../..
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function buildPrinciplePlanText(principle) {
   const totalViolations = principle.total || 0;
@@ -79,7 +80,7 @@ function ViolationCard({ v, principleName, index }) {
         )}
         <CopyButton
           label="Fix plan"
-          onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v, principleName))}
+          onClick={() => copyToClipboard(buildViolationPlanText(v, principleName))}
         />
       </div>
       <div className="vlive-detail">
@@ -158,7 +159,7 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
           </div>
           <CopyButton
             label="Principle fix plan"
-            onClick={() => navigator.clipboard.writeText(buildPrinciplePlanText(principle))}
+            onClick={() => copyToClipboard(buildPrinciplePlanText(principle))}
           />
         </div>
       </section>

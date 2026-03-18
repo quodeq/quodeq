@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import threading
 from collections import deque
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -98,18 +99,23 @@ class InMemoryJobStore:
 
     def __init__(self) -> None:
         self._jobs: dict[str, Job] = {}
+        self._lock = threading.Lock()
 
     def get(self, job_id: str) -> Job | None:
-        return self._jobs.get(job_id)
+        with self._lock:
+            return self._jobs.get(job_id)
 
     def put(self, job: Job) -> None:
-        self._jobs[job.job_id] = job
+        with self._lock:
+            self._jobs[job.job_id] = job
 
     def list(self) -> list[Job]:
-        return list(self._jobs.values())
+        with self._lock:
+            return list(self._jobs.values())
 
     def delete(self, job_id: str) -> None:
-        self._jobs.pop(job_id, None)
+        with self._lock:
+            self._jobs.pop(job_id, None)
 
 
 def create_job_store() -> JobStore:

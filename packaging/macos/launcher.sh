@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 # Quodeq macOS launcher — starts the dashboard and opens the browser.
 
 # macOS .app bundles don't inherit the user's shell PATH.

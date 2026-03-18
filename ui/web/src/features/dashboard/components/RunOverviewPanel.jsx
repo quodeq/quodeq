@@ -3,6 +3,7 @@ import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { formatRunId, gradeColorClass, scoreColorClass, splitScore, mostFrequentGrade } from '../../../utils/formatters.js';
 
@@ -198,7 +199,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
                 const allViolations = (dashboard.dimensions || []).flatMap(
                   (d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
                 );
-                navigator.clipboard.writeText(
+                copyToClipboard(
                   buildDimensionPlanFromViolations(dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId), allViolations)
                 );
               }}

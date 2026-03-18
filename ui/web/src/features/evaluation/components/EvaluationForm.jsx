@@ -88,7 +88,7 @@ function useEvaluationForm(onStart) {
         }
         setAllDimensions([...seen.values()]);
       })
-      .catch(() => setAllDimensions([]));
+      .catch((err) => { console.warn('Failed to load dimensions:', err); setAllDimensions([]); });
   }, []);
 
   const toggleDim = (id) => setSelectedDims((prev) => {

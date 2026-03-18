@@ -3,6 +3,7 @@ import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../..
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function buildFilePlanText(file) {
   const totalViolations = SEVERITY_ORDER.reduce(
@@ -81,7 +82,7 @@ function ViolationCard({ v, index }) {
         )}
         <CopyButton
           label="Fix plan"
-          onClick={() => navigator.clipboard.writeText(buildViolationPlanText(v))}
+          onClick={() => copyToClipboard(buildViolationPlanText(v))}
         />
       </div>
       <div className="vlive-detail">
@@ -138,7 +139,7 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
           </div>
           <CopyButton
             label="File fix plan"
-            onClick={() => navigator.clipboard.writeText(buildFilePlanText(file))}
+            onClick={() => copyToClipboard(buildFilePlanText(file))}
           />
         </div>
       </section>

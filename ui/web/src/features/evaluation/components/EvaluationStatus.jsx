@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
+import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function deriveProjectName(repo) {
   if (!repo) return null;
@@ -97,7 +98,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
           <span className="job-meta-label">Job ID</span>
           <div className="job-meta-id-row">
             <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>
-            <CopyButton aria-label="Copy job ID" onClick={() => navigator.clipboard.writeText(job.jobId)} />
+            <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(job.jobId)} />
           </div>
         </div>
         {job.repo && (
