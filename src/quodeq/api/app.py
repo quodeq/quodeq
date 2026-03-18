@@ -214,7 +214,7 @@ def create_app(
             "QUODEQ_API_KEY is not set — API restricted to localhost only. "
             "Set QUODEQ_API_KEY to enable authenticated remote access."
         )
-        _logger.error(_msg)
+        _logger.warning(_msg)
 
     @app.before_request
     def _audit_log() -> None:
