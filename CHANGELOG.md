@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.6.1] — 2026-03-18
+
+### Fixes
+- **QuodeqBar** — correct port range (4173+), prereq checks on main thread, CLI flag detection
+- **QuodeqBar** — alert on missing quodeq, invalidate command cache on Start, log stderr
+- **Dashboard** — clicking a project on the Projects page now navigates to the overview
+
+---
+
 ## [0.6.0] — 2026-03-18
 
 ### Features
