@@ -76,6 +76,7 @@ function useEvaluationForm(onStart) {
   const [allDimensions, setAllDimensions] = useState([]);
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
+  const [dimLoadError, setDimLoadError] = useState(null);
 
   useEffect(() => {
     listPlugins()
@@ -87,8 +88,9 @@ function useEvaluationForm(onStart) {
           }
         }
         setAllDimensions([...seen.values()]);
+        setDimLoadError(null);
       })
-      .catch((err) => { console.warn('Failed to load dimensions:', err); setAllDimensions([]); });
+      .catch((err) => { console.warn('Failed to load dimensions:', err); setAllDimensions([]); setDimLoadError('Failed to load dimensions. Using defaults.'); });
   }, []);
 
   const toggleDim = (id) => setSelectedDims((prev) => {
@@ -109,13 +111,13 @@ function useEvaluationForm(onStart) {
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
   const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
 
-  return { repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen, toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear };
+  return { repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen, toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError };
 }
 
 export default function EvaluationForm({ onStart, disabled }) {
   const {
     repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen,
-    toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear,
+    toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError,
   } = useEvaluationForm(onStart);
 
   const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
@@ -130,6 +132,7 @@ export default function EvaluationForm({ onStart, disabled }) {
           onBrowse={() => setFolderBrowserOpen(true)}
         />
 
+        {dimLoadError && <p className="inline-error" style={{ marginBottom: 8 }}>{dimLoadError}</p>}
         {repo && allDimensions.length > 0 && (
           <DimensionGrid
             allDimensions={allDimensions}

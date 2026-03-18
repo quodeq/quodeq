@@ -61,6 +61,18 @@ class TestCollectStaleDimensions:
         stale, _ = _collect_stale_dimensions(runs, 0, {"security"}, fetcher)
         assert stale == []
 
+    def test_empty_runs_returns_empty(self):
+        stale, _ = _collect_stale_dimensions([], 0, {"security"}, lambda rid: [])
+        assert stale == []
+
+
+class TestCollectPreviousScoresEdgeCases:
+    def test_single_run_returns_empty(self):
+        runs = [_make_run("r1")]
+        fetcher = lambda rid: [_dim("security", "A", "9.0")]
+        result = _collect_previous_scores(runs, 0, {"security"}, fetcher)
+        assert result == {}
+
 
 class TestEnrichDimensionsWithTrend:
     def test_adds_trend_fields(self):

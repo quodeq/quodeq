@@ -203,11 +203,12 @@ class QuodeqApp(rumps.App):
                     if pip_result.returncode != 0:
                         self._prereq_items["quodeq"].title = "  Quodeq \u2717 pip install failed"
                         return
-                    site_bin = subprocess.run(
+                    site_result = subprocess.run(
                         ["python3", "-m", "site", "--user-base"],
                         capture_output=True, text=True, timeout=5,
-                    ).stdout.strip()
-                    os.environ["PATH"] += f":{site_bin}/bin"
+                    )
+                    if site_result.returncode == 0 and site_result.stdout.strip():
+                        os.environ["PATH"] += f":{site_result.stdout.strip()}/bin"
                     self._prereq_items["quodeq"].title = "  Quodeq \u2713"
                 except (subprocess.TimeoutExpired, OSError):
                     self._prereq_items["quodeq"].title = "  Quodeq \u2717 install failed"

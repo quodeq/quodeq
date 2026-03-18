@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import ipaddress
+import logging
 import socket
 from functools import lru_cache
+
+_logger = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=256)
@@ -15,12 +18,12 @@ def is_private_address(hostname: str) -> bool:
         addr = ipaddress.ip_address(hostname)
         return addr.is_private or addr.is_loopback or addr.is_link_local
     except ValueError:
-        pass
+        _logger.debug("Cannot parse %r as IP literal, falling through to DNS", hostname)
     try:
         for _fam, _typ, _pro, _can, sockaddr in socket.getaddrinfo(hostname, None):
             addr = ipaddress.ip_address(sockaddr[0])
             if addr.is_private or addr.is_loopback or addr.is_link_local:
                 return True
-    except (socket.gaierror, OSError):
-        pass
+    except (socket.gaierror, OSError) as exc:
+        _logger.warning("DNS resolution failed for %r — treating as non-private: %s", hostname, exc)
     return False

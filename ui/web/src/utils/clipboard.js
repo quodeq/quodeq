@@ -5,7 +5,7 @@
  * @param {string} text
  */
 export function copyToClipboard(text) {
-  navigator.clipboard.writeText(text).catch((err) =>
+  return navigator.clipboard.writeText(text).catch((err) =>
     console.warn('Clipboard write failed:', err)
   );
 }

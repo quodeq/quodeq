@@ -47,7 +47,10 @@ def _run_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
     """Return the run-dimension cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+    try:
+        return int((env or os.environ).get("QUODEQ_RUN_DIM_CACHE_MAX", str(_DEFAULT_RUN_DIM_CACHE_MAX)))
+    except (ValueError, TypeError):
+        return _DEFAULT_RUN_DIM_CACHE_MAX
 
 
 def create_dimension_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
