@@ -10,6 +10,7 @@ import { getHealth } from '../api/index.js';
  */
 const DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183];
 const DEFAULT_BASE_URL = 'http://127.0.0.1';
+const HEALTH_CHECK_TIMEOUT_MS = 2000;
 
 export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAULT_BASE_URL } = {}) {
   const [serverConnected, setServerConnected] = useState(true);
@@ -27,7 +28,7 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAUL
         for (const port of altPorts) {
           if (String(port) === currentPort) continue;
           try {
-            const res = await fetch(`${baseUrl}:${port}/api/health`, { timeout: 2000 });
+            const res = await fetch(`${baseUrl}:${port}/api/health`, { timeout: HEALTH_CHECK_TIMEOUT_MS });
             if (res.ok) {
               window.location.href = `${baseUrl}:${port}`;
               return;

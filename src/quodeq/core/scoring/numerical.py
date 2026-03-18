@@ -18,11 +18,6 @@ _DEFAULT_CRITICAL_PENALTY = 2.0
 _DEFAULT_MAJOR_PENALTY = 1.0
 _DEFAULT_MINOR_PENALTY = 0.25
 
-# Module-level penalty cache — avoids repeated os.environ lookups in the hot
-# scoring path.  Values are populated lazily by _critical_penalty() et al.
-_cached_penalties: dict[str, float] = {}
-
-
 def _env_float(var: str, default: float, env: dict[str, str] | None = None) -> float:
     """Read an env var as float, returning *default* if unset or non-numeric."""
     raw = (env or os.environ).get(var)
@@ -34,31 +29,22 @@ def _env_float(var: str, default: float, env: dict[str, str] | None = None) -> f
         return default
 
 
-def _critical_penalty(override: float | None = None) -> float:
-    """Points deducted per critical violation type (default: 2.0)."""
-    if override is not None:
-        return override
-    if "critical" not in _cached_penalties:
-        _cached_penalties["critical"] = _env_float("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
-    return _cached_penalties["critical"]
+def _penalty_reader(env_var: str, default: float):
+    """Create a lazy-cached penalty reader for a severity level."""
+    _cache: list[float] = []  # mutable container avoids nonlocal/global
+
+    def read(override: float | None = None) -> float:
+        if override is not None:
+            return override
+        if not _cache:
+            _cache.append(_env_float(env_var, default))
+        return _cache[0]
+    return read
 
 
-def _major_penalty(override: float | None = None) -> float:
-    """Points deducted per major violation type (default: 1.0)."""
-    if override is not None:
-        return override
-    if "major" not in _cached_penalties:
-        _cached_penalties["major"] = _env_float("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
-    return _cached_penalties["major"]
-
-
-def _minor_penalty(override: float | None = None) -> float:
-    """Points deducted per minor violation type (default: 0.25)."""
-    if override is not None:
-        return override
-    if "minor" not in _cached_penalties:
-        _cached_penalties["minor"] = _env_float("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
-    return _cached_penalties["minor"]
+_critical_penalty = _penalty_reader("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
+_major_penalty = _penalty_reader("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
+_minor_penalty = _penalty_reader("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
 
 
 _CRITICAL_SCORE_CAP = 3

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getProjectInfo, listPlugins } from '../../../api/index.js';
+import { ISO_25010_URL } from '../../../constants.js';
 
 export default function ReEvaluateCard({ project, onStart, disabled }) {
   const [info, setInfo] = useState(null);
@@ -79,7 +80,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         {allDimensions.length > 0 && (
           <div className="form-group">
             <div className="dimension-label-row">
-              <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
+              <label><a className="iso-link" href={ISO_25010_URL} target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
               <div className="dimension-chip-actions">
                 <button type="button" className="dim-action-btn" onClick={selectAll}>All</button>
                 <button type="button" className="dim-action-btn" onClick={clearAll}>Clear</button>

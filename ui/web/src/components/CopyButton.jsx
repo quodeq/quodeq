@@ -1,6 +1,6 @@
 import { useState } from 'react';
 
-const COPY_FEEDBACK_MS = 1500;
+export const COPY_FEEDBACK_MS = 1500;
 
 export function CopyIcon() {
   return (

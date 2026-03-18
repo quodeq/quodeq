@@ -1,9 +1,15 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 from quodeq.core.types import Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
 from quodeq.core.evidence.model import DEFAULT_WEIGHT, Evidence
+from quodeq.core.scoring.overall import (
+    _accumulate_weights,
+    _build_overall_result,
+    _weighted_overall,
+    MODE_NUMERICAL,
+)
 from quodeq.core.scoring.internals import (
     GRADE_LADDER,
     SCALE_TIER_NAMES,
@@ -28,8 +34,6 @@ from quodeq.core.scoring.internals import (
 
 # Re-export public API symbols that other modules may import from here.
 _BASE_SCORE = 10
-_INSUFFICIENT_MAJORITY_RATIO = 0.5
-MODE_NUMERICAL = "numerical"
 
 __all__ = [
     "DEFAULT_WEIGHT",
@@ -248,67 +252,6 @@ def run_scoring(evidence: dict, mode: str) -> ScoringResult:
             files_read=files_read,
         ),
     )
-
-
-def _accumulate_weights(
-    principles_scores: dict[str, PrincipleScore], mode: str,
-) -> tuple[int, float, int, int]:
-    """Sum weighted values across scorable principles.
-
-    Returns (total_weight, total_value, total_count, insufficient_count).
-    """
-    total_count = len(principles_scores)
-    insufficient_count = sum(
-        1 for p in principles_scores.values() if p.grade == "Insufficient"
-    )
-    total_weight = 0
-    total_value = 0.0
-    for pdata in principles_scores.values():
-        if pdata.grade == "Insufficient":
-            continue
-        multiplier = weight_as_multiplier(pdata.weight)
-        total_weight += multiplier
-        if mode == MODE_NUMERICAL:
-            total_value += (pdata.final_score or 0.0) * multiplier
-        else:
-            total_value += GRADE_LADDER.index(pdata.grade) * multiplier
-    return total_weight, total_value, total_count, insufficient_count
-
-
-def _build_overall_result(mode: str, total_weight: int, total_value: float) -> OverallScore:
-    """Build the overall result from aggregated weights."""
-    if mode == MODE_NUMERICAL:
-        mean_score = round(total_value / total_weight, 1)
-        return OverallScore(
-            weighted_score=mean_score,
-            grade=score_to_grade_label(mean_score),
-            total_weight=total_weight,
-        )
-    mean_index = total_value / total_weight
-    ladder_pos = min(len(GRADE_LADDER) - 1, round(mean_index))
-    return OverallScore(weighted_grade=GRADE_LADDER[ladder_pos], total_weight=total_weight)
-
-
-def _weighted_overall(principles_scores: dict[str, PrincipleScore], mode: str) -> OverallScore:
-    """Compute a weighted overall score or grade from per-principle results."""
-    tw, tv, total, insuff = _accumulate_weights(principles_scores, mode)
-
-    if tw == 0:
-        if mode == MODE_NUMERICAL:
-            return OverallScore(weighted_score=0.0, grade="Insufficient")
-        return OverallScore(weighted_grade="Insufficient")
-
-    result = _build_overall_result(mode, tw, tv)
-
-    if total > 0 and insuff > total * _INSUFFICIENT_MAJORITY_RATIO:
-        scored = total - insuff
-        # OverallScore is frozen, so we need to create a new instance
-        result = replace(
-            result,
-            confidence="low",
-            confidence_reason=f"Only {scored}/{total} principles had sufficient evidence",
-        )
-    return result
 
 
 def score_evidence(evidence: Evidence, mode: str = "numerical") -> ScoringResult:

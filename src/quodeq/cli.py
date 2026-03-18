@@ -161,10 +161,7 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
     return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
 
 
-def _build_run_config(
-    args: argparse.Namespace, src: Path, language: str,
-    manifest, dims_data: dict, evidence_dir: Path,
-) -> RunConfig:
+def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, manifest, dims_data: dict, evidence_dir: Path) -> RunConfig:
     """Assemble a RunConfig from CLI args and resolved paths."""
     standards_dir = default_paths().standards_dir
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
@@ -227,7 +224,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
 
     # Single-pass analysis: all files in one unified queue per dimension.
     # The AI analyzes each file according to its language naturally.
-    config = _build_run_config(args, src, language, manifest, dims_data, evidence_dir)
+    config = _build_run_config(args, src=src, language=language, manifest=manifest, dims_data=dims_data, evidence_dir=evidence_dir)
     return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
 
 

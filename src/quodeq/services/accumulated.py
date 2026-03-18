@@ -32,11 +32,11 @@ def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]
 _DEFAULT_ACC_CACHE_MAX = 256
 
 
-def _acc_dim_cache_max(override: int | None = None) -> int:
+def _acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the accumulated-view cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int(os.environ.get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
+    return int((env or os.environ).get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
 
 
 def _read_all_run_data(
