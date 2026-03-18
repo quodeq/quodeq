@@ -64,7 +64,7 @@ export default function DashboardPage({
 
   return (
     <div className="dashboard-page">
-      {error && <p className="inline-error">{error}</p>}
+      {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
       {loading && <p className="loading" role="status" aria-live="polite">Loading dashboard...</p>}
 
       {!loading && dashboard && (

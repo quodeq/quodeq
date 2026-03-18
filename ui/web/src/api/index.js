@@ -13,13 +13,20 @@ import { createProject } from '../models/project.js';
 const BASE = import.meta.env.VITE_API_BASE || '/api';
 const API_TIMEOUT_MS = 30000;
 
+/** Read the session token injected by the server into a <meta> tag. */
+function _getSessionToken() {
+  return document.querySelector('meta[name="quodeq-token"]')?.content || '';
+}
+
 async function request(path, options = {}) {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+  const token = _getSessionToken();
   try {
     const res = await fetch(`${BASE}${path}`, {
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...(options.headers || {}),
       },
       ...options,
