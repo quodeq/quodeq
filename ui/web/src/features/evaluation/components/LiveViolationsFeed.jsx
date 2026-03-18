@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { parseFileRef } from '../../../utils/formatters.js';
 
 const COPY_FEEDBACK_MS = 1500;
 const ANIM_DELAY_PER_ITEM_MS = 40;
@@ -34,16 +35,6 @@ function FileCopyBtn({ display, copyText }) {
       <CopyIcon />
     </button>
   );
-}
-
-// Parse a raw file string that may or may not carry a trailing :line.
-// Returns { filePath, line } where filePath has no line suffix.
-function parseFileRef(rawFile, rawLine) {
-  if (!rawFile) return { filePath: null, line: rawLine ?? null };
-  const m = rawFile.match(/^(.*?)(?::(\d+))?$/);
-  const filePath = m[1] || rawFile;
-  const line = rawLine ?? (m[2] ? parseInt(m[2], 10) : null);
-  return { filePath, line };
 }
 
 function ViolationLiveRow({ violation, index }) {

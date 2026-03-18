@@ -12,24 +12,17 @@ const _SETTINGS_PHRASES = [
   'code quality compass',
 ];
 
-export default function SettingsPage({
-  themePreference,
-  onApplyTheme,
-  aiCmd,
-  onApplyAiCmd,
-  aiModel,
-  onAiModelChange,
-  modelFast,
-  onModelFastChange,
-  modelBalanced,
-  onModelBalancedChange,
-  modelThorough,
-  onModelThoroughChange,
-  analysisPower,
-  onAnalysisPowerChange,
-  verifyFindings,
-  onApplyVerifyFindings,
-}) {
+export default function SettingsPage({ theme, models, analysis, verification }) {
+  const { preference: themePreference, onApply: onApplyTheme } = theme;
+  const {
+    aiCmd, onApplyAiCmd, aiModel, onAiModelChange,
+    fast: modelFast, onFastChange: onModelFastChange,
+    balanced: modelBalanced, onBalancedChange: onModelBalancedChange,
+    thorough: modelThorough, onThoroughChange: onModelThoroughChange,
+  } = models;
+  const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
+  const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
+
   const [availableClients, setAvailableClients] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');

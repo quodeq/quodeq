@@ -38,14 +38,19 @@ export function splitScore(score) {
  * @param {number|string|null|undefined} score
  * @returns {string}
  */
+const SCORE_EXEMPLARY = 9;
+const SCORE_GOOD = 7;
+const SCORE_ADEQUATE = 5;
+const SCORE_POOR = 3;
+
 export function scoreColorClass(score) {
   const n = parseFloat(score);
   if (isNaN(n)) return 'grade-none';
-  if (n >= 9) return 'grade-top';    // exemplary
-  if (n >= 7) return 'grade-high';   // good
-  if (n >= 5) return 'grade-mid';    // adequate
-  if (n >= 3) return 'grade-low';    // poor
-  return 'grade-bottom';             // critical
+  if (n >= SCORE_EXEMPLARY) return 'grade-top';
+  if (n >= SCORE_GOOD) return 'grade-high';
+  if (n >= SCORE_ADEQUATE) return 'grade-mid';
+  if (n >= SCORE_POOR) return 'grade-low';
+  return 'grade-bottom';
 }
 
 /**
@@ -129,23 +134,43 @@ export function parseFileRef(rawFile, rawLine) {
   return { filePath, line };
 }
 
+/**
+ * Convert a score delta into a rotation angle for trend arrows.
+ * Clamps the delta to [-4, 4] and maps it to an angle around 90 degrees.
+ *
+ * @param {number} d - Score delta value
+ * @returns {number} Rotation angle in degrees (35..145)
+ */
 export function angleFromDelta(d) {
   const clamped = Math.max(-4, Math.min(4, d));
   return 90 - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / 4) * 55;
 }
 
+/**
+ * Map a numeric score (0-10) to a letter tier label (A-F).
+ *
+ * @param {number|string} score - Numeric score value
+ * @returns {string} Single letter grade ('A', 'B', 'C', 'D', 'F') or empty string
+ */
 export function scoreTierLabel(score) {
   const n = parseFloat(score);
   if (isNaN(n)) return '';
-  if (n >= 9) return 'A';
-  if (n >= 7) return 'B';
-  if (n >= 5) return 'C';
-  if (n >= 3) return 'D';
+  if (n >= SCORE_EXEMPLARY) return 'A';
+  if (n >= SCORE_GOOD) return 'B';
+  if (n >= SCORE_ADEQUATE) return 'C';
+  if (n >= SCORE_POOR) return 'D';
   return 'F';
 }
 
 const GRADE_LABEL_MAP = { exemplary: 'A', good: 'B', proficient: 'B', adequate: 'C', developing: 'C', poor: 'D', insufficient: 'D', critical: 'F' };
 
+/**
+ * Convert a word grade (e.g. "exemplary", "good") to a single letter label.
+ * Falls back to the first character if it is a known letter grade.
+ *
+ * @param {string|null|undefined} grade - Grade word or letter
+ * @returns {string|null} Single letter grade ('A'-'F') or null
+ */
 export function gradeLabel(grade) {
   if (!grade) return null;
   const k = grade.trim().toLowerCase();
@@ -154,11 +179,24 @@ export function gradeLabel(grade) {
   return ['A', 'B', 'C', 'D', 'F'].includes(firstChar) ? firstChar : null;
 }
 
+/**
+ * Format the ratio of compliance items to violations as a readable string.
+ *
+ * @param {number} violations - Number of violations
+ * @param {number} compliance - Number of compliance items
+ * @returns {string} Formatted ratio string (e.g. "1:5") or em-dash when no violations
+ */
 export function complianceRatio(violations, compliance) {
   if (violations === 0) return '\u2014';
   return `1:${Math.round(compliance / violations)}`;
 }
 
+/**
+ * Find the most frequently occurring grade in a list and return it capitalized.
+ *
+ * @param {string[]} grades - Array of grade strings
+ * @returns {string|null} The most common grade (capitalized) or null if empty
+ */
 export function mostFrequentGrade(grades) {
   if (!grades || grades.length === 0) return null;
   const counts = {};

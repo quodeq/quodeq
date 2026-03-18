@@ -21,14 +21,16 @@ const cssVar = (() => {
   };
 })();
 
+const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
+
 function scoreBarColor(score) {
   const n = parseFloat(score);
   if (isNaN(n)) return cssVar('--color-accent');
-  if (n >= 9) return cssVar('--color-grade-top-text');   // exemplary
-  if (n >= 7) return cssVar('--color-grade-high-text');  // good
-  if (n >= 5) return cssVar('--color-grade-mid-text');   // adequate
-  if (n >= 3) return cssVar('--color-grade-low-text');   // poor
-  return cssVar('--color-grade-bottom-text');            // critical
+  if (n >= SCORE_THRESHOLDS.exemplary) return cssVar('--color-grade-top-text');
+  if (n >= SCORE_THRESHOLDS.good) return cssVar('--color-grade-high-text');
+  if (n >= SCORE_THRESHOLDS.adequate) return cssVar('--color-grade-mid-text');
+  if (n >= SCORE_THRESHOLDS.poor) return cssVar('--color-grade-low-text');
+  return cssVar('--color-grade-bottom-text');
 }
 
 function trendColorClass(angle) {

@@ -15,6 +15,9 @@ import rumps
 _HEALTH_TIMEOUT = 1.0
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
+_PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
+# macOS-specific paths for Homebrew and user-local binaries
+_EXTRA_PATH_DIRS = "/usr/local/bin:/opt/homebrew/bin"
 
 
 def _load_config(env=None):
@@ -46,7 +49,7 @@ def _source_user_path() -> None:
             return
     except (subprocess.TimeoutExpired, OSError):
         pass
-    extra = f"{os.path.expanduser('~/.local/bin')}:/usr/local/bin:/opt/homebrew/bin"
+    extra = f"{os.path.expanduser('~/.local/bin')}:{_EXTRA_PATH_DIRS}"
     os.environ["PATH"] = f"{os.environ.get('PATH', '')}:{extra}"
 
 
@@ -240,6 +243,22 @@ class QuodeqApp(rumps.App):
                 return
         rumps.alert("Timeout", "Dashboard did not start in time.")
 
+    @staticmethod
+    def _kill_port_processes(port: int) -> None:
+        """Send SIGTERM to all processes listening on *port*."""
+        try:
+            result = subprocess.run(
+                ["lsof", f"-ti:{port}"], capture_output=True, text=True, timeout=5,
+            )
+            for pid in result.stdout.strip().split("\n"):
+                if pid.strip():
+                    try:
+                        os.kill(int(pid.strip()), signal.SIGTERM)
+                    except (OSError, ValueError):
+                        pass
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+
     def _on_stop(self, _):
         if self._process and self._process.poll() is None:
             try:
@@ -248,19 +267,8 @@ class QuodeqApp(rumps.App):
                 self._process.terminate()
             self._process = None
         for port in self._ports:
-            try:
-                result = subprocess.run(
-                    ["lsof", f"-ti:{port}"], capture_output=True, text=True, timeout=5,
-                )
-                for pid in result.stdout.strip().split("\n"):
-                    if pid.strip():
-                        try:
-                            os.kill(int(pid.strip()), signal.SIGTERM)
-                        except (OSError, ValueError):
-                            pass
-            except (subprocess.TimeoutExpired, OSError):
-                pass
-        for pattern in ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard"):
+            self._kill_port_processes(port)
+        for pattern in _PROCESS_PATTERNS:
             try:
                 subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=5)
             except (subprocess.TimeoutExpired, OSError):

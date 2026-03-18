@@ -16,7 +16,7 @@ export function useAppSettings() {
   const [modelBalanced, setModelBalanced] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}2`) || '');
   const [modelThorough, setModelThorough] = useState(localStorage.getItem(`${MODEL_STORAGE_PREFIX}3`) || '');
   const [verifyFindings, setVerifyFindings] = useState(() => {
-    try { return localStorage.getItem(VERIFY_FINDINGS_KEY) !== 'false'; } catch { return true; }
+    try { return localStorage.getItem(VERIFY_FINDINGS_KEY) === 'true'; } catch { return false; }
   });
 
   function applyTheme(value) {

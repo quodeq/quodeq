@@ -1,7 +1,5 @@
 import { useState } from 'react';
-import { CopyIcon } from './CopyButton.jsx';
-
-const COPY_FEEDBACK_MS = 1500;
+import { CopyIcon, COPY_FEEDBACK_MS } from './CopyButton.jsx';
 
 export default function FileCopyBtn({ display, copyText }) {
   const [copied, setCopied] = useState(false);

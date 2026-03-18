@@ -190,10 +190,32 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
   return lines;
 }
 
+function _buildPlanLines(dimName, totalCount, bySeverity, allViolations, entryKeys) {
+  const affectedFiles = collectAffectedFiles(allViolations);
+  const lines = [
+    ...PLAN_SYSTEM_PREAMBLE, '',
+    `# Fix Plan: ${dimName} dimension`, '',
+    `**Total violations:** ${totalCount}`,
+  ];
+  if (affectedFiles.length > 0) {
+    lines.push('', `**Files you will modify** (${affectedFiles.length}):`);
+    affectedFiles.forEach((f) => lines.push(`- \`${f}\``));
+  }
+  lines.push('', '---', '');
+  KNOWN_SEVERITIES.forEach((sev) => {
+    const vs = bySeverity[sev];
+    if (!vs || vs.length === 0) return;
+    lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`, '');
+    vs.forEach((v, i) => lines.push(...renderViolationEntry(v, i, entryKeys)));
+  });
+  lines.push(...PLAN_OUTPUT_INSTRUCTIONS);
+  lines.push(PLAN_TEST_INSTRUCTION_GROUP);
+  return lines.join('\n').trim();
+}
+
 export function buildDimensionPlanText(evalData) {
   const bySeverity = {};
   let total = 0;
-
   (evalData.principles || []).forEach((principle) => {
     (principle.violations || []).forEach((v) => {
       const sev = normalizeSeverity(v.severity);
@@ -202,97 +224,24 @@ export function buildDimensionPlanText(evalData) {
       total++;
     });
   });
-
   if (total === 0) return '';
-
-  const dimName = evalData.dimension || 'dimension';
-
-  // Collect all violations flat for the affected-files summary
   const allViolations = KNOWN_SEVERITIES.flatMap((sev) => bySeverity[sev] || []);
-  const affectedFiles = collectAffectedFiles(allViolations);
-
-  const lines = [
-    ...PLAN_SYSTEM_PREAMBLE,
-    '',
-    `# Fix Plan: ${dimName} dimension`,
-    '',
-    `**Total violations:** ${total}`,
-  ];
-
-  // Affected files summary — gives the LLM a map of scope before diving in
-  if (affectedFiles.length > 0) {
-    lines.push('');
-    lines.push(`**Files you will modify** (${affectedFiles.length}):`);
-    affectedFiles.forEach((f) => lines.push(`- \`${f}\``));
-  }
-
-  lines.push('', '---', '');
-
-  KNOWN_SEVERITIES.forEach((sev) => {
-    const vs = bySeverity[sev];
-    if (!vs || vs.length === 0) return;
-    lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);
-    lines.push('');
-    vs.forEach((v, i) => {
-      const entryLines = renderViolationEntry(v, i, {
-        principleKey: '_principle',
-        reasonKey: '_findings',
-      });
-      lines.push(...entryLines);
-    });
-  });
-
-  lines.push(...PLAN_OUTPUT_INSTRUCTIONS);
-  lines.push(PLAN_TEST_INSTRUCTION_GROUP);
-
-  return lines.join('\n').trim();
+  return _buildPlanLines(
+    evalData.dimension || 'dimension', total, bySeverity, allViolations,
+    { principleKey: '_principle', reasonKey: '_findings' },
+  );
 }
 
 export function buildDimensionPlanFromViolations(dimName, violations) {
   if (!violations || violations.length === 0) return '';
-
   const bySeverity = {};
-
   violations.forEach((v) => {
     const sev = normalizeSeverity(v.severity);
     if (!bySeverity[sev]) bySeverity[sev] = [];
     bySeverity[sev].push(v);
   });
-
-  const affectedFiles = collectAffectedFiles(violations);
-
-  const lines = [
-    ...PLAN_SYSTEM_PREAMBLE,
-    '',
-    `# Fix Plan: ${dimName} dimension`,
-    '',
-    `**Total violations:** ${violations.length}`,
-  ];
-
-  if (affectedFiles.length > 0) {
-    lines.push('');
-    lines.push(`**Files you will modify** (${affectedFiles.length}):`);
-    affectedFiles.forEach((f) => lines.push(`- \`${f}\``));
-  }
-
-  lines.push('', '---', '');
-
-  KNOWN_SEVERITIES.forEach((sev) => {
-    const vs = bySeverity[sev];
-    if (!vs || vs.length === 0) return;
-    lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);
-    lines.push('');
-    vs.forEach((v, i) => {
-      const entryLines = renderViolationEntry(v, i, {
-        principleKey: 'principle',
-        reasonKey: 'reason',
-      });
-      lines.push(...entryLines);
-    });
-  });
-
-  lines.push(...PLAN_OUTPUT_INSTRUCTIONS);
-  lines.push(PLAN_TEST_INSTRUCTION_GROUP);
-
-  return lines.join('\n').trim();
+  return _buildPlanLines(
+    dimName, violations.length, bySeverity, violations,
+    { principleKey: 'principle', reasonKey: 'reason' },
+  );
 }

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
 import { listPlugins } from '../../../api/index.js';
+import { ISO_25010_URL } from '../../../constants.js';
 
 function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   return (
@@ -46,14 +47,14 @@ function DimensionGrid({ allDimensions, selectedDims, onToggle, onSelectAll, onC
   return (
     <div className="form-group">
       <div className="dimension-label-row">
-        <label><a className="iso-link" href="https://www.iso.org/" target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
+        <label><a className="iso-link" href={ISO_25010_URL} target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
         <div className="dimension-chip-actions">
           <button type="button" className="dim-action-btn" onClick={onSelectAll}>All</button>
           <button type="button" className="dim-action-btn" onClick={onClearAll}>Clear</button>
         </div>
       </div>
       <div className="dimension-grid">
-        {allDimensions.map((dim) => (
+        {[...allDimensions].sort((a, b) => a.id.localeCompare(b.id)).map((dim) => (
           <button
             key={dim.id}
             type="button"
@@ -70,7 +71,7 @@ function DimensionGrid({ allDimensions, selectedDims, onToggle, onSelectAll, onC
   );
 }
 
-export default function EvaluationForm({ onStart, disabled }) {
+function useEvaluationForm(onStart) {
   const [repo, setRepo] = useState('');
   const [allDimensions, setAllDimensions] = useState([]);
   const [selectedDims, setSelectedDims] = useState(new Set());
@@ -82,9 +83,7 @@ export default function EvaluationForm({ onStart, disabled }) {
         const seen = new Map();
         for (const p of plugins) {
           for (const d of p.dimensions) {
-            if (!seen.has(d.id)) {
-              seen.set(d.id, d);
-            }
+            if (!seen.has(d.id)) seen.set(d.id, d);
           }
         }
         setAllDimensions([...seen.values()]);
@@ -92,43 +91,32 @@ export default function EvaluationForm({ onStart, disabled }) {
       .catch(() => setAllDimensions([]));
   }, []);
 
-  function toggleDim(id) {
-    setSelectedDims((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }
-
-  function selectAll() {
-    setSelectedDims(new Set(allDimensions.map((d) => d.id)));
-  }
-
-  function clearAll() {
-    setSelectedDims(new Set());
-  }
-
-  function handleSubmit(e) {
+  const toggleDim = (id) => setSelectedDims((prev) => {
+    const next = new Set(prev);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    return next;
+  });
+  const selectAll = () => setSelectedDims(new Set(allDimensions.map((d) => d.id)));
+  const clearAll = () => setSelectedDims(new Set());
+  const handleSubmit = (e) => {
     e.preventDefault();
     const payload = { repo };
-    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
-      payload.dimensions = [...selectedDims];
-    }
+    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) payload.dimensions = [...selectedDims];
     onStart(payload);
     setRepo('');
     setSelectedDims(new Set());
-  }
+  };
+  const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
+  const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
 
-  function handleFolderSelect(path) {
-    setRepo(path);
-    setFolderBrowserOpen(false);
-  }
+  return { repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen, toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear };
+}
 
-  function handleRepoClear() {
-    setRepo('');
-    setSelectedDims(new Set());
-  }
+export default function EvaluationForm({ onStart, disabled }) {
+  const {
+    repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen,
+    toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear,
+  } = useEvaluationForm(onStart);
 
   const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
 

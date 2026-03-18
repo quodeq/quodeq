@@ -97,7 +97,6 @@ def count_files_from_stream(stream_file: Path) -> int:
 _DEFAULT_AI_TOOLS = "Glob,Grep,Read"
 _DEFAULT_BASE_AI_ARGS = "--print --output-format stream-json --verbose"
 
-
 def _get_ai_tools(env: dict[str, str] | None = None) -> str:
     """Return AI tools from QUODEQ_AI_TOOLS env var (default: "Glob,Grep,Read")."""
     return (env or os.environ).get("QUODEQ_AI_TOOLS", _DEFAULT_AI_TOOLS)
@@ -233,7 +232,6 @@ def _run_with_heartbeat(
 _SENSITIVE_ENV_KEYS = frozenset({
     "QUODEQ_API_KEY", "DATABASE_URL", "SECRET_KEY",
 })
-
 
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
     """Build the subprocess environment for the AI CLI.

@@ -69,6 +69,84 @@ function sortDimensionsByViolationSeverity(dimensions) {
 }
 
 // ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function StatsGrid({ runSummary }) {
+  return (
+    <div className="acc-eval-stats-grid">
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Violations</span>
+        <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
+        <div className="acc-eval-tags">
+          {(runSummary.severity?.critical || 0) > 0 && (
+            <span className="severity-tag critical">{runSummary.severity.critical} critical</span>
+          )}
+          {(runSummary.severity?.major || 0) > 0 && (
+            <span className="severity-tag major">{runSummary.severity.major} major</span>
+          )}
+          {(runSummary.severity?.minor || 0) > 0 && (
+            <span className="severity-tag minor">{runSummary.severity.minor} minor</span>
+          )}
+        </div>
+      </div>
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Compliance</span>
+        <span className="acc-eval-stat-value">{runSummary.totalCompliance || 0}</span>
+      </div>
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Ratio</span>
+        <span className="acc-eval-stat-value">
+          {(() => {
+            const v = runSummary.totalViolations || 0;
+            const c = runSummary.totalCompliance || 0;
+            if (v === 0) return '\u2014';
+            return `1:${Math.round(c / v)}`;
+          })()}
+        </span>
+      </div>
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Files Affected</span>
+        <span className="acc-eval-stat-value">{runSummary.filesAffected}</span>
+      </div>
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Principles</span>
+        <span className="acc-eval-stat-value">{runSummary.uniquePrinciples}</span>
+      </div>
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Dimensions</span>
+        <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
+      </div>
+    </div>
+  );
+}
+
+function ViolationsByDimension({ dimensionsWithViolations, onDimensionClick, selectedRunId }) {
+  if (dimensionsWithViolations.length === 0) return null;
+  return (
+    <>
+      <div className="section-header">
+        <h3 className="section-title">Violations by Dimension</h3>
+        <span className="section-count">
+          {dimensionsWithViolations.length} dimensions analyzed
+        </span>
+      </div>
+      <section className="panel violations-panel expandable">
+        <div className="dimension-violations-list">
+          {dimensionsWithViolations.map((dim) => (
+            <DimensionViolationsRow
+              key={dim.dimension}
+              dimension={dim}
+              onClick={() => onDimensionClick(dim, selectedRunId)}
+            />
+          ))}
+        </div>
+      </section>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Run-specific overview panel
 // ---------------------------------------------------------------------------
 
@@ -143,50 +221,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
           )}
         </div>
 
-        <div className="acc-eval-stats-grid">
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Violations</span>
-            <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
-            <div className="acc-eval-tags">
-              {(runSummary.severity?.critical || 0) > 0 && (
-                <span className="severity-tag critical">{runSummary.severity.critical} critical</span>
-              )}
-              {(runSummary.severity?.major || 0) > 0 && (
-                <span className="severity-tag major">{runSummary.severity.major} major</span>
-              )}
-              {(runSummary.severity?.minor || 0) > 0 && (
-                <span className="severity-tag minor">{runSummary.severity.minor} minor</span>
-              )}
-            </div>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Compliance</span>
-            <span className="acc-eval-stat-value">{runSummary.totalCompliance || 0}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Ratio</span>
-            <span className="acc-eval-stat-value">
-              {(() => {
-                const v = runSummary.totalViolations || 0;
-                const c = runSummary.totalCompliance || 0;
-                if (v === 0) return '—';
-                return `1:${Math.round(c / v)}`;
-              })()}
-            </span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Files Affected</span>
-            <span className="acc-eval-stat-value">{runTopFiles.length}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Principles</span>
-            <span className="acc-eval-stat-value">{runUniquePrinciples}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Dimensions</span>
-            <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
-          </div>
-        </div>
+        <StatsGrid runSummary={{ ...runSummary, filesAffected: runTopFiles.length, uniquePrinciples: runUniquePrinciples }} />
       </section>
 
       <div className="dimensions-header">
@@ -248,27 +283,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
         </div>
       </div>
 
-      {dimensionsWithViolations.length > 0 && (
-        <>
-          <div className="section-header">
-            <h3 className="section-title">Violations by Dimension</h3>
-            <span className="section-count">
-              {dimensionsWithViolations.length} dimensions analyzed
-            </span>
-          </div>
-          <section className="panel violations-panel expandable">
-            <div className="dimension-violations-list">
-              {dimensionsWithViolations.map((dim) => (
-                <DimensionViolationsRow
-                  key={dim.dimension}
-                  dimension={dim}
-                  onClick={() => onDimensionClick(dim, selectedRunId)}
-                />
-              ))}
-            </div>
-          </section>
-        </>
-      )}
+      <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />
 
       {runTopFiles.length > 0 && (
         <>

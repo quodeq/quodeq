@@ -31,7 +31,12 @@ _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
 
 _DEFAULT_STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
 # Overridable via --api-base CLI argument or CWE_API_BASE env var
-_DEFAULT_API_BASE = os.environ.get("CWE_API_BASE", "https://cwe-api.mitre.org/api/v1/cwe")
+_CWE_API_URL = "https://cwe-api.mitre.org/api/v1/cwe"
+
+
+def _default_api_base() -> str:
+    """Return CWE API base URL, reading env lazily at call time."""
+    return os.environ.get("CWE_API_BASE", _CWE_API_URL)
 
 
 def get_all_cwes(standards_dir: Path | None = None) -> dict[int, list[str]]:
@@ -63,8 +68,9 @@ def _fetch_cwe_endpoint(
         return None
 
 
-def fetch_cwe_info(cwe_id: int, api_base: str = _DEFAULT_API_BASE) -> dict | None:
+def fetch_cwe_info(cwe_id: int, api_base: str | None = None) -> dict | None:
     """Fetch abstraction and mapping info from CWE API."""
+    api_base = api_base or _default_api_base()
     w = _fetch_cwe_endpoint("weakness", "Weaknesses", cwe_id, api_base)
     if w is not None:
         mapping_notes = w.get("MappingNotes", {})
@@ -194,8 +200,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--api-base",
-        default=_DEFAULT_API_BASE,
-        help=f"CWE REST API base URL (default: {_DEFAULT_API_BASE})",
+        default=None,
+        help=f"CWE REST API base URL (default: {_CWE_API_URL})",
     )
     args = parser.parse_args()
     api_base: str = args.api_base

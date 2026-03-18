@@ -61,6 +61,35 @@ def _flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[
     return result
 
 
+def _build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
+    """Build a single principle row dict from evidence and score lookup."""
+    label = pdata.get("display_name", raw_key)
+    matched = lookup.get(label, {})
+    grade = matched.get("grade")
+    raw_final = matched.get(_FIELD_FINAL_SCORE)
+    if raw_final is None:
+        raw_final = matched.get(_FIELD_FINAL_SCORE_SNAKE)
+    if grade == _GRADE_INSUFFICIENT:
+        formatted_score = None
+    else:
+        formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
+    row: dict = {
+        "name": label,
+        "score": formatted_score,
+        "grade": grade or grade_from_score(formatted_score),
+    }
+    ci = matched.get(_FIELD_CONFIDENCE_INTERVAL) or matched.get(_FIELD_CONFIDENCE_INTERVAL_SNAKE)
+    gs = matched.get("gradeStability") or matched.get("grade_stability")
+    if ci is not None:
+        row["confidence_interval"] = ci
+    if gs is not None:
+        row["grade_stability"] = gs
+    raw_metrics = pdata.get("metrics")
+    if raw_metrics:
+        row["metrics"] = raw_metrics
+    return row
+
+
 def _build_principle_rows(
     evidence: dict, lookup: dict
 ) -> tuple[list, list, list, dict]:
@@ -75,32 +104,7 @@ def _build_principle_rows(
 
     for raw_key, pdata in evidence.get("principles", {}).items():
         label = pdata.get("display_name", raw_key)
-        matched = lookup.get(label, {})
-        grade = matched.get("grade")
-        # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
-        raw_final = matched.get(_FIELD_FINAL_SCORE)
-        if raw_final is None:
-            raw_final = matched.get(_FIELD_FINAL_SCORE_SNAKE)
-        # Insufficient principles have no meaningful score — suppress "0.0/10".
-        if grade == _GRADE_INSUFFICIENT:
-            formatted_score = None
-        else:
-            formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
-        row: dict = {
-            "name": label,
-            "score": formatted_score,
-            "grade": grade or grade_from_score(formatted_score),
-        }
-        ci = matched.get(_FIELD_CONFIDENCE_INTERVAL) or matched.get(_FIELD_CONFIDENCE_INTERVAL_SNAKE)
-        gs = matched.get("gradeStability") or matched.get("grade_stability")
-        if ci is not None:
-            row["confidence_interval"] = ci
-        if gs is not None:
-            row["grade_stability"] = gs
-        raw_metrics = pdata.get("metrics")
-        if raw_metrics:
-            row["metrics"] = raw_metrics
-        principle_rows.append(row)
+        principle_rows.append(_build_principle_row(raw_key, pdata, lookup))
 
         viols = _flatten_findings(pdata.get("violations", []), label, _VIOLATION_FIELDS)
         flat_violations.extend(viols)

@@ -15,16 +15,16 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.pool import PoolPaths, SubagentPool
-from quodeq.shared.logging import log_info, log_warning
+from quodeq.shared.logging import log_info, log_success, log_warning
 
 if TYPE_CHECKING:
     from quodeq.analysis.runner import RunConfig
 
 _MAX_FILES_PER_AGENT = 30
-_VERIFY_MAX_FILES_PER_AGENT = 20  # verification is lighter, can handle more files
-_VERIFY_MAX_TURNS = 50            # verification tasks are quick
-_VERIFY_MAX_DURATION = 120        # 2 minutes max for verification pool
-_VERIFY_N_AGENTS = 3              # fewer agents needed for verification
+_VERIFY_MAX_FILES_PER_AGENT = 40  # verification is lighter, can handle more files
+_VERIFY_MAX_TURNS = 100           # verification tasks are quick but need enough turns
+_VERIFY_MAX_DURATION = 600        # 10 minutes max for verification pool
+_VERIFY_N_AGENTS = 5              # match main pool agent count for faster verification
 
 
 @dataclass

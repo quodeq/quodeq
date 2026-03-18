@@ -179,9 +179,9 @@ export default function App() {
       case 'evaluate':
         return (
           <EvaluateScreen
-            job={job} jobError={jobError} liveViolations={liveViolations} selectedProject={selectedProject}
-            analysisPower={analysisPower} onAnalysisPowerChange={setAnalysisPower}
-            onStartEvaluation={handleStartEvaluation} onDismiss={handleEvalDismiss} onCancel={cancelEvaluation}
+            evaluation={{ job, jobError, liveViolations }}
+            context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
+            actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
           />
         );
       case 'file':
@@ -194,14 +194,16 @@ export default function App() {
       case 'settings':
         return (
           <SettingsPage
-            themePreference={settings.themePreference} onApplyTheme={settings.applyTheme}
-            aiCmd={settings.aiCmd} onApplyAiCmd={settings.applyAiCmd}
-            aiModel={settings.aiModel} onAiModelChange={settings.setAiModel}
-            modelFast={settings.modelFast} onModelFastChange={settings.setModelFast}
-            modelBalanced={settings.modelBalanced} onModelBalancedChange={settings.setModelBalanced}
-            modelThorough={settings.modelThorough} onModelThoroughChange={settings.setModelThorough}
-            analysisPower={analysisPower} onAnalysisPowerChange={setAnalysisPower}
-            verifyFindings={settings.verifyFindings} onApplyVerifyFindings={settings.applyVerifyFindings}
+            theme={{ preference: settings.themePreference, onApply: settings.applyTheme }}
+            models={{
+              aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
+              aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
+              fast: settings.modelFast, onFastChange: settings.setModelFast,
+              balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
+              thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
+            }}
+            analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
+            verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
           />
         );
       case 'projects':

@@ -3,17 +3,11 @@ import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import PowerSelector from './PowerSelector.jsx';
 
-export default function EvaluateScreen({
-  job,
-  jobError,
-  liveViolations,
-  selectedProject,
-  analysisPower,
-  onAnalysisPowerChange,
-  onStartEvaluation,
-  onDismiss,
-  onCancel,
-}) {
+export default function EvaluateScreen({ evaluation, context, actions }) {
+  const { job, jobError, liveViolations } = evaluation;
+  const { selectedProject, analysisPower, onAnalysisPowerChange } = context;
+  const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
+
   return (
     <section className="evaluate-screen">
       <header className="evaluate-header">

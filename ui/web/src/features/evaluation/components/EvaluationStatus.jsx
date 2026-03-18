@@ -25,12 +25,14 @@ function phaseLabel(job) {
   }
 }
 
+const STATUS_MARKERS = { arrow: '\u2192', check: '\u2713', error: 'Error:', failed: 'failed' };
+
 export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel }) {
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
   function isRelevantLogLine(line) {
-    return line.startsWith('→') || line.startsWith('✓') || line.startsWith('Error:') || line.includes('failed');
+    return line.startsWith(STATUS_MARKERS.arrow) || line.startsWith(STATUS_MARKERS.check) || line.startsWith(STATUS_MARKERS.error) || line.includes(STATUS_MARKERS.failed);
   }
 
   function lastRelevantLog(logs) {
