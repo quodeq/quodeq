@@ -6,6 +6,7 @@
 </p>
 
 <h3 align="center">AI-powered code quality analysis mapped to ISO 25010 & CWE</h3>
+<p align="center"><strong>v0.6.0</strong></p>
 
 <p align="center">
   Point Quodeq at any repo and get a full quality breakdown across
@@ -16,15 +17,43 @@
 
 ---
 
+## Requirements
+
+| Dependency | Version | |
+|---|---|---|
+| [Python](https://www.python.org/downloads/) | 3.12+ | Runtime |
+| [Node.js](https://nodejs.org/) | 18+ | Dashboard UI |
+| [npm](https://www.npmjs.com/get-npm) | 9+ | Bundled with Node.js |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | latest | AI analysis engine |
+
+## Install
+
+**Recommended:**
+```bash
+pipx install quodeq
+```
+
+**Homebrew:**
+```bash
+brew install quodeq/tap/quodeq
+```
+
+**pip:**
+```bash
+pip install quodeq
+```
+
+---
+
 ## Dashboard
 
-The Quodeq Dashboard is where everything comes together. Launch it with:
+The Quodeq Dashboard is the recommended way to use Quodeq. It lets you launch evaluations, browse results, and track quality over time — all from a single web UI.
 
 ```bash
 quodeq dashboard
 ```
 
-You get a live web UI at `http://localhost:4173` with:
+Opens at `http://localhost:4173` with:
 
 - **Overall grade & score** — A-F letter grade, numeric score /10, trend across runs
 - **Dimension breakdown** — individual scores per quality dimension with severity counts
@@ -36,58 +65,46 @@ Click any dimension, file, or principle to explore the details.
 
 ### QuodeqBar (macOS)
 
-On macOS, **QuodeqBar** lives in your menu bar and manages the dashboard for you — start/stop the server, see evaluation status at a glance, and open the dashboard in one click. Just open the app and it handles the rest.
+On macOS, [**QuodeqBar**](https://github.com/quodeq/quodeq/releases/latest) lives in your menu bar and manages the dashboard for you — start/stop the server, see evaluation status at a glance, and open the dashboard in one click.
+
+### CLI-only usage
+
+You can also run evaluations directly from the terminal without the dashboard:
+
+```bash
+quodeq evaluate /path/to/project
+```
+
+Run `quodeq evaluate --help` for all options.
 
 ---
 
-## Install
+## The Q² Scoring Formula
 
-```bash
-# Recommended
-pipx install quodeq
+Quodeq scores each principle on a 0–10 scale using four independent constraints:
 
-# Or with Homebrew
-brew install quodeq/tap/quodeq
+1. **Violation Base** — hyperbolic curve where the first violations hurt most (`10 / (1 + K * weighted_violations)`)
+2. **Compliance Lift** — evidence of good practices fills the gap between the base and 10
+3. **Violation Ceiling** — log₂-based cap prevents compliance from overriding significant violations
+4. **Severity Grade Floor** — grade labels match reality (only critical violations can produce a "Critical" grade)
 
-# Or with pip
-pip install quodeq
-```
+The final score: `max(floor, min(ceiling, base + (10 - base) * lift))`
 
-**Requirements:** Python 3.12+ and an AI CLI client (e.g. [Claude Code](https://docs.anthropic.com/en/docs/claude-code)).
-Node.js 18+ is only needed when installing from source.
+Full details in [src/quodeq/core/scoring/README.md](src/quodeq/core/scoring/README.md).
 
-## Quick Start
+## Supported Languages
 
-```bash
-# Configure your AI client
-quodeq configure
-
-# Evaluate a local project
-quodeq evaluate /path/to/your/project
-
-# Evaluate a remote repo
-quodeq evaluate git@github.com:org/repo.git
-
-# Specific dimensions only
-quodeq evaluate /path/to/project -d security,reliability
-
-# Open the dashboard
-quodeq dashboard
-```
+Quodeq can evaluate **any codebase in any language**. The AI analysis engine reads and understands code regardless of the tech stack.
 
 ## How It Works
 
-1. **Detect** — identifies the language and loads the matching evaluator plugin
-2. **Analyze** — spawns an AI CLI with read-only tools to explore the codebase
+1. **Detect** — identifies the languages and structure of the codebase
+2. **Analyze** — spawns an AI CLI with read-only tools to explore the code
 3. **Collect** — findings stream as structured JSONL via tool calls
 4. **Score** — maps findings to ISO 25010 principles with CWE classifications
 5. **Report** — produces per-dimension reports with grades, violations, and compliance
 
 Results are stored in `~/.quodeq/evaluations/` and persist across sessions.
-
-## Supported Languages
-
-TypeScript/JavaScript, Python, Kotlin, Java, Bash/Shell, Swift (iOS)
 
 ## CLI Reference
 
@@ -96,7 +113,6 @@ TypeScript/JavaScript, Python, Kotlin, Java, Bash/Shell, Swift (iOS)
 | Flag | Default | Description |
 |------|---------|-------------|
 | `repo` | *(required)* | Path or URL to the repository |
-| `-p, --plugin` | auto-detect | Plugin ID (typescript, python, kotlin, java, bash, mobile_ios) |
 | `-o, --output` | `~/.quodeq/evaluations` | Reports output directory |
 | `-d, --dimensions` | all | Comma-separated dimensions to evaluate |
 | `--max-turns` | 200 | Max AI conversation turns per dimension |
