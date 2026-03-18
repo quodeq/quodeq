@@ -5,6 +5,7 @@ import json
 import os
 import signal
 import subprocess
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -239,14 +240,26 @@ class QuodeqApp(rumps.App):
                 self._starting = False
 
     def _do_start_inner(self):
+        # Re-discover commands in case PATH changed since last check
+        self._commands_cache = None
         quodeq_cmd = self._find_commands().get("quodeq")
         if not quodeq_cmd:
+            rumps.alert(
+                "Quodeq not found",
+                "Could not find the 'quodeq' command.\n\n"
+                "Install it with: pipx install quodeq\n\n"
+                f"Current PATH:\n{os.environ.get('PATH', '(empty)')}"
+            )
             return
         self._status_item.title = "Starting..."
+        # Log stderr to a temp file for debugging startup failures
+        self._stderr_log = tempfile.NamedTemporaryFile(
+            prefix="quodeq-dashboard-", suffix=".log", delete=False, mode="w",
+        )
         try:
             self._process = subprocess.Popen(
                 [quodeq_cmd, "dashboard", "--no-open", "--port", str(self._app_port)],
-                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                stdout=subprocess.DEVNULL, stderr=self._stderr_log,
                 start_new_session=True,
             )
         except OSError as e:
@@ -255,6 +268,19 @@ class QuodeqApp(rumps.App):
         import time
         for _ in range(_MAX_START_RETRIES):
             time.sleep(0.5)
+            # Check if process crashed
+            if self._process.poll() is not None:
+                self._stderr_log.close()
+                try:
+                    with open(self._stderr_log.name) as f:
+                        err = f.read(2000)
+                except OSError:
+                    err = "(could not read log)"
+                rumps.alert(
+                    "Dashboard crashed",
+                    f"Exit code: {self._process.returncode}\n\n{err}"
+                )
+                return
             port = self._find_running_port()
             if port:
                 self._port = port
