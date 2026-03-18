@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis.subagents.verify import _mechanical_check, run_mechanical_verify
+from quodeq.analysis.subagents.verify import _mechanical_check, run_mechanical_verify, write_verified_findings
 
 
 class TestMechanicalCheck:
@@ -53,26 +53,32 @@ class TestMechanicalCheck:
 
 
 class TestRunMechanicalVerify:
-    def test_copies_confirmed_findings(self, tmp_path):
+    def test_returns_confirmed_findings_in_memory(self, tmp_path):
         (tmp_path / "app.py").write_text("x = 1\ny = 2\nz = 3\n")
         findings = [
             {"p": "Modularity", "t": "violation", "file": "app.py", "line": 1, "snippet": "x = 1"},
             {"p": "Modularity", "t": "compliance", "file": "gone.py", "line": 1, "snippet": "ok"},
         ]
-        output = tmp_path / "output.jsonl"
-        confirmed, gone, ambiguous = run_mechanical_verify(tmp_path, findings, output)
+        confirmed, gone, ambiguous = run_mechanical_verify(tmp_path, findings)
 
-        assert confirmed == 1
+        assert len(confirmed) == 1
         assert gone == 1
         assert len(ambiguous) == 0
+        assert confirmed[0]["file"] == "app.py"
+
+    def test_write_verified_findings(self, tmp_path):
+        output = tmp_path / "output.jsonl"
+        findings = [
+            {"p": "Modularity", "t": "violation", "file": "app.py", "line": 1, "snippet": "x = 1"},
+        ]
+        write_verified_findings(findings, output)
         assert output.exists()
         lines = output.read_text().strip().split("\n")
         assert len(lines) == 1
         assert '"x = 1"' in lines[0]
 
     def test_empty_findings(self, tmp_path):
-        output = tmp_path / "output.jsonl"
-        confirmed, gone, ambiguous = run_mechanical_verify(tmp_path, [], output)
-        assert confirmed == 0
+        confirmed, gone, ambiguous = run_mechanical_verify(tmp_path, [])
+        assert len(confirmed) == 0
         assert gone == 0
         assert len(ambiguous) == 0

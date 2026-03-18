@@ -119,71 +119,83 @@ def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
 def run_mechanical_verify(
     src: Path,
     prev_findings: list[dict],
-    output_jsonl: Path,
-) -> tuple[int, int, list[dict]]:
+) -> tuple[list[dict], int, list[dict]]:
     """Mechanically verify findings against current code.
 
-    Returns (confirmed_count, gone_count, ambiguous_findings).
+    Returns (confirmed_findings, gone_count, ambiguous_findings).
+    Confirmed findings are returned in memory — the caller decides
+    when to write them (e.g., after subagent analysis completes).
     """
-    confirmed = 0
+    confirmed: list[dict] = []
     gone = 0
     ambiguous: list[dict] = []
 
-    with open(output_jsonl, "a") as fh:
-        for finding in prev_findings:
-            status = _mechanical_check(finding, src)
-            if status == "confirmed":
-                _write_finding(finding, fh)
-                confirmed += 1
-            elif status == "gone":
-                gone += 1
-            else:
-                ambiguous.append(finding)
+    for finding in prev_findings:
+        status = _mechanical_check(finding, src)
+        if status == "confirmed":
+            confirmed.append(finding)
+        elif status == "gone":
+            gone += 1
+        else:
+            ambiguous.append(finding)
 
     return confirmed, gone, ambiguous
+
+
+def write_verified_findings(findings: list[dict], output_jsonl: Path) -> None:
+    """Write verified findings to the JSONL evidence file.
+
+    Called after subagent analysis completes so the dashboard doesn't
+    show stale findings before fresh analysis is done.
+    """
+    if not findings:
+        return
+    with open(output_jsonl, "a") as fh:
+        for finding in findings:
+            _write_finding(finding, fh)
 
 
 def run_verify_for_dimension(
     config: Any,
     dim_id: str,
     evidence_dir: Path,
-) -> int:
+) -> list[dict]:
     """Run mechanical verification for a dimension.
 
     1. Find previous run's JSONL
     2. For each finding: check if file/snippet still exists
-    3. Confirmed findings → copy to current JSONL
+    3. Confirmed findings → return in memory (NOT written to JSONL yet)
     4. Gone findings → drop
     5. Ambiguous findings → drop (conservative; analysis agents will re-discover if real)
 
-    Returns number of findings carried forward.
+    Returns list of confirmed findings. The caller is responsible for writing
+    them to the JSONL after subagent analysis completes.
     """
     if not getattr(config, 'options', None) or not config.options.verify_findings:
-        return 0
+        return []
 
     paths = _resolve_evidence_paths(evidence_dir)
     if paths is None:
         log_info(f"  [{dim_id}] Cannot locate evidence root — skipping verification")
-        return 0
+        return []
 
     current_run_id, project_uuid, reports_base = paths
 
     prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
     if prev_jsonl is None:
         log_info(f"  [{dim_id}] No previous evaluation — skipping verification")
-        return 0
+        return []
 
     prev_findings = _load_previous_findings(prev_jsonl)
     if not prev_findings:
-        return 0
+        return []
 
     log_info(f"  [{dim_id}] Verifying {len(prev_findings)} previous findings mechanically")
 
-    output_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
-    confirmed, gone, ambiguous = run_mechanical_verify(config.src, prev_findings, output_jsonl)
+    confirmed, gone, ambiguous = run_mechanical_verify(config.src, prev_findings)
 
     log_success(
-        f"  [{dim_id}] Verification: {confirmed} confirmed, "
+        f"  [{dim_id}] Verification: {len(confirmed)} confirmed, "
         f"{gone} gone, {len(ambiguous)} ambiguous (dropped)"
     )
     return confirmed
