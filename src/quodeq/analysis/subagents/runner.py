@@ -32,16 +32,14 @@ def _compute_files_per_agent(total_files: int) -> int:
 
     Larger projects get higher limits to reduce context rotation overhead
     (each rotation spawns a new CLI session with ~8K tokens of fixed cost).
+    Capped at 50 — empirically, agents hit turn/time limits above that
+    and leave files unread, which reduces coverage and score quality.
     """
     if total_files <= 0:
         return 0
     if total_files <= 50:
         return total_files
-    if total_files <= 200:
-        return 50
-    if total_files <= 1000:
-        return 75
-    return 100
+    return 50
 
 
 @dataclass

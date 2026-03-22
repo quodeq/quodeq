@@ -18,13 +18,13 @@ class TestComputeFilesPerAgent:
         assert _compute_files_per_agent(200) == 50
 
     def test_large_project(self):
-        assert _compute_files_per_agent(500) == 75
+        assert _compute_files_per_agent(500) == 50
 
     def test_boundary_1000(self):
-        assert _compute_files_per_agent(1000) == 75
+        assert _compute_files_per_agent(1000) == 50
 
     def test_very_large_project(self):
-        assert _compute_files_per_agent(5000) == 100
+        assert _compute_files_per_agent(5000) == 50
 
     def test_minimum_1(self):
         assert _compute_files_per_agent(1) == 1
