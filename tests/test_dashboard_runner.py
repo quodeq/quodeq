@@ -42,6 +42,8 @@ def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkey
 
     monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
     monkeypatch.setattr(runner, "_ensure_action_api", fake_ensure)
+    monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
+    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
 
     config = _make_config(tmp_path, static_dist=static_dist)
 
@@ -59,6 +61,8 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
         runner, "_ensure_action_api",
         lambda *_args, **_kwargs: ("http://127.0.0.1:4173", DummyProcess()),
     )
+    monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
+    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
 
     reports_dir = tmp_path / "reports"
     config = _make_config(tmp_path, reports_dir=reports_dir, static_dist=static_dist, reports_defaulted=True)
@@ -85,6 +89,8 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
         lambda *_args, **_kwargs: ("http://127.0.0.1:4174", DummyProcess()),
     )
     monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == 4173)
+    monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
+    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
 
     config = _make_config(tmp_path, static_dist=static_dist, reports_defaulted=True)
 

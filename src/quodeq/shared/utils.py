@@ -194,14 +194,14 @@ def get_dashboard_port() -> int:
 
 
 def get_static_dist(env: dict[str, str] | None = None) -> str | None:
-    """Return the static dist path from environment, or the bundled static dir."""
+    """Return the static dist path from environment, or the user-level cache."""
     from_env = (env or os.environ).get("QUODEQ_STATIC_DIST")
     if from_env:
         return from_env
-    # Fall back to static assets bundled inside the package
-    bundled = Path(__file__).resolve().parent.parent / "static"
-    if bundled.is_dir() and (bundled / "index.html").exists():
-        return str(bundled)
+    # Check user-level cache (built on demand by `quodeq dashboard`)
+    cached = Path.home() / ".quodeq" / "static"
+    if cached.is_dir() and (cached / "index.html").exists():
+        return str(cached)
     return None
 
 
