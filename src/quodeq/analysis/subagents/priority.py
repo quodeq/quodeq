@@ -9,7 +9,9 @@ import subprocess
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
+from typing import Any
 
+from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension
 from quodeq.config.paths import default_paths
 
 
@@ -184,3 +186,27 @@ def compute_git_scores(files: list[str], src: Path) -> dict[str, float]:
         scores[f] = score
 
     return scores
+
+
+def compute_previous_violations(
+    config: Any, evidence_dir: Path, dimension: str | list[str],
+) -> dict[str, int]:
+    """Layer 5: count violations per file from previous evaluation.
+
+    Reuses load_previous_findings_for_dimension from verify.py which
+    resolves the correct previous run's evidence directory.
+    """
+    dims = dimension if isinstance(dimension, list) else [dimension]
+    counts: dict[str, int] = {}
+
+    for dim in dims:
+        try:
+            findings = load_previous_findings_for_dimension(config, dim, evidence_dir)
+        except Exception:
+            continue
+        for finding in findings:
+            if finding.get("t") == "violation" and finding.get("file"):
+                f = finding["file"]
+                counts[f] = counts.get(f, 0) + 1
+
+    return counts

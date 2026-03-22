@@ -108,7 +108,7 @@ class TestComputeFanIn:
 
 
 from unittest.mock import patch
-from quodeq.analysis.subagents.priority import compute_git_scores
+from quodeq.analysis.subagents.priority import compute_git_scores, compute_previous_violations
 
 
 class TestComputeGitScores:
@@ -132,3 +132,35 @@ class TestComputeGitScores:
         with patch("quodeq.analysis.subagents.priority._run_git_log", return_value=mock_output):
             scores = compute_git_scores(["recent.py", "old.py"], tmp_path)
         assert scores.get("recent.py", 0) >= scores.get("old.py", 0)
+
+
+class TestComputePreviousViolations:
+    def test_counts_violations_per_file(self, tmp_path):
+        findings = [
+            {"p": "Confidentiality", "d": "security", "t": "violation", "file": "auth.py", "line": 1},
+            {"p": "Confidentiality", "d": "security", "t": "violation", "file": "auth.py", "line": 5},
+            {"p": "Integrity", "d": "security", "t": "violation", "file": "routes.py", "line": 10},
+            {"p": "Integrity", "d": "security", "t": "compliance", "file": "utils.py", "line": 1},
+        ]
+        with patch("quodeq.analysis.subagents.priority.load_previous_findings_for_dimension", return_value=findings):
+            counts = compute_previous_violations(None, tmp_path, "security")
+        assert counts.get("auth.py", 0) == 2
+        assert counts.get("routes.py", 0) == 1
+        assert counts.get("utils.py", 0) == 0
+
+    def test_no_previous_run(self, tmp_path):
+        with patch("quodeq.analysis.subagents.priority.load_previous_findings_for_dimension", return_value=[]):
+            counts = compute_previous_violations(None, tmp_path, "security")
+        assert counts == {}
+
+    def test_consolidated_merges_dimensions(self, tmp_path):
+        def mock_load(config, dim, evidence_dir):
+            if dim == "security":
+                return [{"t": "violation", "file": "auth.py", "line": 1}]
+            elif dim == "maintainability":
+                return [{"t": "violation", "file": "big.py", "line": 1}]
+            return []
+        with patch("quodeq.analysis.subagents.priority.load_previous_findings_for_dimension", side_effect=mock_load):
+            counts = compute_previous_violations(None, tmp_path, ["security", "maintainability"])
+        assert counts.get("auth.py", 0) >= 1
+        assert counts.get("big.py", 0) >= 1
