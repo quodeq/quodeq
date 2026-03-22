@@ -9,6 +9,7 @@ import pytest
 from quodeq.analysis.prompts.builder import (
     PromptContext,
     build_analysis_prompt,
+    build_consolidated_prompt,
     load_template,
     render_compiled_standards,
     render_dimensions,
@@ -249,3 +250,48 @@ class TestBuildAnalysisPrompt:
             ),
         )
         assert "PROMPT_HASH" not in prompt
+
+
+# ---------------------------------------------------------------------------
+# build_consolidated_prompt
+# ---------------------------------------------------------------------------
+
+class TestBuildConsolidatedPrompt:
+    def test_includes_all_dimension_standards(self, tmp_path):
+        compiled = tmp_path / "compiled"
+        compiled.mkdir()
+        for dim, req_id in [("security", "S-CON-1"), ("maintainability", "M-MOD-1")]:
+            data = {"id": dim, "principles": [{"name": "Test", "source": "iso25010",
+                    "requirements": [{"id": req_id, "source": "iso25010",
+                    "text": f"Test req for {dim}", "refs": []}]}]}
+            (compiled / f"{dim}.json").write_text(json.dumps(data))
+
+        prompt = build_consolidated_prompt(
+            dimensions=["security", "maintainability"],
+            context=PromptContext(
+                language="python", repo_name="test", date_str="2026-03-22",
+                dimension="consolidated",
+                source_file_count=20,
+                dimensions_data=_sample_dimensions(),
+                standards_dir=tmp_path,
+            ),
+        )
+        assert "S-CON-1" in prompt
+        assert "M-MOD-1" in prompt
+        assert "security" in prompt.lower()
+        assert "maintainability" in prompt.lower()
+
+    def test_dimension_list_in_prompt(self, tmp_path):
+        compiled = tmp_path / "compiled"
+        compiled.mkdir()
+        prompt = build_consolidated_prompt(
+            dimensions=["security", "reliability"],
+            context=PromptContext(
+                language="python", repo_name="test", date_str="2026-03-22",
+                dimension="consolidated",
+                source_file_count=10,
+                dimensions_data=_sample_dimensions(),
+                standards_dir=tmp_path,
+            ),
+        )
+        assert "security, reliability" in prompt

@@ -184,6 +184,8 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
             from quodeq.provider.base import EvaluationOptions
+            max_subagents_raw = payload.get("maxSubagents", 5)
+            max_subagents = max(1, min(10, int(max_subagents_raw)))
             job = provider.start_evaluation(
                 repo=repo,
                 reports_dir=_reports_dir(),
@@ -195,6 +197,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
                     ai_model=payload.get("aiModel") or None,
                     subagent_model=payload.get("subagentModel") or None,
                     verify_findings=bool(payload.get("verifyFindings", False)),
+                    max_subagents=max_subagents,
                 ),
             )
         except (FileNotFoundError, ValueError):

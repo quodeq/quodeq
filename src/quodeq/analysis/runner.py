@@ -39,9 +39,10 @@ class AnalysisOptions:
     dimensions: list[str] | None = None
     max_turns: int | None = None
     max_duration: int | None = None
-    n_subagents: int = 1
+    max_subagents: int = 1
     subagent_model: str | None = None
     verify_findings: bool = False
+    consolidated: bool = True
 
 
 @dataclass
@@ -234,7 +235,7 @@ def _process_single_dimension(
     emit_marker("analyzing", dimension=dimension)
     log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
-    if config.options.n_subagents > 1:
+    if config.options.max_subagents > 1:
         ev = _process_dimension_with_subagents(config, dimension, idx, ctx)
     else:
         prompt = _build_dimension_prompt(config, dimension, ctx)
@@ -252,8 +253,26 @@ def _process_single_dimension(
 def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
     dimensions, ctx = load_analysis_context(config)
-    result: dict[str, Evidence] = {}
     emit_marker("setup", dimensions=dimensions)
+
+    # Consolidated mode: evaluate all dimensions in one pass
+    if (config.options.consolidated
+            and len(dimensions) > 1
+            and config.options.max_subagents > 1):
+        from quodeq.analysis.subagents.runner import process_consolidated_dimensions
+        try:
+            result = process_consolidated_dimensions(config, dimensions, ctx)
+            if result:
+                for dim, ev in result.items():
+                    idx = dimensions.index(dim) + 1 if dim in dimensions else 0
+                    _log_dimension_result(ev, dim, idx, len(dimensions))
+                return result
+            log_warning("Consolidated mode produced no results, falling back to per-dimension")
+        except Exception as exc:
+            log_warning(f"Consolidated mode failed: {exc}, falling back to per-dimension")
+
+    # Per-dimension loop (fallback or single-dimension)
+    result: dict[str, Evidence] = {}
     skipped_count = 0
 
     for idx, dimension in enumerate(dimensions, 1):

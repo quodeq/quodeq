@@ -43,12 +43,17 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         help="Max seconds per dimension before terminating (default: 1800)",
     )
     parser.add_argument(
-        "--n-subagents", type=int, default=_DEFAULT_N_SUBAGENTS,
-        help="Number of parallel subagents per dimension (default: %(default)s)",
+        "--n-subagents", "--max-subagents", type=int, default=_DEFAULT_N_SUBAGENTS,
+        dest="n_subagents",
+        help="Max parallel subagents per dimension (default: %(default)s)",
     )
     parser.add_argument(
         "--no-verify", action="store_true",
         help="Skip post-analysis verification pass",
+    )
+    parser.add_argument(
+        "--no-consolidated", action="store_true",
+        help="Disable multi-dimension consolidation (evaluate dimensions separately)",
     )
 
 

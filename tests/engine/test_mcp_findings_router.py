@@ -144,3 +144,49 @@ class TestGetNextFiles:
         result = responses[0]["result"]
         assert result["isError"] is True
         assert "No file queue" in result["content"][0]["text"]
+
+
+class TestFindingsRouterMultiDimension:
+    def test_derives_dimension_from_req_id(self):
+        """In consolidated mode, dimension comes from req_to_dim mapping."""
+        import io
+        from quodeq.analysis.mcp.findings_server import FindingsRouter
+
+        fh = io.StringIO()
+        req_to_dim = {"S-CON-1": "security", "M-MOD-1": "maintainability"}
+        reqs = {
+            "S-CON-1": {"principle": "Confidentiality", "text": "..."},
+            "M-MOD-1": {"principle": "Modularity", "text": "..."},
+        }
+        router = FindingsRouter(
+            output_fh=fh,
+            compiled_reqs=reqs,
+            req_to_dim=req_to_dim,
+        )
+
+        msg1, dup1 = router.receive({"req": "S-CON-1", "t": "violation", "file": "a.py", "line": 1, "w": "test"})
+        msg2, dup2 = router.receive({"req": "M-MOD-1", "t": "violation", "file": "b.py", "line": 2, "w": "test2"})
+
+        import json
+        lines = [json.loads(l) for l in fh.getvalue().strip().split("\n")]
+        assert lines[0]["d"] == "security"
+        assert lines[1]["d"] == "maintainability"
+
+    def test_fallback_to_single_dimension(self):
+        """When req_to_dim is empty, falls back to self._dimension."""
+        import io
+        from quodeq.analysis.mcp.findings_server import FindingsRouter
+
+        fh = io.StringIO()
+        reqs = {"S-CON-1": {"principle": "Confidentiality", "text": "..."}}
+        router = FindingsRouter(
+            output_fh=fh,
+            compiled_reqs=reqs,
+            dimension="security",
+        )
+
+        router.receive({"req": "S-CON-1", "t": "violation", "file": "a.py", "line": 1, "w": "test"})
+
+        import json
+        line = json.loads(fh.getvalue().strip())
+        assert line["d"] == "security"
