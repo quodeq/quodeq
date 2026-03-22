@@ -70,7 +70,7 @@ class SubagentPool:
         n_agents: int,
         paths: PoolPaths,
         prompt: str,
-        dimension: str,
+        dimension: str | list[str],
         config: AnalysisConfig | None = None,
     ):
         self._n = max(1, n_agents)
@@ -78,7 +78,15 @@ class SubagentPool:
         self._prompt = prompt
         self._evidence_dir = paths.evidence_dir
         self._queue_path = paths.queue_path
-        self._dimension = dimension
+        # Normalize dimension to support both single and multi-dimension
+        if isinstance(dimension, list):
+            self._dimensions = dimension
+            self._dimension = ",".join(dimension)  # for AnalysisConfig/MCP
+            self._dimension_key = "consolidated"    # for file naming
+        else:
+            self._dimensions = [dimension] if dimension else []
+            self._dimension = dimension
+            self._dimension_key = dimension
         self._base_config = config or AnalysisConfig()
         self._jsonl_lock = threading.Lock()
         # Initialised here so helpers like _collect_done/_process_completed_futures
@@ -89,7 +97,7 @@ class SubagentPool:
 
     def _shared_jsonl_path(self) -> Path:
         """The shared JSONL path all agents write to (same path the UI expects)."""
-        return self._evidence_dir / f"{self._dimension}_evidence.jsonl"
+        return self._evidence_dir / f"{self._dimension_key}_evidence.jsonl"
 
     def _build_agent_config(self, idx: int) -> tuple[AnalysisConfig, Path, Path]:
         """Build per-agent AnalysisConfig, JSONL path, and stream path."""
@@ -97,7 +105,7 @@ class SubagentPool:
         # All agents append to the same JSONL -- the UI reads this file live.
         # Writes are synchronized via self._jsonl_lock.
         jsonl_file = self._shared_jsonl_path()
-        stream_file = self._evidence_dir / f"{self._dimension}_{agent_id}.stream"
+        stream_file = self._evidence_dir / f"{self._dimension_key}_{agent_id}.stream"
 
         # Per-agent timeout: use pool budget so individual agents can't run
         # indefinitely after the queue is drained.
@@ -167,7 +175,7 @@ class SubagentPool:
                 total_agents = len(finished)
                 active = sum(1 for v in finished.values() if not v)
                 log_info(
-                    f"  [{self._dimension}] {mins}m{secs:02d}s | "
+                    f"  [{self._dimension_key}] {mins}m{secs:02d}s | "
                     f"{active} active ({total_agents} total) | "
                     f"{taken} files taken ({remaining} left) | "
                     f"{total_findings} findings"
@@ -218,7 +226,7 @@ class SubagentPool:
                 result = SubagentResult(
                     agent_id=agent_id,
                     jsonl_file=self._shared_jsonl_path(),
-                    stream_file=self._evidence_dir / f"{self._dimension}_{agent_id}.stream",
+                    stream_file=self._evidence_dir / f"{self._dimension_key}_{agent_id}.stream",
                     success=False,
                     error=str(exc),
                 )
@@ -304,7 +312,7 @@ class SubagentPool:
         Returns list of SubagentResult (one per agent, including failures).
         """
         max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
-        log_info(f"Launching scout agent for {self._dimension} (max {self._n} agents)")
+        log_info(f"Launching scout agent for {self._dimension_key} (max {self._n} agents)")
         results: list[SubagentResult] = []
         self._finished.clear()
         self._futures.clear()

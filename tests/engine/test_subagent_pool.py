@@ -226,6 +226,46 @@ class TestComputeScaleUp:
         assert pool._compute_scale_up(500) == 0
 
 
+class TestMultiDimensionPool:
+    def test_single_dimension_backward_compat(self, tmp_path):
+        """Single dimension string still works as before."""
+        queue_path = tmp_path / "queue.json"
+        FileQueue(queue_path, ["a.py"])
+        pool = SubagentPool(
+            n_agents=1,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            prompt="test",
+            dimension="security",
+        )
+        assert pool._dimension == "security"
+        assert pool._dimension_key == "security"
+
+    def test_multi_dimension_list(self, tmp_path):
+        """List of dimensions uses 'consolidated' key for file naming."""
+        queue_path = tmp_path / "queue.json"
+        FileQueue(queue_path, ["a.py"])
+        pool = SubagentPool(
+            n_agents=1,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            prompt="test",
+            dimension=["security", "maintainability"],
+        )
+        assert pool._dimension == "security,maintainability"
+        assert pool._dimension_key == "consolidated"
+        assert pool._dimensions == ["security", "maintainability"]
+
+    def test_multi_dimension_jsonl_path(self, tmp_path):
+        queue_path = tmp_path / "queue.json"
+        FileQueue(queue_path, ["a.py"])
+        pool = SubagentPool(
+            n_agents=1,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            prompt="test",
+            dimension=["security", "maintainability"],
+        )
+        assert "consolidated_evidence.jsonl" in str(pool._shared_jsonl_path())
+
+
 class TestScoutThenScale:
     def test_small_queue_uses_one_agent(self, tmp_path):
         """20 files with max_agents=5 -> only 1 agent should run (scout handles all)."""
