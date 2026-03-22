@@ -24,6 +24,7 @@ from quodeq.shared.validation import validate_path_segment
 
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
+_ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
 
 
 def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
@@ -182,6 +183,7 @@ def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, man
             subagent_model=_subagent_model(),
             verify_findings=not _no_verify(args),
             consolidated=not getattr(args, 'no_consolidated', False) and not bool(os.environ.get("QUODEQ_NO_CONSOLIDATE")),
+            pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None),
         ),
     )
 

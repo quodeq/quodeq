@@ -52,6 +52,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         help="Skip post-analysis verification pass",
     )
     parser.add_argument(
+        "--pool-budget", type=int, default=None,
+        help="Total time budget for agent pool in seconds (default: 600)",
+    )
+    parser.add_argument(
         "--no-consolidated", action="store_true",
         help="Disable multi-dimension consolidation (evaluate dimensions separately)",
     )
