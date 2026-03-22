@@ -243,13 +243,14 @@ When re-evaluating a project, the current system analyzes all files from scratch
 
 On re-evaluation, determine which files changed since the last run. Only send changed files (and their dependents) to the AI agents. Carry forward cached findings for all unchanged files. Merge both into the final Evidence.
 
-### Evaluation Fingerprint
+### Evaluation Fingerprint (Per-Dimension)
 
-Each evaluation stores a fingerprint alongside its evidence:
+Each dimension stores its own fingerprint independently. A project evaluated for security and reliability has two separate fingerprints. Re-evaluating security uses the security fingerprint; evaluating a never-before-evaluated dimension (e.g., performance) runs a full analysis for that dimension regardless of other dimensions' cache state.
 
-**`evaluation_fingerprint.json`** (in the run's evidence directory):
+**`{dimension}_fingerprint.json`** (in the run's evidence directory):
 ```json
 {
+  "dimension": "security",
   "git_commit": "abc123def",
   "file_hashes": {
     "src/auth.py": "sha256:...",
@@ -263,7 +264,18 @@ Each evaluation stores a fingerprint alongside its evidence:
 
 - **Git commit**: primary diff mechanism when available
 - **File hashes**: fallback for non-git repos, and for verifying git diff accuracy (handles rebases/force-pushes)
-- **Standards checksum**: hash of compiled standards JSON — if standards change, all files need re-analysis
+- **Standards checksum**: hash of the compiled standards JSON **for this dimension** — if security standards change, only security needs full re-analysis
+
+### Multi-Dimension Behavior
+
+| Scenario | Security | Reliability |
+|----------|----------|-------------|
+| Both previously evaluated, re-evaluating both | Incremental | Incremental |
+| Only security evaluated, now evaluating both | Incremental | **Full** (no cache) |
+| Both evaluated, standards changed for security only | **Full** | Incremental |
+| Consolidated mode, both previously evaluated | Incremental for both (changed files union across both dimensions) |
+
+**Consolidated mode specifics**: When evaluating multiple dimensions in one pass, the changed-file set is the **union** of changed files across all selected dimensions. A file is "unchanged" only if it was unchanged for *every* selected dimension. Carried-forward findings are loaded per-dimension from their respective previous JSONLs.
 
 ### Change Detection
 
