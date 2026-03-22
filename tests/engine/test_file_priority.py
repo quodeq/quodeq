@@ -205,3 +205,30 @@ class TestPrioritizeFiles:
         files = ["src/auth.py", "src/error_handler.py"]
         result = prioritize_files(files, tmp_path, ["security", "reliability"])
         assert len(result) == 2
+
+
+class TestPrioritizationIntegration:
+    def test_list_source_files_returns_prioritized(self, tmp_path):
+        from quodeq.analysis.subagents.runner import _list_source_files
+        from quodeq.analysis.runner import RunConfig, AnalysisOptions
+        from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
+
+        (tmp_path / "src").mkdir()
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "src" / "auth.py").write_text("x" * 100)
+        (tmp_path / "tests" / "test_stuff.py").write_text("x" * 100)
+
+        target = AnalysisTarget(
+            name="python", language="python", category="backend",
+            source_files=["tests/test_stuff.py", "src/auth.py"],
+            total_files=2,
+        )
+        config = RunConfig(
+            src=tmp_path, language="python",
+            options=AnalysisOptions(),
+            target=target,
+            manifest=SourceManifest(targets=[target], total_files=2),
+        )
+        files, _ = _list_source_files(config, "security")
+        # src/auth.py should come before tests/test_stuff.py
+        assert files.index("src/auth.py") < files.index("tests/test_stuff.py")
