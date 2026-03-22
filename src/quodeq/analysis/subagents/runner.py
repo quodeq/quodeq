@@ -15,6 +15,7 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.pool import PoolPaths, SubagentPool
+from quodeq.analysis.subagents.priority import prioritize_files
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 if TYPE_CHECKING:
@@ -59,17 +60,34 @@ def _list_source_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[s
     """List source files for the subagent queue from the target or manifest.
 
     Returns (files, extensions) or ([], set()) if none found.
+    Files are returned in priority order (most important first).
     """
     # Prefer target-scoped files when available
     if config.target is not None and config.target.source_files:
+        files = config.target.source_files
         extensions = set(config.target.language_stats.keys()) if config.target.language_stats else set()
-        return config.target.source_files, extensions
-
-    if config.manifest is not None and config.manifest.source_files:
+    elif config.manifest is not None and config.manifest.source_files:
+        files = config.manifest.source_files
         extensions = set(config.manifest.language_stats.keys()) if config.manifest.language_stats else set()
-        return config.manifest.source_files, extensions
+    else:
+        return [], set()
 
-    return [], set()
+    # Prioritize files: most important first
+    category = None
+    if config.target and config.target.category:
+        category = config.target.category
+    elif config.manifest:
+        category = config.manifest.category
+
+    evidence_dir = config.work_dir or config.src
+    files = prioritize_files(
+        files, config.src, dim_id,
+        category=category,
+        language=config.language,
+        evidence_dir=evidence_dir,
+        config=config,
+    )
+    return files, extensions
 
 
 def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
