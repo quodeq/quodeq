@@ -156,6 +156,8 @@ _TPL_ANALYSIS_GUIDANCE = "ANALYSIS_GUIDANCE"
 _TPL_DIMENSIONS = "DIMENSIONS"
 _TPL_PROMPT_HASH = "PROMPT_HASH"
 _TPL_SOURCE_MANIFEST = "SOURCE_MANIFEST"
+_TPL_DIMENSION_LIST = "DIMENSION_LIST"
+_TPL_STANDARDS_CHECKLISTS = "STANDARDS_CHECKLISTS"
 
 
 def _render_manifest_context(context: PromptContext) -> str:
@@ -229,6 +231,51 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
         _TPL_STANDARDS_CHECKLIST: standards_checklist,
         _TPL_ANALYSIS_GUIDANCE: manifest_context,
         _TPL_DIMENSIONS: dimensions_text,
+        _TPL_PROMPT_HASH: prompt_hash,
+        _TPL_SOURCE_MANIFEST: manifest_context,
+    }
+    if context.extra_vars:
+        values.update(context.extra_vars)
+    return render_template(template, values)
+
+
+def _render_all_standards(standards_dir: Path, dimensions: list[str]) -> str:
+    """Render compact standards for all dimensions, separated by headers."""
+    compiled_dir = standards_dir / "compiled"
+    if not compiled_dir.exists():
+        return _NO_STANDARDS
+    sections = []
+    for dim in dimensions:
+        compact = render_compact_standards(compiled_dir, dim)
+        if compact != _NO_STANDARDS_FOR_DIM:
+            sections.append(f"## {dim.title()}\n\n{compact}")
+    return "\n\n".join(sections) if sections else _NO_STANDARDS
+
+
+def build_consolidated_prompt(
+    dimensions: list[str],
+    context: PromptContext,
+    template: str | None = None,
+) -> str:
+    """Build a multi-dimension analysis prompt with all standards inline."""
+    if template is None:
+        template = load_template(template_name="consolidated.md")
+
+    standards_text = _render_all_standards(
+        context.standards_dir, dimensions,
+    ) if context.standards_dir else _NO_STANDARDS
+
+    manifest_context = _render_manifest_context(context)
+    prompt_hash = _template_hash(template)
+
+    values = {
+        _TPL_DISCIPLINE: context.language,
+        _TPL_REPO_NAME: context.repo_name,
+        _TPL_DATE: context.date_str,
+        _TPL_DIMENSION_LIST: ", ".join(dimensions),
+        _TPL_SOURCE_FILE_COUNT: str(context.source_file_count),
+        _TPL_STANDARDS_CHECKLISTS: standards_text,
+        _TPL_ANALYSIS_GUIDANCE: manifest_context,
         _TPL_PROMPT_HASH: prompt_hash,
         _TPL_SOURCE_MANIFEST: manifest_context,
     }
