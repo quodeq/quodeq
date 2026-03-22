@@ -27,6 +27,23 @@ _VERIFY_MAX_DURATION = 600        # 10 minutes max for verification pool
 _VERIFY_N_AGENTS = 5              # match main pool agent count for faster verification
 
 
+def _compute_files_per_agent(total_files: int) -> int:
+    """Compute adaptive max files per agent based on project size.
+
+    Larger projects get higher limits to reduce context rotation overhead
+    (each rotation spawns a new CLI session with ~8K tokens of fixed cost).
+    """
+    if total_files <= 0:
+        return 0
+    if total_files <= 50:
+        return total_files
+    if total_files <= 200:
+        return 50
+    if total_files <= 1000:
+        return 75
+    return 100
+
+
 @dataclass
 class DimensionCallbacks:
     """Grouped callbacks for single-agent dimension processing fallback."""
@@ -209,7 +226,8 @@ def process_dimension_with_subagents(
 
     # 4. Create queue with per-agent file limit for context rotation
     queue_path = evidence_dir / f"{dim_id}_queue.json"
-    FileQueue(queue_path, files, max_files_per_agent=_MAX_FILES_PER_AGENT)
+    files_per_agent = _compute_files_per_agent(len(files))
+    FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
     log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued for {config.options.n_subagents} subagents")
 
     # 5. Build prompt and launch main analysis pool
