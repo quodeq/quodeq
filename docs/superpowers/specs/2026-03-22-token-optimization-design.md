@@ -200,9 +200,39 @@ else:
 - New function `build_consolidated_prompt(template, dimensions, context)` that renders standards for all dimensions into one prompt.
 - Reuses existing `render_compact_standards` per dimension, concatenated with dimension headers.
 
-**`src/quodeq/core/evidence/parser.py`**
+### 2.2b MCP server and evidence pipeline changes
 
-- Already routes findings by req ID prefix → principle → dimension. No changes needed — the MCP server's `FindingsRouter` already auto-fills dimension from the req ID.
+The current MCP server and evidence parser are **single-dimension by design**. Consolidated mode requires changes across the pipeline:
+
+**`src/quodeq/analysis/mcp/findings_server.py`**
+- `FindingsRouter.__init__`: Accept a list of dimensions instead of a single dimension. Load compiled requirements and refs for ALL selected dimensions.
+- `FindingsRouter._enrich()`: Currently auto-fills dimension from `self._dimension` (a single value). Must instead **derive dimension from the req ID prefix** (e.g., `S-CON-3` → `security`, `M-MOD-1` → `maintainability`). The req ID prefix-to-dimension mapping is deterministic and can be built at init time from the compiled standards.
+
+**`src/quodeq/analysis/mcp/args.py`**
+- Accept `--dimension` as a comma-separated list (e.g., `--dimension security,maintainability,reliability`) instead of a single value.
+
+**`src/quodeq/core/standards/refs.py`**
+- `load_compiled_requirements` and `load_compiled_refs`: Add multi-dimension variants that load and merge requirements from multiple dimension JSON files. Or change the existing functions to accept `list[str]` instead of `str`.
+
+**`src/quodeq/analysis/subprocess.py`**
+- `_create_mcp_config`: Pass comma-separated dimensions to the MCP server args when in consolidated mode.
+
+**`src/quodeq/core/evidence/parser.py`**
+- Current `parse_jsonl_to_evidence` takes dimension from the first judgment and applies to all. In consolidated mode, a single JSONL file contains findings from multiple dimensions.
+- New function `parse_jsonl_to_evidence_by_dimension(jsonl_path, context, compiled_dir) -> dict[str, Evidence]` that splits JSONL entries by dimension (derived from req ID prefix) and produces per-dimension Evidence objects.
+
+**`src/quodeq/analysis/subagents/pool.py`**
+- `SubagentPool.__init__`: Accept `dimensions: list[str]` instead of `dimension: str` for consolidated mode. File naming uses a combined key (e.g., `consolidated_evidence.jsonl` instead of `{dimension}_evidence.jsonl`).
+- `_build_agent_config`: Pass all dimensions to `AnalysisConfig`.
+- `_shared_jsonl_path` and stream file naming: Use `consolidated` prefix when in multi-dimension mode.
+
+**`src/quodeq/analysis/subagents/runner.py`**
+- New function `process_consolidated_dimensions(config, dimensions, ctx)` that:
+  1. Builds the consolidated prompt with all dimension standards
+  2. Creates a single file queue
+  3. Launches the adaptive pool with `dimensions=dimensions`
+  4. Collects evidence and splits by dimension
+  5. Returns `dict[str, Evidence]`
 
 ### 2.3 When to use consolidated mode
 
@@ -243,14 +273,35 @@ Total estimated savings for 5000 files, 6 dims: **~18M tokens → ~2.5M tokens (
 
 ## What stays the same
 
-- **compass.md template** — single-agent, single-dimension path unchanged
-- **subagent.md template** — used for single-dimension subagent runs
+- **compass.md template** — single-agent path (`n_subagents=1` from CLI) is unchanged and continues to use the per-dimension loop with compass.md. Phase 2 consolidated mode only applies to the subagent pool path.
+- **subagent.md template** — used for single-dimension subagent runs (when 1 dimension selected)
 - **Standards data files** — no changes to compiled JSONs
-- **MCP findings server** — already routes by req ID, dimension-agnostic
 - **FileQueue** — unchanged
-- **Evidence parsing** — already handles mixed-dimension JSONL
 - **Report generation** — already splits evidence by dimension downstream
 - **Output quality** — same standards, same reporting granularity
+
+## Important clarifications
+
+### `n_subagents=1` (single-agent CLI path)
+
+When `n_subagents=1` (the `AnalysisOptions` default), `runner.py:237` takes a completely different code path: no pool, no file queue, no `get_next_files` — it uses `compass.md` with Grep-first strategy. This path is **unchanged** by Phase 1 or Phase 2.
+
+The web UI default is `max_subagents=5` which means web-launched evaluations always go through the subagent pool path. The adaptive scaling in Phase 1 may decide to run only 1 agent, but it still uses `subagent.md` with the file queue workflow — it doesn't fall back to the `compass.md` path.
+
+### Naming: `n_subagents` vs `max_subagents`
+
+- `AnalysisOptions.n_subagents` (runner.py) — rename to `max_subagents` to reflect that it's now a ceiling, not a fixed count.
+- `EvaluationOptions.max_subagents` (base.py) — new field, consistent naming.
+- CLI flag `--n-subagents` (cli_parser.py) — keep for backward compatibility, add `--max-subagents` as preferred alias.
+- `_build_evaluate_cmd` passes `--n-subagents` to the CLI subprocess (new, currently not passed at all).
+
+### Consolidated mode opt-out
+
+Add `--no-consolidated` CLI flag and `QUODEQ_NO_CONSOLIDATE=1` env var to explicitly opt out of consolidated mode. This enables A/B testing and provides a rollback mechanism.
+
+### Scout timeout fallback
+
+If the scout agent runs longer than **3 minutes** (or 50% of `max_duration / max_agents`, whichever is smaller) and the queue still has more than `max_files_per_agent` files remaining, spawn overflow agents without waiting for the scout to complete. Implemented in `SubagentPool._run_pool_loop` via a secondary timer thread.
 
 ## Risks
 
@@ -262,6 +313,7 @@ Total estimated savings for 5000 files, 6 dims: **~18M tokens → ~2.5M tokens (
 | Standards for all 6 dims too large for prompt | Currently ~5.3K tokens total — well within limits. Monitor if standards grow. |
 | Higher files-per-agent degrades quality on later files (context pressure) | Monitor findings-per-file ratio at different batch sizes; keep 100 as hard cap; the MCP-based reporting means findings don't accumulate in context |
 | 5K file projects hit API rate limits with fewer, longer sessions | Longer sessions make fewer API calls total; this should improve rate limit behavior |
+| Multi-dim prompt degrades quality on smaller subagent models | `QUODEQ_SUBAGENT_MODEL` can override to cheaper models; A/B test must include these. At 5.3K tokens for all standards, even smaller models should handle it, but monitor findings quality |
 
 ## Testing
 
