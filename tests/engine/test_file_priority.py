@@ -1,7 +1,7 @@
 """Tests for file priority scoring."""
 from __future__ import annotations
 
-from quodeq.analysis.subagents.priority import compute_base_score, compute_dimension_boost, load_priority_config
+from quodeq.analysis.subagents.priority import compute_base_score, compute_dimension_boost, compute_fan_in, load_priority_config
 
 
 class TestLoadPriorityConfig:
@@ -73,3 +73,35 @@ class TestComputeDimensionBoost:
 
     def test_unknown_dimension(self):
         assert compute_dimension_boost("src/file.py", "unknown_dim") == 0
+
+
+class TestComputeFanIn:
+    def test_counts_python_imports(self, tmp_path):
+        (tmp_path / "main.py").write_text("from auth import login\nimport utils\n")
+        (tmp_path / "handler.py").write_text("from auth import verify\n")
+        (tmp_path / "auth.py").write_text("# no imports\n")
+        (tmp_path / "utils.py").write_text("# no imports\n")
+
+        files = ["main.py", "handler.py", "auth.py", "utils.py"]
+        fan_in = compute_fan_in(files, tmp_path, "python")
+        assert fan_in.get("auth.py", 0) >= 2
+        assert fan_in.get("utils.py", 0) >= 1
+
+    def test_javascript_imports(self, tmp_path):
+        (tmp_path / "app.js").write_text("import { foo } from './auth'\nconst bar = require('./utils')\n")
+        (tmp_path / "auth.js").write_text("")
+        (tmp_path / "utils.js").write_text("")
+
+        files = ["app.js", "auth.js", "utils.js"]
+        fan_in = compute_fan_in(files, tmp_path, "javascript")
+        assert fan_in.get("auth.js", 0) >= 1
+        assert fan_in.get("utils.js", 0) >= 1
+
+    def test_no_imports_returns_empty(self, tmp_path):
+        (tmp_path / "a.py").write_text("x = 1\n")
+        fan_in = compute_fan_in(["a.py"], tmp_path, "python")
+        assert fan_in == {} or all(v == 0 for v in fan_in.values())
+
+    def test_unknown_language_returns_empty(self, tmp_path):
+        fan_in = compute_fan_in(["a.xyz"], tmp_path, "cobol")
+        assert fan_in == {}
