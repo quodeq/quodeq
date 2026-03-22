@@ -187,6 +187,13 @@ def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, man
 
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
+    from quodeq.shared.prereqs import check_evaluate_prereqs
+    try:
+        check_evaluate_prereqs()
+    except RuntimeError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
     src = _resolve_repo(args)
     if src is None:
         return 1
