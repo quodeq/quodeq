@@ -131,6 +131,8 @@ export function useEvaluation() {
     setLiveViolations({});
     const maxSubagents = parseInt(localStorage.getItem('cc-max-subagents') || '5', 10);
     if (maxSubagents !== 5) payload.maxSubagents = maxSubagents;
+    const poolBudget = parseInt(localStorage.getItem('cc-pool-budget') || '600', 10);
+    if (poolBudget !== 600) payload.poolBudget = poolBudget;
     try {
       const created = await startEvaluation(payload);
       setJob({ ...created, repo: payload.repo });
