@@ -94,12 +94,12 @@ else:
 
 This reduces respawn cycles:
 
-| Files | Current (30/agent) | Adaptive | Sessions saved |
-|-------|-------------------|----------|----------------|
-| 20 | 1 session (all fit) | 1 session | 0 |
-| 200 | 7 respawns/agent | 4 respawns/agent | ~40% |
-| 1000 | 34 respawns/agent | 14 respawns/agent | ~60% |
-| 5000 | 167 total sessions | **50 total sessions** | **70%** |
+| Files | Current (30/agent, total sessions) | Adaptive (total sessions) | Sessions saved |
+|-------|--------------------------------------|---------------------------|----------------|
+| 20 | 1 | 1 | 0 |
+| 200 | ceil(200/30) = 7 | ceil(200/50) = 4 | ~40% |
+| 1000 | ceil(1000/30) = 34 | ceil(1000/75) = 14 | ~60% |
+| 5000 | ceil(5000/30) = 167 | ceil(5000/100) = **50** | **70%** |
 
 #### Files changed
 
@@ -215,7 +215,9 @@ The current MCP server and evidence parser are **single-dimension by design**. C
 - `load_compiled_requirements` and `load_compiled_refs`: Add multi-dimension variants that load and merge requirements from multiple dimension JSON files. Or change the existing functions to accept `list[str]` instead of `str`.
 
 **`src/quodeq/analysis/subprocess.py`**
+- `AnalysisConfig.dimension` field: Change from `dimension: str | None = None` to `dimensions: list[str] | None = None` (or keep as `str | None` with comma-separated values for simplicity — comma-separated is preferred since it flows directly to CLI args).
 - `_create_mcp_config`: Pass comma-separated dimensions to the MCP server args when in consolidated mode.
+- `_build_ai_cmd`: Pass `config.dimensions` (comma-separated string) through to `_create_mcp_config`.
 
 **`src/quodeq/core/evidence/parser.py`**
 - Current `parse_jsonl_to_evidence` takes dimension from the first judgment and applies to all. In consolidated mode, a single JSONL file contains findings from multiple dimensions.
@@ -301,7 +303,7 @@ Add `--no-consolidated` CLI flag and `QUODEQ_NO_CONSOLIDATE=1` env var to explic
 
 ### Scout timeout fallback
 
-If the scout agent runs longer than **3 minutes** (or 50% of `max_duration / max_agents`, whichever is smaller) and the queue still has more than `max_files_per_agent` files remaining, spawn overflow agents without waiting for the scout to complete. Implemented in `SubagentPool._run_pool_loop` via a secondary timer thread.
+If the scout agent runs longer than **3 minutes** (or 50% of `max_duration / max_agents`, whichever is smaller) and the queue still has more than `max_files_per_agent` files remaining, spawn overflow agents without waiting for the scout to complete. Implemented in `SubagentPool._run_pool_loop` by checking elapsed time during the existing poll loop (`_FUTURE_POLL_INTERVAL_S = 0.5s`). When the timeout triggers, submit overflow agents from within the poll loop — no secondary timer thread needed since the poll loop already runs continuously.
 
 ## Risks
 
