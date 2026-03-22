@@ -9,18 +9,15 @@ from pathlib import Path
 from quodeq.shared.utils import get_dashboard_port, get_evaluations_dir, get_static_dist
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
 
-
-# Walk up from src/quodeq/dashboard/cli.py to project root (4 levels: dashboard -> quodeq -> src -> root)
-_DIST_PARENT_DEPTH = 4
-_DEV_STATIC_DIST = Path(__file__).resolve().parents[_DIST_PARENT_DEPTH - 1] / "ui" / "web" / "dist"
+_DEFAULT_STATIC_DIR = Path.home() / ".quodeq" / "static"
 
 
 def _default_static_dist() -> str:
-    """Return the best default for --static-dist (bundled or development)."""
+    """Return the best default for --static-dist."""
     bundled = get_static_dist()
     if bundled:
         return bundled
-    return str(_DEV_STATIC_DIST)
+    return str(_DEFAULT_STATIC_DIR)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -31,17 +28,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--evaluations", default=get_evaluations_dir(),
                         help="Directory containing evaluation reports (default: %(default)s)")
     parser.add_argument("--static-dist", default=_default_static_dist(),
-                        help="Path to the pre-built UI static files (default: %(default)s)")
+                        help="Path to the built UI static files (default: %(default)s)")
     parser.add_argument("--repo-root", default=".",
                         help="Root directory of the repository being evaluated (default: %(default)s)")
     parser.add_argument("--api-host", default=None,
-                        help="Hostname of an external API server to proxy to (overrides built-in server)")
+                        help="Hostname of an external API server to proxy to")
     parser.add_argument("--api-port", type=int, default=None,
                         help="Port of the external API server (used with --api-host)")
     parser.add_argument("--no-build", action="store_true",
-                        help="Skip rebuilding the UI before starting the server")
+                        help="Skip rebuilding the UI; use cached build (error if none exists)")
     parser.add_argument("--reinstall", action="store_true",
-                        help="Force reinstallation of UI dependencies before building")
+                        help="Force reinstallation of UI dependencies and full rebuild")
     parser.add_argument("--open", action=argparse.BooleanOptionalAction, default=True,
                         help="Open the dashboard in a browser after starting (default: %(default)s)")
     return parser

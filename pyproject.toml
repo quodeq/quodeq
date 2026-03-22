@@ -1,6 +1,6 @@
 [project]
 name = "quodeq"
-version = "0.6.1"
+version = "0.6.2"
 description = "Source code quality evaluation platform powered by AI"
 readme = "README.md"
 license = "MIT"
@@ -57,7 +57,3 @@ fail_under = 60
 [build-system]
 requires = ["uv_build>=0.10.6,<0.11.0"]
 build-backend = "uv_build"
-
-[tool.uv-build]
-# Include web UI source in the sdist (for building from source)
-source-include = ["ui/web/"]

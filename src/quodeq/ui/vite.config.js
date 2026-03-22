@@ -8,7 +8,7 @@ const DEFAULT_API_TARGET = 'http://localhost:4173';
 export default defineConfig({
   plugins: [react()],
   build: {
-    outDir: '../../src/quodeq/static',
+    outDir: process.env.QUODEQ_BUILD_OUTDIR || '../static',
     emptyOutDir: true,
   },
   server: {

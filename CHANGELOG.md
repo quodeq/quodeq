@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.6.2] — 2026-03-22
+
+### Features
+- **On-demand UI build** — dashboard builds from source at runtime, eliminating stale static assets
+- **Prerequisite checks** — `quodeq dashboard` validates Node.js 18+ and npm 9+; `quodeq evaluate` validates Claude Code
+- **UI source in package** — moved from `ui/web/` to `src/quodeq/ui/`, ships inside the wheel
+- **Content hash rebuilds** — SHA-256 hash detects source changes, skips unnecessary rebuilds
+- **Homebrew-compatible** — no bundled static files; formula can `depends_on "node"`
+
+---
+
 ## [0.6.1] — 2026-03-18
 
 ### Fixes

@@ -2,9 +2,8 @@
 .worktrees/
 .DS_Store
 node_modules/
-ui/web/node_modules/
-ui/web/dist/
-src/quodeq/static/
+src/quodeq/ui/node_modules/
+src/quodeq/ui/dist/
 dist/
 __pycache__/
 *.pyc

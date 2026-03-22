@@ -76,8 +76,8 @@ app = BUNDLE(
     icon=str(repo_root / "packaging" / "macos" / "icon.icns") if (repo_root / "packaging" / "macos" / "icon.icns").exists() else None,
     bundle_identifier="com.quodeq.app",
     info_plist={
-        "CFBundleShortVersionString": os.environ.get("QUODEQ_VERSION", "0.6.1"),
-        "CFBundleVersion": os.environ.get("QUODEQ_VERSION", "0.6.1"),
+        "CFBundleShortVersionString": os.environ.get("QUODEQ_VERSION", "0.6.2"),
+        "CFBundleVersion": os.environ.get("QUODEQ_VERSION", "0.6.2"),
         "CFBundleDisplayName": "Quodeq",
         "CFBundleName": "Quodeq",
         "NSHighResolutionCapable": True,

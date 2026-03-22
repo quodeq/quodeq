@@ -28,6 +28,7 @@ from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
 from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
 from quodeq.shared.paths import resolve_path
 from quodeq.shared.config_loader import get_default_host as _get_default_host
+from quodeq.shared.prereqs import check_dashboard_prereqs
 from quodeq.shared.utils import IS_WIN32
 
 
@@ -161,19 +162,25 @@ def _ensure_action_api_forced(
 
 
 def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
-    """Resolve paths, choose a free port, and run npm build if needed.
-
-    Returns a new DashboardConfig with resolved paths.
-    """
+    """Resolve paths, check prerequisites, build UI if needed, choose a free port."""
     reports_dir = resolve_path(str(config.reports_dir))
-    static_dist = resolve_path(str(config.static_dist))
     repo_root = resolve_path(str(config.repo_root))
 
     chosen_port = _choose_ui_port(config.server.port)
     if chosen_port != config.server.port:
         log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
-    maybe_build_ui(config.build.no_build, config.build.reinstall, static_dist, repo_root)
+    # If user provided --static-dist explicitly, use it as-is (skip build).
+    # Otherwise, run the on-demand build flow.
+    user_provided_dist = resolve_path(str(config.static_dist))
+    if (user_provided_dist / "index.html").exists():
+        # User pointed to an existing build — use it directly
+        static_dist = user_provided_dist
+    else:
+        # On-demand build flow
+        if not config.build.no_build:
+            check_dashboard_prereqs()
+        static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
 
     return DashboardConfig(
         server=ServerConfig(
