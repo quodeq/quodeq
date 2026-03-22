@@ -24,6 +24,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
   const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
 
   const [maxSubagents, setMaxSubagents] = useState(() => parseInt(localStorage.getItem('cc-max-subagents') || '5', 10));
+  const [poolBudgetMinutes, setPoolBudgetMinutes] = useState(() => Math.round(parseInt(localStorage.getItem('cc-pool-budget') || '600', 10) / 60));
 
   const [availableClients, setAvailableClients] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
@@ -238,7 +239,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
               >Off</button>
             </div>
           </div>
-          <div className="settings-row settings-row--last">
+          <div className="settings-row">
             <div className="settings-row-label">
               <span className="settings-label">Max parallel agents</span>
               <span className="settings-description">
@@ -255,6 +256,26 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
                 const v = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5));
                 setMaxSubagents(v);
                 localStorage.setItem('cc-max-subagents', String(v));
+              }}
+            />
+          </div>
+          <div className="settings-row settings-row--last">
+            <div className="settings-row-label">
+              <span className="settings-label">Analysis time limit</span>
+              <span className="settings-description">
+                Maximum time allowed for the analysis pool to run (1–60 minutes). Evaluations exceeding this limit will stop early.
+              </span>
+            </div>
+            <input
+              type="number"
+              className="settings-model-input"
+              min={1}
+              max={60}
+              value={poolBudgetMinutes}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 10));
+                setPoolBudgetMinutes(v);
+                localStorage.setItem('cc-pool-budget', String(v * 60));
               }}
             />
           </div>
