@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from quodeq.dashboard import _api_health, _build, runner
+from quodeq.dashboard import _api_health, runner
 from quodeq.dashboard._api_health import ApiConfig
 
 from tests.conftest import DummyProcess
@@ -50,7 +50,8 @@ def test_force_action_api_host_port(monkeypatch):
         return f"http://{host}:{port}", FakeProcess()
 
     monkeypatch.setattr(runner, "_ensure_action_api_forced", fake_ensure)
-    monkeypatch.setattr(_build, "npm_build", lambda *_args, **_kwargs: None)
+    monkeypatch.setattr(runner, "maybe_build_ui", lambda *_args, **_kwargs: Path("ui/web/dist"))
+    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
     monkeypatch.setattr(runner, "validate_paths", lambda *_args, **_kwargs: None)
 
     config = runner.DashboardConfig(
