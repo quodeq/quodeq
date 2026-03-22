@@ -3,23 +3,14 @@ class Quodeq < Formula
 
   desc "AI-powered source code quality evaluation platform"
   homepage "https://github.com/quodeq/quodeq"
-  url "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-0.4.1.tar.gz"
-  sha256 "5985c89243329ab3b7ab540d5d186a151dec29ecdb47b486a6982ee748945307"
+  url "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-0.6.2.tar.gz"
+  sha256 "0940d6b62b7329c156b13070a16b1c9d97e113c90e870053225b92af3566b06d"
   license "MIT"
 
   depends_on "python@3.12"
   depends_on "node"
 
   def install
-    # Build the web UI before installing the Python package
-    cd "ui/web" do
-      system "npm", "install", *std_npm_args(prefix: false)
-      system "npm", "run", "build"
-    end
-
-    # Bundle pre-built static assets into the package
-    cp_r "ui/web/dist/.", "src/quodeq/static"
-
     virtualenv_install_with_resources
   end
 
