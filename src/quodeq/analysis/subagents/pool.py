@@ -72,6 +72,7 @@ class SubagentPool:
         prompt: str,
         dimension: str | list[str],
         config: AnalysisConfig | None = None,
+        scout_first: bool = True,
     ):
         self._n = max(1, n_agents)
         self._work_dir = paths.work_dir
@@ -88,6 +89,7 @@ class SubagentPool:
             self._dimension = dimension
             self._dimension_key = dimension
         self._base_config = config or AnalysisConfig()
+        self._scout_first = scout_first
         self._jsonl_lock = threading.Lock()
         # Initialised here so helpers like _collect_done/_process_completed_futures
         # never encounter missing attributes regardless of call order.
@@ -262,48 +264,65 @@ class SubagentPool:
     def _run_pool_loop(
         self, results: list[SubagentResult], max_duration: float, pool_start: float,
     ) -> None:
-        """Execute scout-then-scale pool loop.
+        """Execute the pool loop.
 
-        1. Launch 1 scout agent
-        2. When scout completes (or timeout), check queue and scale up if needed
-        3. Continue with respawn-on-completion for remaining work
+        When scout_first=True (default): scout-then-scale strategy.
+          1. Launch 1 scout agent
+          2. When scout completes (or timeout), check queue and scale up if needed
+          3. Continue with respawn-on-completion for remaining work
+
+        When scout_first=False: launch all agents immediately (original behavior).
         """
-        scout_timeout = min(
-            _SCOUT_TIMEOUT_S,
-            max_duration / max(self._n, 1) * 0.5,
-        )
-        scout_done = False
-
         with ThreadPoolExecutor(max_workers=self._n) as pool:
-            # Phase 1: Launch scout
-            self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
-            self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
-            self._next_idx += 1
+            if self._scout_first:
+                scout_timeout = min(
+                    _SCOUT_TIMEOUT_S,
+                    max_duration / max(self._n, 1) * 0.5,
+                )
+                scout_done = False
 
-            while self._futures:
-                done = self._collect_done(results)
+                # Phase 1: Launch scout
+                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+                self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
+                self._next_idx += 1
 
-                # Phase 2: Scale up after scout completes or times out
-                if not scout_done:
-                    elapsed = time.monotonic() - pool_start
-                    scout_completed = len(done) > 0
-                    scout_timed_out = elapsed >= scout_timeout and self._n > 1
+                while self._futures:
+                    done = self._collect_done(results)
 
-                    if scout_completed or scout_timed_out:
-                        scout_done = True
-                        remaining = self._should_respawn(pool_start, max_duration)
-                        overflow = self._compute_scale_up(remaining)
-                        for _ in range(overflow):
-                            self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
-                            self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
-                            self._next_idx += 1
+                    # Phase 2: Scale up after scout completes or times out
+                    if not scout_done:
+                        elapsed = time.monotonic() - pool_start
+                        scout_completed = len(done) > 0
+                        scout_timed_out = elapsed >= scout_timeout and self._n > 1
 
-                if not done:
-                    time.sleep(_FUTURE_POLL_INTERVAL_S)
-                    continue
+                        if scout_completed or scout_timed_out:
+                            scout_done = True
+                            remaining = self._should_respawn(pool_start, max_duration)
+                            overflow = self._compute_scale_up(remaining)
+                            for _ in range(overflow):
+                                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+                                self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
+                                self._next_idx += 1
 
-                # Phase 3: Normal respawn-on-completion
-                if scout_done:
+                    if not done:
+                        time.sleep(_FUTURE_POLL_INTERVAL_S)
+                        continue
+
+                    # Phase 3: Normal respawn-on-completion
+                    if scout_done:
+                        self._process_completed_futures(done, pool_start, max_duration, pool)
+            else:
+                # Launch all agents immediately (no scout delay)
+                for _ in range(self._n):
+                    self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+                    self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
+                    self._next_idx += 1
+
+                while self._futures:
+                    done = self._collect_done(results)
+                    if not done:
+                        time.sleep(_FUTURE_POLL_INTERVAL_S)
+                        continue
                     self._process_completed_futures(done, pool_start, max_duration, pool)
 
     def run(self) -> list[SubagentResult]:
@@ -312,7 +331,10 @@ class SubagentPool:
         Returns list of SubagentResult (one per agent, including failures).
         """
         max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
-        log_info(f"Launching scout agent for {self._dimension_key} (max {self._n} agents)")
+        if self._scout_first:
+            log_info(f"Launching scout agent for {self._dimension_key} (max {self._n} agents)")
+        else:
+            log_info(f"Launching {self._n} agents for {self._dimension_key}")
         results: list[SubagentResult] = []
         self._finished.clear()
         self._futures.clear()

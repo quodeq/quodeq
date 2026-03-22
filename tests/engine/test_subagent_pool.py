@@ -304,3 +304,24 @@ class TestScoutThenScale:
 
         assert len(results) > 1
         assert results[0].agent_id == "agent-0"
+
+    def test_scout_first_false_launches_all_agents(self, tmp_path):
+        """When scout_first=False, all agents launch immediately."""
+        queue_path = tmp_path / "queue.json"
+        FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
+
+        pool = SubagentPool(
+            n_agents=3,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            prompt="verify",
+            dimension="security",
+            config=AnalysisConfig(max_files_per_agent=30),
+            scout_first=False,
+        )
+
+        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
+            results = pool.run()
+
+        # All 3 agents should have run (not just scout + scale-up)
+        agent_ids = {r.agent_id for r in results}
+        assert len(agent_ids) >= 3

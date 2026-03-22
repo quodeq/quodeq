@@ -153,6 +153,7 @@ def _run_verification_pool(
         prompt=prompt,
         dimension=dim_id,
         config=ac,
+        scout_first=False,
     )
     return pool.run()
 
