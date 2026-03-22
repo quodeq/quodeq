@@ -48,6 +48,7 @@ class AnalysisConfig:
     ai_model: str | None = None
     max_turns: int | None = _DEFAULT_MAX_TURNS
     max_duration: int | None = _DEFAULT_MAX_DURATION
+    pool_budget: int = 600
     compiled_dir: Path | None = None
     dimension: str | None = None
     queue_path: Path | None = None
