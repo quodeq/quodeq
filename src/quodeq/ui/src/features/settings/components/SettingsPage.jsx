@@ -23,6 +23,8 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
   const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
   const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
 
+  const [maxSubagents, setMaxSubagents] = useState(() => parseInt(localStorage.getItem('cc-max-subagents') || '5', 10));
+
   const [availableClients, setAvailableClients] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
@@ -216,7 +218,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
               </div>
             </div>
           )}
-          <div className="settings-row settings-row--last">
+          <div className="settings-row">
             <div className="settings-row-label">
               <span className="settings-label">Verify findings</span>
               <span className="settings-description">
@@ -235,6 +237,26 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
                 onClick={() => onApplyVerifyFindings(false)}
               >Off</button>
             </div>
+          </div>
+          <div className="settings-row settings-row--last">
+            <div className="settings-row-label">
+              <span className="settings-label">Max parallel agents</span>
+              <span className="settings-description">
+                Maximum number of subagents to run in parallel during evaluation (1–10). Higher values speed up analysis but use more resources.
+              </span>
+            </div>
+            <input
+              type="number"
+              className="settings-model-input"
+              min={1}
+              max={10}
+              value={maxSubagents}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5));
+                setMaxSubagents(v);
+                localStorage.setItem('cc-max-subagents', String(v));
+              }}
+            />
           </div>
         </section>
         <section className="panel settings-section">

@@ -129,6 +129,8 @@ export function useEvaluation() {
     liveViolationsRef.current = {};
     partialDimensionsRef.current = new Set();
     setLiveViolations({});
+    const maxSubagents = parseInt(localStorage.getItem('cc-max-subagents') || '5', 10);
+    if (maxSubagents !== 5) payload.maxSubagents = maxSubagents;
     try {
       const created = await startEvaluation(payload);
       setJob({ ...created, repo: payload.repo });

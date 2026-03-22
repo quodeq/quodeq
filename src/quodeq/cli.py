@@ -178,9 +178,10 @@ def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, man
             dimensions=dimensions_filter,
             max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
             max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
-            n_subagents=args.n_subagents,
+            max_subagents=args.n_subagents,
             subagent_model=_subagent_model(),
             verify_findings=not _no_verify(args),
+            consolidated=not getattr(args, 'no_consolidated', False) and not bool(os.environ.get("QUODEQ_NO_CONSOLIDATE")),
         ),
     )
 

@@ -18,6 +18,7 @@ class EvaluationOptions:
     ai_model: str | None = None
     subagent_model: str | None = None
     verify_findings: bool = True
+    max_subagents: int = 5
 
 
 class ProjectActions(Protocol):

@@ -52,6 +52,7 @@ class AnalysisConfig:
     dimension: str | None = None
     queue_path: Path | None = None
     agent_id: str = ""
+    max_files_per_agent: int = 30
 
 
 def _create_mcp_config(
