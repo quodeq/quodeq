@@ -51,6 +51,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "--no-verify", action="store_true",
         help="Skip post-analysis verification pass",
     )
+    parser.add_argument(
+        "--no-consolidated", action="store_true",
+        help="Disable multi-dimension consolidation (evaluate dimensions separately)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

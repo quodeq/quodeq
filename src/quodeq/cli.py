@@ -181,6 +181,7 @@ def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, man
             max_subagents=args.n_subagents,
             subagent_model=_subagent_model(),
             verify_findings=not _no_verify(args),
+            consolidated=not getattr(args, 'no_consolidated', False) and not bool(os.environ.get("QUODEQ_NO_CONSOLIDATE")),
         ),
     )
 
