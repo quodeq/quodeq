@@ -1,7 +1,9 @@
 """File priority scoring — ranks source files by analysis importance."""
 from __future__ import annotations
 
+import fnmatch
 import json
+import os
 from functools import lru_cache
 from pathlib import Path
 
@@ -13,3 +15,30 @@ def load_priority_config() -> dict:
     """Load file priority config. Cached after first call."""
     config_path = default_paths().root / "config" / "file_priority.json"
     return json.loads(config_path.read_text())
+
+
+def compute_base_score(filepath: str, category: str | None = None) -> int:
+    """Layer 1: base score from path patterns, entry points, and category."""
+    config = load_priority_config()
+    score = config["default_path_score"]
+
+    filepath_lower = filepath.lower().replace("\\", "/")
+    for prefix, boost in config["path_boost"].items():
+        if filepath_lower.startswith(prefix) or f"/{prefix}" in filepath_lower:
+            score = boost
+            break
+
+    basename = os.path.basename(filepath_lower)
+    for pattern in config["entry_points"]:
+        if fnmatch.fnmatch(basename, pattern.lower()):
+            score += config["entry_point_boost"]
+            break
+
+    if category and category in config.get("category_keywords", {}):
+        keywords = config["category_keywords"][category]
+        for kw in keywords:
+            if kw in filepath_lower:
+                score += config["category_keyword_boost"]
+                break
+
+    return score
