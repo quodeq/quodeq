@@ -4,6 +4,7 @@ from __future__ import annotations
 import fnmatch
 import json
 import os
+import re
 from functools import lru_cache
 from pathlib import Path
 
@@ -68,3 +69,47 @@ def compute_dimension_boost(
                     break
         best = max(best, score)
     return best
+
+
+def compute_fan_in(
+    files: list[str], src: Path, language: str,
+) -> dict[str, int]:
+    """Layer 3: count how many files import each file."""
+    config = load_priority_config()
+    lang_key = language.lower()
+    _LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
+    lang_key = _LANG_ALIASES.get(lang_key, lang_key)
+    patterns = config.get("import_patterns", {}).get(lang_key)
+    if not patterns:
+        return {}
+
+    # Build filename lookup: stem → relative path
+    stem_to_file: dict[str, str] = {}
+    for f in files:
+        stem = Path(f).stem
+        stem_to_file.setdefault(stem, f)
+
+    compiled = [re.compile(p) for p in patterns]
+    counts: dict[str, int] = {}
+
+    for f in files:
+        full_path = src / f
+        if not full_path.exists():
+            continue
+        try:
+            content = full_path.read_text(errors="ignore")
+        except OSError:
+            continue
+        for line in content.splitlines():
+            for pattern in compiled:
+                m = pattern.search(line)
+                if m:
+                    imported = m.group(1)
+                    module_name = imported.rsplit(".", 1)[-1].rsplit("/", 1)[-1]
+                    if module_name in stem_to_file:
+                        target = stem_to_file[module_name]
+                        if target != f:
+                            counts[target] = counts.get(target, 0) + 1
+                    break
+
+    return counts

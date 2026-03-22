@@ -34,7 +34,7 @@
   "previous_violations_max": 5,
   "import_patterns": {
     "python": ["^\\s*(?:from|import)\\s+(\\S+)"],
-    "javascript": ["(?:import|require)\\s*\\(?['\"]([^'\"]+)"],
+    "javascript": ["(?:import|require)\\s*\\(?['\"]([^'\"]+)", "from\\s+['\"]([^'\"]+)"],
     "java": ["^\\s*import\\s+([\\w.]+)"],
     "go": ["\"([^\"]+)\""],
     "swift": ["^\\s*import\\s+(\\w+)"]
