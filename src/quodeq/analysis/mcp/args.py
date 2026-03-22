@@ -14,6 +14,13 @@ class ServerArgs:
     queue_path: str | None = None
     agent_id: str = ""
 
+    @property
+    def dimensions(self) -> list[str]:
+        """Return dimensions as a list (splits comma-separated values)."""
+        if not self.dimension:
+            return []
+        return [d.strip() for d in self.dimension.split(",") if d.strip()]
+
 
 _FLAG_MAP = {
     "--compiled-dir": "compiled_dir",
