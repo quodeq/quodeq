@@ -109,9 +109,8 @@ class SubagentPool:
         jsonl_file = self._shared_jsonl_path()
         stream_file = self._evidence_dir / f"{self._dimension_key}_{agent_id}.stream"
 
-        # Per-agent timeout: use pool budget so individual agents can't run
-        # indefinitely after the queue is drained.
-        agent_max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
+        # Per-agent timeout: use max_duration so individual agents can't run indefinitely.
+        agent_max_duration = self._base_config.max_duration or 1800  # per-agent timeout default
 
         ac = AnalysisConfig(
             jsonl_file=jsonl_file,
@@ -330,7 +329,7 @@ class SubagentPool:
 
         Returns list of SubagentResult (one per agent, including failures).
         """
-        max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
+        max_duration = self._base_config.pool_budget or _DEFAULT_POOL_BUDGET
         if self._scout_first:
             log_info(f"Launching scout agent for {self._dimension_key} (max {self._n} agents)")
         else:

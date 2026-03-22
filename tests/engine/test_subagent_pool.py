@@ -325,3 +325,21 @@ class TestScoutThenScale:
         # All 3 agents should have run (not just scout + scale-up)
         agent_ids = {r.agent_id for r in results}
         assert len(agent_ids) >= 3
+
+
+class TestPoolBudget:
+    def test_pool_uses_pool_budget_not_max_duration(self, tmp_path):
+        """Pool time limit should use pool_budget, not max_duration."""
+        queue_path = tmp_path / "queue.json"
+        FileQueue(queue_path, [f"f{i}.py" for i in range(5)])
+
+        ac = AnalysisConfig(pool_budget=60, max_duration=1800, max_files_per_agent=30)
+        pool = SubagentPool(
+            n_agents=1,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            prompt="test",
+            dimension="security",
+            config=ac,
+        )
+        assert pool._base_config.pool_budget == 60
+        assert pool._base_config.max_duration == 1800
