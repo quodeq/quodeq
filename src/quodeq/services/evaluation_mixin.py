@@ -69,6 +69,8 @@ def _build_evaluate_cmd(
             cmd += ["-d", str(options.dimensions)]
     if options.numerical:
         cmd += ["-m", "numerical"]
+    if options.max_subagents != 5:
+        cmd += ["--n-subagents", str(options.max_subagents)]
     return cmd
 
 
