@@ -106,7 +106,7 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
         max_files_per_agent=max_files_per_agent,
     )
     pool = SubagentPool(
-        n_agents=config.options.n_subagents,
+        n_agents=config.options.max_subagents,
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
         prompt=prompt,
         dimension=dim_id,
@@ -229,7 +229,7 @@ def process_dimension_with_subagents(
     queue_path = evidence_dir / f"{dim_id}_queue.json"
     files_per_agent = _compute_files_per_agent(len(files))
     FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
-    log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued for {config.options.n_subagents} subagents")
+    log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued for {config.options.max_subagents} subagents")
 
     # 5. Build prompt and launch main analysis pool
     prompt = _build_subagent_prompt(config, dim_id, ctx)

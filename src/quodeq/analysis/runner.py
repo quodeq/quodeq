@@ -39,7 +39,7 @@ class AnalysisOptions:
     dimensions: list[str] | None = None
     max_turns: int | None = None
     max_duration: int | None = None
-    n_subagents: int = 1
+    max_subagents: int = 1
     subagent_model: str | None = None
     verify_findings: bool = False
 
@@ -234,7 +234,7 @@ def _process_single_dimension(
     emit_marker("analyzing", dimension=dimension)
     log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
-    if config.options.n_subagents > 1:
+    if config.options.max_subagents > 1:
         ev = _process_dimension_with_subagents(config, dimension, idx, ctx)
     else:
         prompt = _build_dimension_prompt(config, dimension, ctx)
