@@ -210,3 +210,49 @@ def compute_previous_violations(
                 counts[f] = counts.get(f, 0) + 1
 
     return counts
+
+
+def prioritize_files(
+    files: list[str],
+    src: Path,
+    dimension: str | list[str],
+    category: str | None = None,
+    language: str | None = None,
+    evidence_dir: Path | None = None,
+    config: Any = None,
+) -> list[str]:
+    """Score and sort files by analysis priority (highest first)."""
+    priority_config = load_priority_config()
+    fan_in_divisor = priority_config.get("fan_in_divisor", 3)
+    fan_in_max = priority_config.get("fan_in_max", 5)
+    max_prev_violations = priority_config.get("previous_violations_max", 5)
+
+    # Batch computations (one pass each)
+    fan_in = compute_fan_in(files, src, language or "") if language else {}
+    git_scores = compute_git_scores(files, src)
+    prev_violations = compute_previous_violations(config, evidence_dir, dimension) if evidence_dir and config else {}
+
+    scored: list[tuple[float, str]] = []
+    for f in files:
+        base = compute_base_score(f, category)
+
+        file_size = 0
+        try:
+            file_size = (src / f).stat().st_size
+        except OSError:
+            pass
+        dim_boost = compute_dimension_boost(f, dimension, file_size=file_size)
+
+        fi_raw = fan_in.get(f, 0)
+        fi_score = min(fan_in_max, fi_raw / fan_in_divisor) if fi_raw > 0 else 0
+
+        git_score = git_scores.get(f, 0)
+
+        pv_count = prev_violations.get(f, 0)
+        pv_score = min(max_prev_violations, pv_count)
+
+        total = base + dim_boost + fi_score + git_score + pv_score
+        scored.append((total, f))
+
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    return [f for _, f in scored]

@@ -164,3 +164,44 @@ class TestComputePreviousViolations:
             counts = compute_previous_violations(None, tmp_path, ["security", "maintainability"])
         assert counts.get("auth.py", 0) >= 1
         assert counts.get("big.py", 0) >= 1
+
+
+from quodeq.analysis.subagents.priority import prioritize_files
+
+
+class TestPrioritizeFiles:
+    def test_returns_sorted_by_score_descending(self, tmp_path):
+        (tmp_path / "src").mkdir()
+        (tmp_path / "tests").mkdir()
+        (tmp_path / "src" / "important.py").write_text("x" * 100)
+        (tmp_path / "tests" / "boring.py").write_text("x" * 10)
+
+        files = ["tests/boring.py", "src/important.py"]
+        result = prioritize_files(files, tmp_path, "security", category=None)
+        assert result[0] == "src/important.py"
+
+    def test_all_files_preserved(self, tmp_path):
+        files = [f"file{i}.py" for i in range(20)]
+        for f in files:
+            (tmp_path / f).write_text("")
+        result = prioritize_files(files, tmp_path, "security", category=None)
+        assert set(result) == set(files)
+        assert len(result) == 20
+
+    def test_dimension_affects_order(self, tmp_path):
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "auth.py").write_text("x" * 100)
+        (tmp_path / "src" / "utils.py").write_text("x" * 100)
+
+        files = ["src/utils.py", "src/auth.py"]
+        result = prioritize_files(files, tmp_path, "security")
+        assert result[0] == "src/auth.py"
+
+    def test_consolidated_uses_max_dimension_boost(self, tmp_path):
+        (tmp_path / "src").mkdir()
+        (tmp_path / "src" / "auth.py").write_text("x")
+        (tmp_path / "src" / "error_handler.py").write_text("x")
+
+        files = ["src/auth.py", "src/error_handler.py"]
+        result = prioritize_files(files, tmp_path, ["security", "reliability"])
+        assert len(result) == 2
