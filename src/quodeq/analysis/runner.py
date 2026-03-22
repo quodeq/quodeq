@@ -43,6 +43,7 @@ class AnalysisOptions:
     subagent_model: str | None = None
     verify_findings: bool = False
     consolidated: bool = True
+    pool_budget: int | None = None
 
 
 @dataclass
@@ -122,6 +123,8 @@ def _run_dimension_analysis(
         ac_kwargs["max_turns"] = config.options.max_turns
     if config.options.max_duration is not None:
         ac_kwargs["max_duration"] = config.options.max_duration
+    if config.options.pool_budget is not None:
+        ac_kwargs["pool_budget"] = config.options.pool_budget
     run_analysis(
         work_dir=config.src,
         prompt=prompt,

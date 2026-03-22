@@ -113,6 +113,7 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
+    pool_budget_val = config.options.pool_budget
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -120,6 +121,7 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
         max_duration=config.options.max_duration,
         ai_model=subagent_model,
         max_files_per_agent=max_files_per_agent,
+        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
     )
     pool = SubagentPool(
         n_agents=config.options.max_subagents,
@@ -246,6 +248,7 @@ def process_consolidated_dimensions(
     # 4. Build AnalysisConfig
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
+    pool_budget_val = config.options.pool_budget
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -254,6 +257,7 @@ def process_consolidated_dimensions(
         ai_model=subagent_model,
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,
+        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
     )
 
     # 5. Launch pool
