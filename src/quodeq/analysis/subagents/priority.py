@@ -42,3 +42,29 @@ def compute_base_score(filepath: str, category: str | None = None) -> int:
                 break
 
     return score
+
+
+def compute_dimension_boost(
+    filepath: str,
+    dimension: str | list[str],
+    file_size: int = 0,
+) -> int:
+    """Layer 2: dimension-specific keyword boost or file-size boost."""
+    config = load_priority_config()
+    dims = dimension if isinstance(dimension, list) else [dimension]
+    filepath_lower = filepath.lower().replace("\\", "/")
+
+    best = 0
+    for dim in dims:
+        keywords = config.get("dimension_keywords", {}).get(dim, [])
+        if not keywords and dim == "maintainability":
+            divisor = config.get("maintainability_size_divisor", 2000)
+            score = min(5, int(file_size / divisor))
+        else:
+            score = 0
+            for kw in keywords:
+                if kw in filepath_lower:
+                    score = config.get("dimension_keyword_boost", 5)
+                    break
+        best = max(best, score)
+    return best
