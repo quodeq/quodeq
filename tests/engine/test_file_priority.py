@@ -1,7 +1,7 @@
 """Tests for file priority scoring."""
 from __future__ import annotations
 
-from quodeq.analysis.subagents.priority import compute_base_score, load_priority_config
+from quodeq.analysis.subagents.priority import compute_base_score, compute_dimension_boost, load_priority_config
 
 
 class TestLoadPriorityConfig:
@@ -49,3 +49,27 @@ class TestComputeBaseScore:
     def test_no_category(self):
         score = compute_base_score("src/file.py", category=None)
         assert score >= 0
+
+
+class TestComputeDimensionBoost:
+    def test_security_keyword_match(self):
+        assert compute_dimension_boost("src/auth_handler.py", "security") == 5
+
+    def test_security_no_match(self):
+        assert compute_dimension_boost("src/utils.py", "security") == 0
+
+    def test_reliability_keyword_match(self):
+        assert compute_dimension_boost("src/error_handler.py", "reliability") == 5
+
+    def test_maintainability_uses_file_size(self):
+        assert compute_dimension_boost("src/big.py", "maintainability", file_size=10000) == 5
+
+    def test_maintainability_small_file(self):
+        assert compute_dimension_boost("src/tiny.py", "maintainability", file_size=500) == 0
+
+    def test_consolidated_max_across_dimensions(self):
+        score = compute_dimension_boost("src/auth_handler.py", ["security", "maintainability"])
+        assert score == 5
+
+    def test_unknown_dimension(self):
+        assert compute_dimension_boost("src/file.py", "unknown_dim") == 0
