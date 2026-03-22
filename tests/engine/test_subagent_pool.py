@@ -45,22 +45,21 @@ def _failing_run_analysis(work_dir, prompt, stream_file, config):
 class TestSubagentPool:
     def test_launches_n_agents(self, tmp_path: Path) -> None:
         queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, [f"src/f{i}.py" for i in range(20)])
+        FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
 
         pool = SubagentPool(
             n_agents=3,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             prompt="analyse files",
             dimension="maintainability",
+            config=AnalysisConfig(max_files_per_agent=30),
         )
 
         with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
             results = pool.run()
 
-        assert len(results) == 3
+        assert len(results) >= 2  # scout + at least 1 overflow
         assert all(r.success for r in results)
-        agents = {r.agent_id for r in results}
-        assert agents == {"agent-0", "agent-1", "agent-2"}
 
     def test_agent_configs_have_queue_and_agent_id(self, tmp_path: Path) -> None:
         # NOTE: Directly tests private method _build_agent_config for coverage of
@@ -86,13 +85,9 @@ class TestSubagentPool:
 
     def test_failed_agent_does_not_stop_others(self, tmp_path: Path) -> None:
         queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, ["a.py"])
-
-        call_count = 0
+        FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
 
         def _mixed_run(work_dir, prompt, stream_file, config):
-            nonlocal call_count
-            call_count += 1
             if config.agent_id == "agent-0":
                 _failing_run_analysis(work_dir, prompt, stream_file, config)
             else:
@@ -103,18 +98,18 @@ class TestSubagentPool:
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
             prompt="test",
             dimension="maint",
+            config=AnalysisConfig(max_files_per_agent=30),
         )
 
         with patch("quodeq.analysis.subagents.pool.run_analysis", _mixed_run):
             results = pool.run()
 
-        assert len(results) == 3
         failed = [r for r in results if not r.success]
         succeeded = [r for r in results if r.success]
-        assert len(failed) == 1
+        assert len(failed) >= 1
         assert failed[0].agent_id == "agent-0"
         assert "crashed" in failed[0].error.lower()
-        assert len(succeeded) == 2
+        assert len(succeeded) >= 1
 
     def test_n_agents_minimum_is_one(self, tmp_path: Path) -> None:
         queue_path = tmp_path / "queue.json"
@@ -196,3 +191,76 @@ class TestMergeJsonl:
 
         lines = output.read_text().strip().splitlines()
         assert len(lines) == 1
+
+
+class TestComputeScaleUp:
+    def _make_pool(self, n_agents, tmp_path, max_files=30):
+        queue_path = tmp_path / "queue.json"
+        FileQueue(queue_path, ["f.py"])
+        return SubagentPool(
+            n_agents=n_agents,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            prompt="test",
+            dimension="security",
+            config=AnalysisConfig(max_files_per_agent=max_files),
+        )
+
+    def test_no_remaining_returns_zero(self, tmp_path):
+        pool = self._make_pool(5, tmp_path)
+        assert pool._compute_scale_up(0) == 0
+
+    def test_remaining_within_one_batch(self, tmp_path):
+        pool = self._make_pool(5, tmp_path)
+        assert pool._compute_scale_up(25) == 0
+
+    def test_remaining_needs_two_agents(self, tmp_path):
+        pool = self._make_pool(5, tmp_path)
+        assert pool._compute_scale_up(50) == 2
+
+    def test_remaining_capped_by_max_agents(self, tmp_path):
+        pool = self._make_pool(3, tmp_path)
+        assert pool._compute_scale_up(200) == 2
+
+    def test_max_agents_1_never_scales(self, tmp_path):
+        pool = self._make_pool(1, tmp_path)
+        assert pool._compute_scale_up(500) == 0
+
+
+class TestScoutThenScale:
+    def test_small_queue_uses_one_agent(self, tmp_path):
+        """20 files with max_agents=5 -> only 1 agent should run (scout handles all)."""
+        queue_path = tmp_path / "queue.json"
+        FileQueue(queue_path, [f"src/f{i}.py" for i in range(20)])
+
+        pool = SubagentPool(
+            n_agents=5,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            prompt="analyse",
+            dimension="security",
+            config=AnalysisConfig(max_files_per_agent=30),
+        )
+
+        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
+            results = pool.run()
+
+        assert len(results) == 1
+        assert results[0].agent_id == "agent-0"
+
+    def test_large_queue_scales_up(self, tmp_path):
+        """200 files with max_agents=5 -> scout + overflow agents."""
+        queue_path = tmp_path / "queue.json"
+        FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
+
+        pool = SubagentPool(
+            n_agents=5,
+            paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
+            prompt="analyse",
+            dimension="security",
+            config=AnalysisConfig(max_files_per_agent=30),
+        )
+
+        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
+            results = pool.run()
+
+        assert len(results) > 1
+        assert results[0].agent_id == "agent-0"

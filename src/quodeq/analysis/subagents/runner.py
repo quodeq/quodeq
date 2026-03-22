@@ -93,7 +93,7 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
     )
 
 
-def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str) -> tuple[Any, list[Any]]:
+def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str, max_files_per_agent: int = 30) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
@@ -103,6 +103,7 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
         max_turns=config.options.max_turns,
         max_duration=config.options.max_duration,
         ai_model=subagent_model,
+        max_files_per_agent=max_files_per_agent,
     )
     pool = SubagentPool(
         n_agents=config.options.n_subagents,
@@ -232,7 +233,7 @@ def process_dimension_with_subagents(
 
     # 5. Build prompt and launch main analysis pool
     prompt = _build_subagent_prompt(config, dim_id, ctx)
-    pool, results = _launch_pool(config, dim_id, evidence_dir, queue_path, prompt)
+    pool, results = _launch_pool(config, dim_id, evidence_dir, queue_path, prompt, max_files_per_agent=files_per_agent)
 
     # 6. Collect and return evidence (includes both verified + new findings)
     all_results = verify_results + results

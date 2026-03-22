@@ -14,6 +14,7 @@ import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
+from math import ceil
 from pathlib import Path
 
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
@@ -29,6 +30,7 @@ _HEARTBEAT_JOIN_TIMEOUT_S = 2
 
 _DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
 _SECONDS_PER_MINUTE = 60
+_SCOUT_TIMEOUT_S = 180  # 3 minutes before forcing scale-up
 
 
 @dataclass
@@ -114,6 +116,7 @@ class SubagentPool:
             dimension=self._dimension,
             queue_path=self._queue_path,
             agent_id=agent_id,
+            max_files_per_agent=self._base_config.max_files_per_agent,
         )
         return ac, jsonl_file, stream_file
 
@@ -187,6 +190,16 @@ class SubagentPool:
             return 0
         return remaining
 
+    def _compute_scale_up(self, remaining: int) -> int:
+        """Compute how many overflow agents to spawn after scout completes."""
+        if remaining <= 0:
+            return 0
+        batch = self._base_config.max_files_per_agent or 30
+        needed = ceil(remaining / batch)
+        if needed <= 1:
+            return 0
+        return min(needed, self._n - 1)
+
     def _collect_done(
         self, results: list[SubagentResult],
     ) -> set[Future[SubagentResult]]:
@@ -241,19 +254,49 @@ class SubagentPool:
     def _run_pool_loop(
         self, results: list[SubagentResult], max_duration: float, pool_start: float,
     ) -> None:
-        """Execute the main thread-pool loop: submit initial agents and respawn on completion."""
+        """Execute scout-then-scale pool loop.
+
+        1. Launch 1 scout agent
+        2. When scout completes (or timeout), check queue and scale up if needed
+        3. Continue with respawn-on-completion for remaining work
+        """
+        scout_timeout = min(
+            _SCOUT_TIMEOUT_S,
+            max_duration / max(self._n, 1) * 0.5,
+        )
+        scout_done = False
+
         with ThreadPoolExecutor(max_workers=self._n) as pool:
-            for _ in range(self._n):
-                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
-                self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
-                self._next_idx += 1
+            # Phase 1: Launch scout
+            self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+            self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
+            self._next_idx += 1
 
             while self._futures:
                 done = self._collect_done(results)
+
+                # Phase 2: Scale up after scout completes or times out
+                if not scout_done:
+                    elapsed = time.monotonic() - pool_start
+                    scout_completed = len(done) > 0
+                    scout_timed_out = elapsed >= scout_timeout and self._n > 1
+
+                    if scout_completed or scout_timed_out:
+                        scout_done = True
+                        remaining = self._should_respawn(pool_start, max_duration)
+                        overflow = self._compute_scale_up(remaining)
+                        for _ in range(overflow):
+                            self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+                            self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
+                            self._next_idx += 1
+
                 if not done:
                     time.sleep(_FUTURE_POLL_INTERVAL_S)
                     continue
-                self._process_completed_futures(done, pool_start, max_duration, pool)
+
+                # Phase 3: Normal respawn-on-completion
+                if scout_done:
+                    self._process_completed_futures(done, pool_start, max_duration, pool)
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, respawning when slots free up and queue has files.
@@ -261,7 +304,7 @@ class SubagentPool:
         Returns list of SubagentResult (one per agent, including failures).
         """
         max_duration = self._base_config.max_duration or _DEFAULT_POOL_BUDGET
-        log_info(f"Launching {self._n} subagents for {self._dimension}")
+        log_info(f"Launching scout agent for {self._dimension} (max {self._n} agents)")
         results: list[SubagentResult] = []
         self._finished.clear()
         self._futures.clear()
