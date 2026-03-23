@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings
+from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, FileClassification
 
 
 class TestDetectChangedFiles:
@@ -108,3 +108,31 @@ class TestCarryForwardFindings:
     def test_missing_prev_jsonl(self, tmp_path):
         count = carry_forward_findings(tmp_path / "nonexistent.jsonl", tmp_path / "output.jsonl", {"a.py"})
         assert count == 0
+
+
+class TestClassifyFiles:
+    def test_classifies_changed_dependent_unchanged(self, tmp_path):
+        (tmp_path / "changed.py").write_text("new_code")
+        (tmp_path / "dependent.py").write_text("from changed import foo\n")
+        (tmp_path / "unchanged.py").write_text("same")
+        prev_fp = {
+            "dimension": "security", "git_commit": None,
+            "file_hashes": {
+                "changed.py": hashlib.sha256(b"old_code").hexdigest(),
+                "dependent.py": hashlib.sha256(b"from changed import foo\n").hexdigest(),
+                "unchanged.py": hashlib.sha256(b"same").hexdigest(),
+            },
+            "standards_checksum": None,
+        }
+        result = classify_files(src=tmp_path, files=["changed.py", "dependent.py", "unchanged.py"],
+                               prev_fingerprint=prev_fp, standards_dir=None, dimension="security", language="python")
+        assert "changed.py" in result.to_analyze
+        assert "dependent.py" in result.to_analyze
+        assert "unchanged.py" in result.unchanged
+
+    def test_full_reanalysis_returns_all(self, tmp_path):
+        result = classify_files(src=tmp_path, files=["a.py", "b.py"],
+                               prev_fingerprint=None, standards_dir=None, dimension="security", language="python")
+        assert set(result.to_analyze) == {"a.py", "b.py"}
+        assert len(result.unchanged) == 0
+        assert result.full_reanalysis is True
