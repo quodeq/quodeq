@@ -255,9 +255,127 @@ def _process_single_dimension(
     return ev
 
 
+def _run_dimension_incremental(
+    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
+) -> Evidence | None:
+    """Incremental path: detect changes, carry forward, analyze only changed files."""
+    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint, load_fingerprint
+    from quodeq.analysis.incremental import classify_files, carry_forward_findings
+    from quodeq.analysis.subagents.verify import _resolve_evidence_paths
+
+    evidence_dir = config.work_dir or config.src
+
+    # Find previous fingerprint
+    paths_info = _resolve_evidence_paths(evidence_dir)
+    prev_fp = None
+    prev_evidence_dir = None
+    if not paths_info:
+        log_warning(f"  [{dimension}] Cannot resolve evidence paths — falling back to full analysis")
+    if paths_info:
+        current_run_id, project_uuid, reports_base = paths_info
+        from quodeq.data.fs.report_parser.runs import list_runs
+        for run_info in list_runs(reports_base, project_uuid):
+            if run_info.run_id == current_run_id:
+                continue
+            prev_evidence = reports_base / project_uuid / run_info.run_id / "evidence"
+            fp = load_fingerprint(prev_evidence, dimension)
+            if fp:
+                prev_fp = fp
+                prev_evidence_dir = prev_evidence
+                break
+
+    # Get full source files list (for classification)
+    from quodeq.analysis.subagents.runner import _list_source_files
+    # Temporarily disable file filter to get ALL files for classification
+    saved_filter = config.options.incremental_file_filter
+    config.options.incremental_file_filter = None
+    files, extensions = _list_source_files(config, dimension)
+    config.options.incremental_file_filter = saved_filter
+    if not files:
+        return None
+
+    # Classify files
+    classification = classify_files(
+        src=config.src, files=files,
+        prev_fingerprint=prev_fp,
+        standards_dir=config.standards_dir,
+        dimension=dimension,
+        language=config.language,
+    )
+
+    # Carry forward unchanged findings
+    if prev_fp and prev_evidence_dir and not classification.full_reanalysis and classification.unchanged:
+        prev_jsonl = prev_evidence_dir / f"{dimension}_evidence.jsonl"
+        output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
+        carried = carry_forward_findings(prev_jsonl, output_jsonl, classification.unchanged)
+        log_info(f"  [{dimension}] Carried forward {carried} findings for {len(classification.unchanged)} unchanged files")
+
+    if not classification.to_analyze:
+        log_info(f"  [{dimension}] No changes detected — using cached findings only")
+        # Parse the carried-forward JSONL as evidence
+        jsonl_file = evidence_dir / f"{dimension}_evidence.jsonl"
+        if jsonl_file.exists() and jsonl_file.stat().st_size > 0:
+            compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+            ev = parse_jsonl_to_evidence(
+                jsonl_file,
+                EvidenceContext(
+                    language=config.language, repository=str(config.src),
+                    date_str=ctx.date_str, source_file_count=config.source_file_count,
+                    files_read=0, module=config.target.name if config.target else "",
+                ),
+                compiled_dir=compiled_dir,
+            )
+        else:
+            ev = None
+    else:
+        log_info(f"  [{dimension}] Analyzing {len(classification.to_analyze)} changed files ({len(classification.unchanged)} cached)")
+        # Set file filter so _list_source_files returns only changed+dependent files
+        config.options.incremental_file_filter = set(classification.to_analyze)
+        try:
+            ev = _process_single_dimension(config, dimension, idx, ctx)
+        finally:
+            config.options.incremental_file_filter = None
+
+    # Save new fingerprint
+    new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir)
+    save_fingerprint(new_fp, evidence_dir)
+
+    return ev
+
+
 def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
     dimensions, ctx = load_analysis_context(config)
+
+    # Incremental mode: per-dimension incremental analysis
+    if config.options.incremental:
+        emit_marker("setup", dimensions=dimensions)
+        result: dict[str, Evidence] = {}
+        for idx, dimension in enumerate(dimensions, 1):
+            emit_marker("analyzing", dimension=dimension)
+            log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
+            try:
+                ev = _run_dimension_incremental(config, dimension, idx, ctx)
+            except Exception as exc:
+                log_warning(f"[{idx}/{ctx.total}] {dimension} — incremental failed: {exc}, falling back to full")
+                ev = _process_single_dimension(config, dimension, idx, ctx)
+            if ev:
+                _log_dimension_result(ev, dimension, idx, ctx.total)
+                result[dimension] = ev
+        # Check for zero findings (same as existing logic)
+        if result and config.source_file_count > 0:
+            total_findings = sum(
+                sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
+                for ev in result.values()
+            )
+            if total_findings == 0:
+                raise EvaluationError(
+                    f"Evaluation produced 0 findings across {len(result)} dimensions. "
+                    f"This usually means the AI CLI could not read files or report findings "
+                    f"— check tool permissions and MCP configuration."
+                )
+        return result
+
     emit_marker("setup", dimensions=dimensions)
 
     # Consolidated mode: evaluate all dimensions in one pass

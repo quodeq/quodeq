@@ -87,6 +87,12 @@ def _list_source_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[s
         evidence_dir=evidence_dir,
         config=config,
     )
+
+    # Incremental mode: filter to only changed + dependent files
+    if config.options.incremental_file_filter is not None:
+        filter_set = config.options.incremental_file_filter
+        files = [f for f in files if f in filter_set]
+
     return files, extensions
 
 
