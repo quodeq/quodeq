@@ -198,7 +198,10 @@ def _build_dashboard_result(
 
 
 def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
-    """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent."""
+    """Return the selected RunInfo and its index in *runs*, raising FileNotFoundError if absent.
+
+    Note: run IDs are opaque UUIDs (no sensitive data), safe to include in error messages.
+    """
     selected_run = runs[0] if run == _LATEST_RUN else next((item for item in runs if item.run_id == run), None)
     if not selected_run:
         raise FileNotFoundError(f"Run not found: {run}")

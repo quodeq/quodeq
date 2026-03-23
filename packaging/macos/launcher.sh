@@ -44,8 +44,10 @@ if [ -z "$QUODEQ" ]; then
     if [ -f "$REQ_FILE" ] && grep -q -- '--hash' "$REQ_FILE"; then
         python3 -m pip install --user --require-hashes -r "$REQ_FILE" 2>&1
     else
-        # Fallback: no pinned hashes available — install from PyPI over TLS.
-        python3 -m pip install --user quodeq 2>&1
+        # SECURITY: No pinned hashes available — install from PyPI over TLS.
+        # Using --only-binary :all: to reduce supply chain risk by avoiding
+        # arbitrary code execution in source distributions (setup.py).
+        python3 -m pip install --user --only-binary :all: quodeq 2>&1
     fi
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)

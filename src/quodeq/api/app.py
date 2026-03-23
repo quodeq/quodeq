@@ -29,6 +29,8 @@ from quodeq.api.routes import (
 
 _HEALTH_PATH = "/api/health"
 _RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
+_EVALUATION_RATE_LIMIT_WINDOW = 300  # 5-minute window for evaluation creation
+_EVALUATION_RATE_LIMIT_MAX = 10  # max evaluations per window
 
 _DEFAULT_RATE_LIMIT_WINDOW = 60
 _DEFAULT_RATE_LIMIT_MAX = 60
@@ -222,7 +224,12 @@ def create_app(
     app = Flask(__name__)
     provider = provider or _default_provider()
     store = rate_limit_store or create_rate_limit_store()
+    eval_store = InMemoryRateLimitStore(
+        window=_EVALUATION_RATE_LIMIT_WINDOW,
+        max_requests=_EVALUATION_RATE_LIMIT_MAX,
+    )
     if api_key is None:
+        # NOTE: The key value is never logged — only its absence.
         _msg = (
             "QUODEQ_API_KEY is not set — API restricted to localhost only. "
             "Set QUODEQ_API_KEY to enable authenticated remote access."
@@ -231,7 +238,12 @@ def create_app(
 
     @app.before_request
     def _audit_log() -> None:
-        _logger.info("API: %s %s (remote_addr=%s)", request.method, request.path, request.remote_addr)
+        actor = ""
+        if api_key:
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer ") and len(auth) > 11:
+                actor = f", actor=key:***{auth[-4:]}"
+        _logger.info("API: %s %s (remote_addr=%s%s)", request.method, request.path, request.remote_addr, actor)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
@@ -252,7 +264,7 @@ def create_app(
 
     register_project_list_routes(app, provider)
     register_project_data_routes(app, provider)
-    register_evaluation_list_routes(app, provider)
+    register_evaluation_list_routes(app, provider, eval_store)
     register_evaluation_item_routes(app, provider)
     register_discovery_routes(app, provider)
     register_static_routes(app, static_dist)
