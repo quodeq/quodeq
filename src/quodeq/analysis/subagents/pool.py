@@ -1,13 +1,4 @@
-"""SubagentPool -- launches N parallel AI CLI subprocesses sharing a FileQueue.
-
-Each subagent:
-  - Gets its own MCP server with access to the shared queue
-  - Gets its own JSONL output file and stream file
-  - Uses the subagent.md prompt (file-fed, not search-based)
-  - Dies when the queue is empty or max_turns is reached
-
-The pool merges all JSONL files at the end, deduplicating by (p, file, line, t).
-"""
+"""SubagentPool -- launches N parallel AI CLI subprocesses sharing a FileQueue."""
 from __future__ import annotations
 
 import threading
@@ -33,6 +24,42 @@ _SECONDS_PER_MINUTE = 60
 _SCOUT_TIMEOUT_S = 180  # 3 minutes before forcing scale-up
 
 
+def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> int:
+    """Count non-empty lines in a JSONL file under a lock."""
+    try:
+        if not jsonl_path.exists():
+            return 0
+        with lock:
+            with open_text(jsonl_path) as f:
+                return sum(1 for line in f if line.strip())
+    except OSError:
+        return 0
+
+
+def _heartbeat_loop(
+    stop: threading.Event, finished: dict[str, bool],
+    queue_path: Path, dimension_key: str, jsonl_path: Path, lock: threading.Lock,
+) -> None:
+    """Emit periodic progress lines for the subagent pool."""
+    start = time.monotonic()
+    while not stop.wait(_HEARTBEAT_INTERVAL):
+        try:
+            elapsed = int(time.monotonic() - start)
+            mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
+            total_findings = _count_jsonl_findings(jsonl_path, lock)
+            remaining, taken = FileQueue(queue_path).stats()
+            total_agents = len(finished)
+            active = sum(1 for v in finished.values() if not v)
+            log_info(
+                f"  [{dimension_key}] {mins}m{secs:02d}s | "
+                f"{active} active ({total_agents} total) | "
+                f"{taken} files taken ({remaining} left) | "
+                f"{total_findings} findings"
+            )
+        except (OSError, ValueError, RuntimeError) as exc:
+            log_warning(f"Heartbeat error: {exc}")
+
+
 @dataclass
 class PoolPaths:
     """Grouped filesystem paths for the subagent pool."""
@@ -52,18 +79,7 @@ class SubagentResult:
 
 
 class SubagentPool:
-    """Manages N parallel AI CLI subprocesses sharing a FileQueue.
-
-    Usage::
-
-        pool = SubagentPool(
-            n_agents=5,
-            paths=PoolPaths(work_dir=repo_path, evidence_dir=evidence_dir, queue_path=queue_path),
-            prompt=rendered_prompt,
-            config=AnalysisConfig(...),
-        )
-        merged = pool.run()  # blocks until all agents finish
-    """
+    """Manages N parallel AI CLI subprocesses sharing a FileQueue."""
 
     def __init__(
         self,
@@ -75,24 +91,16 @@ class SubagentPool:
         scout_first: bool = True,
     ):
         self._n = max(1, n_agents)
-        self._work_dir = paths.work_dir
-        self._prompt = prompt
-        self._evidence_dir = paths.evidence_dir
-        self._queue_path = paths.queue_path
-        # Normalize dimension to support both single and multi-dimension
+        self._work_dir, self._prompt = paths.work_dir, prompt
+        self._evidence_dir, self._queue_path = paths.evidence_dir, paths.queue_path
         if isinstance(dimension, list):
-            self._dimensions = dimension
-            self._dimension = ",".join(dimension)  # for AnalysisConfig/MCP
-            self._dimension_key = "consolidated"    # for file naming
+            self._dimensions, self._dimension = dimension, ",".join(dimension)
+            self._dimension_key = "consolidated"
         else:
             self._dimensions = [dimension] if dimension else []
-            self._dimension = dimension
-            self._dimension_key = dimension
+            self._dimension, self._dimension_key = dimension, dimension
         self._base_config = config or AnalysisConfig()
-        self._scout_first = scout_first
-        self._jsonl_lock = threading.Lock()
-        # Initialised here so helpers like _collect_done/_process_completed_futures
-        # never encounter missing attributes regardless of call order.
+        self._scout_first, self._jsonl_lock = scout_first, threading.Lock()
         self._futures: dict[Future[SubagentResult], int] = {}
         self._finished: dict[str, bool] = {}
         self._next_idx = 0
@@ -104,28 +112,17 @@ class SubagentPool:
     def _build_agent_config(self, idx: int) -> tuple[AnalysisConfig, Path, Path]:
         """Build per-agent AnalysisConfig, JSONL path, and stream path."""
         agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
-        # All agents append to the same JSONL -- the UI reads this file live.
-        # Writes are synchronized via self._jsonl_lock.
         jsonl_file = self._shared_jsonl_path()
         stream_file = self._evidence_dir / f"{self._dimension_key}_{agent_id}.stream"
-
-        # Per-agent timeout: use max_duration so individual agents can't run indefinitely.
-        agent_max_duration = self._base_config.max_duration or 1800  # per-agent timeout default
-
+        bc = self._base_config
         ac = AnalysisConfig(
-            jsonl_file=jsonl_file,
-            analysis_budget=self._base_config.analysis_budget,
-            heartbeat_interval=self._base_config.heartbeat_interval,
-            heartbeat_callback=self._base_config.heartbeat_callback,
-            ai_cmd=self._base_config.ai_cmd,
-            ai_model=self._base_config.ai_model,
-            max_turns=self._base_config.max_turns,
-            max_duration=agent_max_duration,
-            compiled_dir=self._base_config.compiled_dir,
-            dimension=self._dimension,
-            queue_path=self._queue_path,
-            agent_id=agent_id,
-            max_files_per_agent=self._base_config.max_files_per_agent,
+            jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
+            heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,
+            ai_cmd=bc.ai_cmd, ai_model=bc.ai_model, max_turns=bc.max_turns,
+            max_duration=bc.max_duration or 1800,
+            compiled_dir=bc.compiled_dir, dimension=self._dimension,
+            queue_path=self._queue_path, agent_id=agent_id,
+            max_files_per_agent=bc.max_files_per_agent,
         )
         return ac, jsonl_file, stream_file
 
@@ -151,42 +148,7 @@ class SubagentPool:
                 stream_file=stream_file, success=False, error=str(exc),
             )
 
-    def _count_findings(self) -> int:
-        """Count findings in the shared JSONL file."""
-        jsonl = self._shared_jsonl_path()
-        try:
-            if not jsonl.exists():
-                return 0
-            with self._jsonl_lock:
-                with open_text(jsonl) as f:
-                    return sum(1 for line in f if line.strip())
-        except OSError:
-            return 0
-
-    def _heartbeat_loop(self, stop: threading.Event, finished: dict[str, bool]) -> None:
-        """Emit periodic progress lines."""
-        start = time.monotonic()
-        while not stop.wait(_HEARTBEAT_INTERVAL):
-            try:
-                elapsed = int(time.monotonic() - start)
-                mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
-                total_findings = self._count_findings()
-
-                remaining, taken = FileQueue(self._queue_path).stats()
-                total_agents = len(finished)
-                active = sum(1 for v in finished.values() if not v)
-                log_info(
-                    f"  [{self._dimension_key}] {mins}m{secs:02d}s | "
-                    f"{active} active ({total_agents} total) | "
-                    f"{taken} files taken ({remaining} left) | "
-                    f"{total_findings} findings"
-                )
-            except (OSError, ValueError, RuntimeError) as exc:
-                log_warning(f"Heartbeat error: {exc}")
-
-    def _should_respawn(
-        self, pool_start: float, max_duration: float,
-    ) -> int:
+    def _should_respawn(self, pool_start: float, max_duration: float) -> int:
         """Return remaining file count if a new agent should be spawned, else 0."""
         remaining = FileQueue(self._queue_path).remaining()
         elapsed = time.monotonic() - pool_start
@@ -203,19 +165,13 @@ class SubagentPool:
         """Compute how many overflow agents to spawn after scout completes."""
         if remaining <= 0:
             return 0
-        batch = self._base_config.max_files_per_agent or 30
-        needed = ceil(remaining / batch)
-        if needed <= 1:
-            return 0
-        return min(needed, self._n - 1)
+        needed = ceil(remaining / (self._base_config.max_files_per_agent or 30))
+        return min(needed, self._n - 1) if needed > 1 else 0
 
     def _collect_done(
         self, results: list[SubagentResult],
     ) -> set[Future[SubagentResult]]:
-        """Collect completed futures, updating results and finished map.
-
-        Returns the set of completed futures.
-        """
+        """Collect completed futures, updating results and finished map."""
         done_futures = {f for f in self._futures if f.done()}
         for future in done_futures:
             idx = self._futures[future]
@@ -237,86 +193,69 @@ class SubagentPool:
         return done_futures
 
     def _process_completed_futures(
-        self,
-        done: set[Future[SubagentResult]],
-        pool_start: float,
-        max_duration: float,
-        executor: ThreadPoolExecutor,
+        self, done: set, pool_start: float, max_duration: float, executor: ThreadPoolExecutor,
     ) -> None:
         """Respawn agents for each completed future if queue still has files."""
         for _ in done:
-            remaining = self._should_respawn(pool_start, max_duration)
-            if remaining:
-                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
-                self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
-                self._next_idx += 1
+            if self._should_respawn(pool_start, max_duration):
+                self._submit_agent(executor)
 
     def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
         """Create and start the heartbeat monitoring thread."""
         stop = threading.Event()
         heartbeat = threading.Thread(
-            target=self._heartbeat_loop, args=(stop, self._finished), daemon=True,
+            target=_heartbeat_loop,
+            args=(stop, self._finished, self._queue_path, self._dimension_key,
+                  self._shared_jsonl_path(), self._jsonl_lock),
+            daemon=True,
         )
         heartbeat.start()
         return stop, heartbeat
 
+    def _submit_agent(self, executor: ThreadPoolExecutor) -> None:
+        """Submit a new agent to the executor."""
+        self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
+        self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
+        self._next_idx += 1
+
+    def _maybe_scale_up(
+        self, done: set, pool_start: float, max_duration: float,
+        scout_timeout: float, scout_done: bool, executor: ThreadPoolExecutor,
+    ) -> bool:
+        """Check if scout phase is complete and scale up if needed. Returns updated scout_done."""
+        if scout_done:
+            return True
+        elapsed = time.monotonic() - pool_start
+        scout_completed = len(done) > 0
+        scout_timed_out = elapsed >= scout_timeout and self._n > 1
+        if not (scout_completed or scout_timed_out):
+            return False
+        remaining = self._should_respawn(pool_start, max_duration)
+        for _ in range(self._compute_scale_up(remaining)):
+            self._submit_agent(executor)
+        return True
+
     def _run_pool_loop(
         self, results: list[SubagentResult], max_duration: float, pool_start: float,
     ) -> None:
-        """Execute the pool loop.
-
-        When scout_first=True (default): scout-then-scale strategy.
-          1. Launch 1 scout agent
-          2. When scout completes (or timeout), check queue and scale up if needed
-          3. Continue with respawn-on-completion for remaining work
-
-        When scout_first=False: launch all agents immediately (original behavior).
-        """
+        """Execute the pool loop: scout-then-scale or immediate launch."""
         with ThreadPoolExecutor(max_workers=self._n) as pool:
             if self._scout_first:
-                scout_timeout = min(
-                    _SCOUT_TIMEOUT_S,
-                    max_duration / max(self._n, 1) * 0.5,
-                )
+                scout_timeout = min(_SCOUT_TIMEOUT_S, max_duration / max(self._n, 1) * 0.5)
                 scout_done = False
-
-                # Phase 1: Launch scout
-                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
-                self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
-                self._next_idx += 1
+                self._submit_agent(pool)
 
                 while self._futures:
                     done = self._collect_done(results)
-
-                    # Phase 2: Scale up after scout completes or times out
-                    if not scout_done:
-                        elapsed = time.monotonic() - pool_start
-                        scout_completed = len(done) > 0
-                        scout_timed_out = elapsed >= scout_timeout and self._n > 1
-
-                        if scout_completed or scout_timed_out:
-                            scout_done = True
-                            remaining = self._should_respawn(pool_start, max_duration)
-                            overflow = self._compute_scale_up(remaining)
-                            for _ in range(overflow):
-                                self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
-                                self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
-                                self._next_idx += 1
-
+                    scout_done = self._maybe_scale_up(done, pool_start, max_duration, scout_timeout, scout_done, pool)
                     if not done:
                         time.sleep(_FUTURE_POLL_INTERVAL_S)
                         continue
-
-                    # Phase 3: Normal respawn-on-completion
                     if scout_done:
                         self._process_completed_futures(done, pool_start, max_duration, pool)
             else:
-                # Launch all agents immediately (no scout delay)
                 for _ in range(self._n):
-                    self._finished[f"{_AGENT_ID_PREFIX}-{self._next_idx}"] = False
-                    self._futures[pool.submit(self._run_single, self._next_idx)] = self._next_idx
-                    self._next_idx += 1
-
+                    self._submit_agent(pool)
                 while self._futures:
                     done = self._collect_done(results)
                     if not done:
@@ -325,10 +264,7 @@ class SubagentPool:
                     self._process_completed_futures(done, pool_start, max_duration, pool)
 
     def run(self) -> list[SubagentResult]:
-        """Launch agents in parallel, respawning when slots free up and queue has files.
-
-        Returns list of SubagentResult (one per agent, including failures).
-        """
+        """Launch agents in parallel, returning a SubagentResult per agent."""
         max_duration = self._base_config.pool_budget or _DEFAULT_POOL_BUDGET
         if self._scout_first:
             log_info(f"Launching scout agent for {self._dimension_key} (max {self._n} agents)")
@@ -352,16 +288,10 @@ class SubagentPool:
 
     @staticmethod
     def deduplicate_jsonl(jsonl_path: Path) -> int:
-        """Deduplicate a shared JSONL file in-place by (p, file, line, t).
-
-        Returns the number of unique findings kept.
-        """
+        """Deduplicate a shared JSONL file in-place by (p, file, line, t)."""
         return deduplicate_jsonl(jsonl_path)
 
     @staticmethod
     def merge_jsonl(results: list[SubagentResult], output: Path) -> Path:
-        """Merge JSONL files from all agents, deduplicating by (p, file, line, t).
-
-        Returns the output path.
-        """
+        """Merge JSONL files from all agents, deduplicating by (p, file, line, t)."""
         return merge_jsonl((r.jsonl_file for r in results), output)

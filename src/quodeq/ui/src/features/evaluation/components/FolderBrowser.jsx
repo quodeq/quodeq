@@ -1,6 +1,39 @@
 import { useEffect, useState } from 'react';
 import { browseDirectory } from '../../../api/index.js';
 
+function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigate }) {
+  return (
+    <>
+      {navError && <p className="inline-error" role="alert">{navError}</p>}
+      {!navError && data?.directories?.length === 0 && (
+        <p className="empty-folder">No subfolders in this directory</p>
+      )}
+      {data?.directories?.length > 0 && (
+        <div className="folder-browser-hint">Click to select · Double-click to open</div>
+      )}
+      {(data?.directories || []).map((dir) => (
+        <div
+          key={dir.path}
+          className={`folder-item ${dir.isGitRepo ? 'is-git-repo' : ''} ${selectedFolder === dir.path ? 'selected' : ''}`}
+          role="button"
+          tabIndex={0}
+          aria-pressed={selectedFolder === dir.path}
+          onClick={() => setSelectedFolder(dir.path)}
+          onDoubleClick={() => navigate(dir.path)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') navigate(dir.path);
+            if (e.key === ' ') { e.preventDefault(); setSelectedFolder(dir.path); }
+          }}
+        >
+          <span className="folder-icon">{dir.isGitRepo ? '\uD83D\uDCE6' : '\uD83D\uDCC1'}</span>
+          <span className="folder-name">{dir.name}</span>
+          {dir.isGitRepo && <span className="git-indicator">repo</span>}
+        </div>
+      ))}
+    </>
+  );
+}
+
 export default function FolderBrowser({ onSelect, onClose }) {
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
@@ -73,34 +106,7 @@ export default function FolderBrowser({ onSelect, onClose }) {
           {loading ? (
             <p className="loading" role="status" aria-live="polite">Loading...</p>
           ) : (
-            <>
-              {navError && <p className="inline-error" role="alert">{navError}</p>}
-              {!navError && data?.directories?.length === 0 && (
-                <p className="empty-folder">No subfolders in this directory</p>
-              )}
-              {data?.directories?.length > 0 && (
-                <div className="folder-browser-hint">Click to select · Double-click to open</div>
-              )}
-              {(data?.directories || []).map((dir) => (
-                <div
-                  key={dir.path}
-                  className={`folder-item ${dir.isGitRepo ? 'is-git-repo' : ''} ${selectedFolder === dir.path ? 'selected' : ''}`}
-                  role="button"
-                  tabIndex={0}
-                  aria-pressed={selectedFolder === dir.path}
-                  onClick={() => setSelectedFolder(dir.path)}
-                  onDoubleClick={() => navigate(dir.path)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') navigate(dir.path);
-                    if (e.key === ' ') { e.preventDefault(); setSelectedFolder(dir.path); }
-                  }}
-                >
-                  <span className="folder-icon">{dir.isGitRepo ? '📦' : '📁'}</span>
-                  <span className="folder-name">{dir.name}</span>
-                  {dir.isGitRepo && <span className="git-indicator">repo</span>}
-                </div>
-              ))}
-            </>
+            <FolderList data={data} navError={navError} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} />
           )}
         </div>
 

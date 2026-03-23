@@ -1,25 +1,27 @@
-"""Quodeq menu bar app for macOS — manages the dashboard server."""
+"""Quodeq menu bar app for macOS."""
 from __future__ import annotations
 
-import json
 import os
 import signal
 import subprocess
 import tempfile
 import threading
 import time
-import urllib.error
-import urllib.request
 import webbrowser
 
 import rumps
 
-_HEALTH_TIMEOUT = 1.0
+from _helpers import (
+    find_commands as _find_commands,
+    find_icon as _find_icon,
+    health_check as _health_check,
+    is_evaluating as _is_evaluating,
+    source_user_path as _source_user_path,
+)
+
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
-# Standard Homebrew bin directories on macOS (Intel: /usr/local/bin, Apple Silicon: /opt/homebrew/bin).
-_HOMEBREW_PATH_DIRS = "/usr/local/bin:/opt/homebrew/bin"
 
 
 def _load_config(env=None):
@@ -28,73 +30,6 @@ def _load_config(env=None):
     app_port = int(env.get("QUODEQ_PORT", "4173"))
     ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", "4173,4174,4175,4180,4181,4182,4183").split(","))
     return app_port, ports
-
-
-def _health_check(port: int) -> bool:
-    # NOTE: Plain HTTP is intentional here — traffic is loopback-only (127.0.0.1).
-    try:
-        url = f"http://127.0.0.1:{port}/api/health"
-        with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
-            return json.loads(r.read()).get("ok") is True
-    except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):
-        return False
-
-
-def _source_user_path() -> None:
-    """Load the user's shell PATH since .app bundles don't inherit it."""
-    try:
-        cmd = ('source ~/.zprofile 2>/dev/null; source ~/.zshrc 2>/dev/null; '
-               'source ~/.bash_profile 2>/dev/null; echo $PATH')
-        shell = os.environ.get("SHELL", "/bin/zsh")
-        result = subprocess.run([shell, "-c", cmd], capture_output=True, text=True, timeout=5)
-        if result.returncode == 0 and result.stdout.strip():
-            os.environ["PATH"] = result.stdout.strip()
-            return
-    except (subprocess.TimeoutExpired, OSError):
-        pass
-    extra = f"{os.path.expanduser('~/.local/bin')}:{_HOMEBREW_PATH_DIRS}"
-    os.environ["PATH"] = f"{os.environ.get('PATH', '')}:{extra}"
-
-
-def _find_icon(name: str) -> str | None:
-    """Find a menu bar icon by filename."""
-    here = os.path.dirname(os.path.abspath(__file__))
-    for base in [here, os.path.join(os.path.dirname(here), "Resources")]:
-        path = os.path.join(base, name)
-        if os.path.exists(path):
-            return path
-    return None
-
-
-def _is_evaluating(port: int) -> bool:
-    """Check if any evaluation job is currently running."""
-    try:
-        url = f"http://127.0.0.1:{port}/api/evaluations"
-        with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
-            return any(j.get("status") == "running" for j in json.loads(r.read()))
-    except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):
-        return False
-
-
-_cached_commands: dict[str, str | None] | None = None
-
-
-def _find_commands() -> dict[str, str | None]:
-    """Check which required commands are available (cached after first call)."""
-    global _cached_commands
-    if _cached_commands is not None:
-        return _cached_commands
-    cmds = {}
-    for name in ("python3", "node", "claude", "quodeq"):
-        try:
-            result = subprocess.run(
-                ["which", name], capture_output=True, text=True, timeout=5,
-            )
-            cmds[name] = result.stdout.strip() if result.returncode == 0 else None
-        except (subprocess.TimeoutExpired, OSError):
-            cmds[name] = None
-    _cached_commands = cmds
-    return cmds
 
 
 class QuodeqApp(rumps.App):
@@ -244,11 +179,27 @@ class QuodeqApp(rumps.App):
                 pass
             self._stderr_log_path = None
 
+    def _build_dashboard_cmd(self, quodeq_cmd: str) -> list[str]:
+        """Build the dashboard command, probing --help for supported flags."""
+        cmd = [quodeq_cmd, "dashboard"]
+        try:
+            help_out = subprocess.run(
+                [quodeq_cmd, "dashboard", "--help"],
+                capture_output=True, text=True, timeout=5,
+            ).stdout
+            if "--no-open" in help_out:
+                cmd.append("--no-open")
+            if "--port" in help_out:
+                cmd.extend(["--port", str(self._app_port)])
+        except (subprocess.TimeoutExpired, OSError):
+            pass
+        return cmd
+
     def _do_start_inner(self):
         cmds = _find_commands()
         quodeq_cmd = cmds.get("quodeq")
         if not quodeq_cmd:
-            self._set_error(f"quodeq not in PATH")
+            self._set_error("quodeq not in PATH")
             self._status_item.title = "Stopped"
             return
         self._status_item.title = "Starting..."
@@ -257,28 +208,18 @@ class QuodeqApp(rumps.App):
         )
         self._stderr_log_path = stderr_log.name
         try:
-            cmd = [quodeq_cmd, "dashboard"]
-            # Pass flags only if the CLI supports them
-            try:
-                help_out = subprocess.run(
-                    [quodeq_cmd, "dashboard", "--help"],
-                    capture_output=True, text=True, timeout=5,
-                ).stdout
-                if "--no-open" in help_out:
-                    cmd.append("--no-open")
-                if "--port" in help_out:
-                    cmd.extend(["--port", str(self._app_port)])
-            except (subprocess.TimeoutExpired, OSError):
-                pass
+            cmd = self._build_dashboard_cmd(quodeq_cmd)
             self._process = subprocess.Popen(
-                cmd,
-                stdout=subprocess.DEVNULL, stderr=stderr_log,
-                start_new_session=True,
+                cmd, stdout=subprocess.DEVNULL, stderr=stderr_log, start_new_session=True,
             )
         except OSError as e:
             self._set_error(f"Failed: {e}")
             self._status_item.title = "Stopped"
             return
+        self._wait_for_dashboard(stderr_log)
+
+    def _wait_for_dashboard(self, stderr_log):
+        """Poll until the dashboard responds or process crashes."""
         for _ in range(_MAX_START_RETRIES):
             time.sleep(0.5)
             if self._process.poll() is not None:

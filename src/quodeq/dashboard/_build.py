@@ -8,7 +8,6 @@ import subprocess
 from pathlib import Path
 
 from quodeq.shared.logging import log_info
-from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
 
 _HASH_FILE = ".build_hash"
 _QUODEQ_DIR = Path.home() / ".quodeq"

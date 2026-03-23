@@ -110,24 +110,28 @@ def _load_index(reports_dir: Path) -> dict[str, str]:
     return data
 
 
+def _cleanup_tmp(tmp: str) -> None:
+    """Remove a temp file, ignoring errors."""
+    try:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+    except OSError as exc:
+        logging.getLogger(__name__).debug("Could not remove temp file %s: %s", tmp, exc)
+
+
 def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
     """Write the project index file atomically."""
     index_path = reports_dir / _INDEX_FILE
     _index_cache.pop(index_path)  # invalidate cache
+    tmp = ""
     try:
         fd, tmp = tempfile.mkstemp(dir=reports_dir, suffix=".tmp")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(index, f, indent=2)
-            os.replace(tmp, index_path)
-        finally:
-            if os.path.exists(tmp):
-                try:
-                    os.unlink(tmp)
-                except OSError as exc:
-                    logging.getLogger(__name__).debug("Could not remove temp file %s: %s", tmp, exc)
+        with os.fdopen(fd, "w") as f:
+            json.dump(index, f, indent=2)
+        os.replace(tmp, index_path)
     except OSError as exc:
         logging.getLogger(__name__).warning("Could not save project index: %s", exc)
+        _cleanup_tmp(tmp)
 
 
 def _find_existing_project(

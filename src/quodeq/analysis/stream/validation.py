@@ -28,6 +28,18 @@ def get_mcp_status(stream_file: Path) -> str | None:
     return None
 
 
+def _is_error_event(line: str, stream_file: Path) -> bool | None:
+    """Check if a stream line is an error event. Returns True/False or None to skip."""
+    try:
+        d = json.loads(line.strip())
+    except json.JSONDecodeError as exc:
+        log_debug(f"Skipping malformed stream line in {stream_file}: {exc}")
+        return None
+    if d.get("type") == "result" and d.get("is_error"):
+        return True
+    return False
+
+
 def is_stream_valid(stream_file: Path) -> bool:
     """Return True if stream exists, is non-empty, and has no error events."""
     if not stream_file.exists() or stream_file.stat().st_size == 0:
@@ -35,12 +47,8 @@ def is_stream_valid(stream_file: Path) -> bool:
     try:
         with open_text(stream_file) as f:
             for line in f:
-                try:
-                    d = json.loads(line.strip())
-                    if d.get("type") == "result" and d.get("is_error"):
-                        return False
-                except json.JSONDecodeError as exc:
-                    log_debug(f"Skipping malformed stream line in {stream_file}: {exc}")
+                if _is_error_event(line, stream_file) is True:
+                    return False
     except OSError as exc:
         log_debug(f"Cannot read stream file {stream_file}: {exc}")
         return False

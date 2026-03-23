@@ -215,26 +215,18 @@ def create_app(
     rate_limit_store: RateLimitStore | None = None,
     api_key: str | None = None,
 ) -> Flask:
-    """Create and configure the Flask application with all API routes.
-
-    *api_key* overrides the ``QUODEQ_API_KEY`` env-var lookup when provided,
-    making the app testable without environment mutation.  Pass an empty string
-    to explicitly disable authentication.
-    """
+    """Create and configure the Flask application with all API routes."""
     app = Flask(__name__)
     provider = provider or _default_provider()
     store = rate_limit_store or create_rate_limit_store()
     eval_store = InMemoryRateLimitStore(
-        window=_EVALUATION_RATE_LIMIT_WINDOW,
-        max_requests=_EVALUATION_RATE_LIMIT_MAX,
+        window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
     )
     if api_key is None:
-        # NOTE: The key value is never logged — only its absence.
-        _msg = (
+        _logger.warning(
             "QUODEQ_API_KEY is not set — API restricted to localhost only. "
             "Set QUODEQ_API_KEY to enable authenticated remote access."
         )
-        _logger.warning(_msg)
 
     @app.before_request
     def _audit_log() -> None:
@@ -262,13 +254,21 @@ def create_app(
         from quodeq import __version__
         return jsonify({"ok": True, "version": __version__})
 
+    _register_all_routes(app, provider, eval_store, static_dist)
+    return app
+
+
+def _register_all_routes(
+    app: Flask, provider: ActionProvider,
+    eval_store: InMemoryRateLimitStore, static_dist: str | None,
+) -> None:
+    """Register all API route groups on the app."""
     register_project_list_routes(app, provider)
     register_project_data_routes(app, provider)
     register_evaluation_list_routes(app, provider, eval_store)
     register_evaluation_item_routes(app, provider)
     register_discovery_routes(app, provider)
     register_static_routes(app, static_dist)
-    return app
 
 
 def main() -> None:

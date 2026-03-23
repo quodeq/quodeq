@@ -1,7 +1,17 @@
 """Tests for file priority scoring."""
 from __future__ import annotations
 
-from quodeq.analysis.subagents.priority import compute_base_score, compute_dimension_boost, compute_fan_in, load_priority_config
+from unittest.mock import patch
+
+from quodeq.analysis.subagents.priority import (
+    compute_base_score,
+    compute_dimension_boost,
+    compute_fan_in,
+    compute_git_scores,
+    compute_previous_violations,
+    load_priority_config,
+    prioritize_files,
+)
 
 
 class TestLoadPriorityConfig:
@@ -107,10 +117,6 @@ class TestComputeFanIn:
         assert fan_in == {}
 
 
-from unittest.mock import patch
-from quodeq.analysis.subagents.priority import compute_git_scores, compute_previous_violations
-
-
 class TestComputeGitScores:
     def test_parses_git_log(self, tmp_path):
         mock_output = "abc123abc123abc123abc123abc123abc123abcd\n2026-03-20 10:00:00 +0000\nfile1.py\nfile2.py\n\ndef456def456def456def456def456def456defg\n2026-03-10 10:00:00 +0000\nfile1.py\n\n"
@@ -164,9 +170,6 @@ class TestComputePreviousViolations:
             counts = compute_previous_violations(None, tmp_path, ["security", "maintainability"])
         assert counts.get("auth.py", 0) >= 1
         assert counts.get("big.py", 0) >= 1
-
-
-from quodeq.analysis.subagents.priority import prioritize_files
 
 
 class TestPrioritizeFiles:

@@ -33,7 +33,8 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
   const [consoleOpen, setConsoleOpen] = useState(false);
 
   function isStatusLine(line) {
-    return line.startsWith(STATUS_MARKERS.arrow) || line.startsWith(STATUS_MARKERS.check) || line.startsWith(STATUS_MARKERS.error) || line.includes(STATUS_MARKERS.failed);
+    const prefixes = [STATUS_MARKERS.arrow, STATUS_MARKERS.check, STATUS_MARKERS.error];
+    return prefixes.some((p) => line.startsWith(p)) || line.includes(STATUS_MARKERS.failed);
   }
 
   function lastRelevantLog(logs) {

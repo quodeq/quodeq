@@ -197,6 +197,15 @@ def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, man
     )
 
 
+def _save_manifest(manifest, evidence_dir: Path) -> None:
+    """Save manifest for debugging (best-effort)."""
+    if manifest and evidence_dir:
+        try:
+            write_text(evidence_dir / "manifest.json", json.dumps(manifest.to_dict(), indent=2))
+        except OSError as exc:
+            _logger.debug("Could not write manifest: %s", exc)
+
+
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
     from quodeq.shared.prereqs import check_evaluate_prereqs
@@ -211,7 +220,6 @@ def run_evaluate(args: argparse.Namespace) -> int:
         return 1
 
     paths = default_paths()
-
     if not paths.detection_file.exists() or not paths.dimensions_file.exists():
         print("Configuration not found: detection.json and dimensions.json are required.", file=sys.stderr)
         return 1
@@ -230,19 +238,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
     manifest = _build_manifest(args, src, paths)
     _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
     print(f"Report path: {evaluation_dir}", file=sys.stderr)
+    _save_manifest(manifest, evidence_dir)
 
-    # Save manifest for debugging
-    if manifest and evidence_dir:
-        try:
-            write_text(
-                evidence_dir / "manifest.json",
-                json.dumps(manifest.to_dict(), indent=2),
-            )
-        except OSError as exc:
-            _logger.debug("Could not write manifest: %s", exc)
-
-    # Single-pass analysis: all files in one unified queue per dimension.
-    # The AI analyzes each file according to its language naturally.
     config = _build_run_config(args, src=src, language=language, manifest=manifest, dims_data=dims_data, evidence_dir=evidence_dir)
     try:
         return _execute_pipeline(args, config, evidence_dir, evaluation_dir)

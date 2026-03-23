@@ -7,6 +7,51 @@ import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 
 const PAGE_SIZE = 20;
 
+function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText }) {
+  return EVAL_SEVERITY_ORDER.map((sev) => {
+    const vs = violationsBySeverity[sev];
+    if (!vs || vs.length === 0) return null;
+    return (
+      <div key={sev}>
+        <div className="violation-group-header">
+          <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
+          <span className="violation-group-count">{vs.length}</span>
+        </div>
+        <div className="vlive-violations-group">
+          {vs.map((v, idx) => (
+            <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} />
+          ))}
+        </div>
+      </div>
+    );
+  });
+}
+
+function ComplianceListSection({ compliance, displayedCompliance, hasMoreCompliance, showAllCompliance, setShowAllCompliance, principle }) {
+  if (compliance.length === 0) return null;
+  return (
+    <div>
+      <div className="violation-group-header">
+        <span className="violation-group-title">Compliance</span>
+        <span className="violation-group-count">{compliance.length}</span>
+      </div>
+      <div className="vlive-violations-group">
+        {displayedCompliance.map((c, idx) => (
+          <ComplianceCard key={idx} c={c} principle={principle} index={idx} />
+        ))}
+      </div>
+      {hasMoreCompliance && (
+        <button
+          className="offending-show-more"
+          onClick={() => setShowAllCompliance((v) => !v)}
+        >
+          {showAllCompliance ? 'Show less' : `Show all ${compliance.length} compliance items`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal }) {
   const {
     principleData,
@@ -162,45 +207,13 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         </p>
       )}
 
-      {EVAL_SEVERITY_ORDER.map((sev) => {
-        const vs = violationsBySeverity[sev];
-        if (!vs || vs.length === 0) return null;
-        return (
-          <div key={sev}>
-            <div className="violation-group-header">
-              <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
-              <span className="violation-group-count">{vs.length}</span>
-            </div>
-            <div className="vlive-violations-group">
-              {vs.map((v, idx) => (
-                <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      <ViolationListSection violationsBySeverity={violationsBySeverity} principle={principle} buildViolationPlanText={buildViolationPlanText} />
 
-      {compliance.length > 0 && (
-        <div>
-          <div className="violation-group-header">
-            <span className="violation-group-title">Compliance</span>
-            <span className="violation-group-count">{compliance.length}</span>
-          </div>
-          <div className="vlive-violations-group">
-            {displayedCompliance.map((c, idx) => (
-              <ComplianceCard key={idx} c={c} principle={principle} index={idx} />
-            ))}
-          </div>
-          {hasMoreCompliance && (
-            <button
-              className="offending-show-more"
-              onClick={() => setShowAllCompliance((v) => !v)}
-            >
-              {showAllCompliance ? 'Show less' : `Show all ${compliance.length} compliance items`}
-            </button>
-          )}
-        </div>
-      )}
+      <ComplianceListSection
+        compliance={compliance} displayedCompliance={displayedCompliance}
+        hasMoreCompliance={hasMoreCompliance} showAllCompliance={showAllCompliance}
+        setShowAllCompliance={setShowAllCompliance} principle={principle}
+      />
     </>
   );
 });

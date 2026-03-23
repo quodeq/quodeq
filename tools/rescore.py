@@ -180,7 +180,7 @@ def main():
         print(f"\nDone — {ok} rescored, {fail} skipped/failed")
         if dry_run and ok:
             print("Run with --apply to write changes.")
-    except Exception as exc:
+    except (OSError, ValueError, KeyError) as exc:
         print(f"Fatal error: {exc}", file=sys.stderr)
         sys.exit(1)
 
