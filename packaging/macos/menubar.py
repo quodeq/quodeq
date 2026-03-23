@@ -76,8 +76,14 @@ def _is_evaluating(port: int) -> bool:
         return False
 
 
+_cached_commands: dict[str, str | None] | None = None
+
+
 def _find_commands() -> dict[str, str | None]:
-    """Check which required commands are available."""
+    """Check which required commands are available (cached after first call)."""
+    global _cached_commands
+    if _cached_commands is not None:
+        return _cached_commands
     cmds = {}
     for name in ("python3", "node", "claude", "quodeq"):
         try:
@@ -87,6 +93,7 @@ def _find_commands() -> dict[str, str | None]:
             cmds[name] = result.stdout.strip() if result.returncode == 0 else None
         except (subprocess.TimeoutExpired, OSError):
             cmds[name] = None
+    _cached_commands = cmds
     return cmds
 
 
@@ -136,14 +143,23 @@ class QuodeqApp(rumps.App):
         self._error_item.title = ""
 
     def _find_running_port(self) -> int | None:
-        """Find the running dashboard port, checking last known port first."""
+        """Find the running dashboard port, checking last known port first (TTL-cached)."""
+        now = time.monotonic()
+        if hasattr(self, '_port_cache_time') and (now - self._port_cache_time) < _POLL_INTERVAL:
+            return self._port_cached_result
         if self._last_known_port is not None and _health_check(self._last_known_port):
+            self._port_cached_result = self._last_known_port
+            self._port_cache_time = now
             return self._last_known_port
         for port in self._ports:
             if _health_check(port):
                 self._last_known_port = port
+                self._port_cached_result = port
+                self._port_cache_time = now
                 return port
         self._last_known_port = None
+        self._port_cached_result = None
+        self._port_cache_time = now
         return None
 
     def _set_ui_state(self, running: bool) -> None:

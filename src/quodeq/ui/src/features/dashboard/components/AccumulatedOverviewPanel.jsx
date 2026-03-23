@@ -102,6 +102,11 @@ export default function AccumulatedOverviewPanel({
     [accumulatedDimensions]
   );
 
+  const sortedDimensions = useMemo(
+    () => [...accumulatedDimensions].sort((a, b) => a.dimension.localeCompare(b.dimension)),
+    [accumulatedDimensions]
+  );
+
   return (
     <>
       {/* Accumulated summary hero */}
@@ -183,14 +188,13 @@ export default function AccumulatedOverviewPanel({
       </div>
       <div className="dimensions-panel">
         <div className="dimensions-grid">
-          {[...accumulatedDimensions]
-            .sort((a, b) => a.dimension.localeCompare(b.dimension))
-            .map((item) => {
+          {sortedDimensions.map((item) => {
               const isStale = item.fromRunId !== referenceRun;
               const currScore = parseFloat(item.overallScore);
               const prevScore = parseFloat(item.previousScore);
               const delta =
                 !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
+              const score = splitScore(item.overallScore);
               return (
                 <article
                   key={item.dimension}
@@ -208,10 +212,10 @@ export default function AccumulatedOverviewPanel({
                   </div>
                   <div className="qd-card-score-row">
                     <span className="qd-card-score-main">
-                      <span className="qd-card-score">{splitScore(item.overallScore).value}</span>
-                      {splitScore(item.overallScore).denom && (
+                      <span className="qd-card-score">{score.value}</span>
+                      {score.denom && (
                         <span className="qd-card-score-denom">
-                          {splitScore(item.overallScore).denom}
+                          {score.denom}
                         </span>
                       )}
                     </span>
