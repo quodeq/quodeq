@@ -2,6 +2,7 @@ import pytest
 
 from quodeq.adapters.web.http_client import HttpResponse
 from quodeq.adapters.web.evaluations_repository import WebEvaluationsRepository
+from quodeq.data.ports.data_errors import NotFoundError
 
 
 class FakeClient:
@@ -22,5 +23,5 @@ def test_web_evaluations_repository_reads_report():
 
 def test_web_evaluations_repository_404_raises():
     repo = WebEvaluationsRepository(base_url="https://api.example.com", client=FakeClient())
-    with pytest.raises(Exception):
+    with pytest.raises(NotFoundError):
         repo.get_report("nonexistent")

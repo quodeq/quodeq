@@ -20,6 +20,7 @@ from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services._cache import make_lru_dimension_fetcher
 
+
 def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
     """Create the default accumulated-view LRU cache and its lock.
 
@@ -232,8 +233,9 @@ def compute_accumulated(
 ) -> dict[str, Any] | None:
     """Compute the accumulated (cross-run) view for *project*.
 
-    Optional *cache_config* overrides the module-level LRU cache, making
-    the function testable without global state mutation.
+    Parameter count is intentional: each argument represents a distinct
+    query axis with no natural grouping.  *cache_config* overrides the
+    module-level LRU cache for testing without global state mutation.
     """
     reports_root = Path(reports_dir)
     project_path = reports_root / project

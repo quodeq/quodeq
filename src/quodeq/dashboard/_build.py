@@ -8,7 +8,6 @@ import subprocess
 from pathlib import Path
 
 from quodeq.shared.logging import log_info
-from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
 
 _HASH_FILE = ".build_hash"
 _QUODEQ_DIR = Path.home() / ".quodeq"
@@ -104,13 +103,40 @@ def _run_npm_build(workdir: Path, static_dir: Path) -> None:
     subprocess.run([npm, "run", "build"], cwd=str(workdir), check=True, timeout=600, env=env)
 
 
-def maybe_build_ui(no_build: bool, reinstall: bool) -> Path:
+def _resolve_dev_source() -> Path:
+    """Find the UI source directory for --dev mode (repo working copy)."""
+    # Look for ui/web/ relative to cwd, then walk up to find repo root
+    cwd = Path.cwd()
+    for candidate in (cwd / "ui" / "web", cwd / "src" / "quodeq" / "ui"):
+        if (candidate / "package.json").exists():
+            return candidate
+    # Walk up looking for ui/web/
+    for parent in cwd.parents:
+        candidate = parent / "ui" / "web"
+        if (candidate / "package.json").exists():
+            return candidate
+    raise FileNotFoundError(
+        "Cannot find UI source directory. "
+        "Run --dev from the quodeq repo root or a subdirectory."
+    )
+
+
+_DEV_STATIC_DIR = _QUODEQ_DIR / "static-dev"
+_DEV_BUILD_WORKDIR = _QUODEQ_DIR / "ui_build_dev"
+
+
+def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
     """Build the UI if needed and return the path to the static dist directory.
 
     Raises FileNotFoundError if --no-build is set and no cached build exists.
     """
-    static_dir = _STATIC_DIR
-    source_dir = _get_ui_source_dir()
+    if dev:
+        source_dir = _resolve_dev_source()
+        static_dir = _DEV_STATIC_DIR
+        log_info(f"Dev mode: building from {source_dir}")
+    else:
+        source_dir = _get_ui_source_dir()
+        static_dir = _STATIC_DIR
 
     if no_build:
         if not (static_dir / "index.html").exists():
@@ -120,13 +146,17 @@ def maybe_build_ui(no_build: bool, reinstall: bool) -> Path:
             )
         return static_dir
 
-    if not needs_rebuild(source_dir, static_dir, reinstall):
+    if not dev and not needs_rebuild(source_dir, static_dir, reinstall):
         log_info("Web UI is up to date, skipping build.")
         return static_dir
 
     log_info("Building web UI (source changed)...")
-    workdir = _BUILD_WORKDIR
-    sync_source_to_workdir(source_dir, workdir)
+    if dev:
+        # Build directly from repo source — no copy needed
+        workdir = source_dir
+    else:
+        workdir = _BUILD_WORKDIR
+        sync_source_to_workdir(source_dir, workdir)
     static_dir.mkdir(parents=True, exist_ok=True)
     _run_npm_build(workdir, static_dir)
 

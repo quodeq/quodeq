@@ -66,6 +66,7 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
         os.close(fd)
         closed = True
         os.replace(tmp_path, str(paths.env_file))
+        os.chmod(str(paths.env_file), 0o600)
     except BaseException:
         if not closed:
             os.close(fd)

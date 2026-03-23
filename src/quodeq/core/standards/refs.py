@@ -70,6 +70,26 @@ def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -
     return lookup
 
 
+def load_compiled_refs_multi(
+    compiled_dir: str | Path | None, dimensions: list[str],
+) -> dict[str, list[dict]]:
+    """Load refs for multiple dimensions, merging into a single lookup."""
+    merged: dict[str, list[dict]] = {}
+    for dim in dimensions:
+        merged.update(load_compiled_refs(compiled_dir, dim))
+    return merged
+
+
+def load_compiled_requirements_multi(
+    compiled_dir: str | Path | None, dimensions: list[str],
+) -> dict[str, dict]:
+    """Load requirements for multiple dimensions, merging into a single lookup."""
+    merged: dict[str, dict] = {}
+    for dim in dimensions:
+        merged.update(load_compiled_requirements(compiled_dir, dim))
+    return merged
+
+
 def load_compiled_requirements(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, dict]:
     """Load {req_id: {principle, text}} from compiled standards.
 

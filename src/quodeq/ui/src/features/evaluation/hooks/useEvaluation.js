@@ -5,6 +5,54 @@ const DIMENSION_POLL_MS = 2000;
 const JOB_POLL_MS = 1500;
 const MAX_DIM_POLL_FAILURES = 10;
 
+function stopTimer(ref) {
+  if (ref.current) {
+    clearInterval(ref.current);
+    ref.current = null;
+  }
+}
+
+async function pollSingleDimension(dim, project, runId, refs, setLiveViolations) {
+  try {
+    const data = await getDimensionEval(project, runId, dim);
+    refs.dimFailCount[dim] = 0;
+    if (data?.violations) {
+      setLiveViolations(prev => ({ ...prev, [dim]: data.violations }));
+      if (!data.partial) {
+        refs.partialDimensions.delete(dim);
+      }
+    }
+  } catch (err) {
+    console.debug('Dimension poll failed:', dim, err);
+    const fails = (refs.dimFailCount[dim] || 0) + 1;
+    refs.dimFailCount[dim] = fails;
+    if (fails > MAX_DIM_POLL_FAILURES) refs.partialDimensions.delete(dim);
+  }
+}
+
+function handleJobUpdate(updated, refs, setJob, callbacks) {
+  setJob((prev) => ({ ...updated, repo: prev?.repo }));
+  if (updated.dimensions?.length && !refs.requestedDimensions.length) {
+    refs.requestedDimensions = updated.dimensions;
+  }
+  if (updated.phase === 'analyzing' && updated.currentDimension) {
+    refs.partialDimensions.add(updated.currentDimension);
+  }
+  const hasOutput = updated.outputProject && updated.outputRunId;
+  const isAnalyzing = updated.phase === 'analyzing' || updated.phase === 'scoring' || updated.status !== 'running';
+  const canPollDims = hasOutput && isAnalyzing;
+  if (updated.status !== 'running') {
+    callbacks.stopPolling();
+    if (canPollDims && !refs.dimPollingStarted) {
+      refs.dimPollingStarted = true;
+      callbacks.startDimPolling(updated.outputProject, updated.outputRunId);
+    }
+  } else if (canPollDims && !refs.dimPollingStarted) {
+    refs.dimPollingStarted = true;
+    callbacks.startDimPolling(updated.outputProject, updated.outputRunId);
+  }
+}
+
 export function useEvaluation() {
   const [job, setJob] = useState(null);
   const [jobError, setJobError] = useState('');
@@ -18,7 +66,6 @@ export function useEvaluation() {
   const dimFailCountRef = useRef({});
 
   useEffect(() => {
-    // Discover any running evaluation (e.g. started in another tab)
     listEvaluations()
       .then((jobs) => {
         const running = jobs.find((j) => j.status === 'running');
@@ -29,8 +76,8 @@ export function useEvaluation() {
       })
       .catch((err) => console.warn('Failed to fetch running evaluations:', err));
     return () => {
-      stopPolling();
-      stopDimensionPolling();
+      stopTimer(pollRef);
+      stopTimer(dimPollRef);
     };
   }, []);
 
@@ -38,84 +85,39 @@ export function useEvaluation() {
     liveViolationsRef.current = liveViolations;
   }, [liveViolations]);
 
-
-  function stopPolling() {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  }
-
-  function stopDimensionPolling() {
-    if (dimPollRef.current) {
-      clearInterval(dimPollRef.current);
-      dimPollRef.current = null;
-    }
-  }
-
   function startDimensionPolling(project, runId) {
-    stopDimensionPolling();
+    stopTimer(dimPollRef);
     dimFailCountRef.current = {};
+    const refs = { dimFailCount: dimFailCountRef.current, partialDimensions: partialDimensionsRef.current };
     dimPollRef.current = setInterval(async () => {
-      // Only poll dimensions that are still partial (stream-based)
       const partial = [...partialDimensionsRef.current];
       if (!partial.length) return;
-
       await Promise.allSettled(
-        partial.map(async (dim) => {
-          try {
-            const data = await getDimensionEval(project, runId, dim);
-            dimFailCountRef.current[dim] = 0;
-            if (data?.violations) {
-              setLiveViolations(prev => ({ ...prev, [dim]: data.violations }));
-              if (!data.partial) {
-                // Final scored result — stop polling this dimension
-                partialDimensionsRef.current.delete(dim);
-              }
-            }
-          } catch {
-            const fails = (dimFailCountRef.current[dim] || 0) + 1;
-            dimFailCountRef.current[dim] = fails;
-            if (fails > MAX_DIM_POLL_FAILURES) partialDimensionsRef.current.delete(dim);
-          }
-        })
+        partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
       );
     }, DIMENSION_POLL_MS);
   }
 
   function startPolling(jobId) {
-    stopPolling();
-    let dimPollingStarted = false;
+    stopTimer(pollRef);
+    const refs = {
+      requestedDimensions: requestedDimensionsRef.current,
+      partialDimensions: partialDimensionsRef.current,
+      dimPollingStarted: false,
+    };
+    const callbacks = {
+      stopPolling: () => stopTimer(pollRef),
+      startDimPolling: startDimensionPolling,
+    };
     pollRef.current = setInterval(async () => {
       try {
         const updated = await getEvaluation(jobId);
-        setJob((prev) => ({ ...updated, repo: prev?.repo }));
-        // Use dimensions list from job (emitted during setup phase)
-        if (updated.dimensions?.length && !requestedDimensionsRef.current.length) {
-          requestedDimensionsRef.current = updated.dimensions;
-        }
-        // When a dimension enters analyzing phase, start polling it
-        if (updated.phase === 'analyzing' && updated.currentDimension) {
-          partialDimensionsRef.current.add(updated.currentDimension);
-        }
-        const hasOutput = updated.outputProject && updated.outputRunId;
-        const canPollDims = hasOutput && (updated.phase === 'analyzing' || updated.phase === 'scoring' || updated.status !== 'running');
-        if (updated.status !== 'running') {
-          stopPolling();
-          if (canPollDims && !dimPollingStarted) {
-            dimPollingStarted = true;
-            startDimensionPolling(updated.outputProject, updated.outputRunId);
-          }
-        } else if (canPollDims && !dimPollingStarted) {
-          dimPollingStarted = true;
-          startDimensionPolling(updated.outputProject, updated.outputRunId);
-        }
+        handleJobUpdate(updated, refs, setJob, callbacks);
       } catch (err) {
-        // Job no longer tracked (e.g. server restarted) — mark as lost
         setJob((prev) => prev ? { ...prev, status: 'lost' } : prev);
         setJobError(err.message);
-        stopPolling();
-        stopDimensionPolling();
+        stopTimer(pollRef);
+        stopTimer(dimPollRef);
       }
     }, JOB_POLL_MS);
   }
@@ -129,6 +131,10 @@ export function useEvaluation() {
     liveViolationsRef.current = {};
     partialDimensionsRef.current = new Set();
     setLiveViolations({});
+    const maxSubagents = parseInt(localStorage.getItem('cc-max-subagents') || '5', 10);
+    if (maxSubagents !== 5) payload.maxSubagents = maxSubagents;
+    const poolBudget = parseInt(localStorage.getItem('cc-pool-budget') || '600', 10);
+    if (poolBudget !== 600) payload.poolBudget = poolBudget;
     try {
       const created = await startEvaluation(payload);
       setJob({ ...created, repo: payload.repo });
@@ -139,8 +145,8 @@ export function useEvaluation() {
   }
 
   function clearJob() {
-    stopPolling();
-    stopDimensionPolling();
+    stopTimer(pollRef);
+    stopTimer(dimPollRef);
     setJob(null);
     setJobError('');
     setLiveViolations({});

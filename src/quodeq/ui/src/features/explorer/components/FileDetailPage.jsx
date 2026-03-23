@@ -109,6 +109,30 @@ function ViolationCard({ v, index }) {
   );
 }
 
+function FileSeverityStats({ file, totalViolations, dimensionsCount }) {
+  return (
+    <div className="file-detail-stats">
+      {file.critical > 0 && (
+        <span className="file-detail-stat severity-tag critical">{file.critical} critical</span>
+      )}
+      {file.major > 0 && (
+        <span className="file-detail-stat severity-tag major">{file.major} major</span>
+      )}
+      {file.minor > 0 && (
+        <span className="file-detail-stat severity-tag minor">{file.minor} minor</span>
+      )}
+      {(file.critical > 0 || file.major > 0 || file.minor > 0) && <span className="file-detail-stat-sep">·</span>}
+      <span className="file-detail-stat">
+        <strong>{totalViolations}</strong> violations
+      </span>
+      <span className="file-detail-stat-sep">·</span>
+      <span className="file-detail-stat">
+        <strong>{dimensionsCount}</strong> {dimensionsCount === 1 ? 'dimension' : 'dimensions'}
+      </span>
+    </div>
+  );
+}
+
 const FileDetailPage = memo(function FileDetailPage({ file }) {
   const totalViolations = file.total || 0;
   const dimensionsCount = file.dimensionsCount || 0;
@@ -118,25 +142,7 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
       <section className="panel file-detail-summary-panel">
         <h3 className="file-detail-title">{file.file}</h3>
         <div className="file-detail-stats-row">
-          <div className="file-detail-stats">
-            {file.critical > 0 && (
-              <span className="file-detail-stat severity-tag critical">{file.critical} critical</span>
-            )}
-            {file.major > 0 && (
-              <span className="file-detail-stat severity-tag major">{file.major} major</span>
-            )}
-            {file.minor > 0 && (
-              <span className="file-detail-stat severity-tag minor">{file.minor} minor</span>
-            )}
-            {(file.critical > 0 || file.major > 0 || file.minor > 0) && <span className="file-detail-stat-sep">·</span>}
-            <span className="file-detail-stat">
-              <strong>{totalViolations}</strong> violations
-            </span>
-            <span className="file-detail-stat-sep">·</span>
-            <span className="file-detail-stat">
-              <strong>{dimensionsCount}</strong> {dimensionsCount === 1 ? 'dimension' : 'dimensions'}
-            </span>
-          </div>
+          <FileSeverityStats file={file} totalViolations={totalViolations} dimensionsCount={dimensionsCount} />
           <CopyButton
             label="File fix plan"
             onClick={() => copyToClipboard(buildFilePlanText(file))}

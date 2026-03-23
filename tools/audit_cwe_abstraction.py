@@ -205,6 +205,9 @@ def main() -> None:
     )
     args = parser.parse_args()
     api_base: str = args.api_base
+    if api_base is not None and not api_base.startswith(("http://", "https://")):
+        print(f"Error: --api-base must start with http:// or https://, got: {api_base}", file=sys.stderr)
+        sys.exit(1)
 
     cwe_dims = get_all_cwes(args.standards_dir)
     print(f"Total unique CWEs in ISO 25010 files: {len(cwe_dims)}\n")

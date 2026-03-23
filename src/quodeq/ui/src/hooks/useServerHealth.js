@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getHealth } from '../api/index.js';
+import { SERVER_BASE_URL } from '../config.js';
 
 /**
  * Monitors server connectivity, polling every 5 seconds.
@@ -9,10 +10,9 @@ import { getHealth } from '../api/index.js';
  * Returns [serverConnected, setServerConnected].
  */
 const DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183];
-const DEFAULT_BASE_URL = 'http://127.0.0.1';
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
 
-export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAULT_BASE_URL } = {}) {
+export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER_BASE_URL } = {}) {
   const [serverConnected, setServerConnected] = useState(true);
 
   useEffect(() => {
@@ -25,18 +25,23 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAUL
       } catch {
         // Server unreachable on current origin — check if it moved to another port
         const currentPort = window.location.port;
-        for (const port of altPorts) {
-          if (String(port) === currentPort) continue;
-          try {
+        const candidates = altPorts.filter(p => String(p) !== currentPort);
+        const results = await Promise.allSettled(
+          candidates.map(async (port) => {
             const ac = new AbortController();
             const tid = setTimeout(() => ac.abort(), HEALTH_CHECK_TIMEOUT_MS);
-            const res = await fetch(`${baseUrl}:${port}/api/health`, { signal: ac.signal });
-            clearTimeout(tid);
-            if (res.ok) {
-              window.location.href = `${baseUrl}:${port}`;
-              return;
-            }
-          } catch { /* try next */ }
+            try {
+              const res = await fetch(`${baseUrl}:${port}/api/health`, { signal: ac.signal });
+              clearTimeout(tid);
+              if (res.ok) return port;
+            } catch { clearTimeout(tid); }
+            return null;
+          })
+        );
+        const found = results.find(r => r.status === 'fulfilled' && r.value !== null);
+        if (found) {
+          window.location.href = `${baseUrl}:${found.value}`;
+          return;
         }
         if (mounted) setServerConnected(false);
       }

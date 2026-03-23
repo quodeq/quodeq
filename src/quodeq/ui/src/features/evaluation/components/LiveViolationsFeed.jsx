@@ -1,41 +1,12 @@
-import { useState } from 'react';
-import { copyToClipboard } from '../../../utils/clipboard.js';
+import { useState, useMemo } from 'react';
+import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
 
-const COPY_FEEDBACK_MS = 1500;
 const ANIM_DELAY_PER_ITEM_MS = 40;
 const ANIM_MAX_DELAY_MS = 400;
 
 function severityOrder(s) {
   return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
-}
-
-function CopyIcon() {
-  return (
-    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-      <rect x="9" y="9" width="13" height="13" rx="2" />
-      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
-    </svg>
-  );
-}
-
-function FileCopyBtn({ display, copyText }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    <button
-      type="button"
-      className="vlive-detail-file-btn"
-      onClick={(e) => {
-        e.stopPropagation();
-        copyToClipboard(copyText);
-        setCopied(true);
-        setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-      }}
-    >
-      {copied ? 'Copied!' : display}
-      <CopyIcon />
-    </button>
-  );
 }
 
 function ViolationLiveRow({ violation, index }) {
@@ -102,6 +73,17 @@ function ViolationLiveRow({ violation, index }) {
 export default function LiveViolationsFeed({ liveViolations }) {
   const dims = Object.keys(liveViolations ?? {});
   const totalCount = dims.reduce((sum, d) => sum + (liveViolations[d]?.length ?? 0), 0);
+
+  const sortedByDim = useMemo(() => {
+    const result = {};
+    for (const dim of Object.keys(liveViolations ?? {})) {
+      result[dim] = [...(liveViolations[dim] ?? [])].sort((a, b) =>
+        severityOrder(a.severity) - severityOrder(b.severity)
+      );
+    }
+    return result;
+  }, [liveViolations]);
+
   if (!totalCount) return null;
 
   return (
@@ -110,9 +92,7 @@ export default function LiveViolationsFeed({ liveViolations }) {
         {totalCount} violation{totalCount !== 1 ? 's' : ''} found across {dims.length} dimension{dims.length !== 1 ? 's' : ''}
       </div>
       {dims.map(dim => {
-        const violations = [...(liveViolations[dim] ?? [])].sort((a, b) =>
-          severityOrder(a.severity) - severityOrder(b.severity)
-        );
+        const violations = sortedByDim[dim] || [];
         return (
           <div key={dim} className="vlive-dimension-group">
             <div className="vlive-dimension-label">{dim}</div>

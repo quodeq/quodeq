@@ -5,69 +5,9 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
-import { formatRunId, gradeColorClass, scoreColorClass, splitScore, mostFrequentGrade } from '../../../utils/formatters.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function buildRunSummary(dimensions) {
-  if (!dimensions || dimensions.length === 0) {
-    return {
-      overallGrade: '-',
-      numericAverage: null,
-      totalViolations: 0,
-      totalCompliance: 0,
-      dimensionCount: 0,
-      severity: { critical: 0, major: 0, minor: 0 },
-    };
-  }
-
-  const grades = dimensions.map((d) => d.overallGrade).filter(Boolean);
-  const scores = dimensions.map((d) => parseFloat(d.overallScore)).filter((s) => !isNaN(s));
-  const numericAverage =
-    scores.length > 0
-      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
-      : null;
-
-  return {
-    overallGrade: mostFrequentGrade(grades) || '-',
-    numericAverage,
-    totalViolations: dimensions.reduce((sum, d) => sum + (d.totals?.violationCount || 0), 0),
-    totalCompliance: dimensions.reduce((sum, d) => sum + (d.totals?.complianceCount || 0), 0),
-    dimensionCount: dimensions.length,
-    severity: {
-      critical: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.critical || 0), 0),
-      major: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.major || 0), 0),
-      minor: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.minor || 0), 0),
-    },
-  };
-}
-
-function withDimensionsStr(files) {
-  return files.map((f) => ({
-    ...f,
-    dimensionsStr: f.dimensions?.length > 0 ? f.dimensions.join(', ') : '',
-  }));
-}
-
-function sortDimensionsByViolationSeverity(dimensions) {
-  return [...dimensions]
-    .filter((d) => (d.violations || []).length > 0)
-    .map((d) => {
-      const counts = { critical: 0, major: 0, minor: 0 };
-      (d.violations || []).forEach((v) => {
-        const s = (v.severity || 'minor').toLowerCase();
-        if (counts[s] !== undefined) counts[s]++;
-      });
-      return { ...d, _c: counts };
-    })
-    .sort((a, b) => {
-      if (b._c.critical !== a._c.critical) return b._c.critical - a._c.critical;
-      if (b._c.major !== a._c.major) return b._c.major - a._c.major;
-      return b._c.minor - a._c.minor;
-    });
-}
+import { formatRunId, gradeColorClass, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
+import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
+import buildRunSummary from '../buildRunSummary.js';
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -98,12 +38,7 @@ function StatsGrid({ runSummary }) {
       <div className="acc-eval-stat-block">
         <span className="acc-eval-stat-label">Ratio</span>
         <span className="acc-eval-stat-value">
-          {(() => {
-            const v = runSummary.totalViolations || 0;
-            const c = runSummary.totalCompliance || 0;
-            if (v === 0) return '\u2014';
-            return `1:${Math.round(c / v)}`;
-          })()}
+          {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
         </span>
       </div>
       <div className="acc-eval-stat-block">
@@ -169,8 +104,8 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
 
   const runScoreDelta = useMemo(() => {
     const trendSeries = dashboard?.trend || [];
-    const selectedRunId = dashboard?.selectedRun?.runId;
-    const idx = trendSeries.findIndex((t) => t.runId === selectedRunId);
+    const currentRunId = dashboard?.selectedRun?.runId;
+    const idx = trendSeries.findIndex((t) => t.runId === currentRunId);
     if (idx < 0 || idx + 1 >= trendSeries.length) return null;
     const curr = parseFloat(trendSeries[idx].numericAverage);
     const prev = parseFloat(trendSeries[idx + 1].numericAverage);
@@ -237,6 +172,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
               const prevScore = parseFloat(item.previousScore);
               const delta =
                 !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
+              const scored = splitScore(item.overallScore);
               return (
                 <article
                   key={item.dimension}
@@ -254,10 +190,10 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
                   </div>
                   <div className="qd-card-score-row">
                     <span className="qd-card-score-main">
-                      <span className="qd-card-score">{splitScore(item.overallScore).value}</span>
-                      {splitScore(item.overallScore).denom && (
+                      <span className="qd-card-score">{scored.value}</span>
+                      {scored.denom && (
                         <span className="qd-card-score-denom">
-                          {splitScore(item.overallScore).denom}
+                          {scored.denom}
                         </span>
                       )}
                     </span>

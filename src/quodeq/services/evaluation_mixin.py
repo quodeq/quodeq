@@ -69,6 +69,10 @@ def _build_evaluate_cmd(
             cmd += ["-d", str(options.dimensions)]
     if options.numerical:
         cmd += ["-m", "numerical"]
+    if options.max_subagents != 5:
+        cmd += ["--n-subagents", str(options.max_subagents)]
+    if options.incremental:
+        cmd += ["--incremental"]
     return cmd
 
 
@@ -113,6 +117,8 @@ class FsEvaluationMixin:
             env["SUBAGENT_MODEL"] = options.subagent_model
         if not options.verify_findings:
             env["QUODEQ_NO_VERIFY"] = "1"
+        if options.pool_budget != 600:
+            env["QUODEQ_POOL_BUDGET"] = str(options.pool_budget)
         return env
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:

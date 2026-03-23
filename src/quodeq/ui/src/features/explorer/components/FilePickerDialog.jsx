@@ -5,8 +5,8 @@ export default function FilePickerDialog({ files, selectedFile, onSelect, onClos
 
   const needle = search.trim().toLowerCase();
   const filtered = needle
-    ? files.filter((f) => f.toLowerCase().includes(needle))
-    : files;
+    ? (files || []).filter((f) => f.toLowerCase().includes(needle))
+    : (files || []);
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>

@@ -129,7 +129,11 @@ def _extract_scores(scores: ScoringResult | dict | None) -> tuple[dict, dict]:
 
 
 def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
-    """Build a complete JSON report dict from evidence and scoring data for one dimension."""
+    """Build a complete JSON report dict from evidence and scoring data for one dimension.
+
+    Parameter count is intentional: dimension identity, raw evidence, and
+    scoring result are each a distinct pipeline output with no shared container.
+    """
     per_principle_scores, aggregate = _extract_scores(scores)
     lookup = _build_score_lookup(per_principle_scores)
     principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
@@ -200,8 +204,7 @@ def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: 
     dashboard_report = build_dashboard_report(evidence, scores)
 
     dim = evidence.language
-    if ".." in dim or "/" in dim or "\\" in dim:
-        raise ValueError(f"Invalid language for report output: {dim!r}")
+    validate_path_segment(dim)
     try:
         (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
         (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))

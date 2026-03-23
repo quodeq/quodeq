@@ -1,8 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
-import { useEvaluation } from './features/evaluation/hooks/useEvaluation.js';
-import { getLevels, STORAGE_KEY as POWER_KEY } from './features/evaluation/components/powerLevels.js';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
@@ -19,8 +17,80 @@ import { useNavStack } from './hooks/useNavStack.js';
 import { useRunNavigator } from './hooks/useRunNavigator.js';
 import { useProjectState } from './hooks/useProjectState.js';
 import { useAppSettings } from './hooks/useAppSettings.js';
+import { useEvaluationLifecycle } from './hooks/useEvaluationLifecycle.js';
 
 
+function MainContent({
+  activePage, selectedProject, selectedRun, projects,
+  handleNavigate, handleRunSelect, dashboard, accumulated, loading, error,
+  availableRuns, overviewRunIndex, job, jobError, liveViolations,
+  analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
+  settings, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject,
+  serverConnected, setServerConnected,
+}) {
+  const { page, ...params } = activePage;
+  switch (page) {
+    case 'overview':
+    case 'run':
+      return (
+        <DashboardPage
+          data={{
+            selectedProject, selectedRun, projects,
+            dashboard, accumulated, loading, error,
+            availableRuns, overviewRunIndex,
+          }}
+          callbacks={{
+            onNavigate: handleNavigate,
+            onRunSelect: page === 'overview' ? handleRunSelect : undefined,
+          }}
+          runMode={page === 'run'}
+        />
+      );
+    case 'explorer':
+      return <ExplorerPage project={selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={handleNavigate} />;
+    case 'evaluate':
+      return (
+        <>
+          {!serverConnected && <ServerDisconnectedOverlay onReconnect={() => setServerConnected(true)} />}
+          <EvaluateScreen
+            evaluation={{ job, jobError, liveViolations }}
+            context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
+            actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
+          />
+        </>
+      );
+    case 'file':
+      return <FileDetailPage file={params.file} />;
+    case 'principle':
+      return <PrincipleDetailPage principle={params.principle} />;
+    case 'evalprinciple':
+    case 'eval-principle-detail':
+      return <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />;
+    case 'settings':
+      return (
+        <SettingsPage
+          theme={{ preference: settings.themePreference, onApply: settings.applyTheme }}
+          models={{
+            aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
+            aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
+            fast: settings.modelFast, onFastChange: settings.setModelFast,
+            balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
+            thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
+          }}
+          analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
+          verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
+        />
+      );
+    case 'projects':
+      return <ProjectsPage projects={projects} selectedProject={selectedProject} onSelect={(id) => { handleProjectChange(id); navTab('overview'); }} onDelete={handleDeleteProject} onExport={handleExportProject} onRelocate={handleRelocateProject} />;
+    default:
+      return <div className="empty-state"><p>Page not found: {page}</p></div>;
+  }
+}
+
+// App is the root component and naturally aggregates all application hooks.
+// The hook count is proportional to the app's feature set and is not worth
+// refactoring into sub-providers for a project of this size.
 export default function App() {
   const [serverConnected, setServerConnected] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
@@ -134,37 +204,13 @@ export default function App() {
   }, [selectedProject, projects]);
 
   // Evaluation
-  const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
-  const [analysisPower, setAnalysisPower] = useState(() => {
-    try { return Number(localStorage.getItem(POWER_KEY)) || 2; } catch (e) { console.warn('localStorage unavailable:', e); return 2; }
+  const {
+    job, jobError, liveViolations,
+    analysisPower, setAnalysisPower,
+    handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
+  } = useEvaluationLifecycle({
+    settings, navTab, loadProjects, setProjects, selectProjectAndRun, navReset,
   });
-
-  const prevJobRef = useRef(null);
-  useEffect(() => {
-    if (job?.status === 'running' && !prevJobRef.current) navTab('evaluate');
-    prevJobRef.current = job;
-  }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleStartEvaluation(payload) {
-    const levels = getLevels();
-    const subagentModel = levels.find(l => l.level === analysisPower)?.model;
-    startEvaluation({ ...payload, aiCmd: settings.aiCmd || undefined, aiModel: settings.aiModel || undefined, subagentModel, verifyFindings: settings.verifyFindings });
-  }
-
-  function handleEvalDismiss(action) {
-    if (action === 'view') {
-      const project = job?.outputProject;
-      const runId = job?.outputRunId;
-      if (project) {
-        loadProjects()
-          .then((list) => setProjects(list))
-          .catch((err) => console.error('Operation failed:', err));
-        selectProjectAndRun(project, runId);
-      }
-      navReset();
-    }
-    clearJob();
-  }
 
   // Active tab / header visibility
   const activeTab = ['overview', 'projects', 'evaluate', 'settings'].includes(activePage.page)
@@ -173,79 +219,44 @@ export default function App() {
   const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
   const onViewRun = activePage.page === 'overview' ? handleRunView : undefined;
 
-  // Content renderer
-  function renderContent() {
-    const { page, ...params } = activePage;
-    switch (page) {
-      case 'overview':
-      case 'run':
-        return (
-          <DashboardPage
-            selectedProject={selectedProject} selectedRun={selectedRun} projects={projects}
-            onNavigate={handleNavigate} onRunSelect={page === 'overview' ? handleRunSelect : undefined}
-            dashboard={dashboard} accumulated={accumulated} loading={loading} error={error}
-            availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
-            runMode={page === 'run'}
-          />
-        );
-      case 'explorer':
-        return <ExplorerPage project={selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={handleNavigate} />;
-      case 'evaluate':
-        return (
-          <EvaluateScreen
-            evaluation={{ job, jobError, liveViolations }}
-            context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
-            actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
-          />
-        );
-      case 'file':
-        return <FileDetailPage file={params.file} />;
-      case 'principle':
-        return <PrincipleDetailPage principle={params.principle} />;
-      case 'evalprinciple':
-      case 'eval-principle-detail':
-        return <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />;
-      case 'settings':
-        return (
-          <SettingsPage
-            theme={{ preference: settings.themePreference, onApply: settings.applyTheme }}
-            models={{
-              aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
-              aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
-              fast: settings.modelFast, onFastChange: settings.setModelFast,
-              balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
-              thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
-            }}
-            analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
-            verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
-          />
-        );
-      case 'projects':
-        return <ProjectsPage projects={projects} selectedProject={selectedProject} onSelect={(id) => { handleProjectChange(id); navTab('overview'); }} onDelete={handleDeleteProject} onExport={handleExportProject} onRelocate={handleRelocateProject} />;
-      default:
-        return <div className="empty-state"><p>Page not found: {page}</p></div>;
-    }
-  }
-
   return (
     <div className="app-shell">
-      {!serverConnected && <ServerDisconnectedOverlay onReconnect={() => setServerConnected(true)} />}
       <Sidebar activeTab={activeTab} onNavTab={navTab} />
       <main className="dashboard">
         {showProjectHeader && (
           <ProjectHeader
-            selectedDisplayName={selectedDisplayName} selectedProjectParent={selectedProjectParent}
-            selectedProjectParentId={selectedProjectParentId} onProjectChange={handleProjectChange}
-            headerMeta={headerMeta} showRunNav={showRunNav}
-            runNavProps={{
-              currentOverviewRun, overviewRunIndex, availableRuns,
-              onRunPrev: handleRunPrev, onRunNext: handleRunNext,
-              onRunLatest: handleRunLatest, onViewRun: onViewRun,
+            project={{
+              displayName: selectedDisplayName,
+              parent: selectedProjectParent,
+              parentId: selectedProjectParentId,
+              meta: headerMeta,
+            }}
+            navigation={{
+              onProjectChange: handleProjectChange,
+              showRunNav,
+              runNavProps: {
+                currentOverviewRun, overviewRunIndex, availableRuns,
+                onRunPrev: handleRunPrev, onRunNext: handleRunNext,
+                onRunLatest: handleRunLatest, onViewRun: onViewRun,
+              },
             }}
           />
         )}
         {navStack.length > 1 && <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} />}
-        {renderContent()}
+        <MainContent
+          activePage={activePage}
+          selectedProject={selectedProject} selectedRun={selectedRun} projects={projects}
+          handleNavigate={handleNavigate} handleRunSelect={handleRunSelect}
+          dashboard={dashboard} accumulated={accumulated} loading={loading} error={error}
+          availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
+          job={job} jobError={jobError} liveViolations={liveViolations}
+          analysisPower={analysisPower} setAnalysisPower={setAnalysisPower}
+          handleStartEvaluation={handleStartEvaluation} handleEvalDismiss={handleEvalDismiss} cancelEvaluation={cancelEvaluation}
+          settings={settings}
+          handleProjectChange={handleProjectChange} navTab={navTab}
+          handleDeleteProject={handleDeleteProject} handleExportProject={handleExportProject} handleRelocateProject={handleRelocateProject}
+          serverConnected={serverConnected} setServerConnected={setServerConnected}
+        />
       </main>
     </div>
   );

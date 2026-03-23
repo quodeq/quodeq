@@ -5,9 +5,7 @@ Merge per-dimension Evidence into a single Evidence object.
 """
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +22,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.engine._runner_markers import CC_MARKER_KEY, cleanup_stream, emit_marker, make_heartbeat
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
-from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
+from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
 from quodeq.shared.logging import log_info, log_success, log_warning
 from quodeq.shared.validation import validate_path_segment
@@ -39,9 +37,13 @@ class AnalysisOptions:
     dimensions: list[str] | None = None
     max_turns: int | None = None
     max_duration: int | None = None
-    n_subagents: int = 1
+    max_subagents: int = 1
     subagent_model: str | None = None
-    verify_findings: bool = False
+    verify_findings: bool = True
+    consolidated: bool = True
+    pool_budget: int | None = None
+    incremental: bool = False
+    incremental_file_filter: set[str] | None = None
 
 
 @dataclass
@@ -121,6 +123,8 @@ def _run_dimension_analysis(
         ac_kwargs["max_turns"] = config.options.max_turns
     if config.options.max_duration is not None:
         ac_kwargs["max_duration"] = config.options.max_duration
+    if config.options.pool_budget is not None:
+        ac_kwargs["pool_budget"] = config.options.pool_budget
     run_analysis(
         work_dir=config.src,
         prompt=prompt,
@@ -168,55 +172,23 @@ def _parse_dimension_evidence(
     return ev
 
 
-def _process_dimension_with_subagents(
-    config: RunConfig, dim_id: str, idx: int, ctx: _AnalysisContext,
-) -> Evidence | None:
-    """Run dimension analysis using N parallel subagents (delegates to _subagent_runner)."""
-    return process_dimension_with_subagents(
-        config, dim_id, idx, ctx,
-        callbacks=DimensionCallbacks(
-            build_prompt=_build_dimension_prompt,
-            run_analysis=_run_dimension_analysis,
-            parse_evidence=_parse_dimension_evidence,
-        ),
-    )
-
-
 def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
     """Load dimensions data and resolve which dimensions to analyze."""
-    dims_data = config.dimensions_data
-    if dims_data is None:
-        raise ValueError("RunConfig.dimensions_data is required")
-
-    all_dims_raw = [d.get("id") for d in dims_data.get("applies", []) if d.get("id")]
-    if config.options.dimensions:
-        all_dims_set = set(all_dims_raw)
-        unknown = [d for d in config.options.dimensions if d not in all_dims_set]
-        if unknown:
-            log_warning(f"Unknown dimensions ignored: {', '.join(unknown)}. "
-                        f"Available: {', '.join(all_dims_raw)}")
-        dimensions = [d for d in all_dims_raw if d in config.options.dimensions]
-        if not dimensions:
-            raise ValueError(
-                f"No valid dimensions selected. "
-                f"Requested: {', '.join(config.options.dimensions)}. "
-                f"Available: {', '.join(all_dims_raw)}"
-            )
-    else:
-        dimensions = all_dims_raw
-
-    ctx = _AnalysisContext(
-        dimensions_data=dims_data,
-        date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        template=load_template(config.options.template_path),
-        subagent_template=load_template(template_name="subagent.md"),
-        total=len(dimensions),
-    )
-    return dimensions, ctx
+    from quodeq.analysis._incremental import load_analysis_context as _load_ctx
+    return _load_ctx(config)
 
 
 class EvaluationError(RuntimeError):
     """Raised when an evaluation completes but produces no usable findings."""
+
+
+def _save_dimension_fingerprint(
+    config: RunConfig, dimension: str, files: list[str] | None = None,
+    analyzed_files: set[str] | None = None,
+) -> None:
+    """Save a fingerprint after any successful dimension analysis."""
+    from quodeq.analysis._incremental import save_dimension_fingerprint
+    save_dimension_fingerprint(config, dimension, files, analyzed_files)
 
 
 def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) -> None:
@@ -229,13 +201,22 @@ def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) ->
 
 def _process_single_dimension(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
+    *, emit_log: bool = True,
 ) -> Evidence | None:
     """Analyze a single dimension: build prompt, run AI, parse evidence."""
-    emit_marker("analyzing", dimension=dimension)
-    log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
+    if emit_log:
+        emit_marker("analyzing", dimension=dimension)
+        log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
-    if config.options.n_subagents > 1:
-        ev = _process_dimension_with_subagents(config, dimension, idx, ctx)
+    if config.options.max_subagents > 1:
+        ev = process_dimension_with_subagents(
+            config, dimension, idx, ctx,
+            callbacks=DimensionCallbacks(
+                build_prompt=_build_dimension_prompt,
+                run_analysis=_run_dimension_analysis,
+                parse_evidence=_parse_dimension_evidence,
+            ),
+        )
     else:
         prompt = _build_dimension_prompt(config, dimension, ctx)
         stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
@@ -245,42 +226,51 @@ def _process_single_dimension(
         log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
         return None
 
-    _log_dimension_result(ev, dimension, idx, ctx.total)
+    _save_dimension_fingerprint(config, dimension)
+    if emit_log:
+        _log_dimension_result(ev, dimension, idx, ctx.total)
     return ev
+
+
+def _run_dimension_incremental(
+    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
+) -> Evidence | None:
+    """Incremental path: detect changes, carry forward, analyze only changed files."""
+    from quodeq.analysis._incremental import run_dimension_incremental
+    return run_dimension_incremental(config, dimension, idx, ctx)
 
 
 def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
+    from quodeq.analysis._incremental import (
+        run_incremental_loop, run_per_dimension_loop,
+    )
+
     dimensions, ctx = load_analysis_context(config)
-    result: dict[str, Evidence] = {}
+
+    if config.options.incremental:
+        emit_marker("setup", dimensions=dimensions)
+        return run_incremental_loop(config, dimensions, ctx)
+
     emit_marker("setup", dimensions=dimensions)
-    skipped_count = 0
 
-    for idx, dimension in enumerate(dimensions, 1):
+    # Consolidated mode: evaluate all dimensions in one pass
+    if (config.options.consolidated
+            and len(dimensions) > 1
+            and config.options.max_subagents > 1):
+        from quodeq.analysis.subagents.runner import process_consolidated_dimensions
         try:
-            ev = _process_single_dimension(config, dimension, idx, ctx)
-        except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} — failed: {exc}")
-            skipped_count += 1
-            continue
-        if ev is None:
-            skipped_count += 1
-            continue
-        result[dimension] = ev
+            result = process_consolidated_dimensions(config, dimensions, ctx)
+            if result:
+                for dim, ev in result.items():
+                    idx = dimensions.index(dim) + 1 if dim in dimensions else 0
+                    _log_dimension_result(ev, dim, idx, len(dimensions))
+                return result
+            log_warning("Consolidated mode produced no results, falling back to per-dimension")
+        except (OSError, KeyError, ValueError, RuntimeError) as exc:
+            log_warning(f"Consolidated mode failed: {exc}, falling back to per-dimension")
 
-    if result and config.source_file_count > 0:
-        total_findings = sum(
-            sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
-            for ev in result.values()
-        )
-        if total_findings == 0:
-            raise EvaluationError(
-                f"Evaluation produced 0 findings across {len(result)} dimensions "
-                f"({skipped_count} skipped). This usually means the AI CLI could not "
-                f"read files or report findings — check tool permissions and MCP configuration."
-            )
-
-    return result
+    return run_per_dimension_loop(config, dimensions, ctx)
 
 
 def run(config: RunConfig) -> Evidence:

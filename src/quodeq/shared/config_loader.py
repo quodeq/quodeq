@@ -73,6 +73,17 @@ def _get_config() -> Config:
     return _config_instance
 
 
+def _reset_config_for_testing() -> None:
+    """Clear the singleton so the next ``_get_config()`` call reloads from disk.
+
+    Intended **only** for test teardown — never call in production code.
+    """
+    global _config_instance
+    with _config_lock:
+        _config_instance = None
+        _lazy_cache.clear()
+
+
 # ---------------------------------------------------------------------------
 # Lazy accessors for constants derived from defaults.json
 # ---------------------------------------------------------------------------

@@ -29,6 +29,8 @@ from quodeq.api.routes import (
 
 _HEALTH_PATH = "/api/health"
 _RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
+_EVALUATION_RATE_LIMIT_WINDOW = 300  # 5-minute window for evaluation creation
+_EVALUATION_RATE_LIMIT_MAX = 10  # max evaluations per window
 
 _DEFAULT_RATE_LIMIT_WINDOW = 60
 _DEFAULT_RATE_LIMIT_MAX = 60
@@ -72,6 +74,8 @@ class InMemoryRateLimitStore:
     Set ``QUODEQ_RATE_LIMIT_STORE=redis`` to opt in (requires custom wiring).
     """
 
+    _CLEANUP_INTERVAL = 60  # seconds between full TTL sweeps
+
     def __init__(
         self,
         window: float | None = None,
@@ -82,6 +86,7 @@ class InMemoryRateLimitStore:
         self._window = window if window is not None else _rate_limit_window()
         self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
         self._max_ips = max_ips
+        self._last_cleanup: float = 0.0
 
     def _evict_stale(self, now: float) -> None:
         if len(self._store) <= self._max_ips:
@@ -97,8 +102,18 @@ class InMemoryRateLimitStore:
         if len(self._store) > self._max_ips:
             self._store.clear()
 
+    def _periodic_cleanup(self, now: float) -> None:
+        """Remove all expired entries if enough time has passed since the last sweep."""
+        if now - self._last_cleanup < self._CLEANUP_INTERVAL:
+            return
+        self._last_cleanup = now
+        stale = [k for k, v in self._store.items() if all(now - t >= self._window for t in v)]
+        for k in stale:
+            del self._store[k]
+
     def record(self, ip: str, now: float) -> None:
         """Record a state-changing request from *ip* at time *now*."""
+        self._periodic_cleanup(now)
         timestamps = self._store.setdefault(ip, [])
         timestamps.append(now)
         if len(timestamps) > self._max_requests * 2:
@@ -200,25 +215,27 @@ def create_app(
     rate_limit_store: RateLimitStore | None = None,
     api_key: str | None = None,
 ) -> Flask:
-    """Create and configure the Flask application with all API routes.
-
-    *api_key* overrides the ``QUODEQ_API_KEY`` env-var lookup when provided,
-    making the app testable without environment mutation.  Pass an empty string
-    to explicitly disable authentication.
-    """
+    """Create and configure the Flask application with all API routes."""
     app = Flask(__name__)
     provider = provider or _default_provider()
     store = rate_limit_store or create_rate_limit_store()
+    eval_store = InMemoryRateLimitStore(
+        window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
+    )
     if api_key is None:
-        _msg = (
+        _logger.warning(
             "QUODEQ_API_KEY is not set — API restricted to localhost only. "
             "Set QUODEQ_API_KEY to enable authenticated remote access."
         )
-        _logger.warning(_msg)
 
     @app.before_request
     def _audit_log() -> None:
-        _logger.info("API: %s %s (remote_addr=%s)", request.method, request.path, request.remote_addr)
+        actor = ""
+        if api_key:
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer ") and len(auth) > 11:
+                actor = f", actor=key:***{auth[-4:]}"
+        _logger.info("API: %s %s (remote_addr=%s%s)", request.method, request.path, request.remote_addr, actor)
 
     @app.before_request
     def _security_checks() -> Response | tuple[Response, int] | None:
@@ -237,13 +254,21 @@ def create_app(
         from quodeq import __version__
         return jsonify({"ok": True, "version": __version__})
 
+    _register_all_routes(app, provider, eval_store, static_dist)
+    return app
+
+
+def _register_all_routes(
+    app: Flask, provider: ActionProvider,
+    eval_store: InMemoryRateLimitStore, static_dist: str | None,
+) -> None:
+    """Register all API route groups on the app."""
     register_project_list_routes(app, provider)
     register_project_data_routes(app, provider)
-    register_evaluation_list_routes(app, provider)
+    register_evaluation_list_routes(app, provider, eval_store)
     register_evaluation_item_routes(app, provider)
     register_discovery_routes(app, provider)
     register_static_routes(app, static_dist)
-    return app
 
 
 def main() -> None:

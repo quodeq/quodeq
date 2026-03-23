@@ -170,17 +170,18 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     if chosen_port != config.server.port:
         log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
-    # If user provided --static-dist explicitly, use it as-is (skip build).
-    # Otherwise, run the on-demand build flow.
-    user_provided_dist = resolve_path(str(config.static_dist))
-    if (user_provided_dist / "index.html").exists():
-        # User pointed to an existing build — use it directly
-        static_dist = user_provided_dist
+    # --dev always builds from repo source; otherwise check for existing build.
+    if config.build.dev:
+        check_dashboard_prereqs()
+        static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall, dev=True)
     else:
-        # On-demand build flow
-        if not config.build.no_build:
-            check_dashboard_prereqs()
-        static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
+        user_provided_dist = resolve_path(str(config.static_dist))
+        if (user_provided_dist / "index.html").exists():
+            static_dist = user_provided_dist
+        else:
+            if not config.build.no_build:
+                check_dashboard_prereqs()
+            static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
 
     return DashboardConfig(
         server=ServerConfig(

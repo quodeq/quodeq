@@ -14,7 +14,8 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.analysis.subagents.pool import PoolPaths, SubagentPool
+from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+from quodeq.analysis.subagents.priority import prioritize_files
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 if TYPE_CHECKING:
@@ -25,6 +26,21 @@ _VERIFY_MAX_FILES_PER_AGENT = 40  # verification is lighter, can handle more fil
 _VERIFY_MAX_TURNS = 100           # verification tasks are quick but need enough turns
 _VERIFY_MAX_DURATION = 600        # 10 minutes max for verification pool
 _VERIFY_N_AGENTS = 5              # match main pool agent count for faster verification
+
+
+def _compute_files_per_agent(total_files: int) -> int:
+    """Compute adaptive max files per agent based on project size.
+
+    Larger projects get higher limits to reduce context rotation overhead
+    (each rotation spawns a new CLI session with ~8K tokens of fixed cost).
+    Capped at 50 — empirically, agents hit turn/time limits above that
+    and leave files unread, which reduces coverage and score quality.
+    """
+    if total_files <= 0:
+        return 0
+    if total_files <= 50:
+        return total_files
+    return 50
 
 
 @dataclass
@@ -44,17 +60,40 @@ def _list_source_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[s
     """List source files for the subagent queue from the target or manifest.
 
     Returns (files, extensions) or ([], set()) if none found.
+    Files are returned in priority order (most important first).
     """
     # Prefer target-scoped files when available
     if config.target is not None and config.target.source_files:
+        files = config.target.source_files
         extensions = set(config.target.language_stats.keys()) if config.target.language_stats else set()
-        return config.target.source_files, extensions
-
-    if config.manifest is not None and config.manifest.source_files:
+    elif config.manifest is not None and config.manifest.source_files:
+        files = config.manifest.source_files
         extensions = set(config.manifest.language_stats.keys()) if config.manifest.language_stats else set()
-        return config.manifest.source_files, extensions
+    else:
+        return [], set()
 
-    return [], set()
+    # Prioritize files: most important first
+    category = None
+    if config.target and config.target.category:
+        category = config.target.category
+    elif config.manifest:
+        category = config.manifest.category
+
+    evidence_dir = config.work_dir or config.src
+    files = prioritize_files(
+        files, config.src, dim_id,
+        category=category,
+        language=config.language,
+        evidence_dir=evidence_dir,
+        config=config,
+    )
+
+    # Incremental mode: filter to only changed + dependent files
+    if config.options.incremental_file_filter is not None:
+        filter_set = config.options.incremental_file_filter
+        files = [f for f in files if f in filter_set]
+
+    return files, extensions
 
 
 def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
@@ -76,22 +115,27 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
     )
 
 
-def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str) -> tuple[Any, list[Any]]:
+def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str, max_files_per_agent: int = 30) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
+    pool_budget_val = config.options.pool_budget
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
         max_turns=config.options.max_turns,
         max_duration=config.options.max_duration,
         ai_model=subagent_model,
+        max_files_per_agent=max_files_per_agent,
+        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
     )
     pool = SubagentPool(
-        n_agents=config.options.n_subagents,
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
-        prompt=prompt,
-        dimension=dim_id,
+        options=PoolOptions(
+            n_agents=config.options.max_subagents,
+            prompt=prompt,
+            dimension=dim_id,
+        ),
         config=base_ac,
     )
     return pool, pool.run()
@@ -130,10 +174,13 @@ def _run_verification_pool(
 
     n_agents = min(_VERIFY_N_AGENTS, len(files_to_verify))
     pool = SubagentPool(
-        n_agents=n_agents,
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
-        prompt=prompt,
-        dimension=dim_id,
+        options=PoolOptions(
+            n_agents=n_agents,
+            prompt=prompt,
+            dimension=dim_id,
+            scout_first=False,
+        ),
         config=ac,
     )
     return pool.run()
@@ -168,6 +215,39 @@ def _collect_evidence(config: RunConfig, dim_id: str, evidence_dir: Path, result
     return ev
 
 
+def process_consolidated_dimensions(
+    config: RunConfig, dimensions: list[str], ctx: Any,
+) -> dict[str, Evidence]:
+    """Run all dimensions in a single pass -- files read once, not per dimension."""
+    from quodeq.analysis.subagents._consolidated import process_consolidated_dimensions as _impl
+    return _impl(config, dimensions, ctx)
+
+
+def _run_verification_step(
+    config: RunConfig, dim_id: str, evidence_dir: Path, files: list[str],
+) -> list:
+    """Load previous findings and run AI verification pool if needed."""
+    from quodeq.analysis.subagents.verify import (
+        load_previous_findings_for_dimension, _group_by_file, _write_verify_manifest,
+    )
+    skip_verify = (
+        config.options.incremental
+        and config.options.incremental_file_filter is not None
+        and len(config.options.incremental_file_filter) < len(files)
+    )
+    prev_findings = [] if skip_verify else load_previous_findings_for_dimension(config, dim_id, evidence_dir)
+    if not prev_findings:
+        return []
+    grouped = _group_by_file(prev_findings)
+    manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
+    _write_verify_manifest(grouped, manifest_path)
+    files_to_verify = list(grouped.keys())
+    log_info(f"  [{dim_id}] Launching fast verification pool for {len(prev_findings)} findings across {len(files_to_verify)} files")
+    verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
+    log_success(f"  [{dim_id}] Verification pool complete")
+    return verify_results
+
+
 def process_dimension_with_subagents(
     config: RunConfig, dim_id: str, idx: int, ctx: Any,
     callbacks: DimensionCallbacks,
@@ -190,31 +270,18 @@ def process_dimension_with_subagents(
         stream_file, jsonl_file = callbacks.run_analysis(config, dim_id, prompt, idx, ctx)
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
-    # 2. Load and pre-filter previous findings for AI verification
-    from quodeq.analysis.subagents.verify import (
-        load_previous_findings_for_dimension, _group_by_file, _write_verify_manifest,
-    )
-    prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)
-
-    # 3. Run AI verification pool (fast model) if there are findings to verify
-    verify_results: list = []
-    if prev_findings:
-        grouped = _group_by_file(prev_findings)
-        manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
-        _write_verify_manifest(grouped, manifest_path)
-        files_to_verify = list(grouped.keys())
-        log_info(f"  [{dim_id}] Launching fast verification pool for {len(prev_findings)} findings across {len(files_to_verify)} files")
-        verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
-        log_success(f"  [{dim_id}] Verification pool complete")
+    # 2-3. Load previous findings and run verification
+    verify_results = _run_verification_step(config, dim_id, evidence_dir, files)
 
     # 4. Create queue with per-agent file limit for context rotation
     queue_path = evidence_dir / f"{dim_id}_queue.json"
-    FileQueue(queue_path, files, max_files_per_agent=_MAX_FILES_PER_AGENT)
-    log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued for {config.options.n_subagents} subagents")
+    files_per_agent = _compute_files_per_agent(len(files))
+    FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
+    log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued for {config.options.max_subagents} subagents")
 
     # 5. Build prompt and launch main analysis pool
     prompt = _build_subagent_prompt(config, dim_id, ctx)
-    pool, results = _launch_pool(config, dim_id, evidence_dir, queue_path, prompt)
+    pool, results = _launch_pool(config, dim_id, evidence_dir, queue_path, prompt, max_files_per_agent=files_per_agent)
 
     # 6. Collect and return evidence (includes both verified + new findings)
     all_results = verify_results + results

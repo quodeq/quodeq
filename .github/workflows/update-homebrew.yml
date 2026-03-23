@@ -1,0 +1,106 @@
+name: Update Homebrew Formula
+
+on:
+  workflow_run:
+    workflows: ["Publish to PyPI"]
+    types: [completed]
+
+jobs:
+  update-formula:
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: develop
+
+      - name: Extract version from pyproject.toml
+        id: version
+        run: |
+          VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for PyPI availability
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          for i in $(seq 1 30); do
+            if curl -sf "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz" -o /dev/null; then
+              echo "Package available on PyPI"
+              exit 0
+            fi
+            echo "Waiting for PyPI... ($i/30)"
+            sleep 10
+          done
+          echo "Timed out waiting for PyPI"
+          exit 1
+
+      - name: Get SHA256 of tarball
+        id: sha
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA=$(curl -sL "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
+          echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
+
+      - name: Update local formula
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA="${{ steps.sha.outputs.sha256 }}"
+          sed -i "s|url \".*\"|url \"https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz\"|" Formula/quodeq.rb
+          sed -i "s|sha256 \".*\"|sha256 \"${SHA}\"|" Formula/quodeq.rb
+
+      - name: Commit and push local formula
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add Formula/quodeq.rb
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "chore: update Homebrew formula to v${VERSION}"
+          git push
+
+      - name: Update homebrew-tap repo
+        env:
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          SHA="${{ steps.sha.outputs.sha256 }}"
+
+          # Get current file SHA from the tap repo
+          FILE_SHA=$(gh api repos/quodeq/homebrew-tap/contents/quodeq.rb --jq '.sha')
+
+          # Build updated formula
+          FORMULA=$(cat <<RUBY
+          class Quodeq < Formula
+            include Language::Python::Virtualenv
+
+            desc "AI-powered source code quality evaluation platform"
+            homepage "https://github.com/quodeq/quodeq"
+            url "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz"
+            sha256 "${SHA}"
+            license "MIT"
+
+            depends_on "python@3.12"
+            depends_on "node"
+
+            def install
+              virtualenv_install_with_resources
+            end
+
+            test do
+              assert_match "quodeq", shell_output("#{bin}/quodeq --help 2>&1", 2)
+            end
+          end
+          RUBY
+          )
+
+          ENCODED=$(echo "$FORMULA" | base64 -w 0)
+
+          gh api repos/quodeq/homebrew-tap/contents/quodeq.rb \
+            -X PUT \
+            -f message="chore: update formula to v${VERSION}" \
+            -f content="$ENCODED" \
+            -f sha="$FILE_SHA"
+
+          echo "Updated homebrew-tap to v${VERSION}"

@@ -4,7 +4,6 @@ import logging
 import re
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
@@ -28,11 +27,7 @@ def _sanitize_url(url: str) -> str:
 
 
 def _reports_dir(default_path: str | None = None) -> str:
-    """Resolve the reports directory from query params or *default_path*.
-
-    *default_path* overrides the env-based ``get_evaluations_dir()`` fallback,
-    making the helper testable without environment mutation.
-    """
+    """Resolve the reports directory from query params or *default_path*."""
     fallback = default_path if default_path is not None else get_evaluations_dir()
     raw = request.args.get("evaluations") or fallback
     resolved = Path(raw).resolve()
@@ -162,15 +157,25 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     return None
 
 
-def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> None:
+def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
-
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
         return jsonify([to_camel_dict(j) for j in provider.list_evaluations()])
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
+        # Enforce stricter per-endpoint rate limit for evaluation creation
+        if eval_rate_store is not None:
+            import time as _time
+            ip = request.remote_addr or "unknown"
+            now = _time.monotonic()
+            if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
+                body, status = error_response(
+                    "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
+                )
+                return jsonify(body), status
+            eval_rate_store.record(ip, now)  # type: ignore[union-attr]
         payload = request.get_json(silent=True) or {}
         validation_error = validate_evaluation_payload(payload)
         if validation_error:
@@ -184,6 +189,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
             from quodeq.provider.base import EvaluationOptions
+            max_subagents_raw = payload.get("maxSubagents", 5)
+            max_subagents = max(1, min(10, int(max_subagents_raw)))
+            pool_budget_raw = payload.get("poolBudget", 600)
+            pool_budget = max(60, min(3600, int(pool_budget_raw)))
             job = provider.start_evaluation(
                 repo=repo,
                 reports_dir=_reports_dir(),
@@ -194,7 +203,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
                     ai_cmd=ai_cmd,
                     ai_model=payload.get("aiModel") or None,
                     subagent_model=payload.get("subagentModel") or None,
-                    verify_findings=bool(payload.get("verifyFindings", False)),
+                    verify_findings=bool(payload.get("verifyFindings", True)),
+                    max_subagents=max_subagents,
+                    pool_budget=pool_budget,
+                    incremental=bool(payload.get("incremental", False)),
                 ),
             )
         except (FileNotFoundError, ValueError):

@@ -26,6 +26,7 @@ from quodeq.adapters.fs.report_parser import (
 from quodeq.services._filesystem_helpers import (
     _auto_detect_parents,
     _build_project_entry,
+    _has_fingerprints,
     _infer_discipline,
     _list_available_dimensions_for_discipline,
     _max_projects_listed,
@@ -63,16 +64,24 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         if self._project_cache is not None and (now - self._project_cache_time) < _PROJECT_CACHE_TTL_S:
             return self._project_cache
         reports_root = Path(reports_dir)
-        projects = []
+        # Collect eligible entries first, then build in parallel (I/O-bound).
+        eligible: list[tuple[str, list]] = []
+        max_listed = _max_projects_listed()
         for entry in safe_read_dir(reports_root):
             if not entry.is_dir() or entry.name.startswith("."):
                 continue
             runs = list_runs(reports_root, entry.name)
             if not runs:
                 continue
-            projects.append(_build_project_entry(reports_root, entry.name, runs))
-            if len(projects) >= _max_projects_listed():
+            eligible.append((entry.name, runs))
+            if len(eligible) >= max_listed:
                 break
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=min(8, len(eligible) or 1)) as pool:
+            projects = list(pool.map(
+                lambda args: _build_project_entry(reports_root, args[0], args[1]),
+                eligible,
+            ))
         projects.sort(key=lambda p: p.name)
         projects = _auto_detect_parents(projects)
         result = {"projects": [to_camel_dict(p) for p in projects]}
@@ -129,7 +138,8 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
         discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
         available_dimensions = _list_available_dimensions_for_discipline() if discipline else []
-        return {**info, "discipline": discipline, "availableDimensions": available_dimensions}
+        has_fingerprints = _has_fingerprints(Path(reports_dir), project)
+        return {**info, "discipline": discipline, "availableDimensions": available_dimensions, "hasFingerprints": has_fingerprints}
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
         """Return the dashboard payload for a specific project run."""

@@ -40,39 +40,55 @@ _DEFAULT_CB_RESET = 60
 _BACKOFF_BASE = 2
 
 
+def _safe_int(raw: str, default: int) -> int:
+    """Parse *raw* as int, returning *default* on ValueError."""
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _safe_float(raw: str, default: float) -> float:
+    """Parse *raw* as float, returning *default* on ValueError."""
+    try:
+        return float(raw)
+    except ValueError:
+        return default
+
+
 def _http_timeout_s(env: dict[str, str] | None = None) -> int:
     """Return HTTP timeout in seconds (reads env at call time). Must be > 0."""
-    value = int((env or os.environ).get("QUODEQ_HTTP_TIMEOUT", str(_DEFAULT_HTTP_TIMEOUT)))
+    value = _safe_int((env or os.environ).get("QUODEQ_HTTP_TIMEOUT", str(_DEFAULT_HTTP_TIMEOUT)), _DEFAULT_HTTP_TIMEOUT)
     return max(1, value)
 
 
 def _max_retries(env: dict[str, str] | None = None) -> int:
     """Return max HTTP retries (reads env at call time). Must be >= 1."""
-    value = int((env or os.environ).get("QUODEQ_HTTP_MAX_RETRIES", str(_DEFAULT_MAX_RETRIES)))
+    value = _safe_int((env or os.environ).get("QUODEQ_HTTP_MAX_RETRIES", str(_DEFAULT_MAX_RETRIES)), _DEFAULT_MAX_RETRIES)
     return max(1, value)
 
 
 def _retry_base_delay_s(env: dict[str, str] | None = None) -> float:
     """Return retry base delay in seconds (reads env at call time). Must be >= 0."""
-    value = float((env or os.environ).get("QUODEQ_HTTP_RETRY_DELAY", str(_DEFAULT_RETRY_BASE_DELAY)))
+    value = _safe_float((env or os.environ).get("QUODEQ_HTTP_RETRY_DELAY", str(_DEFAULT_RETRY_BASE_DELAY)), _DEFAULT_RETRY_BASE_DELAY)
     return max(0.0, value)
 
 
 def _retry_jitter_s(env: dict[str, str] | None = None) -> float:
     """Return retry jitter in seconds (reads env at call time). Must be >= 0."""
-    value = float((env or os.environ).get("QUODEQ_HTTP_RETRY_JITTER", str(_DEFAULT_RETRY_JITTER)))
+    value = _safe_float((env or os.environ).get("QUODEQ_HTTP_RETRY_JITTER", str(_DEFAULT_RETRY_JITTER)), _DEFAULT_RETRY_JITTER)
     return max(0.0, value)
 
 
 def _circuit_breaker_threshold(env: dict[str, str] | None = None) -> int:
     """Return circuit breaker failure threshold (reads env at call time). Must be >= 1."""
-    value = int((env or os.environ).get("QUODEQ_CB_THRESHOLD", str(_DEFAULT_CB_THRESHOLD)))
+    value = _safe_int((env or os.environ).get("QUODEQ_CB_THRESHOLD", str(_DEFAULT_CB_THRESHOLD)), _DEFAULT_CB_THRESHOLD)
     return max(1, value)
 
 
 def _circuit_breaker_reset_s(env: dict[str, str] | None = None) -> int:
     """Return circuit breaker reset seconds (reads env at call time). Must be > 0."""
-    value = int((env or os.environ).get("QUODEQ_CB_RESET", str(_DEFAULT_CB_RESET)))
+    value = _safe_int((env or os.environ).get("QUODEQ_CB_RESET", str(_DEFAULT_CB_RESET)), _DEFAULT_CB_RESET)
     return max(1, value)
 
 
@@ -155,8 +171,11 @@ class HttpClient:
             if self._failure_count >= self._cb_threshold and self._circuit_opened_at is None:
                 self._circuit_opened_at = time.monotonic()
 
-    def _validate_url(self, url: str) -> None:
+    def _validate_url(self, url: str, env: dict[str, str] | None = None) -> None:
         """Validate URL scheme and check for private/plaintext restrictions.
+
+        *env* overrides ``os.environ`` for testing (consistent with other
+        functions in this module).
 
         .. note:: DNS rebinding caveat — hostname is resolved here but
            ``urlopen`` re-resolves independently.  For untrusted URLs in
@@ -170,7 +189,7 @@ class HttpClient:
             if self._allow_plaintext_http is not None:
                 allow = self._allow_plaintext_http
             else:
-                allow = os.environ.get(_ENV_ALLOW_PLAINTEXT_HTTP) == "1"
+                allow = (env or os.environ).get(_ENV_ALLOW_PLAINTEXT_HTTP) == "1"
             if not allow:
                 raise ValueError(
                     f"Cleartext HTTP to {parsed.hostname!r} is blocked — credentials would be "

@@ -5,23 +5,21 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 
 // ---------------------------------------------------------------------------
 // DashboardPage — body only, header is rendered by App.jsx
+// Top-level page component that receives all dashboard state and callbacks
+// directly from App; the high prop count is intentional and not worth splitting.
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage({
-  selectedProject,
-  selectedRun,
-  projects = [],
-  onNavigate,
-  onRunSelect,
+  data = {},
+  callbacks = {},
   runMode = false,
-  // Data from App-level useDashboard
-  dashboard,
-  accumulated,
-  loading,
-  error,
-  availableRuns = [],
-  overviewRunIndex = 0,
 }) {
+  const {
+    selectedProject, selectedRun, projects = [],
+    dashboard, accumulated, loading, error,
+    availableRuns = [], overviewRunIndex = 0,
+  } = data;
+  const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
 
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;

@@ -45,15 +45,16 @@ body {
 /* ── Server disconnected overlay ──────────────────────── */
 
 .server-disconnected-overlay {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 9999;
+  z-index: 100;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: var(--radius-lg);
 }
 
 .server-disconnected-card {
@@ -658,6 +659,7 @@ textarea:focus {
 /* ── Main content area ────────────────────────────────── */
 
 .dashboard {
+  position: relative;
   padding: var(--space-8);
   display: flex;
   flex-direction: column;
@@ -1194,6 +1196,18 @@ textarea:focus {
 .settings-model-input:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+.settings-model-input[type="number"] {
+  width: 80px;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.settings-model-input[type="number"]::-webkit-inner-spin-button,
+.settings-model-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
 }
 
 .settings-row-label {

@@ -6,13 +6,21 @@ set -euo pipefail
 if [ -f "$HOME/.zprofile" ]; then source "$HOME/.zprofile" 2>/dev/null; fi
 if [ -f "$HOME/.zshrc" ]; then source "$HOME/.zshrc" 2>/dev/null; fi
 if [ -f "$HOME/.bash_profile" ]; then source "$HOME/.bash_profile" 2>/dev/null; fi
-# Homebrew paths are macOS-specific; this script only runs inside a .app bundle.
-export PATH="$PATH:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin"
+# Detect Homebrew prefix — use `brew --prefix` if available, fall back to arch-based defaults.
+if command -v brew &>/dev/null; then
+    _HOMEBREW_BIN="$(brew --prefix)/bin"
+elif [ "$(uname -m)" = "arm64" ]; then
+    _HOMEBREW_BIN="/opt/homebrew/bin"
+else
+    _HOMEBREW_BIN="/usr/local/bin"
+fi
+export PATH="$PATH:$HOME/.local/bin:$_HOMEBREW_BIN"
 
-# If dashboard is already running, just open the browser
+# If dashboard is already running, just open the browser.
+# Ports 4173-4175 are the Vite preview server default range.
 QUODEQ_PORTS="${QUODEQ_PORTS:-4173 4174 4175}"
 for PORT in $QUODEQ_PORTS; do
-    if curl -s "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q '"ok"'; then
+    if curl -s --max-time 3 "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q '"ok"'; then
         open "http://127.0.0.1:$PORT"
         exit 0
     fi
@@ -44,8 +52,10 @@ if [ -z "$QUODEQ" ]; then
     if [ -f "$REQ_FILE" ] && grep -q -- '--hash' "$REQ_FILE"; then
         python3 -m pip install --user --require-hashes -r "$REQ_FILE" 2>&1
     else
-        # Fallback: no pinned hashes available — install from PyPI over TLS.
-        python3 -m pip install --user quodeq 2>&1
+        # SECURITY: No pinned hashes available — install from PyPI over TLS.
+        # Using --only-binary :all: to reduce supply chain risk by avoiding
+        # arbitrary code execution in source distributions (setup.py).
+        python3 -m pip install --user --only-binary :all: quodeq 2>&1
     fi
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)

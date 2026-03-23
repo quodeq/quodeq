@@ -1,4 +1,4 @@
-"""AI CLI subprocess runner -- spawns the AI CLI, captures stream-json, extracts JSONL."""
+"""AI CLI subprocess runner -- spawns the AI CLI, captures stream-json."""
 from __future__ import annotations
 
 import json
@@ -48,10 +48,12 @@ class AnalysisConfig:
     ai_model: str | None = None
     max_turns: int | None = _DEFAULT_MAX_TURNS
     max_duration: int | None = _DEFAULT_MAX_DURATION
+    pool_budget: int = 600
     compiled_dir: Path | None = None
     dimension: str | None = None
     queue_path: Path | None = None
     agent_id: str = ""
+    max_files_per_agent: int = 30
 
 
 def _create_mcp_config(
@@ -234,10 +236,7 @@ _SENSITIVE_ENV_KEYS = frozenset({
 })
 
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
-    """Build the subprocess environment for the AI CLI.
-
-    Removes known sensitive variables that the child process does not need.
-    """
+    """Build the subprocess environment, removing sensitive variables."""
     env = (env or os.environ).copy()
     for key in _SENSITIVE_ENV_KEYS:
         env.pop(key, None)

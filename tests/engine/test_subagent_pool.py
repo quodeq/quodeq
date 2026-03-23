@@ -9,7 +9,7 @@ import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError
 from quodeq.engine.file_queue import FileQueue
-from quodeq.engine.subagent_pool import PoolPaths, SubagentPool, SubagentResult
+from quodeq.engine.subagent_pool import PoolOptions, PoolPaths, SubagentPool, SubagentResult
 
 
 def _fake_run_analysis(work_dir, prompt, stream_file, config):
@@ -45,22 +45,19 @@ def _failing_run_analysis(work_dir, prompt, stream_file, config):
 class TestSubagentPool:
     def test_launches_n_agents(self, tmp_path: Path) -> None:
         queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, [f"src/f{i}.py" for i in range(20)])
+        FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
 
         pool = SubagentPool(
-            n_agents=3,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="analyse files",
-            dimension="maintainability",
+            options=PoolOptions(n_agents=3, prompt="analyse files", dimension="maintainability"),
+            config=AnalysisConfig(max_files_per_agent=30),
         )
 
         with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
             results = pool.run()
 
-        assert len(results) == 3
+        assert len(results) >= 2  # scout + at least 1 overflow
         assert all(r.success for r in results)
-        agents = {r.agent_id for r in results}
-        assert agents == {"agent-0", "agent-1", "agent-2"}
 
     def test_agent_configs_have_queue_and_agent_id(self, tmp_path: Path) -> None:
         # NOTE: Directly tests private method _build_agent_config for coverage of
@@ -69,10 +66,8 @@ class TestSubagentPool:
         FileQueue(queue_path, ["a.py"])
 
         pool = SubagentPool(
-            n_agents=2,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="test",
-            dimension="security",
+            options=PoolOptions(n_agents=2, prompt="test", dimension="security"),
             config=AnalysisConfig(compiled_dir=tmp_path / "compiled"),
         )
 
@@ -86,45 +81,37 @@ class TestSubagentPool:
 
     def test_failed_agent_does_not_stop_others(self, tmp_path: Path) -> None:
         queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, ["a.py"])
-
-        call_count = 0
+        FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
 
         def _mixed_run(work_dir, prompt, stream_file, config):
-            nonlocal call_count
-            call_count += 1
             if config.agent_id == "agent-0":
                 _failing_run_analysis(work_dir, prompt, stream_file, config)
             else:
                 _fake_run_analysis(work_dir, prompt, stream_file, config)
 
         pool = SubagentPool(
-            n_agents=3,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="test",
-            dimension="maint",
+            options=PoolOptions(n_agents=3, prompt="test", dimension="maint"),
+            config=AnalysisConfig(max_files_per_agent=30),
         )
 
         with patch("quodeq.analysis.subagents.pool.run_analysis", _mixed_run):
             results = pool.run()
 
-        assert len(results) == 3
         failed = [r for r in results if not r.success]
         succeeded = [r for r in results if r.success]
-        assert len(failed) == 1
+        assert len(failed) >= 1
         assert failed[0].agent_id == "agent-0"
         assert "crashed" in failed[0].error.lower()
-        assert len(succeeded) == 2
+        assert len(succeeded) >= 1
 
     def test_n_agents_minimum_is_one(self, tmp_path: Path) -> None:
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["a.py"])
 
         pool = SubagentPool(
-            n_agents=0,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="test",
-            dimension="maint",
+            options=PoolOptions(n_agents=0, prompt="test", dimension="maint"),
         )
 
         with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
@@ -196,3 +183,5 @@ class TestMergeJsonl:
 
         lines = output.read_text().strip().splitlines()
         assert len(lines) == 1
+
+

@@ -1,6 +1,7 @@
 """Zip export helpers for the action API."""
 from __future__ import annotations
 
+import logging
 import os
 import tempfile
 import zipfile
@@ -8,6 +9,8 @@ from http import HTTPStatus
 from pathlib import Path
 
 from flask import Response, after_this_request, jsonify, send_file
+
+_logger = logging.getLogger(__name__)
 
 from quodeq.api.helpers import error_response
 
@@ -76,8 +79,8 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
     def _cleanup(response: Response) -> Response:
         try:
             os.unlink(str(tmp_path))
-        except OSError:
-            pass
+        except OSError as exc:
+            _logger.warning("Failed to remove temp zip %s: %s", tmp_path, exc)
         return response
 
     return send_file(str(tmp_path), mimetype="application/zip", as_attachment=True, download_name=f"{project}.zip")

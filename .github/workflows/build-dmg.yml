@@ -1,0 +1,38 @@
+name: Build macOS DMG
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  build-dmg:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Build DMG
+        run: bash packaging/macos/build-dmg.sh
+
+      - name: Upload DMG to release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION=$(grep '^version = ' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
+          DMG="dist/QuodeqBar-${VERSION}-macOS.dmg"
+          if [ -f "$DMG" ]; then
+            gh release upload "${{ github.event.release.tag_name }}" "$DMG" --clobber
+          else
+            echo "DMG not found at $DMG"
+            exit 1
+          fi

@@ -3,6 +3,9 @@ import { getHealth, getAiClients } from '../../../api/index.js';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/components/powerLevels.js';
 import SettingsAside from './SettingsAside.jsx';
+import AboutSection from './AboutSection.jsx';
+
+const AI_MODEL_STORAGE_KEY = 'cc-ai-model';
 
 const _SETTINGS_PHRASES = [
   'quode with cuore \u2665',
@@ -22,6 +25,9 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
   } = models;
   const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
   const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
+
+  const [maxSubagents, setMaxSubagents] = useState(() => parseInt(localStorage.getItem('cc-max-subagents') || '5', 10));
+  const [poolBudgetMinutes, setPoolBudgetMinutes] = useState(() => Math.round(parseInt(localStorage.getItem('cc-pool-budget') || '600', 10) / 60));
 
   const [availableClients, setAvailableClients] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
@@ -163,9 +169,9 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
                   const v = e.target.value;
                   onAiModelChange(v);
                   if (v) {
-                    localStorage.setItem('cc-ai-model', v);
+                    localStorage.setItem(AI_MODEL_STORAGE_KEY, v);
                   } else {
-                    localStorage.removeItem('cc-ai-model');
+                    localStorage.removeItem(AI_MODEL_STORAGE_KEY);
                   }
                 }}
               />
@@ -216,7 +222,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
               </div>
             </div>
           )}
-          <div className="settings-row settings-row--last">
+          <div className="settings-row">
             <div className="settings-row-label">
               <span className="settings-label">Verify findings</span>
               <span className="settings-description">
@@ -236,31 +242,48 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
               >Off</button>
             </div>
           </div>
-        </section>
-        <section className="panel settings-section">
-          <div className="panel-header">
-            <h2 className="settings-section-title">About</h2>
+          <div className="settings-row">
+            <div className="settings-row-label">
+              <span className="settings-label">Max parallel agents</span>
+              <span className="settings-description">
+                Maximum number of subagents to run in parallel during evaluation (1–10). Higher values speed up analysis but use more resources.
+              </span>
+            </div>
+            <input
+              type="number"
+              className="settings-model-input"
+              min={1}
+              max={10}
+              value={maxSubagents}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5));
+                setMaxSubagents(v);
+                localStorage.setItem('cc-max-subagents', String(v));
+              }}
+            />
           </div>
-          <div className="settings-about-rows">
-            <div className="settings-about-row">
-              <span className="settings-about-key">Version</span>
-              <span className="settings-about-value">{appVersion ?? '\u2014'}</span>
+          <div className="settings-row settings-row--last">
+            <div className="settings-row-label">
+              <span className="settings-label">Analysis time limit</span>
+              <span className="settings-description">
+                Maximum time allowed for the analysis pool to run (1–60 minutes). Evaluations exceeding this limit will stop early.
+              </span>
             </div>
-            <div className="settings-about-row">
-              <span className="settings-about-key">Website</span>
-              <a className="settings-about-link" href="https://quodeq.ai" target="_blank" rel="noopener noreferrer">quodeq.ai</a>
-            </div>
-            <div className="settings-about-row">
-              <span className="settings-about-key">Repository</span>
-              <a className="settings-about-link" href="https://github.com/quodeq/quodeq" target="_blank" rel="noopener noreferrer">github.com/quodeq/quodeq</a>
-            </div>
+            <input
+              type="number"
+              className="settings-model-input"
+              min={1}
+              max={60}
+              value={poolBudgetMinutes}
+              onChange={(e) => {
+                const v = Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 10));
+                setPoolBudgetMinutes(v);
+                localStorage.setItem('cc-pool-budget', String(v * 60));
+              }}
+            />
           </div>
-          {settingsPhrase && (
-            <div className="settings-row settings-row--last settings-about-phrase-row">
-              <span className="settings-about-phrase">{settingsPhrase}</span>
-            </div>
-          )}
         </section>
+        <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
       </div>
 
       <SettingsAside />

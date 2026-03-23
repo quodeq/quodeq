@@ -178,9 +178,9 @@ def _env_int(var: str, default: int, env: dict[str, str] | None = None) -> int:
     return default
 
 
-def get_action_api_port() -> int:
+def get_action_api_port(env: dict[str, str] | None = None) -> int:
     """Return the action API port from environment or default."""
-    return _env_int("QUODEQ_ACTION_API_PORT", _get_config()["action_api_port"])
+    return _env_int("QUODEQ_ACTION_API_PORT", _get_config()["action_api_port"], env=env)
 
 
 def get_action_api_host(env: dict[str, str] | None = None) -> str:
@@ -188,9 +188,9 @@ def get_action_api_host(env: dict[str, str] | None = None) -> str:
     return (env or os.environ).get("QUODEQ_ACTION_API_HOST", _get_config()["default_host"])
 
 
-def get_dashboard_port() -> int:
+def get_dashboard_port(env: dict[str, str] | None = None) -> int:
     """Return the dashboard preview port from environment or default."""
-    return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"])
+    return _env_int("QUODEQ_DASHBOARD_PORT", _get_config()["dashboard_port"], env=env)
 
 
 def get_static_dist(env: dict[str, str] | None = None) -> str | None:

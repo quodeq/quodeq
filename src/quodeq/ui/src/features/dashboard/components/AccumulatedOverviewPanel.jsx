@@ -3,42 +3,17 @@ import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from './ViolationsByPrincipleTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
+import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
-import { formatRunId, gradeColorClass, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
+import { formatRunId, scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
+import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function withDimensionsStr(files) {
-  return files.map((f) => ({
-    ...f,
-    dimensionsStr: f.dimensions?.length > 0 ? f.dimensions.join(', ') : '',
-  }));
-}
-
-function sortDimensionsByViolationSeverity(dimensions) {
-  return [...dimensions]
-    .filter((d) => (d.violations || []).length > 0)
-    .map((d) => {
-      const counts = { critical: 0, major: 0, minor: 0 };
-      (d.violations || []).forEach((v) => {
-        const s = (v.severity || 'minor').toLowerCase();
-        if (counts[s] !== undefined) counts[s]++;
-      });
-      return { ...d, _c: counts };
-    })
-    .sort((a, b) => {
-      if (b._c.critical !== a._c.critical) return b._c.critical - a._c.critical;
-      if (b._c.major !== a._c.major) return b._c.major - a._c.major;
-      return b._c.minor - a._c.minor;
-    });
-}
-
-// ---------------------------------------------------------------------------
 // Accumulated overview panel
+// Top-level panel component — prop count is intentional to avoid unnecessary
+// indirection; each prop maps directly to a distinct piece of state or callback.
 // ---------------------------------------------------------------------------
 
 export default function AccumulatedOverviewPanel({
@@ -97,6 +72,11 @@ export default function AccumulatedOverviewPanel({
 
   const dimensionsWithViolations = useMemo(
     () => sortDimensionsByViolationSeverity(accumulatedDimensions),
+    [accumulatedDimensions]
+  );
+
+  const sortedDimensions = useMemo(
+    () => [...accumulatedDimensions].sort((a, b) => a.dimension.localeCompare(b.dimension)),
     [accumulatedDimensions]
   );
 
@@ -180,61 +160,7 @@ export default function AccumulatedOverviewPanel({
         <h3 className="dimensions-title">Quality Dimensions</h3>
       </div>
       <div className="dimensions-panel">
-        <div className="dimensions-grid">
-          {[...accumulatedDimensions]
-            .sort((a, b) => a.dimension.localeCompare(b.dimension))
-            .map((item) => {
-              const isStale = item.fromRunId !== referenceRun;
-              const currScore = parseFloat(item.overallScore);
-              const prevScore = parseFloat(item.previousScore);
-              const delta =
-                !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
-              return (
-                <article
-                  key={item.dimension}
-                  className={`qd-card${isStale ? ' qd-card-stale' : ''}`}
-                  onClick={() => onDimensionClick(item)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDimensionClick(item); } }}
-                >
-                  <div className="qd-card-header">
-                    <span className="qd-card-name">{item.dimension}</span>
-                    <span className={`chip small ${gradeColorClass(item.overallGrade)}`}>
-                      {item.overallGrade || '—'}
-                    </span>
-                  </div>
-                  <div className="qd-card-score-row">
-                    <span className="qd-card-score-main">
-                      <span className="qd-card-score">{splitScore(item.overallScore).value}</span>
-                      {splitScore(item.overallScore).denom && (
-                        <span className="qd-card-score-denom">
-                          {splitScore(item.overallScore).denom}
-                        </span>
-                      )}
-                    </span>
-                    <TrendBadge delta={delta} />
-                  </div>
-                  <div className="qd-card-stats">
-                    {(item.totals?.violationCount ?? 0) > 0 && (
-                      <span className="qd-card-stat-violations">
-                        {item.totals.violationCount} violations
-                      </span>
-                    )}
-                    {(item.totals?.complianceCount ?? 0) > 0 && (
-                      <span className="qd-card-stat-compliance">
-                        {item.totals.complianceCount} compliant
-                      </span>
-                    )}
-                  </div>
-                  <div className="qd-card-footer">
-                    <span className="qd-card-date">{item.fromDateLabel || formatRunId(item.fromRunId)}</span>
-                    {isStale && <span className="qd-card-stale-label">Older run</span>}
-                  </div>
-                </article>
-              );
-            })}
-        </div>
+        <DimensionCardsGrid sortedDimensions={sortedDimensions} referenceRun={referenceRun} onDimensionClick={onDimensionClick} />
       </div>
 
       {/* Violations by dimension */}

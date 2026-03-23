@@ -225,6 +225,48 @@ def _build_principles(
     return principles
 
 
+def parse_jsonl_to_evidence_by_dimension(
+    jsonl_file: Path,
+    context: EvidenceContext,
+    compiled_dir: Path | None = None,
+) -> dict[str, Evidence]:
+    """Parse a multi-dimension JSONL file into per-dimension Evidence objects.
+
+    Groups judgments by dimension (from the `d` field), then builds
+    separate Evidence objects for each dimension.
+    """
+    judgments = _read_judgments(jsonl_file, compiled_dir)
+    if not judgments:
+        return {}
+
+    # Group by dimension
+    by_dim: dict[str, list[Judgment]] = {}
+    for j in judgments:
+        dim = j.dimension or "unknown"
+        by_dim.setdefault(dim, []).append(j)
+
+    source_file_count = context.source_file_count
+    files_read = context.files_read
+    coverage_pct = compute_coverage_pct(files_read, source_file_count)
+
+    result: dict[str, Evidence] = {}
+    for dim, dim_judgments in by_dim.items():
+        grouped = _group_judgments(dim_judgments)
+        principles = _build_principles(grouped, dim)
+        result[dim] = Evidence(
+            repository=context.repository,
+            language=context.language,
+            date=context.date_str,
+            source_file_count=source_file_count,
+            files_read=files_read,
+            coverage_pct=coverage_pct,
+            principles=principles,
+            dismissed_count=0,
+            module=context.module,
+        )
+    return result
+
+
 def parse_jsonl_to_evidence(
     jsonl_file: Path,
     context: EvidenceContext,

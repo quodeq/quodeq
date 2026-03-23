@@ -3,7 +3,7 @@ import { getDimensionEval } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
-import { gradeColorClass, scoreColorClass } from '../../../utils/formatters.js';
+import { gradeColorClass, scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 
@@ -147,12 +147,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Ratio</span>
             <span className="acc-eval-stat-value">
-              {(() => {
-                const v = allViolations.length;
-                const c = totalCompliant;
-                if (v === 0) return '—';
-                return `1:${Math.round(c / v)}`;
-              })()}
+              {complianceRatio(allViolations.length, totalCompliant)}
             </span>
           </div>
           <div className="acc-eval-stat-block">

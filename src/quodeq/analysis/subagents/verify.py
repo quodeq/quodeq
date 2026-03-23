@@ -31,26 +31,30 @@ def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_i
     return None
 
 
+def _parse_finding_line(line: str) -> dict | None:
+    """Parse a single JSONL line into a finding dict, or None if invalid."""
+    line = line.strip()
+    if not line:
+        return None
+    try:
+        entry = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    if entry.get("p") and entry.get("t") in ("violation", "compliance"):
+        return entry
+    return None
+
+
 def _load_previous_findings(jsonl_path: Path) -> list[dict]:
     """Load all findings from a JSONL file."""
-    findings: list[dict] = []
     if not jsonl_path.exists():
-        return findings
+        return []
     try:
         with open_text(jsonl_path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                    if entry.get("p") and entry.get("t") in ("violation", "compliance"):
-                        findings.append(entry)
-                except json.JSONDecodeError:
-                    continue
+            return [e for line in f if (e := _parse_finding_line(line)) is not None]
     except OSError as exc:
         log_debug(f"Cannot read findings JSONL {jsonl_path}: {exc}")
-    return findings
+        return []
 
 
 def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
@@ -58,11 +62,18 @@ def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
 
     Returns (surviving_findings, gone_count).
     """
+    # Batch existence checks: resolve unique paths once instead of per-finding.
+    unique_paths: dict[str, bool] = {}
+    for finding in findings:
+        rel_path = finding.get("file", "")
+        if rel_path and rel_path not in unique_paths:
+            unique_paths[rel_path] = (src / rel_path).exists()
+
     surviving: list[dict] = []
     gone = 0
     for finding in findings:
         rel_path = finding.get("file", "")
-        if not rel_path or not (src / rel_path).exists():
+        if not rel_path or not unique_paths.get(rel_path, False):
             gone += 1
         else:
             surviving.append(finding)
@@ -140,78 +151,61 @@ def load_previous_findings_for_dimension(
     config: Any,
     dim_id: str,
     evidence_dir: Path,
+    *,
+    quiet: bool = False,
+    cache: dict[tuple[str, str], tuple[list[dict], int, int]] | None = None,
 ) -> list[dict]:
     """Load and pre-filter previous findings for a dimension.
 
-    1. Find previous run's JSONL
-    2. Pre-filter: drop findings whose files no longer exist
-    3. Return surviving findings for AI verification
+    When *cache* is provided, results are stored per (evidence_dir, dim_id)
+    so multiple callers (priority scoring, verification) don't repeat file
+    I/O within the same run.  Pass ``None`` to disable caching.
 
     Returns list of findings to verify (may be empty).
     """
     if not getattr(config, 'options', None) or not config.options.verify_findings:
         return []
 
+    cache_key = (str(evidence_dir), dim_id)
+    if cache is not None:
+        cached = cache.get(cache_key)
+        if cached is not None:
+            surviving, total, gone = cached
+            if not quiet and total > 0:
+                log_info(
+                    f"  [{dim_id}] {total} previous findings: "
+                    f"{gone} files gone, {len(surviving)} to verify"
+                )
+            return surviving
+
     paths = _resolve_evidence_paths(evidence_dir)
     if paths is None:
+        if cache is not None:
+            cache[cache_key] = ([], 0, 0)
         return []
 
     current_run_id, project_uuid, reports_base = paths
 
     prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
     if prev_jsonl is None:
-        log_info(f"  [{dim_id}] No previous evaluation — skipping verification")
+        if not quiet:
+            log_info(f"  [{dim_id}] No previous evaluation — skipping verification")
+        if cache is not None:
+            cache[cache_key] = ([], 0, 0)
         return []
 
     prev_findings = _load_previous_findings(prev_jsonl)
     if not prev_findings:
+        if cache is not None:
+            cache[cache_key] = ([], 0, 0)
         return []
 
     surviving, gone = _pre_filter_gone(prev_findings, config.src)
-    log_info(
-        f"  [{dim_id}] {len(prev_findings)} previous findings: "
-        f"{gone} files gone, {len(surviving)} to verify"
-    )
+    if not quiet:
+        log_info(
+            f"  [{dim_id}] {len(prev_findings)} previous findings: "
+            f"{gone} files gone, {len(surviving)} to verify"
+        )
+    if cache is not None:
+        cache[cache_key] = (surviving, len(prev_findings), gone)
     return surviving
-
-
-# ---------------------------------------------------------------------------
-# Legacy helpers — kept for backward compatibility with tests
-# ---------------------------------------------------------------------------
-
-def _mechanical_check(finding: dict, src: Path) -> str:
-    """Check if a finding's file still exists. Used by pre-filter."""
-    rel_path = finding.get("file", "")
-    if not rel_path:
-        return "gone"
-    if not (src / rel_path).exists():
-        return "gone"
-    return "ambiguous"  # needs AI verification
-
-
-def run_mechanical_verify(
-    src: Path,
-    prev_findings: list[dict],
-) -> tuple[list[dict], int, list[dict]]:
-    """Pre-filter findings by file existence.
-
-    Returns (surviving, gone_count, []) — all surviving findings
-    are treated as needing AI verification (ambiguous).
-    """
-    surviving, gone = _pre_filter_gone(prev_findings, src)
-    return [], gone, surviving  # none confirmed mechanically, all ambiguous
-
-
-def _write_finding(finding: dict, output_fh: Any) -> None:
-    """Append a finding to the JSONL output file."""
-    output_fh.write(json.dumps(finding) + "\n")
-    output_fh.flush()
-
-
-def write_verified_findings(findings: list[dict], output_jsonl: Path) -> None:
-    """Write verified findings to the JSONL evidence file."""
-    if not findings:
-        return
-    with open(output_jsonl, "a") as fh:
-        for finding in findings:
-            _write_finding(finding, fh)
