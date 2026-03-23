@@ -111,16 +111,18 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         )}
 
         <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
-          <button
-            type="button"
-            className="evaluate-submit-btn"
-            style={{ flex: 1, marginTop: 0 }}
-            disabled={!canStart}
-            onClick={handleIncremental}
-            title="Only analyze files changed since last evaluation"
-          >
-            Re-scan changes
-          </button>
+          {info.hasFingerprints && (
+            <button
+              type="button"
+              className="evaluate-submit-btn"
+              style={{ flex: 1, marginTop: 0 }}
+              disabled={!canStart}
+              onClick={handleIncremental}
+              title="Only analyze files changed since last evaluation"
+            >
+              Re-scan changes
+            </button>
+          )}
           <button
             type="button"
             className="evaluate-submit-btn"
