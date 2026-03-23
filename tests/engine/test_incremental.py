@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import hashlib
+import json
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult
+from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents
 
 
 class TestDetectChangedFiles:
@@ -54,3 +55,28 @@ class TestDetectChangedFiles:
         result = detect_changed_files(src=tmp_path, files=["a.py"], prev_fingerprint=prev, standards_dir=None, dimension="security")
         assert len(result.changed) == 0
         assert result.full_reanalysis is False
+
+
+class TestFindDependents:
+    def test_finds_files_that_import_changed_file(self, tmp_path):
+        (tmp_path / "auth.py").write_text("")
+        (tmp_path / "routes.py").write_text("from auth import login\n")
+        (tmp_path / "utils.py").write_text("")
+        dependents = find_dependents(changed={"auth.py"}, files=["auth.py", "routes.py", "utils.py"], src=tmp_path, language="python")
+        assert "routes.py" in dependents
+        assert "utils.py" not in dependents
+        assert "auth.py" not in dependents
+
+    def test_no_dependents(self, tmp_path):
+        (tmp_path / "a.py").write_text("")
+        (tmp_path / "b.py").write_text("")
+        dependents = find_dependents(changed={"a.py"}, files=["a.py", "b.py"], src=tmp_path, language="python")
+        assert len(dependents) == 0
+
+    def test_one_level_deep_only(self, tmp_path):
+        (tmp_path / "core.py").write_text("")
+        (tmp_path / "mid.py").write_text("import core\n")
+        (tmp_path / "top.py").write_text("import mid\n")
+        dependents = find_dependents(changed={"core.py"}, files=["core.py", "mid.py", "top.py"], src=tmp_path, language="python")
+        assert "mid.py" in dependents
+        assert "top.py" not in dependents

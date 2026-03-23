@@ -1,6 +1,7 @@
 """Incremental analysis — detect changes, classify files, carry forward findings."""
 from __future__ import annotations
 
+import re
 import subprocess
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -72,3 +73,43 @@ def detect_changed_files(
     changed |= new_files
 
     return ChangeDetectionResult(changed=changed)
+
+
+def find_dependents(changed: set[str], files: list[str], src: Path, language: str) -> set[str]:
+    """Find files that directly import any changed file (1 level deep)."""
+    from quodeq.analysis.subagents.priority import load_priority_config
+
+    config = load_priority_config()
+    lang_key = language.lower()
+    _LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
+    lang_key = _LANG_ALIASES.get(lang_key, lang_key)
+    patterns = config.get("import_patterns", {}).get(lang_key)
+    if not patterns:
+        return set()
+
+    changed_stems = {Path(f).stem: f for f in changed}
+    compiled = [re.compile(p) for p in patterns]
+    dependents: set[str] = set()
+
+    for f in files:
+        if f in changed:
+            continue
+        full_path = src / f
+        if not full_path.exists():
+            continue
+        try:
+            content = full_path.read_text(errors="ignore")
+        except OSError:
+            continue
+        for line in content.splitlines():
+            for pattern in compiled:
+                m = pattern.search(line)
+                if m:
+                    imported = m.group(1)
+                    module_name = imported.rsplit(".", 1)[-1].rsplit("/", 1)[-1]
+                    if module_name in changed_stems:
+                        dependents.add(f)
+                    break
+            if f in dependents:
+                break
+    return dependents
