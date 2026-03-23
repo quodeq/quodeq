@@ -63,6 +63,14 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
     onStart(payload);
   }
 
+  function handleIncremental() {
+    const payload = { repo: info.path, incremental: true };
+    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
+      payload.dimensions = [...selectedDims];
+    }
+    onStart(payload);
+  }
+
   const canStart = !disabled && selectedDims.size > 0;
 
   return (
@@ -102,14 +110,25 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
           </div>
         )}
 
-        <button
-          type="button"
-          className="evaluate-submit-btn"
-          disabled={!canStart}
-          onClick={handleStart}
-        >
-          {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
-        </button>
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <button
+            type="button"
+            className="evaluate-submit-btn"
+            disabled={!canStart}
+            onClick={handleStart}
+          >
+            {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
+          </button>
+          <button
+            type="button"
+            className="evaluate-submit-btn"
+            disabled={!canStart}
+            onClick={handleIncremental}
+            title="Only analyze files changed since last evaluation"
+          >
+            Re-scan Changes
+          </button>
+        </div>
         {!disabled && selectedDims.size === 0 && (
           <p className="form-hint">Select at least one dimension to start evaluation.</p>
         )}
