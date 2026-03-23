@@ -55,20 +55,20 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
     setSelectedDims(new Set());
   }
 
-  function handleStart() {
-    const payload = { repo: info.path };
+  function buildPayload(extra) {
+    const payload = { repo: info.path, ...extra };
     if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
       payload.dimensions = [...selectedDims];
     }
-    onStart(payload);
+    return payload;
+  }
+
+  function handleStart() {
+    onStart(buildPayload());
   }
 
   function handleIncremental() {
-    const payload = { repo: info.path, incremental: true };
-    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
-      payload.dimensions = [...selectedDims];
-    }
-    onStart(payload);
+    onStart(buildPayload({ incremental: true }));
   }
 
   const canStart = !disabled && selectedDims.size > 0;

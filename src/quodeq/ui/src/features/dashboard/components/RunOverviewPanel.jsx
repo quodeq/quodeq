@@ -5,37 +5,9 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
-import { formatRunId, gradeColorClass, scoreColorClass, splitScore } from '../../../utils/formatters.js';
+import { formatRunId, gradeColorClass, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
+import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import buildRunSummary from '../buildRunSummary.js';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function withDimensionsStr(files) {
-  return files.map((f) => ({
-    ...f,
-    dimensionsStr: f.dimensions?.length > 0 ? f.dimensions.join(', ') : '',
-  }));
-}
-
-function sortDimensionsByViolationSeverity(dimensions) {
-  return [...dimensions]
-    .filter((d) => (d.violations || []).length > 0)
-    .map((d) => {
-      const counts = { critical: 0, major: 0, minor: 0 };
-      (d.violations || []).forEach((v) => {
-        const s = (v.severity || 'minor').toLowerCase();
-        if (counts[s] !== undefined) counts[s]++;
-      });
-      return { ...d, _c: counts };
-    })
-    .sort((a, b) => {
-      if (b._c.critical !== a._c.critical) return b._c.critical - a._c.critical;
-      if (b._c.major !== a._c.major) return b._c.major - a._c.major;
-      return b._c.minor - a._c.minor;
-    });
-}
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -66,12 +38,7 @@ function StatsGrid({ runSummary }) {
       <div className="acc-eval-stat-block">
         <span className="acc-eval-stat-label">Ratio</span>
         <span className="acc-eval-stat-value">
-          {(() => {
-            const v = runSummary.totalViolations || 0;
-            const c = runSummary.totalCompliance || 0;
-            if (v === 0) return '\u2014';
-            return `1:${Math.round(c / v)}`;
-          })()}
+          {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
         </span>
       </div>
       <div className="acc-eval-stat-block">

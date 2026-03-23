@@ -6,37 +6,9 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { formatRunId, scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
+import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-function withDimensionsStr(files) {
-  return files.map((f) => ({
-    ...f,
-    dimensionsStr: f.dimensions?.length > 0 ? f.dimensions.join(', ') : '',
-  }));
-}
-
-function sortDimensionsByViolationSeverity(dimensions) {
-  return [...dimensions]
-    .filter((d) => (d.violations || []).length > 0)
-    .map((d) => {
-      const counts = { critical: 0, major: 0, minor: 0 };
-      (d.violations || []).forEach((v) => {
-        const s = (v.severity || 'minor').toLowerCase();
-        if (counts[s] !== undefined) counts[s]++;
-      });
-      return { ...d, _c: counts };
-    })
-    .sort((a, b) => {
-      if (b._c.critical !== a._c.critical) return b._c.critical - a._c.critical;
-      if (b._c.major !== a._c.major) return b._c.major - a._c.major;
-      return b._c.minor - a._c.minor;
-    });
-}
 
 // ---------------------------------------------------------------------------
 // Accumulated overview panel
