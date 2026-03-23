@@ -222,7 +222,7 @@ class SubagentPool:
             agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
             try:
                 result = future.result()
-            except Exception as exc:
+            except (OSError, RuntimeError, ValueError) as exc:
                 log_warning(f"  {agent_id} raised {type(exc).__name__}: {exc}")
                 result = SubagentResult(
                     agent_id=agent_id,

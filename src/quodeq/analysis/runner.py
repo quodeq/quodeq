@@ -395,7 +395,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
             log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
             try:
                 ev = _run_dimension_incremental(config, dimension, idx, ctx)
-            except Exception as exc:
+            except (OSError, KeyError, ValueError, RuntimeError) as exc:
                 log_warning(f"[{idx}/{ctx.total}] {dimension} — incremental failed: {exc}, falling back to full")
                 config.options.incremental_file_filter = None
                 ev = _process_single_dimension(config, dimension, idx, ctx)
@@ -431,7 +431,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
                     _log_dimension_result(ev, dim, idx, len(dimensions))
                 return result
             log_warning("Consolidated mode produced no results, falling back to per-dimension")
-        except Exception as exc:
+        except (OSError, KeyError, ValueError, RuntimeError) as exc:
             log_warning(f"Consolidated mode failed: {exc}, falling back to per-dimension")
 
     # Per-dimension loop (fallback or single-dimension)

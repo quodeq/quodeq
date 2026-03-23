@@ -6,8 +6,8 @@ import { memo, useState } from 'react';
 
 const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onFileClick, pageSize = 20 }) {
   const [showAll, setShowAll] = useState(false);
-  const displayFiles = showAll ? files : files.slice(0, pageSize);
-  const hasMore = files.length > pageSize;
+  const displayFiles = showAll ? (files || []) : (files || []).slice(0, pageSize);
+  const hasMore = (files || []).length > pageSize;
 
   return (
     <>

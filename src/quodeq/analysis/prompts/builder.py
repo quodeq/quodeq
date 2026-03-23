@@ -186,7 +186,10 @@ def _write_standards_file(work_dir: Path, dimension: str, content: str) -> Path:
     Returns the absolute path to the written file.
     """
     standards_path = work_dir / f"{_STANDARDS_FILE_PREFIX}{dimension}.md"
-    standards_path.write_text(content)
+    try:
+        standards_path.write_text(content)
+    except OSError as exc:
+        raise OSError(f"Failed to write standards file {standards_path}: {exc}") from exc
     return standards_path
 
 

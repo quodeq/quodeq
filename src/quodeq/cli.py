@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import logging
 import os
 import subprocess
 import sys
@@ -18,9 +19,11 @@ from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.core.scoring.report import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
-from quodeq.shared.repo_handler import prepare_repository
+from quodeq.shared.repo_handler import cleanup_cloned_repo, prepare_repository
 from quodeq.shared.utils import is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.validation import validate_path_segment
+
+_logger = logging.getLogger(__name__)
 
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
@@ -230,13 +233,17 @@ def run_evaluate(args: argparse.Namespace) -> int:
                 evidence_dir / "manifest.json",
                 json.dumps(manifest.to_dict(), indent=2),
             )
-        except OSError:
-            pass  # non-critical
+        except OSError as exc:
+            _logger.debug("Could not write manifest: %s", exc)
 
     # Single-pass analysis: all files in one unified queue per dimension.
     # The AI analyzes each file according to its language naturally.
     config = _build_run_config(args, src=src, language=language, manifest=manifest, dims_data=dims_data, evidence_dir=evidence_dir)
-    return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+    try:
+        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+    finally:
+        if is_repo_url(args.repo):
+            cleanup_cloned_repo(str(src))
 
 
 def _run_dashboard(argv: list[str] | None) -> int:

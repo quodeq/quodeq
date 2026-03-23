@@ -95,37 +95,41 @@ def main():
     parser.add_argument("--apply", action="store_true", help="Write changes (default is dry-run)")
     args = parser.parse_args()
 
-    root = Path(args.dir)
-    if not root.exists():
-        print(f"Directory not found: {root}")
+    try:
+        root = Path(args.dir)
+        if not root.exists():
+            print(f"Directory not found: {root}")
+            sys.exit(1)
+
+        eval_files = list(root.rglob("evaluation/*.json"))
+        if not eval_files:
+            print("No evaluation/*.json files found.")
+            sys.exit(0)
+
+        total_v = 0
+        total_c = 0
+        files_changed = 0
+
+        for path in sorted(eval_files):
+            try:
+                v, c = migrate_file(path, args.apply)
+            except (OSError, json.JSONDecodeError) as exc:
+                print(f"  ERROR processing {path}: {exc}")
+                continue
+            if v or c:
+                files_changed += 1
+                total_v += v
+                total_c += c
+                rel = path.relative_to(root)
+                print(f"  {'updated' if args.apply else 'would update'} {rel}: {v} violations, {c} compliance")
+
+        mode = "Applied" if args.apply else "Dry-run"
+        print(f"\n{mode}: {files_changed} files, {total_v} violations, {total_c} compliance entries")
+        if not args.apply and (total_v or total_c):
+            print("Run with --apply to write changes.")
+    except Exception as exc:
+        print(f"Fatal error: {exc}", file=sys.stderr)
         sys.exit(1)
-
-    eval_files = list(root.rglob("evaluation/*.json"))
-    if not eval_files:
-        print("No evaluation/*.json files found.")
-        sys.exit(0)
-
-    total_v = 0
-    total_c = 0
-    files_changed = 0
-
-    for path in sorted(eval_files):
-        try:
-            v, c = migrate_file(path, args.apply)
-        except (OSError, json.JSONDecodeError) as exc:
-            print(f"  ERROR processing {path}: {exc}")
-            continue
-        if v or c:
-            files_changed += 1
-            total_v += v
-            total_c += c
-            rel = path.relative_to(root)
-            print(f"  {'updated' if args.apply else 'would update'} {rel}: {v} violations, {c} compliance")
-
-    mode = "Applied" if args.apply else "Dry-run"
-    print(f"\n{mode}: {files_changed} files, {total_v} violations, {total_c} compliance entries")
-    if not args.apply and (total_v or total_c):
-        print("Run with --apply to write changes.")
 
 
 if __name__ == "__main__":
