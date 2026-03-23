@@ -136,42 +136,68 @@ def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
     return run_dir.name, run_dir.parent.name, run_dir.parent.parent
 
 
+_findings_cache: dict[tuple[str, str], tuple[list[dict], int, int]] = {}
+
+
+def _clear_findings_cache() -> None:
+    """Clear the per-run findings cache (call between runs)."""
+    _findings_cache.clear()
+
+
 def load_previous_findings_for_dimension(
     config: Any,
     dim_id: str,
     evidence_dir: Path,
+    *,
+    quiet: bool = False,
 ) -> list[dict]:
     """Load and pre-filter previous findings for a dimension.
 
-    1. Find previous run's JSONL
-    2. Pre-filter: drop findings whose files no longer exist
-    3. Return surviving findings for AI verification
+    Results are cached per (evidence_dir, dim_id) so multiple callers
+    (priority scoring, verification) don't repeat file I/O.
 
     Returns list of findings to verify (may be empty).
     """
     if not getattr(config, 'options', None) or not config.options.verify_findings:
         return []
 
+    cache_key = (str(evidence_dir), dim_id)
+    cached = _findings_cache.get(cache_key)
+    if cached is not None:
+        surviving, total, gone = cached
+        if not quiet and total > 0:
+            log_info(
+                f"  [{dim_id}] {total} previous findings: "
+                f"{gone} files gone, {len(surviving)} to verify"
+            )
+        return surviving
+
     paths = _resolve_evidence_paths(evidence_dir)
     if paths is None:
+        _findings_cache[cache_key] = ([], 0, 0)
         return []
 
     current_run_id, project_uuid, reports_base = paths
 
     prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
     if prev_jsonl is None:
-        log_info(f"  [{dim_id}] No previous evaluation — skipping verification")
+        if not quiet:
+            log_info(f"  [{dim_id}] No previous evaluation — skipping verification")
+        _findings_cache[cache_key] = ([], 0, 0)
         return []
 
     prev_findings = _load_previous_findings(prev_jsonl)
     if not prev_findings:
+        _findings_cache[cache_key] = ([], 0, 0)
         return []
 
     surviving, gone = _pre_filter_gone(prev_findings, config.src)
-    log_info(
-        f"  [{dim_id}] {len(prev_findings)} previous findings: "
-        f"{gone} files gone, {len(surviving)} to verify"
-    )
+    if not quiet:
+        log_info(
+            f"  [{dim_id}] {len(prev_findings)} previous findings: "
+            f"{gone} files gone, {len(surviving)} to verify"
+        )
+    _findings_cache[cache_key] = (surviving, len(prev_findings), gone)
     return surviving
 
 

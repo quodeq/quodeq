@@ -201,7 +201,7 @@ def compute_previous_violations(
 
     for dim in dims:
         try:
-            findings = load_previous_findings_for_dimension(config, dim, evidence_dir)
+            findings = load_previous_findings_for_dimension(config, dim, evidence_dir, quiet=True)
         except Exception:
             continue
         for finding in findings:

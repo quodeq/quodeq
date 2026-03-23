@@ -26,7 +26,7 @@ from quodeq.engine._runner_markers import CC_MARKER_KEY, cleanup_stream, emit_ma
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt, load_template
 from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
-from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
 from quodeq.shared.validation import validate_path_segment
 
 
@@ -238,8 +238,8 @@ def _save_dimension_fingerprint(config: RunConfig, dimension: str, files: list[s
             config.options.incremental_file_filter = saved_filter
         fp = build_fingerprint(config.src, files, dimension, config.standards_dir)
         save_fingerprint(fp, evidence_dir)
-    except Exception:
-        pass  # fingerprint is best-effort, never block evaluation
+    except Exception as exc:
+        log_debug(f"  [{dimension}] Fingerprint save failed: {exc}")
 
 
 def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) -> None:
@@ -252,10 +252,12 @@ def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) ->
 
 def _process_single_dimension(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
+    *, emit_log: bool = True,
 ) -> Evidence | None:
     """Analyze a single dimension: build prompt, run AI, parse evidence."""
-    emit_marker("analyzing", dimension=dimension)
-    log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
+    if emit_log:
+        emit_marker("analyzing", dimension=dimension)
+        log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
     if config.options.max_subagents > 1:
         ev = _process_dimension_with_subagents(config, dimension, idx, ctx)
@@ -269,7 +271,8 @@ def _process_single_dimension(
         return None
 
     _save_dimension_fingerprint(config, dimension)
-    _log_dimension_result(ev, dimension, idx, ctx.total)
+    if emit_log:
+        _log_dimension_result(ev, dimension, idx, ctx.total)
     return ev
 
 
@@ -339,7 +342,7 @@ def _run_dimension_incremental(
                 EvidenceContext(
                     language=config.language, repository=str(config.src),
                     date_str=ctx.date_str, source_file_count=config.source_file_count,
-                    files_read=0, module=config.target.name if config.target else "",
+                    files_read=len(classification.unchanged), module=config.target.name if config.target else "",
                 ),
                 compiled_dir=compiled_dir,
             )
@@ -350,7 +353,7 @@ def _run_dimension_incremental(
         # Set file filter so _list_source_files returns only changed+dependent files
         config.options.incremental_file_filter = set(classification.to_analyze)
         try:
-            ev = _process_single_dimension(config, dimension, idx, ctx)
+            ev = _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
         finally:
             config.options.incremental_file_filter = None
 
@@ -394,6 +397,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
                 ev = _run_dimension_incremental(config, dimension, idx, ctx)
             except Exception as exc:
                 log_warning(f"[{idx}/{ctx.total}] {dimension} — incremental failed: {exc}, falling back to full")
+                config.options.incremental_file_filter = None
                 ev = _process_single_dimension(config, dimension, idx, ctx)
             if ev:
                 _log_dimension_result(ev, dimension, idx, ctx.total)
