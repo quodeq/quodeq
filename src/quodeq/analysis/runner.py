@@ -6,6 +6,7 @@ Merge per-dimension Evidence into a single Evidence object.
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -225,7 +226,10 @@ class EvaluationError(RuntimeError):
     """Raised when an evaluation completes but produces no usable findings."""
 
 
-def _save_dimension_fingerprint(config: RunConfig, dimension: str, files: list[str] | None = None) -> None:
+def _save_dimension_fingerprint(
+    config: RunConfig, dimension: str, files: list[str] | None = None,
+    analyzed_files: set[str] | None = None,
+) -> None:
     """Save a fingerprint after any successful dimension analysis."""
     try:
         from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
@@ -236,7 +240,17 @@ def _save_dimension_fingerprint(config: RunConfig, dimension: str, files: list[s
             config.options.incremental_file_filter = None
             files, _ = _list_source_files(config, dimension)
             config.options.incremental_file_filter = saved_filter
-        fp = build_fingerprint(config.src, files, dimension, config.standards_dir)
+        # Try to read analyzed files from the queue if not provided
+        if analyzed_files is None:
+            queue_path = evidence_dir / f"{dimension}_queue.json"
+            if queue_path.exists():
+                from quodeq.analysis.subagents.file_queue import FileQueue
+                try:
+                    queue = FileQueue(queue_path)
+                    analyzed_files = set(queue.all_taken_files())
+                except Exception:
+                    pass
+        fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=analyzed_files)
         save_fingerprint(fp, evidence_dir)
     except Exception as exc:
         log_debug(f"  [{dimension}] Fingerprint save failed: {exc}")
@@ -284,6 +298,7 @@ def _run_dimension_incremental(
     from quodeq.analysis.incremental import classify_files, carry_forward_findings
     from quodeq.analysis.subagents.verify import _resolve_evidence_paths
 
+    phase_start = time.monotonic()
     evidence_dir = config.work_dir or config.src
 
     # Find previous fingerprint
@@ -375,9 +390,73 @@ def _run_dimension_incremental(
                 compiled_dir=compiled_dir,
             )
 
-    # Save new fingerprint
-    new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir)
+    # --- Phase 3: Backfill — analyze previously-unevaluated files with remaining budget ---
+    from quodeq.analysis.incremental import identify_backfill_files
+
+    prev_analyzed = set(prev_fp.get("analyzed_files", [])) if prev_fp else set()
+    phase1_files = set(classification.to_analyze) if classification.to_analyze else set()
+    backfill_candidates = identify_backfill_files(files, list(prev_analyzed), phase1_files)
+
+    output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
+    backfill_taken: set[str] = set()
+    if backfill_candidates:
+        elapsed = time.monotonic() - phase_start
+        total_budget = config.options.pool_budget or 600
+        remaining_budget = max(0, total_budget - int(elapsed))
+
+        if remaining_budget >= 60:  # at least 1 minute remaining
+            log_info(
+                f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, "
+                f"{remaining_budget}s budget remaining"
+            )
+            config.options.incremental_file_filter = set(backfill_candidates)
+            saved_budget = config.options.pool_budget
+            config.options.pool_budget = remaining_budget
+            try:
+                _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
+            finally:
+                config.options.incremental_file_filter = None
+                config.options.pool_budget = saved_budget
+
+            # Read which backfill files were actually taken from queue
+            backfill_queue = evidence_dir / f"{dimension}_queue.json"
+            if backfill_queue.exists():
+                from quodeq.analysis.subagents.file_queue import FileQueue
+                try:
+                    backfill_taken = set(FileQueue(backfill_queue).all_taken_files())
+                except Exception:
+                    pass
+
+            # Dedup carried + phase1 + backfill findings
+            from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl as _dedup_jsonl
+            if output_jsonl.exists():
+                _dedup_jsonl(output_jsonl)
+        else:
+            log_info(f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, but no budget remaining")
+
+    # Re-parse after all phases to get accurate Evidence
+    if output_jsonl.exists() and output_jsonl.stat().st_size > 0:
+        compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+        ev = parse_jsonl_to_evidence(
+            output_jsonl,
+            EvidenceContext(
+                language=config.language, repository=str(config.src),
+                date_str=ctx.date_str, source_file_count=config.source_file_count,
+                files_read=len(phase1_files) + len(backfill_taken) + len(classification.unchanged),
+                module=config.target.name if config.target else "",
+            ),
+            compiled_dir=compiled_dir,
+        )
+
+    # Save new fingerprint — accumulate analyzed files across runs
+    all_analyzed = prev_analyzed | phase1_files | backfill_taken
+    # Remove files that no longer exist in the project
+    all_analyzed &= set(files)
+    new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
     save_fingerprint(new_fp, evidence_dir)
+
+    coverage_pct = len(all_analyzed) * 100 // len(files) if files else 100
+    log_info(f"  [{dimension}] Coverage: {len(all_analyzed)}/{len(files)} files ({coverage_pct}%)")
 
     return ev
 

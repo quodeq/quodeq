@@ -158,3 +158,16 @@ def classify_files(src: Path, files: list[str], prev_fingerprint: dict | None,
     to_analyze = detection.changed | dependents
     unchanged = set(files) - to_analyze
     return FileClassification(to_analyze=sorted(to_analyze), unchanged=unchanged)
+
+
+def identify_backfill_files(
+    all_files: list[str],
+    prev_analyzed: list[str],
+    already_queued: set[str],
+) -> list[str]:
+    """Identify files never analyzed that aren't already queued for this run.
+
+    Returns files in the same order as all_files (preserving priority ordering).
+    """
+    covered = set(prev_analyzed) | already_queued
+    return [f for f in all_files if f not in covered]
