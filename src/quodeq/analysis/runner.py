@@ -448,8 +448,10 @@ def _run_dimension_incremental(
             compiled_dir=compiled_dir,
         )
 
-    # Save new fingerprint (include backfill files in analyzed set)
-    all_analyzed = phase1_files | backfill_taken
+    # Save new fingerprint — accumulate analyzed files across runs
+    all_analyzed = prev_analyzed | phase1_files | backfill_taken
+    # Remove files that no longer exist in the project
+    all_analyzed &= set(files)
     new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
     save_fingerprint(new_fp, evidence_dir)
 

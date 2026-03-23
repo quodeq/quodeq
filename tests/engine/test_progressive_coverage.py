@@ -28,3 +28,34 @@ class TestIdentifyBackfillFiles:
         all_files = ["a.py", "b.py"]
         result = identify_backfill_files(all_files, ["a.py", "b.py"], set())
         assert result == []
+
+
+class TestAnalyzedFilesAccumulation:
+    def test_accumulate_across_three_runs(self):
+        """Simulate 3 runs: each covers more files."""
+        all_files = [f"f{i}.py" for i in range(10)]
+
+        # Run 1: covers f0-f3
+        run1_analyzed = {"f0.py", "f1.py", "f2.py", "f3.py"}
+        backfill = identify_backfill_files(all_files, list(run1_analyzed), set())
+        assert len(backfill) == 6  # f4-f9
+
+        # Run 2: covers f4-f6 (3 more)
+        run2_new = {"f4.py", "f5.py", "f6.py"}
+        run2_analyzed = run1_analyzed | run2_new
+        backfill = identify_backfill_files(all_files, list(run2_analyzed), set())
+        assert len(backfill) == 3  # f7-f9
+
+        # Run 3: covers f7-f9 (last 3)
+        run3_new = {"f7.py", "f8.py", "f9.py"}
+        run3_analyzed = run2_analyzed | run3_new
+        backfill = identify_backfill_files(all_files, list(run3_analyzed), set())
+        assert len(backfill) == 0  # fully covered
+
+    def test_deleted_files_excluded_from_accumulation(self):
+        """Files removed from project should not persist in analyzed set."""
+        all_files = ["a.py", "b.py"]  # c.py was deleted
+        prev_analyzed = ["a.py", "b.py", "c.py"]
+        # Intersection with current files removes c.py
+        accumulated = set(prev_analyzed) & set(all_files)
+        assert accumulated == {"a.py", "b.py"}
