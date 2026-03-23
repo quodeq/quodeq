@@ -165,13 +165,17 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
     return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
 
 
-def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, manifest, dims_data: dict, evidence_dir: Path) -> RunConfig:
+def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, manifest, dims_data: dict, evidence_dir: Path, env: dict[str, str] | None = None) -> RunConfig:
     """Assemble a RunConfig from CLI args and resolved paths.
 
     All keyword parameters are required config inputs with no natural grouping
     (source location, language, pre-scan manifest, dimension definitions, and
     output path) — kept flat intentionally for call-site clarity.
+
+    *env* overrides ``os.environ`` for environment variable reads (useful for
+    testing).
     """
+    _env = env or os.environ
     standards_dir = default_paths().standards_dir
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
     print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
@@ -185,13 +189,13 @@ def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, man
         dimensions_data=dims_data,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
-            max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None),
-            max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None),
+            max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None, env=env),
+            max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None, env=env),
             max_subagents=args.n_subagents,
-            subagent_model=_subagent_model(),
-            verify_findings=not _no_verify(args),
-            consolidated=not getattr(args, 'no_consolidated', False) and not bool(os.environ.get("QUODEQ_NO_CONSOLIDATE")),
-            pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None),
+            subagent_model=_subagent_model(env=env),
+            verify_findings=not _no_verify(args, env=env),
+            consolidated=not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE")),
+            pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
             incremental=args.incremental,
         ),
     )

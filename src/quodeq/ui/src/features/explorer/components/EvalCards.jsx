@@ -6,6 +6,10 @@ import { copyToClipboard } from '../../../utils/clipboard.js';
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
 
+function filterValidRefs(refs) {
+  return (refs || []).filter((r) => r.url && /^https?:\/\//.test(r.url));
+}
+
 export function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
@@ -24,8 +28,8 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
-                <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
+              {filterValidRefs(v.reqRefs).length > 0 &&
+                <span className="cwe-link-group">{filterValidRefs(v.reqRefs).map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                 ))}</span>
               }
@@ -60,8 +64,8 @@ export function ComplianceCard({ c, principle, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-              {c.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
-                <span className="cwe-link-group">{c.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
+              {filterValidRefs(c.reqRefs).length > 0 &&
+                <span className="cwe-link-group">{filterValidRefs(c.reqRefs).map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                 ))}</span>
               }

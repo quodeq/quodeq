@@ -35,13 +35,13 @@ def _parse_major(version_str: str) -> int:
     return int(cleaned.split(".")[0])
 
 
-def check_node(min_major: int = 18) -> None:
-    """Raise RuntimeError if Node.js is missing or below minimum version."""
+def _check_tool_version(cmd: list[str], tool_name: str, min_major: int, install_hint: str) -> None:
+    """Raise RuntimeError if *tool_name* is missing or below *min_major*."""
     try:
-        version_str = _run_version_cmd(["node", "--version"])
+        version_str = _run_version_cmd(cmd)
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
         raise RuntimeError(
-            f"Node.js {min_major}+ is required but not found.\n{_INSTALL_HINT_NODE}"
+            f"{tool_name} {min_major}+ is required but not found.\n{install_hint}"
         ) from exc
     try:
         major = _parse_major(version_str)
@@ -49,28 +49,19 @@ def check_node(min_major: int = 18) -> None:
         return
     if major < min_major:
         raise RuntimeError(
-            f"Node.js {version_str} is below the minimum required version {min_major}.x.\n"
-            f"{_INSTALL_HINT_NODE}"
+            f"{tool_name} {version_str} is below the minimum required version {min_major}.x.\n"
+            f"{install_hint}"
         )
+
+
+def check_node(min_major: int = 18) -> None:
+    """Raise RuntimeError if Node.js is missing or below minimum version."""
+    _check_tool_version(["node", "--version"], "Node.js", min_major, _INSTALL_HINT_NODE)
 
 
 def check_npm(min_major: int = 9) -> None:
     """Raise RuntimeError if npm is missing or below minimum version."""
-    try:
-        version_str = _run_version_cmd(["npm", "--version"])
-    except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-        raise RuntimeError(
-            f"npm {min_major}+ is required but not found.\n{_INSTALL_HINT_NODE}"
-        ) from exc
-    try:
-        major = _parse_major(version_str)
-    except (ValueError, IndexError):
-        return
-    if major < min_major:
-        raise RuntimeError(
-            f"npm {version_str} is below the minimum required version {min_major}.x.\n"
-            f"{_INSTALL_HINT_NODE}"
-        )
+    _check_tool_version(["npm", "--version"], "npm", min_major, _INSTALL_HINT_NODE)
 
 
 def check_claude_code() -> None:
