@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, FileClassification
+from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, FileClassification, identify_backfill_files
 
 
 class TestDetectChangedFiles:
@@ -136,6 +136,27 @@ class TestClassifyFiles:
         assert set(result.to_analyze) == {"a.py", "b.py"}
         assert len(result.unchanged) == 0
         assert result.full_reanalysis is True
+
+
+class TestIdentifyBackfillFiles:
+    def test_backfill_excludes_previously_analyzed(self):
+        all_files = ["a.py", "b.py", "c.py", "d.py"]
+        prev_analyzed = ["a.py", "b.py"]
+        already_queued = {"c.py"}
+        result = identify_backfill_files(all_files, prev_analyzed, already_queued)
+        assert result == ["d.py"]
+
+    def test_backfill_returns_empty_when_all_covered(self):
+        all_files = ["a.py", "b.py"]
+        prev_analyzed = ["a.py", "b.py"]
+        result = identify_backfill_files(all_files, prev_analyzed, set())
+        assert result == []
+
+    def test_backfill_preserves_input_order(self):
+        all_files = ["z.py", "a.py", "m.py"]
+        prev_analyzed = []
+        result = identify_backfill_files(all_files, prev_analyzed, set())
+        assert result == ["z.py", "a.py", "m.py"]
 
 
 class TestIncrementalRunnerIntegration:
