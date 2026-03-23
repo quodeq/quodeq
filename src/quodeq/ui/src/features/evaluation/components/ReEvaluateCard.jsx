@@ -116,19 +116,19 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
             className="evaluate-submit-btn"
             style={{ flex: 1, marginTop: 0 }}
             disabled={!canStart}
-            onClick={handleStart}
+            onClick={handleIncremental}
+            title="Only analyze files changed since last evaluation"
           >
-            {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
+            Re-scan changes
           </button>
           <button
             type="button"
             className="evaluate-submit-btn"
             style={{ flex: 1, marginTop: 0 }}
             disabled={!canStart}
-            onClick={handleIncremental}
-            title="Only analyze files changed since last evaluation"
+            onClick={handleStart}
           >
-            Re-scan Changes
+            {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
           </button>
         </div>
         {!disabled && selectedDims.size === 0 && (
