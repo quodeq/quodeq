@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.7.0] — 2026-03-23
+
+### Features
+- **Incremental analysis** — fingerprint-based change detection with dependency cascade; only re-analyzes changed files and their dependents
+- **Progressive coverage** — each re-scan backfills previously-unevaluated files with remaining budget, gradually reaching full coverage
+- **File prioritization** — 5-layer scoring (path patterns, dimension relevance, import fan-in, git churn, previous violations) ensures the most important files are analyzed first
+- **Adaptive agent scaling** — scout-then-scale pool strategy adjusts agent count based on project size
+- **Consolidated evaluation** — analyze multiple dimensions in a single pass, reducing token usage
+- **Verify findings on by default** — fast verification pool enabled for all evaluations
+
+### Fixes
+- Server disconnected overlay only shows on evaluate screen; sidebar remains navigable
+- Re-scan button now visible when fingerprints exist
+- 156 auto-healed code quality violations across all dimensions
+
+---
+
 ## [0.6.2] — 2026-03-22
 
 ### Features
