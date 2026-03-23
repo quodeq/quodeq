@@ -138,3 +138,23 @@ def carry_forward_findings(prev_jsonl: Path, output_jsonl: Path, unchanged_files
     except OSError:
         return 0
     return count
+
+
+@dataclass
+class FileClassification:
+    """Classified files for incremental analysis."""
+    to_analyze: list[str] = field(default_factory=list)
+    unchanged: set[str] = field(default_factory=set)
+    full_reanalysis: bool = False
+
+
+def classify_files(src: Path, files: list[str], prev_fingerprint: dict | None,
+                   standards_dir: Path | None, dimension: str, language: str) -> FileClassification:
+    """Classify files into to_analyze (changed + dependents) and unchanged."""
+    detection = detect_changed_files(src, files, prev_fingerprint, standards_dir, dimension)
+    if detection.full_reanalysis:
+        return FileClassification(to_analyze=list(files), full_reanalysis=True)
+    dependents = find_dependents(detection.changed, files, src, language)
+    to_analyze = detection.changed | dependents
+    unchanged = set(files) - to_analyze
+    return FileClassification(to_analyze=sorted(to_analyze), unchanged=unchanged)
