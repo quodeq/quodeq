@@ -10,6 +10,8 @@ from quodeq.core.scoring.internals import (
     weight_as_multiplier,
 )
 
+_GRADE_INDEX: dict[str, int] = {g: i for i, g in enumerate(GRADE_LADDER)}
+
 MODE_NUMERICAL = "numerical"
 _INSUFFICIENT_MAJORITY_RATIO = 0.5
 
@@ -35,7 +37,7 @@ def _accumulate_weights(
         if mode == MODE_NUMERICAL:
             total_value += (pdata.final_score or 0.0) * multiplier
         else:
-            total_value += GRADE_LADDER.index(pdata.grade) * multiplier
+            total_value += _GRADE_INDEX[pdata.grade] * multiplier
     return total_weight, total_value, total_count, insufficient_count
 
 

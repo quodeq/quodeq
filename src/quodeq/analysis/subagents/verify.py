@@ -58,11 +58,18 @@ def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
 
     Returns (surviving_findings, gone_count).
     """
+    # Batch existence checks: resolve unique paths once instead of per-finding.
+    unique_paths: dict[str, bool] = {}
+    for finding in findings:
+        rel_path = finding.get("file", "")
+        if rel_path and rel_path not in unique_paths:
+            unique_paths[rel_path] = (src / rel_path).exists()
+
     surviving: list[dict] = []
     gone = 0
     for finding in findings:
         rel_path = finding.get("file", "")
-        if not rel_path or not (src / rel_path).exists():
+        if not rel_path or not unique_paths.get(rel_path, False):
             gone += 1
         else:
             surviving.append(finding)

@@ -25,18 +25,23 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAUL
       } catch {
         // Server unreachable on current origin — check if it moved to another port
         const currentPort = window.location.port;
-        for (const port of altPorts) {
-          if (String(port) === currentPort) continue;
-          try {
+        const candidates = altPorts.filter(p => String(p) !== currentPort);
+        const results = await Promise.allSettled(
+          candidates.map(async (port) => {
             const ac = new AbortController();
             const tid = setTimeout(() => ac.abort(), HEALTH_CHECK_TIMEOUT_MS);
-            const res = await fetch(`${baseUrl}:${port}/api/health`, { signal: ac.signal });
-            clearTimeout(tid);
-            if (res.ok) {
-              window.location.href = `${baseUrl}:${port}`;
-              return;
-            }
-          } catch { console.debug('Port probe failed:', port); }
+            try {
+              const res = await fetch(`${baseUrl}:${port}/api/health`, { signal: ac.signal });
+              clearTimeout(tid);
+              if (res.ok) return port;
+            } catch { clearTimeout(tid); }
+            return null;
+          })
+        );
+        const found = results.find(r => r.status === 'fulfilled' && r.value !== null);
+        if (found) {
+          window.location.href = `${baseUrl}:${found.value}`;
+          return;
         }
         if (mounted) setServerConnected(false);
       }

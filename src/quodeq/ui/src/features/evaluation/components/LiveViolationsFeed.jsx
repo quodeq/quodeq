@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
 
@@ -73,6 +73,17 @@ function ViolationLiveRow({ violation, index }) {
 export default function LiveViolationsFeed({ liveViolations }) {
   const dims = Object.keys(liveViolations ?? {});
   const totalCount = dims.reduce((sum, d) => sum + (liveViolations[d]?.length ?? 0), 0);
+
+  const sortedByDim = useMemo(() => {
+    const result = {};
+    for (const dim of Object.keys(liveViolations ?? {})) {
+      result[dim] = [...(liveViolations[dim] ?? [])].sort((a, b) =>
+        severityOrder(a.severity) - severityOrder(b.severity)
+      );
+    }
+    return result;
+  }, [liveViolations]);
+
   if (!totalCount) return null;
 
   return (
@@ -81,9 +92,7 @@ export default function LiveViolationsFeed({ liveViolations }) {
         {totalCount} violation{totalCount !== 1 ? 's' : ''} found across {dims.length} dimension{dims.length !== 1 ? 's' : ''}
       </div>
       {dims.map(dim => {
-        const violations = [...(liveViolations[dim] ?? [])].sort((a, b) =>
-          severityOrder(a.severity) - severityOrder(b.severity)
-        );
+        const violations = sortedByDim[dim] || [];
         return (
           <div key={dim} className="vlive-dimension-group">
             <div className="vlive-dimension-label">{dim}</div>
