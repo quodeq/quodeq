@@ -39,6 +39,22 @@ class TestBuildFingerprint:
         assert "git_commit" in fp  # may be None if not a git repo
 
 
+def test_fingerprint_includes_analyzed_files(tmp_path):
+    (tmp_path / "a.py").write_text("print('a')")
+    (tmp_path / "b.py").write_text("print('b')")
+    fp = build_fingerprint(
+        tmp_path, ["a.py", "b.py"], "security", None,
+        analyzed_files={"a.py"},
+    )
+    assert fp["analyzed_files"] == ["a.py"]
+
+
+def test_fingerprint_without_analyzed_files_defaults_empty(tmp_path):
+    (tmp_path / "a.py").write_text("print('a')")
+    fp = build_fingerprint(tmp_path, ["a.py"], "security", None)
+    assert fp["analyzed_files"] == []
+
+
 class TestSaveLoadFingerprint:
     def test_round_trip(self, tmp_path):
         fp = {"dimension": "security", "git_commit": "abc", "file_hashes": {"a.py": "hash1"}, "standards_checksum": None, "timestamp": "2026-01-01"}

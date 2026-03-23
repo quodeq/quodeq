@@ -39,7 +39,7 @@ def _hash_standards(standards_dir: Path, dimension: str) -> str | None:
         return None
 
 
-def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir: Path | None) -> dict:
+def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir: Path | None, *, analyzed_files: set[str] | None = None) -> dict:
     """Build a fingerprint for the current evaluation state."""
     file_hashes = {}
     for f in files:
@@ -51,6 +51,7 @@ def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir
         "git_commit": _get_git_commit(src),
         "file_hashes": file_hashes,
         "standards_checksum": _hash_standards(standards_dir, dimension) if standards_dir else None,
+        "analyzed_files": sorted(analyzed_files) if analyzed_files else [],
         "timestamp": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
 
