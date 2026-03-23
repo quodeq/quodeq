@@ -225,7 +225,10 @@ class EvaluationError(RuntimeError):
     """Raised when an evaluation completes but produces no usable findings."""
 
 
-def _save_dimension_fingerprint(config: RunConfig, dimension: str, files: list[str] | None = None) -> None:
+def _save_dimension_fingerprint(
+    config: RunConfig, dimension: str, files: list[str] | None = None,
+    analyzed_files: set[str] | None = None,
+) -> None:
     """Save a fingerprint after any successful dimension analysis."""
     try:
         from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
@@ -236,7 +239,17 @@ def _save_dimension_fingerprint(config: RunConfig, dimension: str, files: list[s
             config.options.incremental_file_filter = None
             files, _ = _list_source_files(config, dimension)
             config.options.incremental_file_filter = saved_filter
-        fp = build_fingerprint(config.src, files, dimension, config.standards_dir)
+        # Try to read analyzed files from the queue if not provided
+        if analyzed_files is None:
+            queue_path = evidence_dir / f"{dimension}_queue.json"
+            if queue_path.exists():
+                from quodeq.analysis.subagents.file_queue import FileQueue
+                try:
+                    queue = FileQueue(queue_path)
+                    analyzed_files = set(queue.all_taken_files())
+                except Exception:
+                    pass
+        fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=analyzed_files)
         save_fingerprint(fp, evidence_dir)
     except Exception as exc:
         log_debug(f"  [{dimension}] Fingerprint save failed: {exc}")
