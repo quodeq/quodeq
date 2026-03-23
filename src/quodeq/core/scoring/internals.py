@@ -1,6 +1,8 @@
 """Internal constants and helper functions for the scoring engine."""
 from __future__ import annotations
 
+import math
+
 from quodeq.core.scoring.confidence import confidence_interval_for  # noqa: F401 — re-export
 from quodeq.core.scoring.numerical import (  # noqa: F401 — re-export
     build_deductions,
@@ -203,7 +205,6 @@ def violation_ceiling(violation_type_counts: dict[str, int]) -> float:
 
     ``ceiling = 10 - log2(1 + wv) * CEIL_SCALE``
     """
-    import math
     wv = _weighted_sum(violation_type_counts)
     if wv == 0:
         return 10.0

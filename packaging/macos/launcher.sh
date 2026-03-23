@@ -9,7 +9,8 @@ if [ -f "$HOME/.bash_profile" ]; then source "$HOME/.bash_profile" 2>/dev/null; 
 # Homebrew paths are macOS-specific; this script only runs inside a .app bundle.
 export PATH="$PATH:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin"
 
-# If dashboard is already running, just open the browser
+# If dashboard is already running, just open the browser.
+# Ports 4173-4175 are the Vite preview server default range.
 QUODEQ_PORTS="${QUODEQ_PORTS:-4173 4174 4175}"
 for PORT in $QUODEQ_PORTS; do
     if curl -s --max-time 3 "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q '"ok"'; then

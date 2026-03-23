@@ -32,7 +32,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
-  function isRelevantLogLine(line) {
+  function isStatusLine(line) {
     return line.startsWith(STATUS_MARKERS.arrow) || line.startsWith(STATUS_MARKERS.check) || line.startsWith(STATUS_MARKERS.error) || line.includes(STATUS_MARKERS.failed);
   }
 
@@ -40,7 +40,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     if (!logs?.length) return null;
     for (let i = logs.length - 1; i >= 0; i--) {
       const line = logs[i].trim();
-      if (isRelevantLogLine(line)) return line;
+      if (isStatusLine(line)) return line;
     }
     return null;
   }

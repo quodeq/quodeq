@@ -18,7 +18,8 @@ _HEALTH_TIMEOUT = 1.0
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
-_EXTRA_PATH_DIRS = "/usr/local/bin:/opt/homebrew/bin"
+# Standard Homebrew bin directories on macOS (Intel: /usr/local/bin, Apple Silicon: /opt/homebrew/bin).
+_HOMEBREW_PATH_DIRS = "/usr/local/bin:/opt/homebrew/bin"
 
 
 def _load_config(env=None):
@@ -51,7 +52,7 @@ def _source_user_path() -> None:
             return
     except (subprocess.TimeoutExpired, OSError):
         pass
-    extra = f"{os.path.expanduser('~/.local/bin')}:{_EXTRA_PATH_DIRS}"
+    extra = f"{os.path.expanduser('~/.local/bin')}:{_HOMEBREW_PATH_DIRS}"
     os.environ["PATH"] = f"{os.environ.get('PATH', '')}:{extra}"
 
 

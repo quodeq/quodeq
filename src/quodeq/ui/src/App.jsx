@@ -21,6 +21,9 @@ import { useProjectState } from './hooks/useProjectState.js';
 import { useAppSettings } from './hooks/useAppSettings.js';
 
 
+// App is the root component and naturally aggregates all application hooks.
+// The hook count is proportional to the app's feature set and is not worth
+// refactoring into sub-providers for a project of this size.
 export default function App() {
   const [serverConnected, setServerConnected] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();

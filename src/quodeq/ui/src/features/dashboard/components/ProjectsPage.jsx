@@ -84,7 +84,7 @@ function ProjectCard({ project, isSelected, onSelect, footer, isChild = false, c
         </div>
         {cardChildren}
       </div>
-      {footer && <div className={`project-card-footer${isChild ? '' : ''}`} onClick={isChild ? (e) => e.stopPropagation() : undefined}>{footer}</div>}
+      {footer && <div className="project-card-footer" onClick={isChild ? (e) => e.stopPropagation() : undefined}>{footer}</div>}
     </div>
   );
 }

@@ -5,44 +5,12 @@ import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
-import { formatRunId, gradeColorClass, scoreColorClass, splitScore, mostFrequentGrade } from '../../../utils/formatters.js';
+import { formatRunId, gradeColorClass, scoreColorClass, splitScore } from '../../../utils/formatters.js';
+import buildRunSummary from '../buildRunSummary.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function buildRunSummary(dimensions) {
-  if (!dimensions || dimensions.length === 0) {
-    return {
-      overallGrade: '-',
-      numericAverage: null,
-      totalViolations: 0,
-      totalCompliance: 0,
-      dimensionCount: 0,
-      severity: { critical: 0, major: 0, minor: 0 },
-    };
-  }
-
-  const grades = dimensions.map((d) => d.overallGrade).filter(Boolean);
-  const scores = dimensions.map((d) => parseFloat(d.overallScore)).filter((s) => !isNaN(s));
-  const numericAverage =
-    scores.length > 0
-      ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
-      : null;
-
-  return {
-    overallGrade: mostFrequentGrade(grades) || '-',
-    numericAverage,
-    totalViolations: dimensions.reduce((sum, d) => sum + (d.totals?.violationCount || 0), 0),
-    totalCompliance: dimensions.reduce((sum, d) => sum + (d.totals?.complianceCount || 0), 0),
-    dimensionCount: dimensions.length,
-    severity: {
-      critical: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.critical || 0), 0),
-      major: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.major || 0), 0),
-      minor: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.minor || 0), 0),
-    },
-  };
-}
 
 function withDimensionsStr(files) {
   return files.map((f) => ({
@@ -169,8 +137,8 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
 
   const runScoreDelta = useMemo(() => {
     const trendSeries = dashboard?.trend || [];
-    const selectedRunId = dashboard?.selectedRun?.runId;
-    const idx = trendSeries.findIndex((t) => t.runId === selectedRunId);
+    const currentRunId = dashboard?.selectedRun?.runId;
+    const idx = trendSeries.findIndex((t) => t.runId === currentRunId);
     if (idx < 0 || idx + 1 >= trendSeries.length) return null;
     const curr = parseFloat(trendSeries[idx].numericAverage);
     const prev = parseFloat(trendSeries[idx + 1].numericAverage);
@@ -253,14 +221,15 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
                     </span>
                   </div>
                   <div className="qd-card-score-row">
+                    {(() => { const scored = splitScore(item.overallScore); return (
                     <span className="qd-card-score-main">
-                      <span className="qd-card-score">{splitScore(item.overallScore).value}</span>
-                      {splitScore(item.overallScore).denom && (
+                      <span className="qd-card-score">{scored.value}</span>
+                      {scored.denom && (
                         <span className="qd-card-score-denom">
-                          {splitScore(item.overallScore).denom}
+                          {scored.denom}
                         </span>
                       )}
-                    </span>
+                    </span>); })()}
                     <TrendBadge delta={delta} />
                   </div>
                   <div className="qd-card-stats">

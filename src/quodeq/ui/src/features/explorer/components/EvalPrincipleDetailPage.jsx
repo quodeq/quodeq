@@ -1,84 +1,11 @@
 import { memo, useState } from 'react';
 import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
-import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass, parseFileRef } from '../../../utils/formatters.js';
+import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
-import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 
 const PAGE_SIZE = 20;
-
-function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
-  const { filePath, line } = parseFileRef(v.file, v.line);
-  const filename = filePath ? filePath.split('/').pop() : null;
-  const ref = line != null ? `${filePath}:${line}` : filePath;
-  const display = line != null ? `${filename}:${line}` : filename;
-  return (
-    <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}>
-      <div className="vdetail-row-main">
-        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-        <span className="vrow-label">[{v.principle || principle}]</span>
-        {filename && <FileCopyBtn display={display} copyText={ref} />}
-        <CopyButton label="Fix plan" onClick={() => copyToClipboard(buildViolationPlanText(v))} />
-      </div>
-      <div className="vlive-detail">
-        {(v.title || v.reason || v.findings) && (
-          <div className="vlive-detail-section">
-            <div className="vlive-detail-section-header">
-              {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
-                <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
-                  <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                ))}</span>
-              }
-            </div>
-            {v.title && <p className="vlive-detail-title">{v.title}</p>}
-            {v.reason && <>
-              <span className="vlive-detail-section-label">Detail</span>
-              <p className="vlive-detail-reason">{v.reason}</p>
-            </>}
-          </div>
-        )}
-        {v.snippet && <pre className="vlive-snippet">{v.snippet.replace(/\\n/g, '\n')}</pre>}
-      </div>
-    </div>
-  );
-}
-
-function ComplianceCard({ c, principle, index }) {
-  const { filePath, line } = parseFileRef(c.file, c.line);
-  const filename = filePath ? filePath.split('/').pop() : null;
-  const ref = line != null ? `${filePath}:${line}` : filePath;
-  const display = line != null ? `${filename}:${line}` : filename;
-  return (
-    <div className="vdetail-row vdetail-row--compliant" style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}>
-      <div className="vdetail-row-main">
-        <span className="severity-tag compliance">compliant</span>
-        <span className="vrow-label">[{c.principle || principle}]</span>
-        {filename && <FileCopyBtn display={display} copyText={ref} />}
-      </div>
-      <div className="vlive-detail">
-        {(c.title || c.reason) && (
-          <div className="vlive-detail-section">
-            <div className="vlive-detail-section-header">
-              {c.title && <span className="vlive-detail-section-label">Reason</span>}
-              {c.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
-                <span className="cwe-link-group">{c.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
-                  <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                ))}</span>
-              }
-            </div>
-            {c.title && <p className="vlive-detail-title">{c.title}</p>}
-            {c.reason && <>
-              <span className="vlive-detail-section-label">Detail</span>
-              <p className="vlive-detail-reason">{c.reason}</p>
-            </>}
-          </div>
-        )}
-        {c.snippet && <pre className="vlive-snippet">{c.snippet.replace(/\\n/g, '\n')}</pre>}
-      </div>
-    </div>
-  );
-}
 
 const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal }) {
   const {
