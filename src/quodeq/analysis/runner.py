@@ -354,6 +354,24 @@ def _run_dimension_incremental(
         finally:
             config.options.incremental_file_filter = None
 
+        # Dedup: carried-forward + new findings may overlap
+        from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
+        output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
+        if output_jsonl.exists():
+            deduplicate_jsonl(output_jsonl)
+            # Re-parse after dedup to get accurate Evidence
+            compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
+            ev = parse_jsonl_to_evidence(
+                output_jsonl,
+                EvidenceContext(
+                    language=config.language, repository=str(config.src),
+                    date_str=ctx.date_str, source_file_count=config.source_file_count,
+                    files_read=ev.files_read if ev else 0,
+                    module=config.target.name if config.target else "",
+                ),
+                compiled_dir=compiled_dir,
+            )
+
     # Save new fingerprint
     new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir)
     save_fingerprint(new_fp, evidence_dir)
