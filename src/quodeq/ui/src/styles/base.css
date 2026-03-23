@@ -1196,6 +1196,18 @@ textarea:focus {
   border-color: var(--color-accent);
 }
 
+.settings-model-input[type="number"] {
+  width: 80px;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.settings-model-input[type="number"]::-webkit-inner-spin-button,
+.settings-model-input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 .settings-row-label {
   display: flex;
   flex-direction: column;
