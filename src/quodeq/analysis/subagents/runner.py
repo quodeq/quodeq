@@ -321,10 +321,13 @@ def process_dimension_with_subagents(
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
     # 2. Load and pre-filter previous findings for AI verification
+    #    Skip verification in incremental mode — unchanged files have cached findings,
+    #    changed files get full re-analysis. Verification would be redundant.
     from quodeq.analysis.subagents.verify import (
         load_previous_findings_for_dimension, _group_by_file, _write_verify_manifest,
     )
-    prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)
+    skip_verify = config.options.incremental and config.options.incremental_file_filter is not None
+    prev_findings = [] if skip_verify else load_previous_findings_for_dimension(config, dim_id, evidence_dir)
 
     # 3. Run AI verification pool (fast model) if there are findings to verify
     verify_results: list = []
