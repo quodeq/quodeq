@@ -225,6 +225,23 @@ class EvaluationError(RuntimeError):
     """Raised when an evaluation completes but produces no usable findings."""
 
 
+def _save_dimension_fingerprint(config: RunConfig, dimension: str, files: list[str] | None = None) -> None:
+    """Save a fingerprint after any successful dimension analysis."""
+    try:
+        from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
+        evidence_dir = config.work_dir or config.src
+        if files is None:
+            from quodeq.analysis.subagents.runner import _list_source_files
+            saved_filter = config.options.incremental_file_filter
+            config.options.incremental_file_filter = None
+            files, _ = _list_source_files(config, dimension)
+            config.options.incremental_file_filter = saved_filter
+        fp = build_fingerprint(config.src, files, dimension, config.standards_dir)
+        save_fingerprint(fp, evidence_dir)
+    except Exception:
+        pass  # fingerprint is best-effort, never block evaluation
+
+
 def _log_dimension_result(ev: Evidence, dimension: str, idx: int, total: int) -> None:
     """Emit scoring marker and log summary for a completed dimension."""
     emit_marker("scoring", dimension=dimension)
@@ -251,6 +268,7 @@ def _process_single_dimension(
         log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
         return None
 
+    _save_dimension_fingerprint(config, dimension)
     _log_dimension_result(ev, dimension, idx, ctx.total)
     return ev
 
