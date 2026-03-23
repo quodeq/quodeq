@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.engine.file_queue import FileQueue
-from quodeq.engine.subagent_pool import PoolPaths, SubagentPool
+from quodeq.engine.subagent_pool import PoolOptions, PoolPaths, SubagentPool
 
 
 class TestPrioritizationInFileQueue:
@@ -44,10 +44,8 @@ class TestPoolBudgetFlow:
 
         ac = AnalysisConfig(pool_budget=120, max_duration=1800, max_files_per_agent=50)
         pool = SubagentPool(
-            n_agents=1,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="test",
-            dimension="security",
+            options=PoolOptions(n_agents=1, prompt="test", dimension="security"),
             config=ac,
         )
 

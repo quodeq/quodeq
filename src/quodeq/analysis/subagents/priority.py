@@ -6,6 +6,7 @@ import json
 import os
 import re
 import subprocess
+from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
@@ -215,6 +216,15 @@ def compute_previous_violations(
     return counts
 
 
+@dataclass
+class PriorityContext:
+    """Optional scoring context for file prioritization."""
+    category: str | None = None
+    language: str | None = None
+    evidence_dir: Path | None = None
+    config: Any = None
+
+
 def prioritize_files(
     files: list[str],
     src: Path,
@@ -223,8 +233,15 @@ def prioritize_files(
     language: str | None = None,
     evidence_dir: Path | None = None,
     config: Any = None,
+    *,
+    context: PriorityContext | None = None,
 ) -> list[str]:
     """Score and sort files by analysis priority (highest first)."""
+    if context is not None:
+        category = category if category is not None else context.category
+        language = language if language is not None else context.language
+        evidence_dir = evidence_dir if evidence_dir is not None else context.evidence_dir
+        config = config if config is not None else context.config
     priority_config = load_priority_config()
     fan_in_divisor = priority_config.get("fan_in_divisor", 3)
     fan_in_max = priority_config.get("fan_in_max", 5)

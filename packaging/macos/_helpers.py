@@ -8,7 +8,17 @@ import urllib.error
 import urllib.request
 
 _HEALTH_TIMEOUT = 1.0
-_HOMEBREW_PATH_DIRS = "/usr/local/bin:/opt/homebrew/bin"
+
+
+def _homebrew_bin_dirs() -> str:
+    """Return Homebrew bin directories based on the CPU architecture."""
+    import platform
+    arch = platform.machine()
+    if arch == "arm64":
+        return "/opt/homebrew/bin"
+    elif arch == "x86_64":
+        return "/usr/local/bin"
+    return "/opt/homebrew/bin:/usr/local/bin"
 
 _cached_commands: dict[str, str | None] | None = None
 
@@ -25,7 +35,7 @@ def source_user_path() -> None:
             return
     except (subprocess.TimeoutExpired, OSError):
         pass
-    extra = f"{os.path.expanduser('~/.local/bin')}:{_HOMEBREW_PATH_DIRS}"
+    extra = f"{os.path.expanduser('~/.local/bin')}:{_homebrew_bin_dirs()}"
     os.environ["PATH"] = f"{os.environ.get('PATH', '')}:{extra}"
 
 

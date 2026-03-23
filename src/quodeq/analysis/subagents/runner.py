@@ -14,7 +14,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.analysis.subagents.pool import PoolPaths, SubagentPool
+from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents.priority import prioritize_files
 from quodeq.shared.logging import log_info, log_success, log_warning
 
@@ -130,10 +130,12 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
         pool_budget=pool_budget_val if pool_budget_val is not None else 600,
     )
     pool = SubagentPool(
-        n_agents=config.options.max_subagents,
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
-        prompt=prompt,
-        dimension=dim_id,
+        options=PoolOptions(
+            n_agents=config.options.max_subagents,
+            prompt=prompt,
+            dimension=dim_id,
+        ),
         config=base_ac,
     )
     return pool, pool.run()
@@ -172,12 +174,14 @@ def _run_verification_pool(
 
     n_agents = min(_VERIFY_N_AGENTS, len(files_to_verify))
     pool = SubagentPool(
-        n_agents=n_agents,
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
-        prompt=prompt,
-        dimension=dim_id,
+        options=PoolOptions(
+            n_agents=n_agents,
+            prompt=prompt,
+            dimension=dim_id,
+            scout_first=False,
+        ),
         config=ac,
-        scout_first=False,
     )
     return pool.run()
 

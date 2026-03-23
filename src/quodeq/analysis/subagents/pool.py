@@ -69,6 +69,15 @@ class PoolPaths:
 
 
 @dataclass
+class PoolOptions:
+    """Grouped behavioral configuration for the subagent pool."""
+    n_agents: int
+    prompt: str
+    dimension: str | list[str]
+    scout_first: bool = True
+
+
+@dataclass
 class SubagentResult:
     """Result from a single subagent run."""
     agent_id: str
@@ -83,16 +92,14 @@ class SubagentPool:
 
     def __init__(
         self,
-        n_agents: int,
         paths: PoolPaths,
-        prompt: str,
-        dimension: str | list[str],
+        options: PoolOptions,
         config: AnalysisConfig | None = None,
-        scout_first: bool = True,
     ):
-        self._n = max(1, n_agents)
-        self._work_dir, self._prompt = paths.work_dir, prompt
+        self._n = max(1, options.n_agents)
+        self._work_dir, self._prompt = paths.work_dir, options.prompt
         self._evidence_dir, self._queue_path = paths.evidence_dir, paths.queue_path
+        dimension = options.dimension
         if isinstance(dimension, list):
             self._dimensions, self._dimension = dimension, ",".join(dimension)
             self._dimension_key = "consolidated"
@@ -100,7 +107,7 @@ class SubagentPool:
             self._dimensions = [dimension] if dimension else []
             self._dimension, self._dimension_key = dimension, dimension
         self._base_config = config or AnalysisConfig()
-        self._scout_first, self._jsonl_lock = scout_first, threading.Lock()
+        self._scout_first, self._jsonl_lock = options.scout_first, threading.Lock()
         self._futures: dict[Future[SubagentResult], int] = {}
         self._finished: dict[str, bool] = {}
         self._next_idx = 0

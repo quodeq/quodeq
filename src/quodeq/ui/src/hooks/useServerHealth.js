@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getHealth } from '../api/index.js';
+import { SERVER_BASE_URL } from '../config.js';
 
 /**
  * Monitors server connectivity, polling every 5 seconds.
@@ -9,10 +10,9 @@ import { getHealth } from '../api/index.js';
  * Returns [serverConnected, setServerConnected].
  */
 const DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183];
-const DEFAULT_BASE_URL = 'http://127.0.0.1';
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
 
-export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAULT_BASE_URL } = {}) {
+export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER_BASE_URL } = {}) {
   const [serverConnected, setServerConnected] = useState(true);
 
   useEffect(() => {

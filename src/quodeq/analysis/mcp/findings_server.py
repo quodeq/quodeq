@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import logging
 import sys
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, TextIO, runtime_checkable
 
@@ -21,6 +22,15 @@ from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 from quodeq.core.standards.refs import load_compiled_requirements as _load_compiled_requirements
 
 _FINDING_SCHEMA_VERSION = 1
+
+
+@dataclass
+class CompiledContext:
+    """Grouped compiled-standards data for finding enrichment."""
+    compiled_refs: dict[str, list[dict]] = field(default_factory=dict)
+    compiled_reqs: dict[str, dict] = field(default_factory=dict)
+    req_to_dim: dict[str, str] = field(default_factory=dict)
+    dimension: str | None = None
 
 
 @runtime_checkable
@@ -53,7 +63,14 @@ class FindingsRouter:
         compiled_reqs: dict[str, dict] | None = None,
         dimension: str | None = None,
         req_to_dim: dict[str, str] | None = None,
+        *,
+        context: CompiledContext | None = None,
     ):
+        if context is not None:
+            compiled_refs = compiled_refs or context.compiled_refs
+            compiled_reqs = compiled_reqs or context.compiled_reqs
+            req_to_dim = req_to_dim or context.req_to_dim
+            dimension = dimension or context.dimension
         self._fh = output_fh
         self._refs = compiled_refs or {}
         self._reqs = compiled_reqs or {}
@@ -166,17 +183,20 @@ def main() -> None:
             for req_id in dim_reqs:
                 req_to_dim[req_id] = dim
 
+    ctx = CompiledContext(
+        compiled_refs=compiled_refs or {},
+        compiled_reqs=compiled_reqs or {},
+        req_to_dim=req_to_dim,
+        dimension=sa.dimension,
+    )
+
     queue: FileQueue | None = None
     if sa.queue_path:
         queue = FileQueue(Path(sa.queue_path))
 
     try:
         with open(sa.findings_file, "a") as findings_fh:
-            router = FindingsRouter(
-                findings_fh, compiled_refs,
-                compiled_reqs=compiled_reqs, dimension=sa.dimension,
-                req_to_dim=req_to_dim or None,
-            )
+            router = FindingsRouter(findings_fh, context=ctx)
             while True:
                 msg = read_message()
                 if msg is None:

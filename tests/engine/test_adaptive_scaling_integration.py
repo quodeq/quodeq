@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.engine.file_queue import FileQueue
-from quodeq.engine.subagent_pool import PoolPaths, SubagentPool
+from quodeq.engine.subagent_pool import PoolOptions, PoolPaths, SubagentPool
 
 
 def _counting_run_analysis(call_log):
@@ -37,10 +37,8 @@ class TestAdaptiveScalingIntegration:
         FileQueue(queue_path, [f"src/f{i}.py" for i in range(20)])
 
         pool = SubagentPool(
-            n_agents=5,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="analyse",
-            dimension="security",
+            options=PoolOptions(n_agents=5, prompt="analyse", dimension="security"),
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
@@ -58,10 +56,8 @@ class TestAdaptiveScalingIntegration:
         FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
 
         pool = SubagentPool(
-            n_agents=5,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="analyse",
-            dimension="security",
+            options=PoolOptions(n_agents=5, prompt="analyse", dimension="security"),
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
