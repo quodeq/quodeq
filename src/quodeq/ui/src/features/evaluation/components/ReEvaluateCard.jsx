@@ -127,13 +127,11 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
             style={{ flex: 1, marginTop: 0 }}
             disabled={!canStart}
             onClick={handleStart}
+            title="Fresh re-evaluation of all selected dimensions"
           >
             {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
           </button>
         </div>
-        {!disabled && selectedDims.size === 0 && (
-          <p className="form-hint">Select at least one dimension to start evaluation.</p>
-        )}
       </div>
     </div>
   );
