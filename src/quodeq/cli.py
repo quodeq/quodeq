@@ -184,6 +184,7 @@ def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, man
             verify_findings=not _no_verify(args),
             consolidated=not getattr(args, 'no_consolidated', False) and not bool(os.environ.get("QUODEQ_NO_CONSOLIDATE")),
             pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None),
+            incremental=args.incremental,
         ),
     )
 

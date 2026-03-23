@@ -20,6 +20,7 @@ class EvaluationOptions:
     verify_findings: bool = True
     max_subagents: int = 5
     pool_budget: int = 600
+    incremental: bool = False
 
 
 class ProjectActions(Protocol):
