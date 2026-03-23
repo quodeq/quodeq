@@ -136,3 +136,26 @@ class TestClassifyFiles:
         assert set(result.to_analyze) == {"a.py", "b.py"}
         assert len(result.unchanged) == 0
         assert result.full_reanalysis is True
+
+
+class TestIncrementalRunnerIntegration:
+    def test_incremental_file_filter_on_options(self):
+        from quodeq.analysis.runner import AnalysisOptions
+        opts = AnalysisOptions(incremental=True)
+        assert opts.incremental_file_filter is None
+        opts.incremental_file_filter = {"changed.py"}
+        assert "changed.py" in opts.incremental_file_filter
+        opts.incremental_file_filter = None
+        assert opts.incremental_file_filter is None
+
+    def test_no_changes_classify(self, tmp_path):
+        (tmp_path / "a.py").write_text("same")
+        prev_fp = {
+            "dimension": "security", "git_commit": None,
+            "file_hashes": {"a.py": hashlib.sha256(b"same").hexdigest()},
+            "standards_checksum": None,
+        }
+        result = classify_files(src=tmp_path, files=["a.py"], prev_fingerprint=prev_fp,
+                               standards_dir=None, dimension="security", language="python")
+        assert len(result.to_analyze) == 0
+        assert result.unchanged == {"a.py"}
