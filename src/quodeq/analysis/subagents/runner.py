@@ -15,6 +15,7 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.pool import PoolPaths, SubagentPool
+from quodeq.analysis.subagents.priority import prioritize_files
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 if TYPE_CHECKING:
@@ -59,17 +60,40 @@ def _list_source_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[s
     """List source files for the subagent queue from the target or manifest.
 
     Returns (files, extensions) or ([], set()) if none found.
+    Files are returned in priority order (most important first).
     """
     # Prefer target-scoped files when available
     if config.target is not None and config.target.source_files:
+        files = config.target.source_files
         extensions = set(config.target.language_stats.keys()) if config.target.language_stats else set()
-        return config.target.source_files, extensions
-
-    if config.manifest is not None and config.manifest.source_files:
+    elif config.manifest is not None and config.manifest.source_files:
+        files = config.manifest.source_files
         extensions = set(config.manifest.language_stats.keys()) if config.manifest.language_stats else set()
-        return config.manifest.source_files, extensions
+    else:
+        return [], set()
 
-    return [], set()
+    # Prioritize files: most important first
+    category = None
+    if config.target and config.target.category:
+        category = config.target.category
+    elif config.manifest:
+        category = config.manifest.category
+
+    evidence_dir = config.work_dir or config.src
+    files = prioritize_files(
+        files, config.src, dim_id,
+        category=category,
+        language=config.language,
+        evidence_dir=evidence_dir,
+        config=config,
+    )
+
+    # Incremental mode: filter to only changed + dependent files
+    if config.options.incremental_file_filter is not None:
+        filter_set = config.options.incremental_file_filter
+        files = [f for f in files if f in filter_set]
+
+    return files, extensions
 
 
 def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
@@ -95,6 +119,7 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
+    pool_budget_val = config.options.pool_budget
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -102,6 +127,7 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
         max_duration=config.options.max_duration,
         ai_model=subagent_model,
         max_files_per_agent=max_files_per_agent,
+        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
     )
     pool = SubagentPool(
         n_agents=config.options.max_subagents,
@@ -228,6 +254,7 @@ def process_consolidated_dimensions(
     # 4. Build AnalysisConfig
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
+    pool_budget_val = config.options.pool_budget
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -236,6 +263,7 @@ def process_consolidated_dimensions(
         ai_model=subagent_model,
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,
+        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
     )
 
     # 5. Launch pool
@@ -293,10 +321,13 @@ def process_dimension_with_subagents(
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
     # 2. Load and pre-filter previous findings for AI verification
+    #    Skip verification in incremental mode — unchanged files have cached findings,
+    #    changed files get full re-analysis. Verification would be redundant.
     from quodeq.analysis.subagents.verify import (
         load_previous_findings_for_dimension, _group_by_file, _write_verify_manifest,
     )
-    prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)
+    skip_verify = config.options.incremental and config.options.incremental_file_filter is not None
+    prev_findings = [] if skip_verify else load_previous_findings_for_dimension(config, dim_id, evidence_dir)
 
     # 3. Run AI verification pool (fast model) if there are findings to verify
     verify_results: list = []

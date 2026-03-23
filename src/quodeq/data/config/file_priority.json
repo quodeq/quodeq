@@ -1,0 +1,42 @@
+{
+  "path_boost": {
+    "src/": 5, "lib/": 5, "app/": 5, "core/": 5,
+    "pkg/": 4, "internal/": 4,
+    "test/": 1, "tests/": 1, "spec/": 1,
+    "docs/": 0, "scripts/": 0, "tools/": 0
+  },
+  "default_path_score": 2,
+  "entry_points": ["main.*", "app.*", "index.*", "routes.*", "server.*"],
+  "entry_point_boost": 3,
+  "category_keywords": {
+    "backend": ["controller", "service", "handler", "middleware", "router", "repository"],
+    "mobile": ["activity", "fragment", "viewmodel", "screen", "widget", "composable"],
+    "frontend": ["component", "page", "hook", "store", "reducer", "context"]
+  },
+  "category_keyword_boost": 2,
+  "dimension_keywords": {
+    "security": ["auth", "login", "crypto", "token", "session", "password", "secret", "sanitiz", "validat", "permission", "route", "handler", "middleware"],
+    "reliability": ["error", "exception", "retry", "fallback", "timeout", "recovery", "health", "monitor", "migration", "database", "circuit"],
+    "maintainability": [],
+    "performance": ["cache", "query", "database", "pool", "batch", "stream", "index", "optimize", "buffer"],
+    "flexibility": ["config", "plugin", "adapter", "factory", "interface", "abstract", "registry", "provider"],
+    "usability": ["accessibility", "a11y", "i18n", "locale", "input", "form", "validation", "aria"]
+  },
+  "dimension_keyword_boost": 5,
+  "maintainability_size_divisor": 2000,
+  "fan_in_divisor": 3,
+  "fan_in_max": 5,
+  "git_churn_divisor": 4,
+  "git_churn_max": 5,
+  "git_recency_days": 14,
+  "git_recency_multiplier": 1.5,
+  "git_lookback_months": 3,
+  "previous_violations_max": 5,
+  "import_patterns": {
+    "python": ["^\\s*(?:from|import)\\s+(\\S+)"],
+    "javascript": ["(?:import|require)\\s*\\(?['\"]([^'\"]+)", "from\\s+['\"]([^'\"]+)"],
+    "java": ["^\\s*import\\s+([\\w.]+)"],
+    "go": ["\"([^\"]+)\""],
+    "swift": ["^\\s*import\\s+(\\w+)"]
+  }
+}
