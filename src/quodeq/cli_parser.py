@@ -59,6 +59,10 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "--no-consolidated", action="store_true",
         help="Disable multi-dimension consolidation (evaluate dimensions separately)",
     )
+    parser.add_argument(
+        "--incremental", action="store_true",
+        help="Only analyze files changed since last evaluation (carry forward cached findings)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

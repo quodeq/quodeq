@@ -44,6 +44,8 @@ class AnalysisOptions:
     verify_findings: bool = False
     consolidated: bool = True
     pool_budget: int | None = None
+    incremental: bool = False
+    incremental_file_filter: set[str] | None = None
 
 
 @dataclass

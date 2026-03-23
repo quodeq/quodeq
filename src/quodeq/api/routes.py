@@ -201,6 +201,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
                     verify_findings=bool(payload.get("verifyFindings", False)),
                     max_subagents=max_subagents,
                     pool_budget=pool_budget,
+                    incremental=bool(payload.get("incremental", False)),
                 ),
             )
         except (FileNotFoundError, ValueError):

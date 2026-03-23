@@ -71,6 +71,8 @@ def _build_evaluate_cmd(
         cmd += ["-m", "numerical"]
     if options.max_subagents != 5:
         cmd += ["--n-subagents", str(options.max_subagents)]
+    if options.incremental:
+        cmd += ["--incremental"]
     return cmd
 
 
