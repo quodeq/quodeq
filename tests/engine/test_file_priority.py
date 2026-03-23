@@ -154,7 +154,7 @@ class TestComputePreviousViolations:
         assert counts == {}
 
     def test_consolidated_merges_dimensions(self, tmp_path):
-        def mock_load(config, dim, evidence_dir):
+        def mock_load(config, dim, evidence_dir, **kwargs):
             if dim == "security":
                 return [{"t": "violation", "file": "auth.py", "line": 1}]
             elif dim == "maintainability":

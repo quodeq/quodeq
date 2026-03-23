@@ -41,5 +41,6 @@ export function createProject(raw) {
     latestScore:  raw.latestScore ?? null,
     runsCount:    raw.runsCount ?? 0,
     filesCount:   raw.filesCount ?? null,
+    hasFingerprints: raw.hasFingerprints ?? false,
   };
 }

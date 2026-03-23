@@ -20,6 +20,7 @@ class BuildConfig:
     open_browser: bool
     no_build: bool
     reinstall: bool
+    dev: bool = False
 
 
 @dataclass(frozen=True)
