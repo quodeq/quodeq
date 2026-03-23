@@ -2,50 +2,47 @@ import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
 import { formatRunId } from '../utils/formatters.js';
 
 export default function ProjectHeader({
-  selectedDisplayName,
-  selectedProjectParent,
-  selectedProjectParentId,
-  onProjectChange,
-  headerMeta,
-  showRunNav,
-  runNavProps,
+  project = {},
+  navigation = {},
 }) {
+  const { displayName, parent, parentId, meta } = project;
+  const { onProjectChange, showRunNav, runNavProps } = navigation;
   return (
     <header className="content-header">
       <div className="content-header-left">
         <h1 className="content-project-name">
-          {selectedProjectParent && (
+          {parent && (
             <>
               <span
                 className="content-project-parent content-project-parent--link"
                 role="button"
                 tabIndex={0}
-                onClick={() => selectedProjectParentId && onProjectChange(selectedProjectParentId)}
-                onKeyDown={(e) => { if (e.key === 'Enter' && selectedProjectParentId) onProjectChange(selectedProjectParentId); }}
-              >{selectedProjectParent}</span>
+                onClick={() => parentId && onProjectChange(parentId)}
+                onKeyDown={(e) => { if (e.key === 'Enter' && parentId) onProjectChange(parentId); }}
+              >{parent}</span>
               <span className="content-project-sep">&rsaquo;</span>
             </>
           )}
-          {selectedDisplayName}
+          {displayName}
         </h1>
-        {headerMeta && (
+        {meta && (
           <div className="content-meta-row">
-            {headerMeta.repository && (
+            {meta.repository && (
               <span className="content-meta-chip">
                 <span className="content-meta-chip-label">Repository</span>
-                <span className="content-meta-chip-value">{headerMeta.repository}</span>
+                <span className="content-meta-chip-value">{meta.repository}</span>
               </span>
             )}
-            {headerMeta.discipline && (
+            {meta.discipline && (
               <span className="content-meta-chip">
                 <span className="content-meta-chip-label">Discipline</span>
-                <span className="content-meta-chip-value">{headerMeta.discipline}</span>
+                <span className="content-meta-chip-value">{meta.discipline}</span>
               </span>
             )}
-            {headerMeta.totalFiles && (
+            {meta.totalFiles && (
               <span className="content-meta-chip">
                 <span className="content-meta-chip-label">Source files</span>
-                <span className="content-meta-chip-value">{headerMeta.totalFiles.toLocaleString()}</span>
+                <span className="content-meta-chip-value">{meta.totalFiles.toLocaleString()}</span>
               </span>
             )}
           </div>

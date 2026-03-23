@@ -6,8 +6,15 @@ set -euo pipefail
 if [ -f "$HOME/.zprofile" ]; then source "$HOME/.zprofile" 2>/dev/null; fi
 if [ -f "$HOME/.zshrc" ]; then source "$HOME/.zshrc" 2>/dev/null; fi
 if [ -f "$HOME/.bash_profile" ]; then source "$HOME/.bash_profile" 2>/dev/null; fi
-# Homebrew paths are macOS-specific; this script only runs inside a .app bundle.
-export PATH="$PATH:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin"
+# Detect Homebrew prefix — use `brew --prefix` if available, fall back to arch-based defaults.
+if command -v brew &>/dev/null; then
+    _HOMEBREW_BIN="$(brew --prefix)/bin"
+elif [ "$(uname -m)" = "arm64" ]; then
+    _HOMEBREW_BIN="/opt/homebrew/bin"
+else
+    _HOMEBREW_BIN="/usr/local/bin"
+fi
+export PATH="$PATH:$HOME/.local/bin:$_HOMEBREW_BIN"
 
 # If dashboard is already running, just open the browser.
 # Ports 4173-4175 are the Vite preview server default range.

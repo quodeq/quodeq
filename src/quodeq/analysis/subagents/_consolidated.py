@@ -9,7 +9,7 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
-from quodeq.analysis.subagents.pool import PoolPaths, SubagentPool
+from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.shared.logging import log_info, log_warning
 
 if TYPE_CHECKING:
@@ -107,10 +107,12 @@ def process_consolidated_dimensions(
     # 4. Build config and launch pool
     base_ac = _build_consolidated_config(config, dimensions, files_per_agent)
     pool = SubagentPool(
-        n_agents=config.options.max_subagents,
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
-        prompt=prompt,
-        dimension=dimensions,
+        options=PoolOptions(
+            n_agents=config.options.max_subagents,
+            prompt=prompt,
+            dimension=dimensions,
+        ),
         config=base_ac,
     )
     results = pool.run()

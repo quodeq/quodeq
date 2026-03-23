@@ -10,20 +10,16 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage({
-  selectedProject,
-  selectedRun,
-  projects = [],
-  onNavigate,
-  onRunSelect,
+  data = {},
+  callbacks = {},
   runMode = false,
-  // Data from App-level useDashboard
-  dashboard,
-  accumulated,
-  loading,
-  error,
-  availableRuns = [],
-  overviewRunIndex = 0,
 }) {
+  const {
+    selectedProject, selectedRun, projects = [],
+    dashboard, accumulated, loading, error,
+    availableRuns = [], overviewRunIndex = 0,
+  } = data;
+  const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
 
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;

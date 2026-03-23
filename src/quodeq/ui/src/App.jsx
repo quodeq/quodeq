@@ -1,8 +1,6 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useMemo } from 'react';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
-import { useEvaluation } from './features/evaluation/hooks/useEvaluation.js';
-import { getLevels, STORAGE_KEY as POWER_KEY } from './features/evaluation/components/powerLevels.js';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
@@ -19,6 +17,7 @@ import { useNavStack } from './hooks/useNavStack.js';
 import { useRunNavigator } from './hooks/useRunNavigator.js';
 import { useProjectState } from './hooks/useProjectState.js';
 import { useAppSettings } from './hooks/useAppSettings.js';
+import { useEvaluationLifecycle } from './hooks/useEvaluationLifecycle.js';
 
 
 function MainContent({
@@ -34,10 +33,15 @@ function MainContent({
     case 'run':
       return (
         <DashboardPage
-          selectedProject={selectedProject} selectedRun={selectedRun} projects={projects}
-          onNavigate={handleNavigate} onRunSelect={page === 'overview' ? handleRunSelect : undefined}
-          dashboard={dashboard} accumulated={accumulated} loading={loading} error={error}
-          availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
+          data={{
+            selectedProject, selectedRun, projects,
+            dashboard, accumulated, loading, error,
+            availableRuns, overviewRunIndex,
+          }}
+          callbacks={{
+            onNavigate: handleNavigate,
+            onRunSelect: page === 'overview' ? handleRunSelect : undefined,
+          }}
           runMode={page === 'run'}
         />
       );
@@ -196,37 +200,13 @@ export default function App() {
   }, [selectedProject, projects]);
 
   // Evaluation
-  const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
-  const [analysisPower, setAnalysisPower] = useState(() => {
-    try { return Number(localStorage.getItem(POWER_KEY)) || 2; } catch (e) { console.warn('localStorage unavailable:', e); return 2; }
+  const {
+    job, jobError, liveViolations,
+    analysisPower, setAnalysisPower,
+    handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
+  } = useEvaluationLifecycle({
+    settings, navTab, loadProjects, setProjects, selectProjectAndRun, navReset,
   });
-
-  const prevJobRef = useRef(null);
-  useEffect(() => {
-    if (job?.status === 'running' && !prevJobRef.current) navTab('evaluate');
-    prevJobRef.current = job;
-  }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  function handleStartEvaluation(payload) {
-    const levels = getLevels();
-    const subagentModel = levels.find(l => l.level === analysisPower)?.model;
-    startEvaluation({ ...payload, aiCmd: settings.aiCmd || undefined, aiModel: settings.aiModel || undefined, subagentModel, verifyFindings: settings.verifyFindings });
-  }
-
-  function handleEvalDismiss(action) {
-    if (action === 'view') {
-      const project = job?.outputProject;
-      const runId = job?.outputRunId;
-      if (project) {
-        loadProjects()
-          .then((list) => setProjects(list))
-          .catch((err) => console.error('Operation failed:', err));
-        selectProjectAndRun(project, runId);
-      }
-      navReset();
-    }
-    clearJob();
-  }
 
   // Active tab / header visibility
   const activeTab = ['overview', 'projects', 'evaluate', 'settings'].includes(activePage.page)
@@ -242,13 +222,20 @@ export default function App() {
       <main className="dashboard">
         {showProjectHeader && (
           <ProjectHeader
-            selectedDisplayName={selectedDisplayName} selectedProjectParent={selectedProjectParent}
-            selectedProjectParentId={selectedProjectParentId} onProjectChange={handleProjectChange}
-            headerMeta={headerMeta} showRunNav={showRunNav}
-            runNavProps={{
-              currentOverviewRun, overviewRunIndex, availableRuns,
-              onRunPrev: handleRunPrev, onRunNext: handleRunNext,
-              onRunLatest: handleRunLatest, onViewRun: onViewRun,
+            project={{
+              displayName: selectedDisplayName,
+              parent: selectedProjectParent,
+              parentId: selectedProjectParentId,
+              meta: headerMeta,
+            }}
+            navigation={{
+              onProjectChange: handleProjectChange,
+              showRunNav,
+              runNavProps: {
+                currentOverviewRun, overviewRunIndex, availableRuns,
+                onRunPrev: handleRunPrev, onRunNext: handleRunNext,
+                onRunLatest: handleRunLatest, onViewRun: onViewRun,
+              },
             }}
           />
         )}

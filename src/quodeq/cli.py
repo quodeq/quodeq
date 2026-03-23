@@ -12,6 +12,8 @@ import uuid
 from pathlib import Path
 from typing import Callable
 
+from dataclasses import dataclass
+
 from quodeq.cli_parser import build_parser as build_parser  # re-export
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
@@ -24,6 +26,16 @@ from quodeq.shared.utils import is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
+
+
+@dataclass
+class ResolvedInputs:
+    """Grouped evaluation inputs that always travel together."""
+    src: Path
+    language: str
+    manifest: object  # SourceManifest | None
+    dims_data: dict
+
 
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
@@ -165,12 +177,11 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
     return args.no_verify or (env or os.environ).get("QUODEQ_NO_VERIFY") == "1"
 
 
-def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, manifest, dims_data: dict, evidence_dir: Path, env: dict[str, str] | None = None) -> RunConfig:
-    """Assemble a RunConfig from CLI args and resolved paths.
+def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evidence_dir: Path, env: dict[str, str] | None = None) -> RunConfig:
+    """Assemble a RunConfig from CLI args and resolved inputs.
 
-    All keyword parameters are required config inputs with no natural grouping
-    (source location, language, pre-scan manifest, dimension definitions, and
-    output path) — kept flat intentionally for call-site clarity.
+    *inputs* bundles the source path, language, manifest, and dimension data
+    that are resolved together early in the evaluation pipeline.
 
     *env* overrides ``os.environ`` for environment variable reads (useful for
     testing).
@@ -181,12 +192,12 @@ def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, man
     print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
 
     return RunConfig(
-        src=src,
-        language=language,
+        src=inputs.src,
+        language=inputs.language,
         standards_dir=standards_dir if standards_dir.exists() else None,
         work_dir=evidence_dir,
-        manifest=manifest,
-        dimensions_data=dims_data,
+        manifest=inputs.manifest,
+        dimensions_data=inputs.dims_data,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
             max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None, env=env),
@@ -210,6 +221,35 @@ def _save_manifest(manifest, evidence_dir: Path) -> None:
             _logger.debug("Could not write manifest: %s", exc)
 
 
+def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | None:
+    """Resolve src, language, manifest, and dims_data from CLI args.
+
+    Returns ``None`` (with error printed to stderr) if any step fails.
+    """
+    src = _resolve_repo(args)
+    if src is None:
+        return None
+
+    paths = default_paths()
+    if not paths.detection_file.exists() or not paths.dimensions_file.exists():
+        print("Configuration not found: detection.json and dimensions.json are required.", file=sys.stderr)
+        return None
+
+    language = _resolve_language(args, src, paths)
+    if language is None:
+        return None
+
+    from quodeq.analysis.runner import load_universal_dimensions
+    try:
+        dims_data = load_universal_dimensions(paths.dimensions_file)
+    except ValueError as exc:
+        print(f"Invalid dimensions config: {exc}", file=sys.stderr)
+        return None
+
+    manifest = _build_manifest(args, src, paths)
+    return ResolvedInputs(src=src, language=language, manifest=manifest, dims_data=dims_data)
+
+
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
     from quodeq.shared.prereqs import check_evaluate_prereqs
@@ -219,37 +259,20 @@ def run_evaluate(args: argparse.Namespace) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    src = _resolve_repo(args)
-    if src is None:
+    inputs = _resolve_evaluation_inputs(args)
+    if inputs is None:
         return 1
 
-    paths = default_paths()
-    if not paths.detection_file.exists() or not paths.dimensions_file.exists():
-        print("Configuration not found: detection.json and dimensions.json are required.", file=sys.stderr)
-        return 1
-
-    language = _resolve_language(args, src, paths)
-    if language is None:
-        return 1
-
-    from quodeq.analysis.runner import load_universal_dimensions
-    try:
-        dims_data = load_universal_dimensions(paths.dimensions_file)
-    except ValueError as exc:
-        print(f"Invalid dimensions config: {exc}", file=sys.stderr)
-        return 1
-
-    manifest = _build_manifest(args, src, paths)
-    _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, src)
+    _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, inputs.src)
     print(f"Report path: {evaluation_dir}", file=sys.stderr)
-    _save_manifest(manifest, evidence_dir)
+    _save_manifest(inputs.manifest, evidence_dir)
 
-    config = _build_run_config(args, src=src, language=language, manifest=manifest, dims_data=dims_data, evidence_dir=evidence_dir)
+    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
     try:
         return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
     finally:
         if is_repo_url(args.repo):
-            cleanup_cloned_repo(str(src))
+            cleanup_cloned_repo(str(inputs.src))
 
 
 def _run_dashboard(argv: list[str] | None) -> int:

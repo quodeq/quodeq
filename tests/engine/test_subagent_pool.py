@@ -9,7 +9,7 @@ import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError
 from quodeq.engine.file_queue import FileQueue
-from quodeq.engine.subagent_pool import PoolPaths, SubagentPool, SubagentResult
+from quodeq.engine.subagent_pool import PoolOptions, PoolPaths, SubagentPool, SubagentResult
 
 
 def _fake_run_analysis(work_dir, prompt, stream_file, config):
@@ -48,10 +48,8 @@ class TestSubagentPool:
         FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
 
         pool = SubagentPool(
-            n_agents=3,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="analyse files",
-            dimension="maintainability",
+            options=PoolOptions(n_agents=3, prompt="analyse files", dimension="maintainability"),
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
@@ -68,10 +66,8 @@ class TestSubagentPool:
         FileQueue(queue_path, ["a.py"])
 
         pool = SubagentPool(
-            n_agents=2,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="test",
-            dimension="security",
+            options=PoolOptions(n_agents=2, prompt="test", dimension="security"),
             config=AnalysisConfig(compiled_dir=tmp_path / "compiled"),
         )
 
@@ -94,10 +90,8 @@ class TestSubagentPool:
                 _fake_run_analysis(work_dir, prompt, stream_file, config)
 
         pool = SubagentPool(
-            n_agents=3,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="test",
-            dimension="maint",
+            options=PoolOptions(n_agents=3, prompt="test", dimension="maint"),
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
@@ -116,10 +110,8 @@ class TestSubagentPool:
         FileQueue(queue_path, ["a.py"])
 
         pool = SubagentPool(
-            n_agents=0,
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            prompt="test",
-            dimension="maint",
+            options=PoolOptions(n_agents=0, prompt="test", dimension="maint"),
         )
 
         with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):

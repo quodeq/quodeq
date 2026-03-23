@@ -152,9 +152,30 @@ class FileClassification:
     full_reanalysis: bool = False
 
 
-def classify_files(src: Path, files: list[str], prev_fingerprint: dict | None,
-                   standards_dir: Path | None, dimension: str, language: str) -> FileClassification:
+@dataclass
+class ClassificationInput:
+    """Grouped inputs for file classification."""
+    src: Path
+    files: list[str]
+    prev_fingerprint: dict | None
+    standards_dir: Path | None
+    dimension: str
+    language: str
+
+
+def classify_files(src: Path | None = None, files: list[str] | None = None,
+                   prev_fingerprint: dict | None = None,
+                   standards_dir: Path | None = None, dimension: str = "",
+                   language: str = "", *,
+                   inputs: "ClassificationInput | None" = None) -> FileClassification:
     """Classify files into to_analyze (changed + dependents) and unchanged."""
+    if inputs is not None:
+        src = src or inputs.src
+        files = files if files is not None else inputs.files
+        prev_fingerprint = prev_fingerprint if prev_fingerprint is not None else inputs.prev_fingerprint
+        standards_dir = standards_dir or inputs.standards_dir
+        dimension = dimension or inputs.dimension
+        language = language or inputs.language
     detection = detect_changed_files(src, files, prev_fingerprint, standards_dir, dimension)
     if detection.full_reanalysis:
         return FileClassification(to_analyze=list(files), full_reanalysis=True)
