@@ -26,6 +26,7 @@ function MainContent({
   availableRuns, overviewRunIndex, job, jobError, liveViolations,
   analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
   settings, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject,
+  serverConnected, setServerConnected,
 }) {
   const { page, ...params } = activePage;
   switch (page) {
@@ -49,11 +50,14 @@ function MainContent({
       return <ExplorerPage project={selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={handleNavigate} />;
     case 'evaluate':
       return (
-        <EvaluateScreen
-          evaluation={{ job, jobError, liveViolations }}
-          context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
-          actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
-        />
+        <>
+          {!serverConnected && <ServerDisconnectedOverlay onReconnect={() => setServerConnected(true)} />}
+          <EvaluateScreen
+            evaluation={{ job, jobError, liveViolations }}
+            context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
+            actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
+          />
+        </>
       );
     case 'file':
       return <FileDetailPage file={params.file} />;
@@ -217,7 +221,6 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      {!serverConnected && <ServerDisconnectedOverlay onReconnect={() => setServerConnected(true)} />}
       <Sidebar activeTab={activeTab} onNavTab={navTab} />
       <main className="dashboard">
         {showProjectHeader && (
@@ -252,6 +255,7 @@ export default function App() {
           settings={settings}
           handleProjectChange={handleProjectChange} navTab={navTab}
           handleDeleteProject={handleDeleteProject} handleExportProject={handleExportProject} handleRelocateProject={handleRelocateProject}
+          serverConnected={serverConnected} setServerConnected={setServerConnected}
         />
       </main>
     </div>
