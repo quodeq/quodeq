@@ -30,6 +30,7 @@ def _load_config(env=None):
 
 
 def _health_check(port: int) -> bool:
+    # NOTE: Plain HTTP is intentional here — traffic is loopback-only (127.0.0.1).
     try:
         url = f"http://127.0.0.1:{port}/api/health"
         with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:

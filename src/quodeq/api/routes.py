@@ -162,7 +162,7 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     return None
 
 
-def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> None:
+def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
 
     @app.get("/api/evaluations")
@@ -171,6 +171,17 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider) -> Non
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
+        # Enforce stricter per-endpoint rate limit for evaluation creation
+        if eval_rate_store is not None:
+            import time as _time
+            ip = request.remote_addr or "unknown"
+            now = _time.monotonic()
+            if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
+                body, status = error_response(
+                    "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
+                )
+                return jsonify(body), status
+            eval_rate_store.record(ip, now)  # type: ignore[union-attr]
         payload = request.get_json(silent=True) or {}
         validation_error = validate_evaluation_payload(payload)
         if validation_error:

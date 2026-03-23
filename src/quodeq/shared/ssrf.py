@@ -25,5 +25,6 @@ def is_private_address(hostname: str) -> bool:
             if addr.is_private or addr.is_loopback or addr.is_link_local:
                 return True
     except (socket.gaierror, OSError) as exc:
-        _logger.warning("DNS resolution failed for %r — treating as non-private: %s", hostname, exc)
+        _logger.warning("DNS resolution failed for %r — treating as private (fail-closed): %s", hostname, exc)
+        return True
     return False
