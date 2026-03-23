@@ -171,8 +171,11 @@ class HttpClient:
             if self._failure_count >= self._cb_threshold and self._circuit_opened_at is None:
                 self._circuit_opened_at = time.monotonic()
 
-    def _validate_url(self, url: str) -> None:
+    def _validate_url(self, url: str, env: dict[str, str] | None = None) -> None:
         """Validate URL scheme and check for private/plaintext restrictions.
+
+        *env* overrides ``os.environ`` for testing (consistent with other
+        functions in this module).
 
         .. note:: DNS rebinding caveat — hostname is resolved here but
            ``urlopen`` re-resolves independently.  For untrusted URLs in
@@ -186,7 +189,7 @@ class HttpClient:
             if self._allow_plaintext_http is not None:
                 allow = self._allow_plaintext_http
             else:
-                allow = os.environ.get(_ENV_ALLOW_PLAINTEXT_HTTP) == "1"
+                allow = (env or os.environ).get(_ENV_ALLOW_PLAINTEXT_HTTP) == "1"
             if not allow:
                 raise ValueError(
                     f"Cleartext HTTP to {parsed.hostname!r} is blocked — credentials would be "

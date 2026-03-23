@@ -5,6 +5,8 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 
 // ---------------------------------------------------------------------------
 // DashboardPage — body only, header is rendered by App.jsx
+// Top-level page component that receives all dashboard state and callbacks
+// directly from App; the high prop count is intentional and not worth splitting.
 // ---------------------------------------------------------------------------
 
 export default function DashboardPage({

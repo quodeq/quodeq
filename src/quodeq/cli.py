@@ -166,7 +166,12 @@ def _no_verify(args: argparse.Namespace, env: dict[str, str] | None = None) -> b
 
 
 def _build_run_config(args: argparse.Namespace, *, src: Path, language: str, manifest, dims_data: dict, evidence_dir: Path) -> RunConfig:
-    """Assemble a RunConfig from CLI args and resolved paths."""
+    """Assemble a RunConfig from CLI args and resolved paths.
+
+    All keyword parameters are required config inputs with no natural grouping
+    (source location, language, pre-scan manifest, dimension definitions, and
+    output path) — kept flat intentionally for call-site clarity.
+    """
     standards_dir = default_paths().standards_dir
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
     print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)

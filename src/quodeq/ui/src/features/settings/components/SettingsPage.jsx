@@ -4,6 +4,8 @@ import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/components/powerLevels.js';
 import SettingsAside from './SettingsAside.jsx';
 
+const AI_MODEL_STORAGE_KEY = 'cc-ai-model';
+
 const _SETTINGS_PHRASES = [
   'quode with cuore \u2665',
   'human aligned quode',
@@ -166,9 +168,9 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
                   const v = e.target.value;
                   onAiModelChange(v);
                   if (v) {
-                    localStorage.setItem('cc-ai-model', v);
+                    localStorage.setItem(AI_MODEL_STORAGE_KEY, v);
                   } else {
-                    localStorage.removeItem('cc-ai-model');
+                    localStorage.removeItem(AI_MODEL_STORAGE_KEY);
                   }
                 }}
               />

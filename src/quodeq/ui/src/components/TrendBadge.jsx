@@ -9,8 +9,19 @@ export default function TrendBadge({ delta, trend, showLabel = false }) {
   if (delta === null || delta === undefined) return null;
 
   const d = parseFloat(delta);
-  const label = d > IMPROVING_THRESHOLD ? 'Improving' : d < DECLINING_THRESHOLD ? 'Declining' : 'Stable';
-  const dir = trend || (d > IMPROVING_THRESHOLD ? 'up' : d > SOFT_UP_THRESHOLD ? 'soft-up' : d < DECLINING_THRESHOLD ? 'down' : d < SOFT_DOWN_THRESHOLD ? 'soft-down' : 'same');
+
+  let label;
+  if (d > IMPROVING_THRESHOLD) label = 'Improving';
+  else if (d < DECLINING_THRESHOLD) label = 'Declining';
+  else label = 'Stable';
+
+  let dir;
+  if (trend) dir = trend;
+  else if (d > IMPROVING_THRESHOLD) dir = 'up';
+  else if (d > SOFT_UP_THRESHOLD) dir = 'soft-up';
+  else if (d < DECLINING_THRESHOLD) dir = 'down';
+  else if (d < SOFT_DOWN_THRESHOLD) dir = 'soft-down';
+  else dir = 'same';
 
   return (
     <span className={`trend-badge trend-badge-${dir}`}>

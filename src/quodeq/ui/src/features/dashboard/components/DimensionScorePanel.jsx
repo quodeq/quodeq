@@ -22,6 +22,7 @@ const cssVar = (() => {
 })();
 
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
+const CHART_LEFT_MARGIN = -16;
 
 function scoreBarColor(score) {
   const n = parseFloat(score);
@@ -137,7 +138,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
         )}
       </div>
       <ResponsiveContainer width="100%" height={160}>
-        <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
+        <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: CHART_LEFT_MARGIN }}>
           <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
           <XAxis
             dataKey="dimension"

@@ -73,7 +73,8 @@ export function useEvaluation() {
                 partialDimensionsRef.current.delete(dim);
               }
             }
-          } catch {
+          } catch (err) {
+            console.debug('Dimension poll failed:', dim, err);
             const fails = (dimFailCountRef.current[dim] || 0) + 1;
             dimFailCountRef.current[dim] = fails;
             if (fails > MAX_DIM_POLL_FAILURES) partialDimensionsRef.current.delete(dim);
@@ -99,7 +100,8 @@ export function useEvaluation() {
           partialDimensionsRef.current.add(updated.currentDimension);
         }
         const hasOutput = updated.outputProject && updated.outputRunId;
-        const canPollDims = hasOutput && (updated.phase === 'analyzing' || updated.phase === 'scoring' || updated.status !== 'running');
+        const isAnalyzing = updated.phase === 'analyzing' || updated.phase === 'scoring' || updated.status !== 'running';
+        const canPollDims = hasOutput && isAnalyzing;
         if (updated.status !== 'running') {
           stopPolling();
           if (canPollDims && !dimPollingStarted) {

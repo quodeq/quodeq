@@ -1,9 +1,9 @@
 """Helper functions for the filesystem action provider."""
 from __future__ import annotations
 
+import functools
 import json
 import os
-import threading
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
@@ -176,13 +176,6 @@ def _infer_discipline(reports_root: Path, project: str) -> str | None:
     return None
 
 
-# Module-level cache for available dimension IDs from dimensions.json.
-# Populated lazily on first call; avoids repeated disk I/O on every request.
-# Safe for concurrent reads after initial population (immutable list value).
-_cached_dimensions: list[str] | None = None
-_cached_dimensions_lock = threading.Lock()
-
-
 def _has_fingerprints(reports_root: Path, project: str) -> bool:
     """Check if any evaluation run has fingerprint files for this project."""
     project_dir = reports_root / project
@@ -200,20 +193,18 @@ def _has_fingerprints(reports_root: Path, project: str) -> bool:
     return False
 
 
-def _list_available_dimensions_for_discipline() -> list[str]:
-    """Resolve available dimensions from universal dimensions.json (cached after first read)."""
-    global _cached_dimensions
-    with _cached_dimensions_lock:
-        if _cached_dimensions is not None:
-            return _cached_dimensions
-        try:
-            paths = default_paths()
-            universal_dims = paths.dimensions_file
-            if universal_dims.exists():
-                data = json.loads(universal_dims.read_text())
-                _cached_dimensions = [d["id"] for d in data.get("applies", [])]
-                return _cached_dimensions
-            _cached_dimensions = []
-            return _cached_dimensions
-        except (OSError, json.JSONDecodeError, KeyError, TypeError):
-            return []
+@functools.lru_cache(maxsize=1)
+def _list_available_dimensions_for_discipline() -> tuple[str, ...]:
+    """Resolve available dimensions from universal dimensions.json (cached after first read).
+
+    Returns a tuple (immutable) so the result is safe for lru_cache.
+    """
+    try:
+        paths = default_paths()
+        universal_dims = paths.dimensions_file
+        if universal_dims.exists():
+            data = json.loads(universal_dims.read_text())
+            return tuple(d["id"] for d in data.get("applies", []))
+        return ()
+    except (OSError, json.JSONDecodeError, KeyError, TypeError):
+        return ()

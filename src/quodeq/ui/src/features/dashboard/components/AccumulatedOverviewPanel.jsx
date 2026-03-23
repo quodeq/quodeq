@@ -39,6 +39,8 @@ function sortDimensionsByViolationSeverity(dimensions) {
 
 // ---------------------------------------------------------------------------
 // Accumulated overview panel
+// Top-level panel component — prop count is intentional to avoid unnecessary
+// indirection; each prop maps directly to a distinct piece of state or callback.
 // ---------------------------------------------------------------------------
 
 export default function AccumulatedOverviewPanel({
