@@ -17,7 +17,7 @@ export function useAppSettings() {
   const [modelBalanced, setModelBalanced] = useState(safeGet(`${MODEL_STORAGE_PREFIX}2`));
   const [modelThorough, setModelThorough] = useState(safeGet(`${MODEL_STORAGE_PREFIX}3`));
   const [verifyFindings, setVerifyFindings] = useState(() => {
-    try { return localStorage.getItem(VERIFY_FINDINGS_KEY) === 'true'; } catch { return false; }
+    try { const v = localStorage.getItem(VERIFY_FINDINGS_KEY); return v === null ? true : v === 'true'; } catch { return true; }
   });
 
   function applyTheme(value) {

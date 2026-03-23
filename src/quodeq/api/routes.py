@@ -203,7 +203,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
                     ai_cmd=ai_cmd,
                     ai_model=payload.get("aiModel") or None,
                     subagent_model=payload.get("subagentModel") or None,
-                    verify_findings=bool(payload.get("verifyFindings", False)),
+                    verify_findings=bool(payload.get("verifyFindings", True)),
                     max_subagents=max_subagents,
                     pool_budget=pool_budget,
                     incremental=bool(payload.get("incremental", False)),
