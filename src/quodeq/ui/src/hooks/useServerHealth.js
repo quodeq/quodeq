@@ -36,7 +36,7 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = DEFAUL
               window.location.href = `${baseUrl}:${port}`;
               return;
             }
-          } catch { /* try next */ }
+          } catch { console.debug('Port probe failed:', port); }
         }
         if (mounted) setServerConnected(false);
       }

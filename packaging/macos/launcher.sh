@@ -12,7 +12,7 @@ export PATH="$PATH:$HOME/.local/bin:/usr/local/bin:/opt/homebrew/bin"
 # If dashboard is already running, just open the browser
 QUODEQ_PORTS="${QUODEQ_PORTS:-4173 4174 4175}"
 for PORT in $QUODEQ_PORTS; do
-    if curl -s "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q '"ok"'; then
+    if curl -s --max-time 3 "http://127.0.0.1:$PORT/api/health" 2>/dev/null | grep -q '"ok"'; then
         open "http://127.0.0.1:$PORT"
         exit 0
     fi

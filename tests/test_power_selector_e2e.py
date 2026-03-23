@@ -49,7 +49,7 @@ def _capture_popen_args(tmp_path: Path, ai_model: str | None) -> list[str]:
                 config=config,
             )
         except (OSError, RuntimeError, ValueError, TypeError):
-            pass  # We only care about what Popen received
+            pass  # Intentional: run_analysis may fail after Popen (missing files, mock side-effects); we only inspect the captured Popen args
 
     assert mock_popen.called, "Popen was never called"
     return mock_popen.call_args[0][0]  # positional arg 0 = args list

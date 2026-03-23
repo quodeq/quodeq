@@ -96,6 +96,8 @@ class QuodeqApp(rumps.App):
         self._process: subprocess.Popen | None = None
         self._port: int | None = None
         self._starting = False
+        self._state_lock = threading.Lock()
+        self._stderr_log_path: str | None = None
         self._icon_stopped = _find_icon("menubar_iconTemplate.png")
         self._icon_running = _find_icon("menubar_icon_running.png")
         self._icon_evaluating = _find_icon("menubar_icon_evaluating.png")
@@ -197,19 +199,32 @@ class QuodeqApp(rumps.App):
         threading.Thread(target=self._do_start, daemon=True).start()
 
     def _do_start(self):
-        if self._starting:
-            return
-        if self._find_running_port():
-            return
-        self._starting = True
+        with self._state_lock:
+            if self._starting:
+                return
+            if self._find_running_port():
+                return
+            self._starting = True
         self._clear_error()
         try:
             self._do_start_inner()
-        except Exception as e:
+        except (OSError, subprocess.SubprocessError, ValueError) as e:
             self._set_error(f"Error: {e}")
             self._status_item.title = "Stopped"
+            self._cleanup_stderr_log()
         finally:
-            self._starting = False
+            with self._state_lock:
+                self._starting = False
+
+    def _cleanup_stderr_log(self) -> None:
+        """Remove the stderr log tempfile if it exists."""
+        path = self._stderr_log_path
+        if path:
+            try:
+                os.unlink(path)
+            except OSError:
+                pass
+            self._stderr_log_path = None
 
     def _do_start_inner(self):
         cmds = _find_commands()
@@ -222,6 +237,7 @@ class QuodeqApp(rumps.App):
         stderr_log = tempfile.NamedTemporaryFile(
             prefix="quodeq-dashboard-", suffix=".log", delete=False, mode="w",
         )
+        self._stderr_log_path = stderr_log.name
         try:
             cmd = [quodeq_cmd, "dashboard"]
             # Pass flags only if the CLI supports them
@@ -256,6 +272,7 @@ class QuodeqApp(rumps.App):
                     err = "unknown error"
                 self._set_error(f"Crashed (exit {self._process.returncode}): {err[:200]}")
                 self._status_item.title = "Stopped"
+                self._cleanup_stderr_log()
                 return
             port = self._find_running_port()
             if port:
@@ -264,6 +281,7 @@ class QuodeqApp(rumps.App):
                 return
         self._set_error("Timeout: dashboard did not respond")
         self._status_item.title = "Stopped"
+        self._cleanup_stderr_log()
 
     @staticmethod
     def _kill_port_processes(port: int) -> None:
@@ -298,6 +316,7 @@ class QuodeqApp(rumps.App):
         self._port = None
         self._status_item.title = "Stopped"
         self._set_ui_state(running=False)
+        self._cleanup_stderr_log()
 
 
 def main():

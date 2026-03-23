@@ -1,6 +1,7 @@
 """Shared LRU cache factory for dimension fetchers."""
 from __future__ import annotations
 
+import logging
 import threading
 from collections import OrderedDict
 from pathlib import Path
@@ -8,6 +9,8 @@ from typing import Callable
 
 from quodeq.adapters.fs.report_parser import read_run_data
 from quodeq.core.types import DimensionResult
+
+_logger = logging.getLogger(__name__)
 
 
 def make_lru_dimension_fetcher(
@@ -28,7 +31,11 @@ def make_lru_dimension_fetcher(
             if key in cache:
                 cache.move_to_end(key)
                 return cache[key]
-        data = read_run_data(reports_root, project, run_id)
+        try:
+            data = read_run_data(reports_root, project, run_id)
+        except (OSError, ValueError) as exc:
+            _logger.warning("Failed to read run data for %s/%s: %s", project, run_id, exc)
+            return []
         with lock:
             if key in cache:
                 cache.move_to_end(key)

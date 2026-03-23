@@ -151,34 +151,38 @@ def _build_parser() -> argparse.ArgumentParser:
 def main():
     args = _build_parser().parse_args()
 
-    dry_run = not args.apply_
-    evals_dir = Path(args.evaluations_dir) if args.evaluations_dir else repo_root / "evaluations"
-    project_dir = evals_dir / args.project
+    try:
+        dry_run = not args.apply_
+        evals_dir = Path(args.evaluations_dir) if args.evaluations_dir else repo_root / "evaluations"
+        project_dir = evals_dir / args.project
 
-    if not project_dir.exists():
-        print(f"Project dir not found: {project_dir}")
+        if not project_dir.exists():
+            print(f"Project dir not found: {project_dir}")
+            sys.exit(1)
+
+        evaluators_root = repo_root / _EVALUATORS_DIR
+        evidence_files = sorted(project_dir.glob("*/evidence/*_evidence.json"))
+        if not evidence_files:
+            print(f"No evidence files found in {project_dir}")
+            sys.exit(1)
+
+        mode_label = "DRY-RUN" if dry_run else "APPLY"
+        print(f"Found {len(evidence_files)} evidence files in {project_dir}  [{mode_label}]\n")
+        ok = fail = 0
+        for ef in evidence_files:
+            run_id = ef.parents[1].name
+            print(f"[{run_id}]")
+            if rescore_evidence_file(ef, evaluators_root, dry_run=dry_run):
+                ok += 1
+            else:
+                fail += 1
+
+        print(f"\nDone — {ok} rescored, {fail} skipped/failed")
+        if dry_run and ok:
+            print("Run with --apply to write changes.")
+    except Exception as exc:
+        print(f"Fatal error: {exc}", file=sys.stderr)
         sys.exit(1)
-
-    evaluators_root = repo_root / _EVALUATORS_DIR
-    evidence_files = sorted(project_dir.glob("*/evidence/*_evidence.json"))
-    if not evidence_files:
-        print(f"No evidence files found in {project_dir}")
-        sys.exit(1)
-
-    mode_label = "DRY-RUN" if dry_run else "APPLY"
-    print(f"Found {len(evidence_files)} evidence files in {project_dir}  [{mode_label}]\n")
-    ok = fail = 0
-    for ef in evidence_files:
-        run_id = ef.parents[1].name
-        print(f"[{run_id}]")
-        if rescore_evidence_file(ef, evaluators_root, dry_run=dry_run):
-            ok += 1
-        else:
-            fail += 1
-
-    print(f"\nDone — {ok} rescored, {fail} skipped/failed")
-    if dry_run and ok:
-        print("Run with --apply to write changes.")
 
 
 if __name__ == "__main__":

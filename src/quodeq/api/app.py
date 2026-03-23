@@ -72,6 +72,8 @@ class InMemoryRateLimitStore:
     Set ``QUODEQ_RATE_LIMIT_STORE=redis`` to opt in (requires custom wiring).
     """
 
+    _CLEANUP_INTERVAL = 60  # seconds between full TTL sweeps
+
     def __init__(
         self,
         window: float | None = None,
@@ -82,6 +84,7 @@ class InMemoryRateLimitStore:
         self._window = window if window is not None else _rate_limit_window()
         self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
         self._max_ips = max_ips
+        self._last_cleanup: float = 0.0
 
     def _evict_stale(self, now: float) -> None:
         if len(self._store) <= self._max_ips:
@@ -97,8 +100,18 @@ class InMemoryRateLimitStore:
         if len(self._store) > self._max_ips:
             self._store.clear()
 
+    def _periodic_cleanup(self, now: float) -> None:
+        """Remove all expired entries if enough time has passed since the last sweep."""
+        if now - self._last_cleanup < self._CLEANUP_INTERVAL:
+            return
+        self._last_cleanup = now
+        stale = [k for k, v in self._store.items() if all(now - t >= self._window for t in v)]
+        for k in stale:
+            del self._store[k]
+
     def record(self, ip: str, now: float) -> None:
         """Record a state-changing request from *ip* at time *now*."""
+        self._periodic_cleanup(now)
         timestamps = self._store.setdefault(ip, [])
         timestamps.append(now)
         if len(timestamps) > self._max_requests * 2:

@@ -124,8 +124,8 @@ def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
             if os.path.exists(tmp):
                 try:
                     os.unlink(tmp)
-                except OSError:
-                    pass
+                except OSError as exc:
+                    logging.getLogger(__name__).debug("Could not remove temp file %s: %s", tmp, exc)
     except OSError as exc:
         logging.getLogger(__name__).warning("Could not save project index: %s", exc)
 

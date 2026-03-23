@@ -22,6 +22,7 @@ def test_get_current_provider_returns_default_when_no_env(tmp_path):
     paths = ConfigPaths.from_root(tmp_path)
     result = get_current_provider(paths)
     assert result is not None  # falls back to default provider
+    assert isinstance(result, str) and len(result) > 0
 
 
 def test_configure_unknown_provider(tmp_path):

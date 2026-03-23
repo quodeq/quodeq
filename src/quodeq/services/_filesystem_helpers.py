@@ -203,8 +203,6 @@ def _has_fingerprints(reports_root: Path, project: str) -> bool:
 def _list_available_dimensions_for_discipline() -> list[str]:
     """Resolve available dimensions from universal dimensions.json (cached after first read)."""
     global _cached_dimensions
-    if _cached_dimensions is not None:
-        return _cached_dimensions
     with _cached_dimensions_lock:
         if _cached_dimensions is not None:
             return _cached_dimensions

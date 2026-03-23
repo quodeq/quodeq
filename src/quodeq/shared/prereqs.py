@@ -17,10 +17,14 @@ _INSTALL_HINT_CLAUDE = (
 )
 
 
+_VERSION_CMD_TIMEOUT_S = 30
+
+
 def _run_version_cmd(cmd: list[str]) -> str:
     """Run a command and return its stdout, or raise FileNotFoundError."""
     result = subprocess.run(
         cmd, capture_output=True, text=True, check=True, shell=_IS_WIN32,
+        timeout=_VERSION_CMD_TIMEOUT_S,
     )
     return result.stdout.strip()
 

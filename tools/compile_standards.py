@@ -196,11 +196,17 @@ def main() -> None:
             print("No orphan CWEs found.")
         return
 
-    args.output_dir.mkdir(parents=True, exist_ok=True)
+    try:
+        args.output_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise SystemExit(f"Cannot create output directory {args.output_dir}: {exc}") from exc
     for dim in dimensions:
         compiled = compile_dimension(args.standards_dir, dim, cwe_db)
         out_file = args.output_dir / f"{dim}.json"
-        out_file.write_text(json.dumps(compiled, indent=2) + "\n", encoding=_TEXT_ENCODING)
+        try:
+            out_file.write_text(json.dumps(compiled, indent=2) + "\n", encoding=_TEXT_ENCODING)
+        except OSError as exc:
+            raise SystemExit(f"Cannot write {out_file}: {exc}") from exc
         n_principles = len(compiled["principles"])
         n_reqs = sum(len(p["requirements"]) for p in compiled["principles"])
         print(f"  {dim}: {n_principles} principles, {n_reqs} requirements -> {out_file}")

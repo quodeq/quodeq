@@ -19,7 +19,10 @@ from quodeq.config.paths import default_paths
 def load_priority_config() -> dict:
     """Load file priority config. Cached after first call."""
     config_path = default_paths().root / "config" / "file_priority.json"
-    return json.loads(config_path.read_text())
+    try:
+        return json.loads(config_path.read_text())
+    except (FileNotFoundError, PermissionError, json.JSONDecodeError):
+        return {}
 
 
 def compute_base_score(filepath: str, category: str | None = None) -> int:
