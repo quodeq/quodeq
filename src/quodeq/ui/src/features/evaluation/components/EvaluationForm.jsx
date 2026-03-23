@@ -108,16 +108,22 @@ function useEvaluationForm(onStart) {
     setRepo('');
     setSelectedDims(new Set());
   };
+  const handleIncrementalSubmit = (e) => {
+    e.preventDefault();
+    const payload = { repo, incremental: true };
+    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) payload.dimensions = [...selectedDims];
+    onStart(payload);
+  };
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
   const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
 
-  return { repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen, toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError };
+  return { repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen, toggleDim, selectAll, clearAll, handleSubmit, handleIncrementalSubmit, handleFolderSelect, handleRepoClear, dimLoadError };
 }
 
 export default function EvaluationForm({ onStart, disabled }) {
   const {
     repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen,
-    toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError,
+    toggleDim, selectAll, clearAll, handleSubmit, handleIncrementalSubmit, handleFolderSelect, handleRepoClear, dimLoadError,
   } = useEvaluationForm(onStart);
 
   const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
@@ -145,6 +151,9 @@ export default function EvaluationForm({ onStart, disabled }) {
 
         <button type="submit" className="evaluate-submit-btn" disabled={!canSubmit}>
           {disabled ? 'Running Evaluation...' : 'Start Evaluation'}
+        </button>
+        <button type="button" className="evaluate-submit-btn" onClick={handleIncrementalSubmit} disabled={!repo.trim() || disabled}>
+          Re-scan Changes
         </button>
       </form>
 
