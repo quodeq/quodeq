@@ -60,15 +60,8 @@ function trendColor(dir) {
 }
 
 
-export default function RunHistoryPanel({ trend = [], selectedRunId = null, selectedRunScore, onBarClick }) {
-  const [hoveredIndex, setHoveredIndex] = useState(null);
-
-  // Need at least 2 data points to render a meaningful trend line
-  if (!trend || trend.length < 2) return null;
-
-  // Take the 20 most recent runs (trend is newest-first), then display oldest→newest.
-  // For the selected run, use the accumulated score so the bar matches the acc-eval-hero.
-  const data = [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
+function buildTrendData(trend, selectedRunId, selectedRunScore) {
+  return [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
     const isSelected = row.runId === selectedRunId;
     const numericAverage = isSelected && selectedRunScore != null
       ? parseFloat(selectedRunScore)
@@ -79,41 +72,66 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
       delta: i > 0 ? numericAverage - parseFloat(arr[i - 1].numericAverage) : null,
     };
   });
+}
 
-  // Custom label above each bar: rotated ↑ arrow + delta value; tier letter inside bar
-  const renderTrendLabel = ({ x, y, width, height, index }) => {
-    const entry = data[index];
-    const d = entry?.delta;
-    const tier = scoreTierLabel(entry?.numericAverage);
-    const cx = x + width / 2;
-    const hasDelta = d !== null && d !== undefined;
-    const dir = hasDelta ? (trendDir(d) ?? 'same') : null;
-    const color = hasDelta ? trendColor(dir) : null;
-    return (
-      <g>
-        {hasDelta && (
-          <>
-            <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={color}>
-              {d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1)}
-            </text>
-            <text
-              x={cx} y={y - 14}
-              textAnchor="middle" dominantBaseline="central"
-              fontSize={11} fill={color}
-              transform={`rotate(${Math.round(angleFromDelta(d))}, ${cx}, ${y - 14})`}
-            >↑</text>
-          </>
-        )}
-        {tier && height > 12 && (
+function TrendBarLabel({ x, y, width, height, index, data }) {
+  const entry = data[index];
+  const d = entry?.delta;
+  const tier = scoreTierLabel(entry?.numericAverage);
+  const cx = x + width / 2;
+  const hasDelta = d !== null && d !== undefined;
+  const dir = hasDelta ? (trendDir(d) ?? 'same') : null;
+  const color = hasDelta ? trendColor(dir) : null;
+  return (
+    <g>
+      {hasDelta && (
+        <>
+          <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={color}>
+            {d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1)}
+          </text>
           <text
-            x={cx} y={y + Math.min(height / 2, 9)}
+            x={cx} y={y - 14}
             textAnchor="middle" dominantBaseline="central"
-            fontSize={9} fill="white" fillOpacity={0.85}
-          >{tier}</text>
-        )}
-      </g>
-    );
-  };
+            fontSize={11} fill={color}
+            transform={`rotate(${Math.round(angleFromDelta(d))}, ${cx}, ${y - 14})`}
+          >↑</text>
+        </>
+      )}
+      {tier && height > 12 && (
+        <text
+          x={cx} y={y + Math.min(height / 2, 9)}
+          textAnchor="middle" dominantBaseline="central"
+          fontSize={9} fill="white" fillOpacity={0.85}
+        >{tier}</text>
+      )}
+    </g>
+  );
+}
+
+function RunHistoryTooltip({ active, hoveredIndex, data }) {
+  if (!active || hoveredIndex === null) return null;
+  const entry = data[hoveredIndex];
+  if (!entry) return null;
+  return (
+    <div className="run-history-tooltip">
+      <span className="rht-date">{entry.dateLabel}</span>
+      <span className="rht-score">{entry.numericAverage.toFixed(1)} / 10</span>
+      <span className="rht-grade">{entry.overallGrade}</span>
+    </div>
+  );
+}
+
+export default function RunHistoryPanel({ trend = [], selectedRunId = null, selectedRunScore, onBarClick }) {
+  const [hoveredIndex, setHoveredIndex] = useState(null);
+
+  // Need at least 2 data points to render a meaningful trend line
+  if (!trend || trend.length < 2) return null;
+
+  // Take the 20 most recent runs (trend is newest-first), then display oldest→newest.
+  // For the selected run, use the accumulated score so the bar matches the acc-eval-hero.
+  const data = buildTrendData(trend, selectedRunId, selectedRunScore);
+
+  const renderTrendLabel = (props) => <TrendBarLabel {...props} data={data} />;
 
   return (
     <section className="run-history-panel panel" aria-label="Score history chart">
@@ -141,18 +159,7 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
             cursor={false}
             isAnimationActive={false}
             offset={20}
-            content={({ active }) => {
-              if (!active || hoveredIndex === null) return null;
-              const entry = data[hoveredIndex];
-              if (!entry) return null;
-              return (
-                <div className="run-history-tooltip">
-                  <span className="rht-date">{entry.dateLabel}</span>
-                  <span className="rht-score">{entry.numericAverage.toFixed(1)} / 10</span>
-                  <span className="rht-grade">{entry.overallGrade}</span>
-                </div>
-              );
-            }}
+            content={({ active }) => <RunHistoryTooltip active={active} hoveredIndex={hoveredIndex} data={data} />}
           />
           <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />

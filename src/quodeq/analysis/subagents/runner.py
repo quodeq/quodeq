@@ -215,87 +215,33 @@ def process_consolidated_dimensions(
     config: RunConfig, dimensions: list[str], ctx: Any,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
-    from quodeq.analysis.prompts.builder import build_consolidated_prompt
-    from quodeq.core.evidence.parser import parse_jsonl_to_evidence_by_dimension
-    from quodeq.analysis.stream.counters import count_files_in_stream
-    from quodeq.engine._runner_markers import cleanup_stream
+    from quodeq.analysis.subagents._consolidated import process_consolidated_dimensions as _impl
+    return _impl(config, dimensions, ctx)
 
-    evidence_dir = config.work_dir or config.src
 
-    # 1. List source files
-    files, extensions = _list_source_files(config, dimensions[0])
-    if not files:
-        log_warning("No source files for consolidated analysis")
-        return {}
-
-    # 2. Build consolidated prompt
-    prompt = build_consolidated_prompt(
-        dimensions=dimensions,
-        context=PromptContext(
-            language=config.language,
-            repo_name=str(config.src),
-            date_str=ctx.date_str,
-            dimension="consolidated",
-            source_file_count=config.source_file_count,
-            dimensions_data=ctx.dimensions_data,
-            standards_dir=config.standards_dir,
-            manifest=config.manifest,
-            target=config.target,
-            work_dir=config.work_dir or config.src,
-        ),
+def _run_verification_step(
+    config: RunConfig, dim_id: str, evidence_dir: Path, files: list[str],
+) -> list:
+    """Load previous findings and run AI verification pool if needed."""
+    from quodeq.analysis.subagents.verify import (
+        load_previous_findings_for_dimension, _group_by_file, _write_verify_manifest,
     )
-
-    # 3. Create file queue
-    files_per_agent = _compute_files_per_agent(len(files))
-    queue_path = evidence_dir / "consolidated_queue.json"
-    FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
-    log_info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
-
-    # 4. Build AnalysisConfig
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model()
-    pool_budget_val = config.options.pool_budget
-    base_ac = AnalysisConfig(
-        analysis_budget=config.options.analysis_budget,
-        compiled_dir=compiled_dir,
-        max_turns=config.options.max_turns,
-        max_duration=config.options.max_duration,
-        ai_model=subagent_model,
-        dimension=",".join(dimensions),
-        max_files_per_agent=files_per_agent,
-        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
+    skip_verify = (
+        config.options.incremental
+        and config.options.incremental_file_filter is not None
+        and len(config.options.incremental_file_filter) < len(files)
     )
-
-    # 5. Launch pool
-    pool = SubagentPool(
-        n_agents=config.options.max_subagents,
-        paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
-        prompt=prompt,
-        dimension=dimensions,  # list -- triggers consolidated naming
-        config=base_ac,
-    )
-    results = pool.run()
-
-    # 6. Deduplicate and parse
-    merged_jsonl = evidence_dir / "consolidated_evidence.jsonl"
-    SubagentPool.deduplicate_jsonl(merged_jsonl)
-
-    total_files_read = 0
-    for r in results:
-        if r.stream_file.exists():
-            total_files_read += len(count_files_in_stream(r.stream_file))
-            cleanup_stream(r.stream_file)
-
-    ev_ctx = EvidenceContext(
-        language=config.language,
-        repository=str(config.src),
-        date_str=ctx.date_str,
-        source_file_count=config.source_file_count,
-        files_read=total_files_read,
-        module=config.target.name if config.target else "",
-    )
-
-    return parse_jsonl_to_evidence_by_dimension(merged_jsonl, ev_ctx, compiled_dir=compiled_dir)
+    prev_findings = [] if skip_verify else load_previous_findings_for_dimension(config, dim_id, evidence_dir)
+    if not prev_findings:
+        return []
+    grouped = _group_by_file(prev_findings)
+    manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
+    _write_verify_manifest(grouped, manifest_path)
+    files_to_verify = list(grouped.keys())
+    log_info(f"  [{dim_id}] Launching fast verification pool for {len(prev_findings)} findings across {len(files_to_verify)} files")
+    verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
+    log_success(f"  [{dim_id}] Verification pool complete")
+    return verify_results
 
 
 def process_dimension_with_subagents(
@@ -320,30 +266,8 @@ def process_dimension_with_subagents(
         stream_file, jsonl_file = callbacks.run_analysis(config, dim_id, prompt, idx, ctx)
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
-    # 2. Load and pre-filter previous findings for AI verification
-    #    Only skip verification in incremental mode when ALL source files are in the
-    #    file filter (meaning the caller already carried forward cached findings for
-    #    unchanged files — verification would be redundant for the changed subset).
-    from quodeq.analysis.subagents.verify import (
-        load_previous_findings_for_dimension, _group_by_file, _write_verify_manifest,
-    )
-    skip_verify = (
-        config.options.incremental
-        and config.options.incremental_file_filter is not None
-        and len(config.options.incremental_file_filter) < len(files)
-    )
-    prev_findings = [] if skip_verify else load_previous_findings_for_dimension(config, dim_id, evidence_dir)
-
-    # 3. Run AI verification pool (fast model) if there are findings to verify
-    verify_results: list = []
-    if prev_findings:
-        grouped = _group_by_file(prev_findings)
-        manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
-        _write_verify_manifest(grouped, manifest_path)
-        files_to_verify = list(grouped.keys())
-        log_info(f"  [{dim_id}] Launching fast verification pool for {len(prev_findings)} findings across {len(files_to_verify)} files")
-        verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
-        log_success(f"  [{dim_id}] Verification pool complete")
+    # 2-3. Load previous findings and run verification
+    verify_results = _run_verification_step(config, dim_id, evidence_dir, files)
 
     # 4. Create queue with per-agent file limit for context rotation
     queue_path = evidence_dir / f"{dim_id}_queue.json"

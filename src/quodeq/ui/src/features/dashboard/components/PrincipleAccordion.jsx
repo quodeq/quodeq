@@ -5,6 +5,22 @@
 import { useState } from 'react';
 import { gradeColorClass } from '../../../utils/formatters.js';
 
+function ViolationRow({ v, principle, onViolationClick, handleViolationKeyDown }) {
+  return (
+    <div
+      className={`violation-row${onViolationClick ? ' clickable' : ''}`}
+      onClick={onViolationClick ? () => onViolationClick(v, principle) : undefined}
+      role={onViolationClick ? 'button' : undefined}
+      tabIndex={onViolationClick ? 0 : undefined}
+      onKeyDown={onViolationClick ? handleViolationKeyDown(v) : undefined}
+    >
+      <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
+      <span className="violation-row-file">{v.file || '—'}</span>
+      {onViolationClick && <span className="violation-row-arrow">›</span>}
+    </div>
+  );
+}
+
 export default function PrincipleAccordion({ principle, onViolationClick }) {
   const [open, setOpen] = useState(false);
   const contentId = `pa-content-${(principle.name || '').replace(/[^a-zA-Z0-9]/g, '-')}`;
@@ -47,18 +63,7 @@ export default function PrincipleAccordion({ principle, onViolationClick }) {
               <h4>Violations Found</h4>
               <div className="violation-list">
                 {principle.violations.map((v, i) => (
-                  <div
-                    key={i}
-                    className={`violation-row${onViolationClick ? ' clickable' : ''}`}
-                    onClick={onViolationClick ? () => onViolationClick(v, principle) : undefined}
-                    role={onViolationClick ? 'button' : undefined}
-                    tabIndex={onViolationClick ? 0 : undefined}
-                    onKeyDown={onViolationClick ? handleViolationKeyDown(v) : undefined}
-                  >
-                    <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-                    <span className="violation-row-file">{v.file || '—'}</span>
-                    {onViolationClick && <span className="violation-row-arrow">›</span>}
-                  </div>
+                  <ViolationRow key={i} v={v} principle={principle} onViolationClick={onViolationClick} handleViolationKeyDown={handleViolationKeyDown} />
                 ))}
               </div>
             </div>

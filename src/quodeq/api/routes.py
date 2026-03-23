@@ -4,7 +4,6 @@ import logging
 import re
 from http import HTTPStatus
 from pathlib import Path
-from typing import Any
 
 from flask import Flask, Response, jsonify, request, send_from_directory
 
@@ -28,11 +27,7 @@ def _sanitize_url(url: str) -> str:
 
 
 def _reports_dir(default_path: str | None = None) -> str:
-    """Resolve the reports directory from query params or *default_path*.
-
-    *default_path* overrides the env-based ``get_evaluations_dir()`` fallback,
-    making the helper testable without environment mutation.
-    """
+    """Resolve the reports directory from query params or *default_path*."""
     fallback = default_path if default_path is not None else get_evaluations_dir()
     raw = request.args.get("evaluations") or fallback
     resolved = Path(raw).resolve()
@@ -164,7 +159,6 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
 
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
-
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
         return jsonify([to_camel_dict(j) for j in provider.list_evaluations()])

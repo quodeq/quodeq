@@ -21,6 +21,65 @@ import { useProjectState } from './hooks/useProjectState.js';
 import { useAppSettings } from './hooks/useAppSettings.js';
 
 
+function MainContent({
+  activePage, selectedProject, selectedRun, projects,
+  handleNavigate, handleRunSelect, dashboard, accumulated, loading, error,
+  availableRuns, overviewRunIndex, job, jobError, liveViolations,
+  analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
+  settings, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject,
+}) {
+  const { page, ...params } = activePage;
+  switch (page) {
+    case 'overview':
+    case 'run':
+      return (
+        <DashboardPage
+          selectedProject={selectedProject} selectedRun={selectedRun} projects={projects}
+          onNavigate={handleNavigate} onRunSelect={page === 'overview' ? handleRunSelect : undefined}
+          dashboard={dashboard} accumulated={accumulated} loading={loading} error={error}
+          availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
+          runMode={page === 'run'}
+        />
+      );
+    case 'explorer':
+      return <ExplorerPage project={selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={handleNavigate} />;
+    case 'evaluate':
+      return (
+        <EvaluateScreen
+          evaluation={{ job, jobError, liveViolations }}
+          context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
+          actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
+        />
+      );
+    case 'file':
+      return <FileDetailPage file={params.file} />;
+    case 'principle':
+      return <PrincipleDetailPage principle={params.principle} />;
+    case 'evalprinciple':
+    case 'eval-principle-detail':
+      return <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />;
+    case 'settings':
+      return (
+        <SettingsPage
+          theme={{ preference: settings.themePreference, onApply: settings.applyTheme }}
+          models={{
+            aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
+            aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
+            fast: settings.modelFast, onFastChange: settings.setModelFast,
+            balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
+            thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
+          }}
+          analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
+          verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
+        />
+      );
+    case 'projects':
+      return <ProjectsPage projects={projects} selectedProject={selectedProject} onSelect={(id) => { handleProjectChange(id); navTab('overview'); }} onDelete={handleDeleteProject} onExport={handleExportProject} onRelocate={handleRelocateProject} />;
+    default:
+      return <div className="empty-state"><p>Page not found: {page}</p></div>;
+  }
+}
+
 // App is the root component and naturally aggregates all application hooks.
 // The hook count is proportional to the app's feature set and is not worth
 // refactoring into sub-providers for a project of this size.
@@ -176,60 +235,6 @@ export default function App() {
   const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
   const onViewRun = activePage.page === 'overview' ? handleRunView : undefined;
 
-  // Content renderer
-  function renderContent() {
-    const { page, ...params } = activePage;
-    switch (page) {
-      case 'overview':
-      case 'run':
-        return (
-          <DashboardPage
-            selectedProject={selectedProject} selectedRun={selectedRun} projects={projects}
-            onNavigate={handleNavigate} onRunSelect={page === 'overview' ? handleRunSelect : undefined}
-            dashboard={dashboard} accumulated={accumulated} loading={loading} error={error}
-            availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
-            runMode={page === 'run'}
-          />
-        );
-      case 'explorer':
-        return <ExplorerPage project={selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={handleNavigate} />;
-      case 'evaluate':
-        return (
-          <EvaluateScreen
-            evaluation={{ job, jobError, liveViolations }}
-            context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
-            actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
-          />
-        );
-      case 'file':
-        return <FileDetailPage file={params.file} />;
-      case 'principle':
-        return <PrincipleDetailPage principle={params.principle} />;
-      case 'evalprinciple':
-      case 'eval-principle-detail':
-        return <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />;
-      case 'settings':
-        return (
-          <SettingsPage
-            theme={{ preference: settings.themePreference, onApply: settings.applyTheme }}
-            models={{
-              aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
-              aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
-              fast: settings.modelFast, onFastChange: settings.setModelFast,
-              balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
-              thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
-            }}
-            analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
-            verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
-          />
-        );
-      case 'projects':
-        return <ProjectsPage projects={projects} selectedProject={selectedProject} onSelect={(id) => { handleProjectChange(id); navTab('overview'); }} onDelete={handleDeleteProject} onExport={handleExportProject} onRelocate={handleRelocateProject} />;
-      default:
-        return <div className="empty-state"><p>Page not found: {page}</p></div>;
-    }
-  }
-
   return (
     <div className="app-shell">
       {!serverConnected && <ServerDisconnectedOverlay onReconnect={() => setServerConnected(true)} />}
@@ -248,7 +253,19 @@ export default function App() {
           />
         )}
         {navStack.length > 1 && <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} />}
-        {renderContent()}
+        <MainContent
+          activePage={activePage}
+          selectedProject={selectedProject} selectedRun={selectedRun} projects={projects}
+          handleNavigate={handleNavigate} handleRunSelect={handleRunSelect}
+          dashboard={dashboard} accumulated={accumulated} loading={loading} error={error}
+          availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
+          job={job} jobError={jobError} liveViolations={liveViolations}
+          analysisPower={analysisPower} setAnalysisPower={setAnalysisPower}
+          handleStartEvaluation={handleStartEvaluation} handleEvalDismiss={handleEvalDismiss} cancelEvaluation={cancelEvaluation}
+          settings={settings}
+          handleProjectChange={handleProjectChange} navTab={navTab}
+          handleDeleteProject={handleDeleteProject} handleExportProject={handleExportProject} handleRelocateProject={handleRelocateProject}
+        />
       </main>
     </div>
   );

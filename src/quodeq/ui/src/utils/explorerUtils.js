@@ -69,54 +69,50 @@ export function matchesViolationFilters(
   return true;
 }
 
+function aggregateViolationEntry(bucket, dimension, entry) {
+  const file = entry.file;
+  const severity = normalizeSeverity(entry.severity);
+
+  const current = bucket.get(file) || {
+    file,
+    total: 0,
+    critical: 0,
+    major: 0,
+    minor: 0,
+    unknown: 0,
+    dimensions: new Set(),
+    principles: new Set(),
+    violationsBySeverity: { critical: [], major: [], minor: [], unknown: [] },
+  };
+
+  current.total += 1;
+  current[severity] += 1;
+  current.violationsBySeverity[severity].push({
+    dimension: dimension.dimension || '',
+    principle: entry.principle || '',
+    file: entry.file || '',
+    line: entry.line || null,
+    snippet: entry.snippet || '',
+    title: entry.title || '',
+    reason: entry.reason || '',
+    severity,
+    ...(entry.cwe ? { cwe: entry.cwe } : {}),
+  });
+
+  if (dimension.dimension) current.dimensions.add(dimension.dimension);
+  if (entry.principle) current.principles.add(entry.principle);
+
+  bucket.set(file, current);
+}
+
 export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = Infinity) {
   const bucket = new Map();
 
   dimensions.forEach((dimension) => {
     (dimension.violations || []).forEach((entry) => {
-      if (!matchesViolationFilters(entry, filters)) {
-        return;
-      }
-
+      if (!matchesViolationFilters(entry, filters)) return;
       if (!entry.file) return;
-
-      const file = entry.file;
-      const severity = normalizeSeverity(entry.severity);
-
-      const current = bucket.get(file) || {
-        file,
-        total: 0,
-        critical: 0,
-        major: 0,
-        minor: 0,
-        unknown: 0,
-        dimensions: new Set(),
-        principles: new Set(),
-        violationsBySeverity: { critical: [], major: [], minor: [], unknown: [] },
-      };
-
-      current.total += 1;
-      current[severity] += 1;
-      current.violationsBySeverity[severity].push({
-        dimension: dimension.dimension || '',
-        principle: entry.principle || '',
-        file: entry.file || '',
-        line: entry.line || null,
-        snippet: entry.snippet || '',
-        title: entry.title || '',
-        reason: entry.reason || '',
-        severity,
-        ...(entry.cwe ? { cwe: entry.cwe } : {}),
-      });
-
-      if (dimension.dimension) {
-        current.dimensions.add(dimension.dimension);
-      }
-      if (entry.principle) {
-        current.principles.add(entry.principle);
-      }
-
-      bucket.set(file, current);
+      aggregateViolationEntry(bucket, dimension, entry);
     });
   });
 

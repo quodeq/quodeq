@@ -1,4 +1,4 @@
-"""AI CLI subprocess runner -- spawns the AI CLI, captures stream-json, extracts JSONL."""
+"""AI CLI subprocess runner -- spawns the AI CLI, captures stream-json."""
 from __future__ import annotations
 
 import json
@@ -236,10 +236,7 @@ _SENSITIVE_ENV_KEYS = frozenset({
 })
 
 def _build_analysis_env(ai_cmd: str | None = None, env: dict[str, str] | None = None) -> dict[str, str]:
-    """Build the subprocess environment for the AI CLI.
-
-    Removes known sensitive variables that the child process does not need.
-    """
+    """Build the subprocess environment, removing sensitive variables."""
     env = (env or os.environ).copy()
     for key in _SENSITIVE_ENV_KEYS:
         env.pop(key, None)

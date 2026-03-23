@@ -129,7 +129,11 @@ def _extract_scores(scores: ScoringResult | dict | None) -> tuple[dict, dict]:
 
 
 def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
-    """Build a complete JSON report dict from evidence and scoring data for one dimension."""
+    """Build a complete JSON report dict from evidence and scoring data for one dimension.
+
+    Parameter count is intentional: dimension identity, raw evidence, and
+    scoring result are each a distinct pipeline output with no shared container.
+    """
     per_principle_scores, aggregate = _extract_scores(scores)
     lookup = _build_score_lookup(per_principle_scores)
     principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)

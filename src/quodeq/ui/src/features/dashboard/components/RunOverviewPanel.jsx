@@ -205,6 +205,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
               const prevScore = parseFloat(item.previousScore);
               const delta =
                 !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
+              const scored = splitScore(item.overallScore);
               return (
                 <article
                   key={item.dimension}
@@ -221,7 +222,6 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
                     </span>
                   </div>
                   <div className="qd-card-score-row">
-                    {(() => { const scored = splitScore(item.overallScore); return (
                     <span className="qd-card-score-main">
                       <span className="qd-card-score">{scored.value}</span>
                       {scored.denom && (
@@ -229,7 +229,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
                           {scored.denom}
                         </span>
                       )}
-                    </span>); })()}
+                    </span>
                     <TrendBadge delta={delta} />
                   </div>
                   <div className="qd-card-stats">

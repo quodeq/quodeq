@@ -205,7 +205,7 @@ def compute_previous_violations(
     for dim in dims:
         try:
             findings = load_previous_findings_for_dimension(config, dim, evidence_dir, quiet=True)
-        except Exception:
+        except (OSError, KeyError, ValueError):
             continue
         for finding in findings:
             if finding.get("t") == "violation" and finding.get("file"):

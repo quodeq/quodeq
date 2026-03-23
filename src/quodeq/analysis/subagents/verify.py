@@ -31,26 +31,30 @@ def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_i
     return None
 
 
+def _parse_finding_line(line: str) -> dict | None:
+    """Parse a single JSONL line into a finding dict, or None if invalid."""
+    line = line.strip()
+    if not line:
+        return None
+    try:
+        entry = json.loads(line)
+    except json.JSONDecodeError:
+        return None
+    if entry.get("p") and entry.get("t") in ("violation", "compliance"):
+        return entry
+    return None
+
+
 def _load_previous_findings(jsonl_path: Path) -> list[dict]:
     """Load all findings from a JSONL file."""
-    findings: list[dict] = []
     if not jsonl_path.exists():
-        return findings
+        return []
     try:
         with open_text(jsonl_path) as f:
-            for line in f:
-                line = line.strip()
-                if not line:
-                    continue
-                try:
-                    entry = json.loads(line)
-                    if entry.get("p") and entry.get("t") in ("violation", "compliance"):
-                        findings.append(entry)
-                except json.JSONDecodeError:
-                    continue
+            return [e for line in f if (e := _parse_finding_line(line)) is not None]
     except OSError as exc:
         log_debug(f"Cannot read findings JSONL {jsonl_path}: {exc}")
-    return findings
+        return []
 
 
 def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:

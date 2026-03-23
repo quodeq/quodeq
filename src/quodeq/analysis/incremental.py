@@ -76,6 +76,19 @@ def detect_changed_files(
     return ChangeDetectionResult(changed=changed)
 
 
+def _file_imports_changed(content: str, compiled: list, changed_stems: dict[str, str]) -> bool:
+    """Return True if *content* imports any module whose stem is in *changed_stems*."""
+    for line in content.splitlines():
+        for pattern in compiled:
+            m = pattern.search(line)
+            if m:
+                module_name = m.group(1).rsplit(".", 1)[-1].rsplit("/", 1)[-1]
+                if module_name in changed_stems:
+                    return True
+                break
+    return False
+
+
 def find_dependents(changed: set[str], files: list[str], src: Path, language: str) -> set[str]:
     """Find files that directly import any changed file (1 level deep)."""
     from quodeq.analysis.subagents.priority import load_priority_config
@@ -102,17 +115,8 @@ def find_dependents(changed: set[str], files: list[str], src: Path, language: st
             content = full_path.read_text(errors="ignore")
         except OSError:
             continue
-        for line in content.splitlines():
-            for pattern in compiled:
-                m = pattern.search(line)
-                if m:
-                    imported = m.group(1)
-                    module_name = imported.rsplit(".", 1)[-1].rsplit("/", 1)[-1]
-                    if module_name in changed_stems:
-                        dependents.add(f)
-                    break
-            if f in dependents:
-                break
+        if _file_imports_changed(content, compiled, changed_stems):
+            dependents.add(f)
     return dependents
 
 
