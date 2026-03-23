@@ -183,6 +183,23 @@ _cached_dimensions: list[str] | None = None
 _cached_dimensions_lock = threading.Lock()
 
 
+def _has_fingerprints(reports_root: Path, project: str) -> bool:
+    """Check if any evaluation run has fingerprint files for this project."""
+    project_dir = reports_root / project
+    if not project_dir.exists():
+        return False
+    try:
+        for run_dir in sorted(project_dir.iterdir(), reverse=True):
+            evidence_dir = run_dir / "evidence"
+            if not evidence_dir.is_dir():
+                continue
+            if any(f.name.endswith("_fingerprint.json") for f in evidence_dir.iterdir()):
+                return True
+    except OSError:
+        pass
+    return False
+
+
 def _list_available_dimensions_for_discipline() -> list[str]:
     """Resolve available dimensions from universal dimensions.json (cached after first read)."""
     global _cached_dimensions

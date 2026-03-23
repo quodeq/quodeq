@@ -26,6 +26,7 @@ from quodeq.adapters.fs.report_parser import (
 from quodeq.services._filesystem_helpers import (
     _auto_detect_parents,
     _build_project_entry,
+    _has_fingerprints,
     _infer_discipline,
     _list_available_dimensions_for_discipline,
     _max_projects_listed,
@@ -129,7 +130,8 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
         discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
         available_dimensions = _list_available_dimensions_for_discipline() if discipline else []
-        return {**info, "discipline": discipline, "availableDimensions": available_dimensions}
+        has_fingerprints = _has_fingerprints(Path(reports_dir), project)
+        return {**info, "discipline": discipline, "availableDimensions": available_dimensions, "hasFingerprints": has_fingerprints}
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
         """Return the dashboard payload for a specific project run."""
