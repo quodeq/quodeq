@@ -455,6 +455,9 @@ def _run_dimension_incremental(
     new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
     save_fingerprint(new_fp, evidence_dir)
 
+    coverage_pct = len(all_analyzed) * 100 // len(files) if files else 100
+    log_info(f"  [{dimension}] Coverage: {len(all_analyzed)}/{len(files)} files ({coverage_pct}%)")
+
     return ev
 
 
