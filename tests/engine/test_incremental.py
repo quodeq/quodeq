@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents
+from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings
 
 
 class TestDetectChangedFiles:
@@ -80,3 +80,31 @@ class TestFindDependents:
         dependents = find_dependents(changed={"core.py"}, files=["core.py", "mid.py", "top.py"], src=tmp_path, language="python")
         assert "mid.py" in dependents
         assert "top.py" not in dependents
+
+
+class TestCarryForwardFindings:
+    def test_copies_unchanged_file_findings(self, tmp_path):
+        prev_jsonl = tmp_path / "prev.jsonl"
+        findings = [
+            {"p": "Conf", "d": "security", "t": "violation", "file": "unchanged.py", "line": 1, "w": "test"},
+            {"p": "Int", "d": "security", "t": "compliance", "file": "changed.py", "line": 5, "w": "test2"},
+            {"p": "Conf", "d": "security", "t": "violation", "file": "unchanged.py", "line": 10, "w": "test3"},
+        ]
+        prev_jsonl.write_text("\n".join(json.dumps(f) for f in findings))
+        output_jsonl = tmp_path / "output.jsonl"
+        count = carry_forward_findings(prev_jsonl, output_jsonl, {"unchanged.py"})
+        assert count == 2
+        lines = output_jsonl.read_text().strip().split("\n")
+        assert len(lines) == 2
+        assert all("unchanged.py" in line for line in lines)
+
+    def test_skips_changed_file_findings(self, tmp_path):
+        prev_jsonl = tmp_path / "prev.jsonl"
+        prev_jsonl.write_text(json.dumps({"p": "X", "d": "security", "t": "violation", "file": "changed.py", "line": 1, "w": "old"}) + "\n")
+        output_jsonl = tmp_path / "output.jsonl"
+        count = carry_forward_findings(prev_jsonl, output_jsonl, {"other.py"})
+        assert count == 0
+
+    def test_missing_prev_jsonl(self, tmp_path):
+        count = carry_forward_findings(tmp_path / "nonexistent.jsonl", tmp_path / "output.jsonl", {"a.py"})
+        assert count == 0

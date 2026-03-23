@@ -1,6 +1,7 @@
 """Incremental analysis — detect changes, classify files, carry forward findings."""
 from __future__ import annotations
 
+import json as _json
 import re
 import subprocess
 from dataclasses import dataclass, field
@@ -113,3 +114,27 @@ def find_dependents(changed: set[str], files: list[str], src: Path, language: st
             if f in dependents:
                 break
     return dependents
+
+
+def carry_forward_findings(prev_jsonl: Path, output_jsonl: Path, unchanged_files: set[str]) -> int:
+    """Copy findings for unchanged files from previous JSONL to output. Returns count."""
+    if not prev_jsonl.exists():
+        return 0
+    count = 0
+    try:
+        output_jsonl.parent.mkdir(parents=True, exist_ok=True)
+        with open(prev_jsonl) as inp, open(output_jsonl, "a") as out:
+            for line in inp:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    entry = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+                if entry.get("file") in unchanged_files:
+                    out.write(_json.dumps(entry) + "\n")
+                    count += 1
+    except OSError:
+        return 0
+    return count
