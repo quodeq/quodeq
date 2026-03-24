@@ -80,6 +80,87 @@ def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
     return surviving, gone
 
 
+def partition_findings_by_fingerprint(
+    findings: list[dict],
+    prev_fingerprint: dict | None,
+    src: Path,
+    standards_dir: Path | None = None,
+    dimension: str | None = None,
+) -> tuple[list[dict], list[dict]]:
+    """Split findings into (carry_forward, needs_verification) based on file hashes.
+
+    Uses the previous fingerprint's per-file SHA-256 hashes to determine which
+    files have changed. Findings for unchanged files are carried forward (no AI
+    needed); findings for changed/deleted/new files need AI verification.
+
+    If standards changed since the previous run, all findings need verification
+    regardless of file hashes (findings were evaluated under different criteria).
+    """
+    from quodeq.analysis.fingerprint import _hash_file, _hash_standards
+
+    if not prev_fingerprint or not findings:
+        return [], list(findings)
+
+    # Standards guard: if standards changed, all findings need verification
+    if standards_dir and dimension:
+        current_std = _hash_standards(standards_dir, dimension)
+        prev_std = prev_fingerprint.get("standards_checksum")
+        if prev_std is not None and current_std != prev_std:
+            return [], list(findings)
+
+    prev_hashes = prev_fingerprint.get("file_hashes", {})
+
+    # Cache per-file decision to avoid re-hashing the same file
+    file_unchanged: dict[str, bool] = {}
+
+    carry_forward: list[dict] = []
+    needs_verification: list[dict] = []
+
+    for finding in findings:
+        rel_path = finding.get("file", "")
+        if not rel_path:
+            needs_verification.append(finding)
+            continue
+
+        if rel_path not in file_unchanged:
+            prev_hash = prev_hashes.get(rel_path)
+            if prev_hash is None:
+                # File not in previous fingerprint (new file)
+                file_unchanged[rel_path] = False
+            else:
+                current_hash = _hash_file(src / rel_path)
+                file_unchanged[rel_path] = current_hash == prev_hash
+
+        if file_unchanged[rel_path]:
+            carry_forward.append(finding)
+        else:
+            needs_verification.append(finding)
+
+    return carry_forward, needs_verification
+
+
+def write_carry_forward_findings(
+    findings: list[dict], evidence_dir: Path, dim_id: str,
+) -> int:
+    """Append carry-forward findings to the evidence JSONL.
+
+    Writes from an in-memory list of finding dicts (as returned by
+    partition_findings_by_fingerprint). Unlike carry_forward_findings in
+    incremental.py which filters file-to-file, this writes pre-partitioned
+    results directly.
+
+    Returns the number of findings written.
+    """
+    if not findings:
+        return 0
+    output = evidence_dir / f"{dim_id}_evidence.jsonl"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with open(output, "a") as f:
+        for finding in findings:
+            f.write(json.dumps(finding) + "\n")
+    return len(findings)
+
+
 def _group_by_file(findings: list[dict]) -> dict[str, list[dict]]:
     """Group findings by their source file path."""
     groups: dict[str, list[dict]] = {}

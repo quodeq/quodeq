@@ -6,9 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from quodeq.analysis.fingerprint import build_fingerprint, load_fingerprint, save_fingerprint
+from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, load_fingerprint, save_fingerprint
 from quodeq.analysis.incremental import classify_files, carry_forward_findings, identify_backfill_files
-from quodeq.analysis.subagents.verify import _resolve_evidence_paths
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.services.base import _DEFAULT_POOL_BUDGET
@@ -94,26 +93,6 @@ def save_dimension_fingerprint(
     except Exception as exc:
         log_debug(f"  [{dimension}] Fingerprint save failed: {exc}")
 
-
-def _find_previous_fingerprint(
-    evidence_dir: Path, dimension: str,
-) -> tuple[dict | None, Path | None]:
-    """Find the fingerprint and evidence dir from the most recent previous run."""
-    paths_info = _resolve_evidence_paths(evidence_dir)
-    if not paths_info:
-        log_warning(f"  [{dimension}] Cannot resolve evidence paths — falling back to full analysis")
-        return None, None
-
-    current_run_id, project_uuid, reports_base = paths_info
-    from quodeq.data.fs.report_parser.runs import list_runs
-    for run_info in list_runs(reports_base, project_uuid):
-        if run_info.run_id == current_run_id:
-            continue
-        prev_evidence = reports_base / project_uuid / run_info.run_id / "evidence"
-        fp = load_fingerprint(prev_evidence, dimension)
-        if fp:
-            return fp, prev_evidence
-    return None, None
 
 
 def _parse_evidence_from_jsonl(
@@ -257,7 +236,7 @@ def run_dimension_incremental(
     phase_start = time.monotonic()
     evidence_dir = config.work_dir or config.src
 
-    prev_fp, prev_evidence_dir = _find_previous_fingerprint(evidence_dir, dimension)
+    prev_fp, prev_evidence_dir = find_previous_fingerprint(evidence_dir, dimension)
 
     # Get full source files list (for classification)
     from quodeq.analysis.subagents.runner import _list_source_files
