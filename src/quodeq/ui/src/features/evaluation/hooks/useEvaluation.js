@@ -97,10 +97,10 @@ function createJobPoller(refs, setters, startDimensionPolling) {
   };
 }
 
-function preparePayload(payload) {
-  const maxSubagents = parseInt(localStorage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10);
+function preparePayload(payload, storage = localStorage) {
+  const maxSubagents = parseInt(storage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10);
   if (maxSubagents !== DEFAULT_MAX_SUBAGENTS) payload.maxSubagents = maxSubagents;
-  const poolBudget = parseInt(localStorage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10);
+  const poolBudget = parseInt(storage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10);
   if (poolBudget !== DEFAULT_POOL_BUDGET) payload.poolBudget = poolBudget;
 }
 

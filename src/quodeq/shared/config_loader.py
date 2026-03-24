@@ -60,6 +60,7 @@ class Config:
 
 
 _config_lock = threading.Lock()
+# Singleton instance — access via _get_config(override) for DI; reset via _reset_config_for_testing().
 _config_instance: Config | None = None
 
 

@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
-import { listPlugins } from '../../../api/index.js';
+import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { ISO_25010_URL } from '../../../constants.js';
 
 const FOLDER_MARGIN_BOTTOM = 8;
@@ -75,25 +75,9 @@ function DimensionGrid({ allDimensions, selectedDims, onToggle, onSelectAll, onC
 
 function useEvaluationForm(onStart) {
   const [repo, setRepo] = useState('');
-  const [allDimensions, setAllDimensions] = useState([]);
+  const { allDimensions, dimLoadError } = usePluginDimensions();
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
-  const [dimLoadError, setDimLoadError] = useState(null);
-
-  useEffect(() => {
-    listPlugins()
-      .then((plugins) => {
-        const seen = new Map();
-        for (const p of plugins) {
-          for (const d of p.dimensions) {
-            if (!seen.has(d.id)) seen.set(d.id, d);
-          }
-        }
-        setAllDimensions([...seen.values()]);
-        setDimLoadError(null);
-      })
-      .catch((err) => { console.warn('Failed to load dimensions:', err); setAllDimensions([]); setDimLoadError('Failed to load dimensions. Using defaults.'); });
-  }, []);
 
   const toggleDim = (id) => setSelectedDims((prev) => {
     const next = new Set(prev);

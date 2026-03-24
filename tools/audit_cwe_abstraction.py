@@ -34,9 +34,9 @@ _DEFAULT_STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / 
 _CWE_API_URL = "https://cwe-api.mitre.org/api/v1/cwe"
 
 
-def _default_api_base() -> str:
-    """Return CWE API base URL, reading env lazily at call time."""
-    return os.environ.get("CWE_API_BASE", _CWE_API_URL)
+def _default_api_base(env: dict[str, str] | None = None) -> str:
+    """Return CWE API base URL, reading from *env* (or os.environ) lazily."""
+    return (env if env is not None else os.environ).get("CWE_API_BASE", _CWE_API_URL)
 
 
 def get_all_cwes(standards_dir: Path | None = None) -> dict[int, list[str]]:

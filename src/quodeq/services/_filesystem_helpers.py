@@ -193,18 +193,24 @@ def _has_fingerprints(reports_root: Path, project: str) -> bool:
     return False
 
 
-@functools.lru_cache(maxsize=1)
-def _list_available_dimensions_for_discipline() -> tuple[str, ...]:
-    """Resolve available dimensions from universal dimensions.json (cached after first read).
-
-    Returns a tuple (immutable) so the result is safe for lru_cache.
-    """
+@functools.lru_cache(maxsize=4)
+def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
+    """Read dimension IDs from a dimensions.json file (cached by path)."""
     try:
-        paths = default_paths()
-        universal_dims = paths.dimensions_file
-        if universal_dims.exists():
-            data = json.loads(universal_dims.read_text())
+        p = Path(dims_file)
+        if p.exists():
+            data = json.loads(p.read_text())
             return tuple(d["id"] for d in data.get("applies", []))
         return ()
     except (OSError, json.JSONDecodeError, KeyError, TypeError):
         return ()
+
+
+def _list_available_dimensions_for_discipline(paths: object | None = None) -> tuple[str, ...]:
+    """Resolve available dimensions from universal dimensions.json (cached after first read).
+
+    Pass *paths* to override the default path resolution (useful for testing).
+    Returns a tuple (immutable) so the result is safe for caching.
+    """
+    resolved = paths or default_paths()
+    return _read_dimensions_from_file(str(resolved.dimensions_file))
