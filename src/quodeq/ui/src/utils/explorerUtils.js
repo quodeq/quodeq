@@ -6,6 +6,67 @@ export const PLAN_TEST_INSTRUCTION_GROUP =
 export const PLAN_TEST_INSTRUCTION_SINGLE =
   'After applying this fix, run the full test suite. If tests fail, diagnose and fix the breakage before moving on. Only modify a test if it was explicitly asserting the exact pattern you just changed — state your reasoning before editing any test file.';
 
+export const PLAN_COMPLETION_CHECKLIST = [
+  '---', '',
+  '## Completion checklist', '',
+  'Before claiming this plan is done, verify:', '',
+  '- [ ] **Every violation has a code change.** Count your diffs — the number must match the total violations above. A comment or docstring is NOT a fix unless the violation specifically requires documentation.',
+  '- [ ] **No violations were skipped.** If a violation cannot be fixed, state why explicitly — do not silently omit it.',
+  '- [ ] **Tests pass.** Run the full test suite after all changes.',
+  '- [ ] **Verify metrics.** For each function-length or file-length violation, confirm the result is within limits (e.g., `wc -l`, AST line count).',
+].join('\n');
+
+export const FIX_HINTS = {
+  // Maintainability
+  'M-ANA-1': 'Split file or extract code to a new module to reduce line count below 300',
+  'M-ANA-2': 'Extract a helper function to bring the function under 50 lines',
+  'M-ANA':   'Improve code clarity — reduce nesting, add structure, simplify control flow',
+  'M-MOD-1': 'Reduce callees by extracting a helper that groups related calls',
+  'M-MOD-4': 'Group related parameters into an object or dataclass (max 5)',
+  'M-MOD-5': 'Extract into a configurable constant or injectable function',
+  'M-MOD':   'Reduce coupling — extract dependency, use injection, or narrow the interface',
+  'M-REU-1': 'Extract duplicated code into a shared function or hook',
+  'M-REU-2': 'Add an injectable parameter so the default can be overridden for testing',
+  'M-REU':   'Make the code reusable — extract shared logic or add injection points',
+  'M-MDF-1': 'Replace the hard-coded literal with a named constant',
+  'M-MDF':   'Make the code easier to modify — extract constants, reduce coupling',
+  'M-TST':   'Improve testability — add injection points, reduce hidden dependencies',
+  // Reliability
+  'R-MAT':   'Add error handling, input validation, or defensive checks',
+  'R-FT':    'Add fault tolerance — retry logic, fallback, or graceful degradation',
+  'R-REC':   'Add recovery mechanism — cleanup, state restoration, or rollback',
+  'R-AVL':   'Improve availability — reduce single points of failure',
+  // Security
+  'S-CON':   'Fix confidentiality issue — sanitize output, restrict access, encrypt data',
+  'S-INT':   'Fix integrity issue — validate input, use parameterized queries, check boundaries',
+  'S-AUT':   'Fix authentication issue — strengthen auth checks, secure token handling',
+  'S-ACC':   'Fix accountability issue — add logging, audit trail, or access tracking',
+  'S-NRP':   'Fix non-repudiation — add tamper-evident logging or signing',
+  // Performance
+  'P-TIM':   'Optimize time behavior — reduce unnecessary computation, cache, or batch',
+  'P-RES':   'Reduce resource usage — close handles, limit allocations, pool connections',
+  'P-CAP':   'Improve capacity — add pagination, streaming, or bounded data structures',
+  // Flexibility
+  'F-ADP':   'Improve adaptability — make configurable, use abstraction, externalize settings',
+  'F-SCL':   'Improve scalability — avoid bottlenecks, support horizontal growth',
+  'F-INS':   'Improve installability — simplify setup, reduce hard-coded paths',
+  'F-RPL':   'Improve replaceability — use interfaces, reduce tight coupling',
+  // Usability
+  'U-APR':   'Improve recognizability — add labels, descriptions, or help text',
+  'U-LRN':   'Improve learnability — add examples, defaults, or progressive disclosure',
+  'U-OPR':   'Improve operability — simplify controls, reduce steps, add feedback',
+  'U-UEP':   'Add user error protection — validate input, confirm destructive actions',
+  'U-UIA':   'Improve aesthetics — fix layout, spacing, or visual consistency',
+  'U-ACC':   'Improve accessibility — add ARIA labels, keyboard nav, or contrast',
+};
+
+export function getFixHint(req) {
+  if (!req) return null;
+  if (FIX_HINTS[req]) return FIX_HINTS[req];
+  const prefix = req.replace(/-\d+$/, '');
+  return FIX_HINTS[prefix] || null;
+}
+
 const PLAN_SYSTEM_PREAMBLE = [
   'You are a senior software engineer resolving verified code-quality violations.',
   '',
@@ -171,6 +232,11 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
     lines.push('', `**Why it's a violation:** ${reason}`);
   }
 
+  const hint = getFixHint(v.req);
+  if (hint) {
+    lines.push('', `**Expected fix:** ${hint}`);
+  }
+
   if (v.cwe) {
     lines.push('', `**Reference:** CWE-${v.cwe}`);
   }
@@ -206,6 +272,7 @@ function _buildPlanLines(dimName, totalCount, bySeverity, allViolations, entryKe
   });
   lines.push(...PLAN_OUTPUT_INSTRUCTIONS);
   lines.push(PLAN_TEST_INSTRUCTION_GROUP);
+  lines.push('', PLAN_COMPLETION_CHECKLIST);
   return lines.join('\n').trim();
 }
 
