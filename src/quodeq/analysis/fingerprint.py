@@ -7,6 +7,8 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.data.fs.report_parser.runs import list_runs
+
 
 def _get_git_commit(src: Path) -> str | None:
     """Get current HEAD commit hash, or None if not a git repo."""
@@ -73,3 +75,28 @@ def load_fingerprint(evidence_dir: Path, dimension: str) -> dict | None:
         return json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
         return None
+
+
+def find_previous_fingerprint(
+    evidence_dir: Path, dimension: str,
+) -> tuple[dict | None, Path | None]:
+    """Find the fingerprint and evidence dir from the most recent previous run.
+
+    Walks the run history to find the latest run (other than the current one)
+    that has a fingerprint for the given dimension.
+    """
+    from quodeq.analysis.subagents.verify import _resolve_evidence_paths
+
+    paths_info = _resolve_evidence_paths(evidence_dir)
+    if not paths_info:
+        return None, None
+
+    current_run_id, project_uuid, reports_base = paths_info
+    for run_info in list_runs(reports_base, project_uuid):
+        if run_info.run_id == current_run_id:
+            continue
+        prev_evidence = reports_base / project_uuid / run_info.run_id / "evidence"
+        fp = load_fingerprint(prev_evidence, dimension)
+        if fp:
+            return fp, prev_evidence
+    return None, None
