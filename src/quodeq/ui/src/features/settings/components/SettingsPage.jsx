@@ -60,6 +60,10 @@ function ThemeSection({ themePreference, onApplyTheme }) {
   );
 }
 
+function clampSubagents(value) {
+  return Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(value, 10) || DEFAULT_MAX_SUBAGENTS));
+}
+
 function SubagentsRow({ subagents }) {
   const { max, setMax } = subagents;
   return (
@@ -77,7 +81,7 @@ function SubagentsRow({ subagents }) {
         max={MAX_SUBAGENTS}
         value={max}
         onChange={(e) => {
-          const v = Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || DEFAULT_MAX_SUBAGENTS));
+          const v = clampSubagents(e.target.value);
           setMax(v);
           localStorage.setItem(SUBAGENTS_STORAGE_KEY, String(v));
         }}

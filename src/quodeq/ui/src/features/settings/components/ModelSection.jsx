@@ -51,6 +51,15 @@ function ClientSelector({ aiCmd, availableClients }) {
   );
 }
 
+function handleModelChange(level, value, setter) {
+  setter(value);
+  if (value) {
+    localStorage.setItem(`${MODEL_STORAGE_PREFIX}${level}`, value);
+  } else {
+    localStorage.removeItem(`${MODEL_STORAGE_PREFIX}${level}`);
+  }
+}
+
 function ModelOverrideInput({ label, value, setter, level, placeholder }) {
   return (
     <div className="settings-model-field">
@@ -60,15 +69,7 @@ function ModelOverrideInput({ label, value, setter, level, placeholder }) {
         className="settings-model-input"
         value={value}
         placeholder={placeholder}
-        onChange={(e) => {
-          const v = e.target.value;
-          setter(v);
-          if (v) {
-            localStorage.setItem(`${MODEL_STORAGE_PREFIX}${level}`, v);
-          } else {
-            localStorage.removeItem(`${MODEL_STORAGE_PREFIX}${level}`);
-          }
-        }}
+        onChange={(e) => handleModelChange(level, e.target.value, setter)}
       />
     </div>
   );

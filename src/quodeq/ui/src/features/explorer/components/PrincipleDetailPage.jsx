@@ -1,73 +1,26 @@
 import { memo } from 'react';
-import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE, PLAN_COMPLETION_CHECKLIST, getFixHint } from '../../../utils/explorerUtils.js';
+import { buildGroupPlanText, buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function buildPrinciplePlanText(principle) {
-  const totalViolations = principle.total || 0;
-  const lines = [
-    'You are a senior software engineer performing a targeted code review.',
-    'Apply minimal, surgical fixes — no refactoring, no style changes beyond what is required.',
-    '',
-    `# Fix Plan: ${principle.principle}`,
-    '',
-    `**Total violations:** ${totalViolations}`,
-    '',
-    '---',
-    '',
-  ];
-
-  SEVERITY_ORDER.forEach((sev) => {
-    const vs = (principle.violations || []).filter(
+  const violationsBySeverity = {};
+  for (const sev of SEVERITY_ORDER) {
+    violationsBySeverity[sev] = (principle.violations || []).filter(
       (v) => (v.severity || 'minor').toLowerCase() === sev
     );
-    if (vs.length === 0) return;
-    lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);
-    lines.push('');
-    vs.forEach((v, i) => {
-      const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
-      lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
-      if (v.reason) lines.push('', `**Why it's a violation:** ${v.reason}`);
-      const hint = getFixHint(v.req);
-      if (hint) lines.push('', `**Expected fix:** ${hint}`);
-      if (v.snippet) {
-        lines.push('', '**Affected code:**');
-        lines.push('```');
-        v.snippet.split('\n').forEach((l) => lines.push(l));
-        lines.push('```');
-      }
-      lines.push('');
-    });
+  }
+  return buildGroupPlanText({
+    title: principle.principle,
+    violations: principle.violations || [],
+    violationsBySeverity,
   });
-
-  lines.push('---');
-  lines.push('');
-  lines.push('For each violation above, provide a concrete, step-by-step fix.');
-  lines.push('Return each fix as an exact replacement block or unified diff. No explanations beyond what is needed to apply the fix.');
-  lines.push(PLAN_TEST_INSTRUCTION_GROUP);
-  lines.push('', PLAN_COMPLETION_CHECKLIST);
-  return lines.join('\n').trim();
 }
 
 function buildViolationPlanText(v, principleName) {
-  const title = principleName || 'Violation';
-  const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
-  const lines = [
-    `# Fix Request: ${title}`,
-    '',
-    `**Severity:** ${v.severity || 'unknown'}`,
-  ];
-  if (loc) lines.push(`**File:** ${loc}`);
-  if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
-  if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
-  const hint = getFixHint(v.req);
-  if (hint) lines.push('', `**Expected fix:** ${hint}`);
-  lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
-  if (loc) lines.push(`Apply it to \`${loc}\`.`);
-  lines.push(PLAN_TEST_INSTRUCTION_SINGLE);
-  return lines.join('\n').trim();
+  return buildSingleViolationPlanText(v, principleName || 'Violation');
 }
 
 const ANIM_DELAY_PER_ITEM_MS = 30;

@@ -109,17 +109,31 @@ function AppShell({ sidebar, header, breadcrumb, content }) {
   );
 }
 
+function useProjects({ onNoProjects }) {
+  const projectState = useProjectState({ onNoProjects });
+  const projectActions = useProjectActions({
+    projects: projectState.projects,
+    selectedProject: projectState.selectedProject,
+    handleProjectChange: projectState.handleProjectChange,
+    loadProjects: projectState.loadProjects,
+  });
+  return { ...projectState, ...projectActions };
+}
+
 function useAppState() {
   const [serverConnected, setServerConnected] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
-  const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, handleRunChange, selectProjectAndRun } = useProjectState({ onNoProjects: () => navTab('evaluate') });
+  const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
+  const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, handleRunChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
   const settings = useAppSettings();
-  const { handleDeleteProject, handleExportProject, handleRelocateProject } = useProjectActions({ projects, selectedProject, handleProjectChange, loadProjects });
   function handleNavigate(page, params = {}) { if (page === 'run' && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
   const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
-  const headerMeta = useMemo(() => computeHeaderMeta(accumulated, dashboard), [accumulated, dashboard]);
-  const { selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => computeProjectDisplay(selectedProject, projects), [selectedProject, projects]);
+  const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
+    const meta = computeHeaderMeta(accumulated, dashboard);
+    const display = computeProjectDisplay(selectedProject, projects);
+    return { headerMeta: meta, ...display };
+  }, [accumulated, dashboard, selectedProject, projects]);
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
   const activeTab = ['overview', 'projects', 'evaluate', 'settings'].includes(activePage.page) ? activePage.page : 'overview';
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
