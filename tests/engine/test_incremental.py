@@ -3,11 +3,12 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, ClassificationInput, FileClassification, identify_backfill_files
-from quodeq.analysis._incremental import save_dimension_fingerprint, _extract_files_from_jsonl
+from quodeq.analysis._incremental import save_dimension_fingerprint, _extract_files_from_jsonl, _run_backfill_phase, BackfillContext
 
 
 class TestDetectChangedFiles:
@@ -303,3 +304,68 @@ class TestSaveDimensionFingerprintJsonlUnion:
         call_kwargs = mock_build.call_args
         analyzed = call_kwargs.kwargs.get("analyzed_files") or call_kwargs[1].get("analyzed_files")
         assert analyzed == {"a.py", "b.py"}
+
+
+class TestBackfillSkipsVerification:
+    @patch("quodeq.analysis.runner._process_single_dimension")
+    def test_verify_findings_disabled_during_backfill(self, mock_process, tmp_path):
+        """Backfill disables verify_findings before calling _process_single_dimension."""
+        config = MagicMock()
+        config.options.pool_budget = 600
+        config.options.verify_findings = True
+        config.options.incremental_file_filter = None
+
+        captured_verify = []
+
+        def capture_config(*args, **kwargs):
+            captured_verify.append(config.options.verify_findings)
+
+        mock_process.side_effect = capture_config
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+
+        ctx = MagicMock()
+        backfill_ctx = BackfillContext(
+            files=["a.py", "b.py", "c.py"],
+            prev_analyzed=set(),
+            phase1_files=set(),
+            evidence_dir=evidence_dir,
+            phase_start=time.monotonic() - 10,  # 10s elapsed, plenty of budget
+        )
+
+        _run_backfill_phase(config, "security", 1, ctx, backfill_ctx)
+
+        # verify_findings should have been False when _process_single_dimension was called
+        assert captured_verify == [False]
+        # verify_findings should be restored after
+        assert config.options.verify_findings is True
+
+    @patch("quodeq.analysis.runner._process_single_dimension")
+    def test_verify_findings_restored_on_error(self, mock_process, tmp_path):
+        """verify_findings is restored even if _process_single_dimension raises."""
+        config = MagicMock()
+        config.options.pool_budget = 600
+        config.options.verify_findings = True
+        config.options.incremental_file_filter = None
+
+        mock_process.side_effect = RuntimeError("boom")
+
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+
+        ctx = MagicMock()
+        backfill_ctx = BackfillContext(
+            files=["a.py"],
+            prev_analyzed=set(),
+            phase1_files=set(),
+            evidence_dir=evidence_dir,
+            phase_start=time.monotonic() - 10,
+        )
+
+        try:
+            _run_backfill_phase(config, "security", 1, ctx, backfill_ctx)
+        except RuntimeError:
+            pass
+
+        assert config.options.verify_findings is True

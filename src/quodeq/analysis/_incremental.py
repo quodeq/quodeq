@@ -208,12 +208,15 @@ def _run_backfill_phase(
     )
     config.options.incremental_file_filter = set(backfill_candidates)
     saved_budget = config.options.pool_budget
+    saved_verify = config.options.verify_findings
     config.options.pool_budget = remaining_budget
+    config.options.verify_findings = False
     try:
         _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
     finally:
         config.options.incremental_file_filter = None
         config.options.pool_budget = saved_budget
+        config.options.verify_findings = saved_verify
 
     # Read which backfill files were actually taken from queue
     backfill_queue = backfill.evidence_dir / f"{dimension}_queue.json"
