@@ -16,11 +16,12 @@ _VERIFY_MAX_FILES_PER_AGENT = 40
 _VERIFY_MAX_TURNS = 100
 _VERIFY_MAX_DURATION = 600
 _VERIFY_N_AGENTS = 5
+_DEFAULT_FAST_MODEL = "haiku"
 
 
 def _fast_model(env: dict[str, str] | None = None) -> str:
     """Return the fast/verification model. Defaults to 'haiku'."""
-    return (env or os.environ).get("QUODEQ_FAST_MODEL", "haiku")
+    return (env or os.environ).get("QUODEQ_FAST_MODEL", _DEFAULT_FAST_MODEL)
 
 
 def run_verification_pool(

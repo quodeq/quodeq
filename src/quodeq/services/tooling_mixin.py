@@ -72,16 +72,24 @@ class FsToolingMixin:
     def __init__(self) -> None:
         self._model_fetchers: dict[str, Callable] = {}
 
-    def browse_repo(self, path: str | None) -> dict[str, Any]:
-        """List directories at the given path for repository browsing."""
+    @staticmethod
+    def _validate_browse_path(path: str | None) -> tuple[Path, dict[str, Any] | None]:
+        """Resolve and validate a browse path. Returns (target, error_or_None)."""
         target = Path(path) if path else Path.home()
         target = target.resolve()
         if not target.is_relative_to(Path.home()):
-            return {"error": "Path outside allowed boundary", "error_code": "PATH_OUTSIDE_BOUNDARY"}
+            return target, {"error": "Path outside allowed boundary", "error_code": "PATH_OUTSIDE_BOUNDARY"}
         if not target.exists():
-            return {"error": "Path not found", "error_code": "PATH_NOT_FOUND", "path": str(target)}
+            return target, {"error": "Path not found", "error_code": "PATH_NOT_FOUND", "path": str(target)}
         if not target.is_dir():
-            return {"error": "Path is not a directory", "error_code": "PATH_NOT_DIRECTORY", "path": str(target)}
+            return target, {"error": "Path is not a directory", "error_code": "PATH_NOT_DIRECTORY", "path": str(target)}
+        return target, None
+
+    def browse_repo(self, path: str | None) -> dict[str, Any]:
+        """List directories at the given path for repository browsing."""
+        target, error = self._validate_browse_path(path)
+        if error is not None:
+            return error
 
         directories = []
         for entry in safe_read_dir(target):

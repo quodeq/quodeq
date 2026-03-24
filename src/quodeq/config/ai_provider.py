@@ -10,6 +10,7 @@ from quodeq.shared.logging import log_error, log_info, log_success, log_warning
 from quodeq.shared.utils import get_ai_provider
 
 _AI_PROVIDER_EXPORT_PREFIX = "export AI_PROVIDER="
+_OWNER_RW_PERMS = 0o600
 
 PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
@@ -61,12 +62,12 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
     fd, tmp_path = tempfile.mkstemp(dir=str(paths.env_file.parent), suffix=".tmp")
     closed = False
     try:
-        os.fchmod(fd, 0o600)
+        os.fchmod(fd, _OWNER_RW_PERMS)
         os.write(fd, ("\n".join(lines) + "\n").encode())
         os.close(fd)
         closed = True
         os.replace(tmp_path, str(paths.env_file))
-        os.chmod(str(paths.env_file), 0o600)
+        os.chmod(str(paths.env_file), _OWNER_RW_PERMS)
     except BaseException:
         if not closed:
             os.close(fd)

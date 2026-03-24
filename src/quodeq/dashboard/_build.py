@@ -10,9 +10,19 @@ from pathlib import Path
 from quodeq.shared.logging import log_info
 
 _HASH_FILE = ".build_hash"
-_QUODEQ_DIR = Path.home() / ".quodeq"
-_BUILD_WORKDIR = _QUODEQ_DIR / "ui_build"
-_STATIC_DIR = _QUODEQ_DIR / "static"
+
+
+def _quodeq_dir() -> Path:
+    """Return the base Quodeq directory, overridable via QUODEQ_DIR env var."""
+    return Path(os.environ.get("QUODEQ_DIR", str(Path.home() / ".quodeq")))
+
+
+def _build_workdir() -> Path:
+    return _quodeq_dir() / "ui_build"
+
+
+def _static_dir() -> Path:
+    return _quodeq_dir() / "static"
 
 # Files and directories to sync from package source to build workdir
 _SYNC_ITEMS = ("src", "public", "package.json", "vite.config.js", "index.html")
@@ -124,8 +134,12 @@ def _resolve_dev_source() -> Path:
     )
 
 
-_DEV_STATIC_DIR = _QUODEQ_DIR / "static-dev"
-_DEV_BUILD_WORKDIR = _QUODEQ_DIR / "ui_build_dev"
+def _dev_static_dir() -> Path:
+    return _quodeq_dir() / "static-dev"
+
+
+def _dev_build_workdir() -> Path:
+    return _quodeq_dir() / "ui_build_dev"
 
 
 def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
@@ -135,11 +149,11 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
     """
     if dev:
         source_dir = _resolve_dev_source()
-        static_dir = _DEV_STATIC_DIR
+        static_dir = _dev_static_dir()
         log_info(f"Dev mode: building from {source_dir}")
     else:
         source_dir = _get_ui_source_dir()
-        static_dir = _STATIC_DIR
+        static_dir = _static_dir()
 
     if no_build:
         if not (static_dir / "index.html").exists():
@@ -158,7 +172,7 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
         # Build directly from repo source — no copy needed
         workdir = source_dir
     else:
-        workdir = _BUILD_WORKDIR
+        workdir = _build_workdir()
         sync_source_to_workdir(source_dir, workdir)
     static_dir.mkdir(parents=True, exist_ok=True)
     _run_npm_build(workdir, static_dir)

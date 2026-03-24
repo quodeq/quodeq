@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from quodeq.analysis.incremental import identify_backfill_files
 from quodeq.services.base import _DEFAULT_POOL_BUDGET
-from quodeq.shared.logging import log_info
+from quodeq.shared.logging import log_debug, log_info
 
 if TYPE_CHECKING:
     from quodeq.analysis.runner import RunConfig, _AnalysisContext
@@ -50,8 +50,8 @@ def extract_files_from_jsonl(jsonl_path: Path) -> set[str]:
                 file_path = obj.get("file")
                 if file_path:
                     files.add(file_path)
-    except OSError:
-        pass
+    except OSError as exc:
+        log_debug(f"Cannot read JSONL {jsonl_path}: {exc}")
     return files
 
 
@@ -63,8 +63,8 @@ def _collect_backfill_taken(evidence_dir: Path, dimension: str, output_jsonl: Pa
         from quodeq.analysis.subagents.file_queue import FileQueue
         try:
             backfill_taken = set(FileQueue(backfill_queue).all_taken_files())
-        except Exception:
-            pass
+        except Exception as exc:
+            log_debug(f"Cannot read backfill queue {backfill_queue}: {exc}")
     from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
     if output_jsonl.exists():
         deduplicate_jsonl(output_jsonl)

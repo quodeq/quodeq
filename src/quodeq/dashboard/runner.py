@@ -32,8 +32,8 @@ from quodeq.shared.prereqs import check_dashboard_prereqs
 from quodeq.shared.utils import IS_WIN32
 
 
-def _local_hosts() -> frozenset[str]:
-    extra = os.environ.get("QUODEQ_LOCAL_HOSTS", "")
+def _local_hosts(env: dict[str, str] | None = None) -> frozenset[str]:
+    extra = (env if env is not None else os.environ).get("QUODEQ_LOCAL_HOSTS", "")
     base = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
     if extra:
         base.update(h.strip() for h in extra.split(",") if h.strip())

@@ -130,9 +130,18 @@ function useEvalRefs() {
 function useResumeRunning(setJob, startPolling, pollRef, dimPollRef) {
   useEffect(() => {
     listEvaluations()
-      .then((jobs) => { const running = jobs.find((j) => j.status === 'running'); if (running) { setJob(running); startPolling(running.jobId); } })
+      .then((jobs) => {
+        const running = jobs.find((j) => j.status === 'running');
+        if (running) {
+          setJob(running);
+          startPolling(running.jobId);
+        }
+      })
       .catch((err) => console.warn('Failed to fetch running evaluations:', err));
-    return () => { stopTimer(pollRef); stopTimer(dimPollRef); };
+    return () => {
+      stopTimer(pollRef);
+      stopTimer(dimPollRef);
+    };
   }, []);
 }
 
@@ -153,7 +162,13 @@ export function useEvaluation() {
     refs.partialDimensionsRef.current = new Set();
     setLiveViolations({});
     preparePayload(payload);
-    try { const created = await startEvaluation(payload); setJob({ ...created, repo: payload.repo }); startPolling(created.jobId); } catch (err) { setJobError(err.message); }
+    try {
+      const created = await startEvaluation(payload);
+      setJob({ ...created, repo: payload.repo });
+      startPolling(created.jobId);
+    } catch (err) {
+      setJobError(err.message);
+    }
   }
 
   function clearJob() {
@@ -164,7 +179,12 @@ export function useEvaluation() {
 
   async function cancelEvaluationJob() {
     if (!job?.jobId) return;
-    try { await cancelEvaluation(job.jobId); clearJob(); } catch (err) { setJobError(err.message); }
+    try {
+      await cancelEvaluation(job.jobId);
+      clearJob();
+    } catch (err) {
+      setJobError(err.message);
+    }
   }
 
   return { job, jobError, liveViolations, startEvaluation: startEvaluationJob, clearJob, cancelEvaluation: cancelEvaluationJob };

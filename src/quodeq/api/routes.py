@@ -170,6 +170,26 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
     def list_evaluations() -> Response:
         return jsonify([to_camel_dict(j) for j in provider.list_evaluations()])
 
+    def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
+        """Construct and validate EvaluationOptions from the request payload."""
+        from quodeq.provider.base import EvaluationOptions
+        max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
+        max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
+        pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
+        pool_budget = max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, int(pool_budget_raw)))
+        return EvaluationOptions(
+            discipline=payload.get("discipline"),
+            dimensions=payload.get("dimensions") or "",
+            numerical=bool(payload.get("numerical")),
+            ai_cmd=payload.get("aiCmd") or None,
+            ai_model=payload.get("aiModel") or None,
+            subagent_model=payload.get("subagentModel") or None,
+            verify_findings=bool(payload.get("verifyFindings", True)),
+            max_subagents=max_subagents,
+            pool_budget=pool_budget,
+            incremental=bool(payload.get("incremental", False)),
+        )
+
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
         # Enforce stricter per-endpoint rate limit for evaluation creation
@@ -188,34 +208,15 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         if validation_error:
             body, status = error_response(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
-        repo = payload.get("repo")
         ai_cmd = payload.get("aiCmd") or None
         ai_cmd_error = _validate_ai_cmd(ai_cmd)
         if ai_cmd_error is not None:
             return ai_cmd_error
+        repo = payload.get("repo")
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
-            from quodeq.provider.base import EvaluationOptions
-            max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
-            max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
-            pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
-            pool_budget = max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, int(pool_budget_raw)))
-            job = provider.start_evaluation(
-                repo=repo,
-                reports_dir=_reports_dir(),
-                options=EvaluationOptions(
-                    discipline=payload.get("discipline"),
-                    dimensions=payload.get("dimensions") or "",
-                    numerical=bool(payload.get("numerical")),
-                    ai_cmd=ai_cmd,
-                    ai_model=payload.get("aiModel") or None,
-                    subagent_model=payload.get("subagentModel") or None,
-                    verify_findings=bool(payload.get("verifyFindings", True)),
-                    max_subagents=max_subagents,
-                    pool_budget=pool_budget,
-                    incremental=bool(payload.get("incremental", False)),
-                ),
-            )
+            options = _build_evaluation_options(payload)
+            job = provider.start_evaluation(repo=repo, reports_dir=_reports_dir(), options=options)
         except (FileNotFoundError, ValueError):
             body, status = error_response("Invalid repository", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status

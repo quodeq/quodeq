@@ -247,20 +247,24 @@ class QuodeqApp(rumps.App):
         self._cleanup_stderr_log()
 
     @staticmethod
-    def _kill_port_processes(port: int) -> None:
-        """Send SIGTERM to all processes listening on *port*."""
+    def _find_pids_on_port(port: int) -> list[int]:
+        """Return PIDs listening on *port* (macOS: uses lsof)."""
         try:
             result = subprocess.run(
                 ["lsof", f"-ti:{port}"], capture_output=True, text=True, timeout=5,
             )
-            for pid in result.stdout.strip().split("\n"):
-                if pid.strip():
-                    try:
-                        os.kill(int(pid.strip()), signal.SIGTERM)
-                    except (OSError, ValueError):
-                        pass
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+            return [int(pid.strip()) for pid in result.stdout.strip().split("\n") if pid.strip()]
+        except (subprocess.TimeoutExpired, OSError, ValueError):
+            return []
+
+    @staticmethod
+    def _kill_port_processes(port: int) -> None:
+        """Send SIGTERM to all processes listening on *port*."""
+        for pid in QuodeqApp._find_pids_on_port(port):
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (OSError, ValueError):
+                pass
 
     def _on_stop(self, _):
         if self._process and self._process.poll() is None:

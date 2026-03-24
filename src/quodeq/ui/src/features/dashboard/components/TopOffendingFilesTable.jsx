@@ -4,7 +4,9 @@
 
 import { memo, useState } from 'react';
 
-const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onFileClick, pageSize = 20 }) {
+const DEFAULT_PAGE_SIZE = 20;
+
+const TopOffendingFilesTable = memo(function TopOffendingFilesTable({ files, onFileClick, pageSize = DEFAULT_PAGE_SIZE }) {
   const [showAll, setShowAll] = useState(false);
   const displayFiles = showAll ? (files || []) : (files || []).slice(0, pageSize);
   const hasMore = (files || []).length > pageSize;

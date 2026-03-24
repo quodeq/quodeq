@@ -7,11 +7,13 @@ from quodeq.dashboard.runner import BuildConfig, DashboardConfig, ServerConfig, 
 
 from tests.conftest import DummyProcess
 
+_TEST_PORT = 4173
+
 
 def _make_config(tmp_path: Path, **overrides) -> DashboardConfig:
     """Build a DashboardConfig with sensible test defaults, overridable by keyword."""
     defaults = {
-        "server": ServerConfig(port=4173),
+        "server": ServerConfig(port=_TEST_PORT),
         "build": BuildConfig(open_browser=False, no_build=True, reinstall=False),
         "reports_dir": tmp_path / "reports",
         "static_dist": tmp_path / "ui/web/dist",
@@ -38,7 +40,7 @@ def test_run_dashboard_spawns_action_api_with_static_dist(tmp_path: Path, monkey
     def fake_ensure(*args, **kwargs):
         api_config = kwargs.get("api_config")
         captured["static_dist"] = api_config.static_dist if api_config else None
-        return "http://127.0.0.1:4173", DummyProcess()
+        return f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()
 
     monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
     monkeypatch.setattr(runner, "_ensure_action_api", fake_ensure)
@@ -59,7 +61,7 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
     monkeypatch.setattr(
         runner, "_ensure_action_api",
-        lambda *_args, **_kwargs: ("http://127.0.0.1:4173", DummyProcess()),
+        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
     )
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
     monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
@@ -72,9 +74,9 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
 
 
 def test_choose_ui_port_skips_taken(monkeypatch):
-    monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == 4173)
-    port = runner._choose_ui_port(4173)
-    assert port == 4174
+    monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == _TEST_PORT)
+    port = runner._choose_ui_port(_TEST_PORT)
+    assert port == _TEST_PORT + 1
 
 
 def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
@@ -86,9 +88,9 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
     monkeypatch.setattr(
         runner, "_ensure_action_api",
-        lambda *_args, **_kwargs: ("http://127.0.0.1:4174", DummyProcess()),
+        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT + 1}", DummyProcess()),
     )
-    monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == 4173)
+    monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == _TEST_PORT)
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
     monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
 
@@ -97,12 +99,12 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
     captured = []
     monkeypatch.setattr(
         runner, "_ensure_action_api",
-        lambda *args, **kwargs: (captured.append(args) or ("http://127.0.0.1:4174", DummyProcess())),
+        lambda *args, **kwargs: (captured.append(args) or (f"http://127.0.0.1:{_TEST_PORT + 1}", DummyProcess())),
     )
 
     run_dashboard(config)
     # Original config is frozen; the resolved config inside run_dashboard picks 4174
-    assert config.server.port == 4173  # original unchanged
+    assert config.server.port == _TEST_PORT  # original unchanged
 
 
 def test_validate_paths_missing_reports_custom_message(tmp_path: Path):

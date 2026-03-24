@@ -3,6 +3,42 @@ import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import PowerSelector from './PowerSelector.jsx';
 
+const CHIP_DELAY_1 = '0.55s';
+const CHIP_DELAY_2 = '1.1s';
+
+function EvaluateHelpSection() {
+  return (
+    <div className="panel evaluate-help-panel">
+      <div className="panel-header">
+        <h3>How It Works</h3>
+      </div>
+      <div className="help-steps">
+        <div className="help-step">
+          <div className="step-number">1</div>
+          <div className="step-content">
+            <h4>Provide Repository</h4>
+            <p>Enter a GitHub URL, SSH path, or local filesystem path to the repository you want to evaluate.</p>
+          </div>
+        </div>
+        <div className="help-step">
+          <div className="step-number">2</div>
+          <div className="step-content">
+            <h4>Select Dimensions</h4>
+            <p>Choose which quality dimensions to analyze. Each dimension covers different aspects of code quality.</p>
+          </div>
+        </div>
+        <div className="help-step">
+          <div className="step-number">3</div>
+          <div className="step-content">
+            <h4>Review Results</h4>
+            <p>Once complete, view detailed findings, grades, and actionable recommendations in the Overview.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, analysisPower, onAnalysisPowerChange } = context;
@@ -25,8 +61,8 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
             {/* Animated layer — visible when running */}
             <div className="eval-icon-animated">
               <span className="eval-file-chip" style={{animationDelay: '0s'}} />
-              <span className="eval-file-chip" style={{animationDelay: '0.55s'}} />
-              <span className="eval-file-chip" style={{animationDelay: '1.1s'}} />
+              <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_1}} />
+              <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_2}} />
               <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="11" cy="11" r="7" />
                 <line x1="16.5" y1="16.5" x2="21" y2="21" />
@@ -64,34 +100,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
         {jobError && <div className="job-error-banner">Evaluation failed. Please check your inputs and try again.</div>}
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
 
-        {!job && <div className="panel evaluate-help-panel">
-          <div className="panel-header">
-            <h3>How It Works</h3>
-          </div>
-          <div className="help-steps">
-            <div className="help-step">
-              <div className="step-number">1</div>
-              <div className="step-content">
-                <h4>Provide Repository</h4>
-                <p>Enter a GitHub URL, SSH path, or local filesystem path to the repository you want to evaluate.</p>
-              </div>
-            </div>
-            <div className="help-step">
-              <div className="step-number">2</div>
-              <div className="step-content">
-                <h4>Select Dimensions</h4>
-                <p>Choose which quality dimensions to analyze. Each dimension covers different aspects of code quality.</p>
-              </div>
-            </div>
-            <div className="help-step">
-              <div className="step-number">3</div>
-              <div className="step-content">
-                <h4>Review Results</h4>
-                <p>Once complete, view detailed findings, grades, and actionable recommendations in the Overview.</p>
-              </div>
-            </div>
-          </div>
-        </div>}
+        {!job && <EvaluateHelpSection />}
       </div>
     </section>
   );

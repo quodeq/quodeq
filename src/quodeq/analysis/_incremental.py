@@ -181,6 +181,15 @@ def _maybe_carry_forward(
     log_info(f"  [{dimension}] Carried forward {carried} findings for {len(classification.unchanged)} unchanged files")
 
 
+def _list_all_source_files(config: RunConfig, dimension: str) -> list[str]:
+    """List all source files, temporarily clearing the incremental filter."""
+    saved_filter = config.options.incremental_file_filter
+    config.options.incremental_file_filter = None
+    files, _extensions = _list_source_files(config, dimension)
+    config.options.incremental_file_filter = saved_filter
+    return files
+
+
 def run_dimension_incremental(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
 ) -> Evidence | None:
@@ -190,32 +199,22 @@ def run_dimension_incremental(
 
     prev_fp, prev_evidence_dir = find_previous_fingerprint(evidence_dir, dimension)
 
-    # Get full source files list (for classification)
-    saved_filter = config.options.incremental_file_filter
-    config.options.incremental_file_filter = None
-    files, extensions = _list_source_files(config, dimension)
-    config.options.incremental_file_filter = saved_filter
+    files = _list_all_source_files(config, dimension)
     if not files:
         return None
 
-    # Classify files
     from quodeq.analysis.incremental import ClassificationInput
     classification = classify_files(
         inputs=ClassificationInput(
-            src=config.src, files=files,
-            prev_fingerprint=prev_fp,
-            standards_dir=config.standards_dir,
-            dimension=dimension,
-            language=config.language,
+            src=config.src, files=files, prev_fingerprint=prev_fp,
+            standards_dir=config.standards_dir, dimension=dimension, language=config.language,
         ),
     )
 
     _maybe_carry_forward(prev_fp, prev_evidence_dir, classification, dimension, evidence_dir)
 
-    # Phase 1: analyze changed files
     ev = _run_phase1_analysis(config, dimension, idx, ctx, classification)
 
-    # Phase 3: backfill
     prev_analyzed = set(prev_fp.get("analyzed_files", [])) if prev_fp else set()
     phase1_files = set(classification.to_analyze) if classification.to_analyze else set()
     backfill_taken = _run_backfill_phase(
@@ -224,13 +223,11 @@ def run_dimension_incremental(
                         evidence_dir=evidence_dir, phase_start=phase_start),
     )
 
-    # Re-parse after all phases and save fingerprint
     all_analyzed = prev_analyzed | phase1_files | backfill_taken
     return _finalize_incremental(
         config, dimension, ctx,
         IncrementalCoverage(
-            files=files,
-            all_analyzed=all_analyzed,
+            files=files, all_analyzed=all_analyzed,
             files_read=len(phase1_files) + len(backfill_taken) + len(classification.unchanged),
         ),
     )
