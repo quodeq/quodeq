@@ -38,6 +38,7 @@ __all__ = [
 
 _logger = logging.getLogger(__name__)
 _REPORT_PATH_MARKER = "Report path:"
+_PROCESS_WAIT_TIMEOUT_S = 30
 
 # Canonical job status strings.
 STATUS_RUNNING = "running"
@@ -205,7 +206,7 @@ class JobManager:
         except subprocess.TimeoutExpired:
             _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._JOB_TIMEOUT_S)
             process.kill()
-            process.wait(timeout=30)
+            process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
             exit_code = -9
         with self._lock:
             self._processes.pop(job_id, None)

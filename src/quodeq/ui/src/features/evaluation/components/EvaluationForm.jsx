@@ -3,6 +3,8 @@ import FolderBrowser from './FolderBrowser.jsx';
 import { listPlugins } from '../../../api/index.js';
 import { ISO_25010_URL } from '../../../constants.js';
 
+const FOLDER_MARGIN_BOTTOM = 8;
+
 function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   return (
     <div className="form-group">
@@ -132,7 +134,7 @@ export default function EvaluationForm({ onStart, disabled }) {
           onBrowse={() => setFolderBrowserOpen(true)}
         />
 
-        {dimLoadError && <p className="inline-error" style={{ marginBottom: 8 }}>{dimLoadError}</p>}
+        {dimLoadError && <p className="inline-error" style={{ marginBottom: FOLDER_MARGIN_BOTTOM }}>{dimLoadError}</p>}
         {repo && allDimensions.length > 0 && (
           <DimensionGrid
             allDimensions={allDimensions}

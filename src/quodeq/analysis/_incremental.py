@@ -11,10 +11,13 @@ from quodeq.analysis.incremental import classify_files, carry_forward_findings, 
 from quodeq.analysis.subagents.verify import _resolve_evidence_paths
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
+from quodeq.services.base import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_debug, log_info, log_warning
 
 if TYPE_CHECKING:
     from quodeq.analysis.runner import RunConfig, _AnalysisContext
+
+_MIN_BACKFILL_BUDGET_S = 60
 
 
 @dataclass
@@ -181,10 +184,10 @@ def _run_backfill_phase(
         return backfill_taken
 
     elapsed = time.monotonic() - backfill.phase_start
-    total_budget = config.options.pool_budget or 600
+    total_budget = config.options.pool_budget or _DEFAULT_POOL_BUDGET
     remaining_budget = max(0, total_budget - int(elapsed))
 
-    if remaining_budget < 60:
+    if remaining_budget < _MIN_BACKFILL_BUDGET_S:
         log_info(f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, but no budget remaining")
         return backfill_taken
 

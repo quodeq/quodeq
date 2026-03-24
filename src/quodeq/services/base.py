@@ -8,6 +8,10 @@ from typing import Protocol, runtime_checkable
 from quodeq.core.types import JobSnapshot, ViolationSummary
 
 
+_DEFAULT_MAX_SUBAGENTS = 5
+_DEFAULT_POOL_BUDGET = 600
+
+
 @dataclass
 class EvaluationOptions:
     """Options controlling an evaluation run (discipline, dimensions, scoring mode)."""
@@ -18,8 +22,8 @@ class EvaluationOptions:
     ai_model: str | None = None
     subagent_model: str | None = None
     verify_findings: bool = True
-    max_subagents: int = 5
-    pool_budget: int = 600
+    max_subagents: int = _DEFAULT_MAX_SUBAGENTS
+    pool_budget: int = _DEFAULT_POOL_BUDGET
     incremental: bool = False
 
 

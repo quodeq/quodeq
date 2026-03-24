@@ -12,6 +12,7 @@ from quodeq.api.zip import export_project_zip
 from quodeq.core.types import to_camel_dict
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
+from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
 from quodeq.shared.utils import get_evaluations_dir
 
 _CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
@@ -19,6 +20,12 @@ _logger = logging.getLogger(__name__)
 
 # Error keyword returned by browse_repo when the path exists but is not a directory.
 _BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
+
+# Bounds for user-supplied evaluation parameters
+_MIN_SUBAGENTS = 1
+_MAX_SUBAGENTS = 10
+_MIN_POOL_BUDGET = 60
+_MAX_POOL_BUDGET = 3600
 
 
 def _sanitize_url(url: str) -> str:
@@ -189,10 +196,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
             from quodeq.provider.base import EvaluationOptions
-            max_subagents_raw = payload.get("maxSubagents", 5)
-            max_subagents = max(1, min(10, int(max_subagents_raw)))
-            pool_budget_raw = payload.get("poolBudget", 600)
-            pool_budget = max(60, min(3600, int(pool_budget_raw)))
+            max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
+            max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
+            pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
+            pool_budget = max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, int(pool_budget_raw)))
             job = provider.start_evaluation(
                 repo=repo,
                 reports_dir=_reports_dir(),

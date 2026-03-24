@@ -141,9 +141,13 @@ export function parseFileRef(rawFile, rawLine) {
  * @param {number} d - Score delta value
  * @returns {number} Rotation angle in degrees (35..145)
  */
+const DELTA_CLAMP = 4;
+const ANGLE_BASE = 90;
+const ANGLE_RANGE = 55;
+
 export function angleFromDelta(d) {
-  const clamped = Math.max(-4, Math.min(4, d));
-  return 90 - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / 4) * 55;
+  const clamped = Math.max(-DELTA_CLAMP, Math.min(DELTA_CLAMP, d));
+  return ANGLE_BASE - Math.sign(clamped) * Math.sqrt(Math.abs(clamped) / DELTA_CLAMP) * ANGLE_RANGE;
 }
 
 /**

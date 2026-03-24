@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } from '../../../api/index.js';
+import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY } from '../../../constants.js';
 
 const DIMENSION_POLL_MS = 2000;
 const JOB_POLL_MS = 1500;
@@ -138,10 +139,10 @@ export function useEvaluation() {
     liveViolationsRef.current = {};
     partialDimensionsRef.current = new Set();
     setLiveViolations({});
-    const maxSubagents = parseInt(localStorage.getItem('cc-max-subagents') || '5', 10);
-    if (maxSubagents !== 5) payload.maxSubagents = maxSubagents;
-    const poolBudget = parseInt(localStorage.getItem('cc-pool-budget') || '600', 10);
-    if (poolBudget !== 600) payload.poolBudget = poolBudget;
+    const maxSubagents = parseInt(localStorage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10);
+    if (maxSubagents !== DEFAULT_MAX_SUBAGENTS) payload.maxSubagents = maxSubagents;
+    const poolBudget = parseInt(localStorage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10);
+    if (poolBudget !== DEFAULT_POOL_BUDGET) payload.poolBudget = poolBudget;
     try {
       const created = await startEvaluation(payload);
       setJob({ ...created, repo: payload.repo });
