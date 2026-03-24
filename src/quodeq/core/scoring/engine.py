@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from quodeq.core.types import Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
 from quodeq.core.evidence.model import DEFAULT_WEIGHT, Evidence
 from quodeq.core.scoring.overall import (
-    _accumulate_weights,
-    _build_overall_result,
-    _weighted_overall,
+    accumulate_weights,
+    build_overall_result,
+    weighted_overall,
     MODE_NUMERICAL,
 )
 from quodeq.core.scoring.internals import (
@@ -237,7 +237,7 @@ def run_scoring(evidence: dict, mode: str) -> ScoringResult:
     per_principle = _score_all_principles(
         evidence.get("principles", {}), mode, scale_mult, files_read,
     )
-    overall = _weighted_overall(per_principle, mode)
+    overall = weighted_overall(per_principle, mode)
 
     return ScoringResult(
         repository=evidence.get("repository", ""),

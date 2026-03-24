@@ -13,36 +13,15 @@ from __future__ import annotations
 
 import json
 import os
-import sys
 import tempfile
 import time
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
+from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
+
 _QUEUE_VERSION = 1
-
-
-if sys.platform == "win32":
-    import msvcrt as _lock_mod
-else:
-    import fcntl as _lock_mod  # type: ignore[no-redef]
-
-
-def _lock_file(fd: int) -> None:
-    """Acquire an exclusive lock on the file descriptor, dispatching by platform."""
-    if sys.platform == "win32":
-        _lock_mod.locking(fd, _lock_mod.LK_LOCK, 1)
-    else:
-        _lock_mod.flock(fd, _lock_mod.LOCK_EX)
-
-
-def _unlock_file(fd: int) -> None:
-    """Release the lock on the file descriptor, dispatching by platform."""
-    if sys.platform == "win32":
-        _lock_mod.locking(fd, _lock_mod.LK_UNLCK, 1)
-    else:
-        _lock_mod.flock(fd, _lock_mod.LOCK_UN)
 
 
 @runtime_checkable
@@ -217,10 +196,10 @@ class FileQueue:
         """
         fd = os.open(str(self._lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
         try:
-            _lock_file(fd)
+            lock_file(fd)
             yield
         finally:
-            _unlock_file(fd)
+            unlock_file(fd)
             os.close(fd)
 
     def _read_state(self) -> dict:

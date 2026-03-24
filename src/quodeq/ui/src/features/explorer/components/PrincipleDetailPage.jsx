@@ -110,80 +110,92 @@ function ViolationCard({ v, principleName, index }) {
   );
 }
 
+function ComplianceStatsRow({ principle, totalViolations, totalCompliance }) {
+  return (
+    <section className="panel file-detail-summary-panel">
+      <div className="file-detail-stats-row">
+        <div className="file-detail-stats">
+          {principle.critical > 0 && (
+            <span className="file-detail-stat severity-tag critical">{principle.critical} critical</span>
+          )}
+          {principle.major > 0 && (
+            <span className="file-detail-stat severity-tag major">{principle.major} major</span>
+          )}
+          {principle.minor > 0 && (
+            <span className="file-detail-stat severity-tag minor">{principle.minor} minor</span>
+          )}
+          {(principle.critical > 0 || principle.major > 0 || principle.minor > 0) && <span className="file-detail-stat-sep">·</span>}
+          <span className="file-detail-stat">
+            <strong>{totalViolations}</strong> violations
+          </span>
+          {totalCompliance > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat">
+                <strong>{totalCompliance}</strong> compliance
+              </span>
+              {totalViolations > 0 && (
+                <>
+                  <span className="file-detail-stat-sep">·</span>
+                  <span className="file-detail-stat">
+                    <strong>1:{Math.round(totalCompliance / totalViolations)}</strong> ratio
+                  </span>
+                </>
+              )}
+            </>
+          )}
+        </div>
+        <CopyButton
+          label="Principle fix plan"
+          onClick={() => copyToClipboard(buildPrinciplePlanText(principle))}
+        />
+      </div>
+    </section>
+  );
+}
+
+function ViolationGroup({ sev, violations, principleName }) {
+  if (!violations || violations.length === 0) return null;
+  return (
+    <div>
+      <div className="violation-group-header">
+        <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
+        <span className="violation-group-count">{violations.length}</span>
+      </div>
+      <div className="vlive-violations-group">
+        {violations.map((v, idx) => (
+          <ViolationCard key={idx} v={v} principleName={principleName} index={idx} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function groupViolationsBySeverity(violations) {
+  const result = {};
+  for (const sev of SEVERITY_ORDER) result[sev] = [];
+  for (const v of (violations || [])) {
+    const sev = (v.severity || 'minor').toLowerCase();
+    if (result[sev]) result[sev].push(v);
+    else result['minor'].push(v);
+  }
+  return result;
+}
+
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
   const totalViolations = principle.total || 0;
   const totalCompliance = principle.compliance?.length || 0;
-
-  const violationsBySeverity = {};
-  for (const sev of SEVERITY_ORDER) violationsBySeverity[sev] = [];
-  for (const v of (principle.violations || [])) {
-    const sev = (v.severity || 'minor').toLowerCase();
-    if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);
-    else violationsBySeverity['minor'].push(v);
-  }
+  const violationsBySeverity = groupViolationsBySeverity(principle.violations);
 
   return (
     <>
       <div className="section-header">
         <h3 className="section-title file-detail-title">{principle.principle}</h3>
       </div>
-      <section className="panel file-detail-summary-panel">
-        <div className="file-detail-stats-row">
-          <div className="file-detail-stats">
-            {principle.critical > 0 && (
-              <span className="file-detail-stat severity-tag critical">{principle.critical} critical</span>
-            )}
-            {principle.major > 0 && (
-              <span className="file-detail-stat severity-tag major">{principle.major} major</span>
-            )}
-            {principle.minor > 0 && (
-              <span className="file-detail-stat severity-tag minor">{principle.minor} minor</span>
-            )}
-            {(principle.critical > 0 || principle.major > 0 || principle.minor > 0) && <span className="file-detail-stat-sep">·</span>}
-            <span className="file-detail-stat">
-              <strong>{totalViolations}</strong> violations
-            </span>
-            {totalCompliance > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat">
-                  <strong>{totalCompliance}</strong> compliance
-                </span>
-                {totalViolations > 0 && (
-                  <>
-                    <span className="file-detail-stat-sep">·</span>
-                    <span className="file-detail-stat">
-                      <strong>1:{Math.round(totalCompliance / totalViolations)}</strong> ratio
-                    </span>
-                  </>
-                )}
-              </>
-            )}
-          </div>
-          <CopyButton
-            label="Principle fix plan"
-            onClick={() => copyToClipboard(buildPrinciplePlanText(principle))}
-          />
-        </div>
-      </section>
-
-      {SEVERITY_ORDER.map((sev) => {
-        const violations = violationsBySeverity[sev];
-        if (!violations || violations.length === 0) return null;
-        return (
-          <div key={sev}>
-            <div className="violation-group-header">
-              <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
-              <span className="violation-group-count">{violations.length}</span>
-            </div>
-            <div className="vlive-violations-group">
-              {violations.map((v, idx) => (
-                <ViolationCard key={idx} v={v} principleName={principle.principle} index={idx} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      <ComplianceStatsRow principle={principle} totalViolations={totalViolations} totalCompliance={totalCompliance} />
+      {SEVERITY_ORDER.map((sev) => (
+        <ViolationGroup key={sev} sev={sev} violations={violationsBySeverity[sev]} principleName={principle.principle} />
+      ))}
     </>
   );
 });

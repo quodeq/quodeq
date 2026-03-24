@@ -69,10 +69,12 @@ function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef
   };
 }
 
-function createJobPoller(pollRef, dimPollRef, requestedDimensionsRef, partialDimensionsRef, setJob, setJobError, startDimensionPolling) {
+function createJobPoller(refs, setters, startDimensionPolling) {
+  const { poll: pollRef, dimPoll: dimPollRef, requestedDimensions: requestedDimensionsRef, partialDimensions: partialDimensionsRef } = refs;
+  const { setJob, setJobError } = setters;
   return function startPolling(jobId) {
     stopTimer(pollRef);
-    const refs = {
+    const localRefs = {
       requestedDimensions: requestedDimensionsRef.current,
       partialDimensions: partialDimensionsRef.current,
       dimPollingStarted: false,
@@ -84,7 +86,7 @@ function createJobPoller(pollRef, dimPollRef, requestedDimensionsRef, partialDim
     pollRef.current = setInterval(async () => {
       try {
         const updated = await getEvaluation(jobId);
-        handleJobUpdate(updated, refs, setJob, callbacks);
+        handleJobUpdate(updated, localRefs, setJob, callbacks);
       } catch (err) {
         setJob((prev) => prev ? { ...prev, status: 'lost' } : prev);
         setJobError(err.message);
@@ -95,83 +97,74 @@ function createJobPoller(pollRef, dimPollRef, requestedDimensionsRef, partialDim
   };
 }
 
+function preparePayload(payload, storage = localStorage) {
+  const maxSubagents = parseInt(storage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10);
+  if (maxSubagents !== DEFAULT_MAX_SUBAGENTS) payload.maxSubagents = maxSubagents;
+  const poolBudget = parseInt(storage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10);
+  if (poolBudget !== DEFAULT_POOL_BUDGET) payload.poolBudget = poolBudget;
+}
+
+function parseDimensions(payload) {
+  const rawDims = payload.dimensions ?? [];
+  return typeof rawDims === 'string' ? rawDims.split(',').map(d => d.trim()).filter(Boolean) : rawDims;
+}
+
+function resetRefs(liveViolationsRef, requestedDimensionsRef, partialDimensionsRef, dimFailCountRef) {
+  liveViolationsRef.current = {};
+  requestedDimensionsRef.current = [];
+  partialDimensionsRef.current = new Set();
+  dimFailCountRef.current = {};
+}
+
+function useEvalRefs() {
+  return {
+    pollRef: useRef(null),
+    dimPollRef: useRef(null),
+    requestedDimensionsRef: useRef([]),
+    liveViolationsRef: useRef({}),
+    partialDimensionsRef: useRef(new Set()),
+    dimFailCountRef: useRef({}),
+  };
+}
+
+function useResumeRunning(setJob, startPolling, pollRef, dimPollRef) {
+  useEffect(() => {
+    listEvaluations()
+      .then((jobs) => { const running = jobs.find((j) => j.status === 'running'); if (running) { setJob(running); startPolling(running.jobId); } })
+      .catch((err) => console.warn('Failed to fetch running evaluations:', err));
+    return () => { stopTimer(pollRef); stopTimer(dimPollRef); };
+  }, []);
+}
+
 export function useEvaluation() {
   const [job, setJob] = useState(null);
   const [jobError, setJobError] = useState('');
   const [liveViolations, setLiveViolations] = useState({});
-
-  const pollRef = useRef(null);
-  const dimPollRef = useRef(null);
-  const requestedDimensionsRef = useRef([]);
-  const liveViolationsRef = useRef({});
-  const partialDimensionsRef = useRef(new Set());
-  const dimFailCountRef = useRef({});
-
-  const startDimensionPolling = createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef, setLiveViolations);
-  const startPolling = createJobPoller(pollRef, dimPollRef, requestedDimensionsRef, partialDimensionsRef, setJob, setJobError, startDimensionPolling);
-
-  useEffect(() => {
-    listEvaluations()
-      .then((jobs) => {
-        const running = jobs.find((j) => j.status === 'running');
-        if (running) {
-          setJob(running);
-          startPolling(running.jobId);
-        }
-      })
-      .catch((err) => console.warn('Failed to fetch running evaluations:', err));
-    return () => {
-      stopTimer(pollRef);
-      stopTimer(dimPollRef);
-    };
-  }, []);
-
-  useEffect(() => {
-    liveViolationsRef.current = liveViolations;
-  }, [liveViolations]);
+  const refs = useEvalRefs();
+  const startDimensionPolling = createDimensionPoller(refs.dimPollRef, refs.dimFailCountRef, refs.partialDimensionsRef, setLiveViolations);
+  const startPolling = createJobPoller({ poll: refs.pollRef, dimPoll: refs.dimPollRef, requestedDimensions: refs.requestedDimensionsRef, partialDimensions: refs.partialDimensionsRef }, { setJob, setJobError }, startDimensionPolling);
+  useResumeRunning(setJob, startPolling, refs.pollRef, refs.dimPollRef);
+  useEffect(() => { refs.liveViolationsRef.current = liveViolations; }, [liveViolations]);
 
   async function startEvaluationJob(payload) {
     setJobError('');
-    const rawDims = payload.dimensions ?? [];
-    requestedDimensionsRef.current = typeof rawDims === 'string'
-      ? rawDims.split(',').map(d => d.trim()).filter(Boolean)
-      : rawDims;
-    liveViolationsRef.current = {};
-    partialDimensionsRef.current = new Set();
+    refs.requestedDimensionsRef.current = parseDimensions(payload);
+    refs.liveViolationsRef.current = {};
+    refs.partialDimensionsRef.current = new Set();
     setLiveViolations({});
-    const maxSubagents = parseInt(localStorage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10);
-    if (maxSubagents !== DEFAULT_MAX_SUBAGENTS) payload.maxSubagents = maxSubagents;
-    const poolBudget = parseInt(localStorage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10);
-    if (poolBudget !== DEFAULT_POOL_BUDGET) payload.poolBudget = poolBudget;
-    try {
-      const created = await startEvaluation(payload);
-      setJob({ ...created, repo: payload.repo });
-      startPolling(created.jobId);
-    } catch (err) {
-      setJobError(err.message);
-    }
+    preparePayload(payload);
+    try { const created = await startEvaluation(payload); setJob({ ...created, repo: payload.repo }); startPolling(created.jobId); } catch (err) { setJobError(err.message); }
   }
 
   function clearJob() {
-    stopTimer(pollRef);
-    stopTimer(dimPollRef);
-    setJob(null);
-    setJobError('');
-    setLiveViolations({});
-    liveViolationsRef.current = {};
-    requestedDimensionsRef.current = [];
-    partialDimensionsRef.current = new Set();
-    dimFailCountRef.current = {};
+    stopTimer(refs.pollRef); stopTimer(refs.dimPollRef);
+    setJob(null); setJobError(''); setLiveViolations({});
+    resetRefs(refs.liveViolationsRef, refs.requestedDimensionsRef, refs.partialDimensionsRef, refs.dimFailCountRef);
   }
 
   async function cancelEvaluationJob() {
     if (!job?.jobId) return;
-    try {
-      await cancelEvaluation(job.jobId);
-      clearJob();
-    } catch (err) {
-      setJobError(err.message);
-    }
+    try { await cancelEvaluation(job.jobId); clearJob(); } catch (err) { setJobError(err.message); }
   }
 
   return { job, jobError, liveViolations, startEvaluation: startEvaluationJob, clearJob, cancelEvaluation: cancelEvaluationJob };

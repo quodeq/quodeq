@@ -1,7 +1,11 @@
 """Shared helpers for action API modules."""
 from __future__ import annotations
 
+from http import HTTPStatus
+from pathlib import Path
 from typing import Any
+
+from flask import Flask, Response, jsonify, send_from_directory
 
 
 def error_response(message: str, status: int, code: str) -> tuple[dict[str, Any], int]:
@@ -51,3 +55,26 @@ def validate_evaluation_payload(payload: dict[str, Any]) -> str | None:
     if invalid:
         parts.append(f"invalid fields: {', '.join(invalid)}")
     return "; ".join(parts) if parts else None
+
+
+def register_static_routes(app: Flask, static_dist: str | None) -> None:
+    """Register static file serving routes."""
+    if not static_dist:
+        return
+    dist = Path(static_dist).resolve()
+    if not dist.is_dir():
+        return
+
+    @app.route('/')
+    def serve_root() -> Response:
+        """Serve the SPA index page."""
+        return send_from_directory(str(dist), 'index.html')
+
+    @app.route('/<path:path>')
+    def serve_static_or_spa(path: str) -> Response | tuple[Response, int]:
+        """Serve a static file or fall back to the SPA index."""
+        if (dist / path).is_file():
+            return send_from_directory(str(dist), path)
+        if path.startswith('api/'):
+            return jsonify({"error": "Not found", "code": "NOT_FOUND"}), HTTPStatus.NOT_FOUND
+        return send_from_directory(str(dist), 'index.html')

@@ -5,7 +5,7 @@ import re
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response, validate_evaluation_payload
 from quodeq.api.zip import export_project_zip
@@ -283,24 +283,4 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(payload)
 
 
-def register_static_routes(app: Flask, static_dist: str | None) -> None:
-    """Register static file serving routes."""
-    if not static_dist:
-        return
-    dist = Path(static_dist).resolve()
-    if not dist.is_dir():
-        return
-
-    @app.route('/')
-    def serve_root() -> Response:
-        """Serve the SPA index page."""
-        return send_from_directory(str(dist), 'index.html')
-
-    @app.route('/<path:path>')
-    def serve_static_or_spa(path: str) -> Response | tuple[Response, int]:
-        """Serve a static file or fall back to the SPA index."""
-        if (dist / path).is_file():
-            return send_from_directory(str(dist), path)
-        if path.startswith('api/'):
-            return jsonify({"error": "Not found", "code": "NOT_FOUND"}), HTTPStatus.NOT_FOUND
-        return send_from_directory(str(dist), 'index.html')
+from quodeq.api.helpers import register_static_routes as register_static_routes  # noqa: F401, E402

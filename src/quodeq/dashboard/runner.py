@@ -32,7 +32,12 @@ from quodeq.shared.prereqs import check_dashboard_prereqs
 from quodeq.shared.utils import IS_WIN32
 
 
-_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
+def _local_hosts() -> frozenset[str]:
+    extra = os.environ.get("QUODEQ_LOCAL_HOSTS", "")
+    base = {"127.0.0.1", "localhost", "::1", "0.0.0.0"}
+    if extra:
+        base.update(h.strip() for h in extra.split(",") if h.strip())
+    return frozenset(base)
 _MAX_PORT_SCAN_TRIES = 20
 
 
@@ -126,7 +131,7 @@ def _ensure_action_api(
     api_config: ApiConfig | None = None,
 ) -> tuple[str, subprocess.Popen | None]:
     cfg = api_config or ApiConfig()
-    if host not in _LOCAL_HOSTS:
+    if host not in _local_hosts():
         if _allow_plaintext_http(cfg.allow_plaintext):
             logging.getLogger(__name__).warning(
                 "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,

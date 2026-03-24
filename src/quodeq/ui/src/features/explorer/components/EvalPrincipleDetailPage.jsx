@@ -114,7 +114,35 @@ function buildViolationPlanText(v, principle) {
   return lines.join('\n').trim();
 }
 
-function PrincipleHeader({ principle, score, grade, violations, compliance, sevCounts, onCopyPlan }) {
+function SeverityTags({ sevCounts }) {
+  return (
+    <>
+      {sevCounts.critical > 0 && <span className="file-detail-stat severity-tag critical">{sevCounts.critical} critical</span>}
+      {sevCounts.major > 0 && <span className="file-detail-stat severity-tag major">{sevCounts.major} major</span>}
+      {sevCounts.minor > 0 && <span className="file-detail-stat severity-tag minor">{sevCounts.minor} minor</span>}
+      {(sevCounts.critical > 0 || sevCounts.major > 0 || sevCounts.minor > 0) && <span className="file-detail-stat-sep">·</span>}
+    </>
+  );
+}
+
+function ComplianceStats({ compliance, violations }) {
+  if (compliance.length === 0) return null;
+  return (
+    <>
+      <span className="file-detail-stat-sep">·</span>
+      <span className="file-detail-stat"><strong>{compliance.length}</strong> compliance</span>
+      {violations.length > 0 && (
+        <>
+          <span className="file-detail-stat-sep">·</span>
+          <span className="file-detail-stat"><strong>1:{Math.round(compliance.length / violations.length)}</strong> ratio</span>
+        </>
+      )}
+    </>
+  );
+}
+
+function PrincipleHeader({ data, onCopyPlan }) {
+  const { principle, score, grade, violations, compliance, sevCounts } = data;
   return (
     <section className="panel file-detail-summary-panel">
       <div className="file-detail-stats-row">
@@ -140,87 +168,57 @@ function PrincipleHeader({ principle, score, grade, violations, compliance, sevC
         )}
       </div>
       <div className="file-detail-stats" style={{ marginTop: 6 }}>
-        {sevCounts.critical > 0 && (
-          <span className="file-detail-stat severity-tag critical">{sevCounts.critical} critical</span>
-        )}
-        {sevCounts.major > 0 && (
-          <span className="file-detail-stat severity-tag major">{sevCounts.major} major</span>
-        )}
-        {sevCounts.minor > 0 && (
-          <span className="file-detail-stat severity-tag minor">{sevCounts.minor} minor</span>
-        )}
-        {(sevCounts.critical > 0 || sevCounts.major > 0 || sevCounts.minor > 0) && <span className="file-detail-stat-sep">·</span>}
+        <SeverityTags sevCounts={sevCounts} />
         <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
-        {compliance.length > 0 && (
-          <>
-            <span className="file-detail-stat-sep">·</span>
-            <span className="file-detail-stat"><strong>{compliance.length}</strong> compliance</span>
-            {violations.length > 0 && (
-              <>
-                <span className="file-detail-stat-sep">·</span>
-                <span className="file-detail-stat"><strong>1:{Math.round(compliance.length / violations.length)}</strong> ratio</span>
-              </>
-            )}
-          </>
-        )}
+        <ComplianceStats compliance={compliance} violations={violations} />
       </div>
     </section>
   );
 }
 
-const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal }) {
-  const {
-    principleData,
-    principle,
-    score,
-    grade,
-    dimViolations = [],
-    dimCompliance = [],
-  } = evalPrincipal;
-
-  const [showAllCompliance, setShowAllCompliance] = useState(false);
-
-  const violations = (principleData?.violations?.length > 0)
-    ? principleData.violations
-    : dimViolations;
-
+function computeEvalPrincipleData(evalPrincipal) {
+  const { principleData, dimViolations = [], dimCompliance = [] } = evalPrincipal;
+  const violations = (principleData?.violations?.length > 0) ? principleData.violations : dimViolations;
   const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet);
-
   const violationsBySeverity = EVAL_SEVERITY_ORDER.reduce((acc, sev) => {
     acc[sev] = violations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
     return acc;
   }, {});
-
-  const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
-  const hasMoreCompliance = compliance.length > PAGE_SIZE;
-
   const sevCounts = { critical: 0, major: 0, minor: 0 };
   violations.forEach(v => { const s = (v.severity || 'minor').toLowerCase(); if (sevCounts[s] !== undefined) sevCounts[s]++; });
+  return { violations, compliance, violationsBySeverity, sevCounts };
+}
+
+function PrincipleContext({ principleData }) {
+  return (
+    <>
+      {principleData?.findings && (
+        <p className="violation-context-desc" style={{ padding: '0 4px', marginBottom: '4px' }}>{principleData.findings}</p>
+      )}
+      {principleData?.justification && (
+        <p className="violation-context-desc muted" style={{ padding: '0 4px', marginBottom: '12px' }}>{principleData.justification}</p>
+      )}
+    </>
+  );
+}
+
+const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal }) {
+  const { principleData, principle, score, grade } = evalPrincipal;
+  const [showAllCompliance, setShowAllCompliance] = useState(false);
+  const { violations, compliance, violationsBySeverity, sevCounts } = computeEvalPrincipleData(evalPrincipal);
+  const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
 
   return (
     <>
       <PrincipleHeader
-        principle={principle} score={score} grade={grade}
-        violations={violations} compliance={compliance} sevCounts={sevCounts}
+        data={{ principle, score, grade, violations, compliance, sevCounts }}
         onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
       />
-
-      {principleData?.findings && (
-        <p className="violation-context-desc" style={{ padding: '0 4px', marginBottom: '4px' }}>
-          {principleData.findings}
-        </p>
-      )}
-      {principleData?.justification && (
-        <p className="violation-context-desc muted" style={{ padding: '0 4px', marginBottom: '12px' }}>
-          {principleData.justification}
-        </p>
-      )}
-
+      <PrincipleContext principleData={principleData} />
       <ViolationListSection violationsBySeverity={violationsBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} />
-
       <ComplianceListSection
         data={{ compliance, displayedCompliance, principle }}
-        controls={{ hasMore: hasMoreCompliance, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
+        controls={{ hasMore: compliance.length > PAGE_SIZE, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
       />
     </>
   );

@@ -86,72 +86,65 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
   );
 }
 
+function JobHeader({ job, onDismiss, onCancel }) {
+  const isRunning = job.status === 'running';
+  const isDone = job.status === 'done';
+  return (
+    <div className="job-header">
+      <div className="job-header-left">
+        <h3>{statusTitle(job.status)}</h3>
+      </div>
+      <div className="job-header-right">
+        {isRunning && <button type="button" className="job-cancel-inline" onClick={onCancel}>Cancel</button>}
+        {!isRunning && isDone && <button type="button" className="job-header-view-btn" onClick={() => onDismiss('view')}>View Results</button>}
+        {!isRunning && <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>{isDone ? 'Dismiss' : 'Close'}</button>}
+        <span className={`job-status-badge ${job.status}`}>{job.status}</span>
+      </div>
+    </div>
+  );
+}
+
+function JobMeta({ job, projectName }) {
+  return (
+    <div className="job-meta">
+      {projectName && (
+        <div className="job-meta-item">
+          <span className="job-meta-label">Project</span>
+          <span className="job-meta-value">{projectName}</span>
+        </div>
+      )}
+      <div className="job-meta-item">
+        <span className="job-meta-label">Job ID</span>
+        <div className="job-meta-id-row">
+          <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>
+          <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(job.jobId)} />
+        </div>
+      </div>
+      {job.repo && (
+        <div className="job-meta-item job-meta-item--full">
+          <span className="job-meta-label">Repository</span>
+          <code className="job-meta-code">{job.repo}</code>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel }) {
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
   useEffect(() => {
-    if (logViewerRef.current) {
-      logViewerRef.current.scrollTop = logViewerRef.current.scrollHeight;
-    }
+    if (logViewerRef.current) logViewerRef.current.scrollTop = logViewerRef.current.scrollHeight;
   }, [job?.logs]);
 
   if (!job) return null;
 
-  const isRunning = job.status === 'running';
-  const isDone = job.status === 'done';
-  const projectName = deriveProjectName(job.repo);
-
   return (
     <div className="panel evaluate-job-panel">
-      <div className="job-header">
-        <div className="job-header-left">
-          <h3>{statusTitle(job.status)}</h3>
-        </div>
-        <div className="job-header-right">
-          {isRunning && (
-            <button type="button" className="job-cancel-inline" onClick={onCancel}>
-              Cancel
-            </button>
-          )}
-          {!isRunning && isDone && (
-            <button type="button" className="job-header-view-btn" onClick={() => onDismiss('view')}>
-              View Results
-            </button>
-          )}
-          {!isRunning && (
-            <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>
-              {isDone ? 'Dismiss' : 'Close'}
-            </button>
-          )}
-          <span className={`job-status-badge ${job.status}`}>{job.status}</span>
-        </div>
-      </div>
-
-      <div className="job-meta">
-        {projectName && (
-          <div className="job-meta-item">
-            <span className="job-meta-label">Project</span>
-            <span className="job-meta-value">{projectName}</span>
-          </div>
-        )}
-        <div className="job-meta-item">
-          <span className="job-meta-label">Job ID</span>
-          <div className="job-meta-id-row">
-            <code className="job-meta-code job-meta-code--muted">{job.jobId}</code>
-            <CopyButton aria-label="Copy job ID" onClick={() => copyToClipboard(job.jobId)} />
-          </div>
-        </div>
-        {job.repo && (
-          <div className="job-meta-item job-meta-item--full">
-            <span className="job-meta-label">Repository</span>
-            <code className="job-meta-code">{job.repo}</code>
-          </div>
-        )}
-      </div>
-
+      <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
+      <JobMeta job={job} projectName={deriveProjectName(job.repo)} />
       <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} logViewerRef={logViewerRef} />
-
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
   );

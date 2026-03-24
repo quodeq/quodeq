@@ -5,34 +5,20 @@ import { useState, useEffect } from 'react';
  *
  * Returns { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab }.
  */
-export function useNavStack() {
-  const [navStack, setNavStack] = useState([{ page: 'overview' }]);
-
-  // Initialize browser history state on mount
-  useEffect(() => {
-    window.history.replaceState({ navIndex: 0, entry: { page: 'overview' } }, '');
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Sync browser back/forward buttons with navStack
-  useEffect(() => {
-    function onPopState(e) {
-      const targetIndex = e.state?.navIndex ?? 0;
-      setNavStack((prev) => {
-        if (targetIndex < prev.length - 1) {
-          // Going back
-          return prev.slice(0, targetIndex + 1);
-        }
-        if (targetIndex >= prev.length && e.state?.entry) {
-          // Going forward — restore entry from history state
-          return [...prev.slice(0, targetIndex), e.state.entry];
-        }
-        return prev;
-      });
+function handlePopState(e, setNavStack) {
+  const targetIndex = e.state?.navIndex ?? 0;
+  setNavStack((prev) => {
+    if (targetIndex < prev.length - 1) {
+      return prev.slice(0, targetIndex + 1);
     }
-    window.addEventListener('popstate', onPopState);
-    return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+    if (targetIndex >= prev.length && e.state?.entry) {
+      return [...prev.slice(0, targetIndex), e.state.entry];
+    }
+    return prev;
+  });
+}
 
+function createNavActions(setNavStack, navStackRef) {
   function navPush(entry) {
     setNavStack((prev) => {
       const next = [...prev, entry];
@@ -42,12 +28,12 @@ export function useNavStack() {
   }
 
   function navPop() {
-    window.history.back(); // popstate handler updates navStack
+    window.history.back();
   }
 
   function navGoTo(index) {
-    const steps = navStack.length - 1 - index;
-    if (steps > 0) window.history.go(-steps); // popstate handler updates navStack
+    const steps = navStackRef.current.length - 1 - index;
+    if (steps > 0) window.history.go(-steps);
   }
 
   function navReset() {
@@ -66,9 +52,27 @@ export function useNavStack() {
     });
   }
 
+  return { navPush, navPop, navGoTo, navReset, navTab };
+}
+
+export function useNavStack() {
+  const [navStack, setNavStack] = useState([{ page: 'overview' }]);
+  const navStackRef = { current: navStack };
+  navStackRef.current = navStack;
+
+  useEffect(() => {
+    window.history.replaceState({ navIndex: 0, entry: { page: 'overview' } }, '');
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    const handler = (e) => handlePopState(e, setNavStack);
+    window.addEventListener('popstate', handler);
+    return () => window.removeEventListener('popstate', handler);
+  }, []);
+
+  const { navPush, navPop, navGoTo, navReset, navTab } = createNavActions(setNavStack, navStackRef);
   const activePage = navStack[navStack.length - 1];
 
-  // Scroll to top on every navigation
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [activePage]);

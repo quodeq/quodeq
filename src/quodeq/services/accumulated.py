@@ -233,9 +233,16 @@ def compute_accumulated(
 ) -> dict[str, Any] | None:
     """Compute the accumulated (cross-run) view for *project*.
 
+    Args:
+        reports_dir: Filesystem path to the reports root directory.
+        project: Project identifier (UUID or slug).
+        as_of: Optional run-id cutoff; only runs up to and including this
+            run are considered.  *None* means use all runs.
+        cache_config: Override the module-level LRU cache for testing
+            without global state mutation.
+
     Parameter count is intentional: each argument represents a distinct
-    query axis with no natural grouping.  *cache_config* overrides the
-    module-level LRU cache for testing without global state mutation.
+    query axis with no natural grouping.
     """
     reports_root = Path(reports_dir)
     project_path = reports_root / project

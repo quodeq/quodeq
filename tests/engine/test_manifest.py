@@ -179,6 +179,6 @@ def test_multi_target_prompt_context() -> None:
 
 
 def test_analysis_target_name_with_category() -> None:
-    from quodeq.analysis.manifest import _target_name
-    assert _target_name("rust", "backend") == "rust_backend"
-    assert _target_name("python", None) == "python"
+    from quodeq.analysis.manifest import target_name
+    assert target_name("rust", "backend") == "rust_backend"
+    assert target_name("python", None) == "python"

@@ -75,6 +75,42 @@ function FolderFooter({ selectedFolder, onClose, onConfirm }) {
   );
 }
 
+async function navigateFolder(path, setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder) {
+  setLoading(true);
+  setNavError(null);
+  try {
+    const result = await browseDirectory(path || '');
+    setData(result);
+    setCurrentPath(result.current);
+    setPathInput(result.current);
+    setSelectedFolder(result.current);
+  } catch (err) {
+    setNavError(err.message || 'Failed to load folder');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function FolderBrowserDialog({ data, loading, pathInput, setPathInput, navigate, navError, selectedFolder, setSelectedFolder, onClose, onConfirm }) {
+  return (
+    <div className="modal folder-browser-modal" role="dialog" aria-modal="true" aria-labelledby="folder-browser-title" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-header">
+        <h2 id="folder-browser-title">Select Repository Folder</h2>
+        <button className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
+      </div>
+      <FolderPathBar data={data} loading={loading} pathInput={pathInput} setPathInput={setPathInput} onNavigate={navigate} />
+      <div className="folder-browser-list">
+        {loading ? (
+          <p className="loading" role="status" aria-live="polite">Loading...</p>
+        ) : (
+          <FolderList data={data} navError={navError} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} />
+        )}
+      </div>
+      <FolderFooter selectedFolder={selectedFolder} onClose={onClose} onConfirm={onConfirm} />
+    </div>
+  );
+}
+
 export default function FolderBrowser({ onSelect, onClose }) {
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
@@ -83,52 +119,15 @@ export default function FolderBrowser({ onSelect, onClose }) {
   const [navError, setNavError] = useState(null);
   const [selectedFolder, setSelectedFolder] = useState(null);
 
-  async function navigate(path) {
-    setLoading(true);
-    setNavError(null);
-    try {
-      const result = await browseDirectory(path || '');
-      setData(result);
-      setCurrentPath(result.current);
-      setPathInput(result.current);
-      setSelectedFolder(result.current);
-    } catch (err) {
-      setNavError(err.message || 'Failed to load folder');
-    } finally {
-      setLoading(false);
-    }
+  function navigate(path) {
+    navigateFolder(path, setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder);
   }
 
-  useEffect(() => {
-    navigate('');
-  }, []);
-
-  function handleConfirm() {
-    if (selectedFolder) {
-      onSelect(selectedFolder);
-    }
-  }
+  useEffect(() => { navigate(''); }, []);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal folder-browser-modal" role="dialog" aria-modal="true" aria-labelledby="folder-browser-title" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h2 id="folder-browser-title">Select Repository Folder</h2>
-          <button className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
-        </div>
-
-        <FolderPathBar data={data} loading={loading} pathInput={pathInput} setPathInput={setPathInput} onNavigate={navigate} />
-
-        <div className="folder-browser-list">
-          {loading ? (
-            <p className="loading" role="status" aria-live="polite">Loading...</p>
-          ) : (
-            <FolderList data={data} navError={navError} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} />
-          )}
-        </div>
-
-        <FolderFooter selectedFolder={selectedFolder} onClose={onClose} onConfirm={handleConfirm} />
-      </div>
+      <FolderBrowserDialog data={data} loading={loading} pathInput={pathInput} setPathInput={setPathInput} navigate={navigate} navError={navError} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} onClose={onClose} onConfirm={() => { if (selectedFolder) onSelect(selectedFolder); }} />
     </div>
   );
 }
