@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -14,6 +15,16 @@ from quodeq.shared.logging import log_debug, log_info, log_warning
 
 if TYPE_CHECKING:
     from quodeq.analysis.runner import RunConfig, _AnalysisContext
+
+
+@dataclass
+class BackfillContext:
+    """Grouped backfill-specific parameters for _run_backfill_phase."""
+    files: list[str]
+    prev_analyzed: set[str]
+    phase1_files: set[str]
+    evidence_dir: Path
+    phase_start: float
 
 
 def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisContext"]:
@@ -154,8 +165,7 @@ def _run_phase1_analysis(
 
 def _run_backfill_phase(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
-    files: list[str], prev_analyzed: set[str], phase1_files: set[str],
-    evidence_dir: Path, phase_start: float,
+    backfill: BackfillContext,
 ) -> set[str]:
     """Phase 3: backfill previously-unevaluated files with remaining budget.
 
@@ -163,14 +173,14 @@ def _run_backfill_phase(
     """
     from quodeq.analysis.runner import _process_single_dimension
 
-    backfill_candidates = identify_backfill_files(files, list(prev_analyzed), phase1_files)
-    output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
+    backfill_candidates = identify_backfill_files(backfill.files, list(backfill.prev_analyzed), backfill.phase1_files)
+    output_jsonl = backfill.evidence_dir / f"{dimension}_evidence.jsonl"
     backfill_taken: set[str] = set()
 
     if not backfill_candidates:
         return backfill_taken
 
-    elapsed = time.monotonic() - phase_start
+    elapsed = time.monotonic() - backfill.phase_start
     total_budget = config.options.pool_budget or 600
     remaining_budget = max(0, total_budget - int(elapsed))
 
@@ -192,7 +202,7 @@ def _run_backfill_phase(
         config.options.pool_budget = saved_budget
 
     # Read which backfill files were actually taken from queue
-    backfill_queue = evidence_dir / f"{dimension}_queue.json"
+    backfill_queue = backfill.evidence_dir / f"{dimension}_queue.json"
     if backfill_queue.exists():
         from quodeq.analysis.subagents.file_queue import FileQueue
         try:
@@ -256,12 +266,15 @@ def run_dimension_incremental(
         return None
 
     # Classify files
+    from quodeq.analysis.incremental import ClassificationInput
     classification = classify_files(
-        src=config.src, files=files,
-        prev_fingerprint=prev_fp,
-        standards_dir=config.standards_dir,
-        dimension=dimension,
-        language=config.language,
+        inputs=ClassificationInput(
+            src=config.src, files=files,
+            prev_fingerprint=prev_fp,
+            standards_dir=config.standards_dir,
+            dimension=dimension,
+            language=config.language,
+        ),
     )
 
     _maybe_carry_forward(prev_fp, prev_evidence_dir, classification, dimension, evidence_dir)
@@ -273,8 +286,9 @@ def run_dimension_incremental(
     prev_analyzed = set(prev_fp.get("analyzed_files", [])) if prev_fp else set()
     phase1_files = set(classification.to_analyze) if classification.to_analyze else set()
     backfill_taken = _run_backfill_phase(
-        config, dimension, idx, ctx, files, prev_analyzed, phase1_files,
-        evidence_dir, phase_start,
+        config, dimension, idx, ctx,
+        BackfillContext(files=files, prev_analyzed=prev_analyzed, phase1_files=phase1_files,
+                        evidence_dir=evidence_dir, phase_start=phase_start),
     )
 
     # Re-parse after all phases and save fingerprint

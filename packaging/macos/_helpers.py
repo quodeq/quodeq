@@ -8,6 +8,8 @@ import urllib.error
 import urllib.request
 
 _HEALTH_TIMEOUT = 1.0
+_HOMEBREW_ARM64 = "/opt/homebrew/bin"
+_HOMEBREW_X86 = "/usr/local/bin"
 
 
 def _homebrew_bin_dirs() -> str:
@@ -15,10 +17,10 @@ def _homebrew_bin_dirs() -> str:
     import platform
     arch = platform.machine()
     if arch == "arm64":
-        return "/opt/homebrew/bin"
+        return _HOMEBREW_ARM64
     elif arch == "x86_64":
-        return "/usr/local/bin"
-    return "/opt/homebrew/bin:/usr/local/bin"
+        return _HOMEBREW_X86
+    return f"{_HOMEBREW_ARM64}:{_HOMEBREW_X86}"
 
 _cached_commands: dict[str, str | None] | None = None
 

@@ -16,18 +16,10 @@ import DimensionScorePanel from './DimensionScorePanel.jsx';
 // indirection; each prop maps directly to a distinct piece of state or callback.
 // ---------------------------------------------------------------------------
 
-export default function AccumulatedOverviewPanel({
-  accumulated,
-  accumulatedDimensions,
-  availableRuns,
-  overviewRunIndex,
-  trend,
-  selectedRunId,
-  onRunClick,
-  onDimensionClick,
-  onFileClick,
-  onPrincipleClick,
-}) {
+export default function AccumulatedOverviewPanel({ data, callbacks }) {
+  const { accumulated, accumulatedDimensions, availableRuns, overviewRunIndex, trend, selectedRunId } = data;
+  const { onRunClick, onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
+
   const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? availableRuns[0]?.runId : currentOverviewRun;
 

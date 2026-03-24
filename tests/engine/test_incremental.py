@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from unittest.mock import patch
 
-from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, FileClassification, identify_backfill_files
+from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, ClassificationInput, FileClassification, identify_backfill_files
 
 
 class TestDetectChangedFiles:
@@ -124,15 +124,17 @@ class TestClassifyFiles:
             },
             "standards_checksum": None,
         }
-        result = classify_files(src=tmp_path, files=["changed.py", "dependent.py", "unchanged.py"],
-                               prev_fingerprint=prev_fp, standards_dir=None, dimension="security", language="python")
+        result = classify_files(inputs=ClassificationInput(
+            src=tmp_path, files=["changed.py", "dependent.py", "unchanged.py"],
+            prev_fingerprint=prev_fp, standards_dir=None, dimension="security", language="python"))
         assert "changed.py" in result.to_analyze
         assert "dependent.py" in result.to_analyze
         assert "unchanged.py" in result.unchanged
 
     def test_full_reanalysis_returns_all(self, tmp_path):
-        result = classify_files(src=tmp_path, files=["a.py", "b.py"],
-                               prev_fingerprint=None, standards_dir=None, dimension="security", language="python")
+        result = classify_files(inputs=ClassificationInput(
+            src=tmp_path, files=["a.py", "b.py"],
+            prev_fingerprint=None, standards_dir=None, dimension="security", language="python"))
         assert set(result.to_analyze) == {"a.py", "b.py"}
         assert len(result.unchanged) == 0
         assert result.full_reanalysis is True
@@ -176,7 +178,8 @@ class TestIncrementalRunnerIntegration:
             "file_hashes": {"a.py": hashlib.sha256(b"same").hexdigest()},
             "standards_checksum": None,
         }
-        result = classify_files(src=tmp_path, files=["a.py"], prev_fingerprint=prev_fp,
-                               standards_dir=None, dimension="security", language="python")
+        result = classify_files(inputs=ClassificationInput(
+            src=tmp_path, files=["a.py"], prev_fingerprint=prev_fp,
+            standards_dir=None, dimension="security", language="python"))
         assert len(result.to_analyze) == 0
         assert result.unchanged == {"a.py"}

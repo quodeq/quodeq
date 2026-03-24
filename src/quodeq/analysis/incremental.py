@@ -168,25 +168,14 @@ class ClassificationInput:
     language: str
 
 
-def classify_files(src: Path | None = None, files: list[str] | None = None,
-                   prev_fingerprint: dict | None = None,
-                   standards_dir: Path | None = None, dimension: str = "",
-                   language: str = "", *,
-                   inputs: "ClassificationInput | None" = None) -> FileClassification:
+def classify_files(*, inputs: "ClassificationInput") -> FileClassification:
     """Classify files into to_analyze (changed + dependents) and unchanged."""
-    if inputs is not None:
-        src = src or inputs.src
-        files = files if files is not None else inputs.files
-        prev_fingerprint = prev_fingerprint if prev_fingerprint is not None else inputs.prev_fingerprint
-        standards_dir = standards_dir or inputs.standards_dir
-        dimension = dimension or inputs.dimension
-        language = language or inputs.language
-    detection = detect_changed_files(src, files, prev_fingerprint, standards_dir, dimension)
+    detection = detect_changed_files(inputs.src, inputs.files, inputs.prev_fingerprint, inputs.standards_dir, inputs.dimension)
     if detection.full_reanalysis:
-        return FileClassification(to_analyze=list(files), full_reanalysis=True)
-    dependents = find_dependents(detection.changed, files, src, language)
+        return FileClassification(to_analyze=list(inputs.files), full_reanalysis=True)
+    dependents = find_dependents(detection.changed, inputs.files, inputs.src, inputs.language)
     to_analyze = detection.changed | dependents
-    unchanged = set(files) - to_analyze
+    unchanged = set(inputs.files) - to_analyze
     return FileClassification(to_analyze=sorted(to_analyze), unchanged=unchanged)
 
 

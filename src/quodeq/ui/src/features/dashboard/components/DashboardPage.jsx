@@ -37,16 +37,14 @@ function DashboardContent({
   }
   return (
     <AccumulatedOverviewPanel
-      accumulated={accumulated}
-      accumulatedDimensions={accumulatedDimensions}
-      availableRuns={availableRuns}
-      overviewRunIndex={overviewRunIndex}
-      trend={dashboard?.trend || []}
-      selectedRunId={selectedRunId}
-      onRunClick={onRunSelect}
-      onDimensionClick={onAccumulatedDimensionClick}
-      onFileClick={onFileClick}
-      onPrincipleClick={onPrincipleClick}
+      data={{
+        accumulated, accumulatedDimensions, availableRuns, overviewRunIndex,
+        trend: dashboard?.trend || [], selectedRunId,
+      }}
+      callbacks={{
+        onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick,
+        onFileClick, onPrincipleClick,
+      }}
     />
   );
 }

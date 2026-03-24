@@ -27,7 +27,9 @@ function ViolationListSection({ violationsBySeverity, principle, buildViolationP
   });
 }
 
-function ComplianceListSection({ compliance, displayedCompliance, hasMoreCompliance, showAllCompliance, setShowAllCompliance, principle }) {
+function ComplianceListSection({ data, controls }) {
+  const { compliance, displayedCompliance, principle } = data;
+  const { hasMore, showAll, setShowAll } = controls;
   if (compliance.length === 0) return null;
   return (
     <div>
@@ -40,12 +42,12 @@ function ComplianceListSection({ compliance, displayedCompliance, hasMoreComplia
           <ComplianceCard key={idx} c={c} principle={principle} index={idx} />
         ))}
       </div>
-      {hasMoreCompliance && (
+      {hasMore && (
         <button
           className="offending-show-more"
-          onClick={() => setShowAllCompliance((v) => !v)}
+          onClick={() => setShowAll((v) => !v)}
         >
-          {showAllCompliance ? 'Show less' : `Show all ${compliance.length} compliance items`}
+          {showAll ? 'Show less' : `Show all ${compliance.length} compliance items`}
         </button>
       )}
     </div>
@@ -217,9 +219,8 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
       <ViolationListSection violationsBySeverity={violationsBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} />
 
       <ComplianceListSection
-        compliance={compliance} displayedCompliance={displayedCompliance}
-        hasMoreCompliance={hasMoreCompliance} showAllCompliance={showAllCompliance}
-        setShowAllCompliance={setShowAllCompliance} principle={principle}
+        data={{ compliance, displayedCompliance, principle }}
+        controls={{ hasMore: hasMoreCompliance, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
       />
     </>
   );

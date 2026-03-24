@@ -8,7 +8,9 @@ import { getLevels, STORAGE_KEY as POWER_KEY } from '../features/evaluation/comp
  * Extracts evaluation-specific state and side effects from App so that
  * App only wires the hook's return values into the component tree.
  */
-export function useEvaluationLifecycle({ settings, navTab, loadProjects, setProjects, selectProjectAndRun, navReset }) {
+export function useEvaluationLifecycle({ settings, navigation, projects }) {
+  const { navTab, navReset } = navigation;
+  const { loadProjects, setProjects, selectProjectAndRun } = projects;
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
 
   const [analysisPower, setAnalysisPower] = useState(() => {
