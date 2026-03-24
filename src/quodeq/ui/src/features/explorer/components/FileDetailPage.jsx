@@ -5,6 +5,9 @@ import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 
+const ANIM_DELAY_PER_ITEM_MS = 30;
+const ANIM_MAX_DELAY_MS = 300;
+
 function buildFilePlanText(file) {
   const totalViolations = SEVERITY_ORDER.reduce(
     (sum, sev) => sum + (file.violationsBySeverity?.[sev]?.length || 0),
@@ -72,7 +75,7 @@ function ViolationCard({ v, index }) {
   const ref = line != null ? `${filePath}:${line}` : filePath;
   const display = line != null ? `${filename}:${line}` : filename;
   return (
-    <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * 30, 300)}ms` }}>
+    <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
       <div className="vdetail-row-main">
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
         {v.dimension && <span className="vrow-label">[{v.dimension}]</span>}

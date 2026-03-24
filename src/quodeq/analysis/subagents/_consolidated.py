@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quodeq.analysis.subprocess import AnalysisConfig
+from quodeq.services.base import _DEFAULT_POOL_BUDGET
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
@@ -33,7 +34,7 @@ def _build_consolidated_config(
         ai_model=subagent_model,
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,
-        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
+        pool_budget=pool_budget_val if pool_budget_val is not None else _DEFAULT_POOL_BUDGET,
     )
 
 

@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { getProjectInfo, listPlugins } from '../../../api/index.js';
 import { ISO_25010_URL } from '../../../constants.js';
 
+const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' };
+
 export default function ReEvaluateCard({ project, onStart, disabled }) {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState(null);
@@ -110,7 +112,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
+        <div style={buttonRowStyle}>
           {info.hasFingerprints && (
             <button
               type="button"

@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Protocol
 
 from quodeq.core.types import JobSnapshot
-from quodeq.services.base import EvaluationOptions
+from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import is_valid_repo_url
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
@@ -69,7 +69,7 @@ def _build_evaluate_cmd(
             cmd += ["-d", str(options.dimensions)]
     if options.numerical:
         cmd += ["-m", "numerical"]
-    if options.max_subagents != 5:
+    if options.max_subagents != _DEFAULT_MAX_SUBAGENTS:
         cmd += ["--n-subagents", str(options.max_subagents)]
     if options.incremental:
         cmd += ["--incremental"]
@@ -117,7 +117,7 @@ class FsEvaluationMixin:
             env["SUBAGENT_MODEL"] = options.subagent_model
         if not options.verify_findings:
             env["QUODEQ_NO_VERIFY"] = "1"
-        if options.pool_budget != 600:
+        if options.pool_budget != _DEFAULT_POOL_BUDGET:
             env["QUODEQ_POOL_BUDGET"] = str(options.pool_budget)
         return env
 

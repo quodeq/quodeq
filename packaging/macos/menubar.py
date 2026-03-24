@@ -22,6 +22,10 @@ from _helpers import (
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
+_AUTO_START_DELAY_S = 1.5
+_HEALTH_POLL_INTERVAL_S = 0.5
+_STDERR_READ_MAX = 500
+_ERROR_DISPLAY_MAX = 200
 
 
 def _load_config(env=None):
@@ -139,7 +143,7 @@ class QuodeqApp(rumps.App):
 
     def _auto_start(self):
         """Auto-start the dashboard if not already running."""
-        time.sleep(1.5)
+        time.sleep(_AUTO_START_DELAY_S)
         if self._find_running_port() is None:
             self._do_start()
 
@@ -221,15 +225,15 @@ class QuodeqApp(rumps.App):
     def _wait_for_dashboard(self, stderr_log):
         """Poll until the dashboard responds or process crashes."""
         for _ in range(_MAX_START_RETRIES):
-            time.sleep(0.5)
+            time.sleep(_HEALTH_POLL_INTERVAL_S)
             if self._process.poll() is not None:
                 stderr_log.close()
                 try:
                     with open(stderr_log.name) as f:
-                        err = f.read(500).strip()
+                        err = f.read(_STDERR_READ_MAX).strip()
                 except OSError:
                     err = "unknown error"
-                self._set_error(f"Crashed (exit {self._process.returncode}): {err[:200]}")
+                self._set_error(f"Crashed (exit {self._process.returncode}): {err[:_ERROR_DISPLAY_MAX]}")
                 self._status_item.title = "Stopped"
                 self._cleanup_stderr_log()
                 return

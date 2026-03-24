@@ -7,6 +7,8 @@ import { gradeColorClass, scoreColorClass, complianceRatio } from '../../../util
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 
+const columnStyle = { display: 'flex', flexDirection: 'column', gap: 2 };
+
 export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate }) {
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -98,7 +100,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
     <>
       <section className="acc-eval-panel acc-eval-panel--compact panel">
         <div className="acc-eval-top">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+          <div style={columnStyle}>
             <span className="explorer-dimension-title">{evalData.dimension}</span>
             {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
           </div>

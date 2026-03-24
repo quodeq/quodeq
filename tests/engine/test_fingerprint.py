@@ -7,6 +7,8 @@ from pathlib import Path
 
 from quodeq.analysis.fingerprint import build_fingerprint, load_fingerprint, save_fingerprint
 
+_SHA256_HEX_LEN = 64
+
 
 class TestBuildFingerprint:
     def test_includes_file_hashes(self, tmp_path):
@@ -23,7 +25,7 @@ class TestBuildFingerprint:
         (standards / "security.json").write_text('{"id":"security"}')
         fp = build_fingerprint(src=tmp_path, files=[], dimension="security", standards_dir=tmp_path / "standards")
         assert fp["standards_checksum"] is not None
-        assert len(fp["standards_checksum"]) == 64
+        assert len(fp["standards_checksum"]) == _SHA256_HEX_LEN
 
     def test_no_standards_dir(self, tmp_path):
         fp = build_fingerprint(src=tmp_path, files=[], dimension="security", standards_dir=None)

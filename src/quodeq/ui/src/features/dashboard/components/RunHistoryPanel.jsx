@@ -28,23 +28,33 @@ const cssVar = (() => {
   };
 })();
 
+const SCORE_EXEMPLARY = 9;
+const SCORE_GOOD = 7;
+const SCORE_ADEQUATE = 5;
+const SCORE_POOR = 3;
+
 function scoreBarColor(score) {
   const n = parseFloat(score);
   if (isNaN(n)) return cssVar('--color-accent');
-  if (n >= 9) return cssVar('--color-grade-top-text');   // exemplary
-  if (n >= 7) return cssVar('--color-grade-high-text');  // good
-  if (n >= 5) return cssVar('--color-grade-mid-text');   // adequate
-  if (n >= 3) return cssVar('--color-grade-low-text');   // poor
-  return cssVar('--color-grade-bottom-text');            // critical
+  if (n >= SCORE_EXEMPLARY) return cssVar('--color-grade-top-text');
+  if (n >= SCORE_GOOD)      return cssVar('--color-grade-high-text');
+  if (n >= SCORE_ADEQUATE)  return cssVar('--color-grade-mid-text');
+  if (n >= SCORE_POOR)      return cssVar('--color-grade-low-text');
+  return cssVar('--color-grade-bottom-text');
 }
+
+const DELTA_UP = 1;
+const DELTA_SOFT_UP = 0.1;
+const DELTA_DOWN = -1;
+const DELTA_SOFT_DOWN = -0.1;
 
 // Trend direction — mirrors TrendBadge thresholds
 function trendDir(delta) {
   if (delta === null || delta === undefined) return null;
-  if (delta > 1)    return 'up';
-  if (delta > 0.1)  return 'soft-up';
-  if (delta < -1)   return 'down';
-  if (delta < -0.1) return 'soft-down';
+  if (delta > DELTA_UP)        return 'up';
+  if (delta > DELTA_SOFT_UP)   return 'soft-up';
+  if (delta < DELTA_DOWN)      return 'down';
+  if (delta < DELTA_SOFT_DOWN) return 'soft-down';
   return 'same';
 }
 

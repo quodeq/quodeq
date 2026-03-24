@@ -11,6 +11,7 @@ import { SERVER_BASE_URL } from '../config.js';
  */
 const DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183];
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
+const HEALTH_POLL_INTERVAL_MS = 5000;
 
 export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER_BASE_URL } = {}) {
   const [serverConnected, setServerConnected] = useState(true);
@@ -47,7 +48,7 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER
       }
     }
     checkHealth();
-    const interval = setInterval(checkHealth, 5000);
+    const interval = setInterval(checkHealth, HEALTH_POLL_INTERVAL_MS);
     return () => { mounted = false; clearInterval(interval); };
   }, []);
 

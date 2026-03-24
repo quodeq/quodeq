@@ -15,6 +15,8 @@ from typing import Any
 from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension
 from quodeq.config.paths import default_paths
 
+_LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
+
 
 @lru_cache(maxsize=1)
 def load_priority_config() -> dict:
@@ -84,9 +86,7 @@ def compute_fan_in(
 ) -> dict[str, int]:
     """Layer 3: count how many files import each file."""
     config = load_priority_config()
-    lang_key = language.lower()
-    _LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
-    lang_key = _LANG_ALIASES.get(lang_key, lang_key)
+    lang_key = _LANG_ALIASES.get(language.lower(), language.lower())
     patterns = config.get("import_patterns", {}).get(lang_key)
     if not patterns:
         return {}

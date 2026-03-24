@@ -4,8 +4,14 @@ import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/components/powerLevels.js';
 import SettingsAside from './SettingsAside.jsx';
 import AboutSection from './AboutSection.jsx';
+import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY } from '../../../constants.js';
 
 const AI_MODEL_STORAGE_KEY = 'cc-ai-model';
+const MIN_SUBAGENTS = 1;
+const MAX_SUBAGENTS = 10;
+const MIN_POOL_BUDGET_MINS = 1;
+const MAX_POOL_BUDGET_MINS = 60;
+const DEFAULT_POOL_BUDGET_MINS = 10;
 
 const _SETTINGS_PHRASES = [
   'quode with cuore \u2665',
@@ -26,8 +32,8 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
   const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
   const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
 
-  const [maxSubagents, setMaxSubagents] = useState(() => parseInt(localStorage.getItem('cc-max-subagents') || '5', 10));
-  const [poolBudgetMinutes, setPoolBudgetMinutes] = useState(() => Math.round(parseInt(localStorage.getItem('cc-pool-budget') || '600', 10) / 60));
+  const [maxSubagents, setMaxSubagents] = useState(() => parseInt(localStorage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10));
+  const [poolBudgetMinutes, setPoolBudgetMinutes] = useState(() => Math.round(parseInt(localStorage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10) / 60));
 
   const [availableClients, setAvailableClients] = useState(null);
   const [appVersion, setAppVersion] = useState(null);
@@ -252,13 +258,13 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
             <input
               type="number"
               className="settings-model-input"
-              min={1}
-              max={10}
+              min={MIN_SUBAGENTS}
+              max={MAX_SUBAGENTS}
               value={maxSubagents}
               onChange={(e) => {
-                const v = Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5));
+                const v = Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || DEFAULT_MAX_SUBAGENTS));
                 setMaxSubagents(v);
-                localStorage.setItem('cc-max-subagents', String(v));
+                localStorage.setItem(SUBAGENTS_STORAGE_KEY, String(v));
               }}
             />
           </div>
@@ -272,13 +278,13 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
             <input
               type="number"
               className="settings-model-input"
-              min={1}
-              max={60}
+              min={MIN_POOL_BUDGET_MINS}
+              max={MAX_POOL_BUDGET_MINS}
               value={poolBudgetMinutes}
               onChange={(e) => {
-                const v = Math.max(1, Math.min(60, parseInt(e.target.value, 10) || 10));
+                const v = Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parseInt(e.target.value, 10) || DEFAULT_POOL_BUDGET_MINS));
                 setPoolBudgetMinutes(v);
-                localStorage.setItem('cc-pool-budget', String(v * 60));
+                localStorage.setItem(POOL_BUDGET_STORAGE_KEY, String(v * 60));
               }}
             />
           </div>

@@ -23,6 +23,10 @@ const cssVar = (() => {
 
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
 const CHART_LEFT_MARGIN = -16;
+const TREND_UP_ANGLE = 70;
+const TREND_SOFT_UP = 88;
+const TREND_DOWN = 110;
+const TREND_SOFT_DOWN = 92;
 
 function scoreBarColor(score) {
   const n = parseFloat(score);
@@ -35,10 +39,10 @@ function scoreBarColor(score) {
 }
 
 function trendColorClass(angle) {
-  if (angle <= 70)  return 'trend-up';
-  if (angle <= 88)  return 'trend-soft-up';
-  if (angle >= 110) return 'trend-down';
-  if (angle >= 92)  return 'trend-soft-down';
+  if (angle <= TREND_UP_ANGLE)  return 'trend-up';
+  if (angle <= TREND_SOFT_UP)   return 'trend-soft-up';
+  if (angle >= TREND_DOWN)      return 'trend-down';
+  if (angle >= TREND_SOFT_DOWN) return 'trend-soft-down';
   return 'trend-same';
 }
 

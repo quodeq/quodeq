@@ -17,6 +17,9 @@ _STATIC_DIR = _QUODEQ_DIR / "static"
 # Files and directories to sync from package source to build workdir
 _SYNC_ITEMS = ("src", "public", "package.json", "vite.config.js", "index.html")
 
+_NPM_INSTALL_TIMEOUT_S = 300
+_NPM_BUILD_TIMEOUT_S = 600
+
 
 def _get_ui_source_dir() -> Path:
     """Return the path to the UI source bundled inside the package."""
@@ -94,13 +97,13 @@ def _run_npm_build(workdir: Path, static_dir: Path) -> None:
 
     if _needs_npm_install(workdir):
         log_info("Installing npm dependencies...")
-        subprocess.run([npm, "install"], cwd=str(workdir), check=True, timeout=300)
+        subprocess.run([npm, "install"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
     else:
         log_info("npm dependencies up to date, skipping install.")
 
     log_info("Building web UI...")
     env = {**os.environ, "QUODEQ_BUILD_OUTDIR": str(static_dir)}
-    subprocess.run([npm, "run", "build"], cwd=str(workdir), check=True, timeout=600, env=env)
+    subprocess.run([npm, "run", "build"], cwd=str(workdir), check=True, timeout=_NPM_BUILD_TIMEOUT_S, env=env)
 
 
 def _resolve_dev_source() -> Path:
