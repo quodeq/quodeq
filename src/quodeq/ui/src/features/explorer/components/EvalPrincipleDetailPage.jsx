@@ -1,5 +1,5 @@
 import { memo, useState } from 'react';
-import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE } from '../../../utils/explorerUtils.js';
+import { PLAN_TEST_INSTRUCTION_GROUP, PLAN_TEST_INSTRUCTION_SINGLE, PLAN_COMPLETION_CHECKLIST, getFixHint } from '../../../utils/explorerUtils.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
@@ -76,6 +76,8 @@ function buildPrinciplePlanText(principle, violations, violationsBySeverity, pri
       const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
       lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
       if (v.reason) lines.push('', `**Why it's a violation:** ${v.reason}`);
+      const hint = getFixHint(v.req);
+      if (hint) lines.push('', `**Expected fix:** ${hint}`);
       const linkedRefs = (v.reqRefs || []).filter(r => r.url && /^https?:\/\//.test(r.url));
       if (linkedRefs.length > 0) lines.push('', `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
       if (v.snippet) {
@@ -93,6 +95,7 @@ function buildPrinciplePlanText(principle, violations, violationsBySeverity, pri
   lines.push('For each violation above, provide a concrete, step-by-step fix.');
   lines.push('Return each fix as an exact replacement block or unified diff. No explanations beyond what is needed to apply the fix.');
   lines.push(PLAN_TEST_INSTRUCTION_GROUP);
+  lines.push('', PLAN_COMPLETION_CHECKLIST);
   return lines.join('\n').trim();
 }
 
@@ -106,6 +109,8 @@ function buildViolationPlanText(v, principle) {
   if (loc) lines.push(`**File:** ${loc}`);
   if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
   if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
+  const hint = getFixHint(v.req);
+  if (hint) lines.push('', `**Expected fix:** ${hint}`);
   if (v.reqRefs?.length > 0) lines.push('', `**References:** ${v.reqRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
   else if (v.req) lines.push('', `**Requirement:** ${v.req}`);
   lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
