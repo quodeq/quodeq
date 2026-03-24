@@ -229,19 +229,14 @@ def prioritize_files(
     files: list[str],
     src: Path,
     dimension: str | list[str],
-    category: str | None = None,
-    language: str | None = None,
-    evidence_dir: Path | None = None,
-    config: Any = None,
     *,
     context: PriorityContext | None = None,
 ) -> list[str]:
     """Score and sort files by analysis priority (highest first)."""
-    if context is not None:
-        category = category if category is not None else context.category
-        language = language if language is not None else context.language
-        evidence_dir = evidence_dir if evidence_dir is not None else context.evidence_dir
-        config = config if config is not None else context.config
+    category = context.category if context else None
+    language = context.language if context else None
+    evidence_dir = context.evidence_dir if context else None
+    config = context.config if context else None
     priority_config = load_priority_config()
     fan_in_divisor = priority_config.get("fan_in_divisor", 3)
     fan_in_max = priority_config.get("fan_in_max", 5)

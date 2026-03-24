@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import threading
 import time
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis.subagents.file_queue import FileQueue
@@ -11,6 +12,15 @@ from quodeq.shared.utils import open_text
 
 _HEARTBEAT_INTERVAL = 10
 _SECONDS_PER_MINUTE = 60
+
+
+@dataclass
+class HeartbeatContext:
+    """Grouped parameters for heartbeat monitoring."""
+    queue_path: Path
+    dimension_key: str
+    jsonl_path: Path
+    lock: threading.Lock
 
 
 def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> int:
@@ -27,7 +37,7 @@ def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> int:
 
 def heartbeat_loop(
     stop: threading.Event, finished: dict[str, bool],
-    queue_path: Path, dimension_key: str, jsonl_path: Path, lock: threading.Lock,
+    ctx: HeartbeatContext,
 ) -> None:
     """Emit periodic progress lines for the subagent pool."""
     start = time.monotonic()
@@ -35,12 +45,12 @@ def heartbeat_loop(
         try:
             elapsed = int(time.monotonic() - start)
             mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
-            total_findings = _count_jsonl_findings(jsonl_path, lock)
-            remaining, taken = FileQueue(queue_path).stats()
+            total_findings = _count_jsonl_findings(ctx.jsonl_path, ctx.lock)
+            remaining, taken = FileQueue(ctx.queue_path).stats()
             total_agents = len(finished)
             active = sum(1 for v in finished.values() if not v)
             log_info(
-                f"  [{dimension_key}] {mins}m{secs:02d}s | "
+                f"  [{ctx.dimension_key}] {mins}m{secs:02d}s | "
                 f"{active} active ({total_agents} total) | "
                 f"{taken} files taken ({remaining} left) | "
                 f"{total_findings} findings"

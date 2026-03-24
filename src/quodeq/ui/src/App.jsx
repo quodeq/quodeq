@@ -51,14 +51,7 @@ function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
   );
 }
 
-function MainContent({
-  activePage, selectedProject, selectedRun, projects,
-  handleNavigate, handleRunSelect, dashboard, accumulated, loading, error,
-  availableRuns, overviewRunIndex, job, jobError, liveViolations,
-  analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
-  settings, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject,
-  serverConnected, setServerConnected,
-}) {
+function MainContent({ activePage, evaluation, dashboard, navigation, settings, serverHealth }) {
   const { page, ...params } = activePage;
   switch (page) {
     case 'overview':
@@ -66,21 +59,21 @@ function MainContent({
       return (
         <DashboardPage
           data={{
-            selectedProject, selectedRun, projects,
-            dashboard, accumulated, loading, error,
-            availableRuns, overviewRunIndex,
+            selectedProject: navigation.selectedProject, selectedRun: navigation.selectedRun, projects: navigation.projects,
+            dashboard: dashboard.data, accumulated: dashboard.accumulated, loading: dashboard.loading, error: dashboard.error,
+            availableRuns: dashboard.availableRuns, overviewRunIndex: dashboard.overviewRunIndex,
           }}
           callbacks={{
-            onNavigate: handleNavigate,
-            onRunSelect: page === 'overview' ? handleRunSelect : undefined,
+            onNavigate: navigation.handleNavigate,
+            onRunSelect: page === 'overview' ? navigation.handleRunSelect : undefined,
           }}
           runMode={page === 'run'}
         />
       );
     case 'explorer':
-      return <ExplorerPage project={selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={handleNavigate} />;
+      return <ExplorerPage project={navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={navigation.handleNavigate} />;
     case 'evaluate':
-      return <EvaluateCase serverConnected={serverConnected} setServerConnected={setServerConnected} job={job} jobError={jobError} liveViolations={liveViolations} selectedProject={selectedProject} analysisPower={analysisPower} setAnalysisPower={setAnalysisPower} handleStartEvaluation={handleStartEvaluation} handleEvalDismiss={handleEvalDismiss} cancelEvaluation={cancelEvaluation} />;
+      return <EvaluateCase serverConnected={serverHealth.connected} setServerConnected={serverHealth.setConnected} job={evaluation.job} jobError={evaluation.jobError} liveViolations={evaluation.liveViolations} selectedProject={navigation.selectedProject} analysisPower={evaluation.analysisPower} setAnalysisPower={evaluation.setAnalysisPower} handleStartEvaluation={evaluation.handleStartEvaluation} handleEvalDismiss={evaluation.handleEvalDismiss} cancelEvaluation={evaluation.cancelEvaluation} />;
     case 'file':
       return <FileDetailPage file={params.file} />;
     case 'principle':
@@ -89,9 +82,9 @@ function MainContent({
     case 'eval-principle-detail':
       return <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />;
     case 'settings':
-      return <SettingsCase settings={settings} analysisPower={analysisPower} setAnalysisPower={setAnalysisPower} />;
+      return <SettingsCase settings={settings.appSettings} analysisPower={evaluation.analysisPower} setAnalysisPower={evaluation.setAnalysisPower} />;
     case 'projects':
-      return <ProjectsPage projects={projects} selectedProject={selectedProject} onSelect={(id) => { handleProjectChange(id); navTab('overview'); }} onDelete={handleDeleteProject} onExport={handleExportProject} onRelocate={handleRelocateProject} />;
+      return <ProjectsPage projects={navigation.projects} selectedProject={navigation.selectedProject} onSelect={(id) => { navigation.handleProjectChange(id); navigation.navTab('overview'); }} onDelete={navigation.handleDeleteProject} onExport={navigation.handleExportProject} onRelocate={navigation.handleRelocateProject} />;
     default:
       return <div className="empty-state"><p>Page not found: {page}</p></div>;
   }
@@ -169,7 +162,9 @@ export default function App() {
     analysisPower, setAnalysisPower,
     handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
   } = useEvaluationLifecycle({
-    settings, navTab, loadProjects, setProjects, selectProjectAndRun, navReset,
+    settings,
+    navigation: { navTab, navReset },
+    projects: { loadProjects, setProjects, selectProjectAndRun },
   });
 
   // Active tab / header visibility
@@ -205,17 +200,11 @@ export default function App() {
         {navStack.length > 1 && <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} />}
         <MainContent
           activePage={activePage}
-          selectedProject={selectedProject} selectedRun={selectedRun} projects={projects}
-          handleNavigate={handleNavigate} handleRunSelect={handleRunSelect}
-          dashboard={dashboard} accumulated={accumulated} loading={loading} error={error}
-          availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
-          job={job} jobError={jobError} liveViolations={liveViolations}
-          analysisPower={analysisPower} setAnalysisPower={setAnalysisPower}
-          handleStartEvaluation={handleStartEvaluation} handleEvalDismiss={handleEvalDismiss} cancelEvaluation={cancelEvaluation}
-          settings={settings}
-          handleProjectChange={handleProjectChange} navTab={navTab}
-          handleDeleteProject={handleDeleteProject} handleExportProject={handleExportProject} handleRelocateProject={handleRelocateProject}
-          serverConnected={serverConnected} setServerConnected={setServerConnected}
+          evaluation={{ job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation }}
+          dashboard={{ data: dashboard, accumulated, loading, error, availableRuns, overviewRunIndex }}
+          navigation={{ selectedProject, selectedRun, projects, handleNavigate, handleRunSelect, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject }}
+          settings={{ appSettings: settings }}
+          serverHealth={{ connected: serverConnected, setConnected: setServerConnected }}
         />
       </main>
     </div>

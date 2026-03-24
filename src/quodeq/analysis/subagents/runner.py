@@ -15,7 +15,7 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-from quodeq.analysis.subagents.priority import prioritize_files
+from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 if TYPE_CHECKING:
@@ -82,10 +82,12 @@ def _list_source_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[s
     evidence_dir = config.work_dir or config.src
     files = prioritize_files(
         files, config.src, dim_id,
-        category=category,
-        language=config.language,
-        evidence_dir=evidence_dir,
-        config=config,
+        context=PriorityContext(
+            category=category,
+            language=config.language,
+            evidence_dir=evidence_dir,
+            config=config,
+        ),
     )
 
     # Incremental mode: filter to only changed + dependent files
@@ -115,7 +117,16 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
     )
 
 
-def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path: Path, prompt: str, max_files_per_agent: int = 30) -> tuple[Any, list[Any]]:
+@dataclass
+class LaunchPoolParams:
+    """Grouped parameters for launching a subagent pool."""
+    evidence_dir: Path
+    queue_path: Path
+    prompt: str
+    max_files_per_agent: int = 30
+
+
+def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
@@ -126,14 +137,14 @@ def _launch_pool(config: RunConfig, dim_id: str, evidence_dir: Path, queue_path:
         max_turns=config.options.max_turns,
         max_duration=config.options.max_duration,
         ai_model=subagent_model,
-        max_files_per_agent=max_files_per_agent,
+        max_files_per_agent=params.max_files_per_agent,
         pool_budget=pool_budget_val if pool_budget_val is not None else 600,
     )
     pool = SubagentPool(
-        paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
+        paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path),
         options=PoolOptions(
             n_agents=config.options.max_subagents,
-            prompt=prompt,
+            prompt=params.prompt,
             dimension=dim_id,
         ),
         config=base_ac,
@@ -281,7 +292,7 @@ def process_dimension_with_subagents(
 
     # 5. Build prompt and launch main analysis pool
     prompt = _build_subagent_prompt(config, dim_id, ctx)
-    pool, results = _launch_pool(config, dim_id, evidence_dir, queue_path, prompt, max_files_per_agent=files_per_agent)
+    pool, results = _launch_pool(config, dim_id, LaunchPoolParams(evidence_dir=evidence_dir, queue_path=queue_path, prompt=prompt, max_files_per_agent=files_per_agent))
 
     # 6. Collect and return evidence (includes both verified + new findings)
     all_results = verify_results + results

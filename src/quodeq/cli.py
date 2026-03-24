@@ -247,6 +247,22 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     return ResolvedInputs(src=src, language=language, manifest=manifest, dims_data=dims_data)
 
 
+def _run_pipeline_with_cleanup(
+    args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
+) -> int:
+    """Set up directories, build config, run the pipeline, and clean up cloned repos."""
+    _reports_root, evidence_dir, evaluation_dir = paths
+    print(f"Report path: {evaluation_dir}", file=sys.stderr)
+    _save_manifest(inputs.manifest, evidence_dir)
+
+    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
+    try:
+        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+    finally:
+        if is_repo_url(args.repo):
+            cleanup_cloned_repo(str(inputs.src))
+
+
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
     from quodeq.shared.prereqs import check_evaluate_prereqs
@@ -260,16 +276,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if inputs is None:
         return 1
 
-    _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, inputs.src)
-    print(f"Report path: {evaluation_dir}", file=sys.stderr)
-    _save_manifest(inputs.manifest, evidence_dir)
-
-    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
-    try:
-        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-    finally:
-        if is_repo_url(args.repo):
-            cleanup_cloned_repo(str(inputs.src))
+    return _run_pipeline_with_cleanup(args, inputs, _setup_run_dirs(args, inputs.src))
 
 
 def _run_dashboard(argv: list[str] | None) -> int:

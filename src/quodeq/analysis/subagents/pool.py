@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
 
-from quodeq.analysis.subagents._heartbeat import heartbeat_loop
+from quodeq.analysis.subagents._heartbeat import HeartbeatContext, heartbeat_loop
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.analysis.subagents.file_queue import FileQueue
@@ -20,6 +20,15 @@ _HEARTBEAT_JOIN_TIMEOUT_S = 2
 
 _DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
 _SCOUT_TIMEOUT_S = 180  # 3 minutes before forcing scale-up
+
+
+@dataclass
+class ScaleUpState:
+    """Grouped parameters for scale-up decision logic."""
+    pool_start: float
+    max_duration: float
+    scout_timeout: float
+    scout_done: bool = False
 
 
 @dataclass
@@ -172,10 +181,13 @@ class SubagentPool:
     def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
         """Create and start the heartbeat monitoring thread."""
         stop = threading.Event()
+        ctx = HeartbeatContext(
+            queue_path=self._queue_path, dimension_key=self._dimension_key,
+            jsonl_path=self._shared_jsonl_path(), lock=self._jsonl_lock,
+        )
         heartbeat = threading.Thread(
             target=heartbeat_loop,
-            args=(stop, self._finished, self._queue_path, self._dimension_key,
-                  self._shared_jsonl_path(), self._jsonl_lock),
+            args=(stop, self._finished, ctx),
             daemon=True,
         )
         heartbeat.start()
@@ -188,18 +200,17 @@ class SubagentPool:
         self._next_idx += 1
 
     def _maybe_scale_up(
-        self, done: set, pool_start: float, max_duration: float,
-        scout_timeout: float, scout_done: bool, executor: ThreadPoolExecutor,
+        self, done: set, state: ScaleUpState, executor: ThreadPoolExecutor,
     ) -> bool:
         """Check if scout phase is complete and scale up if needed. Returns updated scout_done."""
-        if scout_done:
+        if state.scout_done:
             return True
-        elapsed = time.monotonic() - pool_start
+        elapsed = time.monotonic() - state.pool_start
         scout_completed = len(done) > 0
-        scout_timed_out = elapsed >= scout_timeout and self._n > 1
+        scout_timed_out = elapsed >= state.scout_timeout and self._n > 1
         if not (scout_completed or scout_timed_out):
             return False
-        remaining = self._should_respawn(pool_start, max_duration)
+        remaining = self._should_respawn(state.pool_start, state.max_duration)
         for _ in range(self._compute_scale_up(remaining)):
             self._submit_agent(executor)
         return True
@@ -210,16 +221,16 @@ class SubagentPool:
     ) -> None:
         """Run scout-then-scale loop inside an executor."""
         scout_timeout = min(_SCOUT_TIMEOUT_S, max_duration / max(self._n, 1) * 0.5)
-        scout_done = False
+        scale_state = ScaleUpState(pool_start=pool_start, max_duration=max_duration, scout_timeout=scout_timeout)
         self._submit_agent(executor)
 
         while self._futures:
             done = self._collect_done(results)
-            scout_done = self._maybe_scale_up(done, pool_start, max_duration, scout_timeout, scout_done, executor)
+            scale_state.scout_done = self._maybe_scale_up(done, scale_state, executor)
             if not done:
                 time.sleep(_FUTURE_POLL_INTERVAL_S)
                 continue
-            if scout_done:
+            if scale_state.scout_done:
                 self._process_completed_futures(done, pool_start, max_duration, executor)
 
     def _immediate_loop(

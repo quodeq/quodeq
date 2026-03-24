@@ -10,6 +10,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.engine import mcp_findings
+from quodeq.analysis.mcp.findings_server import CompiledContext
 
 from tests.engine.conftest import _make_request, _run_server
 
@@ -41,7 +42,7 @@ class TestFindingsRouter:
             "S-CON-1": [{"label": "CWE-798", "url": "https://cwe.mitre.org/data/definitions/798.html"}],
         }
         with open(findings_file, "w") as fh:
-            router = mcp_findings.FindingsRouter(fh, compiled_refs)
+            router = mcp_findings.FindingsRouter(fh, CompiledContext(compiled_refs=compiled_refs))
             msg, dup = router.receive({"p": "Confidentiality", "t": "violation", "d": "security", "w": "Hardcoded key", "req": "S-CON-1"})
         assert not dup
         assert "Finding #1" in msg
@@ -52,7 +53,7 @@ class TestFindingsRouter:
         findings_file = tmp_path / "findings.jsonl"
         compiled_refs = {"S-CON-1": [{"label": "CWE-798", "url": "https://example.com"}]}
         with open(findings_file, "w") as fh:
-            router = mcp_findings.FindingsRouter(fh, compiled_refs)
+            router = mcp_findings.FindingsRouter(fh, CompiledContext(compiled_refs=compiled_refs))
             router.receive({"p": "P1", "t": "violation", "d": "perf", "w": "Slow", "req": "UNKNOWN-1"})
         written = json.loads(findings_file.read_text().strip())
         assert "req_refs" not in written
@@ -160,8 +161,7 @@ class TestFindingsRouterMultiDimension:
         }
         router = FindingsRouter(
             output_fh=fh,
-            compiled_reqs=reqs,
-            req_to_dim=req_to_dim,
+            context=CompiledContext(compiled_reqs=reqs, req_to_dim=req_to_dim),
         )
 
         msg1, dup1 = router.receive({"req": "S-CON-1", "t": "violation", "file": "a.py", "line": 1, "w": "test"})
@@ -181,8 +181,7 @@ class TestFindingsRouterMultiDimension:
         reqs = {"S-CON-1": {"principle": "Confidentiality", "text": "..."}}
         router = FindingsRouter(
             output_fh=fh,
-            compiled_reqs=reqs,
-            dimension="security",
+            context=CompiledContext(compiled_reqs=reqs, dimension="security"),
         )
 
         router.receive({"req": "S-CON-1", "t": "violation", "file": "a.py", "line": 1, "w": "test"})
