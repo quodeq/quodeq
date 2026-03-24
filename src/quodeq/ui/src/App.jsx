@@ -18,7 +18,38 @@ import { useRunNavigator } from './hooks/useRunNavigator.js';
 import { useProjectState } from './hooks/useProjectState.js';
 import { useAppSettings } from './hooks/useAppSettings.js';
 import { useEvaluationLifecycle } from './hooks/useEvaluationLifecycle.js';
+import { useProjectActions } from './hooks/useProjectActions.js';
 
+
+function EvaluateCase({ serverConnected, setServerConnected, job, jobError, liveViolations, selectedProject, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation }) {
+  return (
+    <>
+      {!serverConnected && <ServerDisconnectedOverlay onReconnect={() => setServerConnected(true)} />}
+      <EvaluateScreen
+        evaluation={{ job, jobError, liveViolations }}
+        context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
+        actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
+      />
+    </>
+  );
+}
+
+function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
+  return (
+    <SettingsPage
+      theme={{ preference: settings.themePreference, onApply: settings.applyTheme }}
+      models={{
+        aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
+        aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
+        fast: settings.modelFast, onFastChange: settings.setModelFast,
+        balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
+        thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
+      }}
+      analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
+      verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
+    />
+  );
+}
 
 function MainContent({
   activePage, selectedProject, selectedRun, projects,
@@ -49,16 +80,7 @@ function MainContent({
     case 'explorer':
       return <ExplorerPage project={selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={handleNavigate} />;
     case 'evaluate':
-      return (
-        <>
-          {!serverConnected && <ServerDisconnectedOverlay onReconnect={() => setServerConnected(true)} />}
-          <EvaluateScreen
-            evaluation={{ job, jobError, liveViolations }}
-            context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
-            actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
-          />
-        </>
-      );
+      return <EvaluateCase serverConnected={serverConnected} setServerConnected={setServerConnected} job={job} jobError={jobError} liveViolations={liveViolations} selectedProject={selectedProject} analysisPower={analysisPower} setAnalysisPower={setAnalysisPower} handleStartEvaluation={handleStartEvaluation} handleEvalDismiss={handleEvalDismiss} cancelEvaluation={cancelEvaluation} />;
     case 'file':
       return <FileDetailPage file={params.file} />;
     case 'principle':
@@ -67,20 +89,7 @@ function MainContent({
     case 'eval-principle-detail':
       return <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />;
     case 'settings':
-      return (
-        <SettingsPage
-          theme={{ preference: settings.themePreference, onApply: settings.applyTheme }}
-          models={{
-            aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
-            aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
-            fast: settings.modelFast, onFastChange: settings.setModelFast,
-            balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
-            thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
-          }}
-          analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
-          verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
-        />
-      );
+      return <SettingsCase settings={settings} analysisPower={analysisPower} setAnalysisPower={setAnalysisPower} />;
     case 'projects':
       return <ProjectsPage projects={projects} selectedProject={selectedProject} onSelect={(id) => { handleProjectChange(id); navTab('overview'); }} onDelete={handleDeleteProject} onExport={handleExportProject} onRelocate={handleRelocateProject} />;
     default:
@@ -104,59 +113,10 @@ export default function App() {
   // Theme + AI settings
   const settings = useAppSettings();
 
-  function _apiQs() {
-    const params = new URLSearchParams(window.location.search);
-    const dir = params.get('evaluations') || '';
-    return dir ? `?evaluations=${encodeURIComponent(dir)}` : '';
-  }
-
-  async function handleDeleteProject(projectId) {
-    const qs = _apiQs();
-    const separator = qs ? '&' : '?';
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
-    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}${qs}${separator}confirm=true`, { method: 'DELETE', signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!res.ok) {
-      const msg = await res.text().catch(() => res.statusText);
-      alert(`Failed to delete project: ${msg}`);
-      return;
-    }
-    if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
-    loadProjects();
-  }
-
-  function handleExportProject(projectId) {
-    const qs = _apiQs();
-    const url = `/api/projects/${encodeURIComponent(projectId)}/export${qs}`;
-    const proj = projects.find((p) => (p.id || p.name) === projectId);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `${proj?.name || projectId}.zip`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-  }
-
-  async function handleRelocateProject(projectId, newPath) {
-    try {
-      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/path${_apiQs()}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: newPath }),
-      });
-      if (!res.ok) {
-        console.error('Relocate failed:', res.status);
-        alert('Failed to relocate project. Please try again.');
-        return;
-      }
-    } catch (err) {
-      console.error('Relocate failed:', err);
-      alert('Failed to relocate project. Please try again.');
-      return;
-    }
-    loadProjects();
-  }
+  // Project actions (delete, export, relocate)
+  const { handleDeleteProject, handleExportProject, handleRelocateProject } = useProjectActions({
+    projects, selectedProject, handleProjectChange, loadProjects,
+  });
 
   function handleNavigate(page, params = {}) {
     if (page === 'run' && params.runId) setSelectedRun(params.runId);

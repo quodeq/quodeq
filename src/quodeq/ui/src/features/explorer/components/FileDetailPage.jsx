@@ -133,6 +133,23 @@ function FileSeverityStats({ file, totalViolations, dimensionsCount }) {
   );
 }
 
+function SeverityGroup({ sev, violations }) {
+  if (violations.length === 0) return null;
+  return (
+    <div>
+      <div className="violation-group-header">
+        <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
+        <span className="violation-group-count">{violations.length}</span>
+      </div>
+      <div className="vlive-violations-group">
+        {violations.map((v, idx) => (
+          <ViolationCard key={idx} v={v} index={idx} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 const FileDetailPage = memo(function FileDetailPage({ file }) {
   const totalViolations = file.total || 0;
   const dimensionsCount = file.dimensionsCount || 0;
@@ -150,23 +167,9 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
         </div>
       </section>
 
-      {SEVERITY_ORDER.map((sev) => {
-        const violations = file.violationsBySeverity?.[sev] || [];
-        if (violations.length === 0) return null;
-        return (
-          <div key={sev}>
-            <div className="violation-group-header">
-              <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
-              <span className="violation-group-count">{violations.length}</span>
-            </div>
-            <div className="vlive-violations-group">
-              {violations.map((v, idx) => (
-                <ViolationCard key={idx} v={v} index={idx} />
-              ))}
-            </div>
-          </div>
-        );
-      })}
+      {SEVERITY_ORDER.map((sev) => (
+        <SeverityGroup key={sev} sev={sev} violations={file.violationsBySeverity?.[sev] || []} />
+      ))}
     </>
   );
 });

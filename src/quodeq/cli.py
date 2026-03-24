@@ -9,10 +9,9 @@ import os
 import subprocess
 import sys
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
-
-from dataclasses import dataclass
 
 from quodeq.cli_parser import build_parser as build_parser  # re-export
 from quodeq.config.paths import default_paths, load_env_file
@@ -98,7 +97,6 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     return reports_root, evidence_dir, evaluation_dir
 
 
-
 def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
     """Detect or validate the language for a repo using universal detection.
 
@@ -144,7 +142,6 @@ def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManife
         print(f"Detected: {langs}", file=sys.stderr)
     print(f"Source files: {manifest.total_files}", file=sys.stderr)
     return manifest
-
 
 
 def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:

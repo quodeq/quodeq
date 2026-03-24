@@ -62,6 +62,32 @@ function LogoSvg({ leftCls, rightCls, needleWobble, handleLeft, handleRight }) {
   );
 }
 
+function LogoShell({ leftPress, setLeftPress, rightPress, setRightPress, leftCls, rightCls, needleWobble, handleLeft, handleRight }) {
+  return (
+    <div className="sa-logo-shell">
+      <button
+        type="button"
+        className="sa-hit sa-hit--left"
+        tabIndex={-1}
+        onPointerDown={() => setLeftPress(true)}
+        onPointerUp={() => setLeftPress(false)}
+        onPointerLeave={() => setLeftPress(false)}
+        onClick={handleLeft}
+      />
+      <button
+        type="button"
+        className="sa-hit sa-hit--right"
+        tabIndex={-1}
+        onPointerDown={() => setRightPress(true)}
+        onPointerUp={() => setRightPress(false)}
+        onPointerLeave={() => setRightPress(false)}
+        onClick={handleRight}
+      />
+      <LogoSvg leftCls={leftCls} rightCls={rightCls} needleWobble={needleWobble} handleLeft={handleLeft} handleRight={handleRight} />
+    </div>
+  );
+}
+
 export default function SettingsAside() {
   const [index, setIndex] = useState(0);
   const [changing, setChanging] = useState(false);
@@ -134,30 +160,13 @@ export default function SettingsAside() {
   return (
     <div className="settings-aside" aria-hidden="true">
       <div className="sa-brand">
-        <div className="sa-logo-shell">
-          <button
-            type="button"
-            className="sa-hit sa-hit--left"
-            tabIndex={-1}
-            onPointerDown={() => setLeftPress(true)}
-            onPointerUp={() => setLeftPress(false)}
-            onPointerLeave={() => setLeftPress(false)}
-            onClick={handleLeft}
-          />
-          <button
-            type="button"
-            className="sa-hit sa-hit--right"
-            tabIndex={-1}
-            onPointerDown={() => setRightPress(true)}
-            onPointerUp={() => setRightPress(false)}
-            onPointerLeave={() => setRightPress(false)}
-            onClick={handleRight}
-          />
-          <LogoSvg leftCls={leftCls} rightCls={rightCls} needleWobble={needleWobble} handleLeft={handleLeft} handleRight={handleRight} />
-        </div>
-
+        <LogoShell
+          leftPress={leftPress} setLeftPress={setLeftPress}
+          rightPress={rightPress} setRightPress={setRightPress}
+          leftCls={leftCls} rightCls={rightCls}
+          needleWobble={needleWobble} handleLeft={handleLeft} handleRight={handleRight}
+        />
         <span className="sa-wordmark">quodeq</span>
-
         <p className="sa-phrase-wrap">
           <span className={changing ? 'sa-phrase sa-phrase--changing' : 'sa-phrase'}>
             <SafePhrase html={PHRASES[index]} />

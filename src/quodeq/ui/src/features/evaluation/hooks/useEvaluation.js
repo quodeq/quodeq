@@ -53,39 +53,8 @@ function handleJobUpdate(updated, refs, setJob, callbacks) {
   }
 }
 
-export function useEvaluation() {
-  const [job, setJob] = useState(null);
-  const [jobError, setJobError] = useState('');
-  const [liveViolations, setLiveViolations] = useState({});
-
-  const pollRef = useRef(null);
-  const dimPollRef = useRef(null);
-  const requestedDimensionsRef = useRef([]);
-  const liveViolationsRef = useRef({});
-  const partialDimensionsRef = useRef(new Set());
-  const dimFailCountRef = useRef({});
-
-  useEffect(() => {
-    listEvaluations()
-      .then((jobs) => {
-        const running = jobs.find((j) => j.status === 'running');
-        if (running) {
-          setJob(running);
-          startPolling(running.jobId);
-        }
-      })
-      .catch((err) => console.warn('Failed to fetch running evaluations:', err));
-    return () => {
-      stopTimer(pollRef);
-      stopTimer(dimPollRef);
-    };
-  }, []);
-
-  useEffect(() => {
-    liveViolationsRef.current = liveViolations;
-  }, [liveViolations]);
-
-  function startDimensionPolling(project, runId) {
+function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef, setLiveViolations) {
+  return function startDimensionPolling(project, runId) {
     stopTimer(dimPollRef);
     dimFailCountRef.current = {};
     const refs = { dimFailCount: dimFailCountRef.current, partialDimensions: partialDimensionsRef.current };
@@ -96,9 +65,11 @@ export function useEvaluation() {
         partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
       );
     }, DIMENSION_POLL_MS);
-  }
+  };
+}
 
-  function startPolling(jobId) {
+function createJobPoller(pollRef, dimPollRef, requestedDimensionsRef, partialDimensionsRef, setJob, setJobError, startDimensionPolling) {
+  return function startPolling(jobId) {
     stopTimer(pollRef);
     const refs = {
       requestedDimensions: requestedDimensionsRef.current,
@@ -120,7 +91,43 @@ export function useEvaluation() {
         stopTimer(dimPollRef);
       }
     }, JOB_POLL_MS);
-  }
+  };
+}
+
+export function useEvaluation() {
+  const [job, setJob] = useState(null);
+  const [jobError, setJobError] = useState('');
+  const [liveViolations, setLiveViolations] = useState({});
+
+  const pollRef = useRef(null);
+  const dimPollRef = useRef(null);
+  const requestedDimensionsRef = useRef([]);
+  const liveViolationsRef = useRef({});
+  const partialDimensionsRef = useRef(new Set());
+  const dimFailCountRef = useRef({});
+
+  const startDimensionPolling = createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef, setLiveViolations);
+  const startPolling = createJobPoller(pollRef, dimPollRef, requestedDimensionsRef, partialDimensionsRef, setJob, setJobError, startDimensionPolling);
+
+  useEffect(() => {
+    listEvaluations()
+      .then((jobs) => {
+        const running = jobs.find((j) => j.status === 'running');
+        if (running) {
+          setJob(running);
+          startPolling(running.jobId);
+        }
+      })
+      .catch((err) => console.warn('Failed to fetch running evaluations:', err));
+    return () => {
+      stopTimer(pollRef);
+      stopTimer(dimPollRef);
+    };
+  }, []);
+
+  useEffect(() => {
+    liveViolationsRef.current = liveViolations;
+  }, [liveViolations]);
 
   async function startEvaluationJob(payload) {
     setJobError('');

@@ -52,6 +52,120 @@ function ComplianceListSection({ compliance, displayedCompliance, hasMoreComplia
   );
 }
 
+function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData) {
+  const totalViolations = violations.length;
+  const lines = [
+    'You are a senior software engineer performing a targeted code review.',
+    'Apply minimal, surgical fixes — no refactoring, no style changes beyond what is required.',
+    '',
+    `# Fix Plan: ${principle}`,
+    '',
+    `**Total violations:** ${totalViolations}`,
+  ];
+  if (principleData?.findings) lines.push('', `**Context:** ${principleData.findings}`);
+  lines.push('', '---', '');
+
+  EVAL_SEVERITY_ORDER.forEach((sev) => {
+    const vs = violationsBySeverity[sev];
+    if (!vs || vs.length === 0) return;
+    lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);
+    lines.push('');
+    vs.forEach((v, i) => {
+      const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
+      lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
+      if (v.reason) lines.push('', `**Why it's a violation:** ${v.reason}`);
+      const linkedRefs = (v.reqRefs || []).filter(r => r.url && /^https?:\/\//.test(r.url));
+      if (linkedRefs.length > 0) lines.push('', `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
+      if (v.snippet) {
+        lines.push('', '**Affected code:**');
+        lines.push('```');
+        v.snippet.split('\n').forEach((l) => lines.push(l));
+        lines.push('```');
+      }
+      lines.push('');
+    });
+  });
+
+  lines.push('---');
+  lines.push('');
+  lines.push('For each violation above, provide a concrete, step-by-step fix.');
+  lines.push('Return each fix as an exact replacement block or unified diff. No explanations beyond what is needed to apply the fix.');
+  lines.push(PLAN_TEST_INSTRUCTION_GROUP);
+  return lines.join('\n').trim();
+}
+
+function buildViolationPlanText(v, principle) {
+  const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
+  const lines = [
+    `# Fix Request: ${principle}`,
+    '',
+    `**Severity:** ${v.severity || 'unknown'}`,
+  ];
+  if (loc) lines.push(`**File:** ${loc}`);
+  if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
+  if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
+  if (v.reqRefs?.length > 0) lines.push('', `**References:** ${v.reqRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
+  else if (v.req) lines.push('', `**Requirement:** ${v.req}`);
+  lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
+  if (loc) lines.push(`Apply it to \`${loc}\`.`);
+  lines.push(PLAN_TEST_INSTRUCTION_SINGLE);
+  return lines.join('\n').trim();
+}
+
+function PrincipleHeader({ principle, score, grade, violations, compliance, sevCounts, onCopyPlan }) {
+  return (
+    <section className="panel file-detail-summary-panel">
+      <div className="file-detail-stats-row">
+        <div className="file-detail-stats">
+          <h3 className="file-detail-title" style={{ margin: 0 }}>{principle}</h3>
+          {grade === 'Insufficient' ? (
+            <span className="exec-summary-insufficient">Not enough evidence</span>
+          ) : (
+            <>
+              {score && (
+                <>
+                  <span className="file-detail-stat-sep">·</span>
+                  <span className="file-detail-stat" style={{ fontSize: '1.1rem' }}><strong>{score.replace('/10', '')}</strong></span>
+                </>
+              )}
+              <span className="file-detail-stat-sep">·</span>
+              <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
+            </>
+          )}
+        </div>
+        {violations.length > 0 && (
+          <CopyButton label="Principle fix plan" onClick={onCopyPlan} />
+        )}
+      </div>
+      <div className="file-detail-stats" style={{ marginTop: 6 }}>
+        {sevCounts.critical > 0 && (
+          <span className="file-detail-stat severity-tag critical">{sevCounts.critical} critical</span>
+        )}
+        {sevCounts.major > 0 && (
+          <span className="file-detail-stat severity-tag major">{sevCounts.major} major</span>
+        )}
+        {sevCounts.minor > 0 && (
+          <span className="file-detail-stat severity-tag minor">{sevCounts.minor} minor</span>
+        )}
+        {(sevCounts.critical > 0 || sevCounts.major > 0 || sevCounts.minor > 0) && <span className="file-detail-stat-sep">·</span>}
+        <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
+        {compliance.length > 0 && (
+          <>
+            <span className="file-detail-stat-sep">·</span>
+            <span className="file-detail-stat"><strong>{compliance.length}</strong> compliance</span>
+            {violations.length > 0 && (
+              <>
+                <span className="file-detail-stat-sep">·</span>
+                <span className="file-detail-stat"><strong>1:{Math.round(compliance.length / violations.length)}</strong> ratio</span>
+              </>
+            )}
+          </>
+        )}
+      </div>
+    </section>
+  );
+}
+
 const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal }) {
   const {
     principleData,
@@ -78,123 +192,16 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
   const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
   const hasMoreCompliance = compliance.length > PAGE_SIZE;
 
-  const buildPrinciplePlanText = () => {
-    const totalViolations = violations.length;
-    const lines = [
-      'You are a senior software engineer performing a targeted code review.',
-      'Apply minimal, surgical fixes — no refactoring, no style changes beyond what is required.',
-      '',
-      `# Fix Plan: ${principle}`,
-      '',
-      `**Total violations:** ${totalViolations}`,
-    ];
-    if (principleData?.findings) lines.push('', `**Context:** ${principleData.findings}`);
-    lines.push('', '---', '');
-
-    EVAL_SEVERITY_ORDER.forEach((sev) => {
-      const vs = violationsBySeverity[sev];
-      if (!vs || vs.length === 0) return;
-      lines.push(`## ${sev.charAt(0).toUpperCase() + sev.slice(1)} violations (${vs.length})`);
-      lines.push('');
-      vs.forEach((v, i) => {
-        const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
-        lines.push(`### ${i + 1}.${loc ? ` \`${loc}\`` : ''}`);
-        if (v.reason) lines.push('', `**Why it's a violation:** ${v.reason}`);
-        const linkedRefs = (v.reqRefs || []).filter(r => r.url && /^https?:\/\//.test(r.url));
-        if (linkedRefs.length > 0) lines.push('', `**References:** ${linkedRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
-        if (v.snippet) {
-          lines.push('', '**Affected code:**');
-          lines.push('```');
-          v.snippet.split('\n').forEach((l) => lines.push(l));
-          lines.push('```');
-        }
-        lines.push('');
-      });
-    });
-
-    lines.push('---');
-    lines.push('');
-    lines.push('For each violation above, provide a concrete, step-by-step fix.');
-    lines.push('Return each fix as an exact replacement block or unified diff. No explanations beyond what is needed to apply the fix.');
-    lines.push(PLAN_TEST_INSTRUCTION_GROUP);
-    return lines.join('\n').trim();
-  };
-
-  const buildViolationPlanText = (v) => {
-    const loc = v.file ? `${v.file}${v.line ? `:${v.line}` : ''}` : '';
-    const lines = [
-      `# Fix Request: ${principle}`,
-      '',
-      `**Severity:** ${v.severity || 'unknown'}`,
-    ];
-    if (loc) lines.push(`**File:** ${loc}`);
-    if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
-    if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
-    if (v.reqRefs?.length > 0) lines.push('', `**References:** ${v.reqRefs.map(r => `${r.label} (${r.url})`).join(', ')}`);
-    else if (v.req) lines.push('', `**Requirement:** ${v.req}`);
-    lines.push('', '---', 'Please provide a concrete, step-by-step fix for this specific violation.');
-    if (loc) lines.push(`Apply it to \`${loc}\`.`);
-    lines.push(PLAN_TEST_INSTRUCTION_SINGLE);
-    return lines.join('\n').trim();
-  };
-
   const sevCounts = { critical: 0, major: 0, minor: 0 };
   violations.forEach(v => { const s = (v.severity || 'minor').toLowerCase(); if (sevCounts[s] !== undefined) sevCounts[s]++; });
 
   return (
     <>
-      <section className="panel file-detail-summary-panel">
-        <div className="file-detail-stats-row">
-          <div className="file-detail-stats">
-            <h3 className="file-detail-title" style={{ margin: 0 }}>{principle}</h3>
-            {grade === 'Insufficient' ? (
-              <span className="exec-summary-insufficient">Not enough evidence</span>
-            ) : (
-              <>
-                {score && (
-                  <>
-                    <span className="file-detail-stat-sep">·</span>
-                    <span className="file-detail-stat" style={{ fontSize: '1.1rem' }}><strong>{score.replace('/10', '')}</strong></span>
-                  </>
-                )}
-                <span className="file-detail-stat-sep">·</span>
-                <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
-              </>
-            )}
-          </div>
-          {violations.length > 0 && (
-            <CopyButton
-              label="Principle fix plan"
-              onClick={() => copyToClipboard(buildPrinciplePlanText())}
-            />
-          )}
-        </div>
-        <div className="file-detail-stats" style={{ marginTop: 6 }}>
-          {sevCounts.critical > 0 && (
-            <span className="file-detail-stat severity-tag critical">{sevCounts.critical} critical</span>
-          )}
-          {sevCounts.major > 0 && (
-            <span className="file-detail-stat severity-tag major">{sevCounts.major} major</span>
-          )}
-          {sevCounts.minor > 0 && (
-            <span className="file-detail-stat severity-tag minor">{sevCounts.minor} minor</span>
-          )}
-          {(sevCounts.critical > 0 || sevCounts.major > 0 || sevCounts.minor > 0) && <span className="file-detail-stat-sep">·</span>}
-          <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
-          {compliance.length > 0 && (
-            <>
-              <span className="file-detail-stat-sep">·</span>
-              <span className="file-detail-stat"><strong>{compliance.length}</strong> compliance</span>
-              {violations.length > 0 && (
-                <>
-                  <span className="file-detail-stat-sep">·</span>
-                  <span className="file-detail-stat"><strong>1:{Math.round(compliance.length / violations.length)}</strong> ratio</span>
-                </>
-              )}
-            </>
-          )}
-        </div>
-      </section>
+      <PrincipleHeader
+        principle={principle} score={score} grade={grade}
+        violations={violations} compliance={compliance} sevCounts={sevCounts}
+        onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
+      />
 
       {principleData?.findings && (
         <p className="violation-context-desc" style={{ padding: '0 4px', marginBottom: '4px' }}>
@@ -207,7 +214,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         </p>
       )}
 
-      <ViolationListSection violationsBySeverity={violationsBySeverity} principle={principle} buildViolationPlanText={buildViolationPlanText} />
+      <ViolationListSection violationsBySeverity={violationsBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} />
 
       <ComplianceListSection
         compliance={compliance} displayedCompliance={displayedCompliance}

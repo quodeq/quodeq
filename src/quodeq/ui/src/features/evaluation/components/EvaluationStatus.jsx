@@ -28,23 +28,67 @@ function phaseLabel(job) {
 
 const STATUS_MARKERS = { arrow: '\u2192', check: '\u2713', error: 'Error:', failed: 'failed' };
 
+function isStatusLine(line) {
+  const prefixes = [STATUS_MARKERS.arrow, STATUS_MARKERS.check, STATUS_MARKERS.error];
+  return prefixes.some((p) => line.startsWith(p)) || line.includes(STATUS_MARKERS.failed);
+}
+
+function lastRelevantLog(logs) {
+  if (!logs?.length) return null;
+  for (let i = logs.length - 1; i >= 0; i--) {
+    const line = logs[i].trim();
+    if (isStatusLine(line)) return line;
+  }
+  return null;
+}
+
+function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
+  const isRunning = job.status === 'running';
+  const isFailed = job.status === 'failed';
+  const isLost = job.status === 'lost';
+  return (
+    <>
+      <div
+        className="eval-status-row eval-status-row--clickable"
+        role="button"
+        tabIndex={0}
+        onClick={() => setConsoleOpen(o => !o)}
+        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen(o => !o); } }}
+        aria-label={consoleOpen ? 'Hide console' : 'Show console'}
+      >
+        {isRunning && <span className="eval-status-phase">{phaseLabel(job)}</span>}
+        {isFailed && <span className="eval-status-phase eval-status-phase--error">{lastRelevantLog(job.logs) || 'Analysis failed'}</span>}
+        {isLost && <span className="eval-status-phase eval-status-phase--error">Server restarted — job tracking lost</span>}
+        {isRunning && job.dimensions?.length > 0 && (
+          <span className="eval-status-dims">
+            {job.dimensions.map(d => (
+              <span key={d} className={`eval-dim-tag${d === job.currentDimension ? ' active' : ''}`}>{d}</span>
+            ))}
+          </span>
+        )}
+        <span className="eval-console-indicator">
+          <svg className="eval-console-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="1" y="2" width="14" height="12" rx="2" />
+            <polyline points="4.5,6.5 7,9 4.5,11.5" />
+            <line x1="9" y1="11" x2="12" y2="11" />
+          </svg>
+          {consoleOpen ? '▾' : '▸'}
+        </span>
+      </div>
+      {consoleOpen && (
+        <div className="console-output">
+          <pre ref={logViewerRef}>
+            {job.logs?.length ? job.logs.join('\n') : 'Waiting for output\u2026'}
+          </pre>
+        </div>
+      )}
+    </>
+  );
+}
+
 export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel }) {
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
-
-  function isStatusLine(line) {
-    const prefixes = [STATUS_MARKERS.arrow, STATUS_MARKERS.check, STATUS_MARKERS.error];
-    return prefixes.some((p) => line.startsWith(p)) || line.includes(STATUS_MARKERS.failed);
-  }
-
-  function lastRelevantLog(logs) {
-    if (!logs?.length) return null;
-    for (let i = logs.length - 1; i >= 0; i--) {
-      const line = logs[i].trim();
-      if (isStatusLine(line)) return line;
-    }
-    return null;
-  }
 
   useEffect(() => {
     if (logViewerRef.current) {
@@ -52,14 +96,10 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     }
   }, [job?.logs]);
 
-
-
   if (!job) return null;
 
   const isRunning = job.status === 'running';
   const isDone = job.status === 'done';
-  const isFailed = job.status === 'failed';
-  const isLost = job.status === 'lost';
   const projectName = deriveProjectName(job.repo);
 
   return (
@@ -110,41 +150,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
         )}
       </div>
 
-      <div
-        className="eval-status-row eval-status-row--clickable"
-        role="button"
-        tabIndex={0}
-        onClick={() => setConsoleOpen(o => !o)}
-        onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen(o => !o); } }}
-        aria-label={consoleOpen ? 'Hide console' : 'Show console'}
-      >
-        {isRunning && <span className="eval-status-phase">{phaseLabel(job)}</span>}
-        {isFailed && <span className="eval-status-phase eval-status-phase--error">{lastRelevantLog(job.logs) || 'Analysis failed'}</span>}
-        {isLost && <span className="eval-status-phase eval-status-phase--error">Server restarted — job tracking lost</span>}
-        {isRunning && job.dimensions?.length > 0 && (
-          <span className="eval-status-dims">
-            {job.dimensions.map(d => (
-              <span key={d} className={`eval-dim-tag${d === job.currentDimension ? ' active' : ''}`}>{d}</span>
-            ))}
-          </span>
-        )}
-        <span className="eval-console-indicator">
-          <svg className="eval-console-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="1" y="2" width="14" height="12" rx="2" />
-            <polyline points="4.5,6.5 7,9 4.5,11.5" />
-            <line x1="9" y1="11" x2="12" y2="11" />
-          </svg>
-          {consoleOpen ? '▾' : '▸'}
-        </span>
-      </div>
-      {consoleOpen && (
-        <div className="console-output">
-          <pre ref={logViewerRef}>
-            {job.logs?.length ? job.logs.join('\n') : 'Waiting for output…'}
-          </pre>
-        </div>
-      )}
-
+      <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} logViewerRef={logViewerRef} />
 
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
