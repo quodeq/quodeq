@@ -4,6 +4,7 @@
 node_modules/
 src/quodeq/ui/node_modules/
 src/quodeq/ui/dist/
+src/quodeq/static/
 dist/
 __pycache__/
 *.pyc
