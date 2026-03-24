@@ -81,11 +81,12 @@ def _file_imports_changed(content: str, compiled: list, changed_stems: dict[str,
     for line in content.splitlines():
         for pattern in compiled:
             m = pattern.search(line)
-            if m:
-                module_name = m.group(1).rsplit(".", 1)[-1].rsplit("/", 1)[-1]
-                if module_name in changed_stems:
-                    return True
-                break
+            if not m:
+                continue
+            module_name = m.group(1).rsplit(".", 1)[-1].rsplit("/", 1)[-1]
+            if module_name in changed_stems:
+                return True
+            break
     return False
 
 

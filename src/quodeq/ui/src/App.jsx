@@ -90,123 +90,82 @@ function MainContent({ activePage, evaluation, dashboard, navigation, settings, 
   }
 }
 
-// App is the root component and naturally aggregates all application hooks.
-// The hook count is proportional to the app's feature set and is not worth
-// refactoring into sub-providers for a project of this size.
+function computeHeaderMeta(accumulated, dashboard) {
+  const accDims = accumulated?.dimensions || [];
+  if (accDims.length === 0) return null;
+  const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
+  const repository = accDims.find((d) => d.repository)?.repository ?? null;
+  const runDims = dashboard?.dimensions || [];
+  const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
+  return { discipline, repository, totalFiles };
+}
+
+function computeProjectDisplay(selectedProject, projects) {
+  if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
+  const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
+  const parentRef = data?.parent || null;
+  const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
+  const parentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
+  return {
+    selectedDisplayName: data?.displayName || data?.name || selectedProject,
+    selectedProjectParent: parentData?.displayName || parentData?.name || parentRef,
+    selectedProjectParentId: parentId,
+  };
+}
+
+function AppProjectHeader({ selectedDisplayName, selectedProjectParent, selectedProjectParentId, headerMeta, handleProjectChange, showRunNav, runNavProps }) {
+  return (
+    <ProjectHeader
+      project={{
+        displayName: selectedDisplayName,
+        parent: selectedProjectParent,
+        parentId: selectedProjectParentId,
+        meta: headerMeta,
+      }}
+      navigation={{
+        onProjectChange: handleProjectChange,
+        showRunNav,
+        runNavProps,
+      }}
+    />
+  );
+}
+
+function AppShell({ sidebar, header, breadcrumb, content }) {
+  return (
+    <div className="app-shell">
+      {sidebar}
+      <main className="dashboard">
+        {header}
+        {breadcrumb}
+        {content}
+      </main>
+    </div>
+  );
+}
+
 export default function App() {
   const [serverConnected, setServerConnected] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
-
-  // Project / run selection
-  const {
-    projects, setProjects, selectedProject, selectedRun, setSelectedRun,
-    loadProjects, handleProjectChange, handleRunChange, selectProjectAndRun,
-  } = useProjectState({ onNoProjects: () => navTab('evaluate') });
-
-  // Theme + AI settings
+  const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, handleRunChange, selectProjectAndRun } = useProjectState({ onNoProjects: () => navTab('evaluate') });
   const settings = useAppSettings();
-
-  // Project actions (delete, export, relocate)
-  const { handleDeleteProject, handleExportProject, handleRelocateProject } = useProjectActions({
-    projects, selectedProject, handleProjectChange, loadProjects,
-  });
-
-  function handleNavigate(page, params = {}) {
-    if (page === 'run' && params.runId) setSelectedRun(params.runId);
-    navPush({ page, ...params });
-  }
-
-  // Dashboard data
-  const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({
-    selectedProject,
-    selectedRun,
-  });
-
-  // Run navigator
-  const {
-    overviewRunIndex, currentOverviewRun,
-    handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
-  } = useRunNavigator({
-    selectedRun, availableRuns,
-    onRunChange: handleRunChange,
-    onNavigate: handleNavigate,
-  });
-
-  // Header meta
-  const headerMeta = useMemo(() => {
-    const accDims = accumulated?.dimensions || [];
-    if (accDims.length === 0) return null;
-    const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
-    const repository = accDims.find((d) => d.repository)?.repository ?? null;
-    const runDims = dashboard?.dimensions || [];
-    const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
-    return { discipline, repository, totalFiles };
-  }, [accumulated, dashboard]);
-
-  const { selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
-    if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
-    const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
-    const parentRef = data?.parent || null;
-    const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
-    const parentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
-    return {
-      selectedDisplayName: data?.displayName || data?.name || selectedProject,
-      selectedProjectParent: parentData?.displayName || parentData?.name || parentRef,
-      selectedProjectParentId: parentId,
-    };
-  }, [selectedProject, projects]);
-
-  // Evaluation
-  const {
-    job, jobError, liveViolations,
-    analysisPower, setAnalysisPower,
-    handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
-  } = useEvaluationLifecycle({
-    settings,
-    navigation: { navTab, navReset },
-    projects: { loadProjects, setProjects, selectProjectAndRun },
-  });
-
-  // Active tab / header visibility
-  const activeTab = ['overview', 'projects', 'evaluate', 'settings'].includes(activePage.page)
-    ? activePage.page : 'overview';
+  const { handleDeleteProject, handleExportProject, handleRelocateProject } = useProjectActions({ projects, selectedProject, handleProjectChange, loadProjects });
+  function handleNavigate(page, params = {}) { if (page === 'run' && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
+  const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
+  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
+  const headerMeta = useMemo(() => computeHeaderMeta(accumulated, dashboard), [accumulated, dashboard]);
+  const { selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => computeProjectDisplay(selectedProject, projects), [selectedProject, projects]);
+  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
+  const activeTab = ['overview', 'projects', 'evaluate', 'settings'].includes(activePage.page) ? activePage.page : 'overview';
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
-  const onViewRun = activePage.page === 'overview' ? handleRunView : undefined;
 
   return (
-    <div className="app-shell">
-      <Sidebar activeTab={activeTab} onNavTab={navTab} />
-      <main className="dashboard">
-        {showProjectHeader && (
-          <ProjectHeader
-            project={{
-              displayName: selectedDisplayName,
-              parent: selectedProjectParent,
-              parentId: selectedProjectParentId,
-              meta: headerMeta,
-            }}
-            navigation={{
-              onProjectChange: handleProjectChange,
-              showRunNav,
-              runNavProps: {
-                currentOverviewRun, overviewRunIndex, availableRuns,
-                onRunPrev: handleRunPrev, onRunNext: handleRunNext,
-                onRunLatest: handleRunLatest, onViewRun: onViewRun,
-              },
-            }}
-          />
-        )}
-        {navStack.length > 1 && <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} />}
-        <MainContent
-          activePage={activePage}
-          evaluation={{ job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation }}
-          dashboard={{ data: dashboard, accumulated, loading, error, availableRuns, overviewRunIndex }}
-          navigation={{ selectedProject, selectedRun, projects, handleNavigate, handleRunSelect, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject }}
-          settings={{ appSettings: settings }}
-          serverHealth={{ connected: serverConnected, setConnected: setServerConnected }}
-        />
-      </main>
-    </div>
+    <AppShell
+      sidebar={<Sidebar activeTab={activeTab} onNavTab={navTab} />}
+      header={showProjectHeader ? <AppProjectHeader selectedDisplayName={selectedDisplayName} selectedProjectParent={selectedProjectParent} selectedProjectParentId={selectedProjectParentId} headerMeta={headerMeta} handleProjectChange={handleProjectChange} showRunNav={showRunNav} runNavProps={{ currentOverviewRun, overviewRunIndex, availableRuns, onRunPrev: handleRunPrev, onRunNext: handleRunNext, onRunLatest: handleRunLatest, onViewRun: activePage.page === 'overview' ? handleRunView : undefined }} /> : null}
+      breadcrumb={navStack.length > 1 ? <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} /> : null}
+      content={<MainContent activePage={activePage} evaluation={{ job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation }} dashboard={{ data: dashboard, accumulated, loading, error, availableRuns, overviewRunIndex }} navigation={{ selectedProject, selectedRun, projects, handleNavigate, handleRunSelect, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject }} settings={{ appSettings: settings }} serverHealth={{ connected: serverConnected, setConnected: setServerConnected }} />}
+    />
   );
 }

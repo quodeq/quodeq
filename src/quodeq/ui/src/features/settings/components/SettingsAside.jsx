@@ -88,15 +88,51 @@ function LogoShell({ leftPress, setLeftPress, rightPress, setRightPress, leftCls
   );
 }
 
-export default function SettingsAside() {
+function useKeyNav(stopAuto, stepPhrase) {
+  useEffect(() => {
+    function onKey(e) {
+      if (e.key === 'ArrowLeft') { stopAuto(); stepPhrase(-1); }
+      if (e.key === 'ArrowRight') { stopAuto(); stepPhrase(1); }
+    }
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [stopAuto, stepPhrase]);
+}
+
+function useAutoAdvance(stepPhrase, setRightAuto, setLeftPress, setRightPress) {
+  const autoRef = useRef(null);
+  const autoEnabledRef = useRef(true);
+
+  const stopAuto = useCallback(() => {
+    autoEnabledRef.current = false;
+    clearTimeout(autoRef.current);
+    setRightAuto(false);
+    setLeftPress(false);
+    setRightPress(false);
+  }, [setRightAuto, setLeftPress, setRightPress]);
+
+  const scheduleAuto = useCallback(() => {
+    if (!autoEnabledRef.current) return;
+    clearTimeout(autoRef.current);
+    autoRef.current = setTimeout(() => {
+      if (!autoEnabledRef.current) return;
+      setRightAuto(true);
+      setTimeout(() => { setRightAuto(false); stepPhrase(1); scheduleAuto(); }, TRANSITION_MS);
+    }, AUTO_ADVANCE_MS);
+  }, [stepPhrase, setRightAuto]);
+
+  useEffect(() => { autoEnabledRef.current = true; scheduleAuto(); return () => clearTimeout(autoRef.current); }, [scheduleAuto]);
+
+  return { stopAuto, scheduleAuto };
+}
+
+function useCarousel() {
   const [index, setIndex] = useState(0);
   const [changing, setChanging] = useState(false);
   const [leftPress, setLeftPress] = useState(false);
   const [rightPress, setRightPress] = useState(false);
   const [rightAuto, setRightAuto] = useState(false);
   const [needleWobble, setNeedleWobble] = useState(false);
-  const autoRef = useRef(null);
-  const autoEnabledRef = useRef(true);
 
   function triggerWobble() {
     setNeedleWobble(false);
@@ -112,64 +148,33 @@ export default function SettingsAside() {
     }, TRANSITION_MS);
   }, []);
 
-  const stopAuto = useCallback(() => {
-    autoEnabledRef.current = false;
-    clearTimeout(autoRef.current);
-    setRightAuto(false);
-    setLeftPress(false);
-    setRightPress(false);
-  }, []);
+  const { stopAuto } = useAutoAdvance(stepPhrase, setRightAuto, setLeftPress, setRightPress);
+  useKeyNav(stopAuto, stepPhrase);
 
-  const scheduleAuto = useCallback(() => {
-    if (!autoEnabledRef.current) return;
-    clearTimeout(autoRef.current);
-    autoRef.current = setTimeout(() => {
-      if (!autoEnabledRef.current) return;
-      setRightAuto(true);
-      setTimeout(() => {
-        setRightAuto(false);
-        stepPhrase(1);
-        scheduleAuto();
-      }, TRANSITION_MS);
-    }, AUTO_ADVANCE_MS);
-  }, [stepPhrase]);
+  const handleLeft = () => { stopAuto(); stepPhrase(-1); };
+  const handleRight = () => { stopAuto(); stepPhrase(1); };
+  const leftCls = leftPress ? 'sa-chevron sa-chevron--press' : 'sa-chevron';
+  const rightCls = rightAuto ? 'sa-chevron sa-chevron--auto' : rightPress ? 'sa-chevron sa-chevron--press' : 'sa-chevron';
 
-  useEffect(() => {
-    autoEnabledRef.current = true;
-    scheduleAuto();
-    return () => clearTimeout(autoRef.current);
-  }, [scheduleAuto]);
+  return { index, changing, leftPress, setLeftPress, rightPress, setRightPress, needleWobble, leftCls, rightCls, handleLeft, handleRight };
+}
 
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key === 'ArrowLeft')  { stopAuto(); stepPhrase(-1); }
-      if (e.key === 'ArrowRight') { stopAuto(); stepPhrase(1); }
-    }
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [stopAuto, stepPhrase]);
-
-  function handleLeft() { stopAuto(); stepPhrase(-1); }
-  function handleRight() { stopAuto(); stepPhrase(1); }
-
-  const leftCls  = leftPress  ? 'sa-chevron sa-chevron--press' : 'sa-chevron';
-  const rightCls = rightAuto  ? 'sa-chevron sa-chevron--auto'
-                 : rightPress ? 'sa-chevron sa-chevron--press'
-                 :              'sa-chevron';
+export default function SettingsAside() {
+  const c = useCarousel();
 
   return (
     <div className="settings-aside" aria-hidden="true">
       <div className="sa-brand">
         <LogoShell
-          leftPress={leftPress} setLeftPress={setLeftPress}
-          rightPress={rightPress} setRightPress={setRightPress}
-          leftCls={leftCls} rightCls={rightCls}
-          needleWobble={needleWobble} handleLeft={handleLeft} handleRight={handleRight}
+          leftPress={c.leftPress} setLeftPress={c.setLeftPress}
+          rightPress={c.rightPress} setRightPress={c.setRightPress}
+          leftCls={c.leftCls} rightCls={c.rightCls}
+          needleWobble={c.needleWobble} handleLeft={c.handleLeft} handleRight={c.handleRight}
         />
         <span className="sa-wordmark">quodeq</span>
         <p className="sa-phrase-wrap">
-          <span className={changing ? 'sa-phrase sa-phrase--changing' : 'sa-phrase'}>
-            <SafePhrase html={PHRASES[index]} />
+          <span className={c.changing ? 'sa-phrase sa-phrase--changing' : 'sa-phrase'}>
+            <SafePhrase html={PHRASES[c.index]} />
           </span>
         </p>
       </div>

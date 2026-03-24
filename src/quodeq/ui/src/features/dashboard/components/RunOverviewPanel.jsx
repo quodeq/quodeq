@@ -140,107 +140,93 @@ function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionCl
 // Run-specific overview panel
 // ---------------------------------------------------------------------------
 
+function computeRunScoreDelta(dashboard) {
+  const trendSeries = dashboard?.trend || [];
+  const currentRunId = dashboard?.selectedRun?.runId;
+  const idx = trendSeries.findIndex((t) => t.runId === currentRunId);
+  if (idx < 0 || idx + 1 >= trendSeries.length) return null;
+  const curr = parseFloat(trendSeries[idx].numericAverage);
+  const prev = parseFloat(trendSeries[idx + 1].numericAverage);
+  if (isNaN(curr) || isNaN(prev)) return null;
+  return (curr - prev).toFixed(1);
+}
+
+function RunHeroSection({ dashboard, selectedRunId, runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }) {
+  return (
+    <section className="acc-eval-panel panel">
+      <div className="acc-eval-top">
+        <span className="acc-eval-date">{dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId)}</span>
+        {(dashboard?.dimensions || []).some((d) => (d.violations?.length || 0) > 0) && (
+          <CopyButton
+            label="Fix plan"
+            onClick={() => {
+              const allViolations = (dashboard.dimensions || []).flatMap(
+                (d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
+              );
+              copyToClipboard(buildDimensionPlanFromViolations(dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId), allViolations));
+            }}
+          />
+        )}
+      </div>
+      <div className="acc-eval-hero">
+        <span className={`acc-eval-grade-chip chip ${scoreColorClass(runSummary.numericAverage)}`}>
+          {runSummary.overallGrade || '—'}
+        </span>
+        <div className="acc-eval-score-row">
+          <span className="acc-eval-score">{runSummary.numericAverage || '—'}</span>
+          <span className="acc-eval-score-denom">/10</span>
+        </div>
+        {runScoreDelta !== null && (
+          <div className="acc-eval-trend">
+            <TrendBadge delta={runScoreDelta} showLabel={false} />
+          </div>
+        )}
+      </div>
+      <StatsGrid runSummary={{ ...runSummary, filesAffected: runTopFiles.length, uniquePrinciples: runUniquePrinciples }} />
+    </section>
+  );
+}
+
+function RunFileViolations({ runTopFiles, onFileClick }) {
+  if (runTopFiles.length === 0) return null;
+  return (
+    <>
+      <div className="section-header">
+        <h3 className="section-title">Violations by File</h3>
+        <span className="section-count">{runTopFiles.length} files</span>
+      </div>
+      <section className="panel wide-panel offending-panel">
+        <div className="trend-table-wrap">
+          <TopOffendingFilesTable files={runTopFiles} onFileClick={onFileClick} />
+        </div>
+      </section>
+    </>
+  );
+}
+
 export default function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileClick }) {
-  const runSummary = useMemo(
-    () => buildRunSummary(dashboard?.dimensions),
-    [dashboard]
-  );
-
-  const runTopFiles = useMemo(
-    () => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])),
-    [dashboard]
-  );
-
-  const dimensionsWithViolations = useMemo(
-    () => sortDimensionsByViolationSeverity(dashboard?.dimensions || []),
-    [dashboard]
-  );
-
-  const runScoreDelta = useMemo(() => {
-    const trendSeries = dashboard?.trend || [];
-    const currentRunId = dashboard?.selectedRun?.runId;
-    const idx = trendSeries.findIndex((t) => t.runId === currentRunId);
-    if (idx < 0 || idx + 1 >= trendSeries.length) return null;
-    const curr = parseFloat(trendSeries[idx].numericAverage);
-    const prev = parseFloat(trendSeries[idx + 1].numericAverage);
-    if (isNaN(curr) || isNaN(prev)) return null;
-    return (curr - prev).toFixed(1);
-  }, [dashboard]);
-
+  const runSummary = useMemo(() => buildRunSummary(dashboard?.dimensions), [dashboard]);
+  const runTopFiles = useMemo(() => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])), [dashboard]);
+  const dimensionsWithViolations = useMemo(() => sortDimensionsByViolationSeverity(dashboard?.dimensions || []), [dashboard]);
+  const runScoreDelta = useMemo(() => computeRunScoreDelta(dashboard), [dashboard]);
   const runUniquePrinciples = useMemo(() => {
     const violations = (dashboard?.dimensions || []).flatMap((d) => d.violations || []);
     return new Set(violations.map((v) => v.principle).filter(Boolean)).size;
   }, [dashboard]);
 
-  if (!dashboard) {
-    return <p className="empty-state">Loading run data...</p>;
-  }
+  if (!dashboard) return <p className="empty-state">Loading run data...</p>;
 
   return (
     <>
-      <section className="acc-eval-panel panel">
-        <div className="acc-eval-top">
-          <span className="acc-eval-date">{dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId)}</span>
-          {(dashboard?.dimensions || []).some((d) => (d.violations?.length || 0) > 0) && (
-            <CopyButton
-              label="Fix plan"
-              onClick={() => {
-                const allViolations = (dashboard.dimensions || []).flatMap(
-                  (d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
-                );
-                copyToClipboard(
-                  buildDimensionPlanFromViolations(dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId), allViolations)
-                );
-              }}
-            />
-          )}
-        </div>
-
-        <div className="acc-eval-hero">
-          <span className={`acc-eval-grade-chip chip ${scoreColorClass(runSummary.numericAverage)}`}>
-            {runSummary.overallGrade || '—'}
-          </span>
-          <div className="acc-eval-score-row">
-            <span className="acc-eval-score">{runSummary.numericAverage || '—'}</span>
-            <span className="acc-eval-score-denom">/10</span>
-          </div>
-          {runScoreDelta !== null && (
-            <div className="acc-eval-trend">
-              <TrendBadge delta={runScoreDelta} showLabel={false} />
-            </div>
-          )}
-        </div>
-
-        <StatsGrid runSummary={{ ...runSummary, filesAffected: runTopFiles.length, uniquePrinciples: runUniquePrinciples }} />
-      </section>
-
+      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} runScoreDelta={runScoreDelta} runTopFiles={runTopFiles} runUniquePrinciples={runUniquePrinciples} />
       <div className="dimensions-header">
         <h3 className="dimensions-title">Dimensions Analyzed</h3>
       </div>
       <div className="dimensions-panel">
-        <RunDimensionsGrid
-          dimensions={dashboard?.dimensions || []}
-          selectedRunId={selectedRunId}
-          dateLabel={dashboard?.selectedRun?.dateLabel}
-          onDimensionClick={onDimensionClick}
-        />
+        <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} />
       </div>
-
       <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />
-
-      {runTopFiles.length > 0 && (
-        <>
-          <div className="section-header">
-            <h3 className="section-title">Violations by File</h3>
-            <span className="section-count">{runTopFiles.length} files</span>
-          </div>
-          <section className="panel wide-panel offending-panel">
-            <div className="trend-table-wrap">
-              <TopOffendingFilesTable files={runTopFiles} onFileClick={onFileClick} />
-            </div>
-          </section>
-        </>
-      )}
+      <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
     </>
   );
 }

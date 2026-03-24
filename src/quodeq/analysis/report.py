@@ -131,6 +131,11 @@ def _extract_scores(scores: ScoringResult | dict | None) -> tuple[dict, dict]:
 def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
     """Build a complete JSON report dict from evidence and scoring data for one dimension.
 
+    Args:
+        dimension: Quality dimension identifier (e.g. ``"maintainability"``).
+        evidence: Raw evidence dict produced by the analysis pipeline.
+        scores: Scoring result (DTO or plain dict) for the dimension, or *None*.
+
     Parameter count is intentional: dimension identity, raw evidence, and
     scoring result are each a distinct pipeline output with no shared container.
     """

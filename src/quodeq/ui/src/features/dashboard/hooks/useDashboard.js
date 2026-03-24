@@ -13,77 +13,71 @@ import { getDashboard, getAccumulated } from '../../../api/index.js';
  *   availableRuns: Array<{ runId: string, dateLabel: string }>,
  * }}
  */
+function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError) {
+  if (!selectedProject) {
+    setDashboard(null);
+    setError(null);
+    return;
+  }
+
+  let active = true;
+  setLoading(true);
+  setError(null);
+
+  getDashboard(selectedProject, selectedRun)
+    .then((payload) => {
+      if (active) setDashboard(payload);
+    })
+    .catch((err) => {
+      console.warn('Dashboard load failed:', err);
+      if (active) setError('Failed to load dashboard data. Please try again.');
+    })
+    .finally(() => {
+      if (active) setLoading(false);
+    });
+
+  return () => { active = false; };
+}
+
+function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError) {
+  if (!selectedProject) {
+    setAccumulated(null);
+    return;
+  }
+
+  let active = true;
+  const asOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
+
+  getAccumulated(selectedProject, asOf)
+    .then((data) => {
+      if (active) setAccumulated(data);
+    })
+    .catch((err) => {
+      console.error('Dashboard load failed:', err);
+      if (active) setError('Failed to load accumulated data');
+    });
+
+  return () => { active = false; };
+}
+
+function buildAvailableRuns(dashboard) {
+  const trendRows = dashboard?.trend || [];
+  if (trendRows.length === 0) return [];
+  return trendRows.map((row) => ({
+    runId: row.runId,
+    dateLabel: row.dateLabel || row.runId,
+  }));
+}
+
 export function useDashboard({ selectedProject, selectedRun }) {
   const [dashboard, setDashboard] = useState(null);
   const [accumulated, setAccumulated] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Fetch dashboard whenever the project or run changes.
-  useEffect(() => {
-    if (!selectedProject) {
-      setDashboard(null);
-      setError(null);
-      return;
-    }
-
-    let active = true;
-    setLoading(true);
-    setError(null);
-
-    getDashboard(selectedProject, selectedRun)
-      .then((payload) => {
-        if (active) setDashboard(payload);
-      })
-      .catch((err) => {
-        console.warn('Dashboard load failed:', err);
-        if (active) setError('Failed to load dashboard data. Please try again.');
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [selectedProject, selectedRun]);
-
-  // Fetch accumulated data whenever the project changes.
-  // Uses selectedRun as the asOf boundary so the accumulated view stays
-  // aligned with the currently selected run.
-  useEffect(() => {
-    if (!selectedProject) {
-      setAccumulated(null);
-      return;
-    }
-
-    let active = true;
-    const asOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
-
-    getAccumulated(selectedProject, asOf)
-      .then((data) => {
-        if (active) setAccumulated(data);
-      })
-      .catch((err) => {
-        console.error('Dashboard load failed:', err);
-        if (active) setError('Failed to load accumulated data');
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [selectedProject, selectedRun]);
-
-  // Build the list of available runs from the trend data embedded in the
-  // dashboard response (newest first, matching App.jsx overviewAvailableRuns).
-  const availableRuns = useMemo(() => {
-    const trendRows = dashboard?.trend || [];
-    if (trendRows.length === 0) return [];
-    return trendRows.map((row) => ({
-      runId: row.runId,
-      dateLabel: row.dateLabel || row.runId,
-    }));
-  }, [dashboard]);
+  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun]);
+  useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun]);
+  const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
 
   return { dashboard, accumulated, loading, error, availableRuns };
 }

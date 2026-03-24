@@ -18,7 +18,11 @@ from ._mapper_helpers import (
 
 
 def parse_req_ref(raw: dict[str, object]) -> ReqRef:
-    """Parse a raw dict into a ReqRef (requirement reference) instance."""
+    """Parse a raw dict into a ReqRef (requirement reference) instance.
+
+    Args:
+        raw: Dictionary with ``"label"`` and ``"url"`` string keys.
+    """
     return ReqRef(
         label=_str(raw, "label"),
         url=_str(raw, "url"),

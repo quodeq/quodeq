@@ -40,7 +40,6 @@ _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 _ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
 
-
 def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
     """Read an environment variable as an int, returning *default* if unset or invalid."""
     raw = (env or os.environ).get(var)
@@ -279,13 +278,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
     return _run_pipeline_with_cleanup(args, inputs, _setup_run_dirs(args, inputs.src))
 
 
-def _run_dashboard(argv: list[str] | None) -> int:
-    sub_argv = argv[1:] if argv is not None else sys.argv[2:]
-    return dashboard_main(sub_argv)
-
-
 _COMMAND_HANDLERS: dict[str, Callable] = {
-    "dashboard": _run_dashboard,
+    "dashboard": lambda argv: dashboard_main(argv[1:] if argv is not None else sys.argv[2:]),
 }
 
 
