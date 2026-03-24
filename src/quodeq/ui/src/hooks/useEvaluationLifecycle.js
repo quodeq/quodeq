@@ -18,8 +18,18 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
   });
 
   const prevJobRef = useRef(null);
+  const refreshedRunRef = useRef(null);
   useEffect(() => {
     if (job?.status === 'running' && !prevJobRef.current) navTab('evaluate');
+    // Auto-refresh dashboard data as soon as the run completes
+    const finished = job && job.status !== 'running' && job.outputProject && job.outputRunId;
+    if (finished && refreshedRunRef.current !== job.outputRunId) {
+      refreshedRunRef.current = job.outputRunId;
+      loadProjects()
+        .then((list) => setProjects(list))
+        .catch((err) => console.error('Failed to refresh projects:', err));
+      selectProjectAndRun(job.outputProject, job.outputRunId);
+    }
     prevJobRef.current = job;
   }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -31,14 +41,6 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
 
   function handleEvalDismiss(action) {
     if (action === 'view') {
-      const project = job?.outputProject;
-      const runId = job?.outputRunId;
-      if (project) {
-        loadProjects()
-          .then((list) => setProjects(list))
-          .catch((err) => console.error('Operation failed:', err));
-        selectProjectAndRun(project, runId);
-      }
       navReset();
     }
     clearJob();
