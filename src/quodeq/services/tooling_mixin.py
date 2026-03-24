@@ -85,30 +85,31 @@ class FsToolingMixin:
             return target, {"error": "Path is not a directory", "error_code": "PATH_NOT_DIRECTORY", "path": str(target)}
         return target, None
 
+    @staticmethod
+    def _list_directories(target: Path) -> list[dict[str, Any]]:
+        """List readable non-hidden subdirectories of *target*."""
+        directories = []
+        for entry in safe_read_dir(target):
+            if entry.name.startswith(".") or not entry.is_dir():
+                continue
+            entry_path = target / entry.name
+            if not os.access(entry_path, os.R_OK):
+                continue
+            directories.append({
+                "name": entry.name,
+                "path": str(entry_path),
+                "isGitRepo": (entry_path / ".git").exists(),
+            })
+        directories.sort(key=lambda item: item["name"])
+        return directories
+
     def browse_repo(self, path: str | None) -> dict[str, Any]:
         """List directories at the given path for repository browsing."""
         target, error = self._validate_browse_path(path)
         if error is not None:
             return error
 
-        directories = []
-        for entry in safe_read_dir(target):
-            if entry.name.startswith("."):
-                continue
-            if not entry.is_dir():
-                continue
-            entry_path = target / entry.name
-            if not os.access(entry_path, os.R_OK):
-                continue
-            directories.append(
-                {
-                    "name": entry.name,
-                    "path": str(entry_path),
-                    "isGitRepo": (entry_path / ".git").exists(),
-                }
-            )
-
-        directories.sort(key=lambda item: item["name"])
+        directories = self._list_directories(target)
         truncated = len(directories) > _BROWSE_DIR_LIMIT
         if truncated:
             directories = directories[:_BROWSE_DIR_LIMIT]

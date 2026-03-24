@@ -181,14 +181,23 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
   return { startEvaluationJob, clearJob, cancelEvaluationJob };
 }
 
+function usePollingSetup(refs, setJob, setJobError, setLiveViolations) {
+  const startDimensionPolling = createDimensionPoller(refs.dimPollRef, refs.dimFailCountRef, refs.partialDimensionsRef, setLiveViolations);
+  const startPolling = createJobPoller(
+    { poll: refs.pollRef, dimPoll: refs.dimPollRef, requestedDimensions: refs.requestedDimensionsRef, partialDimensions: refs.partialDimensionsRef },
+    { setJob, setJobError },
+    startDimensionPolling,
+  );
+  useResumeRunning(setJob, startPolling, refs.pollRef, refs.dimPollRef);
+  return startPolling;
+}
+
 export function useEvaluation() {
   const [job, setJob] = useState(null);
   const [jobError, setJobError] = useState('');
   const [liveViolations, setLiveViolations] = useState({});
   const refs = useEvalRefs();
-  const startDimensionPolling = createDimensionPoller(refs.dimPollRef, refs.dimFailCountRef, refs.partialDimensionsRef, setLiveViolations);
-  const startPolling = createJobPoller({ poll: refs.pollRef, dimPoll: refs.dimPollRef, requestedDimensions: refs.requestedDimensionsRef, partialDimensions: refs.partialDimensionsRef }, { setJob, setJobError }, startDimensionPolling);
-  useResumeRunning(setJob, startPolling, refs.pollRef, refs.dimPollRef);
+  const startPolling = usePollingSetup(refs, setJob, setJobError, setLiveViolations);
   useEffect(() => { refs.liveViolationsRef.current = liveViolations; }, [liveViolations]);
 
   const { startEvaluationJob, clearJob, cancelEvaluationJob } = useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling);
