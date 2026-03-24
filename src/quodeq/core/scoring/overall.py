@@ -16,7 +16,7 @@ MODE_NUMERICAL = "numerical"
 _INSUFFICIENT_MAJORITY_RATIO = 0.5
 
 
-def _accumulate_weights(
+def accumulate_weights(
     principles_scores: dict[str, PrincipleScore], mode: str,
 ) -> tuple[int, float, int, int]:
     """Sum weighted values across scorable principles.
@@ -41,7 +41,7 @@ def _accumulate_weights(
     return total_weight, total_value, total_count, insufficient_count
 
 
-def _build_overall_result(mode: str, total_weight: int, total_value: float) -> OverallScore:
+def build_overall_result(mode: str, total_weight: int, total_value: float) -> OverallScore:
     """Build the overall result from aggregated weights."""
     if mode == MODE_NUMERICAL:
         mean_score = round(total_value / total_weight, 1)
@@ -55,16 +55,16 @@ def _build_overall_result(mode: str, total_weight: int, total_value: float) -> O
     return OverallScore(weighted_grade=GRADE_LADDER[ladder_pos], total_weight=total_weight)
 
 
-def _weighted_overall(principles_scores: dict[str, PrincipleScore], mode: str) -> OverallScore:
+def weighted_overall(principles_scores: dict[str, PrincipleScore], mode: str) -> OverallScore:
     """Compute a weighted overall score or grade from per-principle results."""
-    tw, tv, total, insuff = _accumulate_weights(principles_scores, mode)
+    tw, tv, total, insuff = accumulate_weights(principles_scores, mode)
 
     if tw == 0:
         if mode == MODE_NUMERICAL:
             return OverallScore(weighted_score=0.0, grade="Insufficient")
         return OverallScore(weighted_grade="Insufficient")
 
-    result = _build_overall_result(mode, tw, tv)
+    result = build_overall_result(mode, tw, tv)
 
     if total > 0 and insuff > total * _INSUFFICIENT_MAJORITY_RATIO:
         scored = total - insuff

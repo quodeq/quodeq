@@ -131,7 +131,8 @@ function RunHistoryTooltip({ active, hoveredIndex, data }) {
   );
 }
 
-function ScoreHistoryChart({ data, hoveredIndex, setHoveredIndex, selectedRunId, onBarClick, renderTrendLabel }) {
+function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
+  const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
   return (
     <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
       <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
@@ -209,8 +210,9 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
         <span className="run-history-title">Score History</span>
       </div>
       <ScoreHistoryChart
-        data={data} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex}
-        selectedRunId={selectedRunId} onBarClick={onBarClick} renderTrendLabel={renderTrendLabel}
+        data={data}
+        interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
+        renderTrendLabel={renderTrendLabel}
       />
     </section>
   );

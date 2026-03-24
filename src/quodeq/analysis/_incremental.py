@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -20,6 +21,14 @@ if TYPE_CHECKING:
 
 # Re-export for backward compatibility
 _extract_files_from_jsonl = extract_files_from_jsonl
+
+
+@dataclass
+class IncrementalCoverage:
+    """Groups coverage-related data for incremental finalization."""
+    files: list[str]
+    all_analyzed: set[str]
+    files_read: int
 
 
 def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisContext"]:
@@ -110,11 +119,12 @@ def _parse_evidence_from_jsonl(
 
 def _run_phase1_analysis(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
-    classification: object, evidence_dir: Path,
+    classification: object,
 ) -> Evidence | None:
     """Phase 1: analyze changed files or use cached findings only."""
     from quodeq.analysis.runner import _process_single_dimension
 
+    evidence_dir = config.work_dir or config.src
     if not classification.to_analyze:
         log_info(f"  [{dimension}] No changes detected — using cached findings only")
         jsonl_file = evidence_dir / f"{dimension}_evidence.jsonl"
@@ -144,17 +154,17 @@ _run_backfill_phase = run_backfill_phase
 
 def _finalize_incremental(
     config: RunConfig, dimension: str, ctx: _AnalysisContext,
-    files: list[str], all_analyzed: set[str], evidence_dir: Path,
-    files_read: int,
+    coverage: IncrementalCoverage,
 ) -> Evidence | None:
     """Re-parse JSONL, save fingerprint, and log coverage."""
-    all_analyzed &= set(files)
+    evidence_dir = config.work_dir or config.src
+    all_analyzed = coverage.all_analyzed & set(coverage.files)
     output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
-    ev = _parse_evidence_from_jsonl(config, dimension, ctx, output_jsonl, files_read)
-    new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
+    ev = _parse_evidence_from_jsonl(config, dimension, ctx, output_jsonl, coverage.files_read)
+    new_fp = build_fingerprint(config.src, coverage.files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
     save_fingerprint(new_fp, evidence_dir)
-    coverage_pct = len(all_analyzed) * 100 // len(files) if files else 100
-    log_info(f"  [{dimension}] Coverage: {len(all_analyzed)}/{len(files)} files ({coverage_pct}%)")
+    coverage_pct = len(all_analyzed) * 100 // len(coverage.files) if coverage.files else 100
+    log_info(f"  [{dimension}] Coverage: {len(all_analyzed)}/{len(coverage.files)} files ({coverage_pct}%)")
     return ev
 
 
@@ -203,7 +213,7 @@ def run_dimension_incremental(
     _maybe_carry_forward(prev_fp, prev_evidence_dir, classification, dimension, evidence_dir)
 
     # Phase 1: analyze changed files
-    ev = _run_phase1_analysis(config, dimension, idx, ctx, classification, evidence_dir)
+    ev = _run_phase1_analysis(config, dimension, idx, ctx, classification)
 
     # Phase 3: backfill
     prev_analyzed = set(prev_fp.get("analyzed_files", [])) if prev_fp else set()
@@ -217,8 +227,12 @@ def run_dimension_incremental(
     # Re-parse after all phases and save fingerprint
     all_analyzed = prev_analyzed | phase1_files | backfill_taken
     return _finalize_incremental(
-        config, dimension, ctx, files, all_analyzed, evidence_dir,
-        len(phase1_files) + len(backfill_taken) + len(classification.unchanged),
+        config, dimension, ctx,
+        IncrementalCoverage(
+            files=files,
+            all_analyzed=all_analyzed,
+            files_read=len(phase1_files) + len(backfill_taken) + len(classification.unchanged),
+        ),
     )
 
 

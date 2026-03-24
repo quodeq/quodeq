@@ -21,10 +21,12 @@ import { useEvaluationLifecycle } from './hooks/useEvaluationLifecycle.js';
 import { useProjectActions } from './hooks/useProjectActions.js';
 
 
-function EvaluateCase({ serverConnected, setServerConnected, job, jobError, liveViolations, selectedProject, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation }) {
+function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
+  const { connected, setConnected } = serverHealth;
+  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   return (
     <>
-      {!serverConnected && <ServerDisconnectedOverlay onReconnect={() => setServerConnected(true)} />}
+      {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
         context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
@@ -51,7 +53,8 @@ function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
   );
 }
 
-function MainContent({ activePage, evaluation, dashboard, navigation, settings, serverHealth }) {
+function MainContent({ activePage, evaluation, dashboard, navigation, appState }) {
+  const { settings, serverHealth } = appState;
   const { page, ...params } = activePage;
   switch (page) {
     case 'overview':
@@ -73,7 +76,7 @@ function MainContent({ activePage, evaluation, dashboard, navigation, settings, 
     case 'explorer':
       return <ExplorerPage project={navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={navigation.handleNavigate} />;
     case 'evaluate':
-      return <EvaluateCase serverConnected={serverHealth.connected} setServerConnected={serverHealth.setConnected} job={evaluation.job} jobError={evaluation.jobError} liveViolations={evaluation.liveViolations} selectedProject={navigation.selectedProject} analysisPower={evaluation.analysisPower} setAnalysisPower={evaluation.setAnalysisPower} handleStartEvaluation={evaluation.handleStartEvaluation} handleEvalDismiss={evaluation.handleEvalDismiss} cancelEvaluation={evaluation.cancelEvaluation} />;
+      return <EvaluateCase serverHealth={serverHealth} evaluation={evaluation} selectedProject={navigation.selectedProject} />;
     case 'file':
       return <FileDetailPage file={params.file} />;
     case 'principle':
@@ -84,7 +87,7 @@ function MainContent({ activePage, evaluation, dashboard, navigation, settings, 
     case 'settings':
       return <SettingsCase settings={settings.appSettings} analysisPower={evaluation.analysisPower} setAnalysisPower={evaluation.setAnalysisPower} />;
     case 'projects':
-      return <ProjectsPage projects={navigation.projects} selectedProject={navigation.selectedProject} onSelect={(id) => { navigation.handleProjectChange(id); navigation.navTab('overview'); }} onDelete={navigation.handleDeleteProject} onExport={navigation.handleExportProject} onRelocate={navigation.handleRelocateProject} />;
+      return <ProjectsPage projects={navigation.projects} selectedProject={navigation.selectedProject} actions={{ onSelect: (id) => { navigation.handleProjectChange(id); navigation.navTab('overview'); }, onDelete: navigation.handleDeleteProject, onExport: navigation.handleExportProject, onRelocate: navigation.handleRelocateProject }} />;
     default:
       return <div className="empty-state"><p>Page not found: {page}</p></div>;
   }
@@ -165,7 +168,7 @@ export default function App() {
       sidebar={<Sidebar activeTab={activeTab} onNavTab={navTab} />}
       header={showProjectHeader ? <AppProjectHeader selectedDisplayName={selectedDisplayName} selectedProjectParent={selectedProjectParent} selectedProjectParentId={selectedProjectParentId} headerMeta={headerMeta} handleProjectChange={handleProjectChange} showRunNav={showRunNav} runNavProps={{ currentOverviewRun, overviewRunIndex, availableRuns, onRunPrev: handleRunPrev, onRunNext: handleRunNext, onRunLatest: handleRunLatest, onViewRun: activePage.page === 'overview' ? handleRunView : undefined }} /> : null}
       breadcrumb={navStack.length > 1 ? <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} /> : null}
-      content={<MainContent activePage={activePage} evaluation={{ job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation }} dashboard={{ data: dashboard, accumulated, loading, error, availableRuns, overviewRunIndex }} navigation={{ selectedProject, selectedRun, projects, handleNavigate, handleRunSelect, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject }} settings={{ appSettings: settings }} serverHealth={{ connected: serverConnected, setConnected: setServerConnected }} />}
+      content={<MainContent activePage={activePage} evaluation={{ job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation }} dashboard={{ data: dashboard, accumulated, loading, error, availableRuns, overviewRunIndex }} navigation={{ selectedProject, selectedRun, projects, handleNavigate, handleRunSelect, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject }} appState={{ settings: { appSettings: settings }, serverHealth: { connected: serverConnected, setConnected: setServerConnected } }} />}
     />
   );
 }

@@ -3,12 +3,10 @@ import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 
-function DashboardContent({
-  runMode, dashboard, selectedRunId, accumulated, accumulatedDimensions,
-  availableRuns, overviewRunIndex, focusedDimension, setFocusedDimension,
-  focusedDimensionData, onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick,
-  onFileClick, onPrincipleClick,
-}) {
+function DashboardContent({ runMode, data, focus, callbacks }) {
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, overviewRunIndex } = data;
+  const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
+  const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onPrincipleClick } = callbacks;
   if (runMode) {
     return (
       <RunOverviewPanel
@@ -97,14 +95,10 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       {loading && <p className="loading" role="status" aria-live="polite">Loading dashboard...</p>}
       {!loading && dashboard && (
         <DashboardContent
-          runMode={runMode} dashboard={dashboard} selectedRunId={selectedRunId}
-          accumulated={accumulated} accumulatedDimensions={accumulatedDimensions}
-          availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
-          focusedDimension={focusedDimension} setFocusedDimension={setFocusedDimension}
-          focusedDimensionData={focusedDimensionData} onRunSelect={onRunSelect}
-          onDimensionCardClick={handlers.handleDimensionCardClick}
-          onAccumulatedDimensionClick={handlers.handleAccumulatedDimensionClick}
-          onFileClick={handlers.handleFileClick} onPrincipleClick={handlers.handlePrincipleClick}
+          runMode={runMode}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, overviewRunIndex }}
+          focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
+          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onPrincipleClick: handlers.handlePrincipleClick }}
         />
       )}
     </div>

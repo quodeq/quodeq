@@ -62,7 +62,10 @@ function LogoSvg({ leftCls, rightCls, needleWobble, handleLeft, handleRight }) {
   );
 }
 
-function LogoShell({ leftPress, setLeftPress, rightPress, setRightPress, leftCls, rightCls, needleWobble, handleLeft, handleRight }) {
+function LogoShell({ press, classes, needleWobble, handlers }) {
+  const { left: leftPress, setLeft: setLeftPress, right: rightPress, setRight: setRightPress } = press;
+  const { left: leftCls, right: rightCls } = classes;
+  const { left: handleLeft, right: handleRight } = handlers;
   return (
     <div className="sa-logo-shell">
       <button
@@ -166,10 +169,10 @@ export default function SettingsAside() {
     <div className="settings-aside" aria-hidden="true">
       <div className="sa-brand">
         <LogoShell
-          leftPress={c.leftPress} setLeftPress={c.setLeftPress}
-          rightPress={c.rightPress} setRightPress={c.setRightPress}
-          leftCls={c.leftCls} rightCls={c.rightCls}
-          needleWobble={c.needleWobble} handleLeft={c.handleLeft} handleRight={c.handleRight}
+          press={{ left: c.leftPress, setLeft: c.setLeftPress, right: c.rightPress, setRight: c.setRightPress }}
+          classes={{ left: c.leftCls, right: c.rightCls }}
+          needleWobble={c.needleWobble}
+          handlers={{ left: c.handleLeft, right: c.handleRight }}
         />
         <span className="sa-wordmark">quodeq</span>
         <p className="sa-phrase-wrap">

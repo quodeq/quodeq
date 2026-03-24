@@ -141,7 +141,8 @@ function ComplianceStats({ compliance, violations }) {
   );
 }
 
-function PrincipleHeader({ principle, score, grade, violations, compliance, sevCounts, onCopyPlan }) {
+function PrincipleHeader({ data, onCopyPlan }) {
+  const { principle, score, grade, violations, compliance, sevCounts } = data;
   return (
     <section className="panel file-detail-summary-panel">
       <div className="file-detail-stats-row">
@@ -210,8 +211,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
   return (
     <>
       <PrincipleHeader
-        principle={principle} score={score} grade={grade}
-        violations={violations} compliance={compliance} sevCounts={sevCounts}
+        data={{ principle, score, grade, violations, compliance, sevCounts }}
         onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
       />
       <PrincipleContext principleData={principleData} />

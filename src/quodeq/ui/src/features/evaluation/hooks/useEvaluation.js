@@ -69,10 +69,12 @@ function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef
   };
 }
 
-function createJobPoller(pollRef, dimPollRef, requestedDimensionsRef, partialDimensionsRef, setJob, setJobError, startDimensionPolling) {
+function createJobPoller(refs, setters, startDimensionPolling) {
+  const { poll: pollRef, dimPoll: dimPollRef, requestedDimensions: requestedDimensionsRef, partialDimensions: partialDimensionsRef } = refs;
+  const { setJob, setJobError } = setters;
   return function startPolling(jobId) {
     stopTimer(pollRef);
-    const refs = {
+    const localRefs = {
       requestedDimensions: requestedDimensionsRef.current,
       partialDimensions: partialDimensionsRef.current,
       dimPollingStarted: false,
@@ -84,7 +86,7 @@ function createJobPoller(pollRef, dimPollRef, requestedDimensionsRef, partialDim
     pollRef.current = setInterval(async () => {
       try {
         const updated = await getEvaluation(jobId);
-        handleJobUpdate(updated, refs, setJob, callbacks);
+        handleJobUpdate(updated, localRefs, setJob, callbacks);
       } catch (err) {
         setJob((prev) => prev ? { ...prev, status: 'lost' } : prev);
         setJobError(err.message);
@@ -140,7 +142,7 @@ export function useEvaluation() {
   const [liveViolations, setLiveViolations] = useState({});
   const refs = useEvalRefs();
   const startDimensionPolling = createDimensionPoller(refs.dimPollRef, refs.dimFailCountRef, refs.partialDimensionsRef, setLiveViolations);
-  const startPolling = createJobPoller(refs.pollRef, refs.dimPollRef, refs.requestedDimensionsRef, refs.partialDimensionsRef, setJob, setJobError, startDimensionPolling);
+  const startPolling = createJobPoller({ poll: refs.pollRef, dimPoll: refs.dimPollRef, requestedDimensions: refs.requestedDimensionsRef, partialDimensions: refs.partialDimensionsRef }, { setJob, setJobError }, startDimensionPolling);
   useResumeRunning(setJob, startPolling, refs.pollRef, refs.dimPollRef);
   useEffect(() => { refs.liveViolationsRef.current = liveViolations; }, [liveViolations]);
 

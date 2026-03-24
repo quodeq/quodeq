@@ -18,6 +18,17 @@ from quodeq.config.paths import default_paths
 _LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
 
 
+@dataclass(frozen=True)
+class ScoringInputs:
+    """Grouped scoring parameters to reduce _score_files parameter count."""
+    fan_in: dict[str, int]
+    fan_in_divisor: int
+    fan_in_max: int
+    git_scores: dict[str, float]
+    prev_violations: dict[str, int]
+    max_prev_violations: int
+
+
 @lru_cache(maxsize=1)
 def load_priority_config() -> dict:
     """Load file priority config. Cached after first call."""
@@ -247,19 +258,19 @@ def prioritize_files(
     git_scores = compute_git_scores(files, src)
     prev_violations = compute_previous_violations(config, evidence_dir, dimension) if evidence_dir and config else {}
 
-    scored = _score_files(
-        files, src, dimension, category,
-        fan_in, fan_in_divisor, fan_in_max,
-        git_scores, prev_violations, max_prev_violations,
+    inputs = ScoringInputs(
+        fan_in=fan_in, fan_in_divisor=fan_in_divisor, fan_in_max=fan_in_max,
+        git_scores=git_scores, prev_violations=prev_violations,
+        max_prev_violations=max_prev_violations,
     )
+    scored = _score_files(files, src, dimension, category, inputs)
     scored.sort(key=lambda x: (-x[0], x[1]))
     return [f for _, f in scored]
 
 
 def _score_files(
     files: list[str], src: Path, dimension: str | list[str], category: str | None,
-    fan_in: dict[str, int], fan_in_divisor: int, fan_in_max: int,
-    git_scores: dict[str, float], prev_violations: dict[str, int], max_prev_violations: int,
+    inputs: ScoringInputs,
 ) -> list[tuple[float, str]]:
     """Compute composite priority scores for each file."""
     scored: list[tuple[float, str]] = []
@@ -271,11 +282,11 @@ def _score_files(
         except OSError:
             pass
         dim_boost = compute_dimension_boost(f, dimension, file_size=file_size)
-        fi_raw = fan_in.get(f, 0)
-        fi_score = min(fan_in_max, fi_raw / fan_in_divisor) if fi_raw > 0 else 0
-        git_score = git_scores.get(f, 0)
-        pv_count = prev_violations.get(f, 0)
-        pv_score = min(max_prev_violations, pv_count)
+        fi_raw = inputs.fan_in.get(f, 0)
+        fi_score = min(inputs.fan_in_max, fi_raw / inputs.fan_in_divisor) if fi_raw > 0 else 0
+        git_score = inputs.git_scores.get(f, 0)
+        pv_count = inputs.prev_violations.get(f, 0)
+        pv_score = min(inputs.max_prev_violations, pv_count)
         total = base + dim_boost + fi_score + git_score + pv_score
         scored.append((total, f))
     return scored

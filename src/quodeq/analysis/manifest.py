@@ -168,7 +168,7 @@ class SourceManifest:
         }
 
 
-def _target_name(language: str, category: str | None) -> str:
+def target_name(language: str, category: str | None) -> str:
     """Build a filesystem-safe target name: '{language}_{category}' or bare '{language}'."""
     if category:
         return f"{language}_{category}"
@@ -205,7 +205,7 @@ def _build_targets_from_disciplines(
         topics = list(rule.suggested_topics) if rule.suggested_topics else []
         ext_counts = ext_counts_by_lang.get(lang, Counter())
         targets.append(AnalysisTarget(
-            name=_target_name(lang, rule.category),
+            name=target_name(lang, rule.category),
             language=lang,
             category=rule.category,
             frameworks=topics,
@@ -269,7 +269,7 @@ def build_manifest(
             continue
         lang_ext_counts = ext_counts_by_lang.get(lang, Counter())
         targets.append(AnalysisTarget(
-            name=_target_name(lang, None),
+            name=target_name(lang, None),
             language=lang,
             source_files=sorted(lang_files),
             total_files=len(lang_files),

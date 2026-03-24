@@ -206,7 +206,8 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   );
 }
 
-export default function ProjectsPage({ projects = [], selectedProject, onSelect, onDelete, onExport, onRelocate }) {
+export default function ProjectsPage({ projects = [], selectedProject, actions }) {
+  const { onSelect, onDelete, onExport, onRelocate } = actions;
   const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
   const [relocating, setRelocating] = useState(null);

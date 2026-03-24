@@ -23,7 +23,8 @@ function toggleInList(list, value) {
     : [...list, value];
 }
 
-function PrincipleFilter({ principleOptions, selectedPrinciples, setSelectedPrinciples }) {
+function PrincipleFilter({ principles }) {
+  const { options: principleOptions, selected: selectedPrinciples, setSelected: setSelectedPrinciples } = principles;
   if (principleOptions.length === 0) return null;
   return (
     <div className="dim-principles-filter">
@@ -45,7 +46,9 @@ function PrincipleFilter({ principleOptions, selectedPrinciples, setSelectedPrin
   );
 }
 
-function DimFilterControls({ selectedSeverities, setSelectedSeverities, fileFilter, setFileFilter, activeFilterCount, clearAllFilters, principleOptions, selectedPrinciples, setSelectedPrinciples }) {
+function DimFilterControls({ severity, file, principles, activeFilterCount, clearAllFilters }) {
+  const { selected: selectedSeverities, setSelected: setSelectedSeverities } = severity;
+  const { filter: fileFilter, setFilter: setFileFilter } = file;
   return (
     <div className="dim-filter-section">
       <div className="filter-row">
@@ -86,7 +89,7 @@ function DimFilterControls({ selectedSeverities, setSelectedSeverities, fileFilt
         )}
       </div>
 
-      <PrincipleFilter principleOptions={principleOptions} selectedPrinciples={selectedPrinciples} setSelectedPrinciples={setSelectedPrinciples} />
+      <PrincipleFilter principles={principles} />
     </div>
   );
 }
@@ -220,7 +223,7 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
       <DimCardHeader title={title} dimension={dimension} delta={delta} />
       <DimKpiGrid dimension={dimension} />
       {(dimension.violations?.length > 0 || dimension.principles?.length > 0) && (
-        <DimFilterControls selectedSeverities={selectedSeverities} setSelectedSeverities={setSelectedSeverities} fileFilter={fileFilter} setFileFilter={setFileFilter} activeFilterCount={activeFilterCount} clearAllFilters={clearAllFilters} principleOptions={principleOptions} selectedPrinciples={selectedPrinciples} setSelectedPrinciples={setSelectedPrinciples} />
+        <DimFilterControls severity={{ selected: selectedSeverities, setSelected: setSelectedSeverities }} file={{ filter: fileFilter, setFilter: setFileFilter }} principles={{ options: principleOptions, selected: selectedPrinciples, setSelected: setSelectedPrinciples }} activeFilterCount={activeFilterCount} clearAllFilters={clearAllFilters} />
       )}
       <DimPrinciplesList dimension={dimension} />
       {filteredViolations.length > 0 && (
