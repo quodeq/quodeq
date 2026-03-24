@@ -7,7 +7,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response, validate_evaluation_payload
+from quodeq.api.helpers import error_response, register_static_routes, validate_evaluation_payload
 from quodeq.api.zip import export_project_zip
 from quodeq.core.types import to_camel_dict
 from quodeq.provider.base import ActionProvider
@@ -293,4 +293,4 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(payload)
 
 
-from quodeq.api.helpers import register_static_routes as register_static_routes  # noqa: F401, E402
+__all__ = ["register_static_routes"]  # re-exported from quodeq.api.helpers

@@ -58,13 +58,9 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         self._project_cache: dict[str, Any] | None = None
         self._project_cache_time: float = 0
 
-    def list_projects(self, reports_dir: str) -> dict[str, Any]:
-        """Return all projects found under the reports directory (TTL-cached)."""
-        now = time.monotonic()
-        if self._project_cache is not None and (now - self._project_cache_time) < _PROJECT_CACHE_TTL_S:
-            return self._project_cache
-        reports_root = Path(reports_dir)
-        # Collect eligible entries first, then build in parallel (I/O-bound).
+    @staticmethod
+    def _build_project_list(reports_root: Path) -> list[ProjectEntry]:
+        """Collect eligible project dirs and build entries in parallel."""
         eligible: list[tuple[str, list]] = []
         max_listed = _max_projects_listed()
         for entry in safe_read_dir(reports_root):
@@ -83,7 +79,14 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 eligible,
             ))
         projects.sort(key=lambda p: p.name)
-        projects = _auto_detect_parents(projects)
+        return _auto_detect_parents(projects)
+
+    def list_projects(self, reports_dir: str) -> dict[str, Any]:
+        """Return all projects found under the reports directory (TTL-cached)."""
+        now = time.monotonic()
+        if self._project_cache is not None and (now - self._project_cache_time) < _PROJECT_CACHE_TTL_S:
+            return self._project_cache
+        projects = self._build_project_list(Path(reports_dir))
         result = {"projects": [to_camel_dict(p) for p in projects]}
         self._project_cache = result
         self._project_cache_time = now

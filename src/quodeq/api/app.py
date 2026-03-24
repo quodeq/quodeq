@@ -271,13 +271,14 @@ def _register_all_routes(
     register_static_routes(app, static_dist)
 
 
-def main() -> None:
+def main(env: dict[str, str] | None = None) -> None:
     """Start the Flask development server using environment configuration."""
     import signal
 
+    _env = env if env is not None else os.environ
     # SECURITY: API key read from environment. For hardened deployments,
     # consider a secrets manager or platform keychain instead.
-    app = create_app(static_dist=get_static_dist(), api_key=os.environ.get("QUODEQ_API_KEY"))
+    app = create_app(static_dist=get_static_dist(), api_key=_env.get("QUODEQ_API_KEY"))
 
     def _handle_shutdown(signum: int, frame: object) -> None:
         raise SystemExit(0)

@@ -41,108 +41,63 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions) {
 }
 
 // ---------------------------------------------------------------------------
-// Accumulated overview panel
-// Top-level panel component — prop count is intentional to avoid unnecessary
-// indirection; each prop maps directly to a distinct piece of state or callback.
+// Sub-components
 // ---------------------------------------------------------------------------
 
-export default function AccumulatedOverviewPanel({ data, callbacks }) {
-  const { accumulated, accumulatedDimensions, availableRuns, overviewRunIndex, trend, selectedRunId } = data;
-  const { onRunClick, onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
-
-  const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
-  const referenceRun = overviewRunIndex === 0 ? availableRuns[0]?.runId : currentOverviewRun;
-
-  const stats = useMemo(
-    () => computeAccumulatedStats(accumulated, accumulatedDimensions),
-    [accumulated, accumulatedDimensions]
+function StatBlock({ label, value, children }) {
+  return (
+    <div className="acc-eval-stat-block">
+      <span className="acc-eval-stat-label">{label}</span>
+      <span className="acc-eval-stat-value">{value}</span>
+      {children}
+    </div>
   );
+}
 
-  const accumulatedTopFiles = stats.topFiles;
-  const accumulatedViolationsByPrinciple = stats.violationsByPrinciple;
-  const accumulatedScoreDelta = stats.scoreDelta;
-  const accumulatedLastRun = stats.lastRun;
-  const accumulatedLastDate = accumulatedLastRun.date;
-  const accumulatedUniquePrinciples = stats.uniquePrinciples;
-  const dimensionsWithViolations = stats.dimsWithViolations;
-  const sortedDimensions = stats.sorted;
+function SeverityTags({ severity }) {
+  return (
+    <div className="acc-eval-tags">
+      {(severity?.critical || 0) > 0 && <span className="severity-tag critical">{severity.critical} critical</span>}
+      {(severity?.major || 0) > 0 && <span className="severity-tag major">{severity.major} major</span>}
+      {(severity?.minor || 0) > 0 && <span className="severity-tag minor">{severity.minor} minor</span>}
+    </div>
+  );
+}
 
+function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, topFilesCount, uniquePrinciples }) {
+  const summary = accumulated?.summary;
+  return (
+    <section className="acc-eval-panel panel">
+      <div className="acc-eval-top">
+        <span className="acc-eval-label">Accumulated Evaluation</span>
+        {lastDate && <span className="acc-eval-date">Last evaluated {lastDate}</span>}
+      </div>
+      <div className="acc-eval-hero">
+        <span className={`acc-eval-grade-chip chip ${scoreColorClass(summary?.numericAverage)}`}>
+          {summary?.overallGrade || '—'}</span>
+        <div className="acc-eval-score-row">
+          <span className="acc-eval-score">{summary?.numericAverage || '—'}</span>
+          <span className="acc-eval-score-denom">/10</span>
+        </div>
+        {scoreDelta !== null && <div className="acc-eval-trend"><TrendBadge delta={scoreDelta} showLabel={false} /></div>}
+      </div>
+      <div className="acc-eval-stats-grid">
+        <StatBlock label="Violations" value={summary?.totalViolations || 0}>
+          <SeverityTags severity={summary?.severity} />
+        </StatBlock>
+        <StatBlock label="Compliance" value={summary?.totalCompliance || 0} />
+        <StatBlock label="Ratio" value={complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)} />
+        <StatBlock label="Files Affected" value={topFilesCount} />
+        <StatBlock label="Principles" value={uniquePrinciples} />
+        <StatBlock label="Dimensions" value={summary?.dimensionCount || 0} />
+      </div>
+    </section>
+  );
+}
+
+function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimensionClick, dimensionsWithViolations }) {
   return (
     <>
-      {/* Accumulated summary hero */}
-      <section className="acc-eval-panel panel">
-        <div className="acc-eval-top">
-          <span className="acc-eval-label">Accumulated Evaluation</span>
-          {accumulatedLastDate && (
-            <span className="acc-eval-date">Last evaluated {accumulatedLastDate}</span>
-          )}
-        </div>
-
-        <div className="acc-eval-hero">
-          <span className={`acc-eval-grade-chip chip ${scoreColorClass(accumulated?.summary?.numericAverage)}`}>
-            {accumulated?.summary?.overallGrade || '—'}</span>
-          <div className="acc-eval-score-row">
-            <span className="acc-eval-score">{accumulated?.summary?.numericAverage || '—'}</span>
-            <span className="acc-eval-score-denom">/10</span>
-          </div>
-          {accumulatedScoreDelta !== null && (
-            <div className="acc-eval-trend">
-              <TrendBadge delta={accumulatedScoreDelta} showLabel={false} />
-            </div>
-          )}
-        </div>
-
-        <div className="acc-eval-stats-grid">
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Violations</span>
-            <span className="acc-eval-stat-value">{accumulated?.summary?.totalViolations || 0}</span>
-            <div className="acc-eval-tags">
-              {(accumulated?.summary?.severity?.critical || 0) > 0 && <span className="severity-tag critical">{accumulated.summary.severity.critical} critical</span>}
-              {(accumulated?.summary?.severity?.major || 0) > 0 && <span className="severity-tag major">{accumulated.summary.severity.major} major</span>}
-              {(accumulated?.summary?.severity?.minor || 0) > 0 && <span className="severity-tag minor">{accumulated.summary.severity.minor} minor</span>}
-            </div>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Compliance</span>
-            <span className="acc-eval-stat-value">{accumulated?.summary?.totalCompliance || 0}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Ratio</span>
-            <span className="acc-eval-stat-value">
-              {complianceRatio(accumulated?.summary?.totalViolations || 0, accumulated?.summary?.totalCompliance || 0)}
-            </span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Files Affected</span>
-            <span className="acc-eval-stat-value">{accumulatedTopFiles.length}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Principles</span>
-            <span className="acc-eval-stat-value">{accumulatedUniquePrinciples}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Dimensions</span>
-            <span className="acc-eval-stat-value">{accumulated?.summary?.dimensionCount || 0}</span>
-          </div>
-        </div>
-      </section>
-
-      <div className="history-panels-row">
-        <RunHistoryPanel
-          trend={trend}
-          selectedRunId={selectedRunId}
-          selectedRunScore={accumulated?.summary?.numericAverage}
-          onBarClick={onRunClick}
-        />
-        <DimensionScorePanel
-          dimensions={accumulatedDimensions}
-          onBarClick={onDimensionClick}
-          runDate={accumulatedLastDate}
-          runId={accumulatedLastRun.runId}
-        />
-      </div>
-
-      {/* Quality dimension cards */}
       <div className="dimensions-header">
         <h3 className="dimensions-title">Quality Dimensions</h3>
       </div>
@@ -150,7 +105,6 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         <DimensionCardsGrid sortedDimensions={sortedDimensions} referenceRun={referenceRun} onDimensionClick={onDimensionClick} />
       </div>
 
-      {/* Violations by dimension */}
       {dimensionsWithViolations.length > 0 && (
         <>
           <div className="section-header">
@@ -172,42 +126,89 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
           </section>
         </>
       )}
+    </>
+  );
+}
 
-      {/* Violations by file */}
-      {accumulatedTopFiles.length > 0 && (
+function AccumulatedDetailsSection({ topFiles, violationsByPrinciple, uniquePrinciples, onFileClick, onPrincipleClick }) {
+  return (
+    <>
+      {topFiles.length > 0 && (
         <>
           <div className="section-header">
             <h3 className="section-title">Violations by File</h3>
-            <span className="section-count">{accumulatedTopFiles.length} files</span>
+            <span className="section-count">{topFiles.length} files</span>
           </div>
           <section className="panel wide-panel offending-panel">
             <div className="trend-table-wrap">
-              <TopOffendingFilesTable
-                files={accumulatedTopFiles}
-                onFileClick={onFileClick}
-              />
+              <TopOffendingFilesTable files={topFiles} onFileClick={onFileClick} />
             </div>
           </section>
         </>
       )}
 
-      {/* Violations by principle */}
-      {accumulatedViolationsByPrinciple.length > 0 && (
+      {violationsByPrinciple.length > 0 && (
         <>
           <div className="section-header">
             <h3 className="section-title">Violations by Principle</h3>
-            <span className="section-count">{accumulatedUniquePrinciples} principles</span>
+            <span className="section-count">{uniquePrinciples} principles</span>
           </div>
           <section className="panel wide-panel offending-panel">
             <div className="trend-table-wrap">
-              <ViolationsByPrincipleTable
-                violations={accumulatedViolationsByPrinciple}
-                onPrincipleClick={onPrincipleClick}
-              />
+              <ViolationsByPrincipleTable violations={violationsByPrinciple} onPrincipleClick={onPrincipleClick} />
             </div>
           </section>
         </>
       )}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Accumulated overview panel
+// ---------------------------------------------------------------------------
+
+export default function AccumulatedOverviewPanel({ data, callbacks }) {
+  const { accumulated, accumulatedDimensions, availableRuns, overviewRunIndex, trend, selectedRunId } = data;
+  const { onRunClick, onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
+
+  const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
+  const referenceRun = overviewRunIndex === 0 ? availableRuns[0]?.runId : currentOverviewRun;
+
+  const stats = useMemo(
+    () => computeAccumulatedStats(accumulated, accumulatedDimensions),
+    [accumulated, accumulatedDimensions]
+  );
+
+  return (
+    <>
+      <AccumulatedHeroSection
+        accumulated={accumulated}
+        scoreDelta={stats.scoreDelta}
+        lastDate={stats.lastRun.date}
+        topFilesCount={stats.topFiles.length}
+        uniquePrinciples={stats.uniquePrinciples}
+      />
+
+      <div className="history-panels-row">
+        <RunHistoryPanel trend={trend} selectedRunId={selectedRunId} selectedRunScore={accumulated?.summary?.numericAverage} onBarClick={onRunClick} />
+        <DimensionScorePanel dimensions={accumulatedDimensions} onBarClick={onDimensionClick} runDate={stats.lastRun.date} runId={stats.lastRun.runId} />
+      </div>
+
+      <AccumulatedDimensionsSection
+        sortedDimensions={stats.sorted}
+        referenceRun={referenceRun}
+        onDimensionClick={onDimensionClick}
+        dimensionsWithViolations={stats.dimsWithViolations}
+      />
+
+      <AccumulatedDetailsSection
+        topFiles={stats.topFiles}
+        violationsByPrinciple={stats.violationsByPrinciple}
+        uniquePrinciples={stats.uniquePrinciples}
+        onFileClick={onFileClick}
+        onPrincipleClick={onPrincipleClick}
+      />
     </>
   );
 }

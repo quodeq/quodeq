@@ -39,6 +39,41 @@ function EvaluateHelpSection() {
   );
 }
 
+function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange }) {
+  return (
+    <header className="evaluate-header">
+      <div className="evaluate-header-content">
+        <div className={`evaluate-icon${isRunning ? ' running' : ''}`}>
+          <div className="eval-icon-static">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="16.5" y1="16.5" x2="21" y2="21" />
+              <line x1="8" y1="11" x2="14" y2="11" />
+              <line x1="11" y1="8" x2="11" y2="14" />
+            </svg>
+          </div>
+          <div className="eval-icon-animated">
+            <span className="eval-file-chip" style={{animationDelay: '0s'}} />
+            <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_1}} />
+            <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_2}} />
+            <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" />
+              <line x1="16.5" y1="16.5" x2="21" y2="21" />
+              <line x1="8" y1="11" x2="14" y2="11" />
+              <line x1="11" y1="8" x2="11" y2="14" />
+            </svg>
+          </div>
+        </div>
+        <div>
+          <h1>Evaluate Repository</h1>
+          <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
+        </div>
+      </div>
+      <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} />
+    </header>
+  );
+}
+
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, analysisPower, onAnalysisPowerChange } = context;
@@ -46,46 +81,11 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
   return (
     <section className="evaluate-screen">
-      <header className="evaluate-header">
-        <div className="evaluate-header-content">
-          <div className={`evaluate-icon${job?.status === 'running' ? ' running' : ''}`}>
-            {/* Static layer — visible when idle */}
-            <div className="eval-icon-static">
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <line x1="16.5" y1="16.5" x2="21" y2="21" />
-                <line x1="8" y1="11" x2="14" y2="11" />
-                <line x1="11" y1="8" x2="11" y2="14" />
-              </svg>
-            </div>
-            {/* Animated layer — visible when running */}
-            <div className="eval-icon-animated">
-              <span className="eval-file-chip" style={{animationDelay: '0s'}} />
-              <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_1}} />
-              <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_2}} />
-              <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                <circle cx="11" cy="11" r="7" />
-                <line x1="16.5" y1="16.5" x2="21" y2="21" />
-                <line x1="8" y1="11" x2="14" y2="11" />
-                <line x1="11" y1="8" x2="11" y2="14" />
-              </svg>
-            </div>
-          </div>
-          <div>
-            <h1>Evaluate Repository</h1>
-            <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
-          </div>
-        </div>
-        <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} />
-      </header>
+      <EvaluateHeader isRunning={job?.status === 'running'} analysisPower={analysisPower} onAnalysisPowerChange={onAnalysisPowerChange} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard
-            project={selectedProject}
-            onStart={onStartEvaluation}
-            disabled={false}
-          />
+          <ReEvaluateCard project={selectedProject} onStart={onStartEvaluation} disabled={false} />
         )}
 
         {!job && (

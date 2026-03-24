@@ -269,8 +269,11 @@ def _start_action_api(
     )
 
 
-def run_dashboard(config: DashboardConfig) -> int:
-    """Start the dashboard: resolve paths, launch the action API, and serve until exit."""
+def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) -> int:
+    """Start the dashboard: resolve paths, launch the action API, and serve until exit.
+
+    *env* overrides ``os.environ`` when provided (useful for testing).
+    """
     config = _resolve_paths_and_build(config)
     validate_paths(config)
 

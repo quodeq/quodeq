@@ -5,10 +5,11 @@ const AI_CMD_STORAGE_KEY = 'cc-ai-cmd';
 
 export { AI_MODEL_STORAGE_KEY, AI_CMD_STORAGE_KEY };
 
-export default function ModelSection({ aiCmd, onApplyAiCmd, aiModel, onAiModelChange, modelFast, onModelFastChange, modelBalanced, onModelBalancedChange, modelThorough, onModelThoroughChange, availableClients }) {
+function ClientSelector({ aiCmd, availableClients }) {
+  const { value, onApply } = aiCmd;
   return (
     <>
-      <div className={`settings-row${!aiCmd ? ' settings-row--last' : ''}`}>
+      <div className={`settings-row${!value ? ' settings-row--last' : ''}`}>
         <div className="settings-row-label">
           <span className="settings-label">Client</span>
           <span className="settings-description">CLI tool used to run the analysis</span>
@@ -21,8 +22,8 @@ export default function ModelSection({ aiCmd, onApplyAiCmd, aiModel, onAiModelCh
               <button
                 key={id}
                 type="button"
-                className={`theme-toggle-btn${aiCmd === id ? ' active' : ''}`}
-                onClick={() => onApplyAiCmd(id)}
+                className={`theme-toggle-btn${value === id ? ' active' : ''}`}
+                onClick={() => onApply(id)}
               >
                 {label}
               </button>
@@ -46,67 +47,84 @@ export default function ModelSection({ aiCmd, onApplyAiCmd, aiModel, onAiModelCh
           </div>
         </div>
       )}
-      {aiCmd && (
-        <div className="settings-row">
-          <div className="settings-row-label">
-            <span className="settings-label">Model</span>
-            <span className="settings-description">
-              Override the default model for all operations. Leave blank to use your client's default.
-            </span>
-          </div>
-          <input
-            type="text"
-            className="settings-model-input"
-            value={aiModel}
-            placeholder="default"
-            onChange={(e) => {
-              const v = e.target.value;
-              onAiModelChange(v);
-              if (v) {
-                localStorage.setItem(AI_MODEL_STORAGE_KEY, v);
-              } else {
-                localStorage.removeItem(AI_MODEL_STORAGE_KEY);
-              }
-            }}
-          />
+    </>
+  );
+}
+
+function ModelOverrideInput({ label, value, setter, level, placeholder }) {
+  return (
+    <div className="settings-model-field">
+      <label className="settings-model-label">{label}</label>
+      <input
+        type="text"
+        className="settings-model-input"
+        value={value}
+        placeholder={placeholder}
+        onChange={(e) => {
+          const v = e.target.value;
+          setter(v);
+          if (v) {
+            localStorage.setItem(`${MODEL_STORAGE_PREFIX}${level}`, v);
+          } else {
+            localStorage.removeItem(`${MODEL_STORAGE_PREFIX}${level}`);
+          }
+        }}
+      />
+    </div>
+  );
+}
+
+function ModelSettings({ aiCmd, models }) {
+  const { value: aiCmdValue } = aiCmd;
+  const { aiModel, onAiModelChange, fast, onFastChange, balanced, onBalancedChange, thorough, onThoroughChange } = models;
+  if (!aiCmdValue) return null;
+  return (
+    <>
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <span className="settings-label">Model</span>
+          <span className="settings-description">
+            Override the default model for all operations. Leave blank to use your client's default.
+          </span>
         </div>
-      )}
-      {aiCmd && (
-        <div className="settings-row">
-          <div className="settings-row-label">
-            <span className="settings-label">Analysis models</span>
-            <span className="settings-description">
-              Override the AI model used by subagents during code evaluation. Leave blank to use the defaults.
-            </span>
-          </div>
-          <div className="settings-model-overrides">
-          {[
-            { label: 'Fast', value: modelFast, setter: onModelFastChange, level: 1, placeholder: DEFAULT_MODELS[1] },
-            { label: 'Balanced', value: modelBalanced, setter: onModelBalancedChange, level: 2, placeholder: DEFAULT_MODELS[2] },
-            { label: 'Thorough', value: modelThorough, setter: onModelThoroughChange, level: 3, placeholder: DEFAULT_MODELS[3] },
-          ].map(({ label, value, setter, level, placeholder }) => (
-            <div key={level} className="settings-model-field">
-              <label className="settings-model-label">{label}</label>
-              <input
-                type="text"
-                className="settings-model-input"
-                value={value}
-                placeholder={placeholder}
-                onChange={(e) => {
-                  const v = e.target.value;
-                  setter(v);
-                  if (v) {
-                    localStorage.setItem(`${MODEL_STORAGE_PREFIX}${level}`, v);
-                  } else {
-                    localStorage.removeItem(`${MODEL_STORAGE_PREFIX}${level}`);
-                  }
-                }}
-              />
-            </div>
-          ))}
-          </div>
+        <input
+          type="text"
+          className="settings-model-input"
+          value={aiModel}
+          placeholder="default"
+          onChange={(e) => {
+            const v = e.target.value;
+            onAiModelChange(v);
+            if (v) {
+              localStorage.setItem(AI_MODEL_STORAGE_KEY, v);
+            } else {
+              localStorage.removeItem(AI_MODEL_STORAGE_KEY);
+            }
+          }}
+        />
+      </div>
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <span className="settings-label">Analysis models</span>
+          <span className="settings-description">
+            Override the AI model used by subagents during code evaluation. Leave blank to use the defaults.
+          </span>
         </div>
-      )}
+        <div className="settings-model-overrides">
+          <ModelOverrideInput label="Fast" value={fast} setter={onFastChange} level={1} placeholder={DEFAULT_MODELS[1]} />
+          <ModelOverrideInput label="Balanced" value={balanced} setter={onBalancedChange} level={2} placeholder={DEFAULT_MODELS[2]} />
+          <ModelOverrideInput label="Thorough" value={thorough} setter={onThoroughChange} level={3} placeholder={DEFAULT_MODELS[3]} />
+        </div>
+      </div>
+    </>
+  );
+}
+
+export default function ModelSection({ aiCmd, models, availableClients }) {
+  return (
+    <>
+      <ClientSelector aiCmd={aiCmd} availableClients={availableClients} />
+      <ModelSettings aiCmd={aiCmd} models={models} />
     </>
   );
 }

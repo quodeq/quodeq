@@ -60,7 +60,60 @@ function ThemeSection({ themePreference, onApplyTheme }) {
   );
 }
 
-function AnalysisSection({ analysisPower, onAnalysisPowerChange, maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes }) {
+function SubagentsRow({ subagents }) {
+  const { max, setMax } = subagents;
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">Max parallel agents</span>
+        <span className="settings-description">
+          Maximum number of subagents to run in parallel during evaluation (1–10). Higher values speed up analysis but use more resources.
+        </span>
+      </div>
+      <input
+        type="number"
+        className="settings-model-input"
+        min={MIN_SUBAGENTS}
+        max={MAX_SUBAGENTS}
+        value={max}
+        onChange={(e) => {
+          const v = Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || DEFAULT_MAX_SUBAGENTS));
+          setMax(v);
+          localStorage.setItem(SUBAGENTS_STORAGE_KEY, String(v));
+        }}
+      />
+    </div>
+  );
+}
+
+function PoolBudgetRow({ subagents }) {
+  const { poolBudgetMinutes, setPoolBudgetMinutes } = subagents;
+  return (
+    <div className="settings-row settings-row--last">
+      <div className="settings-row-label">
+        <span className="settings-label">Analysis time limit</span>
+        <span className="settings-description">
+          Maximum time allowed for the analysis pool to run (1–60 minutes). Evaluations exceeding this limit will stop early.
+        </span>
+      </div>
+      <input
+        type="number"
+        className="settings-model-input"
+        min={MIN_POOL_BUDGET_MINS}
+        max={MAX_POOL_BUDGET_MINS}
+        value={poolBudgetMinutes}
+        onChange={(e) => {
+          const v = Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parseInt(e.target.value, 10) || DEFAULT_POOL_BUDGET_MINS));
+          setPoolBudgetMinutes(v);
+          localStorage.setItem(POOL_BUDGET_STORAGE_KEY, String(v * 60));
+        }}
+      />
+    </div>
+  );
+}
+
+function AnalysisSection({ analysis, subagents }) {
+  const { power, onChange } = analysis;
   return (
     <>
       <div className="settings-row">
@@ -70,48 +123,10 @@ function AnalysisSection({ analysisPower, onAnalysisPowerChange, maxSubagents, s
             Controls the AI model used for analysis. Higher power gives more thorough results but takes longer.
           </span>
         </div>
-        <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} />
+        <PowerSelector value={power} onChange={onChange} />
       </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Max parallel agents</span>
-          <span className="settings-description">
-            Maximum number of subagents to run in parallel during evaluation (1–10). Higher values speed up analysis but use more resources.
-          </span>
-        </div>
-        <input
-          type="number"
-          className="settings-model-input"
-          min={MIN_SUBAGENTS}
-          max={MAX_SUBAGENTS}
-          value={maxSubagents}
-          onChange={(e) => {
-            const v = Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || DEFAULT_MAX_SUBAGENTS));
-            setMaxSubagents(v);
-            localStorage.setItem(SUBAGENTS_STORAGE_KEY, String(v));
-          }}
-        />
-      </div>
-      <div className="settings-row settings-row--last">
-        <div className="settings-row-label">
-          <span className="settings-label">Analysis time limit</span>
-          <span className="settings-description">
-            Maximum time allowed for the analysis pool to run (1–60 minutes). Evaluations exceeding this limit will stop early.
-          </span>
-        </div>
-        <input
-          type="number"
-          className="settings-model-input"
-          min={MIN_POOL_BUDGET_MINS}
-          max={MAX_POOL_BUDGET_MINS}
-          value={poolBudgetMinutes}
-          onChange={(e) => {
-            const v = Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parseInt(e.target.value, 10) || DEFAULT_POOL_BUDGET_MINS));
-            setPoolBudgetMinutes(v);
-            localStorage.setItem(POOL_BUDGET_STORAGE_KEY, String(v * 60));
-          }}
-        />
-      </div>
+      <SubagentsRow subagents={subagents} />
+      <PoolBudgetRow subagents={subagents} />
     </>
   );
 }
@@ -141,17 +156,26 @@ function VerificationSection({ verifyFindings, onApplyVerifyFindings }) {
   );
 }
 
-export default function SettingsPage({ theme, models, analysis, verification }) {
-  const { preference: themePreference, onApply: onApplyTheme } = theme;
-  const {
-    aiCmd, onApplyAiCmd, aiModel, onAiModelChange,
-    fast: modelFast, onFastChange: onModelFastChange,
-    balanced: modelBalanced, onBalancedChange: onModelBalancedChange,
-    thorough: modelThorough, onThoroughChange: onModelThoroughChange,
-  } = models;
-  const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
-  const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
+function SettingsHeader() {
+  return (
+    <div className="settings-header">
+      <div className="settings-header-content">
+        <div className="settings-page-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="12" cy="12" r="3" />
+            <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
+          </svg>
+        </div>
+        <div>
+          <h1 className="settings-title">Settings</h1>
+          <p className="settings-subtitle">Manage your Quodeq preferences</p>
+        </div>
+      </div>
+    </div>
+  );
+}
 
+function useSettingsState(aiCmd, onApplyAiCmd) {
   const [maxSubagents, setMaxSubagents] = useState(() => parseInt(localStorage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10));
   const [poolBudgetMinutes, setPoolBudgetMinutes] = useState(() => Math.round(parseInt(localStorage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10) / 60));
   const [availableClients, setAvailableClients] = useState(null);
@@ -182,23 +206,19 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
       .catch(() => setAvailableClients([]));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
+  return { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase };
+}
+
+export default function SettingsPage({ theme, models, analysis, verification }) {
+  const { preference: themePreference, onApply: onApplyTheme } = theme;
+  const { aiCmd, onApplyAiCmd } = models;
+  const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
+  const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
+  const { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase } = useSettingsState(aiCmd, onApplyAiCmd);
+
   return (
     <div className="settings-page">
-      <div className="settings-header">
-        <div className="settings-header-content">
-          <div className="settings-page-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="settings-title">Settings</h1>
-            <p className="settings-subtitle">Manage your Quodeq preferences</p>
-          </div>
-        </div>
-      </div>
-
+      <SettingsHeader />
       <div className="settings-layout">
       <div className="settings-body">
         <ThemeSection themePreference={themePreference} onApplyTheme={onApplyTheme} />
@@ -209,17 +229,18 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
             <p className="settings-section-description">Configure the AI client used when running evaluations</p>
           </div>
           <ModelSection
-            aiCmd={aiCmd} onApplyAiCmd={onApplyAiCmd}
-            aiModel={aiModel} onAiModelChange={onAiModelChange}
-            modelFast={modelFast} onModelFastChange={onModelFastChange}
-            modelBalanced={modelBalanced} onModelBalancedChange={onModelBalancedChange}
-            modelThorough={modelThorough} onModelThoroughChange={onModelThoroughChange}
+            aiCmd={{ value: aiCmd, onApply: onApplyAiCmd }}
+            models={{
+              aiModel: models.aiModel, onAiModelChange: models.onAiModelChange,
+              fast: models.fast, onFastChange: models.onFastChange,
+              balanced: models.balanced, onBalancedChange: models.onBalancedChange,
+              thorough: models.thorough, onThoroughChange: models.onThoroughChange,
+            }}
             availableClients={availableClients}
           />
           <AnalysisSection
-            analysisPower={analysisPower} onAnalysisPowerChange={onAnalysisPowerChange}
-            maxSubagents={maxSubagents} setMaxSubagents={setMaxSubagents}
-            poolBudgetMinutes={poolBudgetMinutes} setPoolBudgetMinutes={setPoolBudgetMinutes}
+            analysis={{ power: analysisPower, onChange: onAnalysisPowerChange }}
+            subagents={{ max: maxSubagents, setMax: setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes }}
           />
           <VerificationSection verifyFindings={verifyFindings} onApplyVerifyFindings={onApplyVerifyFindings} />
         </section>
