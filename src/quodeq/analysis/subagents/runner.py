@@ -183,7 +183,10 @@ def _run_verification_pool(
         dimension=dim_id,
     )
 
-    n_agents = min(_VERIFY_N_AGENTS, len(files_to_verify))
+    n_agents = min(
+        _VERIFY_N_AGENTS,
+        (len(files_to_verify) + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
+    )
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
         options=PoolOptions(
