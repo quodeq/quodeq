@@ -1,6 +1,7 @@
 """Helper functions for the macOS menu bar app — command discovery and health checks."""
 from __future__ import annotations
 
+import functools
 import json
 import os
 import subprocess
@@ -21,9 +22,6 @@ def _homebrew_bin_dirs() -> str:
     elif arch == "x86_64":
         return _HOMEBREW_X86
     return f"{_HOMEBREW_ARM64}:{_HOMEBREW_X86}"
-
-_cached_commands: dict[str, str | None] | None = None
-
 
 def source_user_path() -> None:
     """Load the user's shell PATH since .app bundles don't inherit it."""
@@ -51,11 +49,9 @@ def find_icon(name: str) -> str | None:
     return None
 
 
+@functools.lru_cache(maxsize=1)
 def find_commands() -> dict[str, str | None]:
     """Check which required commands are available (cached after first call)."""
-    global _cached_commands
-    if _cached_commands is not None:
-        return _cached_commands
     cmds = {}
     for name in ("python3", "node", "claude", "quodeq"):
         try:
@@ -65,7 +61,6 @@ def find_commands() -> dict[str, str | None]:
             cmds[name] = result.stdout.strip() if result.returncode == 0 else None
         except (subprocess.TimeoutExpired, OSError):
             cmds[name] = None
-    _cached_commands = cmds
     return cmds
 
 
