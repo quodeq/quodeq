@@ -11,6 +11,36 @@ import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 
 // ---------------------------------------------------------------------------
+// Accumulated overview panel helpers
+// ---------------------------------------------------------------------------
+
+function computeAccumulatedStats(accumulated, accumulatedDimensions) {
+  const topFiles = withDimensionsStr(buildTopOffendingFiles(accumulatedDimensions));
+
+  const violationsByPrinciple = accumulatedDimensions.flatMap((d) =>
+    (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
+  );
+
+  const curr = parseFloat(accumulated?.summary?.numericAverage);
+  const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
+  const scoreDelta = (isNaN(curr) || isNaN(prev)) ? null : (curr - prev).toFixed(1);
+
+  const withDates = accumulatedDimensions
+    .filter((d) => d.fromRunId)
+    .map((d) => ({ runId: d.fromRunId, dateISO: d.fromDateISO, dateLabel: d.fromDateLabel }));
+  withDates.sort((a, b) => (b.dateISO || '').localeCompare(a.dateISO || ''));
+  const lastRun = withDates.length === 0
+    ? { date: null, runId: null }
+    : { date: withDates[0].dateLabel || formatRunId(withDates[0].runId), runId: withDates[0].runId };
+
+  const uniquePrinciples = new Set(violationsByPrinciple.map((v) => v.principle).filter(Boolean)).size;
+  const dimsWithViolations = sortDimensionsByViolationSeverity(accumulatedDimensions);
+  const sorted = [...accumulatedDimensions].sort((a, b) => a.dimension.localeCompare(b.dimension));
+
+  return { topFiles, violationsByPrinciple, scoreDelta, lastRun, uniquePrinciples, dimsWithViolations, sorted };
+}
+
+// ---------------------------------------------------------------------------
 // Accumulated overview panel
 // Top-level panel component — prop count is intentional to avoid unnecessary
 // indirection; each prop maps directly to a distinct piece of state or callback.
@@ -23,54 +53,19 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? availableRuns[0]?.runId : currentOverviewRun;
 
-  const accumulatedTopFiles = useMemo(
-    () => withDimensionsStr(buildTopOffendingFiles(accumulatedDimensions)),
-    [accumulatedDimensions]
+  const stats = useMemo(
+    () => computeAccumulatedStats(accumulated, accumulatedDimensions),
+    [accumulated, accumulatedDimensions]
   );
 
-  const accumulatedViolationsByPrinciple = useMemo(
-    () =>
-      accumulatedDimensions.flatMap((d) =>
-        (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
-      ),
-    [accumulatedDimensions]
-  );
-
-  const accumulatedScoreDelta = useMemo(() => {
-    const curr = parseFloat(accumulated?.summary?.numericAverage);
-    const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
-    if (isNaN(curr) || isNaN(prev)) return null;
-    return (curr - prev).toFixed(1);
-  }, [accumulated]);
-
-  const accumulatedLastRun = useMemo(() => {
-    // Find the most recent date using fromDateISO (already in API response)
-    const withDates = accumulatedDimensions
-      .filter((d) => d.fromRunId)
-      .map((d) => ({ runId: d.fromRunId, dateISO: d.fromDateISO, dateLabel: d.fromDateLabel }));
-    if (withDates.length === 0) return { date: null, runId: null };
-    withDates.sort((a, b) => (b.dateISO || '').localeCompare(a.dateISO || ''));
-    return {
-      date: withDates[0].dateLabel || formatRunId(withDates[0].runId),
-      runId: withDates[0].runId,
-    };
-  }, [accumulatedDimensions]);
+  const accumulatedTopFiles = stats.topFiles;
+  const accumulatedViolationsByPrinciple = stats.violationsByPrinciple;
+  const accumulatedScoreDelta = stats.scoreDelta;
+  const accumulatedLastRun = stats.lastRun;
   const accumulatedLastDate = accumulatedLastRun.date;
-
-  const accumulatedUniquePrinciples = useMemo(
-    () => new Set(accumulatedViolationsByPrinciple.map((v) => v.principle).filter(Boolean)).size,
-    [accumulatedViolationsByPrinciple]
-  );
-
-  const dimensionsWithViolations = useMemo(
-    () => sortDimensionsByViolationSeverity(accumulatedDimensions),
-    [accumulatedDimensions]
-  );
-
-  const sortedDimensions = useMemo(
-    () => [...accumulatedDimensions].sort((a, b) => a.dimension.localeCompare(b.dimension)),
-    [accumulatedDimensions]
-  );
+  const accumulatedUniquePrinciples = stats.uniquePrinciples;
+  const dimensionsWithViolations = stats.dimsWithViolations;
+  const sortedDimensions = stats.sorted;
 
   return (
     <>

@@ -80,6 +80,32 @@ def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
     return surviving, gone
 
 
+def _classify_findings(
+    findings: list[dict], prev_hashes: dict, src: Path,
+) -> tuple[list[dict], list[dict]]:
+    """Classify findings into carry-forward vs needs-verification by file hash."""
+    from quodeq.analysis.fingerprint import _hash_file
+    file_unchanged: dict[str, bool] = {}
+    carry_forward: list[dict] = []
+    needs_verification: list[dict] = []
+    for finding in findings:
+        rel_path = finding.get("file", "")
+        if not rel_path:
+            needs_verification.append(finding)
+            continue
+        if rel_path not in file_unchanged:
+            prev_hash = prev_hashes.get(rel_path)
+            if prev_hash is None:
+                file_unchanged[rel_path] = False
+            else:
+                file_unchanged[rel_path] = _hash_file(src / rel_path) == prev_hash
+        if file_unchanged[rel_path]:
+            carry_forward.append(finding)
+        else:
+            needs_verification.append(finding)
+    return carry_forward, needs_verification
+
+
 def partition_findings_by_fingerprint(
     findings: list[dict],
     prev_fingerprint: dict | None,
@@ -96,7 +122,7 @@ def partition_findings_by_fingerprint(
     If standards changed since the previous run, all findings need verification
     regardless of file hashes (findings were evaluated under different criteria).
     """
-    from quodeq.analysis.fingerprint import _hash_file, _hash_standards
+    from quodeq.analysis.fingerprint import _hash_standards
 
     if not prev_fingerprint or not findings:
         return [], list(findings)
@@ -108,35 +134,7 @@ def partition_findings_by_fingerprint(
         if prev_std is not None and current_std != prev_std:
             return [], list(findings)
 
-    prev_hashes = prev_fingerprint.get("file_hashes", {})
-
-    # Cache per-file decision to avoid re-hashing the same file
-    file_unchanged: dict[str, bool] = {}
-
-    carry_forward: list[dict] = []
-    needs_verification: list[dict] = []
-
-    for finding in findings:
-        rel_path = finding.get("file", "")
-        if not rel_path:
-            needs_verification.append(finding)
-            continue
-
-        if rel_path not in file_unchanged:
-            prev_hash = prev_hashes.get(rel_path)
-            if prev_hash is None:
-                # File not in previous fingerprint (new file)
-                file_unchanged[rel_path] = False
-            else:
-                current_hash = _hash_file(src / rel_path)
-                file_unchanged[rel_path] = current_hash == prev_hash
-
-        if file_unchanged[rel_path]:
-            carry_forward.append(finding)
-        else:
-            needs_verification.append(finding)
-
-    return carry_forward, needs_verification
+    return _classify_findings(findings, prev_fingerprint.get("file_hashes", {}), src)
 
 
 def write_carry_forward_findings(

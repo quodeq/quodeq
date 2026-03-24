@@ -145,16 +145,7 @@ function useResumeRunning(setJob, startPolling, pollRef, dimPollRef) {
   }, []);
 }
 
-export function useEvaluation() {
-  const [job, setJob] = useState(null);
-  const [jobError, setJobError] = useState('');
-  const [liveViolations, setLiveViolations] = useState({});
-  const refs = useEvalRefs();
-  const startDimensionPolling = createDimensionPoller(refs.dimPollRef, refs.dimFailCountRef, refs.partialDimensionsRef, setLiveViolations);
-  const startPolling = createJobPoller({ poll: refs.pollRef, dimPoll: refs.dimPollRef, requestedDimensions: refs.requestedDimensionsRef, partialDimensions: refs.partialDimensionsRef }, { setJob, setJobError }, startDimensionPolling);
-  useResumeRunning(setJob, startPolling, refs.pollRef, refs.dimPollRef);
-  useEffect(() => { refs.liveViolationsRef.current = liveViolations; }, [liveViolations]);
-
+function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling) {
   async function startEvaluationJob(payload) {
     setJobError('');
     refs.requestedDimensionsRef.current = parseDimensions(payload);
@@ -177,15 +168,35 @@ export function useEvaluation() {
     resetRefs(refs.liveViolationsRef, refs.requestedDimensionsRef, refs.partialDimensionsRef, refs.dimFailCountRef);
   }
 
-  async function cancelEvaluationJob() {
-    if (!job?.jobId) return;
+  async function cancelEvaluationJob(jobId) {
+    if (!jobId) return;
     try {
-      await cancelEvaluation(job.jobId);
+      await cancelEvaluation(jobId);
       clearJob();
     } catch (err) {
       setJobError(err.message);
     }
   }
 
-  return { job, jobError, liveViolations, startEvaluation: startEvaluationJob, clearJob, cancelEvaluation: cancelEvaluationJob };
+  return { startEvaluationJob, clearJob, cancelEvaluationJob };
+}
+
+export function useEvaluation() {
+  const [job, setJob] = useState(null);
+  const [jobError, setJobError] = useState('');
+  const [liveViolations, setLiveViolations] = useState({});
+  const refs = useEvalRefs();
+  const startDimensionPolling = createDimensionPoller(refs.dimPollRef, refs.dimFailCountRef, refs.partialDimensionsRef, setLiveViolations);
+  const startPolling = createJobPoller({ poll: refs.pollRef, dimPoll: refs.dimPollRef, requestedDimensions: refs.requestedDimensionsRef, partialDimensions: refs.partialDimensionsRef }, { setJob, setJobError }, startDimensionPolling);
+  useResumeRunning(setJob, startPolling, refs.pollRef, refs.dimPollRef);
+  useEffect(() => { refs.liveViolationsRef.current = liveViolations; }, [liveViolations]);
+
+  const { startEvaluationJob, clearJob, cancelEvaluationJob } = useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling);
+
+  return {
+    job, jobError, liveViolations,
+    startEvaluation: startEvaluationJob,
+    clearJob,
+    cancelEvaluation: () => cancelEvaluationJob(job?.jobId),
+  };
 }

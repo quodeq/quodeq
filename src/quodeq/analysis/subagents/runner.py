@@ -35,9 +35,7 @@ def _compute_files_per_agent(total_files: int) -> int:
     """
     if total_files <= 0:
         return 0
-    if total_files <= 50:
-        return total_files
-    return 50
+    return min(total_files, 50)
 
 
 @dataclass
@@ -127,7 +125,6 @@ def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tu
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
-    pool_budget_val = config.options.pool_budget
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -135,7 +132,7 @@ def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tu
         max_duration=config.options.max_duration,
         ai_model=subagent_model,
         max_files_per_agent=params.max_files_per_agent,
-        pool_budget=pool_budget_val if pool_budget_val is not None else _DEFAULT_POOL_BUDGET,
+        pool_budget=config.options.pool_budget if config.options.pool_budget is not None else _DEFAULT_POOL_BUDGET,
     )
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path),

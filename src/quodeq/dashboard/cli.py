@@ -8,8 +8,7 @@ from pathlib import Path
 
 from quodeq.shared.utils import get_dashboard_port, get_evaluations_dir, get_static_dist
 from .runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard
-
-_DEFAULT_STATIC_DIR = Path.home() / ".quodeq" / "static"
+from ._build import _static_dir
 
 
 def _default_static_dist() -> str:
@@ -17,7 +16,7 @@ def _default_static_dist() -> str:
     bundled = get_static_dist()
     if bundled:
         return bundled
-    return str(_DEFAULT_STATIC_DIR)
+    return str(_static_dir())
 
 
 def build_parser() -> argparse.ArgumentParser:

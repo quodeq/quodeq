@@ -12,9 +12,9 @@ from quodeq.shared.logging import log_info
 _HASH_FILE = ".build_hash"
 
 
-def _quodeq_dir() -> Path:
+def _quodeq_dir(env: dict[str, str] | None = None) -> Path:
     """Return the base Quodeq directory, overridable via QUODEQ_DIR env var."""
-    return Path(os.environ.get("QUODEQ_DIR", str(Path.home() / ".quodeq")))
+    return Path((env if env is not None else os.environ).get("QUODEQ_DIR", str(Path.home() / ".quodeq")))
 
 
 def _build_workdir() -> Path:

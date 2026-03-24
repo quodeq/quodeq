@@ -154,12 +154,55 @@ export default function App() {
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
 
+  const mainContent = (
+    <MainContent
+      activePage={activePage}
+      evaluation={{
+        job, jobError, liveViolations,
+        analysisPower, setAnalysisPower,
+        handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
+      }}
+      dashboard={{
+        data: dashboard, accumulated, loading, error,
+        availableRuns, overviewRunIndex,
+      }}
+      navigation={{
+        selectedProject, selectedRun, projects,
+        handleNavigate, handleRunSelect, handleProjectChange, navTab,
+        handleDeleteProject, handleExportProject, handleRelocateProject,
+      }}
+      appState={{
+        settings: { appSettings: settings },
+        serverHealth: { connected: serverConnected, setConnected: setServerConnected },
+      }}
+    />
+  );
+
   return (
     <AppShell
       sidebar={<Sidebar activeTab={activeTab} onNavTab={navTab} />}
-      header={showProjectHeader ? <AppProjectHeader project={{ displayName: selectedDisplayName, parent: selectedProjectParent, parentId: selectedProjectParentId, meta: headerMeta }} navigation={{ onProjectChange: handleProjectChange, showRunNav, runNavProps: { currentOverviewRun, overviewRunIndex, availableRuns, onRunPrev: handleRunPrev, onRunNext: handleRunNext, onRunLatest: handleRunLatest, onViewRun: activePage.page === 'overview' ? handleRunView : undefined } }} /> : null}
+      header={showProjectHeader ? (
+        <AppProjectHeader
+          project={{
+            displayName: selectedDisplayName,
+            parent: selectedProjectParent,
+            parentId: selectedProjectParentId,
+            meta: headerMeta,
+          }}
+          navigation={{
+            onProjectChange: handleProjectChange,
+            showRunNav,
+            runNavProps: {
+              currentOverviewRun, overviewRunIndex, availableRuns,
+              onRunPrev: handleRunPrev, onRunNext: handleRunNext,
+              onRunLatest: handleRunLatest,
+              onViewRun: activePage.page === 'overview' ? handleRunView : undefined,
+            },
+          }}
+        />
+      ) : null}
       breadcrumb={navStack.length > 1 ? <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} /> : null}
-      content={<MainContent activePage={activePage} evaluation={{ job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation }} dashboard={{ data: dashboard, accumulated, loading, error, availableRuns, overviewRunIndex }} navigation={{ selectedProject, selectedRun, projects, handleNavigate, handleRunSelect, handleProjectChange, navTab, handleDeleteProject, handleExportProject, handleRelocateProject }} appState={{ settings: { appSettings: settings }, serverHealth: { connected: serverConnected, setConnected: setServerConnected } }} />}
+      content={mainContent}
     />
   );
 }

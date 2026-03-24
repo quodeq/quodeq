@@ -3,25 +3,14 @@
  * were previously inlined inside App, keeping the root component focused
  * on composition rather than API plumbing.
  */
-const REQUEST_TIMEOUT_MS = 30000;
+import { deleteProject, getProjectExportUrl, relocateProject } from '../api/index.js';
 
 export function useProjectActions({ projects, selectedProject, handleProjectChange, loadProjects }) {
-  function _apiQs() {
-    const params = new URLSearchParams(window.location.search);
-    const dir = params.get('evaluations') || '';
-    return dir ? `?evaluations=${encodeURIComponent(dir)}` : '';
-  }
-
   async function handleDeleteProject(projectId) {
-    const qs = _apiQs();
-    const separator = qs ? '&' : '?';
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
-    const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}${qs}${separator}confirm=true`, { method: 'DELETE', signal: controller.signal });
-    clearTimeout(timeoutId);
-    if (!res.ok) {
-      const msg = await res.text().catch(() => res.statusText);
-      alert(`Failed to delete project: ${msg}`);
+    try {
+      await deleteProject(projectId);
+    } catch (err) {
+      alert(`Failed to delete project: ${err.message}`);
       return;
     }
     if (selectedProject === projectId) handleProjectChange(projects.find((p) => (p.id || p.name || p) !== projectId)?.id ?? '');
@@ -29,8 +18,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
   }
 
   function handleExportProject(projectId) {
-    const qs = _apiQs();
-    const url = `/api/projects/${encodeURIComponent(projectId)}/export${qs}`;
+    const url = getProjectExportUrl(projectId);
     const proj = projects.find((p) => (p.id || p.name) === projectId);
     const a = document.createElement('a');
     a.href = url;
@@ -42,16 +30,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
 
   async function handleRelocateProject(projectId, newPath) {
     try {
-      const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}/path${_apiQs()}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ path: newPath }),
-      });
-      if (!res.ok) {
-        console.error('Relocate failed:', res.status);
-        alert('Failed to relocate project. Please try again.');
-        return;
-      }
+      await relocateProject(projectId, newPath);
     } catch (err) {
       console.error('Relocate failed:', err);
       alert('Failed to relocate project. Please try again.');

@@ -41,6 +41,8 @@ class QuodeqApp(rumps.App):
         super().__init__("Quodeq", icon=_find_icon("menubar_iconTemplate.png"), template=True)
         self._app_port, self._ports = _load_config()
         self._last_known_port: int | None = None
+        self._port_cache_time: float = 0
+        self._port_cached_result: int | None = None
         self._process: subprocess.Popen | None = None
         self._port: int | None = None
         self._starting = False
@@ -84,7 +86,7 @@ class QuodeqApp(rumps.App):
     def _find_running_port(self) -> int | None:
         """Find the running dashboard port, checking last known port first (TTL-cached)."""
         now = time.monotonic()
-        if hasattr(self, '_port_cache_time') and (now - self._port_cache_time) < _POLL_INTERVAL:
+        if (now - self._port_cache_time) < _POLL_INTERVAL:
             return self._port_cached_result
         if self._last_known_port is not None and _health_check(self._last_known_port):
             self._port_cached_result = self._last_known_port

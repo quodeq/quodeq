@@ -164,45 +164,54 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     return None
 
 
+def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
+    """Construct and validate EvaluationOptions from the request payload."""
+    from quodeq.provider.base import EvaluationOptions
+    max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
+    max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
+    pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
+    pool_budget = max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, int(pool_budget_raw)))
+    return EvaluationOptions(
+        discipline=payload.get("discipline"),
+        dimensions=payload.get("dimensions") or "",
+        numerical=bool(payload.get("numerical")),
+        ai_cmd=payload.get("aiCmd") or None,
+        ai_model=payload.get("aiModel") or None,
+        subagent_model=payload.get("subagentModel") or None,
+        verify_findings=bool(payload.get("verifyFindings", True)),
+        max_subagents=max_subagents,
+        pool_budget=pool_budget,
+        incremental=bool(payload.get("incremental", False)),
+    )
+
+
+def _check_eval_rate_limit(eval_rate_store: object | None) -> tuple[Response, int] | None:
+    """Return an error response if the evaluation rate limit is exceeded, or None."""
+    if eval_rate_store is None:
+        return None
+    import time as _time
+    ip = request.remote_addr or "unknown"
+    now = _time.monotonic()
+    if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
+        body, status = error_response(
+            "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
+        )
+        return jsonify(body), status
+    eval_rate_store.record(ip, now)  # type: ignore[union-attr]
+    return None
+
+
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
         return jsonify([to_camel_dict(j) for j in provider.list_evaluations()])
 
-    def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
-        """Construct and validate EvaluationOptions from the request payload."""
-        from quodeq.provider.base import EvaluationOptions
-        max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
-        max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
-        pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
-        pool_budget = max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, int(pool_budget_raw)))
-        return EvaluationOptions(
-            discipline=payload.get("discipline"),
-            dimensions=payload.get("dimensions") or "",
-            numerical=bool(payload.get("numerical")),
-            ai_cmd=payload.get("aiCmd") or None,
-            ai_model=payload.get("aiModel") or None,
-            subagent_model=payload.get("subagentModel") or None,
-            verify_findings=bool(payload.get("verifyFindings", True)),
-            max_subagents=max_subagents,
-            pool_budget=pool_budget,
-            incremental=bool(payload.get("incremental", False)),
-        )
-
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
-        # Enforce stricter per-endpoint rate limit for evaluation creation
-        if eval_rate_store is not None:
-            import time as _time
-            ip = request.remote_addr or "unknown"
-            now = _time.monotonic()
-            if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
-                body, status = error_response(
-                    "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
-                )
-                return jsonify(body), status
-            eval_rate_store.record(ip, now)  # type: ignore[union-attr]
+        rate_error = _check_eval_rate_limit(eval_rate_store)
+        if rate_error is not None:
+            return rate_error
         payload = request.get_json(silent=True) or {}
         validation_error = validate_evaluation_payload(payload)
         if validation_error:
