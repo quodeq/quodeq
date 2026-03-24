@@ -373,7 +373,7 @@
         {
           "id": "M-REU-2",
           "source": "iso25010",
-          "text": "Public functions MUST NOT depend on global mutable state",
+          "text": "Public functions MUST NOT depend on global mutable state without an injectable override parameter or a documented reset mechanism for testing",
           "severity": null,
           "scope": null,
           "refs": [
@@ -415,7 +415,7 @@
         {
           "id": "M-REU-4",
           "source": "iso25010",
-          "text": "Configuration MUST be injectable; modules MUST NOT read env vars directly",
+          "text": "Configuration MUST be injectable — functions that read environment variables MUST accept an override parameter (e.g., env dict) so callers can provide values without relying on process environment",
           "severity": null,
           "scope": null,
           "refs": [
