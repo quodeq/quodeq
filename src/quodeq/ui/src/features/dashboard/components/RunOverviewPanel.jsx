@@ -82,6 +82,60 @@ function ViolationsByDimension({ dimensionsWithViolations, onDimensionClick, sel
   );
 }
 
+function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick }) {
+  const currScore = parseFloat(item.overallScore);
+  const prevScore = parseFloat(item.previousScore);
+  const delta = !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
+  const scored = splitScore(item.overallScore);
+  return (
+    <article
+      key={item.dimension}
+      className="qd-card"
+      onClick={() => onDimensionClick(item, selectedRunId)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDimensionClick(item, selectedRunId); } }}
+    >
+      <div className="qd-card-header">
+        <span className="qd-card-name">{item.dimension}</span>
+        <span className={`chip small ${gradeColorClass(item.overallGrade)}`}>
+          {item.overallGrade || '—'}
+        </span>
+      </div>
+      <div className="qd-card-score-row">
+        <span className="qd-card-score-main">
+          <span className="qd-card-score">{scored.value}</span>
+          {scored.denom && <span className="qd-card-score-denom">{scored.denom}</span>}
+        </span>
+        <TrendBadge delta={delta} />
+      </div>
+      <div className="qd-card-stats">
+        {(item.totals?.violationCount ?? 0) > 0 && (
+          <span className="qd-card-stat-violations">{item.totals.violationCount} violations</span>
+        )}
+        {(item.totals?.complianceCount ?? 0) > 0 && (
+          <span className="qd-card-stat-compliance">{item.totals.complianceCount} compliant</span>
+        )}
+      </div>
+      <div className="qd-card-footer">
+        <span className="qd-card-date">{item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId)}</span>
+      </div>
+    </article>
+  );
+}
+
+function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionClick }) {
+  return (
+    <div className="dimensions-grid">
+      {[...dimensions]
+        .sort((a, b) => a.dimension.localeCompare(b.dimension))
+        .map((item) => (
+          <RunDimensionCard key={item.dimension} item={item} selectedRunId={selectedRunId} dateLabel={dateLabel} onDimensionClick={onDimensionClick} />
+        ))}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Run-specific overview panel
 // ---------------------------------------------------------------------------
@@ -164,60 +218,12 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
         <h3 className="dimensions-title">Dimensions Analyzed</h3>
       </div>
       <div className="dimensions-panel">
-        <div className="dimensions-grid">
-          {[...(dashboard?.dimensions || [])]
-            .sort((a, b) => a.dimension.localeCompare(b.dimension))
-            .map((item) => {
-              const currScore = parseFloat(item.overallScore);
-              const prevScore = parseFloat(item.previousScore);
-              const delta =
-                !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
-              const scored = splitScore(item.overallScore);
-              return (
-                <article
-                  key={item.dimension}
-                  className="qd-card"
-                  onClick={() => onDimensionClick(item, selectedRunId)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDimensionClick(item, selectedRunId); } }}
-                >
-                  <div className="qd-card-header">
-                    <span className="qd-card-name">{item.dimension}</span>
-                    <span className={`chip small ${gradeColorClass(item.overallGrade)}`}>
-                      {item.overallGrade || '—'}
-                    </span>
-                  </div>
-                  <div className="qd-card-score-row">
-                    <span className="qd-card-score-main">
-                      <span className="qd-card-score">{scored.value}</span>
-                      {scored.denom && (
-                        <span className="qd-card-score-denom">
-                          {scored.denom}
-                        </span>
-                      )}
-                    </span>
-                    <TrendBadge delta={delta} />
-                  </div>
-                  <div className="qd-card-stats">
-                    {(item.totals?.violationCount ?? 0) > 0 && (
-                      <span className="qd-card-stat-violations">
-                        {item.totals.violationCount} violations
-                      </span>
-                    )}
-                    {(item.totals?.complianceCount ?? 0) > 0 && (
-                      <span className="qd-card-stat-compliance">
-                        {item.totals.complianceCount} compliant
-                      </span>
-                    )}
-                  </div>
-                  <div className="qd-card-footer">
-                    <span className="qd-card-date">{item.fromDateLabel || dashboard?.selectedRun?.dateLabel || formatRunId(item.fromRunId || selectedRunId)}</span>
-                  </div>
-                </article>
-              );
-            })}
-        </div>
+        <RunDimensionsGrid
+          dimensions={dashboard?.dimensions || []}
+          selectedRunId={selectedRunId}
+          dateLabel={dashboard?.selectedRun?.dateLabel}
+          onDimensionClick={onDimensionClick}
+        />
       </div>
 
       <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />

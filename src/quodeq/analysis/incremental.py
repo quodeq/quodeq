@@ -89,6 +89,16 @@ def _file_imports_changed(content: str, compiled: list, changed_stems: dict[str,
     return False
 
 
+def _safe_read(path: Path) -> str | None:
+    """Read a file's text, returning None if missing or unreadable."""
+    if not path.exists():
+        return None
+    try:
+        return path.read_text(errors="ignore")
+    except OSError:
+        return None
+
+
 def find_dependents(changed: set[str], files: list[str], src: Path, language: str) -> set[str]:
     """Find files that directly import any changed file (1 level deep)."""
     from quodeq.analysis.subagents.priority import load_priority_config
@@ -109,13 +119,8 @@ def find_dependents(changed: set[str], files: list[str], src: Path, language: st
         if f in changed:
             continue
         full_path = src / f
-        if not full_path.exists():
-            continue
-        try:
-            content = full_path.read_text(errors="ignore")
-        except OSError:
-            continue
-        if _file_imports_changed(content, compiled, changed_stems):
+        content = _safe_read(full_path)
+        if content is not None and _file_imports_changed(content, compiled, changed_stems):
             dependents.add(f)
     return dependents
 

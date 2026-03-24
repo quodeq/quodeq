@@ -23,6 +23,104 @@ function toggleInList(list, value) {
     : [...list, value];
 }
 
+function DimFilterControls({ selectedSeverities, setSelectedSeverities, fileFilter, setFileFilter, activeFilterCount, clearAllFilters, principleOptions, selectedPrinciples, setSelectedPrinciples }) {
+  return (
+    <div className="dim-filter-section">
+      <div className="filter-row">
+        <div className="checkbox-pills">
+          {SEVERITY_OPTIONS.map((sev) => (
+            <button
+              key={sev}
+              type="button"
+              className={`pill-btn severity-pill ${sev} ${selectedSeverities.includes(sev) ? 'active' : ''}`}
+              aria-pressed={selectedSeverities.includes(sev)}
+              onClick={() => setSelectedSeverities((prev) => toggleInList(prev, sev))}
+            >
+              {sev}
+            </button>
+          ))}
+        </div>
+
+        {fileFilter.trim() === '' ? (
+          <input
+            className="file-filter-input"
+            type="text"
+            placeholder="Filter by file..."
+            aria-label="Filter by file"
+            value={fileFilter}
+            onChange={(e) => setFileFilter(e.target.value)}
+          />
+        ) : (
+          <span className="active-filter-tag">
+            File: {fileFilter}
+            <button type="button" onClick={() => setFileFilter('')} aria-label="Clear file filter">&times;</button>
+          </span>
+        )}
+
+        {activeFilterCount > 0 && (
+          <button type="button" className="clear-filters-btn" onClick={clearAllFilters}>
+            Clear filters ({activeFilterCount})
+          </button>
+        )}
+      </div>
+
+      {principleOptions.length > 0 && (
+        <div className="dim-principles-filter">
+          <p className="filter-section-label">Principles</p>
+          <div className="checkbox-pills">
+            {principleOptions.map((name) => (
+              <button
+                key={name}
+                type="button"
+                className={`pill-btn ${selectedPrinciples.includes(name) ? 'active' : ''}`}
+                aria-pressed={selectedPrinciples.includes(name)}
+                onClick={() => setSelectedPrinciples((prev) => toggleInList(prev, name))}
+              >
+                {name}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DimViolationsList({ filteredViolations, activeFilterCount, totalCount, buildFixPlan }) {
+  return (
+    <div className="dim-violations-section">
+      <div className="section-title-row compact">
+        <h4>
+          Violations
+          {activeFilterCount > 0
+            ? ` (${filteredViolations.length} of ${totalCount})`
+            : ` (${filteredViolations.length})`}
+        </h4>
+        <CopyButton
+          label="Fix plan"
+          onClick={() => copyToClipboard(buildFixPlan())}
+        />
+      </div>
+
+      <div className="violation-list">
+        {filteredViolations.map((entry, index) => (
+          <div key={index} className="violation-row">
+            <span className={`severity-tag ${entry.severity || 'unknown'}`}>
+              {entry.severity || 'unknown'}
+            </span>
+            <span className="violation-row-principle">{entry.principle || '-'}</span>
+            <span className="violation-row-file">
+              {entry.file
+                ? `${entry.file}${entry.line ? `:${entry.line}` : ''}`
+                : '-'}
+            </span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export default function DimensionCard({ title, dimension, isSingleFocus }) {
   const [selectedSeverities, setSelectedSeverities] = useState([]);
   const [selectedPrinciples, setSelectedPrinciples] = useState([]);
@@ -124,64 +222,12 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
       </div>
 
       {(dimension.violations?.length > 0 || dimension.principles?.length > 0) && (
-        <div className="dim-filter-section">
-          <div className="filter-row">
-            <div className="checkbox-pills">
-              {SEVERITY_OPTIONS.map((sev) => (
-                <button
-                  key={sev}
-                  type="button"
-                  className={`pill-btn severity-pill ${sev} ${selectedSeverities.includes(sev) ? 'active' : ''}`}
-                  aria-pressed={selectedSeverities.includes(sev)}
-                  onClick={() => setSelectedSeverities((prev) => toggleInList(prev, sev))}
-                >
-                  {sev}
-                </button>
-              ))}
-            </div>
-
-            {fileFilter.trim() === '' ? (
-              <input
-                className="file-filter-input"
-                type="text"
-                placeholder="Filter by file..."
-                aria-label="Filter by file"
-                value={fileFilter}
-                onChange={(e) => setFileFilter(e.target.value)}
-              />
-            ) : (
-              <span className="active-filter-tag">
-                File: {fileFilter}
-                <button type="button" onClick={() => setFileFilter('')} aria-label="Clear file filter">&times;</button>
-              </span>
-            )}
-
-            {activeFilterCount > 0 && (
-              <button type="button" className="clear-filters-btn" onClick={clearAllFilters}>
-                Clear filters ({activeFilterCount})
-              </button>
-            )}
-          </div>
-
-          {principleOptions.length > 0 && (
-            <div className="dim-principles-filter">
-              <p className="filter-section-label">Principles</p>
-              <div className="checkbox-pills">
-                {principleOptions.map((name) => (
-                  <button
-                    key={name}
-                    type="button"
-                    className={`pill-btn ${selectedPrinciples.includes(name) ? 'active' : ''}`}
-                    aria-pressed={selectedPrinciples.includes(name)}
-                    onClick={() => setSelectedPrinciples((prev) => toggleInList(prev, name))}
-                  >
-                    {name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+        <DimFilterControls
+          selectedSeverities={selectedSeverities} setSelectedSeverities={setSelectedSeverities}
+          fileFilter={fileFilter} setFileFilter={setFileFilter}
+          activeFilterCount={activeFilterCount} clearAllFilters={clearAllFilters}
+          principleOptions={principleOptions} selectedPrinciples={selectedPrinciples} setSelectedPrinciples={setSelectedPrinciples}
+        />
       )}
 
       {dimension.principles?.length > 0 && (
@@ -198,36 +244,12 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
       )}
 
       {filteredViolations.length > 0 && (
-        <div className="dim-violations-section">
-          <div className="section-title-row compact">
-            <h4>
-              Violations
-              {activeFilterCount > 0
-                ? ` (${filteredViolations.length} of ${dimension.violations?.length ?? 0})`
-                : ` (${filteredViolations.length})`}
-            </h4>
-            <CopyButton
-              label="Fix plan"
-              onClick={() => copyToClipboard(buildFixPlan())}
-            />
-          </div>
-
-          <div className="violation-list">
-            {filteredViolations.map((entry, index) => (
-              <div key={index} className="violation-row">
-                <span className={`severity-tag ${entry.severity || 'unknown'}`}>
-                  {entry.severity || 'unknown'}
-                </span>
-                <span className="violation-row-principle">{entry.principle || '-'}</span>
-                <span className="violation-row-file">
-                  {entry.file
-                    ? `${entry.file}${entry.line ? `:${entry.line}` : ''}`
-                    : '-'}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
+        <DimViolationsList
+          filteredViolations={filteredViolations}
+          activeFilterCount={activeFilterCount}
+          totalCount={dimension.violations?.length ?? 0}
+          buildFixPlan={buildFixPlan}
+        />
       )}
 
       {filteredViolations.length === 0 && activeFilterCount > 0 && (

@@ -252,27 +252,35 @@ def prioritize_files(
     git_scores = compute_git_scores(files, src)
     prev_violations = compute_previous_violations(config, evidence_dir, dimension) if evidence_dir and config else {}
 
+    scored = _score_files(
+        files, src, dimension, category,
+        fan_in, fan_in_divisor, fan_in_max,
+        git_scores, prev_violations, max_prev_violations,
+    )
+    scored.sort(key=lambda x: (-x[0], x[1]))
+    return [f for _, f in scored]
+
+
+def _score_files(
+    files: list[str], src: Path, dimension: str | list[str], category: str | None,
+    fan_in: dict[str, int], fan_in_divisor: int, fan_in_max: int,
+    git_scores: dict[str, float], prev_violations: dict[str, int], max_prev_violations: int,
+) -> list[tuple[float, str]]:
+    """Compute composite priority scores for each file."""
     scored: list[tuple[float, str]] = []
     for f in files:
         base = compute_base_score(f, category)
-
         file_size = 0
         try:
             file_size = (src / f).stat().st_size
         except OSError:
             pass
         dim_boost = compute_dimension_boost(f, dimension, file_size=file_size)
-
         fi_raw = fan_in.get(f, 0)
         fi_score = min(fan_in_max, fi_raw / fan_in_divisor) if fi_raw > 0 else 0
-
         git_score = git_scores.get(f, 0)
-
         pv_count = prev_violations.get(f, 0)
         pv_score = min(max_prev_violations, pv_count)
-
         total = base + dim_boost + fi_score + git_score + pv_score
         scored.append((total, f))
-
-    scored.sort(key=lambda x: (-x[0], x[1]))
-    return [f for _, f in scored]
+    return scored

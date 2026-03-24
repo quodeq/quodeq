@@ -208,6 +208,35 @@ def _run_backfill_phase(
     return backfill_taken
 
 
+def _finalize_incremental(
+    config: RunConfig, dimension: str, ctx: _AnalysisContext,
+    files: list[str], all_analyzed: set[str], evidence_dir: Path,
+    files_read: int,
+) -> Evidence | None:
+    """Re-parse JSONL, save fingerprint, and log coverage."""
+    all_analyzed &= set(files)
+    output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
+    ev = _parse_evidence_from_jsonl(config, dimension, ctx, output_jsonl, files_read)
+    new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
+    save_fingerprint(new_fp, evidence_dir)
+    coverage_pct = len(all_analyzed) * 100 // len(files) if files else 100
+    log_info(f"  [{dimension}] Coverage: {len(all_analyzed)}/{len(files)} files ({coverage_pct}%)")
+    return ev
+
+
+def _maybe_carry_forward(
+    prev_fp: dict | None, prev_evidence_dir: Path | None,
+    classification: object, dimension: str, evidence_dir: Path,
+) -> None:
+    """Carry forward findings for unchanged files if conditions are met."""
+    if not (prev_fp and prev_evidence_dir and not classification.full_reanalysis and classification.unchanged):
+        return
+    prev_jsonl = prev_evidence_dir / f"{dimension}_evidence.jsonl"
+    output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
+    carried = carry_forward_findings(prev_jsonl, output_jsonl, classification.unchanged)
+    log_info(f"  [{dimension}] Carried forward {carried} findings for {len(classification.unchanged)} unchanged files")
+
+
 def run_dimension_incremental(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
 ) -> Evidence | None:
@@ -235,13 +264,7 @@ def run_dimension_incremental(
         language=config.language,
     )
 
-    # Carry forward unchanged findings
-    can_carry_forward = prev_fp and prev_evidence_dir and not classification.full_reanalysis and classification.unchanged
-    if can_carry_forward:
-        prev_jsonl = prev_evidence_dir / f"{dimension}_evidence.jsonl"
-        output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
-        carried = carry_forward_findings(prev_jsonl, output_jsonl, classification.unchanged)
-        log_info(f"  [{dimension}] Carried forward {carried} findings for {len(classification.unchanged)} unchanged files")
+    _maybe_carry_forward(prev_fp, prev_evidence_dir, classification, dimension, evidence_dir)
 
     # Phase 1: analyze changed files
     ev = _run_phase1_analysis(config, dimension, idx, ctx, classification, evidence_dir)
@@ -254,89 +277,18 @@ def run_dimension_incremental(
         evidence_dir, phase_start,
     )
 
-    # Re-parse after all phases to get accurate Evidence
-    output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
-    ev = _parse_evidence_from_jsonl(
-        config, dimension, ctx, output_jsonl,
+    # Re-parse after all phases and save fingerprint
+    all_analyzed = prev_analyzed | phase1_files | backfill_taken
+    return _finalize_incremental(
+        config, dimension, ctx, files, all_analyzed, evidence_dir,
         len(phase1_files) + len(backfill_taken) + len(classification.unchanged),
     )
 
-    # Save new fingerprint — accumulate analyzed files across runs
-    all_analyzed = prev_analyzed | phase1_files | backfill_taken
-    all_analyzed &= set(files)
-    new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
-    save_fingerprint(new_fp, evidence_dir)
-
-    coverage_pct = len(all_analyzed) * 100 // len(files) if files else 100
-    log_info(f"  [{dimension}] Coverage: {len(all_analyzed)}/{len(files)} files ({coverage_pct}%)")
-
-    return ev
 
 
-def check_zero_findings(
-    result: dict[str, "Evidence"], source_file_count: int, skipped_count: int = 0,
-) -> None:
-    """Raise EvaluationError if all dimensions produced zero findings."""
-    from quodeq.analysis.runner import EvaluationError
-
-    if not result or source_file_count <= 0:
-        return
-    total_findings = sum(
-        sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
-        for ev in result.values()
-    )
-    if total_findings == 0:
-        skip_msg = f" ({skipped_count} skipped)" if skipped_count else ""
-        raise EvaluationError(
-            f"Evaluation produced 0 findings across {len(result)} dimensions{skip_msg}. "
-            f"This usually means the AI CLI could not read files or report findings "
-            f"— check tool permissions and MCP configuration."
-        )
-
-
-def run_incremental_loop(
-    config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
-) -> dict[str, "Evidence"]:
-    """Run incremental per-dimension analysis."""
-    from quodeq.analysis.runner import _process_single_dimension, _log_dimension_result
-    from quodeq.engine._runner_markers import emit_marker
-
-    result: dict[str, Evidence] = {}
-    for idx, dimension in enumerate(dimensions, 1):
-        emit_marker("analyzing", dimension=dimension)
-        log_info(f"\u2192 [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
-        try:
-            ev = run_dimension_incremental(config, dimension, idx, ctx)
-        except (OSError, KeyError, ValueError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 incremental failed: {exc}, falling back to full")
-            config.options.incremental_file_filter = None
-            ev = _process_single_dimension(config, dimension, idx, ctx)
-        if ev:
-            _log_dimension_result(ev, dimension, idx, ctx.total)
-            result[dimension] = ev
-    check_zero_findings(result, config.source_file_count)
-    return result
-
-
-def run_per_dimension_loop(
-    config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
-) -> dict[str, "Evidence"]:
-    """Per-dimension loop (fallback or single-dimension)."""
-    import json
-    from quodeq.analysis.runner import _process_single_dimension
-
-    result: dict[str, Evidence] = {}
-    skipped_count = 0
-    for idx, dimension in enumerate(dimensions, 1):
-        try:
-            ev = _process_single_dimension(config, dimension, idx, ctx)
-        except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 failed: {exc}")
-            skipped_count += 1
-            continue
-        if ev is None:
-            skipped_count += 1
-            continue
-        result[dimension] = ev
-    check_zero_findings(result, config.source_file_count, skipped_count)
-    return result
+# Re-export loop orchestrators from _loops.py for backward compatibility
+from quodeq.analysis._loops import (  # noqa: F401
+    check_zero_findings,
+    run_incremental_loop,
+    run_per_dimension_loop,
+)

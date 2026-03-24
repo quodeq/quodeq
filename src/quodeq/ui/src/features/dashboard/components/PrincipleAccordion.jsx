@@ -21,6 +21,39 @@ function ViolationRow({ v, principle, onViolationClick, handleViolationKeyDown }
   );
 }
 
+function MetricsSection({ metrics }) {
+  return (
+    <div className="principle-section metrics-section">
+      <h4>Metrics</h4>
+      <div className="metrics-grid">
+        {metrics.instancesExamined && (
+          <div className="metric">
+            <span className="metric-value">{metrics.instancesExamined}</span>
+            <span className="metric-label">Instances Examined</span>
+          </div>
+        )}
+        {metrics.complianceRate && (
+          <div className="metric">
+            <span className="metric-value">{metrics.complianceRate}%</span>
+            <span className="metric-label">Compliance Rate</span>
+          </div>
+        )}
+        {metrics.confidenceLevel && (
+          <div className="metric">
+            <span className="metric-value">{metrics.confidenceLevel}</span>
+            <span className="metric-label">Confidence</span>
+          </div>
+        )}
+      </div>
+      <div className="severity-breakdown">
+        <span className="severity-item critical">{metrics.severity?.critical || 0} critical</span>
+        <span className="severity-item major">{metrics.severity?.major || 0} major</span>
+        <span className="severity-item minor">{metrics.severity?.minor || 0} minor</span>
+      </div>
+    </div>
+  );
+}
+
 export default function PrincipleAccordion({ principle, onViolationClick }) {
   const [open, setOpen] = useState(false);
   const contentId = `pa-content-${(principle.name || '').replace(/[^a-zA-Z0-9]/g, '-')}`;
@@ -87,36 +120,7 @@ export default function PrincipleAccordion({ principle, onViolationClick }) {
             </div>
           )}
 
-          {principle.metrics && (
-            <div className="principle-section metrics-section">
-              <h4>Metrics</h4>
-              <div className="metrics-grid">
-                {principle.metrics.instancesExamined && (
-                  <div className="metric">
-                    <span className="metric-value">{principle.metrics.instancesExamined}</span>
-                    <span className="metric-label">Instances Examined</span>
-                  </div>
-                )}
-                {principle.metrics.complianceRate && (
-                  <div className="metric">
-                    <span className="metric-value">{principle.metrics.complianceRate}%</span>
-                    <span className="metric-label">Compliance Rate</span>
-                  </div>
-                )}
-                {principle.metrics.confidenceLevel && (
-                  <div className="metric">
-                    <span className="metric-value">{principle.metrics.confidenceLevel}</span>
-                    <span className="metric-label">Confidence</span>
-                  </div>
-                )}
-              </div>
-              <div className="severity-breakdown">
-                <span className="severity-item critical">{principle.metrics.severity?.critical || 0} critical</span>
-                <span className="severity-item major">{principle.metrics.severity?.major || 0} major</span>
-                <span className="severity-item minor">{principle.metrics.severity?.minor || 0} minor</span>
-              </div>
-            </div>
-          )}
+          {principle.metrics && <MetricsSection metrics={principle.metrics} />}
         </div>
       )}
     </div>

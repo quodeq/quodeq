@@ -3,6 +3,54 @@ import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 
+function DashboardContent({
+  runMode, dashboard, selectedRunId, accumulated, accumulatedDimensions,
+  availableRuns, overviewRunIndex, focusedDimension, setFocusedDimension,
+  focusedDimensionData, onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick,
+  onFileClick, onPrincipleClick,
+}) {
+  if (runMode) {
+    return (
+      <RunOverviewPanel
+        dashboard={dashboard}
+        selectedRunId={selectedRunId}
+        onDimensionClick={onDimensionCardClick}
+        onFileClick={onFileClick}
+      />
+    );
+  }
+  if (!accumulated) {
+    return <p className="empty-state">Loading accumulated data...</p>;
+  }
+  if (focusedDimension) {
+    return (
+      <div className="dimensions-panel">
+        <div className="dimensions-header">
+          <h3 className="dimensions-title">{focusedDimension}</h3>
+          <button type="button" className="btn-secondary" onClick={() => setFocusedDimension(null)}>
+            Show all
+          </button>
+        </div>
+        <DimensionCard title={focusedDimension} dimension={focusedDimensionData} isSingleFocus={true} />
+      </div>
+    );
+  }
+  return (
+    <AccumulatedOverviewPanel
+      accumulated={accumulated}
+      accumulatedDimensions={accumulatedDimensions}
+      availableRuns={availableRuns}
+      overviewRunIndex={overviewRunIndex}
+      trend={dashboard?.trend || []}
+      selectedRunId={selectedRunId}
+      onRunClick={onRunSelect}
+      onDimensionClick={onAccumulatedDimensionClick}
+      onFileClick={onFileClick}
+      onPrincipleClick={onPrincipleClick}
+    />
+  );
+}
+
 // ---------------------------------------------------------------------------
 // DashboardPage — body only, header is rendered by App.jsx
 // Top-level page component that receives all dashboard state and callbacks
@@ -66,53 +114,17 @@ export default function DashboardPage({
       {loading && <p className="loading" role="status" aria-live="polite">Loading dashboard...</p>}
 
       {!loading && dashboard && (
-        <>
-          {runMode ? (
-            <RunOverviewPanel
-              dashboard={dashboard}
-              selectedRunId={selectedRunId}
-              onDimensionClick={handleDimensionCardClick}
-              onFileClick={handleFileClick}
-            />
-          ) : accumulated ? (
-            <>
-              {focusedDimension ? (
-                <div className="dimensions-panel">
-                  <div className="dimensions-header">
-                    <h3 className="dimensions-title">{focusedDimension}</h3>
-                    <button
-                      type="button"
-                      className="btn-secondary"
-                      onClick={() => setFocusedDimension(null)}
-                    >
-                      Show all
-                    </button>
-                  </div>
-                  <DimensionCard
-                    title={focusedDimension}
-                    dimension={focusedDimensionData}
-                    isSingleFocus={true}
-                  />
-                </div>
-              ) : (
-                <AccumulatedOverviewPanel
-                  accumulated={accumulated}
-                  accumulatedDimensions={accumulatedDimensions}
-                  availableRuns={availableRuns}
-                  overviewRunIndex={overviewRunIndex}
-                  trend={dashboard?.trend || []}
-                  selectedRunId={selectedRunId}
-                  onRunClick={onRunSelect}
-                  onDimensionClick={handleAccumulatedDimensionClick}
-                  onFileClick={handleFileClick}
-                  onPrincipleClick={handlePrincipleClick}
-                />
-              )}
-            </>
-          ) : (
-            <p className="empty-state">Loading accumulated data...</p>
-          )}
-        </>
+        <DashboardContent
+          runMode={runMode} dashboard={dashboard} selectedRunId={selectedRunId}
+          accumulated={accumulated} accumulatedDimensions={accumulatedDimensions}
+          availableRuns={availableRuns} overviewRunIndex={overviewRunIndex}
+          focusedDimension={focusedDimension} setFocusedDimension={setFocusedDimension}
+          focusedDimensionData={focusedDimensionData}
+          onRunSelect={onRunSelect}
+          onDimensionCardClick={handleDimensionCardClick}
+          onAccumulatedDimensionClick={handleAccumulatedDimensionClick}
+          onFileClick={handleFileClick} onPrincipleClick={handlePrincipleClick}
+        />
       )}
 
     </div>

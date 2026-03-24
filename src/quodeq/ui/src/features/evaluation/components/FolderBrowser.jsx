@@ -34,6 +34,47 @@ function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigat
   );
 }
 
+function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate }) {
+  return (
+    <div className="folder-browser-path">
+      <button
+        className="folder-nav-btn"
+        disabled={!data?.parent || loading}
+        onClick={() => data?.parent && onNavigate(data.parent)}
+        aria-label="Go to parent folder"
+      >
+        ↑
+      </button>
+      <input
+        type="text"
+        className="folder-path-input"
+        value={pathInput}
+        onChange={(e) => setPathInput(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') onNavigate(pathInput); }}
+        placeholder="Enter path and press Enter"
+        aria-label="Enter folder path"
+      />
+    </div>
+  );
+}
+
+function FolderFooter({ selectedFolder, onClose, onConfirm }) {
+  return (
+    <div className="folder-browser-footer">
+      <div className={`selected-path ${selectedFolder ? 'visible' : ''}`}>
+        <span className="selected-label">Path:</span>
+        <code>{selectedFolder || ''}</code>
+      </div>
+      <div className="folder-browser-actions">
+        <button className="btn-cancel" onClick={onClose}>Cancel</button>
+        <button className="btn-confirm" onClick={onConfirm} disabled={!selectedFolder}>
+          Use This Folder
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function FolderBrowser({ onSelect, onClose }) {
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
@@ -62,12 +103,6 @@ export default function FolderBrowser({ onSelect, onClose }) {
     navigate('');
   }, []);
 
-  function handlePathKeyDown(e) {
-    if (e.key === 'Enter') {
-      navigate(pathInput);
-    }
-  }
-
   function handleConfirm() {
     if (selectedFolder) {
       onSelect(selectedFolder);
@@ -82,25 +117,7 @@ export default function FolderBrowser({ onSelect, onClose }) {
           <button className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
         </div>
 
-        <div className="folder-browser-path">
-          <button
-            className="folder-nav-btn"
-            disabled={!data?.parent || loading}
-            onClick={() => data?.parent && navigate(data.parent)}
-            aria-label="Go to parent folder"
-          >
-            ↑
-          </button>
-          <input
-            type="text"
-            className="folder-path-input"
-            value={pathInput}
-            onChange={(e) => setPathInput(e.target.value)}
-            onKeyDown={handlePathKeyDown}
-            placeholder="Enter path and press Enter"
-            aria-label="Enter folder path"
-          />
-        </div>
+        <FolderPathBar data={data} loading={loading} pathInput={pathInput} setPathInput={setPathInput} onNavigate={navigate} />
 
         <div className="folder-browser-list">
           {loading ? (
@@ -110,22 +127,7 @@ export default function FolderBrowser({ onSelect, onClose }) {
           )}
         </div>
 
-        <div className="folder-browser-footer">
-          <div className={`selected-path ${selectedFolder ? 'visible' : ''}`}>
-            <span className="selected-label">Path:</span>
-            <code>{selectedFolder || ''}</code>
-          </div>
-          <div className="folder-browser-actions">
-            <button className="btn-cancel" onClick={onClose}>Cancel</button>
-            <button
-              className="btn-confirm"
-              onClick={handleConfirm}
-              disabled={!selectedFolder}
-            >
-              Use This Folder
-            </button>
-          </div>
-        </div>
+        <FolderFooter selectedFolder={selectedFolder} onClose={onClose} onConfirm={handleConfirm} />
       </div>
     </div>
   );
