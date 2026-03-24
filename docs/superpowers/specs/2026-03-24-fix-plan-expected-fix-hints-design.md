@@ -169,6 +169,56 @@ Plan generation (new):
 - **Plan output cost:** ~10-15 words per violation. For 40 violations ≈ 500 extra tokens
 - **Lookup table size:** ~40 entries, ~2KB in JS bundle — negligible
 
+## Completion Checklist
+
+Every group plan (dimension, principle, file) appends a verification checklist after the test instructions. This directly prevents the two worst failure modes: skipping violations and comment-only fixes.
+
+### Template
+
+```markdown
+---
+
+## Completion checklist
+
+Before claiming this plan is done, verify:
+
+- [ ] **Every violation has a code change.** Count your diffs — the number must match the total violations above. A comment or docstring is NOT a fix unless the violation specifically requires documentation.
+- [ ] **No violations were skipped.** If a violation cannot be fixed, state why explicitly — do not silently omit it.
+- [ ] **Tests pass.** Run the full test suite after all changes.
+- [ ] **Verify metrics.** For each function-length or file-length violation, confirm the result is within limits (e.g., `wc -l`, AST line count).
+```
+
+### Where it renders
+
+Appended at the very end of:
+- `_buildPlanLines()` in `explorerUtils.js` (dimension plans)
+- `buildPrinciplePlanText()` in `PrincipleDetailPage.jsx` and `EvalPrincipleDetailPage.jsx`
+- `buildFilePlanText()` in `FileDetailPage.jsx`
+
+NOT included in single-violation plans (only one fix needed, checklist is noise).
+
+### Implementation
+
+A new constant in `explorerUtils.js`:
+
+```js
+export const PLAN_COMPLETION_CHECKLIST = [
+  '---', '',
+  '## Completion checklist', '',
+  'Before claiming this plan is done, verify:', '',
+  '- [ ] **Every violation has a code change.** Count your diffs — the number must match the total violations above. A comment or docstring is NOT a fix unless the violation specifically requires documentation.',
+  '- [ ] **No violations were skipped.** If a violation cannot be fixed, state why explicitly — do not silently omit it.',
+  '- [ ] **Tests pass.** Run the full test suite after all changes.',
+  '- [ ] **Verify metrics.** For each function-length or file-length violation, confirm the result is within limits (e.g., `wc -l`, AST line count).',
+].join('\n');
+```
+
+Appended after `PLAN_TEST_INSTRUCTION_GROUP` in every group plan.
+
+### Token Cost
+
+~80 tokens per plan. Fixed cost, does not scale with violation count.
+
 ## What This Does NOT Change
 
 - No backend changes
