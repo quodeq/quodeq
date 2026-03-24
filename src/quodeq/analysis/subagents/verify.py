@@ -180,39 +180,7 @@ def _write_verify_manifest(
     output_path.write_text(json.dumps(grouped, indent=2))
 
 
-_VERIFY_PROMPT_TEMPLATE = """\
-You are re-verifying previous evaluation findings against the current codebase.
-This is a quick verification pass — be fast and decisive.
-
-## Task
-
-For each file in the verification manifest at `{manifest_path}`:
-1. Read the file from the queue
-2. Look up its findings in the manifest
-3. For each finding, check if the violation/compliance condition **still applies**
-   to the current code — not just whether the line exists, but whether the
-   underlying issue is still present
-4. If the finding still applies, report it using the `report_finding` tool
-   with the same fields (principle, type, severity, file, line, reason, snippet)
-5. If the issue has been fixed or no longer applies, skip it silently
-
-## Important
-
-- Do NOT discover new findings — only verify existing ones
-- Do NOT modify any files
-- Read each file, check the findings, report confirmed ones, move on
-- Be fast — this should take seconds per file
-
-Dimension: {dimension}
-"""
-
-
-def build_verify_prompt(manifest_path: Path, dimension: str) -> str:
-    """Build the prompt for verification subagents."""
-    return _VERIFY_PROMPT_TEMPLATE.format(
-        manifest_path=manifest_path,
-        dimension=dimension,
-    )
+from quodeq.analysis.subagents._verify_pool import build_verify_prompt  # noqa: F401 — re-export
 
 
 def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:

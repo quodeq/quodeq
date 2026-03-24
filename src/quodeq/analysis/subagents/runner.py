@@ -1,7 +1,4 @@
-"""Subagent processing path -- runs a dimension via N parallel subagents.
-
-Extracted from runner.py to keep module size within maintainability limits.
-"""
+"""Subagent processing path -- runs a dimension via N parallel subagents."""
 from __future__ import annotations
 
 import os
@@ -26,16 +23,8 @@ _MAX_FILES_PER_AGENT = 30
 
 
 def _compute_files_per_agent(total_files: int) -> int:
-    """Compute adaptive max files per agent based on project size.
-
-    Larger projects get higher limits to reduce context rotation overhead
-    (each rotation spawns a new CLI session with ~8K tokens of fixed cost).
-    Capped at 50 — empirically, agents hit turn/time limits above that
-    and leave files unread, which reduces coverage and score quality.
-    """
-    if total_files <= 0:
-        return 0
-    return min(total_files, 50)
+    """Compute adaptive max files per agent. Capped at 50 to avoid turn limits."""
+    return min(total_files, 50) if total_files > 0 else 0
 
 
 @dataclass
@@ -292,7 +281,11 @@ def process_dimension_with_subagents(
 
     # 5. Build prompt and launch main analysis pool
     prompt = _build_subagent_prompt(config, dim_id, ctx)
-    pool, results = _launch_pool(config, dim_id, LaunchPoolParams(evidence_dir=evidence_dir, queue_path=queue_path, prompt=prompt, max_files_per_agent=files_per_agent))
+    params = LaunchPoolParams(
+        evidence_dir=evidence_dir, queue_path=queue_path,
+        prompt=prompt, max_files_per_agent=files_per_agent,
+    )
+    pool, results = _launch_pool(config, dim_id, params)
 
     # 6. Collect and return evidence (includes both verified + new findings)
     all_results = verify_results + results
