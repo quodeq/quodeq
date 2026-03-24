@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from copy import copy
 from typing import TYPE_CHECKING
 
 from quodeq.core.evidence.model import Evidence
@@ -48,8 +49,13 @@ def run_incremental_loop(
             ev = run_dimension_incremental(config, dimension, idx, ctx)
         except (OSError, KeyError, ValueError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 incremental failed: {exc}, falling back to full")
+            original_options = config.options
+            config.options = copy(original_options)
             config.options.incremental_file_filter = None
-            ev = _process_single_dimension(config, dimension, idx, ctx)
+            try:
+                ev = _process_single_dimension(config, dimension, idx, ctx)
+            finally:
+                config.options = original_options
         if ev:
             _log_dimension_result(ev, dimension, idx, ctx.total)
             result[dimension] = ev

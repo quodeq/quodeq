@@ -40,7 +40,7 @@ def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
     return (env or os.environ).get("QUODEQ_SUBAGENT_MODEL") or None
 
 
-def _list_source_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[str]]:
+def _list_source_files(config: RunConfig, dim_id: str, *, ignore_file_filter: bool = False) -> tuple[list[str], set[str]]:
     """List source files for the subagent queue from the target or manifest.
 
     Returns (files, extensions) or ([], set()) if none found.
@@ -75,7 +75,7 @@ def _list_source_files(config: RunConfig, dim_id: str) -> tuple[list[str], set[s
     )
 
     # Incremental mode: filter to only changed + dependent files
-    if config.options.incremental_file_filter is not None:
+    if not ignore_file_filter and config.options.incremental_file_filter is not None:
         filter_set = config.options.incremental_file_filter
         files = [f for f in files if f in filter_set]
 

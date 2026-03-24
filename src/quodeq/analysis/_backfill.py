@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json as _json
 import time
+from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -100,17 +101,15 @@ def run_backfill_phase(
         f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, "
         f"{remaining_budget}s budget remaining"
     )
+    original_options = config.options
+    config.options = copy(original_options)
     config.options.incremental_file_filter = set(backfill_candidates)
-    saved_budget = config.options.pool_budget
-    saved_verify = config.options.verify_findings
     config.options.pool_budget = remaining_budget
     config.options.verify_findings = False
     try:
         _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
     finally:
-        config.options.incremental_file_filter = None
-        config.options.pool_budget = saved_budget
-        config.options.verify_findings = saved_verify
+        config.options = original_options
 
     backfill_taken = _collect_backfill_taken(backfill.evidence_dir, dimension, output_jsonl)
     return backfill_taken

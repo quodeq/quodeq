@@ -12,6 +12,7 @@ from quodeq.analysis._backfill import (
 from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, save_fingerprint
 from quodeq.analysis.incremental import classify_files, carry_forward_findings
 from quodeq.analysis.subagents.runner import _list_source_files
+from copy import copy
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.shared.logging import log_debug, log_info, log_warning
@@ -76,10 +77,7 @@ def save_dimension_fingerprint(
     try:
         evidence_dir = config.work_dir or config.src
         if files is None:
-            saved_filter = config.options.incremental_file_filter
-            config.options.incremental_file_filter = None
-            files, _ = _list_source_files(config, dimension)
-            config.options.incremental_file_filter = saved_filter
+            files, _ = _list_source_files(config, dimension, ignore_file_filter=True)
         if analyzed_files is None:
             queue_files: set[str] = set()
             queue_path = evidence_dir / f"{dimension}_queue.json"
@@ -131,11 +129,13 @@ def _run_phase1_analysis(
         return _parse_evidence_from_jsonl(config, dimension, ctx, jsonl_file, len(classification.unchanged))
 
     log_info(f"  [{dimension}] Analyzing {len(classification.to_analyze)} changed files ({len(classification.unchanged)} cached)")
+    original_options = config.options
+    config.options = copy(original_options)
     config.options.incremental_file_filter = set(classification.to_analyze)
     try:
         ev = _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
     finally:
-        config.options.incremental_file_filter = None
+        config.options = original_options
 
     # Dedup: carried-forward + new findings may overlap
     from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
@@ -182,11 +182,8 @@ def _maybe_carry_forward(
 
 
 def _list_all_source_files(config: RunConfig, dimension: str) -> list[str]:
-    """List all source files, temporarily clearing the incremental filter."""
-    saved_filter = config.options.incremental_file_filter
-    config.options.incremental_file_filter = None
-    files, _extensions = _list_source_files(config, dimension)
-    config.options.incremental_file_filter = saved_filter
+    """List all source files, ignoring any active incremental filter."""
+    files, _extensions = _list_source_files(config, dimension, ignore_file_filter=True)
     return files
 
 
