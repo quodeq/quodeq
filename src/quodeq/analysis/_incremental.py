@@ -1,6 +1,7 @@
 """Incremental dimension analysis — extracted from runner.py for file-length limits."""
 from __future__ import annotations
 
+import json as _json
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -8,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, load_fingerprint, save_fingerprint
 from quodeq.analysis.incremental import classify_files, carry_forward_findings, identify_backfill_files
+from quodeq.analysis.subagents.runner import _list_source_files
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.services.base import _DEFAULT_POOL_BUDGET
@@ -15,6 +17,33 @@ from quodeq.shared.logging import log_debug, log_info, log_warning
 
 if TYPE_CHECKING:
     from quodeq.analysis.runner import RunConfig, _AnalysisContext
+
+def _extract_files_from_jsonl(jsonl_path: Path) -> set[str]:
+    """Extract unique file paths from an evidence JSONL file.
+
+    Returns all distinct ``file`` values found in JSONL entries.
+    Skips malformed lines and entries without a valid file path.
+    """
+    if not jsonl_path.exists():
+        return set()
+    files: set[str] = set()
+    try:
+        with open(jsonl_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    obj = _json.loads(line)
+                except _json.JSONDecodeError:
+                    continue
+                file_path = obj.get("file")
+                if file_path:
+                    files.add(file_path)
+    except OSError:
+        pass
+    return files
+
 
 _MIN_BACKFILL_BUDGET_S = 60
 
@@ -74,20 +103,23 @@ def save_dimension_fingerprint(
     try:
         evidence_dir = config.work_dir or config.src
         if files is None:
-            from quodeq.analysis.subagents.runner import _list_source_files
             saved_filter = config.options.incremental_file_filter
             config.options.incremental_file_filter = None
             files, _ = _list_source_files(config, dimension)
             config.options.incremental_file_filter = saved_filter
         if analyzed_files is None:
+            queue_files: set[str] = set()
             queue_path = evidence_dir / f"{dimension}_queue.json"
             if queue_path.exists():
                 from quodeq.analysis.subagents.file_queue import FileQueue
                 try:
-                    queue = FileQueue(queue_path)
-                    analyzed_files = set(queue.all_taken_files())
+                    queue_files = set(FileQueue(queue_path).all_taken_files())
                 except Exception:
                     pass
+            # Include files with findings in the evidence JSONL — covers
+            # carry-forward and verification results not tracked by the queue.
+            jsonl_files = _extract_files_from_jsonl(evidence_dir / f"{dimension}_evidence.jsonl")
+            analyzed_files = queue_files | jsonl_files
         fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=analyzed_files)
         save_fingerprint(fp, evidence_dir)
     except Exception as exc:
@@ -239,7 +271,6 @@ def run_dimension_incremental(
     prev_fp, prev_evidence_dir = find_previous_fingerprint(evidence_dir, dimension)
 
     # Get full source files list (for classification)
-    from quodeq.analysis.subagents.runner import _list_source_files
     saved_filter = config.options.incremental_file_filter
     config.options.incremental_file_filter = None
     files, extensions = _list_source_files(config, dimension)

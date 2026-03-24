@@ -4,9 +4,10 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, ClassificationInput, FileClassification, identify_backfill_files
+from quodeq.analysis._incremental import save_dimension_fingerprint, _extract_files_from_jsonl
 
 
 class TestDetectChangedFiles:
@@ -183,3 +184,122 @@ class TestIncrementalRunnerIntegration:
             standards_dir=None, dimension="security", language="python"))
         assert len(result.to_analyze) == 0
         assert result.unchanged == {"a.py"}
+
+
+class TestExtractFilesFromJsonl:
+    def test_extracts_unique_file_paths(self, tmp_path):
+        """Extracts unique file paths from evidence JSONL."""
+        jsonl = tmp_path / "security_evidence.jsonl"
+        jsonl.write_text(
+            '{"p":"Mod","t":"violation","file":"a.py","line":1}\n'
+            '{"p":"Mod","t":"compliance","file":"b.py","line":2}\n'
+            '{"p":"Mod","t":"violation","file":"a.py","line":5}\n'
+        )
+        files = _extract_files_from_jsonl(jsonl)
+        assert files == {"a.py", "b.py"}
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        """Non-existent JSONL returns empty set."""
+        files = _extract_files_from_jsonl(tmp_path / "missing.jsonl")
+        assert files == set()
+
+    def test_skips_malformed_lines(self, tmp_path):
+        """Malformed JSON lines are skipped gracefully."""
+        jsonl = tmp_path / "security_evidence.jsonl"
+        jsonl.write_text(
+            '{"p":"Mod","t":"violation","file":"a.py","line":1}\n'
+            'not valid json\n'
+            '\n'
+            '{"p":"Mod","t":"violation","line":1}\n'
+            '{"p":"Mod","t":"violation","file":"","line":1}\n'
+        )
+        files = _extract_files_from_jsonl(jsonl)
+        assert files == {"a.py"}
+
+    def test_empty_file_returns_empty(self, tmp_path):
+        """Empty JSONL returns empty set."""
+        jsonl = tmp_path / "security_evidence.jsonl"
+        jsonl.write_text("")
+        files = _extract_files_from_jsonl(jsonl)
+        assert files == set()
+
+
+class TestSaveDimensionFingerprintJsonlUnion:
+    @patch("quodeq.analysis._incremental._list_source_files")
+    @patch("quodeq.analysis._incremental.save_fingerprint")
+    @patch("quodeq.analysis._incremental.build_fingerprint")
+    def test_includes_files_from_jsonl_not_in_queue(
+        self, mock_build, mock_save, mock_list_files, tmp_path,
+    ):
+        """Files in JSONL but not in queue are included in analyzed_files."""
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+
+        # Queue has only file_a
+        queue_data = {
+            "version": 1,
+            "pending": [],
+            "taken": [{"files": ["a.py"], "agent": "agent-0", "ts": 1.0}],
+        }
+        (evidence_dir / "security_queue.json").write_text(json.dumps(queue_data))
+
+        # JSONL has file_a and file_b (file_b came from verification carry-forward)
+        (evidence_dir / "security_evidence.jsonl").write_text(
+            '{"p":"Mod","t":"violation","file":"a.py","line":1}\n'
+            '{"p":"Mod","t":"violation","file":"b.py","line":1}\n'
+        )
+
+        mock_list_files.return_value = (["a.py", "b.py", "c.py"], set())
+        mock_build.return_value = {"dimension": "security"}
+
+        config = MagicMock()
+        config.work_dir = evidence_dir
+        config.src = tmp_path
+        config.options.incremental_file_filter = None
+        config.standards_dir = None
+
+        save_dimension_fingerprint(config, "security")
+
+        # build_fingerprint should receive analyzed_files containing both a.py and b.py
+        call_kwargs = mock_build.call_args
+        analyzed = call_kwargs.kwargs.get("analyzed_files") or call_kwargs[1].get("analyzed_files")
+        assert "a.py" in analyzed
+        assert "b.py" in analyzed
+        assert "c.py" not in analyzed  # not in queue or JSONL
+
+    @patch("quodeq.analysis._incremental._list_source_files")
+    @patch("quodeq.analysis._incremental.save_fingerprint")
+    @patch("quodeq.analysis._incremental.build_fingerprint")
+    def test_no_duplicates_in_union(
+        self, mock_build, mock_save, mock_list_files, tmp_path,
+    ):
+        """Files in both queue and JSONL produce a clean set (no duplicates)."""
+        evidence_dir = tmp_path / "evidence"
+        evidence_dir.mkdir()
+
+        queue_data = {
+            "version": 1,
+            "pending": [],
+            "taken": [{"files": ["a.py", "b.py"], "agent": "agent-0", "ts": 1.0}],
+        }
+        (evidence_dir / "security_queue.json").write_text(json.dumps(queue_data))
+
+        (evidence_dir / "security_evidence.jsonl").write_text(
+            '{"p":"Mod","t":"violation","file":"a.py","line":1}\n'
+            '{"p":"Mod","t":"violation","file":"b.py","line":1}\n'
+        )
+
+        mock_list_files.return_value = (["a.py", "b.py"], set())
+        mock_build.return_value = {"dimension": "security"}
+
+        config = MagicMock()
+        config.work_dir = evidence_dir
+        config.src = tmp_path
+        config.options.incremental_file_filter = None
+        config.standards_dir = None
+
+        save_dimension_fingerprint(config, "security")
+
+        call_kwargs = mock_build.call_args
+        analyzed = call_kwargs.kwargs.get("analyzed_files") or call_kwargs[1].get("analyzed_files")
+        assert analyzed == {"a.py", "b.py"}
