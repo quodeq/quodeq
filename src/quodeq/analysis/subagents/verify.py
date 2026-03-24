@@ -139,6 +139,28 @@ def partition_findings_by_fingerprint(
     return carry_forward, needs_verification
 
 
+def write_carry_forward_findings(
+    findings: list[dict], evidence_dir: Path, dim_id: str,
+) -> int:
+    """Append carry-forward findings to the evidence JSONL.
+
+    Writes from an in-memory list of finding dicts (as returned by
+    partition_findings_by_fingerprint). Unlike carry_forward_findings in
+    incremental.py which filters file-to-file, this writes pre-partitioned
+    results directly.
+
+    Returns the number of findings written.
+    """
+    if not findings:
+        return 0
+    output = evidence_dir / f"{dim_id}_evidence.jsonl"
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with open(output, "a") as f:
+        for finding in findings:
+            f.write(json.dumps(finding) + "\n")
+    return len(findings)
+
+
 def _group_by_file(findings: list[dict]) -> dict[str, list[dict]]:
     """Group findings by their source file path."""
     groups: dict[str, list[dict]] = {}

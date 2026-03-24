@@ -11,6 +11,7 @@ from quodeq.analysis.subagents.verify import (
     _write_verify_manifest,
     build_verify_prompt,
     partition_findings_by_fingerprint,
+    write_carry_forward_findings,
 )
 
 
@@ -226,3 +227,37 @@ class TestPartitionFindingsByFingerprint:
         )
         assert len(carry) == 1
         assert verify == []
+
+
+class TestWriteCarryForwardFindings:
+    def test_creates_file_if_missing(self, tmp_path):
+        """Creates the JSONL file and writes findings."""
+        findings = [
+            {"p": "Mod", "t": "violation", "file": "a.py", "line": 1, "reason": "test"},
+            {"p": "Mod", "t": "compliance", "file": "b.py", "line": 2, "reason": "ok"},
+        ]
+        count = write_carry_forward_findings(findings, tmp_path, "security")
+        assert count == 2
+        jsonl = tmp_path / "security_evidence.jsonl"
+        assert jsonl.exists()
+        lines = [l for l in jsonl.read_text().splitlines() if l.strip()]
+        assert len(lines) == 2
+        assert json.loads(lines[0])["file"] == "a.py"
+        assert json.loads(lines[1])["file"] == "b.py"
+
+    def test_appends_to_existing_file(self, tmp_path):
+        """Appends to existing JSONL without overwriting."""
+        jsonl = tmp_path / "security_evidence.jsonl"
+        jsonl.write_text('{"p":"Exist","t":"violation","file":"x.py","line":1}\n')
+        findings = [{"p": "Mod", "t": "violation", "file": "a.py", "line": 1, "reason": "new"}]
+        count = write_carry_forward_findings(findings, tmp_path, "security")
+        assert count == 1
+        lines = [l for l in jsonl.read_text().splitlines() if l.strip()]
+        assert len(lines) == 2  # original + new
+        assert json.loads(lines[0])["file"] == "x.py"  # original preserved
+        assert json.loads(lines[1])["file"] == "a.py"   # new appended
+
+    def test_empty_findings(self, tmp_path):
+        """Empty list → returns 0, no file created."""
+        count = write_carry_forward_findings([], tmp_path, "security")
+        assert count == 0
