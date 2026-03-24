@@ -14,6 +14,8 @@ from quodeq.engine._ref_utils import load_compiled_refs
 
 from tests.engine.conftest import _make_request, _run_server
 
+_JSONRPC_METHOD_NOT_FOUND = -32601
+
 
 class TestInitialize:
     def test_returns_server_info(self, tmp_path: Path) -> None:
@@ -164,7 +166,7 @@ class TestUnknownMethod:
             [_make_request("nonexistent/method", 99)],
             findings_file,
         )
-        assert responses[0]["error"]["code"] == -32601
+        assert responses[0]["error"]["code"] == _JSONRPC_METHOD_NOT_FOUND
 
 
 class TestLoadCompiledRefs:

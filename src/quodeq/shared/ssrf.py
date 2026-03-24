@@ -8,8 +8,10 @@ from functools import lru_cache
 
 _logger = logging.getLogger(__name__)
 
+_LRU_CACHE_SIZE = 256
 
-@lru_cache(maxsize=256)
+
+@lru_cache(maxsize=_LRU_CACHE_SIZE)
 def is_private_address(hostname: str) -> bool:
     """Return True if *hostname* resolves to a private/loopback/link-local address (cached)."""
     if hostname in ("localhost", "localhost.localdomain"):

@@ -41,7 +41,9 @@ function computeComplianceByPrinciple(evalData) {
   return map;
 }
 
-function DimensionOverview({ evalData, runId, dateLabel, allViolations, overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples }) {
+function DimensionOverview({ data, stats, onNavigate }) {
+  const { evalData, runId, dateLabel, allViolations } = data;
+  const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples } = stats;
   return (
     <section className="acc-eval-panel acc-eval-panel--compact panel">
       <div className="acc-eval-top">
@@ -231,7 +233,11 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
 
   return (
     <>
-      <DimensionOverview evalData={d.evalData} runId={runId} dateLabel={dateLabel} allViolations={d.allViolations} overallGrade={d.overallGrade} severityCounts={d.severityCounts} totalCompliant={d.totalCompliant} topFiles={d.topFiles} uniquePrinciples={d.uniquePrinciples} />
+      <DimensionOverview
+        data={{ evalData: d.evalData, runId, dateLabel, allViolations: d.allViolations }}
+        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: d.topFiles, uniquePrinciples: d.uniquePrinciples }}
+        onNavigate={onNavigate}
+      />
       <PrinciplesList evalData={d.evalData} principleGrades={d.principleGrades} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
       <ViolationsByPrincipleSection allViolations={d.allViolations} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
       <ViolationsByFileSection topFiles={d.topFiles} onNavigate={onNavigate} />

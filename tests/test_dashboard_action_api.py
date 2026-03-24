@@ -5,6 +5,9 @@ from quodeq.dashboard._api_health import ApiConfig
 
 from tests.conftest import DummyProcess
 
+_TEST_PORT = 8001
+_TEST_HOST = "127.0.0.1"
+
 
 def test_spawn_action_api_sets_env(monkeypatch, tmp_path):
     captured = {}
@@ -14,8 +17,8 @@ def test_spawn_action_api_sets_env(monkeypatch, tmp_path):
         return DummyProcess()
 
     monkeypatch.setattr(_api_health.subprocess, "Popen", fake_popen)
-    _api_health.spawn_action_api(8001, tmp_path / "fake.pid", "127.0.0.1")
-    assert captured["env"]["QUODEQ_ACTION_API_PORT"] == "8001"
+    _api_health.spawn_action_api(_TEST_PORT, tmp_path / "fake.pid", _TEST_HOST)
+    assert captured["env"]["QUODEQ_ACTION_API_PORT"] == str(_TEST_PORT)
 
 
 def test_spawn_action_api_sets_static_dist(monkeypatch, tmp_path):
@@ -27,7 +30,7 @@ def test_spawn_action_api_sets_static_dist(monkeypatch, tmp_path):
 
     dist_path = tmp_path / "dist"
     monkeypatch.setattr(_api_health.subprocess, "Popen", fake_popen)
-    _api_health.spawn_action_api(8001, tmp_path / "fake.pid", "127.0.0.1", ApiConfig(static_dist=dist_path))
+    _api_health.spawn_action_api(_TEST_PORT, tmp_path / "fake.pid", _TEST_HOST, ApiConfig(static_dist=dist_path))
     assert captured["env"]["QUODEQ_STATIC_DIST"] == str(dist_path)
 
 

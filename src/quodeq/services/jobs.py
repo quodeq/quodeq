@@ -39,6 +39,8 @@ __all__ = [
 _logger = logging.getLogger(__name__)
 _REPORT_PATH_MARKER = "Report path:"
 _PROCESS_WAIT_TIMEOUT_S = 30
+_EXIT_CODE_SPAWN_FAILURE = -1
+_EXIT_CODE_TIMEOUT = -9
 
 # Canonical job status strings.
 STATUS_RUNNING = "running"
@@ -92,7 +94,7 @@ class JobManager:
             _logger.error("Failed to start job subprocess: %s", exc)
             job.status = STATUS_FAILED
             job.ended_at = datetime.now(timezone.utc).isoformat()
-            job.exit_code = -1
+            job.exit_code = _EXIT_CODE_SPAWN_FAILURE
             job.logs.append(f"Failed to start process: {exc}")
             with self._lock:
                 self._store.put(job)
@@ -207,7 +209,7 @@ class JobManager:
             _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._JOB_TIMEOUT_S)
             process.kill()
             process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
-            exit_code = -9
+            exit_code = _EXIT_CODE_TIMEOUT
         with self._lock:
             self._processes.pop(job_id, None)
             job = self._store.get(job_id)

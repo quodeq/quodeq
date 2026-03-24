@@ -97,22 +97,15 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
 
 
 def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
-    """Detect or validate the language for a repo using universal detection.
-
-    Returns language string or None on error.
-    """
+    """Detect or validate the language for a repo using universal detection."""
     if args.language:
         validate_path_segment(args.language)
         return args.language
-
-    detection_file = paths.detection_file
-    if not detection_file.exists():
+    if not paths.detection_file.exists():
         return None
-
     try:
         from quodeq.analysis.manifest import detect_language
-        language = detect_language(src, detection_file)
-        return language
+        return detect_language(src, paths.detection_file)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return None

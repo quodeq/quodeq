@@ -30,6 +30,7 @@ _ALLOWED_USAGES = {"allowed", "allowed-with-review"}
 _KNOWN_USAGES = {"prohibited", "discouraged"} | _ALLOWED_USAGES
 
 _DEFAULT_STANDARDS_DIR = Path(__file__).resolve().parent.parent / "standards" / "iso25010"
+_DEFAULT_AUDIT_OUTPUT = Path(__file__).resolve().parent.parent / "standards" / "cwe" / "audit.json"
 # Overridable via --api-base CLI argument or CWE_API_BASE env var
 _CWE_API_URL = "https://cwe-api.mitre.org/api/v1/cwe"
 
@@ -157,7 +158,7 @@ def _print_category(label: str, entries: list[dict], *, show_rationale: bool = F
 
 def _write_results_json(results: list[dict]) -> Path:
     """Write the full audit results to a JSON file and return the output path."""
-    output_path = Path(__file__).resolve().parent.parent / "standards" / "cwe" / "audit.json"
+    output_path = _DEFAULT_AUDIT_OUTPUT
     output_path.write_text(json.dumps(results, indent=2, ensure_ascii=False) + "\n")
     return output_path
 

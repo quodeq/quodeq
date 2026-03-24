@@ -223,7 +223,13 @@ export default function DimensionCard({ title, dimension, isSingleFocus }) {
       <DimCardHeader title={title} dimension={dimension} delta={delta} />
       <DimKpiGrid dimension={dimension} />
       {(dimension.violations?.length > 0 || dimension.principles?.length > 0) && (
-        <DimFilterControls severity={{ selected: selectedSeverities, setSelected: setSelectedSeverities }} file={{ filter: fileFilter, setFilter: setFileFilter }} principles={{ options: principleOptions, selected: selectedPrinciples, setSelected: setSelectedPrinciples }} activeFilterCount={activeFilterCount} clearAllFilters={clearAllFilters} />
+        <DimFilterControls
+          severity={{ selected: selectedSeverities, setSelected: setSelectedSeverities }}
+          file={{ filter: fileFilter, setFilter: setFileFilter }}
+          principles={{ options: principleOptions, selected: selectedPrinciples, setSelected: setSelectedPrinciples }}
+          activeFilterCount={activeFilterCount}
+          clearAllFilters={clearAllFilters}
+        />
       )}
       <DimPrinciplesList dimension={dimension} />
       {filteredViolations.length > 0 && (

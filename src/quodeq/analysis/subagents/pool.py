@@ -20,6 +20,8 @@ _HEARTBEAT_JOIN_TIMEOUT_S = 2
 
 _DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
 _SCOUT_TIMEOUT_S = 180  # 3 minutes before forcing scale-up
+_DEFAULT_MAX_DURATION_S = 1800
+_DEFAULT_FILES_PER_AGENT = 30
 
 
 @dataclass
@@ -97,7 +99,7 @@ class SubagentPool:
             jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
             heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,
             ai_cmd=bc.ai_cmd, ai_model=bc.ai_model, max_turns=bc.max_turns,
-            max_duration=bc.max_duration or 1800,
+            max_duration=bc.max_duration or _DEFAULT_MAX_DURATION_S,
             compiled_dir=bc.compiled_dir, dimension=self._dimension,
             queue_path=self._queue_path, agent_id=agent_id,
             max_files_per_agent=bc.max_files_per_agent,
@@ -143,7 +145,7 @@ class SubagentPool:
         """Compute how many overflow agents to spawn after scout completes."""
         if remaining <= 0:
             return 0
-        needed = ceil(remaining / (self._base_config.max_files_per_agent or 30))
+        needed = ceil(remaining / (self._base_config.max_files_per_agent or _DEFAULT_FILES_PER_AGENT))
         return min(needed, self._n - 1) if needed > 1 else 0
 
     def _collect_done(

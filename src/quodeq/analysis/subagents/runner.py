@@ -16,6 +16,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
+from quodeq.services.base import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 if TYPE_CHECKING:
@@ -134,7 +135,7 @@ def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tu
         max_duration=config.options.max_duration,
         ai_model=subagent_model,
         max_files_per_agent=params.max_files_per_agent,
-        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
+        pool_budget=pool_budget_val if pool_budget_val is not None else _DEFAULT_POOL_BUDGET,
     )
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path),
@@ -194,6 +195,37 @@ def process_consolidated_dimensions(
     return _impl(config, dimensions, ctx)
 
 
+def _load_and_filter_previous(
+    config: RunConfig, dim_id: str, evidence_dir: Path,
+) -> list[dict]:
+    """Load previous findings and apply incremental file filter if active."""
+    from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension
+
+    prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)
+    if not prev_findings:
+        return []
+    if config.options.incremental_file_filter is not None:
+        filter_set = config.options.incremental_file_filter
+        prev_findings = [f for f in prev_findings if f.get("file") in filter_set]
+    return prev_findings
+
+
+def _dispatch_verification_pool(
+    config: RunConfig, dim_id: str, evidence_dir: Path, needs_verify: list[dict],
+) -> list:
+    """Write manifest and launch the AI verification pool for changed-file findings."""
+    from quodeq.analysis.subagents.verify import _group_by_file, _write_verify_manifest
+
+    grouped = _group_by_file(needs_verify)
+    manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
+    _write_verify_manifest(grouped, manifest_path)
+    files_to_verify = list(grouped.keys())
+    log_info(f"  [{dim_id}] Launching fast verification pool for {len(needs_verify)} findings across {len(files_to_verify)} files")
+    verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
+    log_success(f"  [{dim_id}] Verification pool complete")
+    return verify_results
+
+
 def _run_verification_step(
     config: RunConfig, dim_id: str, evidence_dir: Path, files: list[str],
     prev_fingerprint: dict | None = None,
@@ -205,50 +237,29 @@ def _run_verification_step(
     Only changed-file findings are sent to the AI verification pool.
     """
     from quodeq.analysis.subagents.verify import (
-        load_previous_findings_for_dimension, _group_by_file,
-        _write_verify_manifest, partition_findings_by_fingerprint,
-        write_carry_forward_findings,
+        partition_findings_by_fingerprint, write_carry_forward_findings,
     )
 
-    prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)
+    prev_findings = _load_and_filter_previous(config, dim_id, evidence_dir)
     if not prev_findings:
         return []
 
-    # In incremental mode, only consider findings for files in the filter.
-    # Unchanged-file findings are already handled by _maybe_carry_forward.
-    if config.options.incremental_file_filter is not None:
-        filter_set = config.options.incremental_file_filter
-        prev_findings = [f for f in prev_findings if f.get("file") in filter_set]
-        if not prev_findings:
-            return []
-
-    # Load previous fingerprint if not provided by caller
     if prev_fingerprint is None:
         from quodeq.analysis.fingerprint import find_previous_fingerprint
         prev_fingerprint, _ = find_previous_fingerprint(evidence_dir, dim_id)
 
-    # Partition: unchanged files carry forward, changed files verify
     carry_forward, needs_verify = partition_findings_by_fingerprint(
         prev_findings, prev_fingerprint, config.src,
         standards_dir=config.standards_dir, dimension=dim_id,
     )
-
     if carry_forward:
         written = write_carry_forward_findings(carry_forward, evidence_dir, dim_id)
         log_info(f"  [{dim_id}] {written} findings carried forward (unchanged files)")
-
     if not needs_verify:
         log_info(f"  [{dim_id}] All previous findings carried forward — skipping verification pool")
         return []
 
-    grouped = _group_by_file(needs_verify)
-    manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
-    _write_verify_manifest(grouped, manifest_path)
-    files_to_verify = list(grouped.keys())
-    log_info(f"  [{dim_id}] Launching fast verification pool for {len(needs_verify)} findings across {len(files_to_verify)} files")
-    verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
-    log_success(f"  [{dim_id}] Verification pool complete")
-    return verify_results
+    return _dispatch_verification_pool(config, dim_id, evidence_dir, needs_verify)
 
 
 def process_dimension_with_subagents(

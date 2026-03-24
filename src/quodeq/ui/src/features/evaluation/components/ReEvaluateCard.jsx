@@ -3,7 +3,8 @@ import { getProjectInfo } from '../../../api/index.js';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { ISO_25010_URL } from '../../../constants.js';
 
-const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' };
+const BUTTON_GAP = '8px';
+const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_GAP, alignItems: 'center' };
 const flexButtonStyle = { flex: 1, marginTop: 0 };
 
 export default function ReEvaluateCard({ project, onStart, disabled }) {

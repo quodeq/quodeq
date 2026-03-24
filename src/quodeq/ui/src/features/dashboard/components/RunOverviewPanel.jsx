@@ -151,7 +151,8 @@ function computeRunScoreDelta(dashboard) {
   return (curr - prev).toFixed(1);
 }
 
-function RunHeroSection({ dashboard, selectedRunId, runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }) {
+function RunHeroSection({ dashboard, selectedRunId, stats }) {
+  const { runSummary, runScoreDelta, runTopFiles, runUniquePrinciples } = stats;
   return (
     <section className="acc-eval-panel panel">
       <div className="acc-eval-top">
@@ -218,7 +219,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
 
   return (
     <>
-      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} runSummary={runSummary} runScoreDelta={runScoreDelta} runTopFiles={runTopFiles} runUniquePrinciples={runUniquePrinciples} />
+      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }} />
       <div className="dimensions-header">
         <h3 className="dimensions-title">Dimensions Analyzed</h3>
       </div>

@@ -3,6 +3,8 @@
  * were previously inlined inside App, keeping the root component focused
  * on composition rather than API plumbing.
  */
+const REQUEST_TIMEOUT_MS = 30000;
+
 export function useProjectActions({ projects, selectedProject, handleProjectChange, loadProjects }) {
   function _apiQs() {
     const params = new URLSearchParams(window.location.search);
@@ -14,7 +16,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
     const qs = _apiQs();
     const separator = qs ? '&' : '?';
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 30000);
+    const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     const res = await fetch(`/api/projects/${encodeURIComponent(projectId)}${qs}${separator}confirm=true`, { method: 'DELETE', signal: controller.signal });
     clearTimeout(timeoutId);
     if (!res.ok) {
