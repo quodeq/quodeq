@@ -11,15 +11,10 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta } from '../../../utils/formatters.js';
 
-const cssVar = (() => {
-  const cache = {};
-  return (name, fallback) => {
-    if (!(name in cache)) {
-      cache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    }
-    return cache[name] || fallback;
-  };
-})();
+const cssVar = (name, fallback) => {
+  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return val || fallback;
+};
 
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
 const CHART_LEFT_MARGIN = -16;
