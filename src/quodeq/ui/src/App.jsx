@@ -156,7 +156,7 @@ function useAppState() {
   const settings = useAppSettings();
   function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
   const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
-  // Build day-level runs for Overview (collapse same-day runs, keep last of each day)
+  // Build day-level runs for Overview (collapse same-day runs, keep first/newest of each day)
   const dailyRuns = useMemo(() => {
     if (!availableRuns.length) return [];
     const trend = dashboard?.trend || [];
@@ -166,11 +166,10 @@ function useAppState() {
       const t = trend.find(r => r.runId === run.runId);
       const datePart = (t?.dateISO || '').slice(0, 10);
       if (datePart !== lastDate) {
-        byDay.push(run);
+        byDay.push(run); // first (newest) entry of the day wins
         lastDate = datePart;
-      } else {
-        byDay[byDay.length - 1] = run; // last run of the day wins
       }
+      // skip older runs of the same day
     }
     return byDay;
   }, [availableRuns, dashboard]);

@@ -169,6 +169,9 @@ function AccumulatedDetailsSection({ topFiles, violationsByPrinciple, uniquePrin
 // ---------------------------------------------------------------------------
 
 function collapseByDay(trend) {
+  // trend is newest-first. For each day, keep the FIRST (newest) entry
+  // which has the most up-to-date accumulated state.
+  // Collect dayDimensions from all runs of that day.
   if (!trend || trend.length === 0) return trend;
   const collapsed = [];
   let currentDay = null;
@@ -184,12 +187,13 @@ function collapseByDay(trend) {
       currentDay = datePart;
       dayDims = new Set();
       dayDimDetails = {};
-      collapsed.push({ ...entry });
-    } else {
-      collapsed[collapsed.length - 1] = { ...entry };
+      collapsed.push({ ...entry }); // first (newest) entry of the day wins
     }
+    // Don't replace — just collect dimensions from all runs of this day
     for (const d of entry.dimensions || []) dayDims.add(d);
-    for (const d of entry.dimensionDetails || []) dayDimDetails[d.dimension || ''] = d;
+    for (const d of entry.dimensionDetails || []) {
+      if (!dayDimDetails[d.dimension || '']) dayDimDetails[d.dimension || ''] = d; // first (newest) wins
+    }
   }
   if (collapsed.length > 0) {
     collapsed[collapsed.length - 1].dayDimensions = [...dayDims].sort();
@@ -225,7 +229,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
       />
 
       <div className="history-panels-row">
-        <RunHistoryPanel trend={dailyTrend} selectedRunId={selectedRunId} selectedRunScore={accumulated?.summary?.numericAverage} onBarClick={onRunClick} />
+        <RunHistoryPanel trend={dailyTrend} selectedRunId={currentOverviewRun} selectedRunScore={accumulated?.summary?.numericAverage} onBarClick={onRunClick} />
         <DimensionScorePanel dimensions={accumulatedDimensions} onBarClick={onDimensionClick} runDate={stats.lastRun.date} runId={stats.lastRun.runId} />
       </div>
 
