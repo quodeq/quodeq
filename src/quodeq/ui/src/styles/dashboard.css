@@ -699,9 +699,9 @@
 }
 
 .run-navigator .run-nav-action--outline:hover:not(:disabled) {
-  background: var(--color-accent-soft);
+  background: var(--color-accent);
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-on-accent);
 }
 
 .run-navigator .run-nav-action--primary {
