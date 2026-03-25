@@ -170,6 +170,35 @@
   --primitive-major-light: #c05030;
   --primitive-major-dark:  #e87850;
 
+  /* Midnight severity — cool magenta-reds */
+  --primitive-midnight-sev-critical-light: #b42850;
+  --primitive-midnight-sev-major-light:    #a0466e;
+  --primitive-midnight-sev-minor-light:    #786482;
+  --primitive-midnight-sev-critical-dark:  #f05078;
+  --primitive-midnight-sev-major-dark:     #d26e96;
+  --primitive-midnight-sev-minor-dark:     #aa8caa;
+
+  /* Neo severity — warm amber-reds (light); already has dark hardcoded */
+  --primitive-neo-sev-critical-light: #c81e1e;
+  --primitive-neo-sev-major-light:    #c85a28;
+  --primitive-neo-sev-minor-light:    #8c6e46;
+
+  /* Forest severity — earthy reds and ambers */
+  --primitive-forest-sev-critical-light: #a83228;
+  --primitive-forest-sev-major-light:    #b05828;
+  --primitive-forest-sev-minor-light:    #8c643c;
+  --primitive-forest-sev-critical-dark:  #e06450;
+  --primitive-forest-sev-major-dark:     #d28c50;
+  --primitive-forest-sev-minor-dark:     #b49664;
+
+  /* Ember severity — deep warm reds */
+  --primitive-ember-sev-critical-light: #aa0000;
+  --primitive-ember-sev-major-light:    #b43c1e;
+  --primitive-ember-sev-minor-light:    #8c503c;
+  --primitive-ember-sev-critical-dark:  #ff4a4a;
+  --primitive-ember-sev-major-dark:     #f07846;
+  --primitive-ember-sev-minor-dark:     #c8966e;
+
   /* Issue-intensity heat scale (gray → crimson, default light + dark) */
   --primitive-ired-200: #c09090;   /* dark B: muted rose-gray */
   --primitive-ired-300: #d86060;   /* dark C: rose-red */
@@ -573,15 +602,15 @@ html[data-theme="ember-dark"]:root {
   --color-danger:  #e05c4b;
   --color-success: #4caf7d;
 
-  --color-sev-critical-text:   var(--primitive-crimson-200);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-200) 42%, transparent);
-  --color-sev-major-text:      var(--primitive-major-dark);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-major-dark) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-major-dark) 38%, transparent);
-  --color-sev-minor-text:      var(--primitive-ired-200);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-200) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-200) 32%, transparent);
+  --color-sev-critical-text:   var(--primitive-ember-sev-critical-dark);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-ember-sev-critical-dark) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-ember-sev-critical-dark) 42%, transparent);
+  --color-sev-major-text:      var(--primitive-ember-sev-major-dark);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ember-sev-major-dark) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-ember-sev-major-dark) 38%, transparent);
+  --color-sev-minor-text:      var(--primitive-ember-sev-minor-dark);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ember-sev-minor-dark) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ember-sev-minor-dark) 32%, transparent);
 
   --color-grade-top-text:    var(--primitive-emerald-300);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-emerald-300) 12%, transparent);
@@ -654,15 +683,15 @@ html[data-theme="forest-light"]:root {
   --color-danger:  #c0392b;
   --color-success: #2d7a4f;
 
-  --color-sev-critical-text:   var(--primitive-crimson-600);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-600) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-600) 38%, transparent);
-  --color-sev-major-text:      var(--primitive-major-light);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-major-light) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-major-light) 35%, transparent);
-  --color-sev-minor-text:      var(--primitive-ired-700);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
+  --color-sev-critical-text:   var(--primitive-forest-sev-critical-light);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-forest-sev-critical-light) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-forest-sev-critical-light) 38%, transparent);
+  --color-sev-major-text:      var(--primitive-forest-sev-major-light);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-forest-sev-major-light) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-forest-sev-major-light) 35%, transparent);
+  --color-sev-minor-text:      var(--primitive-forest-sev-minor-light);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-forest-sev-minor-light) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-forest-sev-minor-light) 30%, transparent);
 
   --color-grade-top-text:    var(--primitive-forest-800);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-forest-800) 12%, transparent);
@@ -732,15 +761,15 @@ html[data-theme="midnight-dark"]:root {
   --color-danger:  #e05c4b;
   --color-success: #4caf7d;
 
-  --color-sev-critical-text:   var(--primitive-crimson-200);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-200) 42%, transparent);
-  --color-sev-major-text:      var(--primitive-major-dark);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-major-dark) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-major-dark) 38%, transparent);
-  --color-sev-minor-text:      var(--primitive-ired-200);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-200) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-200) 32%, transparent);
+  --color-sev-critical-text:   var(--primitive-midnight-sev-critical-dark);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-midnight-sev-critical-dark) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-midnight-sev-critical-dark) 42%, transparent);
+  --color-sev-major-text:      var(--primitive-midnight-sev-major-dark);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-midnight-sev-major-dark) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-midnight-sev-major-dark) 38%, transparent);
+  --color-sev-minor-text:      var(--primitive-midnight-sev-minor-dark);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-midnight-sev-minor-dark) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-midnight-sev-minor-dark) 32%, transparent);
 
   --color-grade-top-text:    #00d4ff;
   --color-grade-top-bg:      color-mix(in srgb, #00d4ff 12%, transparent);
@@ -813,15 +842,15 @@ html[data-theme="midnight-light"]:root {
   --color-danger:  var(--primitive-red-500);
   --color-success: #16a34a;
 
-  --color-sev-critical-text:   var(--primitive-crimson-600);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-600) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-600) 38%, transparent);
-  --color-sev-major-text:      var(--primitive-major-light);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-major-light) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-major-light) 35%, transparent);
-  --color-sev-minor-text:      var(--primitive-ired-700);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
+  --color-sev-critical-text:   var(--primitive-midnight-sev-critical-light);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-midnight-sev-critical-light) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-midnight-sev-critical-light) 38%, transparent);
+  --color-sev-major-text:      var(--primitive-midnight-sev-major-light);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-midnight-sev-major-light) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-midnight-sev-major-light) 35%, transparent);
+  --color-sev-minor-text:      var(--primitive-midnight-sev-minor-light);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-midnight-sev-minor-light) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-midnight-sev-minor-light) 30%, transparent);
 
   --color-grade-top-text:    var(--primitive-green-electric);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-green-electric) 12%, transparent);
@@ -955,15 +984,15 @@ html[data-theme="neo-light"]:root {
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent-dark) 8%, transparent);
   --color-danger:  #c0392b;
   --color-success: #2d7a4f;
-  --color-sev-critical-text:   var(--primitive-crimson-600);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-600) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-600) 38%, transparent);
-  --color-sev-major-text:      var(--primitive-major-light);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-major-light) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-major-light) 35%, transparent);
-  --color-sev-minor-text:      var(--primitive-ired-700);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
+  --color-sev-critical-text:   var(--primitive-neo-sev-critical-light);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-neo-sev-critical-light) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-neo-sev-critical-light) 38%, transparent);
+  --color-sev-major-text:      var(--primitive-neo-sev-major-light);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-neo-sev-major-light) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-neo-sev-major-light) 35%, transparent);
+  --color-sev-minor-text:      var(--primitive-neo-sev-minor-light);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-neo-sev-minor-light) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-neo-sev-minor-light) 30%, transparent);
   --color-grade-top-text:    #006622;
   --color-grade-top-bg:      color-mix(in srgb, #006622 12%, transparent);
   --color-grade-high-text:   #338844;
@@ -1021,15 +1050,15 @@ html[data-theme="forest-dark"]:root {
   --color-accent-soft:  color-mix(in srgb, var(--primitive-green-400) 14%, transparent);
   --color-danger:  #e05c4b;
   --color-success: var(--primitive-green-400);
-  --color-sev-critical-text:   var(--primitive-crimson-200);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-200) 42%, transparent);
-  --color-sev-major-text:      var(--primitive-major-dark);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-major-dark) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-major-dark) 38%, transparent);
-  --color-sev-minor-text:      var(--primitive-ired-200);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-200) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-200) 32%, transparent);
+  --color-sev-critical-text:   var(--primitive-forest-sev-critical-dark);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-forest-sev-critical-dark) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-forest-sev-critical-dark) 42%, transparent);
+  --color-sev-major-text:      var(--primitive-forest-sev-major-dark);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-forest-sev-major-dark) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-forest-sev-major-dark) 38%, transparent);
+  --color-sev-minor-text:      var(--primitive-forest-sev-minor-dark);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-forest-sev-minor-dark) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-forest-sev-minor-dark) 32%, transparent);
   --color-grade-top-text:    var(--primitive-green-400);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-green-400) 12%, transparent);
   --color-grade-high-text:   #6a9678;
@@ -1089,15 +1118,15 @@ html[data-theme="ember-light"]:root {
   --color-accent-soft:  color-mix(in srgb, #c0392b 8%, transparent);
   --color-danger:  #c0392b;
   --color-success: #2d7a4f;
-  --color-sev-critical-text:   var(--primitive-crimson-600);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-600) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-600) 38%, transparent);
-  --color-sev-major-text:      var(--primitive-major-light);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-major-light) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-major-light) 35%, transparent);
-  --color-sev-minor-text:      var(--primitive-ired-700);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
+  --color-sev-critical-text:   var(--primitive-ember-sev-critical-light);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-ember-sev-critical-light) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-ember-sev-critical-light) 38%, transparent);
+  --color-sev-major-text:      var(--primitive-ember-sev-major-light);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ember-sev-major-light) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-ember-sev-major-light) 35%, transparent);
+  --color-sev-minor-text:      var(--primitive-ember-sev-minor-light);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ember-sev-minor-light) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ember-sev-minor-light) 30%, transparent);
   --color-grade-top-text:    var(--primitive-daruma-600);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-daruma-600) 12%, transparent);
   --color-grade-high-text:   #7a6e64;
