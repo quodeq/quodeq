@@ -1,6 +1,39 @@
 import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
 import { formatRunId } from '../utils/formatters.js';
 
+const EXT_NAMES = {
+  py: 'Python', js: 'JavaScript', ts: 'TypeScript', jsx: 'JSX', tsx: 'TSX',
+  sh: 'Shell', bash: 'Shell', rb: 'Ruby', go: 'Go', rs: 'Rust',
+  java: 'Java', kt: 'Kotlin', cs: 'C#', swift: 'Swift', dart: 'Dart',
+  css: 'CSS', html: 'HTML', vue: 'Vue', php: 'PHP', c: 'C', cpp: 'C++',
+};
+
+function extName(ext) {
+  return EXT_NAMES[ext.toLowerCase()] || ext;
+}
+
+function LanguageStats({ stats, totalFiles }) {
+  const sorted = stats ? Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 5) : [];
+  if (!totalFiles && sorted.length === 0) return null;
+  const total = totalFiles || (sorted.length > 0 ? sorted.reduce((sum, [, c]) => sum + c, 0) : null);
+  return (
+    <div className="content-header-stats">
+      {total && (
+        <span className="content-stat">
+          <span className="content-stat-num">{total.toLocaleString()}</span>
+          <span className="content-stat-label">files</span>
+        </span>
+      )}
+      {sorted.map(([lang, count]) => (
+        <span key={lang} className="content-stat">
+          <span className="content-stat-num">{count}</span>
+          <span className="content-stat-label">{extName(lang)}</span>
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export default function ProjectHeader({
   project = {},
   navigation = {},
@@ -9,7 +42,7 @@ export default function ProjectHeader({
   const { onProjectChange, showRunNav, runNavProps } = navigation;
   return (
     <header className="content-header">
-      <div className="content-header-left">
+      <div className="content-header-top">
         <h1 className="content-project-name">
           {parent && (
             <>
@@ -25,43 +58,7 @@ export default function ProjectHeader({
           )}
           {displayName}
         </h1>
-        {meta && (
-          <div className="content-meta-row">
-            {meta.repository && (
-              <span className="content-meta-chip">
-                <span className="content-meta-chip-label">Repository</span>
-                <span className="content-meta-chip-value">{meta.repository}</span>
-              </span>
-            )}
-            {meta.discipline && (
-              <span className="content-meta-chip">
-                <span className="content-meta-chip-label">Discipline</span>
-                <span className="content-meta-chip-value">{meta.discipline}</span>
-              </span>
-            )}
-            {meta.totalFiles && (
-              <span className="content-meta-chip">
-                <span className="content-meta-chip-label">Source files</span>
-                <span className="content-meta-chip-value">{meta.totalFiles.toLocaleString()}</span>
-              </span>
-            )}
-            {meta.languageStats && Object.keys(meta.languageStats).length > 0 && (
-              <span className="content-meta-chip">
-                <span className="content-meta-chip-label">Languages</span>
-                <span className="content-meta-chip-value">
-                  {Object.entries(meta.languageStats)
-                    .sort(([, a], [, b]) => b - a)
-                    .slice(0, 5)
-                    .map(([lang, count]) => `${lang} (${count})`)
-                    .join(', ')}
-                </span>
-              </span>
-            )}
-          </div>
-        )}
-      </div>
-      {showRunNav && runNavProps && (
-        <div className="history-run-nav">
+        {showRunNav && runNavProps && (
           <RunNavigator
             currentRun={runNavProps.currentDayLabel || formatRunId(runNavProps.currentOverviewRun, runNavProps.availableRuns[runNavProps.overviewRunIndex]?.dateLabel)}
             isLatest={runNavProps.overviewRunIndex === 0}
@@ -72,6 +69,14 @@ export default function ProjectHeader({
               onLatest: runNavProps.onRunLatest,
             }}
           />
+        )}
+      </div>
+      {meta && (
+        <div className="content-header-meta">
+          <LanguageStats stats={meta.languageStats} totalFiles={meta.totalFiles} />
+          {meta.repository && (
+            <span className="content-meta-text">{meta.repository}</span>
+          )}
         </div>
       )}
     </header>
