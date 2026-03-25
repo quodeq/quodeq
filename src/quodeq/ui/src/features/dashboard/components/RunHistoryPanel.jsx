@@ -18,15 +18,10 @@ const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
-const cssVar = (() => {
-  const cache = {};
-  return (name, fallback) => {
-    if (!(name in cache)) {
-      cache[name] = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    }
-    return cache[name] || fallback;
-  };
-})();
+const cssVar = (name, fallback) => {
+  const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  return val || fallback;
+};
 
 const SCORE_EXEMPLARY = 9;
 const SCORE_GOOD = 7;

@@ -627,9 +627,9 @@
 .qd-card-stat-compliance {
   font-size: var(--text-xs);
   font-weight: var(--weight-medium);
-  color: color-mix(in srgb, var(--color-grade-top-text) 65%, black);
-  background: var(--color-grade-top-bg);
-  border: 1px solid color-mix(in srgb, var(--color-grade-top-text) 48%, transparent);
+  color: var(--color-compliance);
+  background: var(--color-compliance-bg);
+  border: 1px solid var(--color-compliance-border);
   border-radius: var(--radius-sm);
   padding: 2px var(--space-2);
   white-space: nowrap;
@@ -2400,8 +2400,8 @@
   flex-shrink: 0;
 }
 
-.projects-grade--a { color: color-mix(in srgb, var(--color-grade-top-text) 65%, black); }
-.projects-grade--b { color: color-mix(in srgb, var(--color-grade-high-text) 75%, black); }
+.projects-grade--a { color: var(--color-grade-top-text); }
+.projects-grade--b { color: var(--color-grade-high-text); }
 .projects-grade--c { color: var(--color-grade-mid-text); }
 .projects-grade--d { color: var(--color-grade-low-text); }
 .projects-grade--f { color: var(--color-grade-bottom-text); }

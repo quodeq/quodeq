@@ -39,7 +39,7 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
 function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
   return (
     <SettingsPage
-      theme={{ preference: settings.themePreference, onApply: settings.applyTheme }}
+      theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
       models={{
         aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
         aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
