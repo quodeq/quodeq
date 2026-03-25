@@ -7,6 +7,7 @@ import { sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils
 import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGrouping.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
+import ScoreCircle from '../../../components/ScoreCircle.jsx';
 
 // ---------------------------------------------------------------------------
 // Accumulated overview panel helpers
@@ -35,16 +36,6 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatBlock({ label, value, children }) {
-  return (
-    <div className="acc-eval-stat-block">
-      <span className="acc-eval-stat-label">{label}</span>
-      <span className="acc-eval-stat-value">{value}</span>
-      {children}
-    </div>
-  );
-}
-
 function SeverityTags({ severity }) {
   return (
     <div className="acc-eval-tags">
@@ -63,21 +54,33 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate }) {
         <span className="acc-eval-label">Accumulated Evaluation</span>
         {lastDate && <span className="acc-eval-date">Last evaluated {lastDate}</span>}
       </div>
-      <div className="acc-eval-hero">
-        <span className={`acc-eval-grade-chip chip ${scoreColorClass(summary?.numericAverage)}`}>
-          {summary?.overallGrade || '—'}</span>
-        <div className="acc-eval-score-row">
-          <span className="acc-eval-score">{summary?.numericAverage || '—'}</span>
-          <span className="acc-eval-score-denom">/10</span>
+      <div className="acc-eval-golden">
+        <div className="acc-eval-circle-col">
+          <ScoreCircle
+            score={summary?.numericAverage}
+            grade={summary?.overallGrade}
+            size={120}
+          />
+          {scoreDelta !== null && (
+            <div className="acc-eval-trend">
+              <TrendBadge delta={scoreDelta} showLabel={false} />
+            </div>
+          )}
         </div>
-        {scoreDelta !== null && <div className="acc-eval-trend"><TrendBadge delta={scoreDelta} showLabel={false} /></div>}
-      </div>
-      <div className="acc-eval-stats-grid">
-        <StatBlock label="Violations" value={summary?.totalViolations || 0}>
-          <SeverityTags severity={summary?.severity} />
-        </StatBlock>
-        <StatBlock label="Compliance" value={summary?.totalCompliance || 0} />
-        <StatBlock label="Ratio" value={complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)} />
+        <div className="acc-eval-stats-col">
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Violations</span>
+            <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>
+            <SeverityTags severity={summary?.severity} />
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Compliance Ratio</span>
+            <span className="acc-eval-stat-value">
+              {complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)}
+              <span className="acc-eval-ratio-label">compliance per violation</span>
+            </span>
+          </div>
+        </div>
       </div>
     </section>
   );
