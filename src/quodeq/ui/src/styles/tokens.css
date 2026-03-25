@@ -677,22 +677,22 @@ html[data-theme="ember-dark"]:root {
   --logo-needle-dark:    #a06010;
 }
 
-/* ── Forest Light — nature greens, sage ─────────────────── */
+/* ── Forest Light — mossy greens ────────────────────────── */
 
 html[data-theme="forest-light"]:root {
-  --color-bg:           var(--primitive-forest-50);
+  --color-bg:           #f0f5ef;
   --color-surface:      #ffffff;
-  --color-surface-alt:  var(--primitive-forest-100);
-  --color-border:       var(--primitive-forest-200);
-  --color-border-focus: var(--primitive-forest-700);
+  --color-surface-alt:  #e0eadf;
+  --color-border:       #c0d4be;
+  --color-border-focus: #1b6b3a;
 
-  --color-text:         var(--primitive-forest-900);
+  --color-text:         #162016;
   --color-text-muted:   #5a7a5a;
   --color-text-subtle:  #7a9a7a;
 
-  --color-accent:       var(--primitive-forest-700);
-  --color-accent-hover: var(--primitive-forest-800);
-  --color-accent-soft:  color-mix(in srgb, var(--primitive-forest-700) 8%, transparent);
+  --color-accent:       #1b6b3a;
+  --color-accent-hover: #145228;
+  --color-accent-soft:  color-mix(in srgb, #1b6b3a 8%, transparent);
 
   --color-danger:  #c0392b;
   --color-success: #2d7a4f;
@@ -732,7 +732,7 @@ html[data-theme="forest-light"]:root {
 
   --color-chart-grid:   var(--color-border);
   --color-chart-axis:   var(--color-text-muted);
-  --color-chart-line:   var(--primitive-forest-900);
+  --color-chart-line:   #162016;
   --color-chart-stroke: transparent;
 
   /* Trend — forest greens up, ired chain down */
@@ -748,11 +748,11 @@ html[data-theme="forest-light"]:root {
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
 
   /* Logo */
-  --logo-q:              var(--primitive-forest-700);
-  --logo-chevron:        var(--primitive-forest-800);
-  --logo-chevron-hover:  var(--primitive-forest-700);
-  --logo-needle:         var(--primitive-forest-700);
-  --logo-needle-dark:    var(--primitive-forest-800);
+  --logo-q:              #1b6b3a;
+  --logo-chevron:        #162016;
+  --logo-chevron-hover:  #1b6b3a;
+  --logo-needle:         #1b6b3a;
+  --logo-needle-dark:    #145228;
 }
 
 /* ── Midnight Dark — deep navy, cyan accents ────────────── */
@@ -836,22 +836,22 @@ html[data-theme="midnight-dark"]:root {
   --logo-needle-dark:    #0090b0;
 }
 
-/* ── Midnight Light — cool whites, indigo accent ────────── */
+/* ── Midnight Light — twilight, deep indigo ───────────── */
 
 html[data-theme="midnight-light"]:root {
-  --color-bg:           var(--primitive-horizon-50);
+  --color-bg:           #f4f6fc;
   --color-surface:      #ffffff;
-  --color-surface-alt:  var(--primitive-horizon-100);
-  --color-border:       var(--primitive-horizon-200);
-  --color-border-focus: var(--primitive-horizon-600);
+  --color-surface-alt:  #e8ecf8;
+  --color-border:       #c8d0e8;
+  --color-border-focus: #4f46e5;
 
-  --color-text:         var(--primitive-horizon-900);
-  --color-text-muted:   #6b7280;
-  --color-text-subtle:  #9ca3af;
+  --color-text:         #0e1228;
+  --color-text-muted:   #6070a0;
+  --color-text-subtle:  #8890b0;
 
-  --color-accent:       var(--primitive-horizon-600);
-  --color-accent-hover: var(--primitive-horizon-700);
-  --color-accent-soft:  color-mix(in srgb, var(--primitive-horizon-600) 8%, transparent);
+  --color-accent:       #4f46e5;
+  --color-accent-hover: #4338ca;
+  --color-accent-soft:  color-mix(in srgb, #4f46e5 8%, transparent);
 
   --color-danger:  var(--primitive-red-500);
   --color-success: #16a34a;
@@ -890,8 +890,8 @@ html[data-theme="midnight-light"]:root {
   --color-overlay-light:  rgba(0, 0, 0, 0.3);
 
   --color-chart-grid:   var(--color-border);
-  --color-chart-axis:   var(--color-text-muted);
-  --color-chart-line:   var(--primitive-horizon-900);
+  --color-chart-axis:   #6070a0;
+  --color-chart-line:   #0e1228;
   --color-chart-stroke: transparent;
 
   /* Trend — electric green up, ired chain down */
@@ -907,11 +907,11 @@ html[data-theme="midnight-light"]:root {
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
 
   /* Logo */
-  --logo-q:              var(--primitive-horizon-600);
-  --logo-chevron:        var(--primitive-horizon-700);
-  --logo-chevron-hover:  var(--primitive-horizon-600);
-  --logo-needle:         var(--primitive-horizon-600);
-  --logo-needle-dark:    var(--primitive-horizon-800);
+  --logo-q:              #4f46e5;
+  --logo-chevron:        #0e1228;
+  --logo-chevron-hover:  #4f46e5;
+  --logo-needle:         #4f46e5;
+  --logo-needle-dark:    #4338ca;
 }
 
 /* ── Neo Dark — Matrix terminal ─────────────────────────── */
