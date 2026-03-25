@@ -199,12 +199,13 @@ function collapseByDay(trend) {
 }
 
 export default function AccumulatedOverviewPanel({ data, callbacks }) {
-  const { accumulated, accumulatedDimensions, availableRuns, overviewRunIndex, trend, selectedRunId } = data;
+  const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId } = data;
+  const dayRuns = dailyRuns || availableRuns;
   const { onRunClick, onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
 
   const dailyTrend = useMemo(() => collapseByDay(trend), [trend]);
-  const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
-  const referenceRun = overviewRunIndex === 0 ? availableRuns[0]?.runId : currentOverviewRun;
+  const currentOverviewRun = dayRuns[overviewRunIndex]?.runId || 'latest';
+  const referenceRun = overviewRunIndex === 0 ? dayRuns[0]?.runId : currentOverviewRun;
   const selectedDay = dailyTrend.find((t) => t.runId === currentOverviewRun);
   const dayDimensions = selectedDay?.dayDimensions || [];
 

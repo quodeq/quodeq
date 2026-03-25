@@ -156,7 +156,25 @@ function useAppState() {
   const settings = useAppSettings();
   function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
   const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
-  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
+  // Build day-level runs for Overview (collapse same-day runs, keep last of each day)
+  const dailyRuns = useMemo(() => {
+    if (!availableRuns.length) return [];
+    const trend = dashboard?.trend || [];
+    const byDay = [];
+    let lastDate = null;
+    for (const run of availableRuns) {
+      const t = trend.find(r => r.runId === run.runId);
+      const datePart = (t?.dateISO || '').slice(0, 10);
+      if (datePart !== lastDate) {
+        byDay.push(run);
+        lastDate = datePart;
+      } else {
+        byDay[byDay.length - 1] = run; // last run of the day wins
+      }
+    }
+    return byDay;
+  }, [availableRuns, dashboard]);
+  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
     const meta = computeHeaderMeta(accumulated, dashboard);
     const display = computeProjectDisplay(selectedProject, projects);
@@ -165,13 +183,13 @@ function useAppState() {
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
   const activeTab = ['overview', 'history', 'projects', 'evaluate', 'settings'].includes(activePage.page) ? activePage.page : activePage.page === 'history-run' ? 'history' : 'overview';
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
-  const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
+  const showRunNav = showProjectHeader && dailyRuns.length > 0 && navStack.length === 1;
 
   return {
     serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
     projects, selectedProject, selectedRun, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
-    dashboard, accumulated, loading, error, availableRuns, overviewRunIndex,
+    dashboard, accumulated, loading, error, availableRuns, dailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav,
@@ -186,7 +204,7 @@ export default function App() {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
       dashboard: state.dashboard, accumulated: state.accumulated, loading: state.loading, error: state.error,
-      availableRuns: state.availableRuns, overviewRunIndex: state.overviewRunIndex,
+      availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
     },
     navigation: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
@@ -209,8 +227,8 @@ export default function App() {
           navigation={{
             onProjectChange: state.handleProjectChange, showRunNav: state.showRunNav,
             runNavProps: {
-              currentOverviewRun: state.currentOverviewRun, overviewRunIndex: state.overviewRunIndex, availableRuns: state.availableRuns,
-              currentDayLabel: (() => { const t = (state.dashboard?.trend || []).find(r => r.runId === state.currentOverviewRun); if (t?.dateISO) { try { return new Date(t.dateISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch {} } return state.availableRuns[state.overviewRunIndex]?.dateLabel || state.currentOverviewRun; })(),
+              currentOverviewRun: state.currentOverviewRun, overviewRunIndex: state.overviewRunIndex, availableRuns: state.dailyRuns,
+              currentDayLabel: (() => { const t = (state.dashboard?.trend || []).find(r => r.runId === state.currentOverviewRun); if (t?.dateISO) { try { return new Date(t.dateISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch {} } return state.dailyRuns[state.overviewRunIndex]?.dateLabel || state.currentOverviewRun; })(),
               onRunPrev: state.handleRunPrev, onRunNext: state.handleRunNext, onRunLatest: state.handleRunLatest,
               onViewRun: undefined,
             },
