@@ -562,6 +562,16 @@
   border-style: dashed;
 }
 
+/* Dimension card — evaluated today (accent tint) */
+.qd-card--active {
+  background: color-mix(in srgb, var(--color-accent) 3%, var(--color-surface));
+}
+
+/* Dimension card — carried forward from previous day */
+.qd-card--carried .qd-card-score {
+  opacity: 0.7;
+}
+
 .qd-card-header {
   display: flex;
   align-items: center;
