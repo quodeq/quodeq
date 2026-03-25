@@ -53,15 +53,15 @@
 
 .history-collapse-btn {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
+  padding: 0;
   border: none;
   background: transparent;
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: var(--weight-semibold);
-  color: var(--color-text-muted);
+  color: var(--color-text);
   cursor: pointer;
 }
 
@@ -71,7 +71,8 @@
 
 .history-collapse-icon {
   display: inline-block;
-  font-size: 1.1em;
+  font-size: 0.7em;
+  color: var(--color-text-muted);
   transition: transform 150ms ease;
   transform: rotate(90deg);
 }
