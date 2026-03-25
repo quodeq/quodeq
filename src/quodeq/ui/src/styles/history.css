@@ -33,21 +33,17 @@
   font-weight: var(--weight-semibold);
 }
 
-.history-run-nav .run-nav-action:not(.run-nav-action--danger) {
-  background: var(--color-accent);
-  color: var(--color-on-accent);
-  border-color: var(--color-accent);
-}
-
-.history-run-nav .run-nav-action:not(.run-nav-action--danger):hover {
-  background: var(--color-accent-hover);
-  border-color: var(--color-accent-hover);
-}
-
 .history-run-nav .run-nav-btn {
-  padding: 4px 10px;
+  width: 26px;
+  height: 26px;
+  padding: 0;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  border-color: var(--color-border);
 }
 
 .history-run-nav .run-nav-label {

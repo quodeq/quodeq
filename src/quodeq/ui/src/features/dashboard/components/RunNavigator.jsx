@@ -7,7 +7,7 @@ export default function RunNavigator({ currentRun, isLatest, isOldest, actions: 
     <div className="run-navigator">
       <button
         type="button"
-        className="run-nav-action run-nav-action--danger"
+        className="run-nav-action run-nav-action--outline"
         onClick={onLatest}
         disabled={isLatest}
         title="Go to latest run"
@@ -42,11 +42,11 @@ export default function RunNavigator({ currentRun, isLatest, isOldest, actions: 
       {onView && (
         <button
           type="button"
-          className="run-nav-action"
+          className="run-nav-action run-nav-action--primary"
           onClick={onView}
           title="Open this run"
         >
-          View run
+          View →
         </button>
       )}
     </div>
