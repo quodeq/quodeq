@@ -157,21 +157,21 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
               <span className="acc-eval-stat-value">
                 {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
               </span>
-              <span className="acc-eval-ratio-sublabel">comp / viol</span>
             </div>
-          </div>
-          <div className="acc-eval-mini-stats">
-            <div className="acc-eval-mini-stat">
-              <span className="acc-eval-mini-stat-label">Files</span>
-              <span className="acc-eval-mini-stat-value">{runTopFiles.length}</span>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Files</span>
+              <span className="acc-eval-stat-value">{runTopFiles.length}</span>
             </div>
-            <div className="acc-eval-mini-stat">
-              <span className="acc-eval-mini-stat-label">Principles</span>
-              <span className="acc-eval-mini-stat-value">{runUniquePrinciples}</span>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Principles</span>
+              <span className="acc-eval-stat-value">{runUniquePrinciples}</span>
             </div>
-            <div className="acc-eval-mini-stat">
-              <span className="acc-eval-mini-stat-label">Dimensions</span>
-              <span className="acc-eval-mini-stat-value">{runSummary.dimensionCount || 0}</span>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Dimensions</span>
+              <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
             </div>
           </div>
         </div>

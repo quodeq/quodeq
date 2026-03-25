@@ -121,9 +121,8 @@
 }
 
 .history-row:hover {
-  border-color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
   background: var(--color-surface-alt);
-  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 /* Date column */

@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { formatShortDate, angleFromDelta, scoreTierLabel, gradeLetter } from '../../../utils/formatters.js';
+import { formatShortDate, gradeLetter } from '../../../utils/formatters.js';
 import {
   ComposedChart,
+  Area,
   Bar,
   Line,
   XAxis,
@@ -38,32 +39,6 @@ function scoreBarColor(score) {
   return cssVar('--color-grade-bottom-text');
 }
 
-const DELTA_UP = 1;
-const DELTA_SOFT_UP = 0.1;
-const DELTA_DOWN = -1;
-const DELTA_SOFT_DOWN = -0.1;
-
-// Trend direction — mirrors TrendBadge thresholds
-function trendDir(delta) {
-  if (delta === null || delta === undefined) return null;
-  if (delta > DELTA_UP)        return 'up';
-  if (delta > DELTA_SOFT_UP)   return 'soft-up';
-  if (delta < DELTA_DOWN)      return 'down';
-  if (delta < DELTA_SOFT_DOWN) return 'soft-down';
-  return 'same';
-}
-
-function trendColor(dir) {
-  const map = {
-    'up':         '--color-trend-up',
-    'soft-up':    '--color-trend-soft-up',
-    'same':       '--color-text-muted',
-    'soft-down':  '--color-trend-soft-down',
-    'down':       '--color-trend-down',
-  };
-  return cssVar(map[dir] ?? '--color-text-muted');
-}
-
 
 function buildTrendData(trend, selectedRunId, selectedRunScore) {
   return [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
@@ -79,39 +54,6 @@ function buildTrendData(trend, selectedRunId, selectedRunScore) {
   });
 }
 
-function TrendBarLabel({ x, y, width, height, index, data }) {
-  const entry = data[index];
-  const d = entry?.delta;
-  const tier = scoreTierLabel(entry?.numericAverage);
-  const cx = x + width / 2;
-  const hasDelta = d !== null && d !== undefined;
-  const dir = hasDelta ? (trendDir(d) ?? 'same') : null;
-  const color = hasDelta ? trendColor(dir) : null;
-  return (
-    <g>
-      {hasDelta && (
-        <>
-          <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={color}>
-            {d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1)}
-          </text>
-          <text
-            x={cx} y={y - 14}
-            textAnchor="middle" dominantBaseline="central"
-            fontSize={11} fill={color}
-            transform={`rotate(${Math.round(angleFromDelta(d))}, ${cx}, ${y - 14})`}
-          >↑</text>
-        </>
-      )}
-      {tier && height > 12 && (
-        <text
-          x={cx} y={y + Math.min(height / 2, 9)}
-          textAnchor="middle" dominantBaseline="central"
-          fontSize={9} fill="white" fillOpacity={0.85}
-        >{tier}</text>
-      )}
-    </g>
-  );
-}
 
 function RunHistoryTooltip({ active, hoveredIndex, data }) {
   if (!active || hoveredIndex === null) return null;
@@ -126,11 +68,22 @@ function RunHistoryTooltip({ active, hoveredIndex, data }) {
   );
 }
 
-function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
+function SelectedDot({ cx, cy, payload, selectedRunId }) {
+  if (payload?.runId !== selectedRunId) return null;
+  return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={1.5} />;
+}
+
+function ScoreHistoryChart({ data, interaction }) {
   const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
-      <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
+      <ComposedChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: -16 }}>
+        <defs>
+          <linearGradient id="scoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor={cssVar('--color-chart-line')} stopOpacity={0.1} />
+            <stop offset="100%" stopColor={cssVar('--color-chart-line')} stopOpacity={0} />
+          </linearGradient>
+        </defs>
         <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
         <XAxis
           dataKey="dateLabel"
@@ -155,11 +108,17 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
         <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
         <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
         <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+        <Area
+          dataKey="numericAverage"
+          type="monotone"
+          fill="url(#scoreAreaGrad)"
+          stroke="none"
+          isAnimationActive={false}
+        />
         <Bar
           dataKey="numericAverage"
           radius={[3, 3, 0, 0]}
-          maxBarSize={40}
-          label={renderTrendLabel}
+          maxBarSize={18}
           isAnimationActive={false}
           cursor={onBarClick ? 'pointer' : 'default'}
           onMouseEnter={(_, index) => setHoveredIndex(index)}
@@ -170,7 +129,7 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
             <Cell
               key={entry.runId ?? i}
               fill={scoreBarColor(entry.numericAverage)}
-              opacity={entry.runId === selectedRunId ? 1 : 0.55}
+              opacity={entry.runId === selectedRunId ? 0.85 : 0.4}
               stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
               strokeWidth={hoveredIndex === i ? 1.5 : 0}
             />
@@ -181,9 +140,9 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
           dataKey="numericAverage"
           type="monotone"
           stroke={cssVar('--color-chart-line')}
-          strokeOpacity={0.55}
+          strokeOpacity={0.65}
           strokeWidth={2.5}
-          dot={false}
+          dot={<SelectedDot selectedRunId={selectedRunId} />}
           activeDot={false}
         />
       </ComposedChart>
@@ -197,7 +156,6 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
   if (!trend || trend.length < 2) return null;
 
   const data = buildTrendData(trend, selectedRunId, selectedRunScore);
-  const renderTrendLabel = (props) => <TrendBarLabel {...props} data={data} />;
 
   return (
     <section className="run-history-panel panel" aria-label="Score history chart">
@@ -207,7 +165,6 @@ export default function RunHistoryPanel({ trend = [], selectedRunId = null, sele
       <ScoreHistoryChart
         data={data}
         interaction={{ hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }}
-        renderTrendLabel={renderTrendLabel}
       />
     </section>
   );

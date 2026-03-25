@@ -3,7 +3,6 @@ import { getDimensionEval } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
-import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { gradeColorClass, scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
@@ -59,40 +58,36 @@ function DimensionOverview({ data, stats, onNavigate }) {
           />
         )}
       </div>
-      <div className="acc-eval-golden">
-        <div className="acc-eval-circle-col">
-          <ScoreCircle
-            score={overallGrade?.score?.replace('/10', '')}
-            grade={overallGrade?.grade}
-            size={80}
-          />
+      <div className="compact-stats-row">
+        <div className="compact-score-col">
+          <span className="compact-score-value">{overallGrade?.score?.replace('/10', '') || '—'}</span>
+          <span className="compact-score-grade">{overallGrade?.grade || ''}</span>
         </div>
-        <div className="acc-eval-stats-col">
-          <div className="acc-eval-stats-row">
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Violations</span>
-              <span className="acc-eval-stat-value">{allViolations.length}</span>
-              <div className="acc-eval-tags">
-                {severityCounts.critical > 0 && <span className="severity-tag critical">{severityCounts.critical} crit</span>}
-                {severityCounts.major > 0 && <span className="severity-tag major">{severityCounts.major} maj</span>}
-                {severityCounts.minor > 0 && <span className="severity-tag minor">{severityCounts.minor} min</span>}
-              </div>
+        <div className="acc-eval-stats-divider" />
+        <div className="compact-metrics-col">
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Viol</span>
+            <span className="acc-eval-stat-value">{allViolations.length}</span>
+            <div className="acc-eval-tags">
+              {severityCounts.critical > 0 && <span className="severity-tag critical">{severityCounts.critical} crit</span>}
+              {severityCounts.major > 0 && <span className="severity-tag major">{severityCounts.major} maj</span>}
+              {severityCounts.minor > 0 && <span className="severity-tag minor">{severityCounts.minor} min</span>}
             </div>
-            <div className="acc-eval-stats-divider" />
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Ratio</span>
-              <span className="acc-eval-stat-value">{complianceRatio(allViolations.length, totalCompliant)}</span>
-            </div>
-            <div className="acc-eval-stats-divider" />
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Files</span>
-              <span className="acc-eval-stat-value">{topFiles.length}</span>
-            </div>
-            <div className="acc-eval-stats-divider" />
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Principles</span>
-              <span className="acc-eval-stat-value">{uniquePrinciples}</span>
-            </div>
+          </div>
+          <div className="acc-eval-stats-divider" />
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Ratio</span>
+            <span className="acc-eval-stat-value">{complianceRatio(allViolations.length, totalCompliant)}</span>
+          </div>
+          <div className="acc-eval-stats-divider" />
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Files</span>
+            <span className="acc-eval-stat-value">{topFiles.length}</span>
+          </div>
+          <div className="acc-eval-stats-divider" />
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Principles</span>
+            <span className="acc-eval-stat-value">{uniquePrinciples}</span>
           </div>
         </div>
       </div>
