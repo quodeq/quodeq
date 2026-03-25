@@ -169,6 +169,44 @@ def _build_accumulated_trend(
     return trend
 
 
+def _collapse_by_day(trend: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Collapse consecutive same-day trend entries into one entry per day.
+
+    The last entry of each day wins (has the most up-to-date accumulated state).
+    dayDimensions = union of all dimensions evaluated on that day.
+    dayDimensionDetails = merged details (latest per dimension within the day).
+    """
+    if not trend:
+        return trend
+    collapsed: list[dict[str, Any]] = []
+    current_day: str | None = None
+    day_dims: set[str] = set()
+    day_dim_details: dict[str, dict] = {}
+
+    for entry in trend:
+        date_part = (entry.get("dateISO") or "")[:10]
+        if date_part != current_day:
+            if current_day is not None and collapsed:
+                collapsed[-1]["dayDimensions"] = sorted(day_dims)
+                collapsed[-1]["dayDimensionDetails"] = sorted(day_dim_details.values(), key=lambda d: d.get("dimension", ""))
+            current_day = date_part
+            day_dims = set()
+            day_dim_details = {}
+            collapsed.append(entry)
+        else:
+            collapsed[-1] = entry  # last entry of the day wins
+        for d in entry.get("dimensions", []):
+            day_dims.add(d)
+        for d in entry.get("dimensionDetails", []):
+            day_dim_details[d.get("dimension", "")] = d
+
+    if collapsed:
+        collapsed[-1]["dayDimensions"] = sorted(day_dims)
+        collapsed[-1]["dayDimensionDetails"] = sorted(day_dim_details.values(), key=lambda d: d.get("dimension", ""))
+
+    return collapsed
+
+
 def _make_run_dimension_fetcher(
     reports_root: Path,
     project: str,
@@ -270,7 +308,7 @@ def _compute_dashboard_payload(
     )
     return _DashboardPayload(
         selected_summary=ctx.summary,
-        trend=_build_accumulated_trend(history_runs, get_run_dimensions),
+        trend=_collapse_by_day(_build_accumulated_trend(history_runs, get_run_dimensions)),
         dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,
