@@ -67,7 +67,7 @@ const ROUTE_RENDERERS = {
         selectedRunId={(() => { const sr = props.dashboardData.selectedRun; if (sr && sr !== 'latest' && trend.some(t => t.runId === sr)) return sr; return trend.length > 0 ? trend[0].runId : null; })()}
         selectedRunScore={props.dashboardData.accumulated?.summary?.numericAverage}
         runNav={runs.length > 0 ? {
-          currentRun: props.navigation.currentOverviewRun,
+          currentRun: (() => { const t = trend.find(r => r.runId === (runs[idx]?.runId)); if (t?.dateISO) { try { const d = new Date(t.dateISO); return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); } catch {} } return runs[idx]?.dateLabel || props.navigation.currentOverviewRun; })(),
           isLatest: idx === 0,
           isOldest: idx >= runs.length - 1,
           onPrev: props.navigation.handleRunPrev,

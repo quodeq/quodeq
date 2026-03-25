@@ -1,5 +1,13 @@
 import { scoreColorClass, gradeLabel } from '../../../utils/formatters.js';
 
+function formatDate(dateISO) {
+  if (!dateISO) return '';
+  try {
+    const d = new Date(dateISO);
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+  } catch { return ''; }
+}
+
 function formatTime(dateISO) {
   if (!dateISO) return '';
   try {
@@ -41,7 +49,7 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
   return (
     <button type="button" className={`history-row${isSelected ? ' selected' : ''}`} onClick={() => onClick(runId, dateLabel)}>
       <div className="history-row-date">
-        <span className="history-row-date-main">{dateLabel}</span>
+        <span className="history-row-date-main">{formatDate(dateISO) || dateLabel}</span>
         <span className="history-row-date-time">{formatTime(dateISO)}</span>
       </div>
       <div className="history-row-score">
