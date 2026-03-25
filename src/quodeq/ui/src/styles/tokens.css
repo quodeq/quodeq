@@ -241,6 +241,14 @@
   --primitive-amber-800:   #a16207;
   --primitive-daruma-600:  #d9a010;  /* warm yellow-gold — daruma eye rings */
   --primitive-daruma-400:  #d4d8e0;  /* light gray for dark backgrounds — visibly lighter than grade-high */
+
+  /* Daruma dark palette (warm ink) */
+  --primitive-daruma-950: #121010;
+  --primitive-daruma-900: #1a1816;
+  --primitive-daruma-800: #242220;
+  --primitive-daruma-700: #343230;
+  --primitive-daruma-500: #9a9490;
+  --primitive-daruma-200: #e8e2d8;
   --primitive-brand-300:   #b8bec8;  /* mid gray for dark grade-high — between brand-400 (text-muted) and brand-200 */
   --primitive-emerald-300: #6ee7a0;
   --primitive-rust-700:    #9f3a28;
@@ -359,15 +367,15 @@
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg:           var(--primitive-brand-950);
-    --color-surface:      var(--primitive-brand-900);
-    --color-surface-alt:  var(--primitive-brand-800);
-    --color-border:       var(--primitive-brand-700);
+    --color-bg:           var(--primitive-daruma-950);
+    --color-surface:      var(--primitive-daruma-900);
+    --color-surface-alt:  var(--primitive-daruma-800);
+    --color-border:       var(--primitive-daruma-700);
     --color-border-focus: var(--primitive-crimson-500);
 
-    --color-text:         var(--primitive-brand-200);
-    --color-text-muted:   var(--primitive-brand-400);
-    --color-text-subtle:  var(--primitive-brand-500);
+    --color-text:         var(--primitive-daruma-200);
+    --color-text-muted:   var(--primitive-daruma-500);
+    --color-text-subtle:  #6a6460;
 
     --color-accent:       var(--primitive-crimson-400);
     --color-accent-hover: var(--primitive-crimson-300);
@@ -389,8 +397,8 @@
 
     --color-grade-top-text:    var(--primitive-daruma-400);
     --color-grade-top-bg:      color-mix(in srgb, var(--primitive-daruma-400) 14%, transparent);
-    --color-grade-high-text:   var(--primitive-brand-300);
-    --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-300) 14%, transparent);
+    --color-grade-high-text:   var(--primitive-daruma-500);
+    --color-grade-high-bg:     color-mix(in srgb, var(--primitive-daruma-500) 14%, transparent);
     --color-grade-mid-text:    var(--primitive-ired-300);
     --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 14%, transparent);
     --color-grade-low-text:    var(--primitive-ired-400);
@@ -419,22 +427,22 @@
     --color-overlay-light:  rgba(0, 0, 0, 0.72);
 
     /* Chart */
-    --color-chart-grid:   var(--primitive-brand-700);
-    --color-chart-axis:   var(--primitive-brand-500);
-    --color-chart-line:   var(--primitive-brand-200);
+    --color-chart-grid:   var(--primitive-daruma-700);
+    --color-chart-axis:   var(--primitive-daruma-500);
+    --color-chart-line:   var(--primitive-daruma-200);
     --color-chart-stroke: rgba(255, 255, 255, 0.2);
 
     /* Trend — gray → crimson on dark backgrounds */
-    --color-trend-strong-up:   var(--primitive-brand-300);
+    --color-trend-strong-up:   var(--primitive-daruma-200);
     --color-trend-up:          var(--primitive-ired-200);
-    --color-trend-soft-up:     var(--primitive-brand-500);
+    --color-trend-soft-up:     var(--primitive-daruma-500);
     --color-trend-soft-down:   var(--primitive-ired-300);
     --color-trend-down:        var(--primitive-ired-400);
     --color-trend-strong-down: var(--primitive-crimson-200);
 
     /* Logo — monochrome light */
     --logo-q:              var(--primitive-brand-200);
-    --logo-chevron:        var(--primitive-brand-200);
+    --logo-chevron:        var(--primitive-daruma-200);
     --logo-chevron-hover:  var(--primitive-crimson-300);
     --logo-needle:         var(--primitive-brand-200);
     --logo-needle-dark:    var(--primitive-brand-400);
@@ -447,15 +455,15 @@
    ──────────────────────────────────────────────────────── */
 
 html[data-theme="dark"]:root {
-  --color-bg:           var(--primitive-brand-950);
-  --color-surface:      var(--primitive-brand-900);
-  --color-surface-alt:  var(--primitive-brand-800);
-  --color-border:       var(--primitive-brand-700);
+  --color-bg:           var(--primitive-daruma-950);
+  --color-surface:      var(--primitive-daruma-900);
+  --color-surface-alt:  var(--primitive-daruma-800);
+  --color-border:       var(--primitive-daruma-700);
   --color-border-focus: var(--primitive-crimson-500);
 
-  --color-text:         var(--primitive-brand-200);
-  --color-text-muted:   var(--primitive-brand-400);
-  --color-text-subtle:  var(--primitive-brand-500);
+  --color-text:         var(--primitive-daruma-200);
+  --color-text-muted:   var(--primitive-daruma-500);
+  --color-text-subtle:  #6a6460;
 
   --color-accent:       var(--primitive-crimson-400);
   --color-accent-hover: var(--primitive-crimson-300);
@@ -477,8 +485,8 @@ html[data-theme="dark"]:root {
 
   --color-grade-top-text:    var(--primitive-daruma-400);
   --color-grade-top-bg:      color-mix(in srgb, var(--primitive-daruma-400) 14%, transparent);
-  --color-grade-high-text:   var(--primitive-brand-300);
-  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-300) 14%, transparent);
+  --color-grade-high-text:   var(--primitive-daruma-500);
+  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-daruma-500) 14%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-300);
   --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 14%, transparent);
   --color-grade-low-text:    var(--primitive-ired-400);
@@ -507,15 +515,15 @@ html[data-theme="dark"]:root {
   --color-overlay-light:  rgba(0, 0, 0, 0.72);
 
   /* Chart */
-  --color-chart-grid:   var(--primitive-brand-700);
-  --color-chart-axis:   var(--primitive-brand-500);
-  --color-chart-line:   var(--primitive-brand-200);
+  --color-chart-grid:   var(--primitive-daruma-700);
+  --color-chart-axis:   var(--primitive-daruma-500);
+  --color-chart-line:   var(--primitive-daruma-200);
   --color-chart-stroke: rgba(255, 255, 255, 0.2);
 
   /* Trend — gray → crimson on dark backgrounds */
-  --color-trend-strong-up:   var(--primitive-brand-300);
+  --color-trend-strong-up:   var(--primitive-daruma-200);
   --color-trend-up:          var(--primitive-ired-200);
-  --color-trend-soft-up:     var(--primitive-brand-500);
+  --color-trend-soft-up:     var(--primitive-daruma-500);
   --color-trend-soft-down:   var(--primitive-ired-300);
   --color-trend-down:        var(--primitive-ired-400);
   --color-trend-strong-down: var(--primitive-crimson-200);
@@ -525,7 +533,7 @@ html[data-theme="dark"]:root {
 
   /* Logo — monochrome light */
   --logo-q:              var(--primitive-brand-200);
-  --logo-chevron:        var(--primitive-brand-200);
+  --logo-chevron:        var(--primitive-daruma-200);
   --logo-chevron-hover:  var(--primitive-crimson-300);
   --logo-needle:         var(--primitive-brand-200);
   --logo-needle-dark:    var(--primitive-brand-400);
