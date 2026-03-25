@@ -380,6 +380,7 @@
     --color-accent:       var(--primitive-crimson-400);
     --color-accent-hover: var(--primitive-crimson-300);
     --color-accent-soft:  color-mix(in srgb, var(--primitive-crimson-400) 14%, transparent);
+    --color-on-accent:    var(--primitive-daruma-950);
 
     --color-danger:  var(--primitive-red-400);
     --color-success: var(--primitive-green-400);
@@ -468,6 +469,7 @@ html[data-theme="dark"]:root {
   --color-accent:       var(--primitive-crimson-400);
   --color-accent-hover: var(--primitive-crimson-300);
   --color-accent-soft:  color-mix(in srgb, var(--primitive-crimson-400) 14%, transparent);
+  --color-on-accent:    var(--primitive-daruma-950);
 
   --color-danger:  var(--primitive-red-400);
   --color-success: var(--primitive-green-400);
@@ -645,7 +647,7 @@ html[data-theme="ifrit-dark"]:root {
   --color-accent:       var(--primitive-ifrit-accent-dark);
   --color-accent-hover: #f09040;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-ifrit-accent-dark) 14%, transparent);
-  --color-on-accent:    #111111;
+  --color-on-accent:    var(--primitive-ifrit-950);
 
   --color-danger:  #ff5030;
   --color-success: #50b868;
@@ -816,7 +818,7 @@ html[data-theme="flynn-dark"]:root {
   --color-accent:       #00d4ff;
   --color-accent-hover: #33e0ff;
   --color-accent-soft:  color-mix(in srgb, #00d4ff 10%, transparent);
-  --color-on-accent:    #111111;
+  --color-on-accent:    var(--primitive-flynn-950);
 
   --color-danger:  #e05c4b;
   --color-success: #4caf7d;
@@ -984,7 +986,7 @@ html[data-theme="neo-dark"]:root {
   --color-accent:       var(--primitive-neo-accent);
   --color-accent-hover: #33ff66;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent) 14%, transparent);
-  --color-on-accent:    #111111;
+  --color-on-accent:    var(--primitive-neo-950);
   --color-danger:  #ff4040;
   --color-success: var(--primitive-neo-accent);
   --color-sev-critical-text:   #ff4040;
@@ -1131,7 +1133,7 @@ html[data-theme="galadriel-dark"]:root {
   --color-accent:       var(--primitive-green-400);
   --color-accent-hover: #6ee7a0;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-green-400) 14%, transparent);
-  --color-on-accent:    #111111;
+  --color-on-accent:    var(--primitive-galadriel-950);
   --color-danger:  #e05c4b;
   --color-success: var(--primitive-green-400);
   --color-sev-critical-text:   var(--primitive-galadriel-sev-critical-dark);
@@ -1292,6 +1294,7 @@ html[data-theme="deckard-dark"]:root {
   --color-accent:       var(--primitive-deckard-accent-dark);
   --color-accent-hover: #ff60d0;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-deckard-accent-dark) 14%, transparent);
+  --color-on-accent:    var(--primitive-deckard-950);
 
   --color-danger:  #ff4060;
   --color-success: #00dce0;
