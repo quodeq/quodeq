@@ -27,7 +27,7 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions) {
 
   const withDates = accumulatedDimensions
     .filter((d) => d.fromRunId)
-    .map((d) => ({ runId: d.fromRunId, dateISO: d.fromDateISO, dateLabel: d.fromDateLabel }));
+    .map((d) => ({ runId: d.fromRunId, dateISO: d.fromDateIso, dateLabel: d.fromDateLabel }));
   withDates.sort((a, b) => (b.dateISO || '').localeCompare(a.dateISO || ''));
   const lastRun = withDates.length === 0
     ? { date: null, runId: null }
@@ -230,7 +230,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const referenceRun = overviewRunIndex === 0 ? dayRuns[0]?.runId : currentOverviewRun;
 
   // Get the selected day's date for highlighting dimension cards.
-  // Each accumulated dimension has fromDateISO — if it matches the selected day, it was evaluated that day.
+  // Each accumulated dimension has fromDateIso — if it matches the selected day, it was evaluated that day.
   const selectedDayDate = useMemo(() => {
     const entry = trend.find((t) => t.runId === currentOverviewRun) || trend.find((t) => t.runId === selectedRunId);
     return (entry?.dateISO || '').slice(0, 10) || null;

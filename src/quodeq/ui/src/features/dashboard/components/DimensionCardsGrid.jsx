@@ -46,11 +46,11 @@ function AccDimensionCard({ item, referenceRun, onDimensionClick, evaluatedToday
 }
 
 export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayDate }) {
-  // Each dimension has fromDateISO — compare its date to the selected day
+  // Each dimension has fromDateIso — compare its date to the selected day
   const sorted = [...sortedDimensions].sort((a, b) => {
     if (!selectedDayDate) return a.dimension.localeCompare(b.dimension);
-    const aDate = (a.fromDateISO || '').slice(0, 10);
-    const bDate = (b.fromDateISO || '').slice(0, 10);
+    const aDate = (a.fromDateIso || '').slice(0, 10);
+    const bDate = (b.fromDateIso || '').slice(0, 10);
     const aActive = aDate === selectedDayDate;
     const bActive = bDate === selectedDayDate;
     if (aActive && !bActive) return -1;
@@ -60,7 +60,7 @@ export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onD
   return (
     <div className="dimensions-grid">
       {sorted.map((item) => {
-        const dimDate = (item.fromDateISO || '').slice(0, 10);
+        const dimDate = (item.fromDateIso || '').slice(0, 10);
         const isActive = !selectedDayDate || dimDate === selectedDayDate;
         return (
           <AccDimensionCard
