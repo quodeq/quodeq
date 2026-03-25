@@ -139,8 +139,39 @@
 .history-row-eval-grade-label.grade-bottom-text { color: var(--color-grade-bottom-text); }
 
 .history-row-eval-dims {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.history-dim-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 6px;
   font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  background: color-mix(in srgb, var(--color-border) 40%, transparent);
+  color: var(--color-text-muted);
+}
+
+.history-dim-score {
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
+.history-dim-trend {
+  font-size: 0.85em;
   color: var(--color-text-subtle);
+}
+
+.history-dim-trend.trend-up {
+  color: var(--color-trend-up);
+}
+
+.history-dim-trend.trend-down {
+  color: var(--color-trend-down);
 }
 
 /* Accumulated column */

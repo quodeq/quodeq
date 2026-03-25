@@ -38,11 +38,11 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
     runId, dateLabel, dateISO,
     runNumericAverage, runOverallGrade,
     numericAverage, overallGrade,
-    dimensions,
+    dimensionDetails,
   } = entry;
   const runScore = parseFloat(runNumericAverage);
   const accScore = parseFloat(numericAverage);
-  const dimLabels = (dimensions || []).map(capitalize).join(', ');
+  const dims = dimensionDetails || [];
   const runLetter = gradeLabel(runOverallGrade) || '—';
   const accLetter = gradeLabel(overallGrade) || '—';
   const runGradeWord = runOverallGrade ? capitalize(runOverallGrade) : '';
@@ -60,7 +60,19 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
           <span className={`chip small ${scoreColorClass(runScore)}`}>{runLetter}</span>
           <span className={`history-row-eval-grade-label ${scoreColorClass(runScore)}-text`}>{runGradeWord}</span>
         </div>
-        <div className="history-row-eval-dims">{dimLabels || '—'}</div>
+        <div className="history-row-eval-dims">
+          {dims.map((d) => (
+            <span key={d.dimension} className="history-dim-tag">
+              {capitalize(d.dimension)}
+              {d.score != null && <span className="history-dim-score">{d.score.toFixed(1)}</span>}
+              {d.delta != null && (
+                <span className={`history-dim-trend ${d.delta > 0 ? 'trend-up' : d.delta < 0 ? 'trend-down' : ''}`}>
+                  {d.delta > 0 ? '▲' : d.delta < 0 ? '▼' : '—'}{d.delta !== 0 ? Math.abs(d.delta).toFixed(1) : ''}
+                </span>
+              )}
+            </span>
+          ))}
+        </div>
       </div>
       <div className="history-row-acc">
         <span className="history-row-acc-label">Accumulated</span>

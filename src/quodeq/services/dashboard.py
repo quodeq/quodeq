@@ -22,6 +22,7 @@ from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services.accumulated import numeric_average
+from quodeq.data.fs.report_parser.grades import parse_numeric_score
 
 
 @dataclass
@@ -110,6 +111,7 @@ def _build_accumulated_trend(
     """Build trend using accumulated scores across all runs (oldest to newest)."""
     trend: list[dict[str, Any]] = []
     acc_by_dim: dict[str, DimensionResult] = {}
+    prev_by_dim: dict[str, DimensionResult] = {}
     for item in reversed(runs):  # oldest -> newest
         run_dims = get_run_dimensions(item.run_id)
         for dim in run_dims:
@@ -123,6 +125,21 @@ def _build_accumulated_trend(
         run_avg = numeric_average(run_dims)
         run_grades = [d.overall_grade for d in run_dims if d.overall_grade]
         run_dim_names = sorted(d.dimension for d in run_dims if d.dimension)
+        dim_details = []
+        for dim in sorted(run_dims, key=lambda d: d.dimension or ""):
+            if not dim.dimension:
+                continue
+            prev = prev_by_dim.get(dim.dimension)
+            score = parse_numeric_score(dim.overall_score) if dim.overall_score else None
+            prev_score = parse_numeric_score(prev.overall_score) if prev and prev.overall_score else None
+            delta = round(score - prev_score, 2) if score is not None and prev_score is not None else None
+            dim_details.append({
+                "dimension": dim.dimension,
+                "score": score,
+                "grade": dim.overall_grade,
+                "delta": delta,
+            })
+        prev_by_dim = {d.dimension: d for d in run_dims if d.dimension}
         trend.append(
             {
                 "runId": item.run_id,
@@ -130,6 +147,7 @@ def _build_accumulated_trend(
                 "dateLabel": item.date_label,
                 "dimensionsCount": len(run_dim_names),
                 "dimensions": run_dim_names,
+                "dimensionDetails": dim_details,
                 "accumulatedDimensionsCount": len(acc_by_dim),
                 # Per-run grade/score (this evaluation only)
                 "runNumericAverage": run_avg,
