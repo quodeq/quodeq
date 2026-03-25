@@ -2197,6 +2197,14 @@
   color: var(--color-sev-minor-text);
 }
 
+/* ── Violations pill nav ───────────────────── */
+
+.violations-pill-nav {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
 /* ── Run History Panel ────────────────────────────────── */
 
 .run-history-panel .recharts-wrapper,
