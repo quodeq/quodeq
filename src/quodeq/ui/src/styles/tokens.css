@@ -867,6 +867,274 @@ html[data-theme="midnight-light"]:root {
   --logo-needle-dark:    var(--primitive-horizon-800);
 }
 
+/* ── Neo Dark — Matrix terminal ─────────────────────────── */
+
+html[data-theme="neo-dark"]:root {
+  --color-bg:           var(--primitive-neo-950);
+  --color-surface:      var(--primitive-neo-900);
+  --color-surface-alt:  var(--primitive-neo-800);
+  --color-border:       var(--primitive-neo-700);
+  --color-border-focus: var(--primitive-neo-accent);
+  --color-text:         var(--primitive-neo-200);
+  --color-text-muted:   var(--primitive-neo-500);
+  --color-text-subtle:  #405040;
+  --color-accent:       var(--primitive-neo-accent);
+  --color-accent-hover: #33ff66;
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent) 14%, transparent);
+  --color-danger:  #ff4040;
+  --color-success: var(--primitive-neo-accent);
+  --color-sev-critical-text:   #ff4040;
+  --color-sev-critical-bg:     color-mix(in srgb, #ff4040 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, #ff4040 42%, transparent);
+  --color-sev-major-text:      #ff6432;
+  --color-sev-major-bg:        color-mix(in srgb, #ff6432 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, #ff6432 38%, transparent);
+  --color-sev-minor-text:      #b47850;
+  --color-sev-minor-bg:        color-mix(in srgb, #b47850 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, #b47850 32%, transparent);
+  --color-grade-top-text:    var(--primitive-neo-accent);
+  --color-grade-top-bg:      color-mix(in srgb, var(--primitive-neo-accent) 12%, transparent);
+  --color-grade-high-text:   #80ff80;
+  --color-grade-high-bg:     color-mix(in srgb, #80ff80 10%, transparent);
+  --color-grade-mid-text:    #ff6432;
+  --color-grade-mid-bg:      color-mix(in srgb, #ff6432 12%, transparent);
+  --color-grade-low-text:    #ff4040;
+  --color-grade-low-bg:      color-mix(in srgb, #ff4040 13%, transparent);
+  --color-grade-bottom-text: #ff2020;
+  --color-grade-bottom-bg:   color-mix(in srgb, #ff2020 4%, transparent);
+  --color-warning:      var(--primitive-amber-400);
+  --color-warning-text: var(--primitive-amber-400);
+  --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
+  --color-danger-text:   #ff4040;
+  --color-danger-bg:     color-mix(in srgb, #ff4040 15%, transparent);
+  --color-danger-border: color-mix(in srgb, #ff4040 30%, transparent);
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.92);
+  --color-overlay-medium: rgba(0, 0, 0, 0.85);
+  --color-overlay-light:  rgba(0, 0, 0, 0.75);
+  --color-chart-grid:   var(--primitive-neo-700);
+  --color-chart-axis:   var(--primitive-neo-500);
+  --color-chart-line:   var(--primitive-neo-200);
+  --color-chart-stroke: rgba(0, 255, 65, 0.25);
+  /* Trend — green up, red down */
+  --color-trend-strong-up:   var(--primitive-neo-accent);
+  --color-trend-up:          #80ff80;
+  --color-trend-soft-up:     var(--primitive-neo-500);
+  --color-trend-soft-down:   #b47850;
+  --color-trend-down:        #ff6432;
+  --color-trend-strong-down: #ff4040;
+  /* Console — pure black */
+  --color-console-bg: #000000;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  /* Logo */
+  --logo-q:              var(--primitive-neo-accent);
+  --logo-chevron:        var(--primitive-neo-accent);
+  --logo-chevron-hover:  #33ff66;
+  --logo-needle:         var(--primitive-neo-accent);
+  --logo-needle-dark:    #008833;
+}
+
+/* ── Neo Light — white hat, mint-tinted ────────────────── */
+
+html[data-theme="neo-light"]:root {
+  --color-bg:           var(--primitive-neo-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-neo-100);
+  --color-border:       var(--primitive-neo-border-light);
+  --color-border-focus: var(--primitive-neo-accent-dark);
+  --color-text:         var(--primitive-neo-text-dark);
+  --color-text-muted:   #5a7a5a;
+  --color-text-subtle:  #7a9a7a;
+  --color-accent:       var(--primitive-neo-accent-dark);
+  --color-accent-hover: #006622;
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent-dark) 8%, transparent);
+  --color-danger:  #c0392b;
+  --color-success: #2d7a4f;
+  --color-sev-critical-text:   var(--primitive-crimson-600);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-600) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-600) 38%, transparent);
+  --color-sev-major-text:      var(--primitive-ired-800);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ired-800) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-ired-800) 35%, transparent);
+  --color-sev-minor-text:      var(--primitive-ired-700);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
+  --color-grade-top-text:    #006622;
+  --color-grade-top-bg:      color-mix(in srgb, #006622 12%, transparent);
+  --color-grade-high-text:   #338844;
+  --color-grade-high-bg:     color-mix(in srgb, #338844 10%, transparent);
+  --color-grade-mid-text:    var(--primitive-ired-800);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-800) 10%, transparent);
+  --color-grade-low-text:    var(--primitive-ired-900);
+  --color-grade-low-bg:      color-mix(in srgb, var(--primitive-ired-900) 10%, transparent);
+  --color-grade-bottom-text: var(--primitive-crimson-600);
+  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-600) 12%, transparent);
+  --color-warning:      var(--primitive-amber-700);
+  --color-warning-text: var(--primitive-amber-700);
+  --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-700) 8%, transparent);
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   #5a7a5a;
+  --color-chart-line:   var(--primitive-neo-text-dark);
+  --color-chart-stroke: transparent;
+  /* Trend — green up, ired down */
+  --color-trend-strong-up:   #006622;
+  --color-trend-up:          var(--primitive-neo-accent-dark);
+  --color-trend-soft-up:     #5a7a5a;
+  --color-trend-soft-down:   var(--primitive-ired-700);
+  --color-trend-down:        var(--primitive-ired-900);
+  --color-trend-strong-down: var(--primitive-crimson-600);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+  /* Logo */
+  --logo-q:              var(--primitive-neo-accent-dark);
+  --logo-chevron:        var(--primitive-neo-text-dark);
+  --logo-chevron-hover:  var(--primitive-neo-accent-dark);
+  --logo-needle:         var(--primitive-neo-accent-dark);
+  --logo-needle-dark:    #006622;
+}
+
+/* ── Forest Dark — deep woodland ───────────────────────── */
+
+html[data-theme="forest-dark"]:root {
+  --color-bg:           var(--primitive-forest-950);
+  --color-surface:      var(--primitive-forest-900-dark);
+  --color-surface-alt:  var(--primitive-forest-800-dark);
+  --color-border:       var(--primitive-forest-700-dark);
+  --color-border-focus: var(--primitive-green-400);
+  --color-text:         #c8d4c8;
+  --color-text-muted:   #5a7a5a;
+  --color-text-subtle:  #3a5a3a;
+  --color-accent:       var(--primitive-green-400);
+  --color-accent-hover: #6ee7a0;
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-green-400) 14%, transparent);
+  --color-danger:  #e05c4b;
+  --color-success: var(--primitive-green-400);
+  --color-sev-critical-text:   var(--primitive-crimson-200);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-200) 42%, transparent);
+  --color-sev-major-text:      var(--primitive-ired-300);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ired-300) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-ired-300) 38%, transparent);
+  --color-sev-minor-text:      var(--primitive-ired-200);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-200) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-200) 32%, transparent);
+  --color-grade-top-text:    var(--primitive-green-400);
+  --color-grade-top-bg:      color-mix(in srgb, var(--primitive-green-400) 12%, transparent);
+  --color-grade-high-text:   #6a9678;
+  --color-grade-high-bg:     color-mix(in srgb, #6a9678 12%, transparent);
+  --color-grade-mid-text:    var(--primitive-ired-300);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 12%, transparent);
+  --color-grade-low-text:    var(--primitive-ired-400);
+  --color-grade-low-bg:      color-mix(in srgb, var(--primitive-ired-400) 13%, transparent);
+  --color-grade-bottom-text: var(--primitive-crimson-200);
+  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-200) 4%, transparent);
+  --color-warning:      var(--primitive-amber-400);
+  --color-warning-text: var(--primitive-amber-400);
+  --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
+  --color-danger-text:   var(--primitive-crimson-200);
+  --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 15%, transparent);
+  --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 30%, transparent);
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
+  --color-overlay-medium: rgba(0, 0, 0, 0.82);
+  --color-overlay-light:  rgba(0, 0, 0, 0.72);
+  --color-chart-grid:   var(--primitive-forest-700-dark);
+  --color-chart-axis:   #5a7a5a;
+  --color-chart-line:   #c8d4c8;
+  --color-chart-stroke: rgba(255, 255, 255, 0.25);
+  /* Trend — green up, ired down */
+  --color-trend-strong-up:   var(--primitive-green-400);
+  --color-trend-up:          #6a9678;
+  --color-trend-soft-up:     #5a7a5a;
+  --color-trend-soft-down:   var(--primitive-ired-200);
+  --color-trend-down:        var(--primitive-ired-300);
+  --color-trend-strong-down: var(--primitive-crimson-300);
+  /* Console — deep green tint */
+  --color-console-bg: #060e06;
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+  /* Logo */
+  --logo-q:              var(--primitive-green-400);
+  --logo-chevron:        #c8d4c8;
+  --logo-chevron-hover:  var(--primitive-green-400);
+  --logo-needle:         var(--primitive-green-400);
+  --logo-needle-dark:    var(--primitive-forest-700);
+}
+
+/* ── Ember Light — warm parchment ──────────────────────── */
+
+html[data-theme="ember-light"]:root {
+  --color-bg:           var(--primitive-ember-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-ember-100);
+  --color-border:       var(--primitive-ember-border-light);
+  --color-border-focus: var(--primitive-crimson-500);
+  --color-text:         var(--primitive-ember-text-dark);
+  --color-text-muted:   var(--primitive-ember-500);
+  --color-text-subtle:  #b0a090;
+  --color-accent:       #c0392b;
+  --color-accent-hover: #a02e22;
+  --color-accent-soft:  color-mix(in srgb, #c0392b 8%, transparent);
+  --color-danger:  #c0392b;
+  --color-success: #2d7a4f;
+  --color-sev-critical-text:   var(--primitive-crimson-600);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-crimson-600) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-crimson-600) 38%, transparent);
+  --color-sev-major-text:      var(--primitive-ired-800);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ired-800) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-ired-800) 35%, transparent);
+  --color-sev-minor-text:      var(--primitive-ired-700);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
+  --color-grade-top-text:    var(--primitive-daruma-600);
+  --color-grade-top-bg:      color-mix(in srgb, var(--primitive-daruma-600) 12%, transparent);
+  --color-grade-high-text:   #7a6e64;
+  --color-grade-high-bg:     color-mix(in srgb, #7a6e64 10%, transparent);
+  --color-grade-mid-text:    var(--primitive-ired-800);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-800) 10%, transparent);
+  --color-grade-low-text:    var(--primitive-ired-900);
+  --color-grade-low-bg:      color-mix(in srgb, var(--primitive-ired-900) 10%, transparent);
+  --color-grade-bottom-text: var(--primitive-crimson-600);
+  --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-600) 12%, transparent);
+  --color-warning:      var(--primitive-amber-700);
+  --color-warning-text: var(--primitive-amber-700);
+  --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-700) 8%, transparent);
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   var(--primitive-ember-500);
+  --color-chart-line:   var(--primitive-ember-text-dark);
+  --color-chart-stroke: transparent;
+  /* Trend — warm up, ired down */
+  --color-trend-strong-up:   var(--primitive-daruma-600);
+  --color-trend-up:          var(--primitive-ember-500);
+  --color-trend-soft-up:     #b0a090;
+  --color-trend-soft-down:   var(--primitive-ired-700);
+  --color-trend-down:        var(--primitive-ired-900);
+  --color-trend-strong-down: var(--primitive-crimson-600);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
+  /* Logo */
+  --logo-q:              #c0392b;
+  --logo-chevron:        var(--primitive-ember-text-dark);
+  --logo-chevron-hover:  #c0392b;
+  --logo-needle:         var(--primitive-crimson-300);
+  --logo-needle-dark:    var(--primitive-crimson-700);
+}
+
 /* ── 5. Typography ────────────────────────────────────────
    Font families, scale, line-height, weight.
    ──────────────────────────────────────────────────────── */
