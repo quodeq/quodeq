@@ -1,4 +1,4 @@
-import { scoreColorClass } from '../../../utils/formatters.js';
+import { scoreColorClass, gradeLabel } from '../../../utils/formatters.js';
 
 function formatTime(dateISO) {
   if (!dateISO) return '';
@@ -6,16 +6,6 @@ function formatTime(dateISO) {
     const d = new Date(dateISO);
     return d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   } catch { return ''; }
-}
-
-function scoreToGradeWord(score) {
-  const n = parseFloat(score);
-  if (isNaN(n)) return '';
-  if (n >= 9) return 'Exemplary';
-  if (n >= 7) return 'Good';
-  if (n >= 5) return 'Adequate';
-  if (n >= 3) return 'Poor';
-  return 'Critical';
 }
 
 function TrendBadge({ delta }) {
@@ -45,7 +35,9 @@ export default function HistoryRunRow({ entry, delta, onClick }) {
   const runScore = parseFloat(runNumericAverage);
   const accScore = parseFloat(numericAverage);
   const dimLabels = (dimensions || []).map(capitalize).join(', ');
-  const gradeWord = runOverallGrade ? scoreToGradeWord(runScore) : '';
+  const runLetter = gradeLabel(runOverallGrade) || '—';
+  const accLetter = gradeLabel(overallGrade) || '—';
+  const runGradeWord = runOverallGrade ? capitalize(runOverallGrade) : '';
   return (
     <button type="button" className="history-row" onClick={() => onClick(runId, dateLabel)}>
       <div className="history-row-date">
@@ -57,15 +49,15 @@ export default function HistoryRunRow({ entry, delta, onClick }) {
       </div>
       <div className="history-row-eval">
         <div className="history-row-eval-grade">
-          <span className={`chip small ${scoreColorClass(runScore)}`}>{runOverallGrade || '—'}</span>
-          <span className={`history-row-eval-grade-label ${scoreColorClass(runScore)}-text`}>{gradeWord}</span>
+          <span className={`chip small ${scoreColorClass(runScore)}`}>{runLetter}</span>
+          <span className={`history-row-eval-grade-label ${scoreColorClass(runScore)}-text`}>{runGradeWord}</span>
         </div>
         <div className="history-row-eval-dims">{dimLabels || '—'}</div>
       </div>
       <div className="history-row-acc">
         <span className="history-row-acc-label">Accumulated</span>
         <div className="history-row-acc-line">
-          <span className={`chip small ${scoreColorClass(accScore)}`} style={{ opacity: 0.85 }}>{overallGrade || '—'}</span>
+          <span className={`chip small ${scoreColorClass(accScore)}`} style={{ opacity: 0.85 }}>{accLetter}</span>
           <span className="history-row-acc-score">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>
           <TrendBadge delta={delta} />
         </div>
