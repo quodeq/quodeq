@@ -20,35 +20,41 @@ function TrendBadge({ delta }) {
   );
 }
 
-function abbreviateDimension(name) {
+function capitalize(name) {
   if (!name) return '';
-  const abbrevMap = {
-    maintainability: 'mnt', modifiability: 'mod', reusability: 'reu',
-    analyzability: 'anz', reliability: 'rel', security: 'sec',
-    performance: 'prf', usability: 'usa', affinity: 'aff',
-    evolvability: 'evo', modularity: 'mdu', testability: 'tst',
-  };
-  return abbrevMap[name.toLowerCase()] || name.slice(0, 3);
+  return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
 export default function HistoryRunRow({ entry, delta, onClick }) {
-  const { runId, dateLabel, dateISO, numericAverage, overallGrade, dimensions, accumulatedDimensionsCount } = entry;
-  const score = parseFloat(numericAverage);
-  const dimLabels = (dimensions || []).map(abbreviateDimension).join(', ');
+  const {
+    runId, dateLabel, dateISO,
+    runNumericAverage, runOverallGrade,
+    numericAverage, overallGrade,
+    dimensions, accumulatedDimensionsCount,
+  } = entry;
+  const runScore = parseFloat(runNumericAverage);
+  const accScore = parseFloat(numericAverage);
+  const dimLabels = (dimensions || []).map(capitalize).join(', ');
   return (
     <button type="button" className="history-row" onClick={() => onClick(runId, dateLabel)}>
       <div className="history-row-date">
         <span className="history-row-date-main">{dateLabel}</span>
         <span className="history-row-date-time">{formatTime(dateISO)}</span>
       </div>
-      <span className={`chip small ${scoreColorClass(score)}`}>{overallGrade || '—'}</span>
-      <span className="history-row-score">{isNaN(score) ? '—' : score.toFixed(1)}</span>
+      <div className="history-row-grades">
+        <div className="history-row-grade-run">
+          <span className={`chip small ${scoreColorClass(runScore)}`}>{runOverallGrade || '—'}</span>
+          <span className="history-row-score">{isNaN(runScore) ? '—' : runScore.toFixed(1)}</span>
+        </div>
+        <div className="history-row-grade-acc">
+          <span className={`chip small ${scoreColorClass(accScore)}`}>{overallGrade || '—'}</span>
+          <span className="history-row-score-acc">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>
+          <span className="history-row-label-acc">acc</span>
+        </div>
+      </div>
       <TrendBadge delta={delta} />
       <div className="history-row-dims">
         <span className="history-row-dims-run">{dimLabels || '—'}</span>
-        {accumulatedDimensionsCount != null && (
-          <span className="history-row-dims-acc">{accumulatedDimensionsCount} accumulated</span>
-        )}
       </div>
     </button>
   );
