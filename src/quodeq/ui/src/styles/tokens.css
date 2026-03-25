@@ -87,6 +87,32 @@
   --primitive-horizon-800: #4338ca;
   --primitive-horizon-900: #111827;
 
+  /* Neo palette (Matrix terminal) */
+  --primitive-neo-950:  #0a0a0a;
+  --primitive-neo-900:  #111111;
+  --primitive-neo-800:  #1a1a1a;
+  --primitive-neo-700:  #282828;
+  --primitive-neo-500:  #608060;
+  --primitive-neo-200:  #b0ffb0;
+  --primitive-neo-accent: #00ff41;
+  --primitive-neo-accent-dark: #008833;
+  --primitive-neo-50:   #f0f5f0;
+  --primitive-neo-100:  #e4ede4;
+  --primitive-neo-border-light: #c0d4c0;
+  --primitive-neo-text-dark: #0a2010;
+
+  /* Forest dark extensions */
+  --primitive-forest-950:      #0e1610;
+  --primitive-forest-900-dark: #152018;
+  --primitive-forest-800-dark: #1e2c20;
+  --primitive-forest-700-dark: #2e4230;
+
+  /* Ember light extensions */
+  --primitive-ember-50:  #faf6f2;
+  --primitive-ember-100: #f0ebe4;
+  --primitive-ember-border-light: #ddd4c8;
+  --primitive-ember-text-dark: #2a2018;
+
   /* Brand neutrals (cool near-black, logo-derived) */
   --primitive-brand-950: #0d1014;
   --primitive-brand-900: #14161b;
