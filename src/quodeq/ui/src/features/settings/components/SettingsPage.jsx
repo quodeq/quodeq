@@ -20,12 +20,12 @@ const MODE_OPTIONS = [
 ];
 
 const FAMILY_OPTIONS = [
-  { value: 'default',  label: 'Default',  accent: ['#d80c18', '#e82030'] },
-  { value: 'midnight', label: 'Midnight', accent: ['#4f46e5', '#00d4ff'] },
-  { value: 'neo',      label: 'Neo',      accent: ['#008833', '#00ff41'] },
-  { value: 'forest',   label: 'Forest',   accent: ['#1b6b3a', '#4caf7d'] },
-  { value: 'ember',    label: 'Ember',    accent: ['#c85a10', '#e88030'] },
-  { value: 'cyber',    label: 'Cyber',    accent: ['#d020a0', '#ff40c0'] },
+  { value: 'daruma',    label: 'Daruma',    accent: ['#d80c18', '#e82030'] },
+  { value: 'flynn',     label: 'Flynn',     accent: ['#4f46e5', '#00d4ff'] },
+  { value: 'neo',       label: 'Neo',       accent: ['#008833', '#00ff41'] },
+  { value: 'galadriel', label: 'Galadriel', accent: ['#1b6b3a', '#4caf7d'] },
+  { value: 'ifrit',     label: 'Ifrit',     accent: ['#c85a10', '#e88030'] },
+  { value: 'deckard',   label: 'Deckard',   accent: ['#d020a0', '#ff40c0'] },
 ];
 
 const _SETTINGS_PHRASES = [

@@ -9,24 +9,32 @@ const AI_MODEL_KEY = 'cc-ai-model';
 const VERIFY_FINDINGS_KEY = 'cc-verify-findings';
 
 const VALID_MODES = ['system', 'light', 'dark'];
-const VALID_FAMILIES = ['default', 'midnight', 'neo', 'forest', 'ember', 'cyber'];
+const VALID_FAMILIES = ['daruma', 'flynn', 'neo', 'galadriel', 'ifrit', 'deckard'];
 
 const MIGRATION_MAP = {
-  system:   { mode: 'system', family: 'default' },
-  light:    { mode: 'light',  family: 'default' },
-  dark:     { mode: 'dark',   family: 'default' },
-  ember:    { mode: 'dark',   family: 'ember' },
-  forest:   { mode: 'light',  family: 'forest' },
-  midnight: { mode: 'dark',   family: 'midnight' },
-  slate:    { mode: 'light',  family: 'default' },
-  horizon:  { mode: 'light',  family: 'midnight' },
+  system:   { mode: 'system', family: 'daruma' },
+  light:    { mode: 'light',  family: 'daruma' },
+  dark:     { mode: 'dark',   family: 'daruma' },
+  ember:    { mode: 'dark',   family: 'ifrit' },
+  forest:   { mode: 'light',  family: 'galadriel' },
+  midnight: { mode: 'dark',   family: 'flynn' },
+  slate:    { mode: 'light',  family: 'daruma' },
+  horizon:  { mode: 'light',  family: 'flynn' },
 };
 
 function migrateOldTheme() {
   try {
     const old = localStorage.getItem(OLD_THEME_KEY);
-    if (old === null) return;
-    const mapped = MIGRATION_MAP[old] || { mode: 'system', family: 'default' };
+    if (old === null) {
+      // Migrate old family names to character names
+      const currentFamily = localStorage.getItem(FAMILY_KEY);
+      const familyRenames = { 'default': 'daruma', 'midnight': 'flynn', 'forest': 'galadriel', 'ember': 'ifrit', 'cyber': 'deckard' };
+      if (currentFamily && familyRenames[currentFamily]) {
+        localStorage.setItem(FAMILY_KEY, familyRenames[currentFamily]);
+      }
+      return;
+    }
+    const mapped = MIGRATION_MAP[old] || { mode: 'system', family: 'daruma' };
     localStorage.setItem(MODE_KEY, mapped.mode);
     localStorage.setItem(FAMILY_KEY, mapped.family);
     localStorage.removeItem(OLD_THEME_KEY);
@@ -38,7 +46,7 @@ function migrateOldTheme() {
 /** Compute the data-theme attribute value from mode + family + OS preference. */
 export function resolveDataTheme(mode, family, prefersDark) {
   const effectiveMode = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
-  if (family === 'default') {
+  if (family === 'daruma') {
     // System mode: return null so @media (prefers-color-scheme) drives the theme
     // Explicit mode: return 'light' or 'dark' to override OS preference
     return mode === 'system' ? null : effectiveMode;
@@ -63,7 +71,7 @@ export function useAppSettings() {
   useState(() => migrateOldTheme());
 
   const [themeMode, setThemeMode] = useState(safeGet(MODE_KEY, 'system'));
-  const [themeFamily, setThemeFamily] = useState(safeGet(FAMILY_KEY, 'default'));
+  const [themeFamily, setThemeFamily] = useState(safeGet(FAMILY_KEY, 'daruma'));
   const [aiCmd, setAiCmd] = useState(safeGet(AI_CMD_KEY));
   const [aiModel, setAiModel] = useState(safeGet(AI_MODEL_KEY));
   const [modelFast, setModelFast] = useState(safeGet(`${MODEL_STORAGE_PREFIX}1`));
