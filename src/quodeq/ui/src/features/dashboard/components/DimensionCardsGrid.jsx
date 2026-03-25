@@ -45,26 +45,33 @@ function AccDimensionCard({ item, referenceRun, onDimensionClick, evaluatedToday
   );
 }
 
-export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, dayDimensions = [] }) {
-  const dayDimSet = new Set(dayDimensions.map((d) => d.toLowerCase()));
+export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayDate }) {
+  // Each dimension has fromDateISO — compare its date to the selected day
   const sorted = [...sortedDimensions].sort((a, b) => {
-    const aActive = dayDimSet.has((a.dimension || '').toLowerCase());
-    const bActive = dayDimSet.has((b.dimension || '').toLowerCase());
+    if (!selectedDayDate) return a.dimension.localeCompare(b.dimension);
+    const aDate = (a.fromDateISO || '').slice(0, 10);
+    const bDate = (b.fromDateISO || '').slice(0, 10);
+    const aActive = aDate === selectedDayDate;
+    const bActive = bDate === selectedDayDate;
     if (aActive && !bActive) return -1;
     if (!aActive && bActive) return 1;
     return a.dimension.localeCompare(b.dimension);
   });
   return (
     <div className="dimensions-grid">
-      {sorted.map((item) => (
-        <AccDimensionCard
-          key={item.dimension}
-          item={item}
-          referenceRun={referenceRun}
-          onDimensionClick={onDimensionClick}
-          evaluatedToday={dayDimSet.size === 0 || dayDimSet.has((item.dimension || '').toLowerCase())}
-        />
-      ))}
+      {sorted.map((item) => {
+        const dimDate = (item.fromDateISO || '').slice(0, 10);
+        const isActive = !selectedDayDate || dimDate === selectedDayDate;
+        return (
+          <AccDimensionCard
+            key={item.dimension}
+            item={item}
+            referenceRun={referenceRun}
+            onDimensionClick={onDimensionClick}
+            evaluatedToday={isActive}
+          />
+        );
+      })}
     </div>
   );
 }
