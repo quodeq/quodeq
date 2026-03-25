@@ -1409,6 +1409,54 @@ textarea:focus {
   font-weight: var(--weight-semibold);
 }
 
+.theme-family-picker {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.theme-family-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 2px solid var(--color-border);
+  background: var(--color-surface);
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.theme-family-card:hover {
+  border-color: var(--color-text-muted);
+}
+
+.theme-family-card.active {
+  border-color: var(--color-accent);
+}
+
+.theme-family-swatches {
+  display: flex;
+  gap: 4px;
+}
+
+.theme-family-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 1px solid rgba(128, 128, 128, 0.2);
+}
+
+.theme-family-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.theme-family-card.active .theme-family-label {
+  color: var(--color-text);
+}
+
 /* Responsive breakpoints (app shell / layout) */
 
 @media (max-width: 900px) {

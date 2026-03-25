@@ -13,15 +13,18 @@ const MIN_POOL_BUDGET_MINS = 1;
 const MAX_POOL_BUDGET_MINS = 60;
 const DEFAULT_POOL_BUDGET_MINS = 10;
 
-const THEME_OPTIONS = [
+const MODE_OPTIONS = [
   { value: 'system',   label: 'System' },
   { value: 'light',    label: 'Light' },
   { value: 'dark',     label: 'Dark' },
-  { value: 'ember',    label: 'Ember' },
-  { value: 'forest',   label: 'Forest' },
-  { value: 'midnight', label: 'Midnight' },
-  { value: 'slate',    label: 'Slate' },
-  { value: 'horizon',  label: 'Horizon' },
+];
+
+const FAMILY_OPTIONS = [
+  { value: 'default',  label: 'Default',  accent: ['#d80c18', '#e82030'] },
+  { value: 'midnight', label: 'Midnight', accent: ['#6366f1', '#00d4ff'] },
+  { value: 'neo',      label: 'Neo',      accent: ['#008833', '#00ff41'] },
+  { value: 'forest',   label: 'Forest',   accent: ['#2d6a4f', '#4caf7d'] },
+  { value: 'ember',    label: 'Ember',    accent: ['#c0392b', '#d80c18'] },
 ];
 
 const _SETTINGS_PHRASES = [
@@ -32,7 +35,7 @@ const _SETTINGS_PHRASES = [
   'code quality compass',
 ];
 
-function ThemeSection({ themePreference, onApplyTheme }) {
+function ThemeSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
   return (
     <section className="panel settings-section">
       <div className="panel-header">
@@ -40,18 +43,40 @@ function ThemeSection({ themePreference, onApplyTheme }) {
       </div>
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Theme</span>
-          <span className="settings-description">Choose how Quodeq looks to you</span>
+          <span className="settings-label">Mode</span>
+          <span className="settings-description">Choose light, dark, or follow your system</span>
         </div>
         <div className="theme-toggle">
-          {THEME_OPTIONS.map(({ value, label }) => (
+          {MODE_OPTIONS.map(({ value, label }) => (
             <button
               key={value}
               type="button"
-              className={`theme-toggle-btn${themePreference === value ? ' active' : ''}`}
-              onClick={() => onApplyTheme(value)}
+              className={`theme-toggle-btn${themeMode === value ? ' active' : ''}`}
+              onClick={() => onApplyMode(value)}
             >
               {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="settings-row">
+        <div className="settings-row-label">
+          <span className="settings-label">Theme</span>
+          <span className="settings-description">Pick a color palette</span>
+        </div>
+        <div className="theme-family-picker">
+          {FAMILY_OPTIONS.map(({ value, label, accent }) => (
+            <button
+              key={value}
+              type="button"
+              className={`theme-family-card${themeFamily === value ? ' active' : ''}`}
+              onClick={() => onApplyFamily(value)}
+            >
+              <span className="theme-family-swatches">
+                <span className="theme-family-swatch" style={{ background: accent[0] }} />
+                <span className="theme-family-swatch" style={{ background: accent[1] }} />
+              </span>
+              <span className="theme-family-label">{label}</span>
             </button>
           ))}
         </div>
@@ -214,7 +239,7 @@ function useSettingsState(aiCmd, onApplyAiCmd) {
 }
 
 export default function SettingsPage({ theme, models, analysis, verification }) {
-  const { preference: themePreference, onApply: onApplyTheme } = theme;
+  const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
   const { aiCmd, onApplyAiCmd } = models;
   const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
   const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
@@ -225,7 +250,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
       <SettingsHeader />
       <div className="settings-layout">
       <div className="settings-body">
-        <ThemeSection themePreference={themePreference} onApplyTheme={onApplyTheme} />
+        <ThemeSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
 
         <section className="panel settings-section">
           <div className="panel-header">
