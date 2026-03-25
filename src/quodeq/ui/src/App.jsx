@@ -11,6 +11,7 @@ import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
 import HistoryPage from './features/history/components/HistoryPage.jsx';
 import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
+import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
@@ -75,6 +76,21 @@ function formatHistoryRunLabel(trend, runs, idx, fallbackLabel) {
 
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
+  violations: (params, props) => {
+    const dims = props.dashboardData.accumulated?.dimensions || [];
+    const acc = props.dashboardData.accumulated;
+    const nav = props.navigation.handleNavigate;
+    return (
+      <ViolationsPage
+        data={{ accumulated: acc, accumulatedDimensions: dims }}
+        callbacks={{
+          onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, sourceTab: 'violations' }),
+          onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
+          onPrincipleClick: (principleObj) => nav('principle', { principle: principleObj, sourceTab: 'violations' }),
+        }}
+      />
+    );
+  },
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   history: (params, props) => {
     const trend = props.dashboardData.dashboard?.trend || [];
@@ -196,11 +212,12 @@ function useAppState() {
     return { headerMeta: meta, ...display };
   }, [accumulated, dashboard, selectedProject, projects]);
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
-  const knownTabs = ['overview', 'history', 'projects', 'evaluate', 'settings'];
+  const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'settings'];
   const activeTab = knownTabs.includes(activePage.page) ? activePage.page
+    : activePage.sourceTab && knownTabs.includes(activePage.sourceTab) ? activePage.sourceTab
     : activePage.page === 'history-run' ? 'history'
     : 'overview';
-  const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
+  const showProjectHeader = ['overview', 'violations'].includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = showProjectHeader && dailyRuns.length > 0 && navStack.length === 1;
 
   return {
