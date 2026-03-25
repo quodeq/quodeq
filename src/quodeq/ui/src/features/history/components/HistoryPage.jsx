@@ -16,7 +16,10 @@ function computeDeltas(trend) {
   });
 }
 
-export default function HistoryPage({ trend, selectedRunId, selectedRunScore, accumulatedDimensions, lastRun, runNav, onRunClick, onBarClick, onDimensionClick }) {
+export default function HistoryPage({ trend, selection, runNav, dimensions, callbacks }) {
+  const { selectedRunId, selectedRunScore } = selection;
+  const { accumulatedDimensions, lastRun } = dimensions;
+  const { onRunClick, onBarClick, onDimensionClick } = callbacks;
   const [showAll, setShowAll] = useState(false);
   const [listCollapsed, setListCollapsed] = useState(false);
 

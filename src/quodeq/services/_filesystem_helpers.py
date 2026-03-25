@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import functools
 import json
-import os
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
 from quodeq.config.paths import default_paths
 from quodeq.core.types import ProjectEntry
+from quodeq.shared.utils import _env_int
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
     read_run_data,
@@ -119,13 +119,7 @@ def _max_projects_listed(override: int | None = None, env: dict[str, str] | None
     """Return the max number of projects to list. *override* bypasses env."""
     if override is not None:
         return override
-    raw = (env or os.environ).get("QUODEQ_MAX_PROJECTS_LISTED")
-    if raw is None:
-        return _DEFAULT_MAX_PROJECTS_LISTED
-    try:
-        return int(raw)
-    except ValueError:
-        return _DEFAULT_MAX_PROJECTS_LISTED
+    return _env_int("QUODEQ_MAX_PROJECTS_LISTED", _DEFAULT_MAX_PROJECTS_LISTED, env=env)
 
 
 def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:

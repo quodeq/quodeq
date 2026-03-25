@@ -203,6 +203,15 @@ function buildEvalPrincipalFn(evalData, complianceByPrinciple) {
   };
 }
 
+function useDerivedExplorerStats(evalData, allViolations) {
+  const topFiles = useMemo(() => evalData ? buildTopOffendingFiles([{ dimension: evalData.dimension, violations: allViolations }]) : [], [evalData, allViolations]);
+  const severityCounts = useMemo(() => computeSeverityCounts(allViolations), [allViolations]);
+  const uniquePrinciples = useMemo(() => new Set(allViolations.map((v) => v.principle).filter(Boolean)).size, [allViolations]);
+  const totalCompliant = useMemo(() => (evalData?.principles || []).reduce((sum, p) => sum + (p.compliance?.length || 0), 0), [evalData]);
+  const complianceByPrinciple = useMemo(() => computeComplianceByPrinciple(evalData), [evalData]);
+  return { topFiles, severityCounts, uniquePrinciples, totalCompliant, complianceByPrinciple };
+}
+
 function useExplorerData(project, dimension, runId) {
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -216,12 +225,8 @@ function useExplorerData(project, dimension, runId) {
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
-  const topFiles = useMemo(() => evalData ? buildTopOffendingFiles([{ dimension: evalData.dimension, violations: allViolations }]) : [], [evalData, allViolations]);
-  const severityCounts = useMemo(() => computeSeverityCounts(allViolations), [allViolations]);
-  const uniquePrinciples = useMemo(() => new Set(allViolations.map((v) => v.principle).filter(Boolean)).size, [allViolations]);
-  const totalCompliant = useMemo(() => (evalData?.principles || []).reduce((sum, p) => sum + (p.compliance?.length || 0), 0), [evalData]);
-  const complianceByPrinciple = useMemo(() => computeComplianceByPrinciple(evalData), [evalData]);
-  return { evalData, loading, error, overallGrade, principleGrades, allViolations, topFiles, severityCounts, uniquePrinciples, totalCompliant, complianceByPrinciple };
+  const stats = useDerivedExplorerStats(evalData, allViolations);
+  return { evalData, loading, error, overallGrade, principleGrades, allViolations, ...stats };
 }
 
 export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate }) {

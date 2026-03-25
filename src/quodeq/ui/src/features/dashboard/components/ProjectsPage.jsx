@@ -151,7 +151,8 @@ function CardFooter({ name, confirming, setConfirming, onDelete, onExport }) {
   );
 }
 
-function ProjectPathContent({ id, p, relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate }) {
+function ProjectPathContent({ id, p, relocateActions }) {
+  const { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
   const path = formatPath(p.path);
   const pathMissing = p.location === 'local' && p.pathExists === false;
   if (relocating === id) {
@@ -180,7 +181,8 @@ function ProjectPathContent({ id, p, relocating, relocatePath, setRelocatePath, 
   );
 }
 
-function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, confirming, setConfirming, onDelete, onExport, relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate }) {
+function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, confirmActions, relocateActions }) {
+  const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   const id = p.id || p.name || p;
   const isSelected = id === selectedProject;
   const hasChildren = !!(childProjects?.[id]?.length);
@@ -188,7 +190,7 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
       <ProjectCard project={p} isSelected={isSelected} onSelect={onSelect} footer={<CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} />}>
-        <ProjectPathContent id={id} p={p} relocating={relocating} relocatePath={relocatePath} setRelocatePath={setRelocatePath} submitRelocate={submitRelocate} setRelocating={setRelocating} startRelocate={startRelocate} />
+        <ProjectPathContent id={id} p={p} relocateActions={relocateActions} />
       </ProjectCard>
       {hasChildren && (
         <div className="project-children-outer">
@@ -232,7 +234,7 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
       ) : (
         <div className="projects-cards">
           {roots.map((p) => (
-            <ProjectCardGroup key={p.id || p.name || p} p={p} children={children} selectedProject={selectedProject} onSelect={onSelect} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} relocating={relocating} relocatePath={relocatePath} setRelocatePath={setRelocatePath} submitRelocate={submitRelocate} setRelocating={setRelocating} startRelocate={startRelocate} />
+            <ProjectCardGroup key={p.id || p.name || p} p={p} children={children} selectedProject={selectedProject} onSelect={onSelect} confirmActions={{ confirming, setConfirming, onDelete, onExport }} relocateActions={{ relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate }} />
           ))}
         </div>
       )}

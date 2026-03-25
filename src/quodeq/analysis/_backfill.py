@@ -64,7 +64,7 @@ def _collect_backfill_taken(evidence_dir: Path, dimension: str, output_jsonl: Pa
         from quodeq.analysis.subagents.file_queue import FileQueue
         try:
             backfill_taken = set(FileQueue(backfill_queue).all_taken_files())
-        except Exception as exc:
+        except (OSError, KeyError, ValueError, _json.JSONDecodeError) as exc:
             log_debug(f"Cannot read backfill queue {backfill_queue}: {exc}")
     from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
     if output_jsonl.exists():

@@ -18,6 +18,11 @@ const cssVar = (name, fallback) => {
 
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
 const CHART_LEFT_MARGIN = -16;
+const CHART_HEIGHT = 160;
+const CHART_MAX_BAR_SIZE = 40;
+const CHART_CELL_OPACITY = 0.85;
+const CHART_Y_TICKS = [0, 2.5, 5, 7.5, 10];
+const CHART_BAR_RADIUS = [3, 3, 0, 0];
 const TREND_UP_ANGLE = 70;
 const TREND_SOFT_UP = 88;
 const TREND_DOWN = 110;
@@ -136,7 +141,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
           </span>
         )}
       </div>
-      <ResponsiveContainer width="100%" height={160}>
+      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
         <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: CHART_LEFT_MARGIN }}>
           <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
           <XAxis
@@ -149,7 +154,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
           />
           <YAxis
             domain={[0, 10]}
-            ticks={[0, 2.5, 5, 7.5, 10]}
+            ticks={CHART_Y_TICKS}
             tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
             axisLine={false}
             tickLine={false}
@@ -160,8 +165,8 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
           <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
           <Bar
             dataKey="numericScore"
-            radius={[3, 3, 0, 0]}
-            maxBarSize={40}
+            radius={CHART_BAR_RADIUS}
+            maxBarSize={CHART_MAX_BAR_SIZE}
             label={renderTrendLabel}
             isAnimationActive={false}
             cursor={onBarClick ? 'pointer' : 'default'}
@@ -171,7 +176,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
               <Cell
                 key={entry.dimension ?? i}
                 fill={scoreBarColor(entry.numericScore)}
-                opacity={0.85}
+                opacity={CHART_CELL_OPACITY}
               />
             ))}
           </Bar>

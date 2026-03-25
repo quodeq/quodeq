@@ -7,23 +7,32 @@ from __future__ import annotations
 
 import sys
 
-if sys.platform == "win32":
-    import msvcrt as _lock_mod
-else:
-    import fcntl as _lock_mod  # type: ignore[no-redef]
+
+def _make_lock_ops() -> tuple:
+    """Return (lock_fn, unlock_fn) for the current platform."""
+    if sys.platform == "win32":
+        import msvcrt
+        def _lock(fd: int) -> None:
+            msvcrt.locking(fd, msvcrt.LK_LOCK, 1)
+        def _unlock(fd: int) -> None:
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+    else:
+        import fcntl
+        def _lock(fd: int) -> None:
+            fcntl.flock(fd, fcntl.LOCK_EX)
+        def _unlock(fd: int) -> None:
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    return _lock, _unlock
+
+
+_lock_impl, _unlock_impl = _make_lock_ops()
 
 
 def lock_file(fd: int) -> None:
     """Acquire an exclusive lock on the file descriptor."""
-    if sys.platform == "win32":
-        _lock_mod.locking(fd, _lock_mod.LK_LOCK, 1)
-    else:
-        _lock_mod.flock(fd, _lock_mod.LOCK_EX)
+    _lock_impl(fd)
 
 
 def unlock_file(fd: int) -> None:
     """Release the lock on the file descriptor."""
-    if sys.platform == "win32":
-        _lock_mod.locking(fd, _lock_mod.LK_UNLCK, 1)
-    else:
-        _lock_mod.flock(fd, _lock_mod.LOCK_UN)
+    _unlock_impl(fd)

@@ -2,18 +2,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { listProjects } from '../api/index.js';
 
 const STORAGE_KEY = 'quodeq_selected_project';
+const DEFAULT_RUN = 'latest';
 
 function persistProject(setter, name) {
   setter(name);
   try { localStorage.setItem(STORAGE_KEY, name); } catch { /* private browsing */ }
 }
 
+function readStoredProject() {
+  try { return localStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
+}
+
 export function useProjectState({ onNoProjects }) {
   const [projects, setProjects] = useState([]);
-  const [selectedProject, setSelectedProject] = useState(() => {
-    try { return localStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
-  });
-  const [selectedRun, setSelectedRun] = useState('latest');
+  const [selectedProject, setSelectedProject] = useState(readStoredProject);
+  const [selectedRun, setSelectedRun] = useState(DEFAULT_RUN);
 
   const loadProjects = useCallback(() => {
     return listProjects()
@@ -42,14 +45,14 @@ export function useProjectState({ onNoProjects }) {
 
   function handleProjectChange(name) {
     persistProject(setSelectedProject, name);
-    setSelectedRun('latest');
+    setSelectedRun(DEFAULT_RUN);
   }
 
   function handleRunChange(runId) { setSelectedRun(runId); }
 
   function selectProjectAndRun(project, runId) {
     persistProject(setSelectedProject, project);
-    setSelectedRun(runId || 'latest');
+    setSelectedRun(runId || DEFAULT_RUN);
   }
 
   return {

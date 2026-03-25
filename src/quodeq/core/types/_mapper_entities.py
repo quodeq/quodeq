@@ -138,8 +138,8 @@ def parse_plugin_info(raw: dict[str, object]) -> PluginInfo:
 def _parse_progress_info(raw: dict[str, object]) -> ProgressInfo:
     return ProgressInfo(
         files_read=_int(raw, "filesRead"),
-        violations=_int(raw, "violations"),
-        compliance=_int(raw, "compliance"),
+        violation_count=_int(raw, "violationCount") or _int(raw, "violations"),
+        compliance_count=_int(raw, "complianceCount") or _int(raw, "compliance"),
     )
 
 

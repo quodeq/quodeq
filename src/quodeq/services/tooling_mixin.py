@@ -103,13 +103,9 @@ class FsToolingMixin:
         directories.sort(key=lambda item: item["name"])
         return directories
 
-    def browse_repo(self, path: str | None) -> dict[str, Any]:
-        """List directories at the given path for repository browsing."""
-        target, error = self._validate_browse_path(path)
-        if error is not None:
-            return error
-
-        directories = self._list_directories(target)
+    @staticmethod
+    def _build_browse_response(target: Path, directories: list[dict[str, Any]]) -> dict[str, Any]:
+        """Assemble a browse_repo response from a validated target and directory list."""
         truncated = len(directories) > _BROWSE_DIR_LIMIT
         if truncated:
             directories = directories[:_BROWSE_DIR_LIMIT]
@@ -121,6 +117,13 @@ class FsToolingMixin:
             "isGitRepo": (target / ".git").exists(),
             "truncated": truncated,
         }
+
+    def browse_repo(self, path: str | None) -> dict[str, Any]:
+        """List directories at the given path for repository browsing."""
+        target, error = self._validate_browse_path(path)
+        if error is not None:
+            return error
+        return self._build_browse_response(target, self._list_directories(target))
 
     # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
     # (comma-separated list of client IDs, e.g. "claude,codex").

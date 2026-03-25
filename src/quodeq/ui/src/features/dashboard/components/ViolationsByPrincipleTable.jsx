@@ -4,6 +4,8 @@
 
 import { memo, useMemo, useState } from 'react';
 
+const DEFAULT_PAGE_SIZE = 20;
+
 function PrincipleRow({ p, idx, onPrincipleClick }) {
   return (
     <li
@@ -61,7 +63,7 @@ function groupViolationsByPrinciple(violations) {
   });
 }
 
-const ViolationsByPrincipleTable = memo(function ViolationsByPrincipleTable({ violations, onPrincipleClick, pageSize = 20 }) {
+const ViolationsByPrincipleTable = memo(function ViolationsByPrincipleTable({ violations, onPrincipleClick, pageSize = DEFAULT_PAGE_SIZE }) {
   const [showAll, setShowAll] = useState(false);
 
   const grouped = useMemo(() => groupViolationsByPrinciple(violations), [violations]);

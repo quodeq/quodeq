@@ -1,5 +1,6 @@
 import { memo, useState } from 'react';
-import { buildGroupPlanText, buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
+import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
+import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
@@ -52,15 +53,6 @@ function ComplianceListSection({ data, controls }) {
       )}
     </div>
   );
-}
-
-function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData) {
-  return buildGroupPlanText({
-    title: principle,
-    violations,
-    violationsBySeverity,
-    context: principleData?.findings || undefined,
-  });
 }
 
 function buildViolationPlanText(v, principle) {

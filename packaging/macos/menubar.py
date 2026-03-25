@@ -26,13 +26,14 @@ _AUTO_START_DELAY_S = 1.5
 _HEALTH_POLL_INTERVAL_S = 0.5
 _STDERR_READ_MAX = 500
 _ERROR_DISPLAY_MAX = 200
+_DEFAULT_PORTS = "4173,4174,4175,4180,4181,4182,4183"
 
 
 def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
     env = env or os.environ
     app_port = int(env.get("QUODEQ_PORT", "4173"))
-    ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", "4173,4174,4175,4180,4181,4182,4183").split(","))
+    ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", _DEFAULT_PORTS).split(","))
     return app_port, ports
 
 

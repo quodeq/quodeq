@@ -7,7 +7,7 @@ from unittest.mock import patch
 
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.engine.file_queue import FileQueue
-from quodeq.engine.subagent_pool import PoolOptions, PoolPaths, SubagentPool
+from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
 
 class TestPrioritizationInFileQueue:

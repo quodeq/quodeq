@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { buildGroupPlanText, buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
+import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
+import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
@@ -7,21 +8,6 @@ import { copyToClipboard } from '../../../utils/clipboard.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
-
-function buildFilePlanText(file) {
-  const allViolations = SEVERITY_ORDER.flatMap((sev) =>
-    (file.violationsBySeverity?.[sev] || []).map((v) => ({ ...v, _entryTitle: v.principle || 'Violation' }))
-  );
-  const violationsBySeverity = {};
-  for (const sev of SEVERITY_ORDER) {
-    violationsBySeverity[sev] = (file.violationsBySeverity?.[sev] || []).map((v) => ({ ...v, _entryTitle: v.principle || 'Violation' }));
-  }
-  return buildGroupPlanText({
-    title: `\`${file.file}\``,
-    violations: allViolations,
-    violationsBySeverity,
-  });
-}
 
 function buildViolationPlanText(v) {
   const title = [v.dimension, v.principle].filter(Boolean).join(' / ') || 'Violation';

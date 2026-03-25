@@ -149,9 +149,6 @@ def _run_phase1_analysis(
     return ev
 
 
-_run_backfill_phase = run_backfill_phase
-
-
 def _finalize_incremental(
     config: RunConfig, dimension: str, ctx: _AnalysisContext,
     coverage: IncrementalCoverage,

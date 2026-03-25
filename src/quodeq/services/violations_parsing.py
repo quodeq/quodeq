@@ -9,7 +9,7 @@ from typing import Iterable
 
 from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
 from quodeq.analysis.stream.event_text import TEXT_EXTRACTORS
-from quodeq.engine.analysis_stream import count_files_in_stream, extract_files_from_event
+from quodeq.analysis.stream.counters import count_files_in_stream, extract_files_from_event
 from quodeq.core.evidence.parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 from quodeq.shared.utils import open_text, read_json
@@ -40,8 +40,8 @@ def _build_violation_response(
     if opts.progress is not None:
         progress = ProgressInfo(
             files_read=opts.progress.get("filesRead", 0),
-            violations=opts.progress.get("violations", 0),
-            compliance=opts.progress.get("compliance", 0),
+            violation_count=opts.progress.get("violations", 0),
+            compliance_count=opts.progress.get("compliance", 0),
         )
     return ViolationResponse(
         dimension=ctx.dimension,
