@@ -95,14 +95,14 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, topFilesCou
   );
 }
 
-function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimensionClick, dimensionsWithViolations }) {
+function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimensionClick, dimensionsWithViolations, dayDimensions }) {
   return (
     <>
       <div className="dimensions-header">
         <h3 className="dimensions-title">Quality Dimensions</h3>
       </div>
       <div className="dimensions-panel">
-        <DimensionCardsGrid sortedDimensions={sortedDimensions} referenceRun={referenceRun} onDimensionClick={onDimensionClick} />
+        <DimensionCardsGrid sortedDimensions={sortedDimensions} referenceRun={referenceRun} onDimensionClick={onDimensionClick} dayDimensions={dayDimensions} />
       </div>
 
       {dimensionsWithViolations.length > 0 && (
@@ -174,6 +174,8 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
 
   const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? availableRuns[0]?.runId : currentOverviewRun;
+  const selectedTrend = trend.find((t) => t.runId === (availableRuns[overviewRunIndex]?.runId));
+  const dayDimensions = selectedTrend?.dayDimensions || [];
 
   const stats = useMemo(
     () => computeAccumulatedStats(accumulated, accumulatedDimensions),
@@ -200,6 +202,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         referenceRun={referenceRun}
         onDimensionClick={onDimensionClick}
         dimensionsWithViolations={stats.dimsWithViolations}
+        dayDimensions={dayDimensions}
       />
 
       <AccumulatedDetailsSection
