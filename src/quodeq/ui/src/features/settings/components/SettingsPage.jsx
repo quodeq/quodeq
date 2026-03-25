@@ -20,12 +20,12 @@ const MODE_OPTIONS = [
 ];
 
 const FAMILY_OPTIONS = [
-  { value: 'daruma',    label: 'Daruma',    accent: ['#d80c18', '#e82030'] },
-  { value: 'flynn',     label: 'Flynn',     accent: ['#4f46e5', '#00d4ff'] },
-  { value: 'neo',       label: 'Neo',       accent: ['#008833', '#00ff41'] },
-  { value: 'galadriel', label: 'Galadriel', accent: ['#1b6b3a', '#4caf7d'] },
-  { value: 'ifrit',     label: 'Ifrit',     accent: ['#c85a10', '#e88030'] },
-  { value: 'deckard',   label: 'Deckard',   accent: ['#d020a0', '#ff40c0'] },
+  { value: 'daruma',    label: 'Daruma' },
+  { value: 'flynn',     label: 'Flynn' },
+  { value: 'neo',       label: 'Neo' },
+  { value: 'ifrit',     label: 'Ifrit' },
+  { value: 'deckard',   label: 'Deckard' },
+  { value: 'galadriel', label: 'Galadriel' },
 ];
 
 const _SETTINGS_PHRASES = [
@@ -66,17 +66,13 @@ function ThemeSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
           <span className="settings-description">Pick a color palette</span>
         </div>
         <div className="theme-family-picker">
-          {FAMILY_OPTIONS.map(({ value, label, accent }) => (
+          {FAMILY_OPTIONS.map(({ value, label }) => (
             <button
               key={value}
               type="button"
               className={`theme-family-card${themeFamily === value ? ' active' : ''}`}
               onClick={() => onApplyFamily(value)}
             >
-              <span className="theme-family-swatches">
-                <span className="theme-family-swatch" style={{ background: accent[0] }} />
-                <span className="theme-family-swatch" style={{ background: accent[1] }} />
-              </span>
               <span className="theme-family-label">{label}</span>
             </button>
           ))}
