@@ -73,6 +73,7 @@ const ROUTE_RENDERERS = {
           onPrev: props.navigation.handleRunPrev,
           onNext: props.navigation.handleRunNext,
           onLatest: props.navigation.handleRunLatest,
+          onView: () => { const run = props.dashboardData.selectedRun || (runs[idx] && runs[idx].runId); if (run) props.navigation.handleNavigate('history-run', { runId: run }); },
         } : null}
         onRunClick={(runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel })}
         onBarClick={props.navigation.handleRunSelect}

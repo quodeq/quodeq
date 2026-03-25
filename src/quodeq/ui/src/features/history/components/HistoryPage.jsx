@@ -46,7 +46,7 @@ export default function HistoryPage({ trend, selectedRunId, selectedRunScore, ru
               currentRun={runNav.currentRun}
               isLatest={runNav.isLatest}
               isOldest={runNav.isOldest}
-              actions={{ onPrev: runNav.onPrev, onNext: runNav.onNext, onLatest: runNav.onLatest }}
+              actions={{ onPrev: runNav.onPrev, onNext: runNav.onNext, onLatest: runNav.onLatest, onView: runNav.onView }}
             />
           </div>
         )}
