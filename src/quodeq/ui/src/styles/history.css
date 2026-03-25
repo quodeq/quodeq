@@ -64,8 +64,8 @@
 }
 
 .history-row.selected {
-  border-color: var(--color-accent);
-  background: var(--color-accent-soft);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
+  background: color-mix(in srgb, var(--color-accent) 3%, var(--color-surface));
 }
 
 .history-row:hover {
