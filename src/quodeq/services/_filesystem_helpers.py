@@ -76,15 +76,13 @@ def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo
     """Read language_stats from the latest run's manifest.json."""
     for run in runs:
         manifest_path = reports_root / entry_name / run.run_id / "evidence" / "manifest.json"
-        if not manifest_path.exists():
-            continue
         try:
             data = json.loads(manifest_path.read_text())
             stats = data.get("language_stats") or {}
             if stats:
                 return {k.lstrip("."): v for k, v in stats.items()}
         except (json.JSONDecodeError, OSError):
-            pass
+            continue
     return {}
 
 

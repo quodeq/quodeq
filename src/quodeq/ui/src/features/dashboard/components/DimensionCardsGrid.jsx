@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { formatRunId, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
 
@@ -48,16 +49,15 @@ function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true }) {
 }
 
 export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayDimNames }) {
-  // A dimension is "active" if its name appears in the selected day's evaluations
   const dimNameSet = selectedDayDimNames instanceof Set ? selectedDayDimNames : new Set();
-  const sorted = [...sortedDimensions].sort((a, b) => {
+  const sorted = useMemo(() => [...sortedDimensions].sort((a, b) => {
     if (dimNameSet.size === 0) return a.dimension.localeCompare(b.dimension);
     const aActive = dimNameSet.has((a.dimension || '').toLowerCase());
     const bActive = dimNameSet.has((b.dimension || '').toLowerCase());
     if (aActive && !bActive) return -1;
     if (!aActive && bActive) return 1;
     return a.dimension.localeCompare(b.dimension);
-  });
+  }), [sortedDimensions, dimNameSet]);
   return (
     <div className="dimensions-grid">
       {sorted.map((item) => {

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatShortDate, gradeLetter } from '../../../utils/formatters.js';
+import { formatShortDate, gradeLetter, scoreColorClass } from '../../../utils/formatters.js';
 import {
   ComposedChart,
   Area,
@@ -19,24 +19,31 @@ const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
+
+const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
+  if (_cssVarCache.has(name)) return _cssVarCache.get(name);
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  return val || fallback;
+  const result = val || fallback;
+  _cssVarCache.set(name, result);
+  return result;
 };
 
-const SCORE_EXEMPLARY = 9;
-const SCORE_GOOD = 7;
-const SCORE_ADEQUATE = 5;
-const SCORE_POOR = 3;
+/** Clear cached CSS vars on theme change. */
+export function clearCssVarCache() { _cssVarCache.clear(); }
+
+const GRADE_CSS_VARS = {
+  'grade-top':    '--color-grade-top-text',
+  'grade-high':   '--color-grade-high-text',
+  'grade-mid':    '--color-grade-mid-text',
+  'grade-low':    '--color-grade-low-text',
+  'grade-bottom': '--color-grade-bottom-text',
+  'grade-none':   '--color-text-muted',
+};
 
 function scoreBarColor(score) {
-  const n = parseFloat(score);
-  if (isNaN(n)) return cssVar('--color-accent');
-  if (n >= SCORE_EXEMPLARY) return cssVar('--color-grade-top-text');
-  if (n >= SCORE_GOOD)      return cssVar('--color-grade-high-text');
-  if (n >= SCORE_ADEQUATE)  return cssVar('--color-grade-mid-text');
-  if (n >= SCORE_POOR)      return cssVar('--color-grade-low-text');
-  return cssVar('--color-grade-bottom-text');
+  const varName = GRADE_CSS_VARS[scoreColorClass(score)] || '--color-accent';
+  return cssVar(varName);
 }
 
 

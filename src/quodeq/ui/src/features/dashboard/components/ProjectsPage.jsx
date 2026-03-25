@@ -1,14 +1,6 @@
 import { useState, useMemo } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
-import { gradeLabel, gradeLetter } from '../../../utils/formatters.js';
-
-const EXT_NAMES = {
-  py: 'Python', js: 'JS', ts: 'TS', jsx: 'JSX', tsx: 'TSX',
-  sh: 'Shell', bash: 'Shell', rb: 'Ruby', go: 'Go', rs: 'Rust',
-  java: 'Java', kt: 'Kotlin', cs: 'C#', swift: 'Swift', dart: 'Dart',
-  css: 'CSS', html: 'HTML', vue: 'Vue', php: 'PHP', c: 'C', cpp: 'C++',
-};
-function extName(ext) { return EXT_NAMES[ext.toLowerCase()] || ext; }
+import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -72,7 +64,7 @@ function LanguageNumbers({ stats, filesCount }) {
     <div className="project-lang-row">
       <span className="project-stat"><span className="project-stat-num">{total.toLocaleString()}</span> <span className="project-stat-label">files</span></span>
       {sorted.map(([lang, count]) => (
-        <span key={lang} className="project-stat"><span className="project-stat-num">{count}</span> <span className="project-stat-label">{extName(lang)}</span></span>
+        <span key={lang} className="project-stat"><span className="project-stat-num">{count}</span> <span className="project-stat-label">{extDisplayName(lang)}</span></span>
       ))}
     </div>
   );

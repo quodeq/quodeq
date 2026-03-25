@@ -53,7 +53,7 @@ export function scoreColorClass(score) {
   return 'grade-bottom';
 }
 
-const GRADE_TO_LETTER = {
+const GRADE_WORD_TO_LETTER = {
   exemplary: 'A', good: 'B', proficient: 'B', adequate: 'C',
   developing: 'C', poor: 'D', insufficient: 'D', critical: 'F',
 };
@@ -65,7 +65,37 @@ const GRADE_TO_LETTER = {
 export function gradeLetter(grade) {
   if (!grade) return '—';
   const lower = grade.trim().toLowerCase();
-  return GRADE_TO_LETTER[lower] || grade;
+  return GRADE_WORD_TO_LETTER[lower] || grade;
+}
+
+const GRADE_COLOR_VARS = {
+  'grade-top':    'var(--color-grade-top-text)',
+  'grade-high':   'var(--color-grade-high-text)',
+  'grade-mid':    'var(--color-grade-mid-text)',
+  'grade-low':    'var(--color-grade-low-text)',
+  'grade-bottom': 'var(--color-grade-bottom-text)',
+  'grade-none':   'var(--color-text-muted)',
+};
+
+/**
+ * Map a numeric score to its CSS custom property string for the grade color.
+ * @param {number|string} score
+ * @returns {string} e.g. 'var(--color-grade-high-text)'
+ */
+export function scoreGradeColorVar(score) {
+  return GRADE_COLOR_VARS[scoreColorClass(score)] || 'var(--color-text-muted)';
+}
+
+const EXT_DISPLAY_NAMES = {
+  py: 'Python', js: 'JavaScript', ts: 'TypeScript', jsx: 'JSX', tsx: 'TSX',
+  sh: 'Shell', bash: 'Shell', rb: 'Ruby', go: 'Go', rs: 'Rust',
+  java: 'Java', kt: 'Kotlin', cs: 'C#', swift: 'Swift', dart: 'Dart',
+  css: 'CSS', html: 'HTML', vue: 'Vue', php: 'PHP', c: 'C', cpp: 'C++',
+};
+
+/** Map a file extension to a human-readable language name. */
+export function extDisplayName(ext) {
+  return EXT_DISPLAY_NAMES[ext.toLowerCase()] || ext;
 }
 
 /**
@@ -181,19 +211,14 @@ export function scoreTierLabel(score) {
   return 'F';
 }
 
-const GRADE_LABEL_MAP = { exemplary: 'A', good: 'B', proficient: 'B', adequate: 'C', developing: 'C', poor: 'D', insufficient: 'D', critical: 'F' };
-
 /**
  * Convert a word grade (e.g. "exemplary", "good") to a single letter label.
  * Falls back to the first character if it is a known letter grade.
- *
- * @param {string|null|undefined} grade - Grade word or letter
- * @returns {string|null} Single letter grade ('A'-'F') or null
  */
 export function gradeLabel(grade) {
   if (!grade) return null;
   const k = grade.trim().toLowerCase();
-  if (GRADE_LABEL_MAP[k]) return GRADE_LABEL_MAP[k];
+  if (GRADE_WORD_TO_LETTER[k]) return GRADE_WORD_TO_LETTER[k];
   const firstChar = grade.trim().toUpperCase().charAt(0);
   return ['A', 'B', 'C', 'D', 'F'].includes(firstChar) ? firstChar : null;
 }

@@ -1,16 +1,5 @@
 import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
-import { formatRunId } from '../utils/formatters.js';
-
-const EXT_NAMES = {
-  py: 'Python', js: 'JavaScript', ts: 'TypeScript', jsx: 'JSX', tsx: 'TSX',
-  sh: 'Shell', bash: 'Shell', rb: 'Ruby', go: 'Go', rs: 'Rust',
-  java: 'Java', kt: 'Kotlin', cs: 'C#', swift: 'Swift', dart: 'Dart',
-  css: 'CSS', html: 'HTML', vue: 'Vue', php: 'PHP', c: 'C', cpp: 'C++',
-};
-
-function extName(ext) {
-  return EXT_NAMES[ext.toLowerCase()] || ext;
-}
+import { formatRunId, extDisplayName } from '../utils/formatters.js';
 
 function LanguageStats({ stats, totalFiles }) {
   const sorted = stats ? Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 5) : [];
@@ -27,7 +16,7 @@ function LanguageStats({ stats, totalFiles }) {
       {sorted.map(([lang, count]) => (
         <span key={lang} className="content-stat">
           <span className="content-stat-num">{count}</span>
-          <span className="content-stat-label">{extName(lang)}</span>
+          <span className="content-stat-label">{extDisplayName(lang)}</span>
         </span>
       ))}
     </div>

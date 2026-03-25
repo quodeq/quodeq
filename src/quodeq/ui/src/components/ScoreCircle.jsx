@@ -1,26 +1,9 @@
-// src/quodeq/ui/src/components/ScoreCircle.jsx
-import { scoreColorClass } from '../utils/formatters.js';
+import { scoreGradeColorVar } from '../utils/formatters.js';
 
-const GRADE_STROKE_VAR = {
-  'grade-top':    'var(--color-grade-top-text)',
-  'grade-high':   'var(--color-grade-high-text)',
-  'grade-mid':    'var(--color-grade-mid-text)',
-  'grade-low':    'var(--color-grade-low-text)',
-  'grade-bottom': 'var(--color-grade-bottom-text)',
-  'grade-none':   'var(--color-text-muted)',
-};
-
-/**
- * SVG ring gauge showing score and grade.
- * @param {number|string} score  - numeric score (0-10)
- * @param {string}         grade - letter grade (e.g. "B+")
- * @param {number}         size  - pixel diameter (default 120)
- */
 export default function ScoreCircle({ score, grade, size = 120 }) {
   const n = parseFloat(score);
   const fraction = isNaN(n) ? 0 : Math.min(n / 10, 1);
-  const colorClass = scoreColorClass(score);
-  const strokeColor = GRADE_STROKE_VAR[colorClass] || 'var(--color-text-muted)';
+  const strokeColor = scoreGradeColorVar(score);
 
   const strokeWidth = size >= 100 ? 8 : 6;
   const radius = (size / 2) - (strokeWidth / 2) - 2;

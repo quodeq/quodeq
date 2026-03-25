@@ -629,9 +629,6 @@
   border-color: var(--color-text-muted);
 }
 
-/* Dimension card — evaluated today */
-.qd-card--active {}
-
 /* Dimension card — carried forward from previous day */
 .qd-card--carried .qd-card-col-score {
   opacity: 0.7;

@@ -1,20 +1,5 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import { scoreColorClass } from '../../../utils/formatters.js';
-
-const SCORE_EXEMPLARY = 9;
-const SCORE_GOOD = 7;
-const SCORE_ADEQUATE = 5;
-const SCORE_POOR = 3;
-
-function scoreGradeVar(score) {
-  const n = parseFloat(score);
-  if (isNaN(n)) return 'var(--color-text-muted)';
-  if (n >= SCORE_EXEMPLARY) return 'var(--color-grade-top-text)';
-  if (n >= SCORE_GOOD) return 'var(--color-grade-high-text)';
-  if (n >= SCORE_ADEQUATE) return 'var(--color-grade-mid-text)';
-  if (n >= SCORE_POOR) return 'var(--color-grade-low-text)';
-  return 'var(--color-grade-bottom-text)';
-}
+import { scoreGradeColorVar } from '../../../utils/formatters.js';
 
 function DimensionRow({ dim, onBarClick }) {
   const curr = parseFloat(dim.overallScore);
@@ -22,7 +7,7 @@ function DimensionRow({ dim, onBarClick }) {
   const delta = !isNaN(curr) && !isNaN(prev) ? curr - prev : null;
   const score = isNaN(curr) ? 0 : curr;
   const pct = Math.min(score / 10, 1) * 100;
-  const color = scoreGradeVar(score);
+  const color = scoreGradeColorVar(score);
 
   return (
     <div
