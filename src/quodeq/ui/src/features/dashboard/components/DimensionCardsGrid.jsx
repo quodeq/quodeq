@@ -45,13 +45,13 @@ function AccDimensionCard({ item, referenceRun, onDimensionClick, evaluatedToday
   );
 }
 
-export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayRunIds }) {
-  // A dimension is "active" if its fromRunId matches any run on the selected day
-  const runIdSet = selectedDayRunIds || new Set();
+export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayDimNames }) {
+  // A dimension is "active" if its name appears in the selected day's evaluations
+  const dimNameSet = selectedDayDimNames instanceof Set ? selectedDayDimNames : new Set();
   const sorted = [...sortedDimensions].sort((a, b) => {
-    if (runIdSet.size === 0) return a.dimension.localeCompare(b.dimension);
-    const aActive = runIdSet.has(a.fromRunId);
-    const bActive = runIdSet.has(b.fromRunId);
+    if (dimNameSet.size === 0) return a.dimension.localeCompare(b.dimension);
+    const aActive = dimNameSet.has((a.dimension || '').toLowerCase());
+    const bActive = dimNameSet.has((b.dimension || '').toLowerCase());
     if (aActive && !bActive) return -1;
     if (!aActive && bActive) return 1;
     return a.dimension.localeCompare(b.dimension);
@@ -59,7 +59,7 @@ export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onD
   return (
     <div className="dimensions-grid">
       {sorted.map((item) => {
-        const isActive = runIdSet.size === 0 || runIdSet.has(item.fromRunId);
+        const isActive = dimNameSet.size === 0 || dimNameSet.has((item.dimension || '').toLowerCase());
         return (
           <AccDimensionCard
             key={item.dimension}
