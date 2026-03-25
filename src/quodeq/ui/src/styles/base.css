@@ -1377,15 +1377,15 @@ textarea:focus {
 /* ─── Theme toggle ─── */
 
 .theme-toggle {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
 }
 
 .theme-toggle-btn {
-  padding: 4px var(--space-3);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-full);
+  padding: 10px 14px;
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
   background: var(--color-surface);
   color: var(--color-text-muted);
   font-family: var(--font-sans);
@@ -1397,14 +1397,10 @@ textarea:focus {
 }
 
 .theme-toggle-btn:hover {
-  background: var(--color-surface-alt);
-  color: var(--color-text);
   border-color: var(--color-text-muted);
 }
 
 .theme-toggle-btn.active {
-  background: var(--color-accent-soft);
-  color: var(--color-accent);
   border-color: var(--color-accent);
   font-weight: var(--weight-semibold);
 }
