@@ -82,17 +82,16 @@ function DimensionOverview({ data, stats, onNavigate }) {
             <div className="acc-eval-stat-block">
               <span className="acc-eval-stat-label">Ratio</span>
               <span className="acc-eval-stat-value">{complianceRatio(allViolations.length, totalCompliant)}</span>
-              <span className="acc-eval-ratio-sublabel">comp / viol</span>
             </div>
-          </div>
-          <div className="acc-eval-mini-stats">
-            <div className="acc-eval-mini-stat">
-              <span className="acc-eval-mini-stat-label">Files</span>
-              <span className="acc-eval-mini-stat-value">{topFiles.length}</span>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Files</span>
+              <span className="acc-eval-stat-value">{topFiles.length}</span>
             </div>
-            <div className="acc-eval-mini-stat">
-              <span className="acc-eval-mini-stat-label">Principles</span>
-              <span className="acc-eval-mini-stat-value">{uniquePrinciples}</span>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Principles</span>
+              <span className="acc-eval-stat-value">{uniquePrinciples}</span>
             </div>
           </div>
         </div>
