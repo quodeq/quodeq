@@ -200,6 +200,29 @@
   --primitive-ember-sev-major-dark:     #f0a040;
   --primitive-ember-sev-minor-dark:     #b09880;
 
+  /* Cyber palette (neon magenta, purple-chrome) */
+  --primitive-cyber-950: #0c0a12;
+  --primitive-cyber-900: #141220;
+  --primitive-cyber-800: #1e1a2c;
+  --primitive-cyber-700: #302a40;
+  --primitive-cyber-500: #8a80a0;
+  --primitive-cyber-200: #e0dce8;
+  --primitive-cyber-accent-light: #d020a0;
+  --primitive-cyber-accent-dark: #ff40c0;
+  --primitive-cyber-50: #f4f2f6;
+  --primitive-cyber-100: #e8e4ee;
+  --primitive-cyber-border-light: #c8c2d0;
+  --primitive-cyber-text-dark: #18141e;
+  --primitive-cyber-text-muted-light: #7a7088;
+
+  /* Cyber severity — neon pink-red scale */
+  --primitive-cyber-sev-critical-light: #e02050;
+  --primitive-cyber-sev-major-light:    #b01888;
+  --primitive-cyber-sev-minor-light:    #7a7088;
+  --primitive-cyber-sev-critical-dark:  #ff4060;
+  --primitive-cyber-sev-major-dark:     #ff40c0;
+  --primitive-cyber-sev-minor-dark:     #a098b8;
+
   /* Issue-intensity heat scale (gray → crimson, default light + dark) */
   --primitive-ired-200: #c09090;   /* dark B: muted rose-gray */
   --primitive-ired-300: #d86060;   /* dark C: rose-red */
@@ -1196,6 +1219,177 @@ html[data-theme="ember-light"]:root {
   --logo-chevron-hover:  var(--primitive-ember-accent-light);
   --logo-needle:         var(--primitive-ember-accent-light);
   --logo-needle-dark:    #a84a08;
+}
+
+/* ── Cyber Dark — neon magenta, purple-chrome ──────────── */
+
+html[data-theme="cyber-dark"]:root {
+  --color-bg:           var(--primitive-cyber-950);
+  --color-surface:      var(--primitive-cyber-900);
+  --color-surface-alt:  var(--primitive-cyber-800);
+  --color-border:       var(--primitive-cyber-700);
+  --color-border-focus: var(--primitive-cyber-accent-dark);
+
+  --color-text:         var(--primitive-cyber-200);
+  --color-text-muted:   var(--primitive-cyber-500);
+  --color-text-subtle:  #58506a;
+
+  --color-accent:       var(--primitive-cyber-accent-dark);
+  --color-accent-hover: #ff60d0;
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-cyber-accent-dark) 14%, transparent);
+
+  --color-danger:  #ff4060;
+  --color-success: #00dce0;
+
+  --color-sev-critical-text:   var(--primitive-cyber-sev-critical-dark);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-cyber-sev-critical-dark) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-cyber-sev-critical-dark) 42%, transparent);
+  --color-sev-major-text:      var(--primitive-cyber-sev-major-dark);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-cyber-sev-major-dark) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-cyber-sev-major-dark) 38%, transparent);
+  --color-sev-minor-text:      var(--primitive-cyber-sev-minor-dark);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-cyber-sev-minor-dark) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-cyber-sev-minor-dark) 32%, transparent);
+
+  /* Grades — neon spectrum: violet → purple-gray → pink → red */
+  --color-grade-top-text:    #b040ff;
+  --color-grade-top-bg:      color-mix(in srgb, #b040ff 12%, transparent);
+  --color-grade-high-text:   #a098b8;
+  --color-grade-high-bg:     color-mix(in srgb, #a098b8 12%, transparent);
+  --color-grade-mid-text:    var(--primitive-cyber-accent-dark);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-cyber-accent-dark) 12%, transparent);
+  --color-grade-low-text:    #ff4060;
+  --color-grade-low-bg:      color-mix(in srgb, #ff4060 13%, transparent);
+  --color-grade-bottom-text: #ff2040;
+  --color-grade-bottom-bg:   color-mix(in srgb, #ff2040 4%, transparent);
+
+  /* Compliance — neon cyan */
+  --color-compliance:        #00dce0;
+  --color-compliance-bg:     color-mix(in srgb, #00dce0 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #00dce0 38%, transparent);
+
+  --color-warning:      #f0b428;
+  --color-warning-text: #f0b428;
+  --color-warning-bg:   color-mix(in srgb, #f0b428 10%, transparent);
+
+  --color-danger-text:   #ff4060;
+  --color-danger-bg:     color-mix(in srgb, #ff4060 15%, transparent);
+  --color-danger-border: color-mix(in srgb, #ff4060 30%, transparent);
+
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.92);
+  --color-overlay-medium: rgba(0, 0, 0, 0.85);
+  --color-overlay-light:  rgba(0, 0, 0, 0.75);
+
+  --color-chart-grid:   var(--primitive-cyber-700);
+  --color-chart-axis:   var(--primitive-cyber-500);
+  --color-chart-line:   var(--primitive-cyber-200);
+  --color-chart-stroke: rgba(255, 64, 192, 0.25);
+
+  /* Trend — violet up, red down */
+  --color-trend-strong-up:   #b040ff;
+  --color-trend-up:          var(--primitive-cyber-accent-dark);
+  --color-trend-soft-up:     var(--primitive-cyber-500);
+  --color-trend-soft-down:   #ff40c0;
+  --color-trend-down:        #ff4060;
+  --color-trend-strong-down: #ff2040;
+
+  /* Console — deep purple */
+  --color-console-bg: #06040a;
+
+  --shadow-sm: none;
+  --shadow-md: none;
+  --shadow-lg: none;
+
+  /* Logo */
+  --logo-q:              var(--primitive-cyber-accent-dark);
+  --logo-chevron:        var(--primitive-cyber-accent-dark);
+  --logo-chevron-hover:  #ff60d0;
+  --logo-needle:         var(--primitive-cyber-accent-dark);
+  --logo-needle-dark:    #a01880;
+}
+
+/* ── Cyber Light — frosted lavender, neon magenta ──────── */
+
+html[data-theme="cyber-light"]:root {
+  --color-bg:           var(--primitive-cyber-50);
+  --color-surface:      #ffffff;
+  --color-surface-alt:  var(--primitive-cyber-100);
+  --color-border:       var(--primitive-cyber-border-light);
+  --color-border-focus: var(--primitive-cyber-accent-light);
+
+  --color-text:         var(--primitive-cyber-text-dark);
+  --color-text-muted:   var(--primitive-cyber-text-muted-light);
+  --color-text-subtle:  #9a90a8;
+
+  --color-accent:       var(--primitive-cyber-accent-light);
+  --color-accent-hover: #b01888;
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-cyber-accent-light) 8%, transparent);
+
+  --color-danger:  #e02050;
+  --color-success: #0098a8;
+
+  --color-sev-critical-text:   var(--primitive-cyber-sev-critical-light);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-cyber-sev-critical-light) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-cyber-sev-critical-light) 38%, transparent);
+  --color-sev-major-text:      var(--primitive-cyber-sev-major-light);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-cyber-sev-major-light) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-cyber-sev-major-light) 35%, transparent);
+  --color-sev-minor-text:      var(--primitive-cyber-sev-minor-light);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-cyber-sev-minor-light) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-cyber-sev-minor-light) 30%, transparent);
+
+  /* Grades — neon spectrum: purple → gray → magenta → red */
+  --color-grade-top-text:    #8020d0;
+  --color-grade-top-bg:      color-mix(in srgb, #8020d0 12%, transparent);
+  --color-grade-high-text:   var(--primitive-cyber-text-muted-light);
+  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-cyber-text-muted-light) 10%, transparent);
+  --color-grade-mid-text:    var(--primitive-cyber-accent-light);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-cyber-accent-light) 10%, transparent);
+  --color-grade-low-text:    #e03060;
+  --color-grade-low-bg:      color-mix(in srgb, #e03060 10%, transparent);
+  --color-grade-bottom-text: #c02040;
+  --color-grade-bottom-bg:   color-mix(in srgb, #c02040 12%, transparent);
+
+  /* Compliance — teal-cyan */
+  --color-compliance:        #0098a8;
+  --color-compliance-bg:     color-mix(in srgb, #0098a8 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #0098a8 38%, transparent);
+
+  --color-warning:      var(--primitive-amber-700);
+  --color-warning-text: var(--primitive-amber-700);
+  --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-700) 8%, transparent);
+
+  --color-danger-text:   var(--color-danger);
+  --color-danger-bg:     var(--color-sev-critical-bg);
+  --color-danger-border: var(--color-sev-critical-border);
+
+  --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
+  --color-overlay-medium: rgba(0, 0, 0, 0.5);
+  --color-overlay-light:  rgba(0, 0, 0, 0.3);
+
+  --color-chart-grid:   var(--color-border);
+  --color-chart-axis:   var(--primitive-cyber-text-muted-light);
+  --color-chart-line:   var(--primitive-cyber-text-dark);
+  --color-chart-stroke: transparent;
+
+  /* Trend — purple up, red down */
+  --color-trend-strong-up:   #8020d0;
+  --color-trend-up:          var(--primitive-cyber-accent-light);
+  --color-trend-soft-up:     #9a90a8;
+  --color-trend-soft-down:   #e03060;
+  --color-trend-down:        #c02040;
+  --color-trend-strong-down: #a01830;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.10);
+
+  /* Logo */
+  --logo-q:              var(--primitive-cyber-accent-light);
+  --logo-chevron:        var(--primitive-cyber-text-dark);
+  --logo-chevron-hover:  var(--primitive-cyber-accent-light);
+  --logo-needle:         var(--primitive-cyber-accent-light);
+  --logo-needle-dark:    #b01888;
 }
 
 /* ── 5. Typography ────────────────────────────────────────
