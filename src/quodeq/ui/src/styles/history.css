@@ -31,7 +31,7 @@
   gap: var(--space-2);
 }
 
-/* Row — three columns: date | eval | accumulated */
+/* Row — four columns: date | score | eval | accumulated */
 .history-row {
   display: flex;
   border-radius: var(--radius-lg);
@@ -54,7 +54,7 @@
 
 /* Date column */
 .history-row-date {
-  min-width: 130px;
+  min-width: 120px;
   padding: var(--space-3) var(--space-4);
   display: flex;
   flex-direction: column;
@@ -71,26 +71,50 @@
   color: var(--color-text-subtle);
 }
 
+/* Score column */
+.history-row-score {
+  min-width: 50px;
+  padding: var(--space-3) var(--space-3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid color-mix(in srgb, var(--color-border) 50%, transparent);
+}
+
+.history-row-score-val {
+  font-size: var(--text-lg);
+  font-weight: var(--weight-bold);
+  font-variant-numeric: tabular-nums;
+}
+
 /* Eval column */
 .history-row-eval {
   flex: 1;
   padding: var(--space-3) var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  justify-content: center;
 }
 
-.history-row-eval-top {
+.history-row-eval-grade {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
-.history-row-eval-score {
-  font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
-  font-variant-numeric: tabular-nums;
+.history-row-eval-grade-label {
+  font-weight: var(--weight-semibold);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
+
+/* Grade label inherits color from the grade tier */
+.history-row-eval-grade-label.grade-top-text    { color: var(--color-grade-top-text); }
+.history-row-eval-grade-label.grade-high-text   { color: var(--color-grade-high-text); }
+.history-row-eval-grade-label.grade-mid-text    { color: var(--color-grade-mid-text); }
+.history-row-eval-grade-label.grade-low-text    { color: var(--color-grade-low-text); }
+.history-row-eval-grade-label.grade-bottom-text { color: var(--color-grade-bottom-text); }
 
 .history-row-eval-dims {
   font-size: var(--text-sm);
@@ -124,7 +148,7 @@
 
 .history-row-acc-score {
   font-size: var(--text-base);
-  font-weight: var(--weight-bold);
+  font-weight: var(--weight-extrabold);
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
 }
