@@ -1,12 +1,9 @@
 import { useMemo } from 'react';
 import DimensionViolationsRow from './DimensionViolationsRow.jsx';
-import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
-import ViolationsByPrincipleTable from './ViolationsByPrincipleTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
-import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { formatRunId, scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
-import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
+import { sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGrouping.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
@@ -16,12 +13,6 @@ import DimensionScorePanel from './DimensionScorePanel.jsx';
 // ---------------------------------------------------------------------------
 
 function computeAccumulatedStats(accumulated, accumulatedDimensions) {
-  const topFiles = withDimensionsStr(buildTopOffendingFiles(accumulatedDimensions));
-
-  const violationsByPrinciple = accumulatedDimensions.flatMap((d) =>
-    (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
-  );
-
   const curr = parseFloat(accumulated?.summary?.numericAverage);
   const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
   const scoreDelta = (isNaN(curr) || isNaN(prev)) ? null : (curr - prev).toFixed(1);
@@ -34,11 +25,14 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions) {
     ? { date: null, runId: null }
     : { date: withDates[0].dateLabel || formatRunId(withDates[0].runId), runId: withDates[0].runId };
 
-  const uniquePrinciples = new Set(violationsByPrinciple.map((v) => v.principle).filter(Boolean)).size;
+  const allViolations = accumulatedDimensions.flatMap((d) => d.violations || []);
+  const uniqueFiles = new Set(allViolations.map((v) => v.file).filter(Boolean)).size;
+  const uniquePrinciples = new Set(allViolations.map((v) => v.principle).filter(Boolean)).size;
+
   const dimsWithViolations = sortDimensionsByViolationSeverity(accumulatedDimensions);
   const sorted = [...accumulatedDimensions].sort((a, b) => a.dimension.localeCompare(b.dimension));
 
-  return { topFiles, violationsByPrinciple, scoreDelta, lastRun, uniquePrinciples, dimsWithViolations, sorted };
+  return { scoreDelta, lastRun, uniqueFiles, uniquePrinciples, dimsWithViolations, sorted };
 }
 
 // ---------------------------------------------------------------------------
@@ -131,40 +125,6 @@ function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimens
   );
 }
 
-function AccumulatedDetailsSection({ topFiles, violationsByPrinciple, uniquePrinciples, onFileClick, onPrincipleClick }) {
-  return (
-    <>
-      {topFiles.length > 0 && (
-        <>
-          <div className="section-header">
-            <h3 className="section-title">Violations by File</h3>
-            <span className="section-count">{topFiles.length} files</span>
-          </div>
-          <section className="panel wide-panel offending-panel">
-            <div className="trend-table-wrap">
-              <TopOffendingFilesTable files={topFiles} onFileClick={onFileClick} />
-            </div>
-          </section>
-        </>
-      )}
-
-      {violationsByPrinciple.length > 0 && (
-        <>
-          <div className="section-header">
-            <h3 className="section-title">Violations by Principle</h3>
-            <span className="section-count">{uniquePrinciples} principles</span>
-          </div>
-          <section className="panel wide-panel offending-panel">
-            <div className="trend-table-wrap">
-              <ViolationsByPrincipleTable violations={violationsByPrinciple} onPrincipleClick={onPrincipleClick} />
-            </div>
-          </section>
-        </>
-      )}
-    </>
-  );
-}
-
 // ---------------------------------------------------------------------------
 // Accumulated overview panel
 // ---------------------------------------------------------------------------
@@ -172,7 +132,7 @@ function AccumulatedDetailsSection({ topFiles, violationsByPrinciple, uniquePrin
 export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId } = data;
   const dayRuns = dailyRuns || availableRuns;
-  const { onRunClick, onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
+  const { onRunClick, onDimensionClick } = callbacks;
 
   const dailyTrend = useMemo(() => collapseByDay(trend), [trend]);
 
@@ -212,7 +172,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         accumulated={accumulated}
         scoreDelta={stats.scoreDelta}
         lastDate={stats.lastRun.date}
-        topFilesCount={stats.topFiles.length}
+        topFilesCount={stats.uniqueFiles}
         uniquePrinciples={stats.uniquePrinciples}
       />
 
@@ -229,13 +189,6 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         selectedDayDimNames={selectedDayDimNames}
       />
 
-      <AccumulatedDetailsSection
-        topFiles={stats.topFiles}
-        violationsByPrinciple={stats.violationsByPrinciple}
-        uniquePrinciples={stats.uniquePrinciples}
-        onFileClick={onFileClick}
-        onPrincipleClick={onPrincipleClick}
-      />
     </>
   );
 }
