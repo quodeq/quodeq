@@ -235,7 +235,6 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
     const entry = trend.find((t) => t.runId === currentOverviewRun) || trend.find((t) => t.runId === selectedRunId);
     if (!entry) return new Set();
     const selectedDate = (entry.dateISO || '').slice(0, 10);
-    if (!selectedDate) return new Set();
     const names = new Set();
     for (const t of trend) {
       if ((t.dateISO || '').slice(0, 10) === selectedDate) {
