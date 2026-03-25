@@ -385,6 +385,11 @@
     --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 12%, transparent);
     --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 25%, transparent);
 
+    /* Compliance — light gray, matching exemplary tone */
+    --color-compliance:        var(--primitive-daruma-400);
+    --color-compliance-bg:     color-mix(in srgb, var(--primitive-daruma-400) 4%, transparent);
+    --color-compliance-border: color-mix(in srgb, var(--primitive-daruma-400) 38%, transparent);
+
     /* Overlays */
     --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
     --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -467,6 +472,11 @@ html[data-theme="dark"]:root {
   --color-danger-text:   var(--primitive-crimson-200);
   --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 12%, transparent);
   --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 25%, transparent);
+
+  /* Compliance — light gray, matching exemplary tone */
+  --color-compliance:        var(--primitive-daruma-400);
+  --color-compliance-bg:     color-mix(in srgb, var(--primitive-daruma-400) 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, var(--primitive-daruma-400) 38%, transparent);
 
   /* Overlays */
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
