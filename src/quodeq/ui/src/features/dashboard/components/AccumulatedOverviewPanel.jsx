@@ -25,14 +25,10 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions) {
     ? { date: null, runId: null }
     : { date: withDates[0].dateLabel || formatRunId(withDates[0].runId), runId: withDates[0].runId };
 
-  const allViolations = accumulatedDimensions.flatMap((d) => d.violations || []);
-  const uniqueFiles = new Set(allViolations.map((v) => v.file).filter(Boolean)).size;
-  const uniquePrinciples = new Set(allViolations.map((v) => v.principle).filter(Boolean)).size;
-
   const dimsWithViolations = sortDimensionsByViolationSeverity(accumulatedDimensions);
   const sorted = [...accumulatedDimensions].sort((a, b) => a.dimension.localeCompare(b.dimension));
 
-  return { scoreDelta, lastRun, uniqueFiles, uniquePrinciples, dimsWithViolations, sorted };
+  return { scoreDelta, lastRun, dimsWithViolations, sorted };
 }
 
 // ---------------------------------------------------------------------------
@@ -59,7 +55,7 @@ function SeverityTags({ severity }) {
   );
 }
 
-function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, topFilesCount, uniquePrinciples }) {
+function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate }) {
   const summary = accumulated?.summary;
   return (
     <section className="acc-eval-panel panel">
@@ -82,9 +78,6 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, topFilesCou
         </StatBlock>
         <StatBlock label="Compliance" value={summary?.totalCompliance || 0} />
         <StatBlock label="Ratio" value={complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)} />
-        <StatBlock label="Files Affected" value={topFilesCount} />
-        <StatBlock label="Principles" value={uniquePrinciples} />
-        <StatBlock label="Dimensions" value={summary?.dimensionCount || 0} />
       </div>
     </section>
   );
@@ -172,8 +165,6 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         accumulated={accumulated}
         scoreDelta={stats.scoreDelta}
         lastDate={stats.lastRun.date}
-        topFilesCount={stats.uniqueFiles}
-        uniquePrinciples={stats.uniquePrinciples}
       />
 
       <div className="history-panels-row">
