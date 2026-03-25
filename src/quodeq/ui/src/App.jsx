@@ -7,6 +7,7 @@ import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
 import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
 import EvalPrincipleDetailPage from './features/explorer/components/EvalPrincipleDetailPage.jsx';
 import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
+import HistoryPage from './features/history/components/HistoryPage.jsx';
 import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
@@ -56,6 +57,8 @@ function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
+  history: (params, props) => <HistoryPage trend={props.dashboardData.dashboard?.trend || []} onRunClick={(runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel })} />,
+  'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} />,
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
   file: (params) => <FileDetailPage file={params.file} />,
@@ -126,7 +129,7 @@ function useAppState() {
   const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
   const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, handleRunChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
   const settings = useAppSettings();
-  function handleNavigate(page, params = {}) { if (page === 'run' && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
+  function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
   const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
@@ -135,7 +138,7 @@ function useAppState() {
     return { headerMeta: meta, ...display };
   }, [accumulated, dashboard, selectedProject, projects]);
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
-  const activeTab = ['overview', 'projects', 'evaluate', 'settings'].includes(activePage.page) ? activePage.page : 'overview';
+  const activeTab = ['overview', 'history', 'projects', 'evaluate', 'settings'].includes(activePage.page) ? activePage.page : activePage.page === 'history-run' ? 'history' : 'overview';
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
 
