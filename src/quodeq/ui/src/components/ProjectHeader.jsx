@@ -50,7 +50,7 @@ export default function ProjectHeader({
       </div>
       {showRunNav && runNavProps && (
         <RunNavigator
-          currentRun={formatRunId(runNavProps.currentOverviewRun, runNavProps.availableRuns[runNavProps.overviewRunIndex]?.dateLabel)}
+          currentRun={runNavProps.currentDayLabel || formatRunId(runNavProps.currentOverviewRun, runNavProps.availableRuns[runNavProps.overviewRunIndex]?.dateLabel)}
           isLatest={runNavProps.overviewRunIndex === 0}
           isOldest={runNavProps.overviewRunIndex >= runNavProps.availableRuns.length - 1}
           actions={{

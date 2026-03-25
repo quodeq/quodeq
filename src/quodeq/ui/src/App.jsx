@@ -210,6 +210,7 @@ export default function App() {
             onProjectChange: state.handleProjectChange, showRunNav: state.showRunNav,
             runNavProps: {
               currentOverviewRun: state.currentOverviewRun, overviewRunIndex: state.overviewRunIndex, availableRuns: state.availableRuns,
+              currentDayLabel: (() => { const t = (state.dashboard?.trend || []).find(r => r.runId === state.currentOverviewRun); if (t?.dateISO) { try { return new Date(t.dateISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }); } catch {} } return state.availableRuns[state.overviewRunIndex]?.dateLabel || state.currentOverviewRun; })(),
               onRunPrev: state.handleRunPrev, onRunNext: state.handleRunNext, onRunLatest: state.handleRunLatest,
               onViewRun: undefined,
             },
