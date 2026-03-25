@@ -681,7 +681,7 @@
   transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }
 
-.run-navigator .run-nav-action:hover:not(:disabled) {
+.run-navigator .run-nav-action:hover:not(:disabled):not(.run-nav-action--primary):not(.run-nav-action--outline) {
   border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
   color: var(--color-accent);
   background: var(--color-accent-soft);
@@ -693,16 +693,27 @@
   pointer-events: none;
 }
 
-.run-navigator .run-nav-action--danger {
+.run-navigator .run-nav-action--outline {
   color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 13%, transparent);
   border-color: color-mix(in srgb, var(--color-accent) 38%, transparent);
 }
 
-.run-navigator .run-nav-action--danger:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+.run-navigator .run-nav-action--outline:hover:not(:disabled) {
+  background: var(--color-accent);
   border-color: var(--color-accent);
-  color: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.run-navigator .run-nav-action--primary {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+  border-color: var(--color-accent);
+}
+
+.run-navigator .run-nav-action--primary:hover:not(:disabled) {
+  background: var(--color-accent-hover);
+  border-color: var(--color-accent-hover);
+  color: var(--color-on-accent);
 }
 
 /* Segmented pager: [‹][date][›] as one bordered unit */

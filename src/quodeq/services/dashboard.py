@@ -22,6 +22,7 @@ from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services.accumulated import numeric_average
+from quodeq.data.fs.report_parser.grades import parse_numeric_score
 
 
 @dataclass
@@ -110,6 +111,7 @@ def _build_accumulated_trend(
     """Build trend using accumulated scores across all runs (oldest to newest)."""
     trend: list[dict[str, Any]] = []
     acc_by_dim: dict[str, DimensionResult] = {}
+    prev_by_dim: dict[str, DimensionResult] = {}
     for item in reversed(runs):  # oldest -> newest
         run_dims = get_run_dimensions(item.run_id)
         for dim in run_dims:
@@ -119,16 +121,46 @@ def _build_accumulated_trend(
             continue
         acc_dims = list(acc_by_dim.values())
         acc_grades = [d.overall_grade for d in acc_dims if d.overall_grade]
-        avg = numeric_average(acc_dims)
+        acc_avg = numeric_average(acc_dims)
+        run_avg = numeric_average(run_dims)
+        run_grades = [d.overall_grade for d in run_dims if d.overall_grade]
+        run_dim_names = sorted(d.dimension for d in run_dims if d.dimension)
+        dim_details = []
+        for dim in sorted(run_dims, key=lambda d: d.dimension or ""):
+            if not dim.dimension:
+                continue
+            prev = prev_by_dim.get(dim.dimension)
+            score = parse_numeric_score(dim.overall_score) if dim.overall_score else None
+            prev_score = parse_numeric_score(prev.overall_score) if prev and prev.overall_score else None
+            delta = round(score - prev_score, 2) if score is not None and prev_score is not None else None
+            dim_details.append({
+                "dimension": dim.dimension,
+                "score": score,
+                "grade": dim.overall_grade,
+                "delta": delta,
+            })
+        for dim in run_dims:
+            if dim.dimension:
+                prev_by_dim[dim.dimension] = dim
         trend.append(
             {
                 "runId": item.run_id,
                 "dateISO": item.date_iso,
                 "dateLabel": item.date_label,
-                "dimensionsCount": len(acc_by_dim),
-                "numericAverage": avg,
+                "dimensionsCount": len(run_dim_names),
+                "dimensions": run_dim_names,
+                "dimensionDetails": dim_details,
+                "accumulatedDimensionsCount": len(acc_by_dim),
+                # Per-run grade/score (this evaluation only)
+                "runNumericAverage": run_avg,
+                "runOverallGrade": (
+                    score_to_grade_label(run_avg) if run_avg is not None
+                    else (most_frequent_grade(run_grades) if run_grades else None)
+                ),
+                # Accumulated grade/score (all runs up to this point)
+                "numericAverage": acc_avg,
                 "overallGrade": (
-                    score_to_grade_label(avg) if avg is not None
+                    score_to_grade_label(acc_avg) if acc_avg is not None
                     else (most_frequent_grade(acc_grades) if acc_grades else None)
                 ),
             }

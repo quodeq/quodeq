@@ -7,6 +7,7 @@ import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
 import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
 import EvalPrincipleDetailPage from './features/explorer/components/EvalPrincipleDetailPage.jsx';
 import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
+import HistoryPage from './features/history/components/HistoryPage.jsx';
 import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
@@ -56,6 +57,33 @@ function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
+  history: (params, props) => {
+    const trend = props.dashboardData.dashboard?.trend || [];
+    const runs = props.dashboardData.availableRuns || [];
+    const idx = props.dashboardData.overviewRunIndex || 0;
+    return (
+      <HistoryPage
+        trend={trend}
+        selectedRunId={(() => { const sr = props.dashboardData.selectedRun; if (sr && sr !== 'latest' && trend.some(t => t.runId === sr)) return sr; return trend.length > 0 ? trend[0].runId : null; })()}
+        selectedRunScore={props.dashboardData.accumulated?.summary?.numericAverage}
+        runNav={runs.length > 0 ? {
+          currentRun: (() => { const t = trend.find(r => r.runId === (runs[idx]?.runId)); if (t?.dateISO) { try { const d = new Date(t.dateISO); return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); } catch {} } return runs[idx]?.dateLabel || props.navigation.currentOverviewRun; })(),
+          isLatest: idx === 0,
+          isOldest: idx >= runs.length - 1,
+          onPrev: props.navigation.handleRunPrev,
+          onNext: props.navigation.handleRunNext,
+          onLatest: props.navigation.handleRunLatest,
+          onView: () => { const run = props.dashboardData.selectedRun || (runs[idx] && runs[idx].runId); if (run) props.navigation.handleNavigate('history-run', { runId: run }); },
+        } : null}
+        accumulatedDimensions={props.dashboardData.accumulated?.dimensions || []}
+        lastRun={{ date: props.dashboardData.accumulated?.dimensions?.[0]?.fromDateLabel, runId: props.dashboardData.accumulated?.dimensions?.[0]?.fromRunId }}
+        onRunClick={(runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel })}
+        onBarClick={props.navigation.handleRunSelect}
+        onDimensionClick={(dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel })}
+      />
+    );
+  },
+  'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} />,
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
   file: (params) => <FileDetailPage file={params.file} />,
@@ -126,7 +154,7 @@ function useAppState() {
   const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
   const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, handleRunChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
   const settings = useAppSettings();
-  function handleNavigate(page, params = {}) { if (page === 'run' && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
+  function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
   const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
@@ -135,7 +163,7 @@ function useAppState() {
     return { headerMeta: meta, ...display };
   }, [accumulated, dashboard, selectedProject, projects]);
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
-  const activeTab = ['overview', 'projects', 'evaluate', 'settings'].includes(activePage.page) ? activePage.page : 'overview';
+  const activeTab = ['overview', 'history', 'projects', 'evaluate', 'settings'].includes(activePage.page) ? activePage.page : activePage.page === 'history-run' ? 'history' : 'overview';
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
 
@@ -165,6 +193,7 @@ export default function App() {
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
       handleProjectChange: state.handleProjectChange, navTab,
       handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
+      currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
     },
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
