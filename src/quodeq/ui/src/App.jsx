@@ -64,7 +64,7 @@ const ROUTE_RENDERERS = {
     return (
       <HistoryPage
         trend={trend}
-        selectedRunId={props.dashboardData.selectedRun || (trend.length > 0 ? trend[0].runId : null)}
+        selectedRunId={(() => { const sr = props.dashboardData.selectedRun; if (sr && sr !== 'latest' && trend.some(t => t.runId === sr)) return sr; return trend.length > 0 ? trend[0].runId : null; })()}
         selectedRunScore={props.dashboardData.accumulated?.summary?.numericAverage}
         runNav={runs.length > 0 ? {
           currentRun: props.navigation.currentOverviewRun,

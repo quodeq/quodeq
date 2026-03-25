@@ -63,14 +63,14 @@
   padding: 0;
 }
 
-.history-row:hover {
-  border-color: var(--color-accent);
-  background: var(--color-surface-alt);
-}
-
 .history-row.selected {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
+}
+
+.history-row:hover {
+  border-color: var(--color-accent);
+  background: var(--color-surface-alt);
   box-shadow: 0 0 0 1px var(--color-accent);
 }
 
