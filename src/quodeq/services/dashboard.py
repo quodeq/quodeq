@@ -308,7 +308,7 @@ def _compute_dashboard_payload(
     )
     return _DashboardPayload(
         selected_summary=ctx.summary,
-        trend=_collapse_by_day(_build_accumulated_trend(history_runs, get_run_dimensions)),
+        trend=_build_accumulated_trend(history_runs, get_run_dimensions),
         dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,

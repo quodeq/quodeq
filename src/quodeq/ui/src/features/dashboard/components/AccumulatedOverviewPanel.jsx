@@ -168,14 +168,45 @@ function AccumulatedDetailsSection({ topFiles, violationsByPrinciple, uniquePrin
 // Accumulated overview panel
 // ---------------------------------------------------------------------------
 
+function collapseByDay(trend) {
+  if (!trend || trend.length === 0) return trend;
+  const collapsed = [];
+  let currentDay = null;
+  let dayDims = new Set();
+  let dayDimDetails = {};
+  for (const entry of trend) {
+    const datePart = (entry.dateISO || '').slice(0, 10);
+    if (datePart !== currentDay) {
+      if (currentDay !== null && collapsed.length > 0) {
+        collapsed[collapsed.length - 1].dayDimensions = [...dayDims].sort();
+        collapsed[collapsed.length - 1].dayDimensionDetails = Object.values(dayDimDetails).sort((a, b) => (a.dimension || '').localeCompare(b.dimension || ''));
+      }
+      currentDay = datePart;
+      dayDims = new Set();
+      dayDimDetails = {};
+      collapsed.push({ ...entry });
+    } else {
+      collapsed[collapsed.length - 1] = { ...entry };
+    }
+    for (const d of entry.dimensions || []) dayDims.add(d);
+    for (const d of entry.dimensionDetails || []) dayDimDetails[d.dimension || ''] = d;
+  }
+  if (collapsed.length > 0) {
+    collapsed[collapsed.length - 1].dayDimensions = [...dayDims].sort();
+    collapsed[collapsed.length - 1].dayDimensionDetails = Object.values(dayDimDetails).sort((a, b) => (a.dimension || '').localeCompare(b.dimension || ''));
+  }
+  return collapsed;
+}
+
 export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { accumulated, accumulatedDimensions, availableRuns, overviewRunIndex, trend, selectedRunId } = data;
   const { onRunClick, onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
 
+  const dailyTrend = useMemo(() => collapseByDay(trend), [trend]);
   const currentOverviewRun = availableRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? availableRuns[0]?.runId : currentOverviewRun;
-  const selectedTrend = trend.find((t) => t.runId === (availableRuns[overviewRunIndex]?.runId));
-  const dayDimensions = selectedTrend?.dayDimensions || [];
+  const selectedDay = dailyTrend.find((t) => t.runId === currentOverviewRun);
+  const dayDimensions = selectedDay?.dayDimensions || [];
 
   const stats = useMemo(
     () => computeAccumulatedStats(accumulated, accumulatedDimensions),
@@ -193,7 +224,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
       />
 
       <div className="history-panels-row">
-        <RunHistoryPanel trend={trend} selectedRunId={selectedRunId} selectedRunScore={accumulated?.summary?.numericAverage} onBarClick={onRunClick} />
+        <RunHistoryPanel trend={dailyTrend} selectedRunId={selectedRunId} selectedRunScore={accumulated?.summary?.numericAverage} onBarClick={onRunClick} />
         <DimensionScorePanel dimensions={accumulatedDimensions} onBarClick={onDimensionClick} runDate={stats.lastRun.date} runId={stats.lastRun.runId} />
       </div>
 
