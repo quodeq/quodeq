@@ -90,8 +90,8 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   return (
     <div className="dashboard-page">
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {loading && <p className="loading" role="status" aria-live="polite">Loading dashboard...</p>}
-      {!loading && dashboard && (
+      {loading && !dashboard && <p className="loading" role="status" aria-live="polite">Loading dashboard...</p>}
+      {dashboard && (
         <DashboardContent
           runMode={runMode}
           data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex }}

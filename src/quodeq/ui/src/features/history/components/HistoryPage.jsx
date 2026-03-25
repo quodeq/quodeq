@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import HistoryRunRow from './HistoryRunRow.jsx';
 import HistoryChartPanel from './HistoryChartPanel.jsx';
 import HistoryDimensionPanel from './HistoryDimensionPanel.jsx';
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
+import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
 
 const MAX_VISIBLE = 20;
 
@@ -16,18 +17,37 @@ function computeDeltas(trend) {
   });
 }
 
-export default function HistoryPage({ trend, selection, runNav, dimensions, callbacks }) {
+export default function HistoryPage({ trend, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId, selectedRunScore } = selection;
   const { accumulatedDimensions, lastRun } = dimensions;
-  const { onRunClick, onBarClick, onDimensionClick } = callbacks;
+  const { onRunClick, onBarClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
   const [listCollapsed, setListCollapsed] = useState(false);
+
+  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
+    selectedRun: selectedRunId || 'latest',
+    availableRuns: availableRuns || [],
+    onRunChange: onRunChange || (() => {}),
+    onNavigate: onNavigate || (() => {}),
+  });
+
+  const runNavLabel = useMemo(() => {
+    const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
+    if (entry?.dateISO) {
+      try {
+        const d = new Date(entry.dateISO);
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+          + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+      } catch { /* fall through */ }
+    }
+    return entry?.dateLabel || currentOverviewRun;
+  }, [trend, currentOverviewRun]);
 
   if (!trend || trend.length === 0) {
     return (
       <div className="history-page">
-        <div className="history-header">
-          <h2 className="history-title">History</h2>
+        <div className="page-header">
+          <h2 className="page-title">History</h2>
         </div>
         <div className="empty-state">
           <p>No evaluations yet. Run one from the Evaluate tab.</p>
@@ -42,16 +62,21 @@ export default function HistoryPage({ trend, selection, runNav, dimensions, call
 
   return (
     <div className="history-page">
-      <div className="history-header">
-        <h2 className="history-title">History</h2>
-        <span className="history-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
-        {runNav && (
+      <div className="page-header">
+        <h2 className="page-title">History</h2>
+        <span className="page-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
+        {availableRuns && availableRuns.length > 0 && (
           <div className="history-run-nav">
             <RunNavigator
-              currentRun={runNav.currentRun}
-              isLatest={runNav.isLatest}
-              isOldest={runNav.isOldest}
-              actions={{ onPrev: runNav.onPrev, onNext: runNav.onNext, onLatest: runNav.onLatest, onView: runNav.onView }}
+              currentRun={runNavLabel}
+              isLatest={overviewRunIndex === 0}
+              isOldest={overviewRunIndex >= availableRuns.length - 1}
+              actions={{
+                onPrev: handleRunPrev,
+                onNext: handleRunNext,
+                onLatest: handleRunLatest,
+                onView: () => { if (currentOverviewRun) onRunClick(currentOverviewRun); },
+              }}
             />
           </div>
         )}

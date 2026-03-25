@@ -771,6 +771,27 @@ textarea:focus {
   overflow-x: auto;
 }
 
+/* ── Page headers (top-level tab titles) ─────────────── */
+
+.page-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.page-title {
+  font-size: var(--text-xl);
+  font-weight: var(--weight-bold);
+  color: var(--color-text);
+  margin: 0;
+}
+
+.page-count {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
 /* ── Section headers ──────────────────────────────────── */
 
 .section-header {

@@ -72,12 +72,14 @@ function buildAvailableRuns(dashboard) {
 export function useDashboard({ selectedProject, selectedRun }) {
   const [dashboard, setDashboard] = useState(null);
   const [accumulated, setAccumulated] = useState(null);
+  const [latestAccumulated, setLatestAccumulated] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun]);
+  useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject]);
   const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
 
-  return { dashboard, accumulated, loading, error, availableRuns };
+  return { dashboard, accumulated, latestAccumulated, loading, error, availableRuns };
 }

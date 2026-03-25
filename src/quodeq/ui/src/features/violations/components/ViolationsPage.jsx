@@ -28,45 +28,47 @@ function ViolationsPillNav({ activeSubTab, onSubTabChange }) {
   );
 }
 
-function ViolationsHeroSection({ accumulated, topFilesCount, uniquePrinciples }) {
+function ViolationsHeader({ accumulated, topFilesCount, uniquePrinciples }) {
   const summary = accumulated?.summary;
   return (
-    <section className="acc-eval-panel panel">
-      <div className="acc-eval-top">
-        <span className="acc-eval-label">Violations</span>
+    <>
+      <div className="page-header">
+        <h2 className="page-title">Violations</h2>
       </div>
-      <div className="acc-eval-stats-grid">
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Violations</span>
-          <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>
-          <div className="acc-eval-tags">
-            {(summary?.severity?.critical || 0) > 0 && <span className="severity-tag critical">{summary.severity.critical} critical</span>}
-            {(summary?.severity?.major || 0) > 0 && <span className="severity-tag major">{summary.severity.major} major</span>}
-            {(summary?.severity?.minor || 0) > 0 && <span className="severity-tag minor">{summary.severity.minor} minor</span>}
+      <section className="panel violations-stats-panel">
+        <div className="acc-eval-stats-grid violations-stats-grid">
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Violations</span>
+            <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>
+            <div className="acc-eval-tags">
+              {(summary?.severity?.critical || 0) > 0 && <span className="severity-tag critical">{summary.severity.critical} critical</span>}
+              {(summary?.severity?.major || 0) > 0 && <span className="severity-tag major">{summary.severity.major} major</span>}
+              {(summary?.severity?.minor || 0) > 0 && <span className="severity-tag minor">{summary.severity.minor} minor</span>}
+            </div>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Compliance</span>
+            <span className="acc-eval-stat-value">{summary?.totalCompliance || 0}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Ratio</span>
+            <span className="acc-eval-stat-value">{complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Files Affected</span>
+            <span className="acc-eval-stat-value">{topFilesCount}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Principles</span>
+            <span className="acc-eval-stat-value">{uniquePrinciples}</span>
+          </div>
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Dimensions</span>
+            <span className="acc-eval-stat-value">{summary?.dimensionCount || 0}</span>
           </div>
         </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Compliance</span>
-          <span className="acc-eval-stat-value">{summary?.totalCompliance || 0}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Ratio</span>
-          <span className="acc-eval-stat-value">{complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Files Affected</span>
-          <span className="acc-eval-stat-value">{topFilesCount}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Principles</span>
-          <span className="acc-eval-stat-value">{uniquePrinciples}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Dimensions</span>
-          <span className="acc-eval-stat-value">{summary?.dimensionCount || 0}</span>
-        </div>
-      </div>
-    </section>
+      </section>
+    </>
   );
 }
 
@@ -172,8 +174,8 @@ export default function ViolationsPage({ data, callbacks }) {
   );
 
   return (
-    <div className="dashboard-page">
-      <ViolationsHeroSection accumulated={accumulated} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} />
+    <div className="violations-page">
+      <ViolationsHeader accumulated={accumulated} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} />
       <ViolationsPillNav activeSubTab={activeSubTab} onSubTabChange={setActiveSubTab} />
       {activeSubTab === 'dimension' && (
         <DimensionSubTab dimensions={accumulatedDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} />

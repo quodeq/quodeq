@@ -61,24 +61,11 @@ function resolveHistorySelectedRunId(selectedRun, trend) {
   return trend.length > 0 ? trend[0].runId : null;
 }
 
-function formatHistoryRunLabel(trend, runs, idx, fallbackLabel) {
-  const entry = trend.find((r) => r.runId === runs[idx]?.runId);
-  if (entry?.dateISO) {
-    try {
-      const d = new Date(entry.dateISO);
-      const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-      const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
-      return `${date} · ${time}`;
-    } catch { /* fall through */ }
-  }
-  return runs[idx]?.dateLabel || fallbackLabel;
-}
-
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
   violations: (params, props) => {
-    const dims = props.dashboardData.accumulated?.dimensions || [];
-    const acc = props.dashboardData.accumulated;
+    const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
+    const dims = acc?.dimensions || [];
     const nav = props.navigation.handleNavigate;
     return (
       <ViolationsPage
@@ -103,15 +90,7 @@ const ROUTE_RENDERERS = {
           selectedRunId: resolveHistorySelectedRunId(props.dashboardData.selectedRun, trend),
           selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
         }}
-        runNav={runs.length > 0 ? {
-          currentRun: formatHistoryRunLabel(trend, runs, idx, props.navigation.currentOverviewRun),
-          isLatest: idx === 0,
-          isOldest: idx >= runs.length - 1,
-          onPrev: props.navigation.handleRunPrev,
-          onNext: props.navigation.handleRunNext,
-          onLatest: props.navigation.handleRunLatest,
-          onView: () => { const run = props.dashboardData.selectedRun || (runs[idx] && runs[idx].runId); if (run) props.navigation.handleNavigate('history-run', { runId: run }); },
-        } : null}
+        availableRuns={runs}
         dimensions={{
           accumulatedDimensions: props.dashboardData.accumulated?.dimensions || [],
           lastRun: { date: props.dashboardData.accumulated?.dimensions?.[0]?.fromDateLabel, runId: props.dashboardData.accumulated?.dimensions?.[0]?.fromRunId },
@@ -120,6 +99,8 @@ const ROUTE_RENDERERS = {
           onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
           onBarClick: props.navigation.handleRunSelect,
           onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel }),
+          onNavigate: props.navigation.handleNavigate,
+          onRunChange: props.navigation.handleRunSelect,
         }}
       />
     );
@@ -203,7 +184,7 @@ function useAppState() {
   const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange } = nav;
   const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
   const settings = useAppSettings();
-  const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
+  const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
   const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
@@ -217,14 +198,14 @@ function useAppState() {
     : activePage.sourceTab && knownTabs.includes(activePage.sourceTab) ? activePage.sourceTab
     : activePage.page === 'history-run' ? 'history'
     : 'overview';
-  const showProjectHeader = ['overview', 'violations'].includes(activeTab) && projects.length > 0 && !!selectedProject;
+  const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
   const showRunNav = showProjectHeader && dailyRuns.length > 0 && navStack.length === 1;
 
   return {
     serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
     projects, selectedProject, selectedRun, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
-    dashboard, accumulated, loading, error, availableRuns, dailyRuns, overviewRunIndex,
+    dashboard, accumulated, latestAccumulated, loading, error, availableRuns, dailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav,
@@ -253,7 +234,7 @@ export default function App() {
   const contentProps = {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
-      dashboard: state.dashboard, accumulated: state.accumulated, loading: state.loading, error: state.error,
+      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
     },
     navigation: {
@@ -280,7 +261,6 @@ export default function App() {
               currentOverviewRun: state.currentOverviewRun, overviewRunIndex: state.overviewRunIndex, availableRuns: state.dailyRuns,
               currentDayLabel,
               onRunPrev: state.handleRunPrev, onRunNext: state.handleRunNext, onRunLatest: state.handleRunLatest,
-              onViewRun: undefined,
             },
           }}
         />

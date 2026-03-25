@@ -49,17 +49,18 @@ export default function ProjectHeader({
         )}
       </div>
       {showRunNav && runNavProps && (
-        <RunNavigator
-          currentRun={runNavProps.currentDayLabel || formatRunId(runNavProps.currentOverviewRun, runNavProps.availableRuns[runNavProps.overviewRunIndex]?.dateLabel)}
-          isLatest={runNavProps.overviewRunIndex === 0}
-          isOldest={runNavProps.overviewRunIndex >= runNavProps.availableRuns.length - 1}
-          actions={{
-            onPrev: runNavProps.onRunPrev,
-            onNext: runNavProps.onRunNext,
-            onLatest: runNavProps.onRunLatest,
-            onView: runNavProps.onViewRun,
-          }}
-        />
+        <div className="history-run-nav">
+          <RunNavigator
+            currentRun={runNavProps.currentDayLabel || formatRunId(runNavProps.currentOverviewRun, runNavProps.availableRuns[runNavProps.overviewRunIndex]?.dateLabel)}
+            isLatest={runNavProps.overviewRunIndex === 0}
+            isOldest={runNavProps.overviewRunIndex >= runNavProps.availableRuns.length - 1}
+            actions={{
+              onPrev: runNavProps.onRunPrev,
+              onNext: runNavProps.onRunNext,
+              onLatest: runNavProps.onRunLatest,
+            }}
+          />
+        </div>
       )}
     </header>
   );

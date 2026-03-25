@@ -2197,12 +2197,27 @@
   color: var(--color-sev-minor-text);
 }
 
-/* ── Violations pill nav ───────────────────── */
+/* ── Violations tab ─────────────────────────── */
+
+.violations-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
 
 .violations-pill-nav {
   display: flex;
   gap: 8px;
-  margin-bottom: 20px;
+  margin-bottom: var(--space-4);
+}
+
+.violations-stats-panel {
+  margin-bottom: var(--space-4);
+}
+
+.violations-stats-grid {
+  border-top: none;
+  padding-top: 0;
 }
 
 /* ── Run History Panel ────────────────────────────────── */

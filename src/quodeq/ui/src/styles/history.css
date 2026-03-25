@@ -3,15 +3,11 @@
    ============================================================= */
 
 .history-page {
-  padding: var(--space-4);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
 }
 
-.history-header {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-3);
-  margin-bottom: var(--space-4);
-}
 
 .history-run-nav {
   margin-left: auto;
@@ -95,17 +91,6 @@
   min-width: 0;
 }
 
-.history-title {
-  font-size: var(--text-xl);
-  font-weight: var(--weight-bold);
-  color: var(--color-text);
-  margin: 0;
-}
-
-.history-count {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-}
 
 .history-list {
   display: flex;
