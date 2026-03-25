@@ -268,9 +268,9 @@
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
 
-  /* Grade tier colors */
-  --color-grade-top-text:    #c49000;
-  --color-grade-top-bg:      color-mix(in srgb, #c49000 12%, transparent);
+  /* Grade tier colors — Daruma Fire: vivid gold top, warm gray high */
+  --color-grade-top-text:    #e0a800;
+  --color-grade-top-bg:      color-mix(in srgb, #e0a800 14%, transparent);
   --color-grade-high-text:   #6c7078;
   --color-grade-high-bg:     color-mix(in srgb, #6c7078 12%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-800);
@@ -281,7 +281,7 @@
   --color-grade-bottom-bg:   color-mix(in srgb, var(--primitive-crimson-600) 12%, transparent);
 
   /* Trend — default is light; dark themes override below */
-  --color-trend-strong-up:   #c49000;
+  --color-trend-strong-up:   #e0a800;
   --color-trend-up:          var(--primitive-ired-700);
   --color-trend-soft-up:     var(--primitive-brand-400);
   --color-trend-soft-down:   var(--primitive-ired-800);
@@ -364,10 +364,10 @@
     --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-200) 4%, transparent);
     --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-200) 32%, transparent);
 
-    --color-grade-top-text:    #f0be28;
-    --color-grade-top-bg:      color-mix(in srgb, #f0be28 14%, transparent);
-    --color-grade-high-text:   #a0a4ae;
-    --color-grade-high-bg:     color-mix(in srgb, #a0a4ae 14%, transparent);
+    --color-grade-top-text:    var(--primitive-daruma-400);
+    --color-grade-top-bg:      color-mix(in srgb, var(--primitive-daruma-400) 14%, transparent);
+    --color-grade-high-text:   var(--primitive-brand-300);
+    --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-300) 14%, transparent);
     --color-grade-mid-text:    var(--primitive-ired-300);
     --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 14%, transparent);
     --color-grade-low-text:    var(--primitive-ired-400);
@@ -385,11 +385,6 @@
     --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 12%, transparent);
     --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 25%, transparent);
 
-    /* Compliance — teal (Daruma Fire direction) */
-    --color-compliance:        #28d2b4;
-    --color-compliance-bg:     color-mix(in srgb, #28d2b4 4%, transparent);
-    --color-compliance-border: color-mix(in srgb, #28d2b4 38%, transparent);
-
     /* Overlays */
     --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
     --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -402,7 +397,7 @@
     --color-chart-stroke: rgba(255, 255, 255, 0.2);
 
     /* Trend — gray → crimson on dark backgrounds */
-    --color-trend-strong-up:   #f0be28;
+    --color-trend-strong-up:   var(--primitive-brand-300);
     --color-trend-up:          var(--primitive-ired-200);
     --color-trend-soft-up:     var(--primitive-brand-500);
     --color-trend-soft-down:   var(--primitive-ired-300);
@@ -452,10 +447,10 @@ html[data-theme="dark"]:root {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-200) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-200) 32%, transparent);
 
-  --color-grade-top-text:    #f0be28;
-  --color-grade-top-bg:      color-mix(in srgb, #f0be28 14%, transparent);
-  --color-grade-high-text:   #a0a4ae;
-  --color-grade-high-bg:     color-mix(in srgb, #a0a4ae 14%, transparent);
+  --color-grade-top-text:    var(--primitive-daruma-400);
+  --color-grade-top-bg:      color-mix(in srgb, var(--primitive-daruma-400) 14%, transparent);
+  --color-grade-high-text:   var(--primitive-brand-300);
+  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-brand-300) 14%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-300);
   --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-300) 14%, transparent);
   --color-grade-low-text:    var(--primitive-ired-400);
@@ -473,11 +468,6 @@ html[data-theme="dark"]:root {
   --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 12%, transparent);
   --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 25%, transparent);
 
-  /* Compliance — teal (Daruma Fire direction) */
-  --color-compliance:        #28d2b4;
-  --color-compliance-bg:     color-mix(in srgb, #28d2b4 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, #28d2b4 38%, transparent);
-
   /* Overlays */
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -490,7 +480,7 @@ html[data-theme="dark"]:root {
   --color-chart-stroke: rgba(255, 255, 255, 0.2);
 
   /* Trend — gray → crimson on dark backgrounds */
-  --color-trend-strong-up:   #f0be28;
+  --color-trend-strong-up:   var(--primitive-brand-300);
   --color-trend-up:          var(--primitive-ired-200);
   --color-trend-soft-up:     var(--primitive-brand-500);
   --color-trend-soft-down:   var(--primitive-ired-300);
@@ -541,8 +531,8 @@ html[data-theme="light"]:root {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ired-700) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ired-700) 30%, transparent);
 
-  --color-grade-top-text:    #c49000;
-  --color-grade-top-bg:      color-mix(in srgb, #c49000 12%, transparent);
+  --color-grade-top-text:    #e0a800;
+  --color-grade-top-bg:      color-mix(in srgb, #e0a800 14%, transparent);
   --color-grade-high-text:   #6c7078;
   --color-grade-high-bg:     color-mix(in srgb, #6c7078 12%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-800);
@@ -579,7 +569,7 @@ html[data-theme="light"]:root {
   --color-chart-stroke: transparent;
 
   /* Trend — gray → crimson on light backgrounds */
-  --color-trend-strong-up:   #c49000;
+  --color-trend-strong-up:   #e0a800;
   --color-trend-up:          var(--primitive-ired-700);
   --color-trend-soft-up:     var(--primitive-brand-400);
   --color-trend-soft-down:   var(--primitive-ired-800);
