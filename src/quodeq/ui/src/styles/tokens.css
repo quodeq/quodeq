@@ -45,27 +45,20 @@
   --primitive-dark-500: #9a9490;
   --primitive-dark-200: #f0ece6;
 
-  /* Classic palette (warm dark, logo-derived) */
-  --primitive-classic-950: #12100e;
-  --primitive-classic-900: #1c1916;
-  --primitive-classic-800: #262220;
-  --primitive-classic-700: #3a3330;
-  --primitive-classic-500: #9a8e84;
-  --primitive-classic-200: #f0e8e0;
-
-  /* Classic Campfire palette */
-  --primitive-classic-campfire-950: #14100a;
-  --primitive-classic-campfire-900: #1e1810;
-  --primitive-classic-campfire-800: #2a2218;
-  --primitive-classic-campfire-700: #3e3428;
-  --primitive-classic-campfire-500: #9a8570;
-  --primitive-classic-campfire-200: #f0e4d4;
-  --primitive-classic-campfire-accent-light: #c06810;
-  --primitive-classic-campfire-accent-dark: #e8922a;
-  --primitive-classic-campfire-50: #fdf8f0;
-  --primitive-classic-campfire-100: #f5ece0;
-  --primitive-classic-campfire-border-light: #e0d0be;
-  --primitive-classic-campfire-text-dark: #2c1e10;
+  /* Classic palette (neutral gray, traffic light) */
+  --primitive-classic-950: #141413;
+  --primitive-classic-900: #1e1e1c;
+  --primitive-classic-800: #282826;
+  --primitive-classic-700: #3a3a36;
+  --primitive-classic-500: #90908a;
+  --primitive-classic-200: #e8e8e4;
+  --primitive-classic-accent-light: #c07800;
+  --primitive-classic-accent-dark: #e8a020;
+  --primitive-classic-50: #f5f5f4;
+  --primitive-classic-100: #eaeae8;
+  --primitive-classic-border-light: #d4d4d0;
+  --primitive-classic-text-dark: #1c1c1a;
+  --primitive-classic-text-muted-light: #808078;
 
   /* Forest palette (nature greens, sage) */
   --primitive-forest-50:  #f4f7f4;
@@ -120,12 +113,6 @@
   --primitive-forest-900-dark: #152018;
   --primitive-forest-800-dark: #1e2c20;
   --primitive-forest-700-dark: #2e4230;
-
-  /* Classic light extensions */
-  --primitive-classic-50:  #faf6f2;
-  --primitive-classic-100: #f0ebe4;
-  --primitive-classic-border-light: #ddd4c8;
-  --primitive-classic-text-dark: #2a2018;
 
   /* Brand neutrals (cool near-black, logo-derived) */
   --primitive-brand-950: #0d1014;
@@ -205,13 +192,13 @@
   --primitive-forest-sev-major-dark:     #d28c50;
   --primitive-forest-sev-minor-dark:     #b49664;
 
-  /* Classic traffic-light severity (minor is warm gray, green reserved for compliance) */
-  --primitive-classic-sev-critical-light: #c01e14;
-  --primitive-classic-sev-major-light:    #b89800;
-  --primitive-classic-sev-minor-light:    #9a8a70;
-  --primitive-classic-sev-critical-dark:  #ff4632;
+  /* Classic traffic-light severity */
+  --primitive-classic-sev-critical-light: #c82020;
+  --primitive-classic-sev-major-light:    #a08000;
+  --primitive-classic-sev-minor-light:    #808078;
+  --primitive-classic-sev-critical-dark:  #ff4040;
   --primitive-classic-sev-major-dark:     #f0c832;
-  --primitive-classic-sev-minor-dark:     #b0a088;
+  --primitive-classic-sev-minor-dark:     #b0b0a0;
 
   /* Issue-intensity heat scale (gray → crimson, default light + dark) */
   --primitive-ired-200: #c09090;   /* dark B: muted rose-gray */
@@ -596,25 +583,25 @@ html[data-theme="light"]:root {
   --logo-needle-dark:    var(--primitive-crimson-700);
 }
 
-/* ── Classic Dark — campfire, amber glow ───────────────── */
+/* ── Classic Dark — neutral gray, traffic light ────────── */
 
 html[data-theme="classic-dark"]:root {
-  --color-bg:           var(--primitive-classic-campfire-950);
-  --color-surface:      var(--primitive-classic-campfire-900);
-  --color-surface-alt:  var(--primitive-classic-campfire-800);
-  --color-border:       var(--primitive-classic-campfire-700);
-  --color-border-focus: var(--primitive-classic-campfire-accent-dark);
+  --color-bg:           var(--primitive-classic-950);
+  --color-surface:      var(--primitive-classic-900);
+  --color-surface-alt:  var(--primitive-classic-800);
+  --color-border:       var(--primitive-classic-700);
+  --color-border-focus: var(--primitive-classic-accent-dark);
 
-  --color-text:         var(--primitive-classic-campfire-200);
-  --color-text-muted:   var(--primitive-classic-campfire-500);
-  --color-text-subtle:  #706050;
+  --color-text:         var(--primitive-classic-200);
+  --color-text-muted:   var(--primitive-classic-500);
+  --color-text-subtle:  #606058;
 
-  --color-accent:       var(--primitive-classic-campfire-accent-dark);
-  --color-accent-hover: #f0a030;
-  --color-accent-soft:  color-mix(in srgb, var(--primitive-classic-campfire-accent-dark) 14%, transparent);
+  --color-accent:       var(--primitive-classic-accent-dark);
+  --color-accent-hover: #f0b030;
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-classic-accent-dark) 14%, transparent);
 
-  --color-danger:  #ff4632;
-  --color-success: #50c850;
+  --color-danger:  #ff4040;
+  --color-success: #50d050;
 
   --color-sev-critical-text:   var(--primitive-classic-sev-critical-dark);
   --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-classic-sev-critical-dark) 4%, transparent);
@@ -626,55 +613,55 @@ html[data-theme="classic-dark"]:root {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-classic-sev-minor-dark) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-classic-sev-minor-dark) 32%, transparent);
 
-  /* Grades — traffic light: green → yellow → orange → red */
-  --color-grade-top-text:    #50c850;
-  --color-grade-top-bg:      color-mix(in srgb, #50c850 12%, transparent);
+  /* Grades — traffic light: green → yellow → amber → orange → red */
+  --color-grade-top-text:    #50d050;
+  --color-grade-top-bg:      color-mix(in srgb, #50d050 12%, transparent);
   --color-grade-high-text:   #f0c832;
   --color-grade-high-bg:     color-mix(in srgb, #f0c832 12%, transparent);
-  --color-grade-mid-text:    var(--primitive-classic-campfire-accent-dark);
-  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-classic-campfire-accent-dark) 12%, transparent);
+  --color-grade-mid-text:    var(--primitive-classic-accent-dark);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-classic-accent-dark) 12%, transparent);
   --color-grade-low-text:    #f0643c;
   --color-grade-low-bg:      color-mix(in srgb, #f0643c 13%, transparent);
-  --color-grade-bottom-text: #ff4632;
-  --color-grade-bottom-bg:   color-mix(in srgb, #ff4632 4%, transparent);
+  --color-grade-bottom-text: #ff4040;
+  --color-grade-bottom-bg:   color-mix(in srgb, #ff4040 4%, transparent);
 
   --color-warning:      var(--primitive-amber-400);
   --color-warning-text: var(--primitive-amber-400);
   --color-warning-bg:   color-mix(in srgb, var(--primitive-amber-400) 10%, transparent);
 
-  --color-danger-text:   #ff4632;
-  --color-danger-bg:     color-mix(in srgb, #ff4632 15%, transparent);
-  --color-danger-border: color-mix(in srgb, #ff4632 30%, transparent);
+  --color-danger-text:   #ff4040;
+  --color-danger-bg:     color-mix(in srgb, #ff4040 15%, transparent);
+  --color-danger-border: color-mix(in srgb, #ff4040 30%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
   --color-overlay-light:  rgba(0, 0, 0, 0.72);
 
-  --color-chart-grid:   var(--primitive-classic-campfire-700);
-  --color-chart-axis:   var(--primitive-classic-campfire-500);
-  --color-chart-line:   var(--primitive-classic-campfire-200);
-  --color-chart-stroke: rgba(232, 146, 42, 0.25);
+  --color-chart-grid:   var(--primitive-classic-700);
+  --color-chart-axis:   var(--primitive-classic-500);
+  --color-chart-line:   var(--primitive-classic-200);
+  --color-chart-stroke: rgba(232, 160, 32, 0.25);
 
   /* Trend — traffic light: green up, yellow mid, red down */
-  --color-trend-strong-up:   #50c850;
+  --color-trend-strong-up:   #50d050;
   --color-trend-up:          #f0c832;
-  --color-trend-soft-up:     var(--primitive-classic-campfire-500);
+  --color-trend-soft-up:     var(--primitive-classic-500);
   --color-trend-soft-down:   #f0643c;
-  --color-trend-down:        #ff4632;
+  --color-trend-down:        #ff4040;
   --color-trend-strong-down: #ff2020;
 
-  /* Console — warm tint */
-  --color-console-bg: #0c0806;
+  /* Console */
+  --color-console-bg: #0c0c0b;
 
   --shadow-sm: none;
   --shadow-md: none;
   --shadow-lg: none;
 
   /* Logo */
-  --logo-q:              var(--primitive-classic-campfire-accent-dark);
-  --logo-chevron:        var(--primitive-classic-campfire-200);
-  --logo-chevron-hover:  var(--primitive-classic-campfire-accent-dark);
-  --logo-needle:         var(--primitive-classic-campfire-accent-dark);
+  --logo-q:              var(--primitive-classic-accent-dark);
+  --logo-chevron:        var(--primitive-classic-200);
+  --logo-chevron-hover:  var(--primitive-classic-accent-dark);
+  --logo-needle:         var(--primitive-classic-accent-dark);
   --logo-needle-dark:    #a06010;
 }
 
@@ -1117,25 +1104,25 @@ html[data-theme="forest-dark"]:root {
   --logo-needle-dark:    var(--primitive-forest-700);
 }
 
-/* ── Classic Light — campfire, warm parchment ──────────── */
+/* ── Classic Light — neutral gray, traffic light ───────── */
 
 html[data-theme="classic-light"]:root {
-  --color-bg:           var(--primitive-classic-campfire-50);
+  --color-bg:           var(--primitive-classic-50);
   --color-surface:      #ffffff;
-  --color-surface-alt:  var(--primitive-classic-campfire-100);
-  --color-border:       var(--primitive-classic-campfire-border-light);
-  --color-border-focus: var(--primitive-classic-campfire-accent-light);
+  --color-surface-alt:  var(--primitive-classic-100);
+  --color-border:       var(--primitive-classic-border-light);
+  --color-border-focus: var(--primitive-classic-accent-light);
 
-  --color-text:         var(--primitive-classic-campfire-text-dark);
-  --color-text-muted:   var(--primitive-classic-campfire-500);
-  --color-text-subtle:  #b0a090;
+  --color-text:         var(--primitive-classic-text-dark);
+  --color-text-muted:   var(--primitive-classic-text-muted-light);
+  --color-text-subtle:  #a0a098;
 
-  --color-accent:       var(--primitive-classic-campfire-accent-light);
-  --color-accent-hover: #a05808;
-  --color-accent-soft:  color-mix(in srgb, var(--primitive-classic-campfire-accent-light) 8%, transparent);
+  --color-accent:       var(--primitive-classic-accent-light);
+  --color-accent-hover: #a06000;
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-classic-accent-light) 8%, transparent);
 
-  --color-danger:  #c01e14;
-  --color-success: #3c8c3c;
+  --color-danger:  #c82020;
+  --color-success: #2a8a2a;
 
   --color-sev-critical-text:   var(--primitive-classic-sev-critical-light);
   --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-classic-sev-critical-light) 4%, transparent);
@@ -1147,17 +1134,17 @@ html[data-theme="classic-light"]:root {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-classic-sev-minor-light) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-classic-sev-minor-light) 30%, transparent);
 
-  /* Grades — traffic light: green → yellow → orange → red */
-  --color-grade-top-text:    #3c8c3c;
-  --color-grade-top-bg:      color-mix(in srgb, #3c8c3c 12%, transparent);
-  --color-grade-high-text:   #b89800;
-  --color-grade-high-bg:     color-mix(in srgb, #b89800 10%, transparent);
-  --color-grade-mid-text:    var(--primitive-classic-campfire-accent-light);
-  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-classic-campfire-accent-light) 10%, transparent);
-  --color-grade-low-text:    #c05030;
-  --color-grade-low-bg:      color-mix(in srgb, #c05030 10%, transparent);
-  --color-grade-bottom-text: #c01e14;
-  --color-grade-bottom-bg:   color-mix(in srgb, #c01e14 12%, transparent);
+  /* Grades — traffic light: green → yellow → amber → orange → red */
+  --color-grade-top-text:    #2a8a2a;
+  --color-grade-top-bg:      color-mix(in srgb, #2a8a2a 12%, transparent);
+  --color-grade-high-text:   #a08000;
+  --color-grade-high-bg:     color-mix(in srgb, #a08000 10%, transparent);
+  --color-grade-mid-text:    var(--primitive-classic-accent-light);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-classic-accent-light) 10%, transparent);
+  --color-grade-low-text:    #c83c14;
+  --color-grade-low-bg:      color-mix(in srgb, #c83c14 10%, transparent);
+  --color-grade-bottom-text: #c82020;
+  --color-grade-bottom-bg:   color-mix(in srgb, #c82020 12%, transparent);
 
   --color-warning:      var(--primitive-amber-700);
   --color-warning-text: var(--primitive-amber-700);
@@ -1172,16 +1159,16 @@ html[data-theme="classic-light"]:root {
   --color-overlay-light:  rgba(0, 0, 0, 0.3);
 
   --color-chart-grid:   var(--color-border);
-  --color-chart-axis:   var(--primitive-classic-campfire-500);
-  --color-chart-line:   var(--primitive-classic-campfire-text-dark);
+  --color-chart-axis:   var(--primitive-classic-text-muted-light);
+  --color-chart-line:   var(--primitive-classic-text-dark);
   --color-chart-stroke: transparent;
 
   /* Trend — traffic light: green up, yellow mid, red down */
-  --color-trend-strong-up:   #3c8c3c;
-  --color-trend-up:          #b89800;
-  --color-trend-soft-up:     #b0a090;
-  --color-trend-soft-down:   #c05030;
-  --color-trend-down:        #c01e14;
+  --color-trend-strong-up:   #2a8a2a;
+  --color-trend-up:          #a08000;
+  --color-trend-soft-up:     #a0a098;
+  --color-trend-soft-down:   #c83c14;
+  --color-trend-down:        #c82020;
   --color-trend-strong-down: #a00000;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
@@ -1189,11 +1176,11 @@ html[data-theme="classic-light"]:root {
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
 
   /* Logo */
-  --logo-q:              var(--primitive-classic-campfire-accent-light);
-  --logo-chevron:        var(--primitive-classic-campfire-text-dark);
-  --logo-chevron-hover:  var(--primitive-classic-campfire-accent-light);
-  --logo-needle:         var(--primitive-classic-campfire-accent-light);
-  --logo-needle-dark:    #a05808;
+  --logo-q:              var(--primitive-classic-accent-light);
+  --logo-chevron:        var(--primitive-classic-text-dark);
+  --logo-chevron-hover:  var(--primitive-classic-accent-light);
+  --logo-needle:         var(--primitive-classic-accent-light);
+  --logo-needle-dark:    #a06000;
 }
 
 /* ── 5. Typography ────────────────────────────────────────
