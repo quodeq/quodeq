@@ -139,7 +139,9 @@ def _build_accumulated_trend(
                 "grade": dim.overall_grade,
                 "delta": delta,
             })
-        prev_by_dim = {d.dimension: d for d in run_dims if d.dimension}
+        for dim in run_dims:
+            if dim.dimension:
+                prev_by_dim[dim.dimension] = dim
         trend.append(
             {
                 "runId": item.run_id,
