@@ -835,7 +835,7 @@ textarea:focus {
 }
 
 .severity-tag.compliance {
-  color: color-mix(in srgb, var(--color-compliance) 65%, black);
+  color: var(--color-compliance);
   background: var(--color-compliance-bg);
   border-color: var(--color-compliance-border);
 }
@@ -853,8 +853,8 @@ textarea:focus {
   border: 1px solid transparent;
 }
 
-.chip.grade-top    { color: color-mix(in srgb, var(--color-grade-top-text) 65%, black);    background: var(--color-grade-top-bg);    border-color: color-mix(in srgb, var(--color-grade-top-text) 48%, transparent); }
-.chip.grade-high   { color: color-mix(in srgb, var(--color-grade-high-text) 75%, black);   background: var(--color-grade-high-bg);   border-color: color-mix(in srgb, var(--color-grade-high-text) 38%, transparent); }
+.chip.grade-top    { color: var(--color-grade-top-text);    background: var(--color-grade-top-bg);    border-color: color-mix(in srgb, var(--color-grade-top-text) 48%, transparent); }
+.chip.grade-high   { color: var(--color-grade-high-text);   background: var(--color-grade-high-bg);   border-color: color-mix(in srgb, var(--color-grade-high-text) 38%, transparent); }
 .chip.grade-mid    { color: var(--color-grade-mid-text);    background: var(--color-grade-mid-bg);    border-color: color-mix(in srgb, var(--color-grade-mid-text) 28%, transparent); }
 .chip.grade-low    { color: var(--color-grade-low-text);    background: var(--color-grade-low-bg);    border-color: color-mix(in srgb, var(--color-grade-low-text) 28%, transparent); }
 .chip.grade-bottom { color: var(--color-grade-bottom-text); background: var(--color-grade-bottom-bg); border-color: color-mix(in srgb, var(--color-grade-bottom-text) 28%, transparent); }
