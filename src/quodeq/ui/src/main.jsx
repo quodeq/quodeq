@@ -19,8 +19,11 @@ const _mode = localStorage.getItem('cc-theme-mode') || 'system';
 const _family = localStorage.getItem('cc-theme-family') || 'default';
 const _prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
 const _effectiveMode = _mode === 'system' ? (_prefersDark ? 'dark' : 'light') : _mode;
+// NOTE: This logic must mirror resolveDataTheme() in useAppSettings.js
 if (_family === 'default') {
-  if (_effectiveMode === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+  // System mode: don't set attribute, let @media (prefers-color-scheme) drive
+  // Explicit mode: set 'light' or 'dark' to override OS preference
+  if (_mode !== 'system') document.documentElement.setAttribute('data-theme', _effectiveMode);
 } else {
   document.documentElement.setAttribute('data-theme', `${_family}-${_effectiveMode}`);
 }

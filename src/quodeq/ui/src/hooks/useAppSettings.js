@@ -39,7 +39,9 @@ function migrateOldTheme() {
 export function resolveDataTheme(mode, family, prefersDark) {
   const effectiveMode = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
   if (family === 'default') {
-    return effectiveMode === 'light' ? null : 'dark';
+    // System mode: return null so @media (prefers-color-scheme) drives the theme
+    // Explicit mode: return 'light' or 'dark' to override OS preference
+    return mode === 'system' ? null : effectiveMode;
   }
   return `${family}-${effectiveMode}`;
 }
