@@ -9,13 +9,13 @@ const AI_MODEL_KEY = 'cc-ai-model';
 const VERIFY_FINDINGS_KEY = 'cc-verify-findings';
 
 const VALID_MODES = ['system', 'light', 'dark'];
-const VALID_FAMILIES = ['default', 'midnight', 'neo', 'forest', 'ember'];
+const VALID_FAMILIES = ['default', 'midnight', 'neo', 'forest', 'classic'];
 
 const MIGRATION_MAP = {
   system:   { mode: 'system', family: 'default' },
   light:    { mode: 'light',  family: 'default' },
   dark:     { mode: 'dark',   family: 'default' },
-  ember:    { mode: 'dark',   family: 'ember' },
+  ember:    { mode: 'dark',   family: 'classic' },
   forest:   { mode: 'light',  family: 'forest' },
   midnight: { mode: 'dark',   family: 'midnight' },
   slate:    { mode: 'light',  family: 'default' },

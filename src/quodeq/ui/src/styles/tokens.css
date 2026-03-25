@@ -45,27 +45,27 @@
   --primitive-dark-500: #9a9490;
   --primitive-dark-200: #f0ece6;
 
-  /* Ember palette (warm dark, logo-derived) */
-  --primitive-ember-950: #12100e;
-  --primitive-ember-900: #1c1916;
-  --primitive-ember-800: #262220;
-  --primitive-ember-700: #3a3330;
-  --primitive-ember-500: #9a8e84;
-  --primitive-ember-200: #f0e8e0;
+  /* Classic palette (warm dark, logo-derived) */
+  --primitive-classic-950: #12100e;
+  --primitive-classic-900: #1c1916;
+  --primitive-classic-800: #262220;
+  --primitive-classic-700: #3a3330;
+  --primitive-classic-500: #9a8e84;
+  --primitive-classic-200: #f0e8e0;
 
-  /* Ember Campfire palette */
-  --primitive-ember-campfire-950: #14100a;
-  --primitive-ember-campfire-900: #1e1810;
-  --primitive-ember-campfire-800: #2a2218;
-  --primitive-ember-campfire-700: #3e3428;
-  --primitive-ember-campfire-500: #9a8570;
-  --primitive-ember-campfire-200: #f0e4d4;
-  --primitive-ember-campfire-accent-light: #c06810;
-  --primitive-ember-campfire-accent-dark: #e8922a;
-  --primitive-ember-campfire-50: #fdf8f0;
-  --primitive-ember-campfire-100: #f5ece0;
-  --primitive-ember-campfire-border-light: #e0d0be;
-  --primitive-ember-campfire-text-dark: #2c1e10;
+  /* Classic Campfire palette */
+  --primitive-classic-campfire-950: #14100a;
+  --primitive-classic-campfire-900: #1e1810;
+  --primitive-classic-campfire-800: #2a2218;
+  --primitive-classic-campfire-700: #3e3428;
+  --primitive-classic-campfire-500: #9a8570;
+  --primitive-classic-campfire-200: #f0e4d4;
+  --primitive-classic-campfire-accent-light: #c06810;
+  --primitive-classic-campfire-accent-dark: #e8922a;
+  --primitive-classic-campfire-50: #fdf8f0;
+  --primitive-classic-campfire-100: #f5ece0;
+  --primitive-classic-campfire-border-light: #e0d0be;
+  --primitive-classic-campfire-text-dark: #2c1e10;
 
   /* Forest palette (nature greens, sage) */
   --primitive-forest-50:  #f4f7f4;
@@ -121,11 +121,11 @@
   --primitive-forest-800-dark: #1e2c20;
   --primitive-forest-700-dark: #2e4230;
 
-  /* Ember light extensions */
-  --primitive-ember-50:  #faf6f2;
-  --primitive-ember-100: #f0ebe4;
-  --primitive-ember-border-light: #ddd4c8;
-  --primitive-ember-text-dark: #2a2018;
+  /* Classic light extensions */
+  --primitive-classic-50:  #faf6f2;
+  --primitive-classic-100: #f0ebe4;
+  --primitive-classic-border-light: #ddd4c8;
+  --primitive-classic-text-dark: #2a2018;
 
   /* Brand neutrals (cool near-black, logo-derived) */
   --primitive-brand-950: #0d1014;
@@ -205,13 +205,13 @@
   --primitive-forest-sev-major-dark:     #d28c50;
   --primitive-forest-sev-minor-dark:     #b49664;
 
-  /* Ember traffic-light severity (minor is warm gray, green reserved for compliance) */
-  --primitive-ember-sev-critical-light: #c01e14;
-  --primitive-ember-sev-major-light:    #b89800;
-  --primitive-ember-sev-minor-light:    #9a8a70;
-  --primitive-ember-sev-critical-dark:  #ff4632;
-  --primitive-ember-sev-major-dark:     #f0c832;
-  --primitive-ember-sev-minor-dark:     #b0a088;
+  /* Classic traffic-light severity (minor is warm gray, green reserved for compliance) */
+  --primitive-classic-sev-critical-light: #c01e14;
+  --primitive-classic-sev-major-light:    #b89800;
+  --primitive-classic-sev-minor-light:    #9a8a70;
+  --primitive-classic-sev-critical-dark:  #ff4632;
+  --primitive-classic-sev-major-dark:     #f0c832;
+  --primitive-classic-sev-minor-dark:     #b0a088;
 
   /* Issue-intensity heat scale (gray → crimson, default light + dark) */
   --primitive-ired-200: #c09090;   /* dark B: muted rose-gray */
@@ -596,43 +596,43 @@ html[data-theme="light"]:root {
   --logo-needle-dark:    var(--primitive-crimson-700);
 }
 
-/* ── Ember Dark — campfire, amber glow ─────────────────── */
+/* ── Classic Dark — campfire, amber glow ───────────────── */
 
-html[data-theme="ember-dark"]:root {
-  --color-bg:           var(--primitive-ember-campfire-950);
-  --color-surface:      var(--primitive-ember-campfire-900);
-  --color-surface-alt:  var(--primitive-ember-campfire-800);
-  --color-border:       var(--primitive-ember-campfire-700);
-  --color-border-focus: var(--primitive-ember-campfire-accent-dark);
+html[data-theme="classic-dark"]:root {
+  --color-bg:           var(--primitive-classic-campfire-950);
+  --color-surface:      var(--primitive-classic-campfire-900);
+  --color-surface-alt:  var(--primitive-classic-campfire-800);
+  --color-border:       var(--primitive-classic-campfire-700);
+  --color-border-focus: var(--primitive-classic-campfire-accent-dark);
 
-  --color-text:         var(--primitive-ember-campfire-200);
-  --color-text-muted:   var(--primitive-ember-campfire-500);
+  --color-text:         var(--primitive-classic-campfire-200);
+  --color-text-muted:   var(--primitive-classic-campfire-500);
   --color-text-subtle:  #706050;
 
-  --color-accent:       var(--primitive-ember-campfire-accent-dark);
+  --color-accent:       var(--primitive-classic-campfire-accent-dark);
   --color-accent-hover: #f0a030;
-  --color-accent-soft:  color-mix(in srgb, var(--primitive-ember-campfire-accent-dark) 14%, transparent);
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-classic-campfire-accent-dark) 14%, transparent);
 
   --color-danger:  #ff4632;
   --color-success: #50c850;
 
-  --color-sev-critical-text:   var(--primitive-ember-sev-critical-dark);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-ember-sev-critical-dark) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-ember-sev-critical-dark) 42%, transparent);
-  --color-sev-major-text:      var(--primitive-ember-sev-major-dark);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ember-sev-major-dark) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-ember-sev-major-dark) 38%, transparent);
-  --color-sev-minor-text:      var(--primitive-ember-sev-minor-dark);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ember-sev-minor-dark) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ember-sev-minor-dark) 32%, transparent);
+  --color-sev-critical-text:   var(--primitive-classic-sev-critical-dark);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-classic-sev-critical-dark) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-classic-sev-critical-dark) 42%, transparent);
+  --color-sev-major-text:      var(--primitive-classic-sev-major-dark);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-classic-sev-major-dark) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-classic-sev-major-dark) 38%, transparent);
+  --color-sev-minor-text:      var(--primitive-classic-sev-minor-dark);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-classic-sev-minor-dark) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-classic-sev-minor-dark) 32%, transparent);
 
   /* Grades — traffic light: green → yellow → orange → red */
   --color-grade-top-text:    #50c850;
   --color-grade-top-bg:      color-mix(in srgb, #50c850 12%, transparent);
   --color-grade-high-text:   #f0c832;
   --color-grade-high-bg:     color-mix(in srgb, #f0c832 12%, transparent);
-  --color-grade-mid-text:    var(--primitive-ember-campfire-accent-dark);
-  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ember-campfire-accent-dark) 12%, transparent);
+  --color-grade-mid-text:    var(--primitive-classic-campfire-accent-dark);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-classic-campfire-accent-dark) 12%, transparent);
   --color-grade-low-text:    #f0643c;
   --color-grade-low-bg:      color-mix(in srgb, #f0643c 13%, transparent);
   --color-grade-bottom-text: #ff4632;
@@ -650,15 +650,15 @@ html[data-theme="ember-dark"]:root {
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
   --color-overlay-light:  rgba(0, 0, 0, 0.72);
 
-  --color-chart-grid:   var(--primitive-ember-campfire-700);
-  --color-chart-axis:   var(--primitive-ember-campfire-500);
-  --color-chart-line:   var(--primitive-ember-campfire-200);
+  --color-chart-grid:   var(--primitive-classic-campfire-700);
+  --color-chart-axis:   var(--primitive-classic-campfire-500);
+  --color-chart-line:   var(--primitive-classic-campfire-200);
   --color-chart-stroke: rgba(232, 146, 42, 0.25);
 
   /* Trend — traffic light: green up, yellow mid, red down */
   --color-trend-strong-up:   #50c850;
   --color-trend-up:          #f0c832;
-  --color-trend-soft-up:     var(--primitive-ember-campfire-500);
+  --color-trend-soft-up:     var(--primitive-classic-campfire-500);
   --color-trend-soft-down:   #f0643c;
   --color-trend-down:        #ff4632;
   --color-trend-strong-down: #ff2020;
@@ -671,10 +671,10 @@ html[data-theme="ember-dark"]:root {
   --shadow-lg: none;
 
   /* Logo */
-  --logo-q:              var(--primitive-ember-campfire-accent-dark);
-  --logo-chevron:        var(--primitive-ember-campfire-200);
-  --logo-chevron-hover:  var(--primitive-ember-campfire-accent-dark);
-  --logo-needle:         var(--primitive-ember-campfire-accent-dark);
+  --logo-q:              var(--primitive-classic-campfire-accent-dark);
+  --logo-chevron:        var(--primitive-classic-campfire-200);
+  --logo-chevron-hover:  var(--primitive-classic-campfire-accent-dark);
+  --logo-needle:         var(--primitive-classic-campfire-accent-dark);
   --logo-needle-dark:    #a06010;
 }
 
@@ -1117,43 +1117,43 @@ html[data-theme="forest-dark"]:root {
   --logo-needle-dark:    var(--primitive-forest-700);
 }
 
-/* ── Ember Light — campfire, warm parchment ────────────── */
+/* ── Classic Light — campfire, warm parchment ──────────── */
 
-html[data-theme="ember-light"]:root {
-  --color-bg:           var(--primitive-ember-campfire-50);
+html[data-theme="classic-light"]:root {
+  --color-bg:           var(--primitive-classic-campfire-50);
   --color-surface:      #ffffff;
-  --color-surface-alt:  var(--primitive-ember-campfire-100);
-  --color-border:       var(--primitive-ember-campfire-border-light);
-  --color-border-focus: var(--primitive-ember-campfire-accent-light);
+  --color-surface-alt:  var(--primitive-classic-campfire-100);
+  --color-border:       var(--primitive-classic-campfire-border-light);
+  --color-border-focus: var(--primitive-classic-campfire-accent-light);
 
-  --color-text:         var(--primitive-ember-campfire-text-dark);
-  --color-text-muted:   var(--primitive-ember-campfire-500);
+  --color-text:         var(--primitive-classic-campfire-text-dark);
+  --color-text-muted:   var(--primitive-classic-campfire-500);
   --color-text-subtle:  #b0a090;
 
-  --color-accent:       var(--primitive-ember-campfire-accent-light);
+  --color-accent:       var(--primitive-classic-campfire-accent-light);
   --color-accent-hover: #a05808;
-  --color-accent-soft:  color-mix(in srgb, var(--primitive-ember-campfire-accent-light) 8%, transparent);
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-classic-campfire-accent-light) 8%, transparent);
 
   --color-danger:  #c01e14;
   --color-success: #3c8c3c;
 
-  --color-sev-critical-text:   var(--primitive-ember-sev-critical-light);
-  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-ember-sev-critical-light) 4%, transparent);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-ember-sev-critical-light) 38%, transparent);
-  --color-sev-major-text:      var(--primitive-ember-sev-major-light);
-  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-ember-sev-major-light) 4%, transparent);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-ember-sev-major-light) 35%, transparent);
-  --color-sev-minor-text:      var(--primitive-ember-sev-minor-light);
-  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ember-sev-minor-light) 4%, transparent);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ember-sev-minor-light) 30%, transparent);
+  --color-sev-critical-text:   var(--primitive-classic-sev-critical-light);
+  --color-sev-critical-bg:     color-mix(in srgb, var(--primitive-classic-sev-critical-light) 4%, transparent);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-classic-sev-critical-light) 38%, transparent);
+  --color-sev-major-text:      var(--primitive-classic-sev-major-light);
+  --color-sev-major-bg:        color-mix(in srgb, var(--primitive-classic-sev-major-light) 4%, transparent);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-classic-sev-major-light) 35%, transparent);
+  --color-sev-minor-text:      var(--primitive-classic-sev-minor-light);
+  --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-classic-sev-minor-light) 4%, transparent);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-classic-sev-minor-light) 30%, transparent);
 
   /* Grades — traffic light: green → yellow → orange → red */
   --color-grade-top-text:    #3c8c3c;
   --color-grade-top-bg:      color-mix(in srgb, #3c8c3c 12%, transparent);
   --color-grade-high-text:   #b89800;
   --color-grade-high-bg:     color-mix(in srgb, #b89800 10%, transparent);
-  --color-grade-mid-text:    var(--primitive-ember-campfire-accent-light);
-  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ember-campfire-accent-light) 10%, transparent);
+  --color-grade-mid-text:    var(--primitive-classic-campfire-accent-light);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-classic-campfire-accent-light) 10%, transparent);
   --color-grade-low-text:    #c05030;
   --color-grade-low-bg:      color-mix(in srgb, #c05030 10%, transparent);
   --color-grade-bottom-text: #c01e14;
@@ -1172,8 +1172,8 @@ html[data-theme="ember-light"]:root {
   --color-overlay-light:  rgba(0, 0, 0, 0.3);
 
   --color-chart-grid:   var(--color-border);
-  --color-chart-axis:   var(--primitive-ember-campfire-500);
-  --color-chart-line:   var(--primitive-ember-campfire-text-dark);
+  --color-chart-axis:   var(--primitive-classic-campfire-500);
+  --color-chart-line:   var(--primitive-classic-campfire-text-dark);
   --color-chart-stroke: transparent;
 
   /* Trend — traffic light: green up, yellow mid, red down */
@@ -1189,10 +1189,10 @@ html[data-theme="ember-light"]:root {
   --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.08);
 
   /* Logo */
-  --logo-q:              var(--primitive-ember-campfire-accent-light);
-  --logo-chevron:        var(--primitive-ember-campfire-text-dark);
-  --logo-chevron-hover:  var(--primitive-ember-campfire-accent-light);
-  --logo-needle:         var(--primitive-ember-campfire-accent-light);
+  --logo-q:              var(--primitive-classic-campfire-accent-light);
+  --logo-chevron:        var(--primitive-classic-campfire-text-dark);
+  --logo-chevron-hover:  var(--primitive-classic-campfire-accent-light);
+  --logo-needle:         var(--primitive-classic-campfire-accent-light);
   --logo-needle-dark:    #a05808;
 }
 

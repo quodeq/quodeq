@@ -24,7 +24,7 @@ const FAMILY_OPTIONS = [
   { value: 'midnight', label: 'Midnight', accent: ['#4f46e5', '#00d4ff'] },
   { value: 'neo',      label: 'Neo',      accent: ['#008833', '#00ff41'] },
   { value: 'forest',   label: 'Forest',   accent: ['#1b6b3a', '#4caf7d'] },
-  { value: 'ember',    label: 'Ember',    accent: ['#c06810', '#e8922a'] },
+  { value: 'classic',  label: 'Classic',  accent: ['#c06810', '#e8922a'] },
 ];
 
 const _SETTINGS_PHRASES = [
