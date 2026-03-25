@@ -211,7 +211,7 @@ def run_dimension_incremental(
 
     prev_analyzed = set(prev_fp.get("analyzed_files", [])) if prev_fp else set()
     phase1_files = set(classification.to_analyze) if classification.to_analyze else set()
-    backfill_taken = _run_backfill_phase(
+    backfill_taken = run_backfill_phase(
         config, dimension, idx, ctx,
         BackfillContext(files=files, prev_analyzed=prev_analyzed, phase1_files=phase1_files,
                         evidence_dir=evidence_dir, phase_start=phase_start),
