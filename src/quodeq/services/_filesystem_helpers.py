@@ -215,11 +215,19 @@ def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
         return ()
 
 
+_cached_dimensions: tuple[str, ...] | None = None
+
 def _list_available_dimensions_for_discipline(paths: object | None = None) -> tuple[str, ...]:
     """Resolve available dimensions from universal dimensions.json (cached after first read).
 
     Pass *paths* to override the default path resolution (useful for testing).
     Returns a tuple (immutable) so the result is safe for caching.
     """
+    global _cached_dimensions
+    if paths is None and _cached_dimensions is not None:
+        return _cached_dimensions
     resolved = paths or default_paths()
-    return _read_dimensions_from_file(str(resolved.dimensions_file))
+    result = _read_dimensions_from_file(str(resolved.dimensions_file))
+    if paths is None:
+        _cached_dimensions = result
+    return result

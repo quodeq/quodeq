@@ -61,23 +61,25 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     @staticmethod
     def _build_project_list(reports_root: Path) -> list[ProjectEntry]:
         """Collect eligible project dirs and build entries in parallel."""
-        eligible: list[tuple[str, list]] = []
         max_listed = _max_projects_listed()
+        dir_names: list[str] = []
         for entry in safe_read_dir(reports_root):
             if not entry.is_dir() or entry.name.startswith("."):
                 continue
-            runs = list_runs(reports_root, entry.name)
-            if not runs:
-                continue
-            eligible.append((entry.name, runs))
-            if len(eligible) >= max_listed:
+            dir_names.append(entry.name)
+            if len(dir_names) >= max_listed:
                 break
+
+        def _build_one(name: str) -> ProjectEntry | None:
+            runs = list_runs(reports_root, name)
+            if not runs:
+                return None
+            return _build_project_entry(reports_root, name, runs)
+
         from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=min(8, len(eligible) or 1)) as pool:
-            projects = list(pool.map(
-                lambda args: _build_project_entry(reports_root, args[0], args[1]),
-                eligible,
-            ))
+        with ThreadPoolExecutor(max_workers=min(8, len(dir_names) or 1)) as pool:
+            results = pool.map(_build_one, dir_names)
+        projects = [p for p in results if p is not None]
         projects.sort(key=lambda p: p.name)
         return _auto_detect_parents(projects)
 

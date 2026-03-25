@@ -59,7 +59,8 @@ class QuodeqApp(rumps.App):
         self._error_item = rumps.MenuItem("")
 
         # Check prereqs on main thread so menu items render correctly
-        cmds = _find_commands()
+        self._cached_cmds = _find_commands()
+        cmds = self._cached_cmds
         self._prereq_items = {}
         for label, cmd in [("Python", "python3"), ("Node.js", "node"), ("Claude", "claude"), ("Quodeq", "quodeq")]:
             path = cmds.get(cmd)
@@ -124,7 +125,12 @@ class QuodeqApp(rumps.App):
     @rumps.timer(_POLL_INTERVAL)
     def _poll(self, _):
         """Periodically check if the dashboard is running."""
-        port = self._find_running_port()
+        # Fast path: if we already know the port, just health-check it
+        port = self._port
+        if port and not _health_check(port):
+            port = None
+        if not port:
+            port = self._find_running_port()
         if port:
             self._port = port
             self._clear_error()
@@ -203,7 +209,7 @@ class QuodeqApp(rumps.App):
         return cmd
 
     def _do_start_inner(self):
-        cmds = _find_commands()
+        cmds = self._cached_cmds
         quodeq_cmd = cmds.get("quodeq")
         if not quodeq_cmd:
             self._set_error("quodeq not in PATH")
