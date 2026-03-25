@@ -53,3 +53,10 @@ class TestLoadCompiledRequirementsMulti:
     def test_empty_dimensions_list(self, tmp_path):
         reqs = load_compiled_requirements_multi(tmp_path, [])
         assert reqs == {}
+
+    def test_missing_dimension_file_skipped(self, tmp_path):
+        """Requesting a dimension whose compiled JSON doesn't exist returns empty without error."""
+        _write_compiled(tmp_path, "security", "S-CON-1", "Confidentiality")
+        reqs = load_compiled_requirements_multi(tmp_path, ["security", "nonexistent"])
+        assert "S-CON-1" in reqs
+        assert all(k.startswith("S-") for k in reqs)

@@ -256,6 +256,7 @@ class QuodeqApp(rumps.App):
                 if port:
                     self._port = port
                     self._clear_error()
+                    self._cleanup_stderr_log()
                     return
             self._set_error("Timeout: dashboard did not respond")
             self._status_item.title = "Stopped"
