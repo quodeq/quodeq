@@ -1,13 +1,12 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { formatRunId, gradeColorClass, splitScore } from '../../../utils/formatters.js';
 
-function AccDimensionCard({ item, referenceRun, onDimensionClick, evaluatedToday = true }) {
-  const isStale = item.fromRunId !== referenceRun;
+function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true }) {
   const currScore = parseFloat(item.overallScore);
   const prevScore = parseFloat(item.previousScore);
   const delta = !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
   const score = splitScore(item.overallScore);
-  const cardClass = `qd-card${isStale ? ' qd-card-stale' : ''}${evaluatedToday ? ' qd-card--active' : ' qd-card--carried'}`;
+  const cardClass = `qd-card${evaluatedToday ? ' qd-card--active' : ' qd-card--carried'}`;
   return (
     <article
       className={cardClass}
@@ -39,7 +38,6 @@ function AccDimensionCard({ item, referenceRun, onDimensionClick, evaluatedToday
       </div>
       <div className="qd-card-footer">
         <span className="qd-card-date">{item.fromDateLabel || formatRunId(item.fromRunId)}</span>
-        {isStale && <span className="qd-card-stale-label">Older run</span>}
       </div>
     </article>
   );
@@ -64,7 +62,6 @@ export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onD
           <AccDimensionCard
             key={item.dimension}
             item={item}
-            referenceRun={referenceRun}
             onDimensionClick={onDimensionClick}
             evaluatedToday={isActive}
           />
