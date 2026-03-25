@@ -1,6 +1,14 @@
 import { useState, useMemo } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
-import { gradeLabel } from '../../../utils/formatters.js';
+import { gradeLabel, gradeLetter } from '../../../utils/formatters.js';
+
+const EXT_NAMES = {
+  py: 'Python', js: 'JS', ts: 'TS', jsx: 'JSX', tsx: 'TSX',
+  sh: 'Shell', bash: 'Shell', rb: 'Ruby', go: 'Go', rs: 'Rust',
+  java: 'Java', kt: 'Kotlin', cs: 'C#', swift: 'Swift', dart: 'Dart',
+  css: 'CSS', html: 'HTML', vue: 'Vue', php: 'PHP', c: 'C', cpp: 'C++',
+};
+function extName(ext) { return EXT_NAMES[ext.toLowerCase()] || ext; }
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -48,8 +56,25 @@ function GradeChip({ grade, score }) {
   const cls = grade ? `projects-grade--${grade.toLowerCase()}` : 'projects-grade--x';
   return (
     <span className={`projects-grade ${cls}`}>
-      {grade}{score != null ? ` ${score}` : ''}
+      {score != null ? `${score} ` : ''}{gradeLetter(grade)}
     </span>
+  );
+}
+
+function LanguageNumbers({ stats, filesCount }) {
+  if (!stats || Object.keys(stats).length === 0) {
+    if (filesCount != null) return <span className="project-stat"><span className="project-stat-num">{filesCount.toLocaleString()}</span> <span className="project-stat-label">files</span></span>;
+    return null;
+  }
+  const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 4);
+  const total = filesCount || sorted.reduce((s, [, c]) => s + c, 0);
+  return (
+    <div className="project-lang-row">
+      <span className="project-stat"><span className="project-stat-num">{total.toLocaleString()}</span> <span className="project-stat-label">files</span></span>
+      {sorted.map(([lang, count]) => (
+        <span key={lang} className="project-stat"><span className="project-stat-num">{count}</span> <span className="project-stat-label">{extName(lang)}</span></span>
+      ))}
+    </div>
   );
 }
 
@@ -71,18 +96,20 @@ function ProjectCard({ project, isSelected, onSelect, footer, isChild = false, c
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
       >
         <div className="project-card-top">
-          <span className="project-card-name">{project.displayName || name}</span>
-          <GradeChip grade={grade} score={score} />
+          <div className="project-card-top-left">
+            <span className="project-card-name">{project.displayName || name}</span>
+            <GradeChip grade={grade} score={score} />
+          </div>
+          <div className="project-card-top-right">
+            {discipline && <span className="project-meta-tag">{discipline}</span>}
+            <span className="project-meta-item">{project.runsCount} {project.runsCount === 1 ? 'run' : 'runs'}</span>
+            {date && <span className="project-meta-date">{date}</span>}
+          </div>
         </div>
-        <div className="project-card-meta">
-          {discipline && <span className="project-meta-tag">{discipline}</span>}
-          {project.filesCount != null && (
-            <span className="project-meta-item">{project.filesCount.toLocaleString()} files</span>
-          )}
-          <span className="project-meta-item">{project.runsCount} {project.runsCount === 1 ? 'run' : 'runs'}</span>
-          {date && <span className="project-meta-date">{date}</span>}
+        <div className="project-card-bottom">
+          <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
+          {cardChildren}
         </div>
-        {cardChildren}
       </div>
       {footer && <div className="project-card-footer" onClick={isChild ? (e) => e.stopPropagation() : undefined}>{footer}</div>}
     </div>

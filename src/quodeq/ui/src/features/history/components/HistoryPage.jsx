@@ -22,7 +22,6 @@ export default function HistoryPage({ trend, selection, availableRuns, dimension
   const { accumulatedDimensions, lastRun } = dimensions;
   const { onRunClick, onBarClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
-  const [listCollapsed, setListCollapsed] = useState(false);
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
     selectedRun: selectedRunId || 'latest',
@@ -95,14 +94,9 @@ export default function HistoryPage({ trend, selection, availableRuns, dimension
           runId={lastRun?.runId}
         />
       </div>
-      <div className="history-list-header">
-        <button type="button" className="history-collapse-btn" onClick={() => setListCollapsed(!listCollapsed)}>
-          <span className={`history-collapse-icon${listCollapsed ? ' collapsed' : ''}`}>›</span>
-          Evaluations
-        </button>
+      <div className="dimensions-header">
+        <h3 className="dimensions-title">Evaluations</h3>
       </div>
-      {!listCollapsed && (
-        <>
           <div className="history-list">
             {visible.map((entry, i) => (
               <HistoryRunRow
@@ -121,8 +115,6 @@ export default function HistoryPage({ trend, selection, availableRuns, dimension
               </button>
             </div>
           )}
-        </>
-      )}
     </div>
   );
 }

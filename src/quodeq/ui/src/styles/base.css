@@ -1574,3 +1574,33 @@ textarea:focus {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── Loading screen ─────────────────────────────────── */
+
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  pointer-events: none;
+  animation: loading-fadein 300ms ease;
+}
+
+.loading-logo {
+  width: 80px;
+  height: auto;
+  opacity: 0.15;
+  animation: loading-pulse 1.8s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 0.1; transform: scale(1); }
+  50% { opacity: 0.3; transform: scale(1.05); }
+}
+
+@keyframes loading-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}

@@ -137,7 +137,7 @@
 }
 
 .history-row-date-main {
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-medium);
 }
 
 .history-row-date-time {
@@ -157,7 +157,7 @@
 
 .history-row-score-val {
   font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 

@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
   const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex } = data;
@@ -18,7 +19,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
     );
   }
   if (!accumulated) {
-    return <p className="empty-state">Loading accumulated data...</p>;
+    return <LoadingScreen />;
   }
   if (focusedDimension) {
     return (
@@ -84,13 +85,14 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const handlers = makeDashboardHandlers(onNavigate, dashboard);
 
   if (!projects || projects.length === 0) {
+    if (loading) return <LoadingScreen />;
     return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
   }
 
   return (
     <div className="dashboard-page">
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {loading && !dashboard && <p className="loading" role="status" aria-live="polite">Loading dashboard...</p>}
+      {loading && !dashboard && <LoadingScreen />}
       {dashboard && (
         <DashboardContent
           runMode={runMode}

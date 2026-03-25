@@ -13,6 +13,7 @@ import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx'
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
 import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
+import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useServerHealth } from './hooks/useServerHealth.js';
@@ -118,9 +119,17 @@ const ROUTE_RENDERERS = {
 
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
+  const noProjectTabs = ['evaluate', 'settings'];
+  if (!noProjectTabs.includes(page)) {
+    const projects = props.navigation?.projects;
+    if (!projects || projects.length === 0) {
+      if (props.dashboardData?.loading) return <LoadingScreen />;
+      return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
+    }
+  }
   const renderer = ROUTE_RENDERERS[page];
   if (renderer) return renderer(params, props);
-  return <div className="empty-state"><p>Page not found: {page}</p></div>;
+  return null;
 }
 
 function computeHeaderMeta(accumulated, dashboard, selectedProject, projects) {

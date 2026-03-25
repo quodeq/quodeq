@@ -2244,46 +2244,43 @@
 .pill-btn {
   display: inline-flex;
   align-items: center;
-  padding: 4px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--color-border);
-  background: transparent;
+  padding: 5px 12px;
+  border-radius: 12px;
+  border: none;
+  background: color-mix(in srgb, var(--color-text-muted) 6%, transparent);
   color: var(--color-text-muted);
   font-family: var(--font-sans);
-  font-size: var(--text-xs);
+  font-size: 0.75rem;
   font-weight: var(--weight-medium);
   cursor: pointer;
-  transition: border-color 120ms ease, background 120ms ease, color 120ms ease;
+  transition: background 120ms ease, color 120ms ease;
   text-transform: capitalize;
 }
 
 .pill-btn:hover {
-  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
   color: var(--color-text);
 }
 
 .pill-btn.active {
-  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  color: var(--color-text);
+  font-weight: var(--weight-semibold);
 }
 
 /* Severity-specific pill active colors */
 .severity-pill.critical.active {
-  background: color-mix(in srgb, var(--color-sev-critical-text) 15%, transparent);
-  border-color: var(--color-sev-critical-text);
+  background: color-mix(in srgb, var(--color-sev-critical-text) 12%, transparent);
   color: var(--color-sev-critical-text);
 }
 
 .severity-pill.major.active {
-  background: color-mix(in srgb, var(--color-sev-major-text) 15%, transparent);
-  border-color: var(--color-sev-major-text);
+  background: color-mix(in srgb, var(--color-sev-major-text) 12%, transparent);
   color: var(--color-sev-major-text);
 }
 
 .severity-pill.minor.active {
-  background: color-mix(in srgb, var(--color-sev-minor-text) 15%, transparent);
-  border-color: var(--color-sev-minor-text);
+  background: color-mix(in srgb, var(--color-sev-minor-text) 12%, transparent);
   color: var(--color-sev-minor-text);
 }
 
@@ -2535,10 +2532,22 @@
 
 .project-card-top {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
   gap: var(--space-4);
-  margin-bottom: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.project-card-top-left {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+}
+
+.project-card-top-right {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
 }
 
 .project-card-name {
@@ -2552,12 +2561,35 @@
   color: var(--color-accent);
 }
 
-.project-card-meta {
+.project-card-bottom {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-3);
-  margin-top: var(--space-1);
-  flex-wrap: wrap;
+}
+
+.project-lang-row {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+}
+
+.project-stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+}
+
+.project-stat-num {
+  font-size: 0.75rem;
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
+}
+
+.project-stat-label {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
 }
 
 .project-meta-tag {
