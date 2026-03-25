@@ -57,9 +57,13 @@ class FetchClient:
                 with self._lock:
                     self._failures = 0
                 return r.read().decode("utf-8", errors="replace")
-        except (urllib.error.URLError, OSError, ValueError):
+        except (urllib.error.URLError, OSError, ValueError) as exc:
             with self._lock:
                 self._failures += 1
+                if self._failures >= self._CIRCUIT_THRESHOLD:
+                    _logger.warning("Circuit breaker tripped after %d failures (last: %s)", self._failures, exc)
+                else:
+                    _logger.debug("Fetch attempt %d failed: %s", self._failures, exc)
             return None
 
 

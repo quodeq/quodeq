@@ -125,14 +125,15 @@ class QuodeqApp(rumps.App):
     @rumps.timer(_POLL_INTERVAL)
     def _poll(self, _):
         """Periodically check if the dashboard is running."""
-        # Fast path: if we already know the port, just health-check it
-        port = self._port
+        with self._state_lock:
+            port = self._port
         if port and not _health_check(port):
             port = None
         if not port:
             port = self._find_running_port()
         if port:
-            self._port = port
+            with self._state_lock:
+                self._port = port
             self._clear_error()
             if _is_evaluating(port):
                 self._status_item.title = "Evaluating..."
@@ -157,7 +158,9 @@ class QuodeqApp(rumps.App):
             self._do_start()
 
     def _on_open(self, _):
-        port = self._port or self._find_running_port()
+        with self._state_lock:
+            port = self._port
+        port = port or self._find_running_port()
         if port:
             webbrowser.open(f"http://127.0.0.1:{port}")
 
@@ -226,8 +229,10 @@ class QuodeqApp(rumps.App):
                 cmd, stdout=subprocess.DEVNULL, stderr=stderr_log, start_new_session=True,
             )
         except OSError as e:
+            stderr_log.close()
             self._set_error(f"Failed: {e}")
             self._status_item.title = "Stopped"
+            self._cleanup_stderr_log()
             return
         self._wait_for_dashboard(stderr_log)
 

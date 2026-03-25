@@ -85,13 +85,13 @@ def save_dimension_fingerprint(
                 from quodeq.analysis.subagents.file_queue import FileQueue
                 try:
                     queue_files = set(FileQueue(queue_path).all_taken_files())
-                except Exception as exc:
+                except (OSError, ValueError, KeyError) as exc:
                     log_debug(f"  [{dimension}] Could not read file queue: {exc}")
             jsonl_files = extract_files_from_jsonl(evidence_dir / f"{dimension}_evidence.jsonl")
             analyzed_files = queue_files | jsonl_files
         fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=analyzed_files)
         save_fingerprint(fp, evidence_dir)
-    except Exception as exc:
+    except (OSError, ValueError, TypeError) as exc:
         log_debug(f"  [{dimension}] Fingerprint save failed: {exc}")
 
 

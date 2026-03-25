@@ -3,9 +3,12 @@ from __future__ import annotations
 
 import functools
 import json
+import logging
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
+
+_logger = logging.getLogger(__name__)
 
 from quodeq.config.paths import default_paths
 from quodeq.core.types import ProjectEntry
@@ -226,8 +229,12 @@ def _list_available_dimensions_for_discipline(paths: object | None = None) -> tu
     global _cached_dimensions
     if paths is None and _cached_dimensions is not None:
         return _cached_dimensions
-    resolved = paths or default_paths()
-    result = _read_dimensions_from_file(str(resolved.dimensions_file))
+    try:
+        resolved = paths or default_paths()
+        result = _read_dimensions_from_file(str(resolved.dimensions_file))
+    except (OSError, TypeError) as exc:
+        _logger.warning("Failed to load dimensions config: %s", exc)
+        return ()
     if paths is None:
         _cached_dimensions = result
     return result

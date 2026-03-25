@@ -113,6 +113,8 @@ class InMemoryRateLimitStore:
 
     def record(self, ip: str, now: float) -> None:
         """Record a state-changing request from *ip* at time *now*."""
+        if not ip:
+            return
         self._periodic_cleanup(now)
         timestamps = self._store.setdefault(ip, [])
         timestamps.append(now)

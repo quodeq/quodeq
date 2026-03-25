@@ -3,6 +3,7 @@ import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, lis
 import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY } from '../../../constants.js';
 
 const DIMENSION_POLL_MS = 2000;
+const DIMENSION_POLL_MAX_MS = 8000;
 const JOB_POLL_MS = 1500;
 const MAX_DIM_POLL_FAILURES = 10;
 

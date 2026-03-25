@@ -48,8 +48,11 @@ def compute_source_hash(source_dir: Path) -> str:
             files.extend(sorted(f for f in item.rglob("*") if f.is_file()))
     for f in sorted(files):
         rel = f.relative_to(source_dir)
-        h.update(str(rel).encode())
-        h.update(f.read_bytes())
+        try:
+            h.update(str(rel).encode())
+            h.update(f.read_bytes())
+        except OSError:
+            continue
     return h.hexdigest()
 
 

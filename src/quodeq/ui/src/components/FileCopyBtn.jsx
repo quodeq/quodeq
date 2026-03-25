@@ -12,7 +12,7 @@ export default function FileCopyBtn({ display, copyText }) {
         copyToClipboard(copyText).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), COPY_FEEDBACK_MS);
-        }).catch(() => {});
+        }).catch(() => { setCopied(false); });
       }}
     >
       {copied ? 'Copied!' : display}
