@@ -671,6 +671,11 @@ html[data-theme="ember-dark"]:root {
   --color-danger-bg:     color-mix(in srgb, #ff5030 15%, transparent);
   --color-danger-border: color-mix(in srgb, #ff5030 30%, transparent);
 
+  /* Compliance — warm gold */
+  --color-compliance:        #f0b830;
+  --color-compliance-bg:     color-mix(in srgb, #f0b830 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #f0b830 38%, transparent);
+
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
   --color-overlay-light:  rgba(0, 0, 0, 0.72);
@@ -752,6 +757,11 @@ html[data-theme="forest-light"]:root {
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
 
+  /* Compliance — forest green */
+  --color-compliance:        #1b6b3a;
+  --color-compliance-bg:     color-mix(in srgb, #1b6b3a 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #1b6b3a 38%, transparent);
+
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
   --color-overlay-medium: rgba(0, 0, 0, 0.5);
   --color-overlay-light:  rgba(0, 0, 0, 0.3);
@@ -829,6 +839,11 @@ html[data-theme="midnight-dark"]:root {
   --color-danger-text:   var(--primitive-red-300);
   --color-danger-bg:     color-mix(in srgb, var(--primitive-red-300) 15%, transparent);
   --color-danger-border: color-mix(in srgb, var(--primitive-red-300) 30%, transparent);
+
+  /* Compliance — cool cyan */
+  --color-compliance:        #00d4ff;
+  --color-compliance-bg:     color-mix(in srgb, #00d4ff 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #00d4ff 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
@@ -911,6 +926,11 @@ html[data-theme="midnight-light"]:root {
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
 
+  /* Compliance — deep indigo-teal */
+  --color-compliance:        #0078a0;
+  --color-compliance-bg:     color-mix(in srgb, #0078a0 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #0078a0 38%, transparent);
+
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
   --color-overlay-medium: rgba(0, 0, 0, 0.5);
   --color-overlay-light:  rgba(0, 0, 0, 0.3);
@@ -981,6 +1001,12 @@ html[data-theme="neo-dark"]:root {
   --color-danger-text:   #ff4040;
   --color-danger-bg:     color-mix(in srgb, #ff4040 15%, transparent);
   --color-danger-border: color-mix(in srgb, #ff4040 30%, transparent);
+
+  /* Compliance — matrix green */
+  --color-compliance:        #00ff41;
+  --color-compliance-bg:     color-mix(in srgb, #00ff41 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #00ff41 38%, transparent);
+
   --color-overlay-heavy:  rgba(0, 0, 0, 0.92);
   --color-overlay-medium: rgba(0, 0, 0, 0.85);
   --color-overlay-light:  rgba(0, 0, 0, 0.75);
@@ -1049,6 +1075,12 @@ html[data-theme="neo-light"]:root {
   --color-danger-text:   var(--color-danger);
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
+
+  /* Compliance — deep green */
+  --color-compliance:        #008833;
+  --color-compliance-bg:     color-mix(in srgb, #008833 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #008833 38%, transparent);
+
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
   --color-overlay-medium: rgba(0, 0, 0, 0.5);
   --color-overlay-light:  rgba(0, 0, 0, 0.3);
@@ -1115,6 +1147,12 @@ html[data-theme="forest-dark"]:root {
   --color-danger-text:   var(--primitive-crimson-200);
   --color-danger-bg:     color-mix(in srgb, var(--primitive-crimson-200) 15%, transparent);
   --color-danger-border: color-mix(in srgb, var(--primitive-crimson-200) 30%, transparent);
+
+  /* Compliance — bright sage */
+  --color-compliance:        #4caf7d;
+  --color-compliance-bg:     color-mix(in srgb, #4caf7d 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #4caf7d 38%, transparent);
+
   --color-overlay-heavy:  rgba(0, 0, 0, 0.88);
   --color-overlay-medium: rgba(0, 0, 0, 0.82);
   --color-overlay-light:  rgba(0, 0, 0, 0.72);
@@ -1191,6 +1229,11 @@ html[data-theme="ember-light"]:root {
   --color-danger-text:   var(--color-danger);
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
+
+  /* Compliance — deep amber */
+  --color-compliance:        #c08000;
+  --color-compliance-bg:     color-mix(in srgb, #c08000 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #c08000 38%, transparent);
 
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
   --color-overlay-medium: rgba(0, 0, 0, 0.5);
