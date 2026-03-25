@@ -626,16 +626,17 @@ html[data-theme="ember-dark"]:root {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ember-sev-minor-dark) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ember-sev-minor-dark) 32%, transparent);
 
-  --color-grade-top-text:    #f0c060;
-  --color-grade-top-bg:      color-mix(in srgb, #f0c060 12%, transparent);
-  --color-grade-high-text:   var(--primitive-ember-campfire-500);
-  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-ember-campfire-500) 12%, transparent);
-  --color-grade-mid-text:    #f0643c;
-  --color-grade-mid-bg:      color-mix(in srgb, #f0643c 12%, transparent);
-  --color-grade-low-text:    #ff4632;
-  --color-grade-low-bg:      color-mix(in srgb, #ff4632 13%, transparent);
-  --color-grade-bottom-text: #ff2020;
-  --color-grade-bottom-bg:   color-mix(in srgb, #ff2020 4%, transparent);
+  /* Grades — traffic light: green → yellow → orange → red */
+  --color-grade-top-text:    #50c850;
+  --color-grade-top-bg:      color-mix(in srgb, #50c850 12%, transparent);
+  --color-grade-high-text:   #f0c832;
+  --color-grade-high-bg:     color-mix(in srgb, #f0c832 12%, transparent);
+  --color-grade-mid-text:    var(--primitive-ember-campfire-accent-dark);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ember-campfire-accent-dark) 12%, transparent);
+  --color-grade-low-text:    #f0643c;
+  --color-grade-low-bg:      color-mix(in srgb, #f0643c 13%, transparent);
+  --color-grade-bottom-text: #ff4632;
+  --color-grade-bottom-bg:   color-mix(in srgb, #ff4632 4%, transparent);
 
   --color-warning:      var(--primitive-amber-400);
   --color-warning-text: var(--primitive-amber-400);
@@ -654,9 +655,9 @@ html[data-theme="ember-dark"]:root {
   --color-chart-line:   var(--primitive-ember-campfire-200);
   --color-chart-stroke: rgba(232, 146, 42, 0.25);
 
-  /* Trend — gold up, red down */
-  --color-trend-strong-up:   #f0c060;
-  --color-trend-up:          var(--primitive-ember-campfire-accent-dark);
+  /* Trend — traffic light: green up, yellow mid, red down */
+  --color-trend-strong-up:   #50c850;
+  --color-trend-up:          #f0c832;
   --color-trend-soft-up:     var(--primitive-ember-campfire-500);
   --color-trend-soft-down:   #f0643c;
   --color-trend-down:        #ff4632;
@@ -1146,16 +1147,17 @@ html[data-theme="ember-light"]:root {
   --color-sev-minor-bg:        color-mix(in srgb, var(--primitive-ember-sev-minor-light) 4%, transparent);
   --color-sev-minor-border:    color-mix(in srgb, var(--primitive-ember-sev-minor-light) 30%, transparent);
 
-  --color-grade-top-text:    #b08000;
-  --color-grade-top-bg:      color-mix(in srgb, #b08000 12%, transparent);
-  --color-grade-high-text:   var(--primitive-ember-campfire-500);
-  --color-grade-high-bg:     color-mix(in srgb, var(--primitive-ember-campfire-500) 10%, transparent);
-  --color-grade-mid-text:    #c05030;
-  --color-grade-mid-bg:      color-mix(in srgb, #c05030 10%, transparent);
-  --color-grade-low-text:    #c01e14;
-  --color-grade-low-bg:      color-mix(in srgb, #c01e14 10%, transparent);
-  --color-grade-bottom-text: #a00000;
-  --color-grade-bottom-bg:   color-mix(in srgb, #a00000 12%, transparent);
+  /* Grades — traffic light: green → yellow → orange → red */
+  --color-grade-top-text:    #3c8c3c;
+  --color-grade-top-bg:      color-mix(in srgb, #3c8c3c 12%, transparent);
+  --color-grade-high-text:   #b89800;
+  --color-grade-high-bg:     color-mix(in srgb, #b89800 10%, transparent);
+  --color-grade-mid-text:    var(--primitive-ember-campfire-accent-light);
+  --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ember-campfire-accent-light) 10%, transparent);
+  --color-grade-low-text:    #c05030;
+  --color-grade-low-bg:      color-mix(in srgb, #c05030 10%, transparent);
+  --color-grade-bottom-text: #c01e14;
+  --color-grade-bottom-bg:   color-mix(in srgb, #c01e14 12%, transparent);
 
   --color-warning:      var(--primitive-amber-700);
   --color-warning-text: var(--primitive-amber-700);
@@ -1174,9 +1176,9 @@ html[data-theme="ember-light"]:root {
   --color-chart-line:   var(--primitive-ember-campfire-text-dark);
   --color-chart-stroke: transparent;
 
-  /* Trend — gold up, red down */
-  --color-trend-strong-up:   #b08000;
-  --color-trend-up:          var(--primitive-ember-campfire-accent-light);
+  /* Trend — traffic light: green up, yellow mid, red down */
+  --color-trend-strong-up:   #3c8c3c;
+  --color-trend-up:          #b89800;
   --color-trend-soft-up:     #b0a090;
   --color-trend-soft-down:   #c05030;
   --color-trend-down:        #c01e14;
