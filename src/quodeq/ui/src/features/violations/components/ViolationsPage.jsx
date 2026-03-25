@@ -36,7 +36,7 @@ function ViolationsHeader({ accumulated, topFilesCount, uniquePrinciples }) {
         <h2 className="page-title">Violations</h2>
       </div>
       <section className="panel violations-stats-panel">
-        <div className="acc-eval-stats-grid violations-stats-grid">
+        <div className="violations-stats-grid">
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Violations</span>
             <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>

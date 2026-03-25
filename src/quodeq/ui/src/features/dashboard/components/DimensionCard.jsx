@@ -12,7 +12,7 @@ import PrincipleAccordion from './PrincipleAccordion.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
-import { splitScore, gradeColorClass } from '../../../utils/formatters.js';
+import { splitScore, gradeColorClass, gradeLetter } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 
 const SEVERITY_OPTIONS = ['critical', 'major', 'minor', 'unknown'];
@@ -158,7 +158,7 @@ function DimCardHeader({ title, dimension, delta }) {
           <h3>{dimension.dimension}</h3>
         </div>
         <span className={`chip ${gradeColorClass(dimension.overallGrade)}`}>
-          {dimension.overallGrade || 'No grade'}
+          {gradeLetter(dimension.overallGrade)}
         </span>
       </div>
       {dimension.overallScore && (

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { formatShortDate, angleFromDelta, scoreTierLabel } from '../../../utils/formatters.js';
+import { formatShortDate, angleFromDelta, scoreTierLabel, gradeLetter } from '../../../utils/formatters.js';
 import {
   ComposedChart,
   Bar,
@@ -137,7 +137,7 @@ function RunHistoryTooltip({ active, hoveredIndex, data }) {
     <div className="run-history-tooltip">
       <span className="rht-date">{entry.dateLabel}</span>
       <span className="rht-score">{entry.numericAverage.toFixed(1)} / 10</span>
-      <span className="rht-grade">{entry.overallGrade}</span>
+      <span className="rht-grade">{gradeLetter(entry.overallGrade)}</span>
     </div>
   );
 }

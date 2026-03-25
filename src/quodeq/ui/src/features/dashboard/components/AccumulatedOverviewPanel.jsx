@@ -7,15 +7,25 @@ import { sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils
 import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGrouping.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
+import ScoreCircle from '../../../components/ScoreCircle.jsx';
 
 // ---------------------------------------------------------------------------
 // Accumulated overview panel helpers
 // ---------------------------------------------------------------------------
 
-function computeAccumulatedStats(accumulated, accumulatedDimensions) {
+function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend) {
   const curr = parseFloat(accumulated?.summary?.numericAverage);
-  const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
-  const scoreDelta = (isNaN(curr) || isNaN(prev)) ? null : (curr - prev).toFixed(1);
+  // Derive delta from trend data (same source as the bar chart)
+  let scoreDelta = null;
+  if (dailyTrend && dailyTrend.length >= 2) {
+    const latest = parseFloat(dailyTrend[0]?.numericAverage);
+    const previous = parseFloat(dailyTrend[1]?.numericAverage);
+    if (!isNaN(latest) && !isNaN(previous)) scoreDelta = (latest - previous).toFixed(1);
+  }
+  if (scoreDelta === null) {
+    const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
+    scoreDelta = (isNaN(curr) || isNaN(prev)) ? null : (curr - prev).toFixed(1);
+  }
 
   const withDates = accumulatedDimensions
     .filter((d) => d.fromRunId)
@@ -35,16 +45,6 @@ function computeAccumulatedStats(accumulated, accumulatedDimensions) {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatBlock({ label, value, children }) {
-  return (
-    <div className="acc-eval-stat-block">
-      <span className="acc-eval-stat-label">{label}</span>
-      <span className="acc-eval-stat-value">{value}</span>
-      {children}
-    </div>
-  );
-}
-
 function SeverityTags({ severity }) {
   return (
     <div className="acc-eval-tags">
@@ -63,21 +63,36 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate }) {
         <span className="acc-eval-label">Accumulated Evaluation</span>
         {lastDate && <span className="acc-eval-date">Last evaluated {lastDate}</span>}
       </div>
-      <div className="acc-eval-hero">
-        <span className={`acc-eval-grade-chip chip ${scoreColorClass(summary?.numericAverage)}`}>
-          {summary?.overallGrade || '—'}</span>
-        <div className="acc-eval-score-row">
-          <span className="acc-eval-score">{summary?.numericAverage || '—'}</span>
-          <span className="acc-eval-score-denom">/10</span>
+      <div className="acc-eval-golden">
+        <div className="acc-eval-circle-col">
+          <ScoreCircle
+            score={summary?.numericAverage}
+            grade={summary?.overallGrade}
+            size={120}
+          />
+          {scoreDelta !== null && (
+            <div className="acc-eval-trend">
+              <TrendBadge delta={scoreDelta} showLabel={false} />
+            </div>
+          )}
         </div>
-        {scoreDelta !== null && <div className="acc-eval-trend"><TrendBadge delta={scoreDelta} showLabel={false} /></div>}
-      </div>
-      <div className="acc-eval-stats-grid">
-        <StatBlock label="Violations" value={summary?.totalViolations || 0}>
-          <SeverityTags severity={summary?.severity} />
-        </StatBlock>
-        <StatBlock label="Compliance" value={summary?.totalCompliance || 0} />
-        <StatBlock label="Ratio" value={complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)} />
+        <div className="acc-eval-stats-col">
+          <div className="acc-eval-stats-row">
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Violations</span>
+              <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>
+              <SeverityTags severity={summary?.severity} />
+            </div>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Ratio</span>
+              <span className="acc-eval-stat-value">
+                {complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)}
+              </span>
+              <span className="acc-eval-ratio-sublabel">comp / viol</span>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -155,8 +170,8 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   );
 
   const stats = useMemo(
-    () => computeAccumulatedStats(accumulated, accumulatedDimensions),
-    [accumulated, accumulatedDimensions]
+    () => computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend),
+    [accumulated, accumulatedDimensions, dailyTrend]
   );
 
   return (

@@ -72,6 +72,20 @@ def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str
     }
 
 
+def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:
+    """Read language_stats from the latest run's manifest.json."""
+    for run in runs:
+        manifest_path = reports_root / entry_name / run.run_id / "evidence" / "manifest.json"
+        try:
+            data = json.loads(manifest_path.read_text())
+            stats = data.get("language_stats") or {}
+            if stats:
+                return {k.lstrip("."): v for k, v in stats.items()}
+        except (json.JSONDecodeError, OSError):
+            continue
+    return {}
+
+
 def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list."""
     info = _read_repo_info(reports_root, entry_name)
@@ -94,6 +108,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
         files_count=files_count,
         latest_grade=latest_grade,
         latest_score=latest_score,
+        language_stats=_read_language_stats(reports_root, entry_name, runs),
     )
 
 

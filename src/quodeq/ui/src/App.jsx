@@ -13,6 +13,7 @@ import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx'
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
 import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
+import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useServerHealth } from './hooks/useServerHealth.js';
@@ -118,19 +119,29 @@ const ROUTE_RENDERERS = {
 
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
+  const noProjectTabs = ['evaluate', 'settings'];
+  if (!noProjectTabs.includes(page)) {
+    const projects = props.navigation?.projects;
+    if (!projects || projects.length === 0) {
+      if (props.dashboardData?.loading) return <LoadingScreen />;
+      return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
+    }
+  }
   const renderer = ROUTE_RENDERERS[page];
   if (renderer) return renderer(params, props);
-  return <div className="empty-state"><p>Page not found: {page}</p></div>;
+  return null;
 }
 
-function computeHeaderMeta(accumulated, dashboard) {
+function computeHeaderMeta(accumulated, dashboard, selectedProject, projects) {
   const accDims = accumulated?.dimensions || [];
   if (accDims.length === 0) return null;
   const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
   const repository = accDims.find((d) => d.repository)?.repository ?? null;
   const runDims = dashboard?.dimensions || [];
   const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
-  return { discipline, repository, totalFiles };
+  const project = projects.find((p) => p.id === selectedProject);
+  const languageStats = project?.languageStats ?? null;
+  return { discipline, repository, totalFiles, languageStats };
 }
 
 function computeProjectDisplay(selectedProject, projects) {
@@ -188,7 +199,7 @@ function useAppState() {
   const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
-    const meta = computeHeaderMeta(accumulated, dashboard);
+    const meta = computeHeaderMeta(accumulated, dashboard, selectedProject, projects);
     const display = computeProjectDisplay(selectedProject, projects);
     return { headerMeta: meta, ...display };
   }, [accumulated, dashboard, selectedProject, projects]);

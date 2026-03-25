@@ -53,15 +53,15 @@
 
 .history-collapse-btn {
   display: inline-flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
+  padding: 0;
   border: none;
   background: transparent;
   font-family: var(--font-sans);
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: var(--weight-semibold);
-  color: var(--color-text-muted);
+  color: var(--color-text);
   cursor: pointer;
 }
 
@@ -71,7 +71,8 @@
 
 .history-collapse-icon {
   display: inline-block;
-  font-size: 1.1em;
+  font-size: 0.7em;
+  color: var(--color-text-muted);
   transition: transform 150ms ease;
   transform: rotate(90deg);
 }
@@ -121,9 +122,8 @@
 }
 
 .history-row:hover {
-  border-color: var(--color-accent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, var(--color-border));
   background: var(--color-surface-alt);
-  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 /* Date column */
@@ -137,7 +137,7 @@
 }
 
 .history-row-date-main {
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-medium);
 }
 
 .history-row-date-time {
@@ -157,7 +157,7 @@
 
 .history-row-score-val {
   font-size: var(--text-lg);
-  font-weight: var(--weight-bold);
+  font-weight: 700;
   font-variant-numeric: tabular-nums;
 }
 

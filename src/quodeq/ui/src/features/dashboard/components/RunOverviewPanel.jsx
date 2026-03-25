@@ -3,9 +3,10 @@ import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
+import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
-import { formatRunId, gradeColorClass, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
+import { formatRunId, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
 import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import buildRunSummary from '../buildRunSummary.js';
 
@@ -13,49 +14,6 @@ import buildRunSummary from '../buildRunSummary.js';
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatsGrid({ runSummary }) {
-  return (
-    <div className="acc-eval-stats-grid">
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Violations</span>
-        <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
-        <div className="acc-eval-tags">
-          {(runSummary.severity?.critical || 0) > 0 && (
-            <span className="severity-tag critical">{runSummary.severity.critical} critical</span>
-          )}
-          {(runSummary.severity?.major || 0) > 0 && (
-            <span className="severity-tag major">{runSummary.severity.major} major</span>
-          )}
-          {(runSummary.severity?.minor || 0) > 0 && (
-            <span className="severity-tag minor">{runSummary.severity.minor} minor</span>
-          )}
-        </div>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Compliance</span>
-        <span className="acc-eval-stat-value">{runSummary.totalCompliance || 0}</span>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Ratio</span>
-        <span className="acc-eval-stat-value">
-          {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
-        </span>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Files Affected</span>
-        <span className="acc-eval-stat-value">{runSummary.filesAffected}</span>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Principles</span>
-        <span className="acc-eval-stat-value">{runSummary.uniquePrinciples}</span>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Dimensions</span>
-        <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
-      </div>
-    </div>
-  );
-}
 
 function ViolationsByDimension({ dimensionsWithViolations, onDimensionClick, selectedRunId }) {
   if (dimensionsWithViolations.length === 0) return null;
@@ -87,10 +45,11 @@ function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick }) 
   const prevScore = parseFloat(item.previousScore);
   const delta = !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
   const scored = splitScore(item.overallScore);
+  const gradeClass = scoreColorClass(currScore);
   return (
     <article
       key={item.dimension}
-      className="qd-card"
+      className={`qd-card ${gradeClass}`}
       onClick={() => onDimensionClick(item, selectedRunId)}
       role="button"
       tabIndex={0}
@@ -98,28 +57,27 @@ function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick }) 
     >
       <div className="qd-card-header">
         <span className="qd-card-name">{item.dimension}</span>
-        <span className={`chip small ${gradeColorClass(item.overallGrade)}`}>
-          {item.overallGrade || '—'}
-        </span>
-      </div>
-      <div className="qd-card-score-row">
-        <span className="qd-card-score-main">
-          <span className="qd-card-score">{scored.value}</span>
-          {scored.denom && <span className="qd-card-score-denom">{scored.denom}</span>}
-        </span>
         <TrendBadge delta={delta} />
       </div>
-      <div className="qd-card-stats">
-        {(item.totals?.violationCount ?? 0) > 0 && (
-          <span className="qd-card-stat-violations">{item.totals.violationCount} violations</span>
-        )}
-        {(item.totals?.complianceCount ?? 0) > 0 && (
-          <span className="qd-card-stat-compliance">{item.totals.complianceCount} compliant</span>
-        )}
+      <div className="qd-card-columns">
+        <div className="qd-card-col">
+          <span className="qd-card-col-score">{scored.value}</span>
+        </div>
+        <div className="qd-card-col-divider" />
+        <div className="qd-card-col">
+          <span className="qd-card-col-label">Viol</span>
+          <span className="qd-card-col-value">{item.totals?.violationCount ?? 0}</span>
+        </div>
+        <div className="qd-card-col-divider" />
+        <div className="qd-card-col">
+          <span className="qd-card-col-label">Ratio</span>
+          <span className="qd-card-col-value">{complianceRatio(item.totals?.violationCount ?? 0, item.totals?.complianceCount ?? 0)}</span>
+        </div>
       </div>
       <div className="qd-card-footer">
         <span className="qd-card-date">{item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId)}</span>
       </div>
+      <div className="qd-card-grade-bar" />
     </article>
   );
 }
@@ -169,21 +127,55 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
           />
         )}
       </div>
-      <div className="acc-eval-hero">
-        <span className={`acc-eval-grade-chip chip ${scoreColorClass(runSummary.numericAverage)}`}>
-          {runSummary.overallGrade || '—'}
-        </span>
-        <div className="acc-eval-score-row">
-          <span className="acc-eval-score">{runSummary.numericAverage || '—'}</span>
-          <span className="acc-eval-score-denom">/10</span>
+      <div className="acc-eval-golden">
+        <div className="acc-eval-circle-col">
+          <ScoreCircle
+            score={runSummary.numericAverage}
+            grade={runSummary.overallGrade}
+            size={120}
+          />
+          {runScoreDelta !== null && (
+            <div className="acc-eval-trend">
+              <TrendBadge delta={runScoreDelta} showLabel={false} />
+            </div>
+          )}
         </div>
-        {runScoreDelta !== null && (
-          <div className="acc-eval-trend">
-            <TrendBadge delta={runScoreDelta} showLabel={false} />
+        <div className="acc-eval-stats-col">
+          <div className="acc-eval-stats-row">
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Violations</span>
+              <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
+              <div className="acc-eval-tags">
+                {(runSummary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{runSummary.severity.critical} crit</span>}
+                {(runSummary.severity?.major || 0) > 0 && <span className="severity-tag major">{runSummary.severity.major} maj</span>}
+                {(runSummary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{runSummary.severity.minor} min</span>}
+              </div>
+            </div>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Ratio</span>
+              <span className="acc-eval-stat-value">
+                {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
+              </span>
+            </div>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Files</span>
+              <span className="acc-eval-stat-value">{runTopFiles.length}</span>
+            </div>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Principles</span>
+              <span className="acc-eval-stat-value">{runUniquePrinciples}</span>
+            </div>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Dimensions</span>
+              <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
+            </div>
           </div>
-        )}
+        </div>
       </div>
-      <StatsGrid runSummary={{ ...runSummary, filesAffected: runTopFiles.length, uniquePrinciples: runUniquePrinciples }} />
     </section>
   );
 }

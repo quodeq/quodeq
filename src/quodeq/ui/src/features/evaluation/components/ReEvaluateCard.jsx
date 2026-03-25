@@ -24,7 +24,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
       });
   }, [project]);
 
-  if (error) return <div className="inline-error">{error}</div>;
+  if (error) return null;
   if (!info) return null;
 
   function toggleDim(id) {
