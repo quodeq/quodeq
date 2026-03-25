@@ -13,6 +13,14 @@
   margin-bottom: var(--space-4);
 }
 
+.history-run-nav {
+  margin-left: auto;
+}
+
+.history-chart-wrapper {
+  margin-bottom: var(--space-4);
+}
+
 .history-title {
   font-size: var(--text-xl);
   font-weight: var(--weight-bold);

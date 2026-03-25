@@ -57,7 +57,28 @@ function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
-  history: (params, props) => <HistoryPage trend={props.dashboardData.dashboard?.trend || []} onRunClick={(runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel })} />,
+  history: (params, props) => {
+    const trend = props.dashboardData.dashboard?.trend || [];
+    const runs = props.dashboardData.availableRuns || [];
+    const idx = props.dashboardData.overviewRunIndex || 0;
+    return (
+      <HistoryPage
+        trend={trend}
+        selectedRunId={props.dashboardData.selectedRun}
+        selectedRunScore={props.dashboardData.accumulated?.summary?.numericAverage}
+        runNav={runs.length > 0 ? {
+          currentRun: props.navigation.currentOverviewRun,
+          isLatest: idx === 0,
+          isOldest: idx >= runs.length - 1,
+          onPrev: props.navigation.handleRunPrev,
+          onNext: props.navigation.handleRunNext,
+          onLatest: props.navigation.handleRunLatest,
+        } : null}
+        onRunClick={(runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel })}
+        onBarClick={props.navigation.handleRunSelect}
+      />
+    );
+  },
   'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} />,
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
@@ -168,6 +189,7 @@ export default function App() {
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
       handleProjectChange: state.handleProjectChange, navTab,
       handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
+      currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
     },
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },

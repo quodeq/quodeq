@@ -1,7 +1,9 @@
 import { useState } from 'react';
 import HistoryRunRow from './HistoryRunRow.jsx';
+import HistoryChartPanel from './HistoryChartPanel.jsx';
+import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 
-const INITIAL_LIMIT = 20;
+const MAX_VISIBLE = 20;
 
 function computeDeltas(trend) {
   return trend.map((entry, i) => {
@@ -13,7 +15,7 @@ function computeDeltas(trend) {
   });
 }
 
-export default function HistoryPage({ trend, onRunClick }) {
+export default function HistoryPage({ trend, selectedRunId, selectedRunScore, runNav, onRunClick, onBarClick }) {
   const [showAll, setShowAll] = useState(false);
 
   if (!trend || trend.length === 0) {
@@ -30,14 +32,32 @@ export default function HistoryPage({ trend, onRunClick }) {
   }
 
   const deltas = computeDeltas(trend);
-  const visible = showAll ? trend : trend.slice(0, INITIAL_LIMIT);
-  const hasMore = trend.length > INITIAL_LIMIT && !showAll;
+  const visible = showAll ? trend : trend.slice(0, MAX_VISIBLE);
+  const hasMore = trend.length > MAX_VISIBLE && !showAll;
 
   return (
     <div className="history-page">
       <div className="history-header">
         <h2 className="history-title">History</h2>
         <span className="history-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
+        {runNav && (
+          <div className="history-run-nav">
+            <RunNavigator
+              currentRun={runNav.currentRun}
+              isLatest={runNav.isLatest}
+              isOldest={runNav.isOldest}
+              actions={{ onPrev: runNav.onPrev, onNext: runNav.onNext, onLatest: runNav.onLatest }}
+            />
+          </div>
+        )}
+      </div>
+      <div className="history-chart-wrapper">
+        <HistoryChartPanel
+          trend={trend}
+          selectedRunId={selectedRunId}
+          selectedRunScore={selectedRunScore}
+          onBarClick={onBarClick}
+        />
       </div>
       <div className="history-list">
         {visible.map((entry, i) => (
