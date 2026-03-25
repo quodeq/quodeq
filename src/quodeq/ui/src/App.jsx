@@ -211,7 +211,7 @@ export default function App() {
             runNavProps: {
               currentOverviewRun: state.currentOverviewRun, overviewRunIndex: state.overviewRunIndex, availableRuns: state.availableRuns,
               onRunPrev: state.handleRunPrev, onRunNext: state.handleRunNext, onRunLatest: state.handleRunLatest,
-              onViewRun: activePage.page === 'overview' ? state.handleRunView : undefined,
+              onViewRun: undefined,
             },
           }}
         />
