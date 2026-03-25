@@ -20,9 +20,21 @@ function TrendBadge({ delta }) {
   );
 }
 
+function abbreviateDimension(name) {
+  if (!name) return '';
+  const abbrevMap = {
+    maintainability: 'mnt', modifiability: 'mod', reusability: 'reu',
+    analyzability: 'anz', reliability: 'rel', security: 'sec',
+    performance: 'prf', usability: 'usa', affinity: 'aff',
+    evolvability: 'evo', modularity: 'mdu', testability: 'tst',
+  };
+  return abbrevMap[name.toLowerCase()] || name.slice(0, 3);
+}
+
 export default function HistoryRunRow({ entry, delta, onClick }) {
-  const { runId, dateLabel, dateISO, numericAverage, overallGrade, dimensionsCount } = entry;
+  const { runId, dateLabel, dateISO, numericAverage, overallGrade, dimensions, accumulatedDimensionsCount } = entry;
   const score = parseFloat(numericAverage);
+  const dimLabels = (dimensions || []).map(abbreviateDimension).join(', ');
   return (
     <button type="button" className="history-row" onClick={() => onClick(runId, dateLabel)}>
       <div className="history-row-date">
@@ -32,7 +44,12 @@ export default function HistoryRunRow({ entry, delta, onClick }) {
       <span className={`chip small ${scoreColorClass(score)}`}>{overallGrade || '—'}</span>
       <span className="history-row-score">{isNaN(score) ? '—' : score.toFixed(1)}</span>
       <TrendBadge delta={delta} />
-      <span className="history-row-dims">{dimensionsCount || '—'} dims</span>
+      <div className="history-row-dims">
+        <span className="history-row-dims-run">{dimLabels || '—'}</span>
+        {accumulatedDimensionsCount != null && (
+          <span className="history-row-dims-acc">{accumulatedDimensionsCount} accumulated</span>
+        )}
+      </div>
     </button>
   );
 }

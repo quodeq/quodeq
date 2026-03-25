@@ -91,8 +91,19 @@
 }
 
 .history-row-dims {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.history-row-dims-run {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
-  flex: 1;
-  text-align: right;
+}
+
+.history-row-dims-acc {
+  font-size: var(--text-xs);
+  color: var(--color-text-subtle);
 }
