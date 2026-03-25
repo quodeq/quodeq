@@ -228,8 +228,25 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
 
   const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? dayRuns[0]?.runId : currentOverviewRun;
-  const selectedDay = dailyTrend.find((t) => t.runId === currentOverviewRun);
-  const dayDimensions = selectedDay?.dayDimensions || [];
+
+  // Find dayDimensions: collect ALL dimensions evaluated on the selected day
+  // by matching the date part, not just the runId
+  const dayDimensions = useMemo(() => {
+    if (!trend.length) return [];
+    // Find the date of the current selection
+    const selectedEntry = trend.find((t) => t.runId === currentOverviewRun) || trend.find((t) => t.runId === selectedRunId);
+    if (!selectedEntry) return [];
+    const selectedDate = (selectedEntry.dateISO || '').slice(0, 10);
+    if (!selectedDate) return [];
+    // Collect ALL dimensions from ALL runs on that date
+    const dims = new Set();
+    for (const t of trend) {
+      if ((t.dateISO || '').slice(0, 10) === selectedDate) {
+        for (const d of t.dimensions || []) dims.add(d);
+      }
+    }
+    return [...dims];
+  }, [trend, currentOverviewRun, selectedRunId]);
 
   const stats = useMemo(
     () => computeAccumulatedStats(accumulated, accumulatedDimensions),
