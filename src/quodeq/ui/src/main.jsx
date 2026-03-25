@@ -8,7 +8,7 @@ import './styles/index.css';
 const _oldTheme = localStorage.getItem('cc-theme');
 if (_oldTheme !== null) {
   const _map = { system: ['system','default'], light: ['light','default'], dark: ['dark','default'],
-    ember: ['dark','classic'], forest: ['light','forest'], midnight: ['dark','midnight'],
+    ember: ['dark','ember'], forest: ['light','forest'], midnight: ['dark','midnight'],
     slate: ['light','default'], horizon: ['light','midnight'] };
   const [_m, _f] = _map[_oldTheme] || ['system','default'];
   localStorage.setItem('cc-theme-mode', _m);
