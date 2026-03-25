@@ -68,17 +68,20 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate }) {
           )}
         </div>
         <div className="acc-eval-stats-col">
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Violations</span>
-            <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>
-            <SeverityTags severity={summary?.severity} />
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Compliance Ratio</span>
-            <span className="acc-eval-stat-value">
-              {complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)}
-              <span className="acc-eval-ratio-label">compliance per violation</span>
-            </span>
+          <div className="acc-eval-stats-row">
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Violations</span>
+              <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>
+              <SeverityTags severity={summary?.severity} />
+            </div>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Ratio</span>
+              <span className="acc-eval-stat-value">
+                {complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)}
+              </span>
+              <span className="acc-eval-ratio-sublabel">comp / viol</span>
+            </div>
           </div>
         </div>
       </div>

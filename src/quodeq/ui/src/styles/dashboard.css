@@ -54,13 +54,26 @@
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
-.acc-eval-ratio-label {
+.acc-eval-stats-row {
+  display: flex;
+  align-items: stretch;
+}
+
+.acc-eval-stats-row .acc-eval-stat-block { flex: 1; }
+
+.acc-eval-stats-divider {
+  width: 1px;
+  background: var(--color-border);
+  margin: 0 16px;
+}
+
+.acc-eval-ratio-sublabel {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
-  margin-left: 4px;
+  margin-top: 4px;
 }
 
 /* ── Compact variant (Explorer dimension overview) ──── */

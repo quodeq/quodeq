@@ -68,9 +68,9 @@ function DimensionOverview({ data, stats, onNavigate }) {
           />
         </div>
         <div className="acc-eval-stats-col">
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Violations</span>
-            <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}>
+          <div className="acc-eval-stats-row">
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Violations</span>
               <span className="acc-eval-stat-value">{allViolations.length}</span>
               <div className="acc-eval-tags">
                 {severityCounts.critical > 0 && <span className="severity-tag critical">{severityCounts.critical} crit</span>}
@@ -78,12 +78,14 @@ function DimensionOverview({ data, stats, onNavigate }) {
                 {severityCounts.minor > 0 && <span className="severity-tag minor">{severityCounts.minor} min</span>}
               </div>
             </div>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Ratio</span>
+              <span className="acc-eval-stat-value">{complianceRatio(allViolations.length, totalCompliant)}</span>
+              <span className="acc-eval-ratio-sublabel">comp / viol</span>
+            </div>
           </div>
           <div className="acc-eval-mini-stats">
-            <div className="acc-eval-mini-stat">
-              <span className="acc-eval-mini-stat-label">Ratio</span>
-              <span className="acc-eval-mini-stat-value">{complianceRatio(allViolations.length, totalCompliant)}</span>
-            </div>
             <div className="acc-eval-mini-stat">
               <span className="acc-eval-mini-stat-label">Files</span>
               <span className="acc-eval-mini-stat-value">{topFiles.length}</span>

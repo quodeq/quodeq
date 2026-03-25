@@ -141,21 +141,24 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
           )}
         </div>
         <div className="acc-eval-stats-col">
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Violations</span>
-            <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
-            <div className="acc-eval-tags">
-              {(runSummary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{runSummary.severity.critical} critical</span>}
-              {(runSummary.severity?.major || 0) > 0 && <span className="severity-tag major">{runSummary.severity.major} major</span>}
-              {(runSummary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{runSummary.severity.minor} minor</span>}
+          <div className="acc-eval-stats-row">
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Violations</span>
+              <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
+              <div className="acc-eval-tags">
+                {(runSummary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{runSummary.severity.critical} crit</span>}
+                {(runSummary.severity?.major || 0) > 0 && <span className="severity-tag major">{runSummary.severity.major} maj</span>}
+                {(runSummary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{runSummary.severity.minor} min</span>}
+              </div>
             </div>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Compliance Ratio</span>
-            <span className="acc-eval-stat-value">
-              {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
-              <span className="acc-eval-ratio-label">compliance per violation</span>
-            </span>
+            <div className="acc-eval-stats-divider" />
+            <div className="acc-eval-stat-block">
+              <span className="acc-eval-stat-label">Ratio</span>
+              <span className="acc-eval-stat-value">
+                {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
+              </span>
+              <span className="acc-eval-ratio-sublabel">comp / viol</span>
+            </div>
           </div>
           <div className="acc-eval-mini-stats">
             <div className="acc-eval-mini-stat">
