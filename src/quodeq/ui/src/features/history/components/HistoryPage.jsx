@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import HistoryRunRow from './HistoryRunRow.jsx';
 import HistoryChartPanel from './HistoryChartPanel.jsx';
+import HistoryDimensionPanel from './HistoryDimensionPanel.jsx';
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 
 const MAX_VISIBLE = 20;
@@ -15,7 +16,7 @@ function computeDeltas(trend) {
   });
 }
 
-export default function HistoryPage({ trend, selectedRunId, selectedRunScore, runNav, onRunClick, onBarClick }) {
+export default function HistoryPage({ trend, selectedRunId, selectedRunScore, accumulatedDimensions, lastRun, runNav, onRunClick, onBarClick, onDimensionClick }) {
   const [showAll, setShowAll] = useState(false);
 
   if (!trend || trend.length === 0) {
@@ -51,12 +52,18 @@ export default function HistoryPage({ trend, selectedRunId, selectedRunScore, ru
           </div>
         )}
       </div>
-      <div className="history-chart-wrapper">
+      <div className="history-panels-row">
         <HistoryChartPanel
           trend={trend}
           selectedRunId={selectedRunId}
           selectedRunScore={selectedRunScore}
           onBarClick={onBarClick}
+        />
+        <HistoryDimensionPanel
+          dimensions={accumulatedDimensions || []}
+          onBarClick={onDimensionClick}
+          runDate={lastRun?.date}
+          runId={lastRun?.runId}
         />
       </div>
       <div className="history-list">

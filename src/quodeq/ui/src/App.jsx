@@ -75,8 +75,11 @@ const ROUTE_RENDERERS = {
           onLatest: props.navigation.handleRunLatest,
           onView: () => { const run = props.dashboardData.selectedRun || (runs[idx] && runs[idx].runId); if (run) props.navigation.handleNavigate('history-run', { runId: run }); },
         } : null}
+        accumulatedDimensions={props.dashboardData.accumulated?.dimensions || []}
+        lastRun={{ date: props.dashboardData.accumulated?.dimensions?.[0]?.fromDateLabel, runId: props.dashboardData.accumulated?.dimensions?.[0]?.fromRunId }}
         onRunClick={(runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel })}
         onBarClick={props.navigation.handleRunSelect}
+        onDimensionClick={(dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel })}
       />
     );
   },

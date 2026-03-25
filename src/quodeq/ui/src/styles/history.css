@@ -17,8 +17,15 @@
   margin-left: auto;
 }
 
-.history-chart-wrapper {
+.history-panels-row {
+  display: flex;
+  gap: var(--space-4);
   margin-bottom: var(--space-4);
+}
+
+.history-panels-row > * {
+  flex: 1;
+  min-width: 0;
 }
 
 .history-title {
