@@ -1402,6 +1402,8 @@ textarea:focus {
 
 .theme-toggle-btn.active {
   border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
   font-weight: var(--weight-semibold);
 }
 
@@ -1430,6 +1432,7 @@ textarea:focus {
 
 .theme-family-card.active {
   border-color: var(--color-accent);
+  background: var(--color-accent-soft);
 }
 
 .theme-family-swatches {
@@ -1445,12 +1448,14 @@ textarea:focus {
 }
 
 .theme-family-label {
-  font-size: 0.75rem;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   color: var(--color-text-muted);
 }
 
 .theme-family-card.active .theme-family-label {
-  color: var(--color-text);
+  color: var(--color-accent);
+  font-weight: var(--weight-semibold);
 }
 
 /* Responsive breakpoints (app shell / layout) */
