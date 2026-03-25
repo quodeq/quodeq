@@ -1,9 +1,10 @@
-"""Thread-safe HTTP fetcher with circuit breaker for knowledge refresh."""
+"""Thread-safe HTTP fetcher with circuit breaker and retry for knowledge refresh."""
 from __future__ import annotations
 
 import logging
 import os
 import threading
+import time
 import urllib.error
 import urllib.request
 from urllib.parse import urlparse
@@ -17,6 +18,8 @@ class FetchClient:
     """Thread-safe HTTP fetcher with circuit breaker (trips after repeated failures)."""
 
     _CIRCUIT_THRESHOLD = 5
+    _MAX_RETRIES = 2
+    _RETRY_BACKOFF_S = 0.5
 
     def __init__(self, timeout_s: int = 15, allow_private: bool | None = None, env: dict[str, str] | None = None) -> None:
         self._lock = threading.Lock()
@@ -46,25 +49,31 @@ class FetchClient:
         with self._lock:
             if self._failures >= self._CIRCUIT_THRESHOLD:
                 return None
-        try:
-            # Re-check DNS right before the request to mitigate DNS rebinding.
-            # The window between this check and urlopen is minimal.
-            if hostname and not self._allow_private and _is_private_hostname(hostname):
-                _logger.warning("Blocked fetch after DNS re-check: %s", hostname)
-                return None
-            req = urllib.request.Request(url, headers=headers or {})
-            with urllib.request.urlopen(req, timeout=self._timeout) as r:
-                with self._lock:
-                    self._failures = 0
-                return r.read().decode("utf-8", errors="replace")
-        except (urllib.error.URLError, OSError, ValueError) as exc:
-            with self._lock:
-                self._failures += 1
-                if self._failures >= self._CIRCUIT_THRESHOLD:
-                    _logger.warning("Circuit breaker tripped after %d failures (last: %s)", self._failures, exc)
-                else:
-                    _logger.debug("Fetch attempt %d failed: %s", self._failures, exc)
-            return None
+
+        last_exc: Exception | None = None
+        for retry in range(self._MAX_RETRIES):
+            try:
+                if hostname and not self._allow_private and _is_private_hostname(hostname):
+                    _logger.warning("Blocked fetch after DNS re-check: %s", hostname)
+                    return None
+                req = urllib.request.Request(url, headers=headers or {})
+                with urllib.request.urlopen(req, timeout=self._timeout) as r:
+                    with self._lock:
+                        self._failures = 0
+                    return r.read().decode("utf-8", errors="replace")
+            except (urllib.error.URLError, OSError, ValueError) as exc:
+                last_exc = exc
+                if retry < self._MAX_RETRIES - 1:
+                    _logger.debug("Fetch retry %d/%d after: %s", retry + 1, self._MAX_RETRIES, exc)
+                    time.sleep(self._RETRY_BACKOFF_S * (retry + 1))
+
+        with self._lock:
+            self._failures += 1
+            if self._failures >= self._CIRCUIT_THRESHOLD:
+                _logger.warning("Circuit breaker tripped after %d failures (last: %s)", self._failures, last_exc)
+            else:
+                _logger.debug("All %d retries exhausted (failure %d): %s", self._MAX_RETRIES, self._failures, last_exc)
+        return None
 
 
 # Module-level singleton with thread-safe lazy initialization.

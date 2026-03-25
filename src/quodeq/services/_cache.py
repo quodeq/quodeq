@@ -24,26 +24,50 @@ def make_lru_dimension_fetcher(
 
     Results are stored in *cache* (LRU, bounded at *max_size* entries) so
     repeated calls within and across requests avoid redundant file reads.
+
+    Uses a per-key event to ensure only one thread performs the I/O for a
+    given cache miss, while other threads wait on the result.
     """
+    _inflight: dict[tuple, threading.Event] = {}
+
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
         key = (reports_root, project, run_id)
+
         with lock:
             if key in cache:
                 cache.move_to_end(key)
                 return cache[key]
+            existing_event = _inflight.get(key)
+            if existing_event is not None:
+                waiter = existing_event
+            else:
+                waiter = None
+                _inflight[key] = threading.Event()
+
+        # Another thread is already fetching this key — wait for it
+        if waiter is not None:
+            waiter.wait(timeout=30)
+            with lock:
+                return list(cache.get(key, []))
+
+        # We are the fetcher for this key
         try:
             data = read_run_data(reports_root, project, run_id)
         except (OSError, ValueError) as exc:
             _logger.warning("Failed to read run data for %s/%s: %s", project, run_id, exc)
-            return []
+            data = []
+
         with lock:
-            if key in cache:
+            if data:
+                cache[key] = data
                 cache.move_to_end(key)
-                return cache[key]
-            cache[key] = data
-            cache.move_to_end(key)
-            if len(cache) > max_size:
-                cache.popitem(last=False)  # evict oldest
+                while len(cache) > max_size:
+                    cache.popitem(last=False)
+            event = _inflight.pop(key, None)
+
+        if event is not None:
+            event.set()
+
         return data
 
     return get_run_dimensions

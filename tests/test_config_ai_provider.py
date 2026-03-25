@@ -4,6 +4,7 @@ from quodeq.config.paths import ConfigPaths
 
 
 def test_configure_provider_writes_env(tmp_path):
+    """configure_provider_noninteractive('claude') should write a valid .quodeq.env file."""
     paths = ConfigPaths.from_root(tmp_path)
     exit_code = configure_provider_noninteractive("claude", paths)
     assert exit_code == 0

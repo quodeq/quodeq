@@ -59,14 +59,21 @@ function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef
   return function startDimensionPolling(project, runId) {
     stopTimer(dimPollRef);
     dimFailCountRef.current = {};
+    let delay = DIMENSION_POLL_MS;
     const refs = { dimFailCount: dimFailCountRef.current, partialDimensions: partialDimensionsRef.current };
-    dimPollRef.current = setInterval(async () => {
-      const partial = [...partialDimensionsRef.current];
-      if (!partial.length) return;
-      await Promise.allSettled(
-        partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
-      );
-    }, DIMENSION_POLL_MS);
+    function scheduleNext() {
+      dimPollRef.current = setTimeout(async () => {
+        const partial = [...partialDimensionsRef.current];
+        if (!partial.length) { scheduleNext(); return; }
+        const results = await Promise.allSettled(
+          partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
+        );
+        const anyFailed = results.some((r) => r.status === 'rejected');
+        delay = anyFailed ? Math.min(delay * 1.5, DIMENSION_POLL_MAX_MS) : DIMENSION_POLL_MS;
+        scheduleNext();
+      }, delay);
+    }
+    scheduleNext();
   };
 }
 
