@@ -205,13 +205,13 @@
   --primitive-forest-sev-major-dark:     #d28c50;
   --primitive-forest-sev-minor-dark:     #b49664;
 
-  /* Ember traffic-light severity */
+  /* Ember traffic-light severity (minor is warm gray, green reserved for compliance) */
   --primitive-ember-sev-critical-light: #c01e14;
   --primitive-ember-sev-major-light:    #b89800;
-  --primitive-ember-sev-minor-light:    #3c8c3c;
+  --primitive-ember-sev-minor-light:    #9a8a70;
   --primitive-ember-sev-critical-dark:  #ff4632;
   --primitive-ember-sev-major-dark:     #f0c832;
-  --primitive-ember-sev-minor-dark:     #50c850;
+  --primitive-ember-sev-minor-dark:     #b0a088;
 
   /* Issue-intensity heat scale (gray → crimson, default light + dark) */
   --primitive-ired-200: #c09090;   /* dark B: muted rose-gray */
