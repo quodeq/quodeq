@@ -144,8 +144,12 @@ def _run_verification_pool(
     return run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
 
 
-def _collect_evidence(config: RunConfig, dim_id: str, evidence_dir: Path, results: list[Any], ctx: Any) -> Evidence:
-    """Deduplicate JSONL, count files read, and parse into Evidence."""
+def _collect_evidence(
+    config: RunConfig, dim_id: str, evidence_dir: Path,
+    results: list[Any], ctx: Any, files: list[str] | None = None,
+) -> Evidence:
+    """Deduplicate JSONL, count files read, save fingerprint, and parse into Evidence."""
+    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
     from quodeq.engine._runner_markers import cleanup_stream
 
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
@@ -156,6 +160,11 @@ def _collect_evidence(config: RunConfig, dim_id: str, evidence_dir: Path, result
         if r.stream_file.exists():
             total_files_read += count_files_from_stream(r.stream_file)
             cleanup_stream(r.stream_file)
+
+    # Save fingerprint so next run can carry forward unchanged-file findings
+    if files:
+        fp = build_fingerprint(config.src, files, dim_id, config.standards_dir)
+        save_fingerprint(fp, evidence_dir)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     ev = parse_jsonl_to_evidence(
@@ -233,6 +242,8 @@ def _run_verification_step(
     if prev_fingerprint is None:
         from quodeq.analysis.fingerprint import find_previous_fingerprint
         prev_fingerprint, _ = find_previous_fingerprint(evidence_dir, dim_id)
+        if prev_fingerprint is None:
+            log_info(f"  [{dim_id}] No previous fingerprint — all findings need verification")
 
     carry_forward, needs_verify = partition_findings_by_fingerprint(
         prev_findings, prev_fingerprint, config.src,
@@ -289,4 +300,4 @@ def process_dimension_with_subagents(
 
     # 6. Collect and return evidence (includes both verified + new findings)
     all_results = verify_results + results
-    return _collect_evidence(config, dim_id, evidence_dir, all_results, ctx)
+    return _collect_evidence(config, dim_id, evidence_dir, all_results, ctx, files=files)

@@ -245,7 +245,7 @@ def load_previous_findings_for_dimension(
         if cached is not None:
             surviving, total, gone = cached
             if not quiet and total > 0:
-                log_info(f"  [{dim_id}] {total} previous findings: {gone} files gone, {len(surviving)} to verify")
+                log_info(f"  [{dim_id}] {total} previous findings: {gone} files gone, {len(surviving)} surviving")
             return surviving
 
     prev_jsonl, _ = _resolve_previous_evidence(evidence_dir, dim_id, cache, cache_key)
@@ -262,7 +262,7 @@ def load_previous_findings_for_dimension(
 
     surviving, gone = _pre_filter_gone(prev_findings, config.src)
     if not quiet:
-        log_info(f"  [{dim_id}] {len(prev_findings)} previous findings: {gone} files gone, {len(surviving)} to verify")
+        log_info(f"  [{dim_id}] {len(prev_findings)} previous findings: {gone} files gone, {len(surviving)} surviving")
     if cache is not None:
         cache[cache_key] = (surviving, len(prev_findings), gone)
     return surviving
