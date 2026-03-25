@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
+import { buildDailyRuns } from './utils/dailyGrouping.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
@@ -54,6 +55,24 @@ function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
   );
 }
 
+function resolveHistorySelectedRunId(selectedRun, trend) {
+  if (selectedRun && selectedRun !== 'latest' && trend.some((t) => t.runId === selectedRun)) return selectedRun;
+  return trend.length > 0 ? trend[0].runId : null;
+}
+
+function formatHistoryRunLabel(trend, runs, idx, fallbackLabel) {
+  const entry = trend.find((r) => r.runId === runs[idx]?.runId);
+  if (entry?.dateISO) {
+    try {
+      const d = new Date(entry.dateISO);
+      const date = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const time = d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+      return `${date} · ${time}`;
+    } catch { /* fall through */ }
+  }
+  return runs[idx]?.dateLabel || fallbackLabel;
+}
+
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
@@ -64,10 +83,10 @@ const ROUTE_RENDERERS = {
     return (
       <HistoryPage
         trend={trend}
-        selectedRunId={(() => { const sr = props.dashboardData.selectedRun; if (sr && sr !== 'latest' && trend.some(t => t.runId === sr)) return sr; return trend.length > 0 ? trend[0].runId : null; })()}
+        selectedRunId={resolveHistorySelectedRunId(props.dashboardData.selectedRun, trend)}
         selectedRunScore={props.dashboardData.accumulated?.summary?.numericAverage}
         runNav={runs.length > 0 ? {
-          currentRun: (() => { const t = trend.find(r => r.runId === (runs[idx]?.runId)); if (t?.dateISO) { try { const d = new Date(t.dateISO); return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + ' · ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); } catch {} } return runs[idx]?.dateLabel || props.navigation.currentOverviewRun; })(),
+          currentRun: formatHistoryRunLabel(trend, runs, idx, props.navigation.currentOverviewRun),
           isLatest: idx === 0,
           isOldest: idx >= runs.length - 1,
           onPrev: props.navigation.handleRunPrev,
@@ -156,37 +175,56 @@ function useAppState() {
   const settings = useAppSettings();
   function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
   const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
-  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
+  const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
+  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
     const meta = computeHeaderMeta(accumulated, dashboard);
     const display = computeProjectDisplay(selectedProject, projects);
     return { headerMeta: meta, ...display };
   }, [accumulated, dashboard, selectedProject, projects]);
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
-  const activeTab = ['overview', 'history', 'projects', 'evaluate', 'settings'].includes(activePage.page) ? activePage.page : activePage.page === 'history-run' ? 'history' : 'overview';
+  const knownTabs = ['overview', 'history', 'projects', 'evaluate', 'settings'];
+  const activeTab = knownTabs.includes(activePage.page) ? activePage.page
+    : activePage.page === 'history-run' ? 'history'
+    : 'overview';
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
-  const showRunNav = showProjectHeader && availableRuns.length > 0 && navStack.length === 1;
+  const showRunNav = showProjectHeader && dailyRuns.length > 0 && navStack.length === 1;
 
   return {
     serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
     projects, selectedProject, selectedRun, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
-    dashboard, accumulated, loading, error, availableRuns, overviewRunIndex,
+    dashboard, accumulated, loading, error, availableRuns, dailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav,
   };
 }
 
+function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) {
+  const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
+  if (entry?.dateISO) {
+    try {
+      return new Date(entry.dateISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    } catch { /* fall through */ }
+  }
+  return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;
+}
+
 export default function App() {
   const state = useAppState();
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
+
+  const currentDayLabel = useMemo(
+    () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
+    [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
+  );
 
   const contentProps = {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
       dashboard: state.dashboard, accumulated: state.accumulated, loading: state.loading, error: state.error,
-      availableRuns: state.availableRuns, overviewRunIndex: state.overviewRunIndex,
+      availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
     },
     navigation: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
@@ -209,9 +247,10 @@ export default function App() {
           navigation={{
             onProjectChange: state.handleProjectChange, showRunNav: state.showRunNav,
             runNavProps: {
-              currentOverviewRun: state.currentOverviewRun, overviewRunIndex: state.overviewRunIndex, availableRuns: state.availableRuns,
+              currentOverviewRun: state.currentOverviewRun, overviewRunIndex: state.overviewRunIndex, availableRuns: state.dailyRuns,
+              currentDayLabel,
               onRunPrev: state.handleRunPrev, onRunNext: state.handleRunNext, onRunLatest: state.handleRunLatest,
-              onViewRun: activePage.page === 'overview' ? state.handleRunView : undefined,
+              onViewRun: undefined,
             },
           }}
         />

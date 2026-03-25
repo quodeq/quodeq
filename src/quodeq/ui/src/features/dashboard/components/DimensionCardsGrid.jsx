@@ -1,15 +1,15 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { formatRunId, gradeColorClass, splitScore } from '../../../utils/formatters.js';
 
-function AccDimensionCard({ item, referenceRun, onDimensionClick }) {
-  const isStale = item.fromRunId !== referenceRun;
+function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true }) {
   const currScore = parseFloat(item.overallScore);
   const prevScore = parseFloat(item.previousScore);
   const delta = !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
   const score = splitScore(item.overallScore);
+  const cardClass = `qd-card${evaluatedToday ? ' qd-card--active' : ' qd-card-stale qd-card--carried'}`;
   return (
     <article
-      className={`qd-card${isStale ? ' qd-card-stale' : ''}`}
+      className={cardClass}
       onClick={() => onDimensionClick(item)}
       role="button"
       tabIndex={0}
@@ -26,7 +26,7 @@ function AccDimensionCard({ item, referenceRun, onDimensionClick }) {
           <span className="qd-card-score">{score.value}</span>
           {score.denom && <span className="qd-card-score-denom">{score.denom}</span>}
         </span>
-        <TrendBadge delta={delta} />
+        {evaluatedToday && <TrendBadge delta={delta} />}
       </div>
       <div className="qd-card-stats">
         {(item.totals?.violationCount ?? 0) > 0 && (
@@ -38,18 +38,36 @@ function AccDimensionCard({ item, referenceRun, onDimensionClick }) {
       </div>
       <div className="qd-card-footer">
         <span className="qd-card-date">{item.fromDateLabel || formatRunId(item.fromRunId)}</span>
-        {isStale && <span className="qd-card-stale-label">Older run</span>}
+        {!evaluatedToday && <span className="qd-card-stale-label">Older run</span>}
       </div>
     </article>
   );
 }
 
-export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick }) {
+export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayDimNames }) {
+  // A dimension is "active" if its name appears in the selected day's evaluations
+  const dimNameSet = selectedDayDimNames instanceof Set ? selectedDayDimNames : new Set();
+  const sorted = [...sortedDimensions].sort((a, b) => {
+    if (dimNameSet.size === 0) return a.dimension.localeCompare(b.dimension);
+    const aActive = dimNameSet.has((a.dimension || '').toLowerCase());
+    const bActive = dimNameSet.has((b.dimension || '').toLowerCase());
+    if (aActive && !bActive) return -1;
+    if (!aActive && bActive) return 1;
+    return a.dimension.localeCompare(b.dimension);
+  });
   return (
     <div className="dimensions-grid">
-      {sortedDimensions.map((item) => (
-        <AccDimensionCard key={item.dimension} item={item} referenceRun={referenceRun} onDimensionClick={onDimensionClick} />
-      ))}
+      {sorted.map((item) => {
+        const isActive = dimNameSet.size === 0 || dimNameSet.has((item.dimension || '').toLowerCase());
+        return (
+          <AccDimensionCard
+            key={item.dimension}
+            item={item}
+            onDimensionClick={onDimensionClick}
+            evaluatedToday={isActive}
+          />
+        );
+      })}
     </div>
   );
 }

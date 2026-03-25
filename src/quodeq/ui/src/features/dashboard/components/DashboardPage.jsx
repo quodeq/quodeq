@@ -4,7 +4,7 @@ import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, overviewRunIndex } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onPrincipleClick } = callbacks;
   if (runMode) {
@@ -36,7 +36,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   return (
     <AccumulatedOverviewPanel
       data={{
-        accumulated, accumulatedDimensions, availableRuns, overviewRunIndex,
+        accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
         trend: dashboard?.trend || [], selectedRunId,
       }}
       callbacks={{
@@ -73,7 +73,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const {
     selectedProject, selectedRun, projects = [],
     dashboard, accumulated, loading, error,
-    availableRuns = [], overviewRunIndex = 0,
+    availableRuns = [], dailyRuns, overviewRunIndex = 0,
   } = data;
   const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
@@ -96,7 +96,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       {!loading && dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, overviewRunIndex }}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
           callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onPrincipleClick: handlers.handlePrincipleClick }}
         />
