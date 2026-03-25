@@ -333,10 +333,10 @@
   --logo-needle:         var(--primitive-crimson-300);
   --logo-needle-dark:    var(--primitive-crimson-700);
 
-  /* Compliance — teal (Daruma Fire direction) */
-  --color-compliance:        #0e8a7a;
-  --color-compliance-bg:     color-mix(in srgb, #0e8a7a 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, #0e8a7a 38%, transparent);
+  /* Compliance — rich gold */
+  --color-compliance:        #b08000;
+  --color-compliance-bg:     color-mix(in srgb, #b08000 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #b08000 38%, transparent);
 
   /* Warning */
   --color-warning:      var(--primitive-amber-700);
@@ -593,10 +593,10 @@ html[data-theme="light"]:root {
   --color-danger-bg:     var(--color-sev-critical-bg);
   --color-danger-border: var(--color-sev-critical-border);
 
-  /* Compliance — teal (Daruma Fire direction) */
-  --color-compliance:        #0e8a7a;
-  --color-compliance-bg:     color-mix(in srgb, #0e8a7a 4%, transparent);
-  --color-compliance-border: color-mix(in srgb, #0e8a7a 38%, transparent);
+  /* Compliance — rich gold */
+  --color-compliance:        #b08000;
+  --color-compliance-bg:     color-mix(in srgb, #b08000 4%, transparent);
+  --color-compliance-border: color-mix(in srgb, #b08000 38%, transparent);
 
   /* Overlays */
   --color-overlay-heavy:  rgba(0, 0, 0, 0.7);
