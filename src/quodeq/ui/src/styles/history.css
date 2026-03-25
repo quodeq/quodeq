@@ -56,6 +56,39 @@
   padding: 0 var(--space-2);
 }
 
+.history-list-header {
+  margin-bottom: var(--space-2);
+}
+
+.history-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+
+.history-collapse-btn:hover {
+  color: var(--color-text);
+}
+
+.history-collapse-icon {
+  display: inline-block;
+  font-size: 1.1em;
+  transition: transform 150ms ease;
+  transform: rotate(90deg);
+}
+
+.history-collapse-icon.collapsed {
+  transform: rotate(0deg);
+}
+
 .history-panels-row {
   display: flex;
   gap: var(--space-4);

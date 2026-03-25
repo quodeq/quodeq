@@ -65,8 +65,24 @@ function trendColor(dir) {
 }
 
 
+function windowAroundSelected(trend, selectedRunId) {
+  if (trend.length <= MAX_CHART_RUNS) return trend;
+  const idx = trend.findIndex((r) => r.runId === selectedRunId);
+  if (idx < 0) return trend.slice(0, MAX_CHART_RUNS);
+  // Center the window on the selected run
+  const half = Math.floor(MAX_CHART_RUNS / 2);
+  let start = Math.max(0, idx - half);
+  let end = start + MAX_CHART_RUNS;
+  if (end > trend.length) {
+    end = trend.length;
+    start = Math.max(0, end - MAX_CHART_RUNS);
+  }
+  return trend.slice(start, end);
+}
+
 function buildTrendData(trend, selectedRunId, selectedRunScore) {
-  return [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
+  const windowed = windowAroundSelected(trend, selectedRunId);
+  return [...windowed].reverse().map((row, i, arr) => {
     const isSelected = row.runId === selectedRunId;
     const numericAverage = isSelected && selectedRunScore != null
       ? parseFloat(selectedRunScore)

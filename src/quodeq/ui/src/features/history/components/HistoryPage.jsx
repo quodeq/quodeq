@@ -18,6 +18,7 @@ function computeDeltas(trend) {
 
 export default function HistoryPage({ trend, selectedRunId, selectedRunScore, accumulatedDimensions, lastRun, runNav, onRunClick, onBarClick, onDimensionClick }) {
   const [showAll, setShowAll] = useState(false);
+  const [listCollapsed, setListCollapsed] = useState(false);
 
   if (!trend || trend.length === 0) {
     return (
@@ -66,23 +67,33 @@ export default function HistoryPage({ trend, selectedRunId, selectedRunScore, ac
           runId={lastRun?.runId}
         />
       </div>
-      <div className="history-list">
-        {visible.map((entry, i) => (
-          <HistoryRunRow
-            key={entry.runId}
-            entry={entry}
-            delta={deltas[i]}
-            isSelected={entry.runId === selectedRunId}
-            onClick={onRunClick}
-          />
-        ))}
+      <div className="history-list-header">
+        <button type="button" className="history-collapse-btn" onClick={() => setListCollapsed(!listCollapsed)}>
+          <span className={`history-collapse-icon${listCollapsed ? ' collapsed' : ''}`}>›</span>
+          Evaluations
+        </button>
       </div>
-      {hasMore && (
-        <div className="history-load-more">
-          <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>
-            Load all {trend.length} evaluations
-          </button>
-        </div>
+      {!listCollapsed && (
+        <>
+          <div className="history-list">
+            {visible.map((entry, i) => (
+              <HistoryRunRow
+                key={entry.runId}
+                entry={entry}
+                delta={deltas[i]}
+                isSelected={entry.runId === selectedRunId}
+                onClick={onRunClick}
+              />
+            ))}
+          </div>
+          {hasMore && (
+            <div className="history-load-more">
+              <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>
+                Load all {trend.length} evaluations
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
