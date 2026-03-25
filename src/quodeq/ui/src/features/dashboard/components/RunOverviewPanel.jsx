@@ -3,6 +3,7 @@ import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
+import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { formatRunId, gradeColorClass, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
@@ -13,49 +14,6 @@ import buildRunSummary from '../buildRunSummary.js';
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function StatsGrid({ runSummary }) {
-  return (
-    <div className="acc-eval-stats-grid">
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Violations</span>
-        <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
-        <div className="acc-eval-tags">
-          {(runSummary.severity?.critical || 0) > 0 && (
-            <span className="severity-tag critical">{runSummary.severity.critical} critical</span>
-          )}
-          {(runSummary.severity?.major || 0) > 0 && (
-            <span className="severity-tag major">{runSummary.severity.major} major</span>
-          )}
-          {(runSummary.severity?.minor || 0) > 0 && (
-            <span className="severity-tag minor">{runSummary.severity.minor} minor</span>
-          )}
-        </div>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Compliance</span>
-        <span className="acc-eval-stat-value">{runSummary.totalCompliance || 0}</span>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Ratio</span>
-        <span className="acc-eval-stat-value">
-          {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
-        </span>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Files Affected</span>
-        <span className="acc-eval-stat-value">{runSummary.filesAffected}</span>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Principles</span>
-        <span className="acc-eval-stat-value">{runSummary.uniquePrinciples}</span>
-      </div>
-      <div className="acc-eval-stat-block">
-        <span className="acc-eval-stat-label">Dimensions</span>
-        <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
-      </div>
-    </div>
-  );
-}
 
 function ViolationsByDimension({ dimensionsWithViolations, onDimensionClick, selectedRunId }) {
   if (dimensionsWithViolations.length === 0) return null;
@@ -169,21 +127,52 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
           />
         )}
       </div>
-      <div className="acc-eval-hero">
-        <span className={`acc-eval-grade-chip chip ${scoreColorClass(runSummary.numericAverage)}`}>
-          {runSummary.overallGrade || '—'}
-        </span>
-        <div className="acc-eval-score-row">
-          <span className="acc-eval-score">{runSummary.numericAverage || '—'}</span>
-          <span className="acc-eval-score-denom">/10</span>
+      <div className="acc-eval-golden">
+        <div className="acc-eval-circle-col">
+          <ScoreCircle
+            score={runSummary.numericAverage}
+            grade={runSummary.overallGrade}
+            size={120}
+          />
+          {runScoreDelta !== null && (
+            <div className="acc-eval-trend">
+              <TrendBadge delta={runScoreDelta} showLabel={false} />
+            </div>
+          )}
         </div>
-        {runScoreDelta !== null && (
-          <div className="acc-eval-trend">
-            <TrendBadge delta={runScoreDelta} showLabel={false} />
+        <div className="acc-eval-stats-col">
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Violations</span>
+            <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
+            <div className="acc-eval-tags">
+              {(runSummary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{runSummary.severity.critical} critical</span>}
+              {(runSummary.severity?.major || 0) > 0 && <span className="severity-tag major">{runSummary.severity.major} major</span>}
+              {(runSummary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{runSummary.severity.minor} minor</span>}
+            </div>
           </div>
-        )}
+          <div className="acc-eval-stat-block">
+            <span className="acc-eval-stat-label">Compliance Ratio</span>
+            <span className="acc-eval-stat-value">
+              {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
+              <span className="acc-eval-ratio-label">compliance per violation</span>
+            </span>
+          </div>
+          <div className="acc-eval-mini-stats">
+            <div className="acc-eval-mini-stat">
+              <span className="acc-eval-mini-stat-label">Files</span>
+              <span className="acc-eval-mini-stat-value">{runTopFiles.length}</span>
+            </div>
+            <div className="acc-eval-mini-stat">
+              <span className="acc-eval-mini-stat-label">Principles</span>
+              <span className="acc-eval-mini-stat-value">{runUniquePrinciples}</span>
+            </div>
+            <div className="acc-eval-mini-stat">
+              <span className="acc-eval-mini-stat-label">Dimensions</span>
+              <span className="acc-eval-mini-stat-value">{runSummary.dimensionCount || 0}</span>
+            </div>
+          </div>
+        </div>
       </div>
-      <StatsGrid runSummary={{ ...runSummary, filesAffected: runTopFiles.length, uniquePrinciples: runUniquePrinciples }} />
     </section>
   );
 }
