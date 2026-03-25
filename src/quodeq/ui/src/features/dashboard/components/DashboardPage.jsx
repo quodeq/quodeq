@@ -4,7 +4,7 @@ import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, overviewRunIndex } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onPrincipleClick } = callbacks;
   if (runMode) {
@@ -36,7 +36,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   return (
     <AccumulatedOverviewPanel
       data={{
-        accumulated, accumulatedDimensions, availableRuns, overviewRunIndex,
+        accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
         trend: dashboard?.trend || [], selectedRunId,
       }}
       callbacks={{
