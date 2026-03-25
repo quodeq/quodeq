@@ -2295,6 +2295,13 @@
 }
 
 .run-history-panel {
+  display: flex;
+  flex-direction: column;
+}
+
+.run-history-panel .recharts-responsive-container {
+  flex: 1;
+  min-height: 160px;
 }
 
 .run-history-header {
@@ -2360,10 +2367,78 @@
   align-items: stretch;
 }
 
-.history-panels-row > .run-history-panel {
+.history-panels-row > .run-history-panel,
+.history-panels-row > .dim-score-panel {
   flex: 1 1 0;
   min-width: 0;
 }
+
+/* ── Dimension Score Panel (horizontal bars) ─────────── */
+
+.dim-score-rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.dim-score-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.dim-score-row + .dim-score-row {
+  border-top: 1px solid var(--color-border);
+}
+
+.dim-score-row:hover {
+  background: color-mix(in srgb, var(--color-accent) 4%, transparent);
+  margin: 0 -8px;
+  padding-left: 8px;
+  padding-right: 8px;
+  border-radius: var(--radius-sm);
+}
+
+.dim-score-label {
+  flex: 0 0 100px;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: var(--color-text);
+  text-transform: capitalize;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.dim-score-track {
+  flex: 1;
+  height: 5px;
+  background: var(--color-border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.dim-score-fill {
+  height: 100%;
+  border-radius: 3px;
+}
+
+.dim-score-value {
+  flex: 0 0 32px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--color-text);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.dim-score-trend {
+  flex: 0 0 52px;
+  text-align: right;
+}
+
+.dim-score-trend .trend-badge { font-size: 0.72rem; }
 
 /* ── Projects page ─────────────────────────────────────── */
 

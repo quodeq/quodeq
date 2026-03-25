@@ -129,7 +129,7 @@ function RunHistoryTooltip({ active, hoveredIndex, data }) {
 function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
   const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
   return (
-    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+    <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
       <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
         <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
         <XAxis

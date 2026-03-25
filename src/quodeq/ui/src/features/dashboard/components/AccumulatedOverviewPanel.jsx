@@ -13,10 +13,19 @@ import ScoreCircle from '../../../components/ScoreCircle.jsx';
 // Accumulated overview panel helpers
 // ---------------------------------------------------------------------------
 
-function computeAccumulatedStats(accumulated, accumulatedDimensions) {
+function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend) {
   const curr = parseFloat(accumulated?.summary?.numericAverage);
-  const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
-  const scoreDelta = (isNaN(curr) || isNaN(prev)) ? null : (curr - prev).toFixed(1);
+  // Derive delta from trend data (same source as the bar chart)
+  let scoreDelta = null;
+  if (dailyTrend && dailyTrend.length >= 2) {
+    const latest = parseFloat(dailyTrend[0]?.numericAverage);
+    const previous = parseFloat(dailyTrend[1]?.numericAverage);
+    if (!isNaN(latest) && !isNaN(previous)) scoreDelta = (latest - previous).toFixed(1);
+  }
+  if (scoreDelta === null) {
+    const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
+    scoreDelta = (isNaN(curr) || isNaN(prev)) ? null : (curr - prev).toFixed(1);
+  }
 
   const withDates = accumulatedDimensions
     .filter((d) => d.fromRunId)
@@ -161,8 +170,8 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   );
 
   const stats = useMemo(
-    () => computeAccumulatedStats(accumulated, accumulatedDimensions),
-    [accumulated, accumulatedDimensions]
+    () => computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend),
+    [accumulated, accumulatedDimensions, dailyTrend]
   );
 
   return (
