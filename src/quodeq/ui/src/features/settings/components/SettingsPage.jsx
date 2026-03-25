@@ -188,15 +188,20 @@ function SettingsHeader() {
   return (
     <div className="settings-header">
       <div className="settings-header-content">
-        <div className="settings-page-icon">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
-          </svg>
+        <div className="settings-header-left">
+          <div className="settings-page-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
+            </svg>
+          </div>
+          <div>
+            <h1 className="settings-title">Settings</h1>
+            <p className="settings-subtitle">Manage your Quodeq preferences</p>
+          </div>
         </div>
-        <div>
-          <h1 className="settings-title">Settings</h1>
-          <p className="settings-subtitle">Manage your Quodeq preferences</p>
+        <div className="settings-header-center">
+          <SettingsAside />
         </div>
       </div>
     </div>
@@ -247,35 +252,35 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
   return (
     <div className="settings-page">
       <SettingsHeader />
-      <div className="settings-layout">
-      <div className="settings-body">
-        <ThemeSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
+      <div className="settings-body settings-body--full">
+        <div className="settings-grid">
+          <section className="panel settings-section">
+            <div className="panel-header">
+              <h2 className="settings-section-title">Analysis</h2>
+              <p className="settings-section-description">Configure the AI client used when running evaluations</p>
+            </div>
+            <ModelSection
+              aiCmd={{ value: aiCmd, onApply: onApplyAiCmd }}
+              models={{
+                aiModel: models.aiModel, onAiModelChange: models.onAiModelChange,
+                fast: models.fast, onFastChange: models.onFastChange,
+                balanced: models.balanced, onBalancedChange: models.onBalancedChange,
+                thorough: models.thorough, onThoroughChange: models.onThoroughChange,
+              }}
+              availableClients={availableClients}
+            />
+            <AnalysisSection
+              analysis={{ power: analysisPower, onChange: onAnalysisPowerChange }}
+              subagents={{ max: maxSubagents, setMax: setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes }}
+            />
+            <VerificationSection verifyFindings={verifyFindings} onApplyVerifyFindings={onApplyVerifyFindings} />
+          </section>
 
-        <section className="panel settings-section">
-          <div className="panel-header">
-            <h2 className="settings-section-title">Analysis</h2>
-            <p className="settings-section-description">Configure the AI client used when running evaluations</p>
+          <div className="settings-grid-col">
+            <ThemeSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
+            <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
           </div>
-          <ModelSection
-            aiCmd={{ value: aiCmd, onApply: onApplyAiCmd }}
-            models={{
-              aiModel: models.aiModel, onAiModelChange: models.onAiModelChange,
-              fast: models.fast, onFastChange: models.onFastChange,
-              balanced: models.balanced, onBalancedChange: models.onBalancedChange,
-              thorough: models.thorough, onThoroughChange: models.onThoroughChange,
-            }}
-            availableClients={availableClients}
-          />
-          <AnalysisSection
-            analysis={{ power: analysisPower, onChange: onAnalysisPowerChange }}
-            subagents={{ max: maxSubagents, setMax: setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes }}
-          />
-          <VerificationSection verifyFindings={verifyFindings} onApplyVerifyFindings={onApplyVerifyFindings} />
-        </section>
-        <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
-      </div>
-
-      <SettingsAside />
+        </div>
       </div>
     </div>
   );

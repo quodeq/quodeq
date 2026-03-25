@@ -9,9 +9,19 @@ const PHRASES = [
   'findings are mapped to <b>CWE</b> — the industry standard for software weaknesses',
   'dimensions follow <b>ISO 25010</b>, the international standard for software quality',
   'quality covers <b>reliability</b>, <b>security</b>, <b>maintainability</b>, <b>performance</b>, and more',
+  'compare <b>accumulated scores</b> across all runs to see overall project health',
+  'use <b>parallel subagents</b> to speed up evaluations across multiple dimensions',
+  'the <b>compliance ratio</b> shows how many rules pass for every violation found',
+  'click any <b>dimension card</b> to explore violations, files, and principles in detail',
+  'copy a <b>fix plan</b> to your clipboard and paste it into your IDE or AI assistant',
+  'choose between <b>fast</b>, <b>balanced</b>, or <b>thorough</b> analysis modes',
+  'switch <b>themes</b> — from Daruma to Neo, Deckard to Galadriel',
+  'the <b>score history</b> chart shows how your codebase quality evolves over time',
+  'violations are ranked by <b>severity</b> — critical, major, and minor',
+  'every principle is graded and mapped to a <b>quality dimension</b>',
 ];
 
-const AUTO_ADVANCE_MS = 7000;
+const AUTO_ADVANCE_MS = 3500;
 const TRANSITION_MS = 180;
 
 function SafePhrase({ html }) {
