@@ -7,6 +7,7 @@ import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { formatRunId, scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
+import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGrouping.js';
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 
@@ -168,22 +169,6 @@ function AccumulatedDetailsSection({ topFiles, violationsByPrinciple, uniquePrin
 // Accumulated overview panel
 // ---------------------------------------------------------------------------
 
-function collapseByDay(trend) {
-  // trend is newest-first. For each day, keep the FIRST (newest) entry
-  // which has the most up-to-date accumulated state.
-  if (!trend || trend.length === 0) return trend;
-  const collapsed = [];
-  let currentDay = null;
-  for (const entry of trend) {
-    const datePart = (entry.dateISO || '').slice(0, 10);
-    if (datePart !== currentDay) {
-      currentDay = datePart;
-      collapsed.push({ ...entry });
-    }
-  }
-  return collapsed;
-}
-
 export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId } = data;
   const dayRuns = dailyRuns || availableRuns;
@@ -211,20 +196,10 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? dayRuns[0]?.runId : currentOverviewRun;
 
-  // Collect ALL dimension NAMES evaluated on the selected day from the raw trend.
-  // This is independent of the accumulated API response, so it's always in sync.
-  const selectedDayDimNames = useMemo(() => {
-    const entry = trend.find((t) => t.runId === currentOverviewRun) || trend.find((t) => t.runId === selectedRunId);
-    if (!entry) return new Set();
-    const selectedDate = (entry.dateISO || '').slice(0, 10);
-    const names = new Set();
-    for (const t of trend) {
-      if ((t.dateISO || '').slice(0, 10) === selectedDate) {
-        for (const d of t.dimensions || []) names.add(d.toLowerCase());
-      }
-    }
-    return names;
-  }, [trend, currentOverviewRun, selectedRunId]);
+  const selectedDayDimNames = useMemo(
+    () => collectDayDimensions(trend, currentOverviewRun) || collectDayDimensions(trend, selectedRunId),
+    [trend, currentOverviewRun, selectedRunId]
+  );
 
   const stats = useMemo(
     () => computeAccumulatedStats(accumulated, accumulatedDimensions),

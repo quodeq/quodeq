@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
+import { buildDailyRuns } from './utils/dailyGrouping.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
@@ -174,23 +175,7 @@ function useAppState() {
   const settings = useAppSettings();
   function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
   const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
-  // Build day-level runs for Overview (collapse same-day runs, keep first/newest of each day)
-  const dailyRuns = useMemo(() => {
-    if (!availableRuns.length) return [];
-    const trend = dashboard?.trend || [];
-    const byDay = [];
-    let lastDate = null;
-    for (const run of availableRuns) {
-      const t = trend.find(r => r.runId === run.runId);
-      const datePart = (t?.dateISO || '').slice(0, 10);
-      if (datePart !== lastDate) {
-        byDay.push(run); // first (newest) entry of the day wins
-        lastDate = datePart;
-      }
-      // skip older runs of the same day
-    }
-    return byDay;
-  }, [availableRuns, dashboard]);
+  const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
     const meta = computeHeaderMeta(accumulated, dashboard);
