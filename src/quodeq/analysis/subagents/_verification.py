@@ -71,6 +71,8 @@ def _run_verification_step(
     if prev_fingerprint is None:
         from quodeq.analysis.fingerprint import find_previous_fingerprint
         prev_fingerprint, _ = find_previous_fingerprint(evidence_dir, dim_id)
+        if prev_fingerprint is None:
+            log_info(f"  [{dim_id}] No previous fingerprint — all findings need verification")
 
     carry_forward, needs_verify = partition_findings_by_fingerprint(
         prev_findings, prev_fingerprint, config.src,
