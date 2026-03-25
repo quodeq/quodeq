@@ -51,9 +51,9 @@
   display: flex;
   border-radius: var(--radius-lg);
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 2px solid var(--color-border);
   cursor: pointer;
-  transition: border-color 150ms ease, background 150ms ease;
+  transition: border-color 150ms ease, background 150ms ease, box-shadow 150ms ease;
   width: 100%;
   text-align: left;
   font-family: var(--font-sans);
@@ -71,6 +71,7 @@
 .history-row.selected {
   border-color: var(--color-accent);
   background: var(--color-accent-soft);
+  box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 /* Date column */
