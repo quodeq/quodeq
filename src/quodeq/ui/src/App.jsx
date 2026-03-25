@@ -123,14 +123,16 @@ function MainContent({ activePage, props }) {
   return <div className="empty-state"><p>Page not found: {page}</p></div>;
 }
 
-function computeHeaderMeta(accumulated, dashboard) {
+function computeHeaderMeta(accumulated, dashboard, selectedProject, projects) {
   const accDims = accumulated?.dimensions || [];
   if (accDims.length === 0) return null;
   const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
   const repository = accDims.find((d) => d.repository)?.repository ?? null;
   const runDims = dashboard?.dimensions || [];
   const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
-  return { discipline, repository, totalFiles };
+  const project = projects.find((p) => p.id === selectedProject);
+  const languageStats = project?.languageStats ?? null;
+  return { discipline, repository, totalFiles, languageStats };
 }
 
 function computeProjectDisplay(selectedProject, projects) {
@@ -188,7 +190,7 @@ function useAppState() {
   const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
-    const meta = computeHeaderMeta(accumulated, dashboard);
+    const meta = computeHeaderMeta(accumulated, dashboard, selectedProject, projects);
     const display = computeProjectDisplay(selectedProject, projects);
     return { headerMeta: meta, ...display };
   }, [accumulated, dashboard, selectedProject, projects]);

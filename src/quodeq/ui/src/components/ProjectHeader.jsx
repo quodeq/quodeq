@@ -45,6 +45,18 @@ export default function ProjectHeader({
                 <span className="content-meta-chip-value">{meta.totalFiles.toLocaleString()}</span>
               </span>
             )}
+            {meta.languageStats && Object.keys(meta.languageStats).length > 0 && (
+              <span className="content-meta-chip">
+                <span className="content-meta-chip-label">Languages</span>
+                <span className="content-meta-chip-value">
+                  {Object.entries(meta.languageStats)
+                    .sort(([, a], [, b]) => b - a)
+                    .slice(0, 5)
+                    .map(([lang, count]) => `${lang} (${count})`)
+                    .join(', ')}
+                </span>
+              </span>
+            )}
           </div>
         )}
       </div>

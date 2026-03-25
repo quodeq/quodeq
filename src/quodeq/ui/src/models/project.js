@@ -16,6 +16,7 @@
  * @property {number|null}  latestScore
  * @property {number}       runsCount
  * @property {number|null}  filesCount
+ * @property {Object|null}  languageStats - e.g. { py: 302, js: 84 }
  */
 
 /**
@@ -42,5 +43,6 @@ export function createProject(raw) {
     runsCount:    raw.runsCount ?? 0,
     filesCount:   raw.filesCount ?? null,
     hasFingerprints: raw.hasFingerprints ?? false,
+    languageStats: raw.languageStats ?? null,
   };
 }
