@@ -208,7 +208,25 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { onRunClick, onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
 
   const dailyTrend = useMemo(() => collapseByDay(trend), [trend]);
-  const currentOverviewRun = dayRuns[overviewRunIndex]?.runId || 'latest';
+
+  // Find which daily entry matches the current selection
+  // selectedRunId may be any runId — find the day it belongs to
+  const effectiveSelectedId = useMemo(() => {
+    if (!selectedRunId || !trend.length) return dailyTrend[0]?.runId || null;
+    // Check if selectedRunId is directly a daily entry
+    const direct = dailyTrend.find((t) => t.runId === selectedRunId);
+    if (direct) return direct.runId;
+    // Find which raw trend entry matches, then find its day
+    const rawEntry = trend.find((t) => t.runId === selectedRunId);
+    if (rawEntry) {
+      const datePart = (rawEntry.dateISO || '').slice(0, 10);
+      const dayEntry = dailyTrend.find((t) => (t.dateISO || '').slice(0, 10) === datePart);
+      if (dayEntry) return dayEntry.runId;
+    }
+    return dailyTrend[0]?.runId || null;
+  }, [selectedRunId, trend, dailyTrend]);
+
+  const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? dayRuns[0]?.runId : currentOverviewRun;
   const selectedDay = dailyTrend.find((t) => t.runId === currentOverviewRun);
   const dayDimensions = selectedDay?.dayDimensions || [];
