@@ -2,9 +2,9 @@ import { useEffect, useRef, useState } from 'react';
 import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } from '../../../api/index.js';
 import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY } from '../../../constants.js';
 
-const DIMENSION_POLL_MS = 2000;
+const DIMENSION_POLL_INITIAL_MS = 2000;
 const DIMENSION_POLL_MAX_MS = 8000;
-const JOB_POLL_MS = 1500;
+const JOB_POLL_INITIAL_MS = 1500;
 const MAX_DIM_POLL_FAILURES = 10;
 
 function stopTimer(ref) {
@@ -59,7 +59,7 @@ function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef
   return function startDimensionPolling(project, runId) {
     stopTimer(dimPollRef);
     dimFailCountRef.current = {};
-    let delay = DIMENSION_POLL_MS;
+    let delay = DIMENSION_POLL_INITIAL_MS;
     const refs = { dimFailCount: dimFailCountRef.current, partialDimensions: partialDimensionsRef.current };
     function scheduleNext() {
       dimPollRef.current = setTimeout(async () => {
@@ -69,7 +69,7 @@ function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef
           partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
         );
         const anyFailed = results.some((r) => r.status === 'rejected');
-        delay = anyFailed ? Math.min(delay * 1.5, DIMENSION_POLL_MAX_MS) : DIMENSION_POLL_MS;
+        delay = anyFailed ? Math.min(delay * 1.5, DIMENSION_POLL_MAX_MS) : DIMENSION_POLL_INITIAL_MS;
         scheduleNext();
       }, delay);
     }
@@ -101,7 +101,7 @@ function createJobPoller(refs, setters, startDimensionPolling) {
         stopTimer(pollRef);
         stopTimer(dimPollRef);
       }
-    }, JOB_POLL_MS);
+    }, JOB_POLL_INITIAL_MS);
   };
 }
 

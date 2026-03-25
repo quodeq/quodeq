@@ -144,7 +144,8 @@ class QuodeqApp(rumps.App):
             self.template = False
             self._set_ui_state(running=True)
         else:
-            self._port = None
+            with self._state_lock:
+                self._port = None
             if not self._starting:
                 self._status_item.title = "Stopped"
             self.icon = self._icon_stopped
@@ -254,7 +255,8 @@ class QuodeqApp(rumps.App):
                     return
                 port = self._find_running_port()
                 if port:
-                    self._port = port
+                    with self._state_lock:
+                        self._port = port
                     self._clear_error()
                     self._cleanup_stderr_log()
                     return
@@ -301,7 +303,8 @@ class QuodeqApp(rumps.App):
                 subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=5)
             except (subprocess.TimeoutExpired, OSError):
                 pass
-        self._port = None
+        with self._state_lock:
+            self._port = None
         self._status_item.title = "Stopped"
         self._set_ui_state(running=False)
         self._cleanup_stderr_log()

@@ -21,6 +21,26 @@ class FetchClient:
     _MAX_RETRIES = 2
     _RETRY_BACKOFF_S = 0.5
 
+    def _record_success(self) -> None:
+        """Reset the failure counter on a successful fetch."""
+        with self._lock:
+            self._failures = 0
+
+    def _record_failure(self, exc: Exception) -> None:
+        """Increment failures and log; trips circuit breaker at threshold."""
+        with self._lock:
+            self._failures += 1
+            count = self._failures
+        if count >= self._CIRCUIT_THRESHOLD:
+            _logger.warning("Circuit breaker tripped (failure %d): %s", count, exc)
+        else:
+            _logger.debug("Fetch failure %d/%d: %s", count, self._CIRCUIT_THRESHOLD, exc)
+
+    def _is_circuit_open(self) -> bool:
+        """Return True if too many recent failures have tripped the circuit breaker."""
+        with self._lock:
+            return self._failures >= self._CIRCUIT_THRESHOLD
+
     def __init__(self, timeout_s: int = 15, allow_private: bool | None = None, env: dict[str, str] | None = None) -> None:
         self._lock = threading.Lock()
         self._failures = 0
@@ -46,9 +66,8 @@ class FetchClient:
             _logger.warning("Blocked fetch to private/internal address: %s", hostname)
             return None
 
-        with self._lock:
-            if self._failures >= self._CIRCUIT_THRESHOLD:
-                return None
+        if self._is_circuit_open():
+            return None
 
         last_exc: Exception | None = None
         for retry in range(self._MAX_RETRIES):
@@ -58,8 +77,7 @@ class FetchClient:
                     return None
                 req = urllib.request.Request(url, headers=headers or {})
                 with urllib.request.urlopen(req, timeout=self._timeout) as r:
-                    with self._lock:
-                        self._failures = 0
+                    self._record_success()
                     return r.read().decode("utf-8", errors="replace")
             except (urllib.error.URLError, OSError, ValueError) as exc:
                 last_exc = exc
@@ -67,12 +85,8 @@ class FetchClient:
                     _logger.debug("Fetch retry %d/%d after: %s", retry + 1, self._MAX_RETRIES, exc)
                     time.sleep(self._RETRY_BACKOFF_S * (retry + 1))
 
-        with self._lock:
-            self._failures += 1
-            if self._failures >= self._CIRCUIT_THRESHOLD:
-                _logger.warning("Circuit breaker tripped after %d failures (last: %s)", self._failures, last_exc)
-            else:
-                _logger.debug("All %d retries exhausted (failure %d): %s", self._MAX_RETRIES, self._failures, last_exc)
+        if last_exc is not None:
+            self._record_failure(last_exc)
         return None
 
 
