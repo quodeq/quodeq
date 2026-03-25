@@ -53,7 +53,7 @@
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   cursor: pointer;
-  transition: border-color 150ms ease;
+  transition: border-color 150ms ease, background 150ms ease;
   width: 100%;
   text-align: left;
   font-family: var(--font-sans);
@@ -64,7 +64,8 @@
 }
 
 .history-row:hover {
-  border-color: var(--color-text-muted);
+  border-color: var(--color-accent);
+  background: var(--color-surface-alt);
 }
 
 /* Date column */
