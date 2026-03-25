@@ -9,7 +9,7 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
-import { formatShortDate, angleFromDelta } from '../../../utils/formatters.js';
+import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 
 const cssVar = (name, fallback) => {
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
@@ -83,7 +83,7 @@ function DimensionTooltip({ active, payload }) {
     <div className="run-history-tooltip">
       <span className="rht-date">{d.dimension}</span>
       <span className="rht-score">{parseFloat(d.overallScore).toFixed(1)} / 10</span>
-      <span className="rht-grade">{d.overallGrade}</span>
+      <span className="rht-grade">{gradeLetter(d.overallGrade)}</span>
     </div>
   );
 }

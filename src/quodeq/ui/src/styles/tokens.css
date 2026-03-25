@@ -302,8 +302,8 @@
   /* Grade tier colors — Daruma Fire: vivid gold top, warm gray high */
   --color-grade-top-text:    #e0a800;
   --color-grade-top-bg:      color-mix(in srgb, #e0a800 14%, transparent);
-  --color-grade-high-text:   #6c7078;
-  --color-grade-high-bg:     color-mix(in srgb, #6c7078 12%, transparent);
+  --color-grade-high-text:   #9ca0a8;
+  --color-grade-high-bg:     color-mix(in srgb, #9ca0a8 12%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-800);
   --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-800) 12%, transparent);
   --color-grade-low-text:    var(--primitive-ired-900);
@@ -576,8 +576,8 @@ html[data-theme="light"]:root {
 
   --color-grade-top-text:    #e0a800;
   --color-grade-top-bg:      color-mix(in srgb, #e0a800 14%, transparent);
-  --color-grade-high-text:   #6c7078;
-  --color-grade-high-bg:     color-mix(in srgb, #6c7078 12%, transparent);
+  --color-grade-high-text:   #9ca0a8;
+  --color-grade-high-bg:     color-mix(in srgb, #9ca0a8 12%, transparent);
   --color-grade-mid-text:    var(--primitive-ired-800);
   --color-grade-mid-bg:      color-mix(in srgb, var(--primitive-ired-800) 12%, transparent);
   --color-grade-low-text:    var(--primitive-ired-900);

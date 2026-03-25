@@ -573,15 +573,15 @@
 
 /* ── Quality Dimension Cards (overview grid) ──────────── */
 .qd-card {
-  background: var(--color-surface);
+  background: color-mix(in srgb, var(--qd-grade-color, transparent) 5%, var(--color-surface));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
-  padding: 16px;
   cursor: pointer;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 0;
   transition: background 150ms ease, border-color 150ms ease;
+  overflow: hidden;
 }
 
 .qd-card:not(.qd-card-stale) {
@@ -594,17 +594,15 @@
 }
 
 .qd-card-stale {
-  opacity: 0.85;
   border-style: dashed;
+  border-color: var(--color-text-muted);
 }
 
-/* Dimension card — evaluated today (accent tint) */
-.qd-card--active {
-  background: color-mix(in srgb, var(--color-accent) 3%, var(--color-surface));
-}
+/* Dimension card — evaluated today */
+.qd-card--active {}
 
 /* Dimension card — carried forward from previous day */
-.qd-card--carried .qd-card-score {
+.qd-card--carried .qd-card-col-score {
   opacity: 0.7;
 }
 
@@ -613,6 +611,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 14px 16px 10px;
 }
 
 .qd-card-name {
@@ -625,67 +624,75 @@
   text-overflow: ellipsis;
 }
 
-.qd-card-score-row {
+.qd-card-name-row {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
 }
 
-.qd-card-score {
-  font-size: 1.6rem;
+.qd-card-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--qd-grade-color, var(--color-accent));
+  flex-shrink: 0;
+}
+
+.qd-card .trend-badge { font-size: 0.75rem; }
+
+/* ── Three-column stats row ─────────────────────────── */
+
+.qd-card-columns {
+  display: flex;
+  align-items: center;
+  padding: 0 16px 12px;
+}
+
+.qd-card-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.qd-card-col-score {
+  font-size: 1.8rem;
   font-weight: 700;
   color: var(--color-text);
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
 
-.qd-card-score-main {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 2px;
-}
-
-.qd-card-score-denom {
-  font-size: 0.85rem;
+.qd-card-col-label {
+  font-size: 0.6rem;
   color: var(--color-text-muted);
-  font-weight: var(--weight-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.qd-card .trend-badge { font-size: 0.75rem; }
-
-.qd-card-stats {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
+.qd-card-col-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--color-text);
+  font-variant-numeric: tabular-nums;
 }
 
-.qd-card-stat-violations {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--color-accent);
-  background: color-mix(in srgb, var(--color-accent) 4%, transparent);
-  border: 1px solid color-mix(in srgb, var(--color-accent) 38%, transparent);
-  border-radius: var(--radius-sm);
-  padding: 2px var(--space-2);
-  white-space: nowrap;
+.qd-card-col-divider {
+  width: 1px;
+  min-height: 40px;
+  background: var(--color-border);
 }
 
-.qd-card-stat-compliance {
-  font-size: var(--text-xs);
-  font-weight: var(--weight-medium);
-  color: var(--color-compliance);
-  background: var(--color-compliance-bg);
-  border: 1px solid var(--color-compliance-border);
-  border-radius: var(--radius-sm);
-  padding: 2px var(--space-2);
-  white-space: nowrap;
-}
+/* ── Card footer ────────────────────────────────────── */
 
 .qd-card-footer {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  padding: 0 16px 12px;
   margin-top: auto;
 }
 
@@ -699,6 +706,25 @@
   font-style: italic;
   color: var(--color-accent);
   opacity: 0.8;
+}
+
+/* ── Grade color mapping for cards ──────────────────── */
+
+.qd-card.grade-top    { --qd-grade-color: var(--color-grade-top-text); }
+.qd-card.grade-high   { --qd-grade-color: var(--color-grade-high-text); }
+.qd-card.grade-mid    { --qd-grade-color: var(--color-grade-mid-text); }
+.qd-card.grade-low    { --qd-grade-color: var(--color-grade-low-text); }
+.qd-card.grade-bottom { --qd-grade-color: var(--color-grade-bottom-text); }
+.qd-card.grade-none   { --qd-grade-color: var(--color-text-muted); }
+
+.qd-card-grade-bar {
+  height: 4px;
+  background: var(--qd-grade-color, var(--color-border));
+  margin-top: auto;
+}
+
+.qd-card-stale .qd-card-grade-bar {
+  opacity: 0.3;
 }
 
 /* Run Navigator */

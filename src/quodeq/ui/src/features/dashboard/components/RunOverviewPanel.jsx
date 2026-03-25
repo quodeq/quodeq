@@ -6,7 +6,7 @@ import CopyButton from '../../../components/CopyButton.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
-import { formatRunId, gradeColorClass, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
+import { formatRunId, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
 import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import buildRunSummary from '../buildRunSummary.js';
 
@@ -45,10 +45,11 @@ function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick }) 
   const prevScore = parseFloat(item.previousScore);
   const delta = !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
   const scored = splitScore(item.overallScore);
+  const gradeClass = scoreColorClass(currScore);
   return (
     <article
       key={item.dimension}
-      className="qd-card"
+      className={`qd-card ${gradeClass}`}
       onClick={() => onDimensionClick(item, selectedRunId)}
       role="button"
       tabIndex={0}
@@ -56,28 +57,27 @@ function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick }) 
     >
       <div className="qd-card-header">
         <span className="qd-card-name">{item.dimension}</span>
-        <span className={`chip small ${gradeColorClass(item.overallGrade)}`}>
-          {item.overallGrade || '—'}
-        </span>
-      </div>
-      <div className="qd-card-score-row">
-        <span className="qd-card-score-main">
-          <span className="qd-card-score">{scored.value}</span>
-          {scored.denom && <span className="qd-card-score-denom">{scored.denom}</span>}
-        </span>
         <TrendBadge delta={delta} />
       </div>
-      <div className="qd-card-stats">
-        {(item.totals?.violationCount ?? 0) > 0 && (
-          <span className="qd-card-stat-violations">{item.totals.violationCount} violations</span>
-        )}
-        {(item.totals?.complianceCount ?? 0) > 0 && (
-          <span className="qd-card-stat-compliance">{item.totals.complianceCount} compliant</span>
-        )}
+      <div className="qd-card-columns">
+        <div className="qd-card-col">
+          <span className="qd-card-col-score">{scored.value}</span>
+        </div>
+        <div className="qd-card-col-divider" />
+        <div className="qd-card-col">
+          <span className="qd-card-col-label">Viol</span>
+          <span className="qd-card-col-value">{item.totals?.violationCount ?? 0}</span>
+        </div>
+        <div className="qd-card-col-divider" />
+        <div className="qd-card-col">
+          <span className="qd-card-col-label">Ratio</span>
+          <span className="qd-card-col-value">{complianceRatio(item.totals?.violationCount ?? 0, item.totals?.complianceCount ?? 0)}</span>
+        </div>
       </div>
       <div className="qd-card-footer">
         <span className="qd-card-date">{item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId)}</span>
       </div>
+      <div className="qd-card-grade-bar" />
     </article>
   );
 }

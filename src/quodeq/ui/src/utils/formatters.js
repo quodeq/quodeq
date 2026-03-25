@@ -53,6 +53,21 @@ export function scoreColorClass(score) {
   return 'grade-bottom';
 }
 
+const GRADE_TO_LETTER = {
+  exemplary: 'A', good: 'B', proficient: 'B', adequate: 'C',
+  developing: 'C', poor: 'D', insufficient: 'D', critical: 'F',
+};
+
+/**
+ * Convert a grade word like "Good" to its letter ("B").
+ * If already a letter or short string, returns as-is.
+ */
+export function gradeLetter(grade) {
+  if (!grade) return '—';
+  const lower = grade.trim().toLowerCase();
+  return GRADE_TO_LETTER[lower] || grade;
+}
+
 /**
  * Map a grade word or letter to a CSS class.
  * Tries the full lower-cased word first, then the first character.
@@ -69,7 +84,7 @@ export function gradeColorClass(grade) {
 }
 
 /**
- * Format a date string as "20 Feb" (day + abbreviated month, no year).
+ * Format a date string as "20 Feb 2026" (day + abbreviated month + year).
  * Falls back to the original string if it cannot be parsed as a date.
  *
  * @param {string|null|undefined} dateStr
@@ -79,7 +94,7 @@ export function formatShortDate(dateStr) {
   if (!dateStr) return dateStr;
   const d = new Date(dateStr);
   if (isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+  return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
 /**
