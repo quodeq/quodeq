@@ -2239,8 +2239,9 @@
 }
 
 .violations-stats-grid {
-  border-top: none;
-  padding-top: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(80px, 1fr));
+  gap: 12px;
 }
 
 /* ── Run History Panel ────────────────────────────────── */
