@@ -104,7 +104,7 @@ class TestSubagentPoolModelPropagation:
 
     def test_pool_agents_inherit_model(self, tmp_path: Path) -> None:
         from quodeq.engine.file_queue import FileQueue
-        from quodeq.engine.subagent_pool import PoolOptions, PoolPaths, SubagentPool
+        from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["a.py", "b.py"])
@@ -124,7 +124,7 @@ class TestSubagentPoolModelPropagation:
 
     def test_pool_agents_inherit_haiku(self, tmp_path: Path) -> None:
         from quodeq.engine.file_queue import FileQueue
-        from quodeq.engine.subagent_pool import PoolOptions, PoolPaths, SubagentPool
+        from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["x.py"])

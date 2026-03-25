@@ -1,13 +1,12 @@
 """Violation resolution and aggregation for the filesystem action provider."""
 from __future__ import annotations
 
-import os
 from pathlib import Path
 from typing import Any
 
 from quodeq.adapters.fs.report_parser import parse_eval_from_json, parse_eval_markdown
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
-from quodeq.shared.utils import read_text
+from quodeq.shared.utils import _env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export
 from quodeq.services.violations_parsing import (
     parse_violations_from_evidence,
@@ -22,7 +21,7 @@ def _max_violation_files(override: int | None = None, env: dict[str, str] | None
     """Return the max number of violation files to include. *override* bypasses env for testing."""
     if override is not None:
         return override
-    return int((env or os.environ).get("QUODEQ_MAX_VIOLATION_FILES", str(_DEFAULT_MAX_VIOLATION_FILES)))
+    return _env_int("QUODEQ_MAX_VIOLATION_FILES", _DEFAULT_MAX_VIOLATION_FILES, env=env)
 
 
 def resolve_dimension_eval(

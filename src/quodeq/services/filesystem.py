@@ -81,15 +81,17 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         projects.sort(key=lambda p: p.name)
         return _auto_detect_parents(projects)
 
+    def _is_cache_valid(self) -> bool:
+        return self._project_cache is not None and (time.monotonic() - self._project_cache_time) < _PROJECT_CACHE_TTL_S
+
     def list_projects(self, reports_dir: str) -> dict[str, Any]:
         """Return all projects found under the reports directory (TTL-cached)."""
-        now = time.monotonic()
-        if self._project_cache is not None and (now - self._project_cache_time) < _PROJECT_CACHE_TTL_S:
+        if self._is_cache_valid():
             return self._project_cache
         projects = self._build_project_list(Path(reports_dir))
         result = {"projects": [to_camel_dict(p) for p in projects]}
         self._project_cache = result
-        self._project_cache_time = now
+        self._project_cache_time = time.monotonic()
         return result
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:

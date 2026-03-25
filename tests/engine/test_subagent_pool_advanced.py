@@ -9,7 +9,7 @@ import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError
 from quodeq.engine.file_queue import FileQueue
-from quodeq.engine.subagent_pool import PoolOptions, PoolPaths, SubagentPool, SubagentResult
+from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool, SubagentResult
 
 
 def _fake_run_analysis(work_dir, prompt, stream_file, config):

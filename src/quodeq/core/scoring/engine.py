@@ -186,22 +186,30 @@ def _compute_tallies(
     return vt_counts, ct_counts, using_taxonomy
 
 
+def _extract_metrics(pdata: dict) -> tuple[float, str, bool, int]:
+    """Extract compliance percentage, confidence level, balance, and instance count from principle data."""
+    metrics = pdata.get("metrics", {})
+    return (
+        metrics.get("compliance_percentage", 0.0),
+        metrics.get("confidence_level", "medium"),
+        metrics.get("is_balanced", True),
+        metrics.get("total_instances", 0),
+    )
+
+
 def _build_principle_context(
     key: str, pdata: dict, scale_mult: int, files_read: int,
 ) -> _PrincipleContext:
     """Extract evidence data for a single principle and return a scoring context."""
-    metrics = pdata.get("metrics", {})
-    pct = metrics.get("compliance_percentage", 0.0)
-    conf_level = metrics.get("confidence_level", "medium")
-
+    pct, conf_level, is_balanced, total_instances = _extract_metrics(pdata)
     vt_counts, ct_counts, using_taxonomy = _compute_tallies(
         pdata.get("violations", []), pdata.get("compliance", []),
     )
     dampen = compliance_dampening(ct_counts, vt_counts)
     ci = confidence_interval_for(
         confidence_level=conf_level,
-        is_balanced=metrics.get("is_balanced", True),
-        total_instances=metrics.get("total_instances", 0),
+        is_balanced=is_balanced,
+        total_instances=total_instances,
         files_read=files_read,
     )
     return _PrincipleContext(

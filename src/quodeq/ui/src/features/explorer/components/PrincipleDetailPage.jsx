@@ -1,23 +1,10 @@
 import { memo } from 'react';
-import { buildGroupPlanText, buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
+import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
+import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
-
-function buildPrinciplePlanText(principle) {
-  const violationsBySeverity = {};
-  for (const sev of SEVERITY_ORDER) {
-    violationsBySeverity[sev] = (principle.violations || []).filter(
-      (v) => (v.severity || 'minor').toLowerCase() === sev
-    );
-  }
-  return buildGroupPlanText({
-    title: principle.principle,
-    violations: principle.violations || [],
-    violationsBySeverity,
-  });
-}
 
 function buildViolationPlanText(v, principleName) {
   return buildSingleViolationPlanText(v, principleName || 'Violation');
@@ -26,11 +13,16 @@ function buildViolationPlanText(v, principleName) {
 const ANIM_DELAY_PER_ITEM_MS = 30;
 const ANIM_MAX_DELAY_MS = 300;
 
+function filterHttpRefs(reqRefs) {
+  return (reqRefs || []).filter(r => r.url && /^https?:\/\//.test(r.url));
+}
+
 function ViolationCard({ v, principleName, index }) {
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
   const ref = line != null ? `${filePath}:${line}` : filePath;
   const display = line != null ? `${filename}:${line}` : filename;
+  const linkedRefs = filterHttpRefs(v.reqRefs);
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
       <div className="vdetail-row-main">
@@ -49,8 +41,8 @@ function ViolationCard({ v, principleName, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
-                <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
+              {linkedRefs.length > 0 &&
+                <span className="cwe-link-group">{linkedRefs.map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                 ))}</span>
               }

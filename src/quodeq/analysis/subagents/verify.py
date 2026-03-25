@@ -14,6 +14,7 @@ import json
 from pathlib import Path
 from typing import Any
 
+from quodeq.analysis.subagents._verify_pool import build_verify_prompt  # noqa: F401 — re-export
 from quodeq.data.fs.report_parser.runs import list_runs
 from quodeq.shared.logging import log_debug, log_info, log_success
 from quodeq.shared.utils import open_text
@@ -178,9 +179,6 @@ def _write_verify_manifest(
     Each verification subagent reads this to know which findings to re-check.
     """
     output_path.write_text(json.dumps(grouped, indent=2))
-
-
-from quodeq.analysis.subagents._verify_pool import build_verify_prompt  # noqa: F401 — re-export
 
 
 def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:

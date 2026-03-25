@@ -120,18 +120,27 @@ def compute_fan_in(
         except OSError:
             continue
         for line in content.splitlines():
-            for pattern in compiled:
-                m = pattern.search(line)
-                if m:
-                    imported = m.group(1)
-                    module_name = imported.rsplit(".", 1)[-1].rsplit("/", 1)[-1]
-                    if module_name in stem_to_file:
-                        target = stem_to_file[module_name]
-                        if target != f:
-                            counts[target] = counts.get(target, 0) + 1
-                    break
+            target = _match_import_target(line, compiled, stem_to_file, f)
+            if target is not None:
+                counts[target] = counts.get(target, 0) + 1
 
     return counts
+
+
+def _match_import_target(
+    line: str, compiled: list[re.Pattern], stem_to_file: dict[str, str], current_file: str,
+) -> str | None:
+    """Match a single line against import patterns and return the target file, or None."""
+    for pattern in compiled:
+        m = pattern.search(line)
+        if m:
+            imported = m.group(1)
+            module_name = imported.rsplit(".", 1)[-1].rsplit("/", 1)[-1]
+            target = stem_to_file.get(module_name)
+            if target is not None and target != current_file:
+                return target
+            return None
+    return None
 
 
 def _run_git_log(src: Path, months: int = 3) -> str | None:

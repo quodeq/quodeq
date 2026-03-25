@@ -45,9 +45,12 @@ def test_load_cisq_maintainability():
 
 
 def test_load_cisq_all_characteristics():
+    # Each CISQ characteristic must have at least this many CWE entries;
+    # guards against accidental truncation of the standards data.
+    _MIN_CWES_PER_CHARACTERISTIC = 12
     for char in ["maintainability", "reliability", "security", "performance"]:
         cisq = load_cisq(char)
-        assert len(cisq["cwes"]) >= 12, f"{char}: expected ≥12 CWEs, got {len(cisq['cwes'])}"
+        assert len(cisq["cwes"]) >= _MIN_CWES_PER_CHARACTERISTIC, f"{char}: expected ≥{_MIN_CWES_PER_CHARACTERISTIC} CWEs, got {len(cisq['cwes'])}"
         for cwe in cisq["cwes"]:
             assert "id" in cwe
             assert "name" in cwe

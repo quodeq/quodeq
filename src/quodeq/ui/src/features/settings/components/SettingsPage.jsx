@@ -86,6 +86,12 @@ function clampSubagents(value) {
   return Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(value, 10) || DEFAULT_MAX_SUBAGENTS));
 }
 
+function persistSubagents(value, setter) {
+  const v = clampSubagents(value);
+  setter(v);
+  localStorage.setItem(SUBAGENTS_STORAGE_KEY, String(v));
+}
+
 function SubagentsRow({ subagents }) {
   const { max, setMax } = subagents;
   return (
@@ -102,11 +108,7 @@ function SubagentsRow({ subagents }) {
         min={MIN_SUBAGENTS}
         max={MAX_SUBAGENTS}
         value={max}
-        onChange={(e) => {
-          const v = clampSubagents(e.target.value);
-          setMax(v);
-          localStorage.setItem(SUBAGENTS_STORAGE_KEY, String(v));
-        }}
+        onChange={(e) => persistSubagents(e.target.value, setMax)}
       />
     </div>
   );

@@ -59,7 +59,7 @@ class TestRunVerificationStepFingerprint:
         config.standards_dir = None
         return config
 
-    @patch("quodeq.analysis.subagents.runner._run_verification_pool")
+    @patch("quodeq.analysis.subagents._verification._run_verification_pool")
     @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
     @patch("quodeq.analysis.fingerprint.find_previous_fingerprint")
     def test_unchanged_files_carried_forward_not_sent_to_pool(
@@ -108,7 +108,7 @@ class TestRunVerificationStepFingerprint:
         unchanged_findings = [l for l in lines if l.get("file") == "unchanged.py"]
         assert len(unchanged_findings) == 1
 
-    @patch("quodeq.analysis.subagents.runner._run_verification_pool")
+    @patch("quodeq.analysis.subagents._verification._run_verification_pool")
     @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
     @patch("quodeq.analysis.fingerprint.find_previous_fingerprint")
     def test_incremental_filters_to_file_filter_only(

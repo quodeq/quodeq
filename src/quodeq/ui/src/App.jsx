@@ -83,8 +83,10 @@ const ROUTE_RENDERERS = {
     return (
       <HistoryPage
         trend={trend}
-        selectedRunId={resolveHistorySelectedRunId(props.dashboardData.selectedRun, trend)}
-        selectedRunScore={props.dashboardData.accumulated?.summary?.numericAverage}
+        selection={{
+          selectedRunId: resolveHistorySelectedRunId(props.dashboardData.selectedRun, trend),
+          selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
+        }}
         runNav={runs.length > 0 ? {
           currentRun: formatHistoryRunLabel(trend, runs, idx, props.navigation.currentOverviewRun),
           isLatest: idx === 0,
@@ -94,11 +96,15 @@ const ROUTE_RENDERERS = {
           onLatest: props.navigation.handleRunLatest,
           onView: () => { const run = props.dashboardData.selectedRun || (runs[idx] && runs[idx].runId); if (run) props.navigation.handleNavigate('history-run', { runId: run }); },
         } : null}
-        accumulatedDimensions={props.dashboardData.accumulated?.dimensions || []}
-        lastRun={{ date: props.dashboardData.accumulated?.dimensions?.[0]?.fromDateLabel, runId: props.dashboardData.accumulated?.dimensions?.[0]?.fromRunId }}
-        onRunClick={(runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel })}
-        onBarClick={props.navigation.handleRunSelect}
-        onDimensionClick={(dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel })}
+        dimensions={{
+          accumulatedDimensions: props.dashboardData.accumulated?.dimensions || [],
+          lastRun: { date: props.dashboardData.accumulated?.dimensions?.[0]?.fromDateLabel, runId: props.dashboardData.accumulated?.dimensions?.[0]?.fromRunId },
+        }}
+        callbacks={{
+          onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
+          onBarClick: props.navigation.handleRunSelect,
+          onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel }),
+        }}
       />
     );
   },
@@ -167,13 +173,20 @@ function useProjects({ onNoProjects }) {
   return { ...projectState, ...projectActions };
 }
 
-function useAppState() {
+function useAppNavigation() {
   const [serverConnected, setServerConnected] = useServerHealth();
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
   const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
-  const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, handleRunChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
-  const settings = useAppSettings();
+  const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
   function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
+  return { serverConnected, setServerConnected, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange };
+}
+
+function useAppState() {
+  const nav = useAppNavigation();
+  const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange } = nav;
+  const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
+  const settings = useAppSettings();
   const { dashboard, accumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
   const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });

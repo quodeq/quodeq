@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import json
 from copy import copy
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable
 
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared.logging import log_info, log_warning
@@ -35,12 +35,14 @@ def check_zero_findings(
 
 def run_incremental_loop(
     config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
+    *, process_fn: Callable[..., "Evidence | None"] | None = None,
 ) -> dict[str, "Evidence"]:
     """Run incremental per-dimension analysis."""
     from quodeq.analysis._incremental import run_dimension_incremental
     from quodeq.analysis.runner import _process_single_dimension, _log_dimension_result
     from quodeq.engine._runner_markers import emit_marker
 
+    _process = process_fn or _process_single_dimension
     result: dict[str, Evidence] = {}
     for idx, dimension in enumerate(dimensions, 1):
         emit_marker("analyzing", dimension=dimension)
@@ -53,7 +55,7 @@ def run_incremental_loop(
             config.options = copy(original_options)
             config.options.incremental_file_filter = None
             try:
-                ev = _process_single_dimension(config, dimension, idx, ctx)
+                ev = _process(config, dimension, idx, ctx)
             finally:
                 config.options = original_options
         if ev:
@@ -65,15 +67,17 @@ def run_incremental_loop(
 
 def run_per_dimension_loop(
     config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
+    *, process_fn: Callable[..., "Evidence | None"] | None = None,
 ) -> dict[str, "Evidence"]:
     """Per-dimension loop (fallback or single-dimension)."""
     from quodeq.analysis.runner import _process_single_dimension
 
+    _process = process_fn or _process_single_dimension
     result: dict[str, Evidence] = {}
     skipped_count = 0
     for idx, dimension in enumerate(dimensions, 1):
         try:
-            ev = _process_single_dimension(config, dimension, idx, ctx)
+            ev = _process(config, dimension, idx, ctx)
         except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 failed: {exc}")
             skipped_count += 1

@@ -3,6 +3,10 @@ import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/component
 const AI_MODEL_STORAGE_KEY = 'cc-ai-model';
 const AI_CMD_STORAGE_KEY = 'cc-ai-cmd';
 
+const MODEL_LEVEL_FAST = 1;
+const MODEL_LEVEL_BALANCED = 2;
+const MODEL_LEVEL_THOROUGH = 3;
+
 export { AI_MODEL_STORAGE_KEY, AI_CMD_STORAGE_KEY };
 
 function ClientSelector({ aiCmd, availableClients }) {
@@ -112,9 +116,9 @@ function ModelSettings({ aiCmd, models }) {
           </span>
         </div>
         <div className="settings-model-overrides">
-          <ModelOverrideInput label="Fast" value={fast} setter={onFastChange} level={1} placeholder={DEFAULT_MODELS[1]} />
-          <ModelOverrideInput label="Balanced" value={balanced} setter={onBalancedChange} level={2} placeholder={DEFAULT_MODELS[2]} />
-          <ModelOverrideInput label="Thorough" value={thorough} setter={onThoroughChange} level={3} placeholder={DEFAULT_MODELS[3]} />
+          <ModelOverrideInput label="Fast" value={fast} setter={onFastChange} level={MODEL_LEVEL_FAST} placeholder={DEFAULT_MODELS[MODEL_LEVEL_FAST]} />
+          <ModelOverrideInput label="Balanced" value={balanced} setter={onBalancedChange} level={MODEL_LEVEL_BALANCED} placeholder={DEFAULT_MODELS[MODEL_LEVEL_BALANCED]} />
+          <ModelOverrideInput label="Thorough" value={thorough} setter={onThoroughChange} level={MODEL_LEVEL_THOROUGH} placeholder={DEFAULT_MODELS[MODEL_LEVEL_THOROUGH]} />
         </div>
       </div>
     </>
