@@ -72,6 +72,7 @@ export default function HistoryPage({ trend, selectedRunId, selectedRunScore, ac
             key={entry.runId}
             entry={entry}
             delta={deltas[i]}
+            isSelected={entry.runId === selectedRunId}
             onClick={onRunClick}
           />
         ))}

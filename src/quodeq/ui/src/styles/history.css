@@ -68,6 +68,11 @@
   background: var(--color-surface-alt);
 }
 
+.history-row.selected {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
 /* Date column */
 .history-row-date {
   min-width: 120px;

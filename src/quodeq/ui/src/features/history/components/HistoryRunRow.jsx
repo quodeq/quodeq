@@ -25,7 +25,7 @@ function capitalize(name) {
   return name.charAt(0).toUpperCase() + name.slice(1);
 }
 
-export default function HistoryRunRow({ entry, delta, onClick }) {
+export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
   const {
     runId, dateLabel, dateISO,
     runNumericAverage, runOverallGrade,
@@ -39,7 +39,7 @@ export default function HistoryRunRow({ entry, delta, onClick }) {
   const accLetter = gradeLabel(overallGrade) || '—';
   const runGradeWord = runOverallGrade ? capitalize(runOverallGrade) : '';
   return (
-    <button type="button" className="history-row" onClick={() => onClick(runId, dateLabel)}>
+    <button type="button" className={`history-row${isSelected ? ' selected' : ''}`} onClick={() => onClick(runId, dateLabel)}>
       <div className="history-row-date">
         <span className="history-row-date-main">{dateLabel}</span>
         <span className="history-row-date-time">{formatTime(dateISO)}</span>
