@@ -95,14 +95,14 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, topFilesCou
   );
 }
 
-function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimensionClick, dimensionsWithViolations, selectedDayDate }) {
+function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimensionClick, dimensionsWithViolations, selectedDayRunIds }) {
   return (
     <>
       <div className="dimensions-header">
         <h3 className="dimensions-title">Quality Dimensions</h3>
       </div>
       <div className="dimensions-panel">
-        <DimensionCardsGrid sortedDimensions={sortedDimensions} referenceRun={referenceRun} onDimensionClick={onDimensionClick} selectedDayDate={selectedDayDate} />
+        <DimensionCardsGrid sortedDimensions={sortedDimensions} referenceRun={referenceRun} onDimensionClick={onDimensionClick} selectedDayRunIds={selectedDayRunIds} />
       </div>
 
       {dimensionsWithViolations.length > 0 && (
@@ -229,11 +229,18 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? dayRuns[0]?.runId : currentOverviewRun;
 
-  // Get the selected day's date for highlighting dimension cards.
-  // Each accumulated dimension has fromDateIso — if it matches the selected day, it was evaluated that day.
-  const selectedDayDate = useMemo(() => {
+  // Collect ALL runIds from the selected day — used to highlight dimension cards.
+  // A dimension is "active" if its fromRunId matches any run on this day.
+  const selectedDayRunIds = useMemo(() => {
     const entry = trend.find((t) => t.runId === currentOverviewRun) || trend.find((t) => t.runId === selectedRunId);
-    return (entry?.dateISO || '').slice(0, 10) || null;
+    if (!entry) return new Set();
+    const selectedDate = (entry.dateISO || '').slice(0, 10);
+    if (!selectedDate) return new Set();
+    const ids = new Set();
+    for (const t of trend) {
+      if ((t.dateISO || '').slice(0, 10) === selectedDate) ids.add(t.runId);
+    }
+    return ids;
   }, [trend, currentOverviewRun, selectedRunId]);
 
   const stats = useMemo(
@@ -261,7 +268,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         referenceRun={referenceRun}
         onDimensionClick={onDimensionClick}
         dimensionsWithViolations={stats.dimsWithViolations}
-        selectedDayDate={selectedDayDate}
+        selectedDayRunIds={selectedDayRunIds}
       />
 
       <AccumulatedDetailsSection
