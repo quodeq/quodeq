@@ -29,8 +29,11 @@ const cssVar = (name, fallback) => {
   return result;
 };
 
-/** Clear cached CSS vars on theme change. */
-export function clearCssVarCache() { _cssVarCache.clear(); }
+// Auto-clear cache when theme changes (data-theme attribute mutation)
+new MutationObserver(() => _cssVarCache.clear()).observe(
+  document.documentElement,
+  { attributes: true, attributeFilter: ['data-theme'] },
+);
 
 const GRADE_CSS_VARS = {
   'grade-top':    '--color-grade-top-text',
