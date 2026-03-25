@@ -681,7 +681,7 @@
   transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
 }
 
-.run-navigator .run-nav-action:hover:not(:disabled) {
+.run-navigator .run-nav-action:hover:not(:disabled):not(.run-nav-action--primary):not(.run-nav-action--outline) {
   border-color: color-mix(in srgb, var(--color-accent) 45%, transparent);
   color: var(--color-accent);
   background: var(--color-accent-soft);
@@ -713,6 +713,7 @@
 .run-navigator .run-nav-action--primary:hover:not(:disabled) {
   background: var(--color-accent-hover);
   border-color: var(--color-accent-hover);
+  color: var(--color-on-accent);
 }
 
 /* Segmented pager: [‹][date][›] as one bordered unit */
