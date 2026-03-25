@@ -6,7 +6,7 @@ function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true }) {
   const prevScore = parseFloat(item.previousScore);
   const delta = !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
   const score = splitScore(item.overallScore);
-  const cardClass = `qd-card${evaluatedToday ? ' qd-card--active' : ' qd-card--carried'}`;
+  const cardClass = `qd-card${evaluatedToday ? ' qd-card--active' : ' qd-card-stale qd-card--carried'}`;
   return (
     <article
       className={cardClass}
@@ -38,6 +38,7 @@ function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true }) {
       </div>
       <div className="qd-card-footer">
         <span className="qd-card-date">{item.fromDateLabel || formatRunId(item.fromRunId)}</span>
+        {!evaluatedToday && <span className="qd-card-stale-label">Older run</span>}
       </div>
     </article>
   );
