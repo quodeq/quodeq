@@ -228,7 +228,7 @@ function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) 
   if (entry?.dateISO) {
     try {
       return new Date(entry.dateISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { /* fall through */ }
+    } catch { return entry.dateISO; }
   }
   return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;
 }

@@ -36,7 +36,7 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER
               const res = await fetch(`${baseUrl}:${port}${HEALTH_ENDPOINT}`, { signal: ac.signal });
               clearTimeout(tid);
               if (res.ok) return port;
-            } catch { clearTimeout(tid); }
+            } catch { clearTimeout(tid); return null; }
             return null;
           })
         );

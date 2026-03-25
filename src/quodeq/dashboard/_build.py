@@ -7,7 +7,7 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from quodeq.shared.logging import log_info
+from quodeq.shared.logging import log_debug, log_info
 
 _HASH_FILE = ".build_hash"
 
@@ -51,7 +51,8 @@ def compute_source_hash(source_dir: Path) -> str:
         try:
             h.update(str(rel).encode())
             h.update(f.read_bytes())
-        except OSError:
+        except OSError as exc:
+            log_debug(f"Skipping {f.name} in source hash: {exc}")
             continue
     return h.hexdigest()
 

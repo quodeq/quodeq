@@ -238,27 +238,33 @@ class QuodeqApp(rumps.App):
 
     def _wait_for_dashboard(self, stderr_log):
         """Poll until the dashboard responds or process crashes."""
-        for _ in range(_MAX_START_RETRIES):
-            time.sleep(_HEALTH_POLL_INTERVAL_S)
-            if self._process.poll() is not None:
+        try:
+            for _ in range(_MAX_START_RETRIES):
+                time.sleep(_HEALTH_POLL_INTERVAL_S)
+                if self._process.poll() is not None:
+                    stderr_log.close()
+                    try:
+                        with open(stderr_log.name) as f:
+                            err = f.read(_STDERR_READ_MAX).strip()
+                    except OSError:
+                        err = "unknown error"
+                    self._set_error(f"Crashed (exit {self._process.returncode}): {err[:_ERROR_DISPLAY_MAX]}")
+                    self._status_item.title = "Stopped"
+                    self._cleanup_stderr_log()
+                    return
+                port = self._find_running_port()
+                if port:
+                    self._port = port
+                    self._clear_error()
+                    return
+            self._set_error("Timeout: dashboard did not respond")
+            self._status_item.title = "Stopped"
+            self._cleanup_stderr_log()
+        finally:
+            try:
                 stderr_log.close()
-                try:
-                    with open(stderr_log.name) as f:
-                        err = f.read(_STDERR_READ_MAX).strip()
-                except OSError:
-                    err = "unknown error"
-                self._set_error(f"Crashed (exit {self._process.returncode}): {err[:_ERROR_DISPLAY_MAX]}")
-                self._status_item.title = "Stopped"
-                self._cleanup_stderr_log()
-                return
-            port = self._find_running_port()
-            if port:
-                self._port = port
-                self._clear_error()
-                return
-        self._set_error("Timeout: dashboard did not respond")
-        self._status_item.title = "Stopped"
-        self._cleanup_stderr_log()
+            except OSError:
+                pass
 
     @staticmethod
     def _find_pids_on_port(port: int) -> list[int]:
