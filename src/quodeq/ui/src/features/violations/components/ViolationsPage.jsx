@@ -158,7 +158,9 @@ export default function ViolationsPage({ data, callbacks }) {
   const [activeSubTab, setActiveSubTab] = useState('dimension');
 
   const topFilesCount = useMemo(
-    () => buildTopOffendingFiles(accumulatedDimensions).length,
+    () => new Set(
+      accumulatedDimensions.flatMap((d) => (d.violations || []).map((v) => v.file)).filter(Boolean)
+    ).size,
     [accumulatedDimensions]
   );
 

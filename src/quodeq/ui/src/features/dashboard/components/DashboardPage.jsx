@@ -6,7 +6,7 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 function DashboardContent({ runMode, data, focus, callbacks }) {
   const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
-  const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick, onPrincipleClick } = callbacks;
+  const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick } = callbacks;
   if (runMode) {
     return (
       <RunOverviewPanel
@@ -41,7 +41,6 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
       }}
       callbacks={{
         onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick,
-        onFileClick, onPrincipleClick,
       }}
     />
   );
@@ -65,7 +64,6 @@ function makeDashboardHandlers(onNavigate, dashboard) {
       if (onNavigate) onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel });
     },
     handleFileClick: (fileObj) => { if (onNavigate) onNavigate('file', { file: fileObj }); },
-    handlePrincipleClick: (principleObj) => { if (onNavigate) onNavigate('principle', { principle: principleObj }); },
   };
 }
 
@@ -98,7 +96,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
           runMode={runMode}
           data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
-          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick, onPrincipleClick: handlers.handlePrincipleClick }}
+          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick }}
         />
       )}
     </div>
