@@ -37,26 +37,24 @@ export default function HistoryRunRow({ entry, delta, onClick }) {
   const dimLabels = (dimensions || []).map(capitalize).join(', ');
   return (
     <button type="button" className="history-row" onClick={() => onClick(runId, dateLabel)}>
-      <div className="history-row-left">
-        <div className="history-row-top">
-          <div className="history-row-date">
-            <span className="history-row-date-main">{dateLabel}</span>
-            <span className="history-row-date-time">{formatTime(dateISO)}</span>
-          </div>
-          <span className={`chip small ${scoreColorClass(runScore)}`}>{runOverallGrade || '—'}</span>
-          <span className="history-row-score">{isNaN(runScore) ? '—' : runScore.toFixed(1)}</span>
-        </div>
-        <div className="history-row-bottom">
-          <span className="history-row-dims">{dimLabels || '—'}</span>
-        </div>
+      <div className="history-row-date">
+        <span className="history-row-date-main">{dateLabel}</span>
+        <span className="history-row-date-time">{formatTime(dateISO)}</span>
       </div>
-      <div className="history-row-right">
-        <span className="history-row-acc-label">accumulated</span>
-        <div className="history-row-acc-grade">
-          <span className={`chip small ${scoreColorClass(accScore)}`} style={{ opacity: 0.7 }}>{overallGrade || '—'}</span>
-          <span className="history-row-acc-score">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>
+      <div className="history-row-eval">
+        <div className="history-row-eval-top">
+          <span className={`chip small ${scoreColorClass(runScore)}`}>{runOverallGrade || '—'}</span>
+          <span className="history-row-eval-score">{isNaN(runScore) ? '—' : runScore.toFixed(1)}</span>
         </div>
-        <TrendBadge delta={delta} />
+        <div className="history-row-eval-dims">{dimLabels || '—'}</div>
+      </div>
+      <div className="history-row-acc">
+        <span className="history-row-acc-label">Accumulated</span>
+        <div className="history-row-acc-line">
+          <span className={`chip small ${scoreColorClass(accScore)}`} style={{ opacity: 0.65 }}>{overallGrade || '—'}</span>
+          <span className="history-row-acc-score">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>
+          <TrendBadge delta={delta} />
+        </div>
       </div>
     </button>
   );

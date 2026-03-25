@@ -1,4 +1,7 @@
+import { useState } from 'react';
 import HistoryRunRow from './HistoryRunRow.jsx';
+
+const INITIAL_LIMIT = 20;
 
 function computeDeltas(trend) {
   return trend.map((entry, i) => {
@@ -11,6 +14,8 @@ function computeDeltas(trend) {
 }
 
 export default function HistoryPage({ trend, onRunClick }) {
+  const [showAll, setShowAll] = useState(false);
+
   if (!trend || trend.length === 0) {
     return (
       <div className="history-page">
@@ -25,6 +30,8 @@ export default function HistoryPage({ trend, onRunClick }) {
   }
 
   const deltas = computeDeltas(trend);
+  const visible = showAll ? trend : trend.slice(0, INITIAL_LIMIT);
+  const hasMore = trend.length > INITIAL_LIMIT && !showAll;
 
   return (
     <div className="history-page">
@@ -33,7 +40,7 @@ export default function HistoryPage({ trend, onRunClick }) {
         <span className="history-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
       </div>
       <div className="history-list">
-        {trend.map((entry, i) => (
+        {visible.map((entry, i) => (
           <HistoryRunRow
             key={entry.runId}
             entry={entry}
@@ -42,6 +49,13 @@ export default function HistoryPage({ trend, onRunClick }) {
           />
         ))}
       </div>
+      {hasMore && (
+        <div className="history-load-more">
+          <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>
+            Load all {trend.length} evaluations
+          </button>
+        </div>
+      )}
     </div>
   );
 }
