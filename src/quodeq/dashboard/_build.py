@@ -25,7 +25,7 @@ def _static_dir() -> Path:
     return _quodeq_dir() / "static"
 
 # Files and directories to sync from package source to build workdir
-_SYNC_ITEMS = ("src", "public", "package.json", "vite.config.js", "index.html")
+_SYNC_ITEMS = ("src", "public", "package.json", "package-lock.json", ".npmrc", "vite.config.js", "index.html")
 
 _NPM_INSTALL_TIMEOUT_S = 300
 _NPM_BUILD_TIMEOUT_S = 600
