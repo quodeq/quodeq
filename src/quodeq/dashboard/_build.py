@@ -30,6 +30,9 @@ _SYNC_ITEMS = ("src", "public", "package.json", "package-lock.json", ".npmrc", "
 _NPM_INSTALL_TIMEOUT_S = 300
 _NPM_BUILD_TIMEOUT_S = 600
 
+_NPM_INSTALL_TIMEOUT_S = 300
+_NPM_BUILD_TIMEOUT_S = 600
+
 
 def _get_ui_source_dir() -> Path:
     """Return the path to the UI source bundled inside the package."""
