@@ -14,14 +14,12 @@ from quodeq.adapters.fs.report_parser import (
     RunInfo,
     calculate_trend,
     list_runs,
-    most_frequent_grade,
     read_run_data,
     summarize_dimensions,
 )
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services._dashboard_stale import collect_stale_dimensions
-from quodeq.core.scoring.internals import score_to_grade_label
-from quodeq.services.accumulated import numeric_average
+from quodeq.services._dashboard_trend import build_accumulated_trend
 
 
 @dataclass
@@ -101,40 +99,6 @@ def _enrich_dimensions_with_trend(
             )
         )
     return result
-
-
-def _build_accumulated_trend(
-    runs: list[RunInfo],
-    get_run_dimensions: Callable[[str], list[DimensionResult]],
-) -> list[dict[str, Any]]:
-    """Build trend using accumulated scores across all runs (oldest to newest)."""
-    trend: list[dict[str, Any]] = []
-    acc_by_dim: dict[str, DimensionResult] = {}
-    for item in reversed(runs):  # oldest -> newest
-        run_dims = get_run_dimensions(item.run_id)
-        for dim in run_dims:
-            if dim.dimension:
-                acc_by_dim[dim.dimension] = dim
-        if not run_dims:
-            continue
-        acc_dims = list(acc_by_dim.values())
-        acc_grades = [d.overall_grade for d in acc_dims if d.overall_grade]
-        avg = numeric_average(acc_dims)
-        trend.append(
-            {
-                "runId": item.run_id,
-                "dateISO": item.date_iso,
-                "dateLabel": item.date_label,
-                "dimensionsCount": len(acc_by_dim),
-                "numericAverage": avg,
-                "overallGrade": (
-                    score_to_grade_label(avg) if avg is not None
-                    else (most_frequent_grade(acc_grades) if acc_grades else None)
-                ),
-            }
-        )
-    trend.reverse()
-    return trend
 
 
 def _make_run_dimension_fetcher(
@@ -238,7 +202,7 @@ def _compute_dashboard_payload(
     )
     return _DashboardPayload(
         selected_summary=ctx.summary,
-        trend=_build_accumulated_trend(history_runs, get_run_dimensions),
+        trend=build_accumulated_trend(history_runs, get_run_dimensions),
         dimensions_with_trend=_enrich_dimensions_with_trend(ctx.dimensions, previous_by_dimension),
         previous_by_dimension=previous_by_dimension,
         stale_previous_by_dimension=stale_previous_by_dimension,

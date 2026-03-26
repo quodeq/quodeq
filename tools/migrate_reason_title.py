@@ -94,6 +94,9 @@ def main():
     parser.add_argument("--dir", default="evaluations", help="Evaluations root directory")
     parser.add_argument("--apply", action="store_true", help="Write changes (default is dry-run)")
     args = parser.parse_args()
+    if not args.dir or not args.dir.strip():
+        print("Error: --dir must not be empty", file=sys.stderr)
+        sys.exit(1)
 
     try:
         root = Path(args.dir)
@@ -127,7 +130,7 @@ def main():
         print(f"\n{mode}: {files_changed} files, {total_v} violations, {total_c} compliance entries")
         if not args.apply and (total_v or total_c):
             print("Run with --apply to write changes.")
-    except Exception as exc:
+    except (OSError, json.JSONDecodeError, KeyError, ValueError) as exc:
         print(f"Fatal error: {exc}", file=sys.stderr)
         sys.exit(1)
 

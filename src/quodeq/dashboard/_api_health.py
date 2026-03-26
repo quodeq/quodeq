@@ -59,9 +59,12 @@ def action_api_healthy(base_url: str) -> bool:
 
 def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_S) -> None:
     """Block until the action API becomes healthy, or raise TimeoutError."""
+    import random
     log_info(f"Waiting for Action API at {base_url}...")
     start = time.monotonic()
     attempts = 0
+    delay = _HEALTH_POLL_INTERVAL_S
+    max_delay = 2.0
     while time.monotonic() - start < timeout_s and attempts < _MAX_HEALTH_POLL_ATTEMPTS:
         if action_api_healthy(base_url):
             return None
@@ -69,7 +72,9 @@ def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_
         if attempts % 10 == 0:
             elapsed = round(time.monotonic() - start, 1)
             log_info(f"Still waiting for Action API ({elapsed:.0f}s elapsed)...")
-        time.sleep(_HEALTH_POLL_INTERVAL_S)
+        jitter = random.uniform(0, delay * 0.2)
+        time.sleep(delay + jitter)
+        delay = min(delay * 1.5, max_delay)
     raise TimeoutError(f"Action API did not become ready within {timeout_s} seconds.")
 
 

@@ -5,9 +5,9 @@ from dataclasses import dataclass
 from quodeq.core.types import Deductions, OverallScore, PrincipleScore, ScaleInfo, ScoringResult
 from quodeq.core.evidence.model import DEFAULT_WEIGHT, Evidence
 from quodeq.core.scoring.overall import (
-    _accumulate_weights,
-    _build_overall_result,
-    _weighted_overall,
+    accumulate_weights,
+    build_overall_result,
+    weighted_overall,
     MODE_NUMERICAL,
 )
 from quodeq.core.scoring.internals import (
@@ -173,32 +173,43 @@ def _score_principle_graded(ctx: _PrincipleContext) -> PrincipleScore:
 # Main scoring entry points
 # ---------------------------------------------------------------------------
 
+def _compute_tallies(
+    violations: list, compliance: list,
+) -> tuple[dict[str, int], dict[str, int], bool]:
+    """Tally violation and compliance type counts, selecting taxonomy or reason mode.
+
+    Returns (vt_counts, ct_counts, using_taxonomy).
+    """
+    using_taxonomy = evidence_has_taxonomy(violations)
+    vt_counts = tally_types_by_taxonomy(violations) if using_taxonomy else tally_types_by_reason(violations)
+    ct_counts = tally_compliance_types_by_taxonomy(compliance) if using_taxonomy else tally_compliance_types_by_reason(compliance)
+    return vt_counts, ct_counts, using_taxonomy
+
+
+def _extract_metrics(pdata: dict) -> tuple[float, str, bool, int]:
+    """Extract compliance percentage, confidence level, balance, and instance count from principle data."""
+    metrics = pdata.get("metrics", {})
+    return (
+        metrics.get("compliance_percentage", 0.0),
+        metrics.get("confidence_level", "medium"),
+        metrics.get("is_balanced", True),
+        metrics.get("total_instances", 0),
+    )
+
+
 def _build_principle_context(
     key: str, pdata: dict, scale_mult: int, files_read: int,
 ) -> _PrincipleContext:
     """Extract evidence data for a single principle and return a scoring context."""
-    metrics = pdata.get("metrics", {})
-    pct = metrics.get("compliance_percentage", 0.0)
-    violations = pdata.get("violations", [])
-    compliance = pdata.get("compliance", [])
-    conf_level = metrics.get("confidence_level", "medium")
-
-    using_taxonomy = evidence_has_taxonomy(violations)
-    vt_counts = (
-        tally_types_by_taxonomy(violations)
-        if using_taxonomy
-        else tally_types_by_reason(violations)
-    )
-    ct_counts = (
-        tally_compliance_types_by_taxonomy(compliance)
-        if using_taxonomy
-        else tally_compliance_types_by_reason(compliance)
+    pct, conf_level, is_balanced, total_instances = _extract_metrics(pdata)
+    vt_counts, ct_counts, using_taxonomy = _compute_tallies(
+        pdata.get("violations", []), pdata.get("compliance", []),
     )
     dampen = compliance_dampening(ct_counts, vt_counts)
     ci = confidence_interval_for(
         confidence_level=conf_level,
-        is_balanced=metrics.get("is_balanced", True),
-        total_instances=metrics.get("total_instances", 0),
+        is_balanced=is_balanced,
+        total_instances=total_instances,
         files_read=files_read,
     )
     return _PrincipleContext(
@@ -237,7 +248,7 @@ def run_scoring(evidence: dict, mode: str) -> ScoringResult:
     per_principle = _score_all_principles(
         evidence.get("principles", {}), mode, scale_mult, files_read,
     )
-    overall = _weighted_overall(per_principle, mode)
+    overall = weighted_overall(per_principle, mode)
 
     return ScoringResult(
         repository=evidence.get("repository", ""),

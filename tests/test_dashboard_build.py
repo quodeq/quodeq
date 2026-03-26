@@ -5,6 +5,8 @@ from unittest.mock import patch
 
 import pytest
 
+_SHA256_HEX_LEN = 64
+
 from quodeq.dashboard._build import (
     compute_source_hash,
     needs_rebuild,
@@ -21,7 +23,7 @@ class TestComputeSourceHash:
         (tmp_path / "package.json").write_text('{"name":"test"}')
         result = compute_source_hash(tmp_path)
         assert isinstance(result, str)
-        assert len(result) == 64  # SHA-256 hex
+        assert len(result) == _SHA256_HEX_LEN  # SHA-256 hex
 
     def test_hash_changes_when_source_changes(self, tmp_path):
         src = tmp_path / "src"

@@ -7,7 +7,7 @@ from .finding import Finding, Totals
 
 @dataclass(frozen=True, slots=True)
 class PrincipleGrade:
-    name: str | None = None
+    principle: str | None = None
     score: str | None = None
     grade: str | None = None
 

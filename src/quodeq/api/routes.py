@@ -5,13 +5,14 @@ import re
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request, send_from_directory
+from flask import Flask, Response, jsonify, request
 
-from quodeq.api.helpers import error_response, validate_evaluation_payload
+from quodeq.api.helpers import error_response, register_static_routes, validate_evaluation_payload
 from quodeq.api.zip import export_project_zip
 from quodeq.core.types import to_camel_dict
 from quodeq.provider.base import ActionProvider
 from quodeq.provider.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
+from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
 from quodeq.shared.utils import get_evaluations_dir
 
 _CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
@@ -19,6 +20,12 @@ _logger = logging.getLogger(__name__)
 
 # Error keyword returned by browse_repo when the path exists but is not a directory.
 _BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
+
+# Bounds for user-supplied evaluation parameters
+_MIN_SUBAGENTS = 1
+_MAX_SUBAGENTS = 10
+_MIN_POOL_BUDGET = 60
+_MAX_POOL_BUDGET = 3600
 
 
 def _sanitize_url(url: str) -> str:
@@ -157,6 +164,43 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
     return None
 
 
+def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
+    """Construct and validate EvaluationOptions from the request payload."""
+    from quodeq.provider.base import EvaluationOptions
+    max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
+    max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
+    pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
+    pool_budget = max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, int(pool_budget_raw)))
+    return EvaluationOptions(
+        discipline=payload.get("discipline"),
+        dimensions=payload.get("dimensions") or "",
+        numerical=bool(payload.get("numerical")),
+        ai_cmd=payload.get("aiCmd") or None,
+        ai_model=payload.get("aiModel") or None,
+        subagent_model=payload.get("subagentModel") or None,
+        verify_findings=bool(payload.get("verifyFindings", True)),
+        max_subagents=max_subagents,
+        pool_budget=pool_budget,
+        incremental=bool(payload.get("incremental", False)),
+    )
+
+
+def _check_eval_rate_limit(eval_rate_store: object | None) -> tuple[Response, int] | None:
+    """Return an error response if the evaluation rate limit is exceeded, or None."""
+    if eval_rate_store is None:
+        return None
+    import time as _time
+    ip = request.remote_addr or "unknown"
+    now = _time.monotonic()
+    if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
+        body, status = error_response(
+            "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
+        )
+        return jsonify(body), status
+    eval_rate_store.record(ip, now)  # type: ignore[union-attr]
+    return None
+
+
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
     @app.get("/api/evaluations")
@@ -165,50 +209,23 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
-        # Enforce stricter per-endpoint rate limit for evaluation creation
-        if eval_rate_store is not None:
-            import time as _time
-            ip = request.remote_addr or "unknown"
-            now = _time.monotonic()
-            if eval_rate_store.check(ip, now):  # type: ignore[union-attr]
-                body, status = error_response(
-                    "Too many evaluation requests", HTTPStatus.TOO_MANY_REQUESTS, "RATE_LIMITED",
-                )
-                return jsonify(body), status
-            eval_rate_store.record(ip, now)  # type: ignore[union-attr]
+        rate_error = _check_eval_rate_limit(eval_rate_store)
+        if rate_error is not None:
+            return rate_error
         payload = request.get_json(silent=True) or {}
         validation_error = validate_evaluation_payload(payload)
         if validation_error:
             body, status = error_response(validation_error, HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
-        repo = payload.get("repo")
         ai_cmd = payload.get("aiCmd") or None
         ai_cmd_error = _validate_ai_cmd(ai_cmd)
         if ai_cmd_error is not None:
             return ai_cmd_error
+        repo = payload.get("repo")
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
-            from quodeq.provider.base import EvaluationOptions
-            max_subagents_raw = payload.get("maxSubagents", 5)
-            max_subagents = max(1, min(10, int(max_subagents_raw)))
-            pool_budget_raw = payload.get("poolBudget", 600)
-            pool_budget = max(60, min(3600, int(pool_budget_raw)))
-            job = provider.start_evaluation(
-                repo=repo,
-                reports_dir=_reports_dir(),
-                options=EvaluationOptions(
-                    discipline=payload.get("discipline"),
-                    dimensions=payload.get("dimensions") or "",
-                    numerical=bool(payload.get("numerical")),
-                    ai_cmd=ai_cmd,
-                    ai_model=payload.get("aiModel") or None,
-                    subagent_model=payload.get("subagentModel") or None,
-                    verify_findings=bool(payload.get("verifyFindings", True)),
-                    max_subagents=max_subagents,
-                    pool_budget=pool_budget,
-                    incremental=bool(payload.get("incremental", False)),
-                ),
-            )
+            options = _build_evaluation_options(payload)
+            job = provider.start_evaluation(repo=repo, reports_dir=_reports_dir(), options=options)
         except (FileNotFoundError, ValueError):
             body, status = error_response("Invalid repository", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
             return jsonify(body), status
@@ -276,24 +293,4 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
         return jsonify(payload)
 
 
-def register_static_routes(app: Flask, static_dist: str | None) -> None:
-    """Register static file serving routes."""
-    if not static_dist:
-        return
-    dist = Path(static_dist).resolve()
-    if not dist.is_dir():
-        return
-
-    @app.route('/')
-    def serve_root() -> Response:
-        """Serve the SPA index page."""
-        return send_from_directory(str(dist), 'index.html')
-
-    @app.route('/<path:path>')
-    def serve_static_or_spa(path: str) -> Response | tuple[Response, int]:
-        """Serve a static file or fall back to the SPA index."""
-        if (dist / path).is_file():
-            return send_from_directory(str(dist), path)
-        if path.startswith('api/'):
-            return jsonify({"error": "Not found", "code": "NOT_FOUND"}), HTTPStatus.NOT_FOUND
-        return send_from_directory(str(dist), 'index.html')
+__all__ = ["register_static_routes"]  # re-exported from quodeq.api.helpers

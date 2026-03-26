@@ -150,6 +150,9 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main():
     args = _build_parser().parse_args()
+    if not args.project or not args.project.strip():
+        print("Error: --project must not be empty", file=sys.stderr)
+        sys.exit(1)
 
     try:
         dry_run = not args.apply_

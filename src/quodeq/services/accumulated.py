@@ -1,7 +1,6 @@
 """Accumulated (cross-run) view logic for the filesystem action provider."""
 from __future__ import annotations
 
-import os
 import threading
 from collections import OrderedDict
 from dataclasses import dataclass, field, replace
@@ -19,28 +18,44 @@ from quodeq.adapters.fs.report_parser import (
 from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.shared.utils import _env_int
+
+_DEFAULT_ACC_CACHE_MAX = 256
 
 
 def create_accumulated_cache() -> tuple[OrderedDict[tuple, list[DimensionResult]], threading.Lock]:
-    """Create the default accumulated-view LRU cache and its lock.
-
-    Override this factory to plug in a shared backend (e.g. a Redis-backed
-    OrderedDict wrapper) for multi-worker deployments.
-    """
+    """Create the default accumulated-view LRU cache and its lock."""
     return OrderedDict(), threading.Lock()
-
-
-_DEFAULT_ACC_CACHE_MAX = 256
 
 
 def _acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None = None) -> int:
     """Return the accumulated-view cache size limit. *override* bypasses env for testing."""
     if override is not None:
         return override
-    try:
-        return int((env or os.environ).get("QUODEQ_ACC_CACHE_MAX", str(_DEFAULT_ACC_CACHE_MAX)))
-    except (ValueError, TypeError):
-        return _DEFAULT_ACC_CACHE_MAX
+    return _env_int("QUODEQ_ACC_CACHE_MAX", _DEFAULT_ACC_CACHE_MAX, env=env)
+
+
+def _classify_dimension(
+    dim: DimensionResult, run_id: str, run_info: RunInfo | None, is_first_run: bool,
+    latest_by_dimension: dict[str, DimensionResult],
+    prev_occurrence: dict[str, DimensionResult],
+    prev_run_latest_map: dict[str, DimensionResult],
+) -> None:
+    """Classify a single dimension into latest, previous-occurrence, or previous-run buckets."""
+    dim_name = dim.dimension
+    if not dim_name:
+        return
+    if dim_name not in latest_by_dimension:
+        latest_by_dimension[dim_name] = replace(
+            dim,
+            from_run_id=run_id,
+            from_date_iso=run_info.date_iso if run_info else None,
+            from_date_label=run_info.date_label if run_info else None,
+        )
+    elif dim_name not in prev_occurrence:
+        prev_occurrence[dim_name] = replace(dim, run_id=run_id)
+    if not is_first_run and dim_name not in prev_run_latest_map:
+        prev_run_latest_map[dim_name] = dim
 
 
 def _read_all_run_data(
@@ -52,7 +67,7 @@ def _read_all_run_data(
     Returns:
         latest_by_dimension: most recent dimension data, keyed by dimension name.
         prev_occurrence: for each dimension, its data from the next-older run
-            (used for trend computation — replaces the O(n^2) _find_previous_run).
+            (used for trend computation).
         prev_run_latest: most recent dimension data from runs[1:] (for previous average).
     """
     run_lookup = {r.run_id: r for r in all_run_infos}
@@ -62,26 +77,12 @@ def _read_all_run_data(
     _fetch = get_run_data or (lambda rid: read_run_data(reports_root, project, rid))
 
     for run_idx_i, run_id in enumerate(runs):
-        dims = _fetch(run_id)
         run_info = run_lookup.get(run_id)
-        is_first_run = (run_idx_i == 0)
-
-        for dim in dims:
-            dim_name = dim.dimension
-            if not dim_name:
-                continue
-            if dim_name not in latest_by_dimension:
-                latest_by_dimension[dim_name] = replace(
-                    dim,
-                    from_run_id=run_id,
-                    from_date_iso=run_info.date_iso if run_info else None,
-                    from_date_label=run_info.date_label if run_info else None,
-                )
-            elif dim_name not in prev_occurrence:
-                prev_occurrence[dim_name] = replace(dim, run_id=run_id)
-
-            if not is_first_run and dim_name not in prev_run_latest_map:
-                prev_run_latest_map[dim_name] = dim
+        for dim in _fetch(run_id):
+            _classify_dimension(
+                dim, run_id, run_info, run_idx_i == 0,
+                latest_by_dimension, prev_occurrence, prev_run_latest_map,
+            )
 
     return latest_by_dimension, prev_occurrence, list(prev_run_latest_map.values())
 
@@ -233,9 +234,16 @@ def compute_accumulated(
 ) -> dict[str, Any] | None:
     """Compute the accumulated (cross-run) view for *project*.
 
+    Args:
+        reports_dir: Filesystem path to the reports root directory.
+        project: Project identifier (UUID or slug).
+        as_of: Optional run-id cutoff; only runs up to and including this
+            run are considered.  *None* means use all runs.
+        cache_config: Override the module-level LRU cache for testing
+            without global state mutation.
+
     Parameter count is intentional: each argument represents a distinct
-    query axis with no natural grouping.  *cache_config* overrides the
-    module-level LRU cache for testing without global state mutation.
+    query axis with no natural grouping.
     """
     reports_root = Path(reports_dir)
     project_path = reports_root / project

@@ -8,7 +8,9 @@ import { getLevels, STORAGE_KEY as POWER_KEY } from '../features/evaluation/comp
  * Extracts evaluation-specific state and side effects from App so that
  * App only wires the hook's return values into the component tree.
  */
-export function useEvaluationLifecycle({ settings, navTab, loadProjects, setProjects, selectProjectAndRun, navReset }) {
+export function useEvaluationLifecycle({ settings, navigation, projects }) {
+  const { navTab, navReset } = navigation;
+  const { loadProjects, setProjects, selectProjectAndRun } = projects;
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
 
   const [analysisPower, setAnalysisPower] = useState(() => {
@@ -16,8 +18,18 @@ export function useEvaluationLifecycle({ settings, navTab, loadProjects, setProj
   });
 
   const prevJobRef = useRef(null);
+  const refreshedRunRef = useRef(null);
   useEffect(() => {
     if (job?.status === 'running' && !prevJobRef.current) navTab('evaluate');
+    // Auto-refresh dashboard data as soon as the run completes
+    const finished = job && job.status !== 'running' && job.outputProject && job.outputRunId;
+    if (finished && refreshedRunRef.current !== job.outputRunId) {
+      refreshedRunRef.current = job.outputRunId;
+      loadProjects()
+        .then((list) => setProjects(list))
+        .catch((err) => console.error('Failed to refresh projects:', err));
+      selectProjectAndRun(job.outputProject, job.outputRunId);
+    }
     prevJobRef.current = job;
   }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -29,14 +41,6 @@ export function useEvaluationLifecycle({ settings, navTab, loadProjects, setProj
 
   function handleEvalDismiss(action) {
     if (action === 'view') {
-      const project = job?.outputProject;
-      const runId = job?.outputRunId;
-      if (project) {
-        loadProjects()
-          .then((list) => setProjects(list))
-          .catch((err) => console.error('Operation failed:', err));
-        selectProjectAndRun(project, runId);
-      }
       navReset();
     }
     clearJob();

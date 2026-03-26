@@ -2,18 +2,34 @@
 from __future__ import annotations
 
 import time
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from quodeq.analysis.fingerprint import build_fingerprint, load_fingerprint, save_fingerprint
-from quodeq.analysis.incremental import classify_files, carry_forward_findings, identify_backfill_files
-from quodeq.analysis.subagents.verify import _resolve_evidence_paths
+from quodeq.analysis._backfill import (
+    BackfillContext, extract_files_from_jsonl, run_backfill_phase,
+)
+from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, save_fingerprint
+from quodeq.analysis.incremental import classify_files, carry_forward_findings
+from quodeq.analysis.subagents.runner import _list_source_files
+from copy import copy
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.shared.logging import log_debug, log_info, log_warning
 
 if TYPE_CHECKING:
     from quodeq.analysis.runner import RunConfig, _AnalysisContext
+
+# Re-export for backward compatibility
+_extract_files_from_jsonl = extract_files_from_jsonl
+
+
+@dataclass
+class IncrementalCoverage:
+    """Groups coverage-related data for incremental finalization."""
+    files: list[str]
+    all_analyzed: set[str]
+    files_read: int
 
 
 def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisContext"]:
@@ -61,45 +77,23 @@ def save_dimension_fingerprint(
     try:
         evidence_dir = config.work_dir or config.src
         if files is None:
-            from quodeq.analysis.subagents.runner import _list_source_files
-            saved_filter = config.options.incremental_file_filter
-            config.options.incremental_file_filter = None
-            files, _ = _list_source_files(config, dimension)
-            config.options.incremental_file_filter = saved_filter
+            files, _ = _list_source_files(config, dimension, ignore_file_filter=True)
         if analyzed_files is None:
+            queue_files: set[str] = set()
             queue_path = evidence_dir / f"{dimension}_queue.json"
             if queue_path.exists():
                 from quodeq.analysis.subagents.file_queue import FileQueue
                 try:
-                    queue = FileQueue(queue_path)
-                    analyzed_files = set(queue.all_taken_files())
-                except Exception:
-                    pass
+                    queue_files = set(FileQueue(queue_path).all_taken_files())
+                except (OSError, ValueError, KeyError) as exc:
+                    log_debug(f"  [{dimension}] Could not read file queue: {exc}")
+            jsonl_files = extract_files_from_jsonl(evidence_dir / f"{dimension}_evidence.jsonl")
+            analyzed_files = queue_files | jsonl_files
         fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=analyzed_files)
         save_fingerprint(fp, evidence_dir)
-    except Exception as exc:
+    except (OSError, ValueError, TypeError) as exc:
         log_debug(f"  [{dimension}] Fingerprint save failed: {exc}")
 
-
-def _find_previous_fingerprint(
-    evidence_dir: Path, dimension: str,
-) -> tuple[dict | None, Path | None]:
-    """Find the fingerprint and evidence dir from the most recent previous run."""
-    paths_info = _resolve_evidence_paths(evidence_dir)
-    if not paths_info:
-        log_warning(f"  [{dimension}] Cannot resolve evidence paths — falling back to full analysis")
-        return None, None
-
-    current_run_id, project_uuid, reports_base = paths_info
-    from quodeq.data.fs.report_parser.runs import list_runs
-    for run_info in list_runs(reports_base, project_uuid):
-        if run_info.run_id == current_run_id:
-            continue
-        prev_evidence = reports_base / project_uuid / run_info.run_id / "evidence"
-        fp = load_fingerprint(prev_evidence, dimension)
-        if fp:
-            return fp, prev_evidence
-    return None, None
 
 
 def _parse_evidence_from_jsonl(
@@ -123,22 +117,25 @@ def _parse_evidence_from_jsonl(
 
 def _run_phase1_analysis(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
-    classification: object, evidence_dir: Path,
+    classification: object,
 ) -> Evidence | None:
     """Phase 1: analyze changed files or use cached findings only."""
     from quodeq.analysis.runner import _process_single_dimension
 
+    evidence_dir = config.work_dir or config.src
     if not classification.to_analyze:
         log_info(f"  [{dimension}] No changes detected — using cached findings only")
         jsonl_file = evidence_dir / f"{dimension}_evidence.jsonl"
         return _parse_evidence_from_jsonl(config, dimension, ctx, jsonl_file, len(classification.unchanged))
 
     log_info(f"  [{dimension}] Analyzing {len(classification.to_analyze)} changed files ({len(classification.unchanged)} cached)")
+    original_options = config.options
+    config.options = copy(original_options)
     config.options.incremental_file_filter = set(classification.to_analyze)
     try:
         ev = _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
     finally:
-        config.options.incremental_file_filter = None
+        config.options = original_options
 
     # Dedup: carried-forward + new findings may overlap
     from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
@@ -152,60 +149,39 @@ def _run_phase1_analysis(
     return ev
 
 
-def _run_backfill_phase(
-    config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
-    files: list[str], prev_analyzed: set[str], phase1_files: set[str],
-    evidence_dir: Path, phase_start: float,
-) -> set[str]:
-    """Phase 3: backfill previously-unevaluated files with remaining budget.
-
-    Returns the set of backfill files actually taken.
-    """
-    from quodeq.analysis.runner import _process_single_dimension
-
-    backfill_candidates = identify_backfill_files(files, list(prev_analyzed), phase1_files)
+def _finalize_incremental(
+    config: RunConfig, dimension: str, ctx: _AnalysisContext,
+    coverage: IncrementalCoverage,
+) -> Evidence | None:
+    """Re-parse JSONL, save fingerprint, and log coverage."""
+    evidence_dir = config.work_dir or config.src
+    all_analyzed = coverage.all_analyzed & set(coverage.files)
     output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
-    backfill_taken: set[str] = set()
+    ev = _parse_evidence_from_jsonl(config, dimension, ctx, output_jsonl, coverage.files_read)
+    new_fp = build_fingerprint(config.src, coverage.files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
+    save_fingerprint(new_fp, evidence_dir)
+    coverage_pct = len(all_analyzed) * 100 // len(coverage.files) if coverage.files else 100
+    log_info(f"  [{dimension}] Coverage: {len(all_analyzed)}/{len(coverage.files)} files ({coverage_pct}%)")
+    return ev
 
-    if not backfill_candidates:
-        return backfill_taken
 
-    elapsed = time.monotonic() - phase_start
-    total_budget = config.options.pool_budget or 600
-    remaining_budget = max(0, total_budget - int(elapsed))
+def _maybe_carry_forward(
+    prev_fp: dict | None, prev_evidence_dir: Path | None,
+    classification: object, dimension: str, evidence_dir: Path,
+) -> None:
+    """Carry forward findings for unchanged files if conditions are met."""
+    if not (prev_fp and prev_evidence_dir and not classification.full_reanalysis and classification.unchanged):
+        return
+    prev_jsonl = prev_evidence_dir / f"{dimension}_evidence.jsonl"
+    output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
+    carried = carry_forward_findings(prev_jsonl, output_jsonl, classification.unchanged)
+    log_info(f"  [{dimension}] Carried forward {carried} findings for {len(classification.unchanged)} unchanged files")
 
-    if remaining_budget < 60:
-        log_info(f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, but no budget remaining")
-        return backfill_taken
 
-    log_info(
-        f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, "
-        f"{remaining_budget}s budget remaining"
-    )
-    config.options.incremental_file_filter = set(backfill_candidates)
-    saved_budget = config.options.pool_budget
-    config.options.pool_budget = remaining_budget
-    try:
-        _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
-    finally:
-        config.options.incremental_file_filter = None
-        config.options.pool_budget = saved_budget
-
-    # Read which backfill files were actually taken from queue
-    backfill_queue = evidence_dir / f"{dimension}_queue.json"
-    if backfill_queue.exists():
-        from quodeq.analysis.subagents.file_queue import FileQueue
-        try:
-            backfill_taken = set(FileQueue(backfill_queue).all_taken_files())
-        except Exception:
-            pass
-
-    # Dedup carried + phase1 + backfill findings
-    from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
-    if output_jsonl.exists():
-        deduplicate_jsonl(output_jsonl)
-
-    return backfill_taken
+def _list_all_source_files(config: RunConfig, dimension: str) -> list[str]:
+    """List all source files, ignoring any active incremental filter."""
+    files, _extensions = _list_source_files(config, dimension, ignore_file_filter=True)
+    return files
 
 
 def run_dimension_incremental(
@@ -215,128 +191,46 @@ def run_dimension_incremental(
     phase_start = time.monotonic()
     evidence_dir = config.work_dir or config.src
 
-    prev_fp, prev_evidence_dir = _find_previous_fingerprint(evidence_dir, dimension)
+    prev_fp, prev_evidence_dir = find_previous_fingerprint(evidence_dir, dimension)
 
-    # Get full source files list (for classification)
-    from quodeq.analysis.subagents.runner import _list_source_files
-    saved_filter = config.options.incremental_file_filter
-    config.options.incremental_file_filter = None
-    files, extensions = _list_source_files(config, dimension)
-    config.options.incremental_file_filter = saved_filter
+    files = _list_all_source_files(config, dimension)
     if not files:
         return None
 
-    # Classify files
+    from quodeq.analysis.incremental import ClassificationInput
     classification = classify_files(
-        src=config.src, files=files,
-        prev_fingerprint=prev_fp,
-        standards_dir=config.standards_dir,
-        dimension=dimension,
-        language=config.language,
+        inputs=ClassificationInput(
+            src=config.src, files=files, prev_fingerprint=prev_fp,
+            standards_dir=config.standards_dir, dimension=dimension, language=config.language,
+        ),
     )
 
-    # Carry forward unchanged findings
-    can_carry_forward = prev_fp and prev_evidence_dir and not classification.full_reanalysis and classification.unchanged
-    if can_carry_forward:
-        prev_jsonl = prev_evidence_dir / f"{dimension}_evidence.jsonl"
-        output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
-        carried = carry_forward_findings(prev_jsonl, output_jsonl, classification.unchanged)
-        log_info(f"  [{dimension}] Carried forward {carried} findings for {len(classification.unchanged)} unchanged files")
+    _maybe_carry_forward(prev_fp, prev_evidence_dir, classification, dimension, evidence_dir)
 
-    # Phase 1: analyze changed files
-    ev = _run_phase1_analysis(config, dimension, idx, ctx, classification, evidence_dir)
+    ev = _run_phase1_analysis(config, dimension, idx, ctx, classification)
 
-    # Phase 3: backfill
     prev_analyzed = set(prev_fp.get("analyzed_files", [])) if prev_fp else set()
     phase1_files = set(classification.to_analyze) if classification.to_analyze else set()
-    backfill_taken = _run_backfill_phase(
-        config, dimension, idx, ctx, files, prev_analyzed, phase1_files,
-        evidence_dir, phase_start,
+    backfill_taken = run_backfill_phase(
+        config, dimension, idx, ctx,
+        BackfillContext(files=files, prev_analyzed=prev_analyzed, phase1_files=phase1_files,
+                        evidence_dir=evidence_dir, phase_start=phase_start),
     )
 
-    # Re-parse after all phases to get accurate Evidence
-    output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
-    ev = _parse_evidence_from_jsonl(
-        config, dimension, ctx, output_jsonl,
-        len(phase1_files) + len(backfill_taken) + len(classification.unchanged),
-    )
-
-    # Save new fingerprint — accumulate analyzed files across runs
     all_analyzed = prev_analyzed | phase1_files | backfill_taken
-    all_analyzed &= set(files)
-    new_fp = build_fingerprint(config.src, files, dimension, config.standards_dir, analyzed_files=all_analyzed or None)
-    save_fingerprint(new_fp, evidence_dir)
-
-    coverage_pct = len(all_analyzed) * 100 // len(files) if files else 100
-    log_info(f"  [{dimension}] Coverage: {len(all_analyzed)}/{len(files)} files ({coverage_pct}%)")
-
-    return ev
-
-
-def check_zero_findings(
-    result: dict[str, "Evidence"], source_file_count: int, skipped_count: int = 0,
-) -> None:
-    """Raise EvaluationError if all dimensions produced zero findings."""
-    from quodeq.analysis.runner import EvaluationError
-
-    if not result or source_file_count <= 0:
-        return
-    total_findings = sum(
-        sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
-        for ev in result.values()
+    return _finalize_incremental(
+        config, dimension, ctx,
+        IncrementalCoverage(
+            files=files, all_analyzed=all_analyzed,
+            files_read=len(phase1_files) + len(backfill_taken) + len(classification.unchanged),
+        ),
     )
-    if total_findings == 0:
-        skip_msg = f" ({skipped_count} skipped)" if skipped_count else ""
-        raise EvaluationError(
-            f"Evaluation produced 0 findings across {len(result)} dimensions{skip_msg}. "
-            f"This usually means the AI CLI could not read files or report findings "
-            f"— check tool permissions and MCP configuration."
-        )
 
 
-def run_incremental_loop(
-    config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
-) -> dict[str, "Evidence"]:
-    """Run incremental per-dimension analysis."""
-    from quodeq.analysis.runner import _process_single_dimension, _log_dimension_result
-    from quodeq.engine._runner_markers import emit_marker
 
-    result: dict[str, Evidence] = {}
-    for idx, dimension in enumerate(dimensions, 1):
-        emit_marker("analyzing", dimension=dimension)
-        log_info(f"\u2192 [{idx}/{ctx.total}] Analyzing {dimension} (incremental)")
-        try:
-            ev = run_dimension_incremental(config, dimension, idx, ctx)
-        except (OSError, KeyError, ValueError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 incremental failed: {exc}, falling back to full")
-            config.options.incremental_file_filter = None
-            ev = _process_single_dimension(config, dimension, idx, ctx)
-        if ev:
-            _log_dimension_result(ev, dimension, idx, ctx.total)
-            result[dimension] = ev
-    check_zero_findings(result, config.source_file_count)
-    return result
-
-
-def run_per_dimension_loop(
-    config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
-) -> dict[str, "Evidence"]:
-    """Per-dimension loop (fallback or single-dimension)."""
-    import json
-    from quodeq.analysis.runner import _process_single_dimension
-
-    result: dict[str, Evidence] = {}
-    skipped_count = 0
-    for idx, dimension in enumerate(dimensions, 1):
-        try:
-            ev = _process_single_dimension(config, dimension, idx, ctx)
-        except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
-            log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 failed: {exc}")
-            skipped_count += 1
-            continue
-        if ev is None:
-            skipped_count += 1
-            continue
-        result[dimension] = ev
-    check_zero_findings(result, config.source_file_count, skipped_count)
-    return result
+# Re-export loop orchestrators from _loops.py for backward compatibility
+from quodeq.analysis._loops import (  # noqa: F401
+    check_zero_findings,
+    run_incremental_loop,
+    run_per_dimension_loop,
+)

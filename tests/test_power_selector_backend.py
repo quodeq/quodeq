@@ -12,6 +12,10 @@ import pytest
 from quodeq.provider.base import EvaluationOptions
 from quodeq.analysis.runner import AnalysisOptions
 
+_MODEL_HAIKU = "claude-haiku-4-5"
+_MODEL_OPUS = "claude-opus-4-6"
+_MODEL_SONNET = "claude-sonnet-4-6"
+
 
 # ---------------------------------------------------------------------------
 # EvaluationOptions — subagent_model field
@@ -23,16 +27,16 @@ class TestEvaluationOptionsSubagentModel:
         assert opts.subagent_model is None
 
     def test_accepts_haiku(self) -> None:
-        opts = EvaluationOptions(subagent_model="claude-haiku-4-5")
-        assert opts.subagent_model == "claude-haiku-4-5"
+        opts = EvaluationOptions(subagent_model=_MODEL_HAIKU)
+        assert opts.subagent_model == _MODEL_HAIKU
 
     def test_accepts_sonnet(self) -> None:
-        opts = EvaluationOptions(subagent_model="claude-sonnet-4-6")
-        assert opts.subagent_model == "claude-sonnet-4-6"
+        opts = EvaluationOptions(subagent_model=_MODEL_SONNET)
+        assert opts.subagent_model == _MODEL_SONNET
 
     def test_accepts_opus(self) -> None:
-        opts = EvaluationOptions(subagent_model="claude-opus-4-6")
-        assert opts.subagent_model == "claude-opus-4-6"
+        opts = EvaluationOptions(subagent_model=_MODEL_OPUS)
+        assert opts.subagent_model == _MODEL_OPUS
 
 
 # ---------------------------------------------------------------------------
@@ -45,8 +49,8 @@ class TestAnalysisOptionsSubagentModel:
         assert opts.subagent_model is None
 
     def test_stores_value(self) -> None:
-        opts = AnalysisOptions(subagent_model="claude-sonnet-4-6")
-        assert opts.subagent_model == "claude-sonnet-4-6"
+        opts = AnalysisOptions(subagent_model=_MODEL_SONNET)
+        assert opts.subagent_model == _MODEL_SONNET
 
 
 # ---------------------------------------------------------------------------
@@ -75,9 +79,9 @@ class TestEvaluationMixinSubagentModel:
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(tmp_path / "reports"),
-            options=EvaluationOptions(subagent_model="claude-opus-4-6"),
+            options=EvaluationOptions(subagent_model=_MODEL_OPUS),
         )
-        assert captured["env"]["SUBAGENT_MODEL"] == "claude-opus-4-6"
+        assert captured["env"]["SUBAGENT_MODEL"] == _MODEL_OPUS
 
     def test_subagent_model_not_in_env_when_none(self, tmp_path: Path) -> None:
         repo = tmp_path / "repo"
@@ -99,9 +103,9 @@ class TestEvaluationMixinSubagentModel:
         provider.start_evaluation(
             repo=str(repo),
             reports_dir=str(tmp_path / "reports"),
-            options=EvaluationOptions(subagent_model="claude-haiku-4-5"),
+            options=EvaluationOptions(subagent_model=_MODEL_HAIKU),
         )
-        assert captured["env"]["SUBAGENT_MODEL"] == "claude-haiku-4-5"
+        assert captured["env"]["SUBAGENT_MODEL"] == _MODEL_HAIKU
 
 
 # ---------------------------------------------------------------------------
@@ -152,10 +156,10 @@ class TestApiRouteSubagentModel:
 
         response = client.post("/api/evaluations", json={
             "repo": str(tmp_path),
-            "subagentModel": "claude-sonnet-4-6",
+            "subagentModel": _MODEL_SONNET,
         }, headers={"Origin": "http://localhost"})
         assert captured.get("options") is not None
-        assert captured["options"].subagent_model == "claude-sonnet-4-6"
+        assert captured["options"].subagent_model == _MODEL_SONNET
 
     def test_subagent_model_none_when_not_provided(self, tmp_path: Path) -> None:
         from quodeq.action_api import create_app
@@ -186,13 +190,13 @@ class TestRunnerSubagentModelResolution:
         return opts.subagent_model or _default_subagent_model()
 
     def test_options_takes_priority(self) -> None:
-        opts = AnalysisOptions(subagent_model="claude-opus-4-6")
-        assert self._resolve(opts) == "claude-opus-4-6"
+        opts = AnalysisOptions(subagent_model=_MODEL_OPUS)
+        assert self._resolve(opts) == _MODEL_OPUS
 
     def test_env_fallback(self, monkeypatch) -> None:
-        monkeypatch.setenv("QUODEQ_SUBAGENT_MODEL", "claude-sonnet-4-6")
+        monkeypatch.setenv("QUODEQ_SUBAGENT_MODEL", _MODEL_SONNET)
         opts = AnalysisOptions()  # subagent_model is None
-        assert self._resolve(opts) == "claude-sonnet-4-6"
+        assert self._resolve(opts) == _MODEL_SONNET
 
     def test_default_uses_client_model(self, monkeypatch) -> None:
         """No selection and no env var → None (AI CLI uses its own default model)."""
@@ -201,9 +205,9 @@ class TestRunnerSubagentModelResolution:
         assert self._resolve(opts) is None
 
     def test_options_beats_env(self, monkeypatch) -> None:
-        monkeypatch.setenv("QUODEQ_SUBAGENT_MODEL", "claude-haiku-4-5")
-        opts = AnalysisOptions(subagent_model="claude-opus-4-6")
-        assert self._resolve(opts) == "claude-opus-4-6"
+        monkeypatch.setenv("QUODEQ_SUBAGENT_MODEL", _MODEL_HAIKU)
+        opts = AnalysisOptions(subagent_model=_MODEL_OPUS)
+        assert self._resolve(opts) == _MODEL_OPUS
 
     def test_empty_string_falls_through(self, monkeypatch) -> None:
         """Empty string in options is falsy → should fall through to client default."""

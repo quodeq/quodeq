@@ -134,6 +134,20 @@ def _run_dimension_analysis(
     return stream_file, jsonl_file
 
 
+def _try_parse_stream_evidence(stream_file: Path, jsonl_file: Path) -> int:
+    """Resolve files_read from MCP output or fall back to stream extraction.
+
+    Returns the number of files read.
+    """
+    mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
+    mcp_status = get_mcp_status(stream_file)
+    if mcp_status and mcp_status != "connected":
+        log_warning(f"MCP findings server {mcp_status} — falling back to stream extraction")
+    if mcp_produced:
+        return count_files_from_stream(stream_file)
+    return extract_evidence_from_stream(stream_file, jsonl_file)
+
+
 def _parse_dimension_evidence(
     config: RunConfig, dim_id: str, stream_file: Path, jsonl_file: Path,
     ctx: _AnalysisContext,
@@ -145,19 +159,10 @@ def _parse_dimension_evidence(
     if not is_stream_valid(stream_file):
         return None
 
-    # MCP server writes findings directly to jsonl_file during analysis.
-    # Fall back to stream extraction if MCP produced nothing.
-    mcp_produced = jsonl_file.exists() and jsonl_file.stat().st_size > 0
-    mcp_status = get_mcp_status(stream_file)
-    if mcp_status and mcp_status != "connected":
-        log_warning(f"MCP findings server {mcp_status} — falling back to stream extraction")
-    if mcp_produced:
-        files_read = count_files_from_stream(stream_file)
-    else:
-        files_read = extract_evidence_from_stream(stream_file, jsonl_file)
+    files_read = _try_parse_stream_evidence(stream_file, jsonl_file)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    ev = parse_jsonl_to_evidence(
+    return parse_jsonl_to_evidence(
         jsonl_file,
         EvidenceContext(
             language=config.language,
@@ -169,7 +174,6 @@ def _parse_dimension_evidence(
         ),
         compiled_dir=compiled_dir,
     )
-    return ev
 
 
 def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:

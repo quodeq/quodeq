@@ -72,35 +72,40 @@ class FsToolingMixin:
     def __init__(self) -> None:
         self._model_fetchers: dict[str, Callable] = {}
 
-    def browse_repo(self, path: str | None) -> dict[str, Any]:
-        """List directories at the given path for repository browsing."""
+    @staticmethod
+    def _validate_browse_path(path: str | None) -> tuple[Path, dict[str, Any] | None]:
+        """Resolve and validate a browse path. Returns (target, error_or_None)."""
         target = Path(path) if path else Path.home()
         target = target.resolve()
         if not target.is_relative_to(Path.home()):
-            return {"error": "Path outside allowed boundary", "error_code": "PATH_OUTSIDE_BOUNDARY"}
+            return target, {"error": "Path outside allowed boundary", "error_code": "PATH_OUTSIDE_BOUNDARY"}
         if not target.exists():
-            return {"error": "Path not found", "error_code": "PATH_NOT_FOUND", "path": str(target)}
+            return target, {"error": "Path not found", "error_code": "PATH_NOT_FOUND", "path": str(target)}
         if not target.is_dir():
-            return {"error": "Path is not a directory", "error_code": "PATH_NOT_DIRECTORY", "path": str(target)}
+            return target, {"error": "Path is not a directory", "error_code": "PATH_NOT_DIRECTORY", "path": str(target)}
+        return target, None
 
+    @staticmethod
+    def _list_directories(target: Path) -> list[dict[str, Any]]:
+        """List readable non-hidden subdirectories of *target*."""
         directories = []
         for entry in safe_read_dir(target):
-            if entry.name.startswith("."):
-                continue
-            if not entry.is_dir():
+            if entry.name.startswith(".") or not entry.is_dir():
                 continue
             entry_path = target / entry.name
             if not os.access(entry_path, os.R_OK):
                 continue
-            directories.append(
-                {
-                    "name": entry.name,
-                    "path": str(entry_path),
-                    "isGitRepo": (entry_path / ".git").exists(),
-                }
-            )
-
+            directories.append({
+                "name": entry.name,
+                "path": str(entry_path),
+                "isGitRepo": (entry_path / ".git").exists(),
+            })
         directories.sort(key=lambda item: item["name"])
+        return directories
+
+    @staticmethod
+    def _build_browse_response(target: Path, directories: list[dict[str, Any]]) -> dict[str, Any]:
+        """Assemble a browse_repo response from a validated target and directory list."""
         truncated = len(directories) > _BROWSE_DIR_LIMIT
         if truncated:
             directories = directories[:_BROWSE_DIR_LIMIT]
@@ -112,6 +117,13 @@ class FsToolingMixin:
             "isGitRepo": (target / ".git").exists(),
             "truncated": truncated,
         }
+
+    def browse_repo(self, path: str | None) -> dict[str, Any]:
+        """List directories at the given path for repository browsing."""
+        target, error = self._validate_browse_path(path)
+        if error is not None:
+            return error
+        return self._build_browse_response(target, self._list_directories(target))
 
     # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
     # (comma-separated list of client IDs, e.g. "claude,codex").

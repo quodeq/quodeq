@@ -60,7 +60,7 @@ TOTALS = Totals(
     severity=SeverityTally(critical=1, major=2, minor=2, unknown=0),
 )
 
-PRINCIPLE = PrincipleGrade(name="Naming", score="85", grade="B")
+PRINCIPLE = PrincipleGrade(principle="Naming", score="85", grade="B")
 
 DIMENSION_RESULT = DimensionResult(
     dimension="maintainability",
@@ -151,7 +151,7 @@ VIOLATION_RESPONSE = ViolationResponse(
     violations=[FINDING],
     compliance=[],
     partial=True,
-    progress=ProgressInfo(files_read=10, violations=3, compliance=7),
+    progress=ProgressInfo(files_read=10, violation_count=3, compliance_count=7),
 )
 
 VIOLATION_SUMMARY = ViolationSummary(

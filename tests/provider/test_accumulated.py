@@ -65,6 +65,7 @@ def _setup_project(tmp_path: Path, project: str, runs: list[tuple[str, list[Dime
 
 class TestNumericAverage:
     def test_computes_average(self):
+        """Two dimensions with scores 8.0 and 6.0 should average to 7.0."""
         dims = [_dim("a", "8.0"), _dim("b", "6.0")]
         assert numeric_average(dims) == 7.0
 

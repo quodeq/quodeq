@@ -60,11 +60,18 @@ class Config:
 
 
 _config_lock = threading.Lock()
+# Singleton instance — access via _get_config(override) for DI; reset via _reset_config_for_testing().
 _config_instance: Config | None = None
 
 
-def _get_config() -> Config:
-    """Return the lazily-loaded singleton Config instance (thread-safe)."""
+def _get_config(override: Config | None = None) -> Config:
+    """Return the lazily-loaded singleton Config instance (thread-safe).
+
+    Pass *override* to use a specific Config without touching the singleton
+    (useful for testing and dependency injection).
+    """
+    if override is not None:
+        return override
     global _config_instance
     if _config_instance is None:
         with _config_lock:

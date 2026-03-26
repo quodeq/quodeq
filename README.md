@@ -7,7 +7,7 @@
 
 <h2 align="center">The quality code compass</h2>
 <p align="center"><em>Your guide to drive any codebase to excellence.</em></p>
-<p align="center"><strong>v0.6.2</strong></p>
+<p align="center"><strong>v0.8.0</strong></p>
 
 <p align="center">
   Quodeq scans any codebase with AI and scores it across six quality dimensions —
@@ -116,6 +116,8 @@ Results are stored in `~/.quodeq/evaluations/` and persist across sessions.
 | `repo` | *(required)* | Path or URL to the repository |
 | `-o, --output` | `~/.quodeq/evaluations` | Reports output directory |
 | `-d, --dimensions` | all | Comma-separated dimensions to evaluate |
+| `--incremental` | off | Only re-analyze changed files (requires previous run) |
+| `--pool-budget` | 600 | Subagent pool time budget in seconds |
 | `--max-turns` | 200 | Max AI conversation turns per dimension |
 | `--max-duration` | 1800 | Max seconds per dimension |
 

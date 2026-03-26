@@ -14,7 +14,7 @@ _logger = logging.getLogger(__name__)
 
 from quodeq.api.helpers import error_response
 
-_DEFAULT_MAX_ZIP_SIZE_MB = 100
+_DEFAULT_MAX_ZIP_SIZE_MB = 500
 
 
 def _max_zip_size_bytes(max_mb: int | None = None, env: dict[str, str] | None = None) -> int:

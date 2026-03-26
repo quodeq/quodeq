@@ -3,13 +3,16 @@ from __future__ import annotations
 
 import functools
 import json
-import os
+import logging
 from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+_logger = logging.getLogger(__name__)
+
 from quodeq.config.paths import default_paths
 from quodeq.core.types import ProjectEntry
+from quodeq.shared.utils import _env_int
 from quodeq.adapters.fs.report_parser import (
     RunInfo,
     read_run_data,
@@ -72,6 +75,20 @@ def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str
     }
 
 
+def _read_language_stats(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> dict[str, int]:
+    """Read language_stats from the latest run's manifest.json."""
+    for run in runs:
+        manifest_path = reports_root / entry_name / run.run_id / "evidence" / "manifest.json"
+        try:
+            data = json.loads(manifest_path.read_text())
+            stats = data.get("language_stats") or {}
+            if stats:
+                return {k.lstrip("."): v for k, v in stats.items()}
+        except (json.JSONDecodeError, OSError):
+            continue
+    return {}
+
+
 def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo]) -> ProjectEntry:
     """Build a frozen ProjectEntry from its directory and run list."""
     info = _read_repo_info(reports_root, entry_name)
@@ -94,6 +111,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
         files_count=files_count,
         latest_grade=latest_grade,
         latest_score=latest_score,
+        language_stats=_read_language_stats(reports_root, entry_name, runs),
     )
 
 
@@ -119,13 +137,7 @@ def _max_projects_listed(override: int | None = None, env: dict[str, str] | None
     """Return the max number of projects to list. *override* bypasses env."""
     if override is not None:
         return override
-    raw = (env or os.environ).get("QUODEQ_MAX_PROJECTS_LISTED")
-    if raw is None:
-        return _DEFAULT_MAX_PROJECTS_LISTED
-    try:
-        return int(raw)
-    except ValueError:
-        return _DEFAULT_MAX_PROJECTS_LISTED
+    return _env_int("QUODEQ_MAX_PROJECTS_LISTED", _DEFAULT_MAX_PROJECTS_LISTED, env=env)
 
 
 def _auto_detect_parents(projects: list[ProjectEntry]) -> list[ProjectEntry]:
@@ -193,18 +205,36 @@ def _has_fingerprints(reports_root: Path, project: str) -> bool:
     return False
 
 
-@functools.lru_cache(maxsize=1)
-def _list_available_dimensions_for_discipline() -> tuple[str, ...]:
-    """Resolve available dimensions from universal dimensions.json (cached after first read).
-
-    Returns a tuple (immutable) so the result is safe for lru_cache.
-    """
+@functools.lru_cache(maxsize=4)
+def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
+    """Read dimension IDs from a dimensions.json file (cached by path)."""
     try:
-        paths = default_paths()
-        universal_dims = paths.dimensions_file
-        if universal_dims.exists():
-            data = json.loads(universal_dims.read_text())
+        p = Path(dims_file)
+        if p.exists():
+            data = json.loads(p.read_text())
             return tuple(d["id"] for d in data.get("applies", []))
         return ()
     except (OSError, json.JSONDecodeError, KeyError, TypeError):
         return ()
+
+
+_cached_dimensions: tuple[str, ...] | None = None
+
+def _list_available_dimensions_for_discipline(paths: object | None = None) -> tuple[str, ...]:
+    """Resolve available dimensions from universal dimensions.json (cached after first read).
+
+    Pass *paths* to override the default path resolution (useful for testing).
+    Returns a tuple (immutable) so the result is safe for caching.
+    """
+    global _cached_dimensions
+    if paths is None and _cached_dimensions is not None:
+        return _cached_dimensions
+    try:
+        resolved = paths or default_paths()
+        result = _read_dimensions_from_file(str(resolved.dimensions_file))
+    except (OSError, TypeError) as exc:
+        _logger.warning("Failed to load dimensions config: %s", exc)
+        return ()
+    if paths is None:
+        _cached_dimensions = result
+    return result

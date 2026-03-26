@@ -197,7 +197,7 @@ class HttpClient:
                 )
 
         hostname = parsed.hostname or ""
-        if _is_private_address(hostname) and not _allow_private_urls(self._allow_private):
+        if not _allow_private_urls(self._allow_private) and _is_private_address(hostname):
             raise ValueError(
                 f"Requests to private/internal addresses are blocked: {hostname!r}. "
                 "Set QUODEQ_ALLOW_PRIVATE_URLS=1 to allow."

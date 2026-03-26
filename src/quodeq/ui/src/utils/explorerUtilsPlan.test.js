@@ -2,8 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   PLAN_TEST_INSTRUCTION_GROUP,
+  PLAN_COMPLETION_CHECKLIST,
   buildDimensionPlanText,
   buildDimensionPlanFromViolations,
+  getFixHint,
 } from './explorerUtils.js';
 
 // ---------------------------------------------------------------------------
@@ -145,5 +147,74 @@ test('buildDimensionPlanFromViolations includes file and line reference', () => 
 
 test('buildDimensionPlanFromViolations includes PLAN_TEST_INSTRUCTION_GROUP at end', () => {
   const result = buildDimensionPlanFromViolations('Performance', sampleViolations);
-  assert.ok(result.endsWith(PLAN_TEST_INSTRUCTION_GROUP));
+  assert.ok(result.includes(PLAN_TEST_INSTRUCTION_GROUP));
+});
+
+// ---------------------------------------------------------------------------
+// getFixHint
+// ---------------------------------------------------------------------------
+
+test('getFixHint returns exact match for specific req ID', () => {
+  assert.equal(getFixHint('M-ANA-1'), 'Split file or extract code to a new module to reduce line count below 300');
+});
+
+test('getFixHint returns exact match for M-ANA-2', () => {
+  assert.equal(getFixHint('M-ANA-2'), 'Extract a helper function to bring the function under 50 lines');
+});
+
+test('getFixHint falls back to prefix match', () => {
+  const hint = getFixHint('M-ANA-7');
+  assert.ok(hint, 'should return a fallback hint');
+  assert.ok(hint.includes('clarity'), 'should be the M-ANA fallback');
+});
+
+test('getFixHint returns null for unknown req', () => {
+  assert.equal(getFixHint('X-ZZZ-99'), null);
+});
+
+test('getFixHint returns null for empty/null req', () => {
+  assert.equal(getFixHint(null), null);
+  assert.equal(getFixHint(''), null);
+  assert.equal(getFixHint(undefined), null);
+});
+
+// ---------------------------------------------------------------------------
+// PLAN_COMPLETION_CHECKLIST
+// ---------------------------------------------------------------------------
+
+test('PLAN_COMPLETION_CHECKLIST contains key enforcement phrases', () => {
+  assert.ok(PLAN_COMPLETION_CHECKLIST.includes('Every violation has a code change'));
+  assert.ok(PLAN_COMPLETION_CHECKLIST.includes('No violations were skipped'));
+  assert.ok(PLAN_COMPLETION_CHECKLIST.includes('Tests pass'));
+  assert.ok(PLAN_COMPLETION_CHECKLIST.includes('Verify metrics'));
+});
+
+// ---------------------------------------------------------------------------
+// Expected fix hints in dimension plans
+// ---------------------------------------------------------------------------
+
+test('dimension plan includes Expected fix line when violation has req', () => {
+  const violations = [
+    { severity: 'major', file: 'a.py', principle: 'Analyzability', reason: 'Too long', req: 'M-ANA-2' },
+  ];
+  const result = buildDimensionPlanFromViolations('Maintainability', violations);
+  assert.ok(result.includes('**Expected fix:**'), 'should contain Expected fix line');
+  assert.ok(result.includes('Extract a helper function'), 'should contain the M-ANA-2 hint');
+});
+
+test('dimension plan omits Expected fix line when violation has no req', () => {
+  const violations = [
+    { severity: 'major', file: 'a.py', principle: 'Analyzability', reason: 'Too long' },
+  ];
+  const result = buildDimensionPlanFromViolations('Maintainability', violations);
+  assert.ok(!result.includes('**Expected fix:**'), 'should not contain Expected fix line');
+});
+
+test('dimension plan includes completion checklist', () => {
+  const violations = [
+    { severity: 'minor', file: 'a.py', principle: 'X', reason: 'Y' },
+  ];
+  const result = buildDimensionPlanFromViolations('Test', violations);
+  assert.ok(result.includes('## Completion checklist'), 'should contain checklist');
+  assert.ok(result.includes('Every violation has a code change'), 'should contain enforcement');
 });

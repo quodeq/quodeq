@@ -81,22 +81,31 @@ def _file_imports_changed(content: str, compiled: list, changed_stems: dict[str,
     for line in content.splitlines():
         for pattern in compiled:
             m = pattern.search(line)
-            if m:
-                module_name = m.group(1).rsplit(".", 1)[-1].rsplit("/", 1)[-1]
-                if module_name in changed_stems:
-                    return True
-                break
+            if not m:
+                continue
+            module_name = m.group(1).rsplit(".", 1)[-1].rsplit("/", 1)[-1]
+            if module_name in changed_stems:
+                return True
+            break
     return False
+
+
+def _safe_read(path: Path) -> str | None:
+    """Read a file's text, returning None if missing or unreadable."""
+    if not path.exists():
+        return None
+    try:
+        return path.read_text(errors="ignore")
+    except OSError:
+        return None
 
 
 def find_dependents(changed: set[str], files: list[str], src: Path, language: str) -> set[str]:
     """Find files that directly import any changed file (1 level deep)."""
-    from quodeq.analysis.subagents.priority import load_priority_config
+    from quodeq.analysis.subagents.priority import load_priority_config, _LANG_ALIASES
 
     config = load_priority_config()
-    lang_key = language.lower()
-    _LANG_ALIASES = {"typescript": "javascript", "jsx": "javascript", "tsx": "javascript", "kotlin": "java"}
-    lang_key = _LANG_ALIASES.get(lang_key, lang_key)
+    lang_key = _LANG_ALIASES.get(language.lower(), language.lower())
     patterns = config.get("import_patterns", {}).get(lang_key)
     if not patterns:
         return set()
@@ -109,13 +118,8 @@ def find_dependents(changed: set[str], files: list[str], src: Path, language: st
         if f in changed:
             continue
         full_path = src / f
-        if not full_path.exists():
-            continue
-        try:
-            content = full_path.read_text(errors="ignore")
-        except OSError:
-            continue
-        if _file_imports_changed(content, compiled, changed_stems):
+        content = _safe_read(full_path)
+        if content is not None and _file_imports_changed(content, compiled, changed_stems):
             dependents.add(f)
     return dependents
 
@@ -163,25 +167,14 @@ class ClassificationInput:
     language: str
 
 
-def classify_files(src: Path | None = None, files: list[str] | None = None,
-                   prev_fingerprint: dict | None = None,
-                   standards_dir: Path | None = None, dimension: str = "",
-                   language: str = "", *,
-                   inputs: "ClassificationInput | None" = None) -> FileClassification:
+def classify_files(*, inputs: "ClassificationInput") -> FileClassification:
     """Classify files into to_analyze (changed + dependents) and unchanged."""
-    if inputs is not None:
-        src = src or inputs.src
-        files = files if files is not None else inputs.files
-        prev_fingerprint = prev_fingerprint if prev_fingerprint is not None else inputs.prev_fingerprint
-        standards_dir = standards_dir or inputs.standards_dir
-        dimension = dimension or inputs.dimension
-        language = language or inputs.language
-    detection = detect_changed_files(src, files, prev_fingerprint, standards_dir, dimension)
+    detection = detect_changed_files(inputs.src, inputs.files, inputs.prev_fingerprint, inputs.standards_dir, inputs.dimension)
     if detection.full_reanalysis:
-        return FileClassification(to_analyze=list(files), full_reanalysis=True)
-    dependents = find_dependents(detection.changed, files, src, language)
+        return FileClassification(to_analyze=list(inputs.files), full_reanalysis=True)
+    dependents = find_dependents(detection.changed, inputs.files, inputs.src, inputs.language)
     to_analyze = detection.changed | dependents
-    unchanged = set(files) - to_analyze
+    unchanged = set(inputs.files) - to_analyze
     return FileClassification(to_analyze=sorted(to_analyze), unchanged=unchanged)
 
 

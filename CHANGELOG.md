@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.8.0] — 2026-03-26
+
+### Features
+- **Dashboard redesign** — golden-split hero panels with SVG ScoreCircle gauge, divided-row stats, grade-colored dimension cards
+- **Horizontal bar charts** — pure CSS DimensionScorePanel replacing recharts, sorted alphabetically
+- **Score history K4b** — thin bars + area line with gradient fill, selected dot indicator
+- **Project header** — Q5 numbers-first layout with per-language file counts from manifest
+- **Project cards R3** — two-row dense layout with language stats and grade colors
+- **Settings two-column** — Analysis left, Appearance + About right, rotating tips in header
+- **Breadcrumb pills** — M2 pill segments with accent-tinted active state
+- **Loading screen** — pulsing Q logo replacing text loading states
+- **Language stats** — surface language breakdown from manifest.json in project listings
+- **Date format** — "22 Mar 2026" across server and UI
+
+### Improvements
+- Consolidated `EXT_NAMES`, `scoreGradeColorVar`, `GRADE_WORD_TO_LETTER` into formatters.js
+- Cached `cssVar()` calls with MutationObserver for theme-change invalidation
+- DimensionCardsGrid sort wrapped in useMemo
+- Exponential backoff with jitter for health polling and dimension polling
+- Retry with backoff in FetchClient and hybrid_call before circuit breaker/fallback
+- Thread-safe LRU cache with per-key inflight coordination
+- Protected menubar shared state with consistent lock usage
+
+### Bug Fixes
+- Fix hero delta using trend data source (consistent with bar chart)
+- Fix ViolationsPage stats grid after CSS class removal
+- Fix chart colors not updating on theme switch
+- Clean up stderr temp file on all dashboard start paths
+
+## [0.7.0] — 2026-03-23
+
+### Features
+- **Incremental analysis** — fingerprint-based change detection with dependency cascade; only re-analyzes changed files and their dependents
+- **Progressive coverage** — each re-scan backfills previously-unevaluated files with remaining budget, gradually reaching full coverage
+- **File prioritization** — 5-layer scoring (path patterns, dimension relevance, import fan-in, git churn, previous violations) ensures the most important files are analyzed first
+- **Adaptive agent scaling** — scout-then-scale pool strategy adjusts agent count based on project size
+- **Consolidated evaluation** — analyze multiple dimensions in a single pass, reducing token usage
+- **Verify findings on by default** — fast verification pool enabled for all evaluations
+
+### Fixes
+- Server disconnected overlay only shows on evaluate screen; sidebar remains navigable
+- Re-scan button now visible when fingerprints exist
+- 156 auto-healed code quality violations across all dimensions
+
+---
+
 ## [0.6.2] — 2026-03-22
 
 ### Features

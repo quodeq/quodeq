@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
-import { gradeLabel } from '../../../utils/formatters.js';
+import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -48,8 +48,25 @@ function GradeChip({ grade, score }) {
   const cls = grade ? `projects-grade--${grade.toLowerCase()}` : 'projects-grade--x';
   return (
     <span className={`projects-grade ${cls}`}>
-      {grade}{score != null ? ` ${score}` : ''}
+      {score != null ? `${score} ` : ''}{gradeLetter(grade)}
     </span>
+  );
+}
+
+function LanguageNumbers({ stats, filesCount }) {
+  if (!stats || Object.keys(stats).length === 0) {
+    if (filesCount != null) return <span className="project-stat"><span className="project-stat-num">{filesCount.toLocaleString()}</span> <span className="project-stat-label">files</span></span>;
+    return null;
+  }
+  const sorted = Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 4);
+  const total = filesCount || sorted.reduce((s, [, c]) => s + c, 0);
+  return (
+    <div className="project-lang-row">
+      <span className="project-stat"><span className="project-stat-num">{total.toLocaleString()}</span> <span className="project-stat-label">files</span></span>
+      {sorted.map(([lang, count]) => (
+        <span key={lang} className="project-stat"><span className="project-stat-num">{count}</span> <span className="project-stat-label">{extDisplayName(lang)}</span></span>
+      ))}
+    </div>
   );
 }
 
@@ -71,18 +88,20 @@ function ProjectCard({ project, isSelected, onSelect, footer, isChild = false, c
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onSelect?.(id); } }}
       >
         <div className="project-card-top">
-          <span className="project-card-name">{project.displayName || name}</span>
-          <GradeChip grade={grade} score={score} />
+          <div className="project-card-top-left">
+            <span className="project-card-name">{project.displayName || name}</span>
+            <GradeChip grade={grade} score={score} />
+          </div>
+          <div className="project-card-top-right">
+            {discipline && <span className="project-meta-tag">{discipline}</span>}
+            <span className="project-meta-item">{project.runsCount} {project.runsCount === 1 ? 'run' : 'runs'}</span>
+            {date && <span className="project-meta-date">{date}</span>}
+          </div>
         </div>
-        <div className="project-card-meta">
-          {discipline && <span className="project-meta-tag">{discipline}</span>}
-          {project.filesCount != null && (
-            <span className="project-meta-item">{project.filesCount.toLocaleString()} files</span>
-          )}
-          <span className="project-meta-item">{project.runsCount} {project.runsCount === 1 ? 'run' : 'runs'}</span>
-          {date && <span className="project-meta-date">{date}</span>}
+        <div className="project-card-bottom">
+          <LanguageNumbers stats={project.languageStats} filesCount={project.filesCount} />
+          {cardChildren}
         </div>
-        {cardChildren}
       </div>
       {footer && <div className="project-card-footer" onClick={isChild ? (e) => e.stopPropagation() : undefined}>{footer}</div>}
     </div>
@@ -110,30 +129,107 @@ function TrashIcon() {
   );
 }
 
-export default function ProjectsPage({ projects = [], selectedProject, onSelect, onDelete, onExport, onRelocate }) {
-  const { children, roots } = useMemo(() => {
-    const lookup = {};
-    for (const p of projects) {
-      const id = p.id || p.name || p;
-      const name = p.name || p;
-      lookup[id] = p;
-      lookup[name] = p;
+function computeProjectTree(projects) {
+  const lookup = {};
+  for (const p of projects) {
+    const id = p.id || p.name || p;
+    const name = p.name || p;
+    lookup[id] = p;
+    lookup[name] = p;
+  }
+  const children = {};
+  const roots = [];
+  for (const p of projects) {
+    const parent = p.parent;
+    if (parent && lookup[parent]) {
+      const parentId = lookup[parent].id || lookup[parent].name || parent;
+      if (!children[parentId]) children[parentId] = [];
+      children[parentId].push(p);
+    } else {
+      roots.push(p);
     }
-    const children = {};
-    const roots = [];
-    for (const p of projects) {
-      const parent = p.parent;
-      if (parent && lookup[parent]) {
-        const parentId = lookup[parent].id || lookup[parent].name || parent;
-        if (!children[parentId]) children[parentId] = [];
-        children[parentId].push(p);
-      } else {
-        roots.push(p);
-      }
-    }
-    return { children, roots };
-  }, [projects]);
+  }
+  return { children, roots };
+}
 
+function CardFooter({ name, confirming, setConfirming, onDelete, onExport }) {
+  if (confirming === name) {
+    return (
+      <div className="project-card-actions">
+        <span className="project-delete-confirm-label">Delete?</span>
+        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={(e) => { e.stopPropagation(); onDelete?.(name); setConfirming(null); }}>Yes</button>
+        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={(e) => { e.stopPropagation(); setConfirming(null); }}>No</button>
+      </div>
+    );
+  }
+  return (
+    <>
+      <button type="button" className="project-delete-btn" title="Download project reports" aria-label="Download project reports" onClick={(e) => { e.stopPropagation(); onExport?.(name); }}><DownloadIcon /></button>
+      <button type="button" className="project-delete-btn" title="Delete project" aria-label="Delete project" onClick={(e) => { e.stopPropagation(); setConfirming(name); }}><TrashIcon /></button>
+    </>
+  );
+}
+
+function ProjectPathContent({ id, p, relocateActions }) {
+  const { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } = relocateActions;
+  const path = formatPath(p.path);
+  const pathMissing = p.location === 'local' && p.pathExists === false;
+  if (relocating === id) {
+    return (
+      <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
+        <input className="project-relocate-input" value={relocatePath} onChange={(e) => setRelocatePath(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }} placeholder="/new/path/to/repo" autoFocus />
+        <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>Save</button>
+        <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>Cancel</button>
+      </div>
+    );
+  }
+  return (
+    <div className="project-path-row">
+      {pathMissing && <span className="project-path-missing">Path not found</span>}
+      {p.location === 'online' && p.path ? (
+        <span onClick={(e) => e.stopPropagation()}>
+          <CopyButton label={path} onClick={() => navigator.clipboard?.writeText(p.path)} />
+        </span>
+      ) : (
+        path && <div className="project-card-path">{path}</div>
+      )}
+      {pathMissing && (
+        <button type="button" className="project-path-action project-path-action--warn" onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}>Relocate</button>
+      )}
+    </div>
+  );
+}
+
+function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, confirmActions, relocateActions }) {
+  const { confirming, setConfirming, onDelete, onExport } = confirmActions;
+  const id = p.id || p.name || p;
+  const isSelected = id === selectedProject;
+  const hasChildren = !!(childProjects?.[id]?.length);
+  const childSelected = hasChildren && childProjects[id].some((c) => (c.id || c.name || c) === selectedProject);
+  return (
+    <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
+      <ProjectCard project={p} isSelected={isSelected} onSelect={onSelect} footer={<CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} />}>
+        <ProjectPathContent id={id} p={p} relocateActions={relocateActions} />
+      </ProjectCard>
+      {hasChildren && (
+        <div className="project-children-outer">
+          {childProjects[id].map((child) => {
+            const childId = child.id || child.name || child;
+            return (
+              <div key={childId} className="project-child-entry">
+                <ProjectCard project={child} isSelected={childId === selectedProject} onSelect={onSelect} isChild footer={<CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} />} />
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export default function ProjectsPage({ projects = [], selectedProject, actions }) {
+  const { onSelect, onDelete, onExport, onRelocate } = actions;
+  const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
   const [relocating, setRelocating] = useState(null);
   const [relocatePath, setRelocatePath] = useState('');
@@ -142,48 +238,9 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
     setRelocating(name);
     setRelocatePath(currentPath || '');
   }
-
   function submitRelocate(name) {
     if (relocatePath.trim()) onRelocate?.(name, relocatePath.trim());
     setRelocating(null);
-  }
-
-  function renderCardFooter(name) {
-    if (confirming === name) {
-      return (
-        <div className="project-card-actions">
-          <span className="project-delete-confirm-label">Delete?</span>
-          <button
-            type="button"
-            className="project-delete-btn project-delete-btn--confirm"
-            onClick={(e) => { e.stopPropagation(); onDelete?.(name); setConfirming(null); }}
-          >Yes</button>
-          <button
-            type="button"
-            className="project-delete-btn project-delete-btn--cancel"
-            onClick={(e) => { e.stopPropagation(); setConfirming(null); }}
-          >No</button>
-        </div>
-      );
-    }
-    return (
-      <>
-        <button
-          type="button"
-          className="project-delete-btn"
-          title="Download project reports"
-          aria-label="Download project reports"
-          onClick={(e) => { e.stopPropagation(); onExport?.(name); }}
-        ><DownloadIcon /></button>
-        <button
-          type="button"
-          className="project-delete-btn"
-          title="Delete project"
-          aria-label="Delete project"
-          onClick={(e) => { e.stopPropagation(); setConfirming(name); }}
-        ><TrashIcon /></button>
-      </>
-    );
   }
 
   return (
@@ -192,71 +249,12 @@ export default function ProjectsPage({ projects = [], selectedProject, onSelect,
         <h1 className="projects-title">Projects</h1>
       </div>
       {projects.length === 0 ? (
-        <div className="projects-empty">
-          <p>No projects yet. Run an evaluation to get started.</p>
-        </div>
+        <div className="projects-empty"><p>No projects yet. Run an evaluation to get started.</p></div>
       ) : (
         <div className="projects-cards">
-          {roots.map((p) => {
-            const id = p.id || p.name || p;
-            const isSelected = id === selectedProject;
-            const hasChildren = !!(children[id]?.length);
-            const path = formatPath(p.path);
-            const pathMissing = p.location === 'local' && p.pathExists === false;
-            const childSelected = hasChildren && children[id].some((c) => (c.id || c.name || c) === selectedProject);
-
-            return (
-              <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
-                <ProjectCard project={p} isSelected={isSelected} onSelect={onSelect} footer={renderCardFooter(id)}>
-                  {relocating === id ? (
-                    <div className="project-relocate-row" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        className="project-relocate-input"
-                        value={relocatePath}
-                        onChange={(e) => setRelocatePath(e.target.value)}
-                        onKeyDown={(e) => { if (e.key === 'Enter') submitRelocate(id); if (e.key === 'Escape') setRelocating(null); }}
-                        placeholder="/new/path/to/repo"
-                        autoFocus
-                      />
-                      <button type="button" className="project-delete-btn project-delete-btn--confirm" onClick={() => submitRelocate(id)}>Save</button>
-                      <button type="button" className="project-delete-btn project-delete-btn--cancel" onClick={() => setRelocating(null)}>Cancel</button>
-                    </div>
-                  ) : (
-                    <div className="project-path-row">
-                      {pathMissing && <span className="project-path-missing">Path not found</span>}
-                      {p.location === 'online' && p.path ? (
-                        <span onClick={(e) => e.stopPropagation()}>
-                          <CopyButton label={path} onClick={() => navigator.clipboard?.writeText(p.path)} />
-                        </span>
-                      ) : (
-                        path && <div className="project-card-path">{path}</div>
-                      )}
-                      {pathMissing && (
-                        <button
-                          type="button"
-                          className="project-path-action project-path-action--warn"
-                          onClick={(e) => { e.stopPropagation(); startRelocate(id, p.path); }}
-                        >Relocate</button>
-                      )}
-                    </div>
-                  )}
-                </ProjectCard>
-
-                {hasChildren && (
-                  <div className="project-children-outer">
-                    {children[id].map((child) => {
-                      const childId = child.id || child.name || child;
-                      return (
-                        <div key={childId} className="project-child-entry">
-                          <ProjectCard project={child} isSelected={childId === selectedProject} onSelect={onSelect} isChild footer={renderCardFooter(childId)} />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            );
-          })}
+          {roots.map((p) => (
+            <ProjectCardGroup key={p.id || p.name || p} p={p} children={children} selectedProject={selectedProject} onSelect={onSelect} confirmActions={{ confirming, setConfirming, onDelete, onExport }} relocateActions={{ relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate }} />
+          ))}
         </div>
       )}
     </section>

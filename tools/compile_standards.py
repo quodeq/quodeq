@@ -34,14 +34,20 @@ ALL_DIMENSIONS = ["maintainability", "security", "reliability", "performance",
                   "usability", "flexibility"]
 
 
-def _load_cwe_names() -> object:
+def _load_cwe_names() -> object | None:
     """Load canonical CWE names from the cwe2 library."""
-    from cwe2.database import Database
-    return Database()
+    try:
+        from cwe2.database import Database
+        return Database()
+    except (ImportError, OSError) as exc:
+        print(f"Warning: CWE database unavailable ({exc}), using fallback names")
+        return None
 
 
 def _get_cwe_name(db, cwe_id: int) -> str:
     """Get canonical name for a CWE ID, with fallback."""
+    if db is None:
+        return f"CWE-{cwe_id}"
     try:
         return db.get(cwe_id).name
     except (AttributeError, KeyError):

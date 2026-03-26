@@ -58,35 +58,42 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         self._project_cache: dict[str, Any] | None = None
         self._project_cache_time: float = 0
 
-    def list_projects(self, reports_dir: str) -> dict[str, Any]:
-        """Return all projects found under the reports directory (TTL-cached)."""
-        now = time.monotonic()
-        if self._project_cache is not None and (now - self._project_cache_time) < _PROJECT_CACHE_TTL_S:
-            return self._project_cache
-        reports_root = Path(reports_dir)
-        # Collect eligible entries first, then build in parallel (I/O-bound).
-        eligible: list[tuple[str, list]] = []
+    @staticmethod
+    def _build_project_list(reports_root: Path) -> list[ProjectEntry]:
+        """Collect eligible project dirs and build entries in parallel."""
         max_listed = _max_projects_listed()
+        dir_names: list[str] = []
         for entry in safe_read_dir(reports_root):
             if not entry.is_dir() or entry.name.startswith("."):
                 continue
-            runs = list_runs(reports_root, entry.name)
-            if not runs:
-                continue
-            eligible.append((entry.name, runs))
-            if len(eligible) >= max_listed:
+            dir_names.append(entry.name)
+            if len(dir_names) >= max_listed:
                 break
+
+        def _build_one(name: str) -> ProjectEntry | None:
+            runs = list_runs(reports_root, name)
+            if not runs:
+                return None
+            return _build_project_entry(reports_root, name, runs)
+
         from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=min(8, len(eligible) or 1)) as pool:
-            projects = list(pool.map(
-                lambda args: _build_project_entry(reports_root, args[0], args[1]),
-                eligible,
-            ))
+        with ThreadPoolExecutor(max_workers=min(8, len(dir_names) or 1)) as pool:
+            results = pool.map(_build_one, dir_names)
+        projects = [p for p in results if p is not None]
         projects.sort(key=lambda p: p.name)
-        projects = _auto_detect_parents(projects)
+        return _auto_detect_parents(projects)
+
+    def _is_cache_valid(self) -> bool:
+        return self._project_cache is not None and (time.monotonic() - self._project_cache_time) < _PROJECT_CACHE_TTL_S
+
+    def list_projects(self, reports_dir: str) -> dict[str, Any]:
+        """Return all projects found under the reports directory (TTL-cached)."""
+        if self._is_cache_valid():
+            return self._project_cache
+        projects = self._build_project_list(Path(reports_dir))
         result = {"projects": [to_camel_dict(p) for p in projects]}
         self._project_cache = result
-        self._project_cache_time = now
+        self._project_cache_time = time.monotonic()
         return result
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:

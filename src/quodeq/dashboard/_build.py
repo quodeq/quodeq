@@ -7,15 +7,28 @@ import shutil
 import subprocess
 from pathlib import Path
 
-from quodeq.shared.logging import log_info
+from quodeq.shared.logging import log_debug, log_info
 
 _HASH_FILE = ".build_hash"
-_QUODEQ_DIR = Path.home() / ".quodeq"
-_BUILD_WORKDIR = _QUODEQ_DIR / "ui_build"
-_STATIC_DIR = _QUODEQ_DIR / "static"
+
+
+def _quodeq_dir(env: dict[str, str] | None = None) -> Path:
+    """Return the base Quodeq directory, overridable via QUODEQ_DIR env var."""
+    return Path((env if env is not None else os.environ).get("QUODEQ_DIR", str(Path.home() / ".quodeq")))
+
+
+def _build_workdir() -> Path:
+    return _quodeq_dir() / "ui_build"
+
+
+def _static_dir() -> Path:
+    return _quodeq_dir() / "static"
 
 # Files and directories to sync from package source to build workdir
 _SYNC_ITEMS = ("src", "public", "package.json", "vite.config.js", "index.html")
+
+_NPM_INSTALL_TIMEOUT_S = 300
+_NPM_BUILD_TIMEOUT_S = 600
 
 
 def _get_ui_source_dir() -> Path:
@@ -35,8 +48,12 @@ def compute_source_hash(source_dir: Path) -> str:
             files.extend(sorted(f for f in item.rglob("*") if f.is_file()))
     for f in sorted(files):
         rel = f.relative_to(source_dir)
-        h.update(str(rel).encode())
-        h.update(f.read_bytes())
+        try:
+            h.update(str(rel).encode())
+            h.update(f.read_bytes())
+        except OSError as exc:
+            log_debug(f"Skipping {f.name} in source hash: {exc}")
+            continue
     return h.hexdigest()
 
 
@@ -94,13 +111,13 @@ def _run_npm_build(workdir: Path, static_dir: Path) -> None:
 
     if _needs_npm_install(workdir):
         log_info("Installing npm dependencies...")
-        subprocess.run([npm, "install"], cwd=str(workdir), check=True, timeout=300)
+        subprocess.run([npm, "install"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
     else:
         log_info("npm dependencies up to date, skipping install.")
 
     log_info("Building web UI...")
     env = {**os.environ, "QUODEQ_BUILD_OUTDIR": str(static_dir)}
-    subprocess.run([npm, "run", "build"], cwd=str(workdir), check=True, timeout=600, env=env)
+    subprocess.run([npm, "run", "build"], cwd=str(workdir), check=True, timeout=_NPM_BUILD_TIMEOUT_S, env=env)
 
 
 def _resolve_dev_source() -> Path:
@@ -121,8 +138,12 @@ def _resolve_dev_source() -> Path:
     )
 
 
-_DEV_STATIC_DIR = _QUODEQ_DIR / "static-dev"
-_DEV_BUILD_WORKDIR = _QUODEQ_DIR / "ui_build_dev"
+def _dev_static_dir() -> Path:
+    return _quodeq_dir() / "static-dev"
+
+
+def _dev_build_workdir() -> Path:
+    return _quodeq_dir() / "ui_build_dev"
 
 
 def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
@@ -132,11 +153,11 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
     """
     if dev:
         source_dir = _resolve_dev_source()
-        static_dir = _DEV_STATIC_DIR
+        static_dir = _dev_static_dir()
         log_info(f"Dev mode: building from {source_dir}")
     else:
         source_dir = _get_ui_source_dir()
-        static_dir = _STATIC_DIR
+        static_dir = _static_dir()
 
     if no_build:
         if not (static_dir / "index.html").exists():
@@ -155,7 +176,7 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
         # Build directly from repo source — no copy needed
         workdir = source_dir
     else:
-        workdir = _BUILD_WORKDIR
+        workdir = _build_workdir()
         sync_source_to_workdir(source_dir, workdir)
     static_dir.mkdir(parents=True, exist_ok=True)
     _run_npm_build(workdir, static_dir)

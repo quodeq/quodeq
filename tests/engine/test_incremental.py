@@ -4,9 +4,9 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
-from unittest.mock import patch
 
-from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, FileClassification, identify_backfill_files
+from quodeq.analysis.incremental import detect_changed_files, ChangeDetectionResult, find_dependents, carry_forward_findings, classify_files, ClassificationInput, FileClassification, identify_backfill_files
+from quodeq.analysis._incremental import _extract_files_from_jsonl
 
 
 class TestDetectChangedFiles:
@@ -124,15 +124,17 @@ class TestClassifyFiles:
             },
             "standards_checksum": None,
         }
-        result = classify_files(src=tmp_path, files=["changed.py", "dependent.py", "unchanged.py"],
-                               prev_fingerprint=prev_fp, standards_dir=None, dimension="security", language="python")
+        result = classify_files(inputs=ClassificationInput(
+            src=tmp_path, files=["changed.py", "dependent.py", "unchanged.py"],
+            prev_fingerprint=prev_fp, standards_dir=None, dimension="security", language="python"))
         assert "changed.py" in result.to_analyze
         assert "dependent.py" in result.to_analyze
         assert "unchanged.py" in result.unchanged
 
     def test_full_reanalysis_returns_all(self, tmp_path):
-        result = classify_files(src=tmp_path, files=["a.py", "b.py"],
-                               prev_fingerprint=None, standards_dir=None, dimension="security", language="python")
+        result = classify_files(inputs=ClassificationInput(
+            src=tmp_path, files=["a.py", "b.py"],
+            prev_fingerprint=None, standards_dir=None, dimension="security", language="python"))
         assert set(result.to_analyze) == {"a.py", "b.py"}
         assert len(result.unchanged) == 0
         assert result.full_reanalysis is True
@@ -176,7 +178,48 @@ class TestIncrementalRunnerIntegration:
             "file_hashes": {"a.py": hashlib.sha256(b"same").hexdigest()},
             "standards_checksum": None,
         }
-        result = classify_files(src=tmp_path, files=["a.py"], prev_fingerprint=prev_fp,
-                               standards_dir=None, dimension="security", language="python")
+        result = classify_files(inputs=ClassificationInput(
+            src=tmp_path, files=["a.py"], prev_fingerprint=prev_fp,
+            standards_dir=None, dimension="security", language="python"))
         assert len(result.to_analyze) == 0
         assert result.unchanged == {"a.py"}
+
+
+class TestExtractFilesFromJsonl:
+    def test_extracts_unique_file_paths(self, tmp_path):
+        """Extracts unique file paths from evidence JSONL."""
+        jsonl = tmp_path / "security_evidence.jsonl"
+        jsonl.write_text(
+            '{"p":"Mod","t":"violation","file":"a.py","line":1}\n'
+            '{"p":"Mod","t":"compliance","file":"b.py","line":2}\n'
+            '{"p":"Mod","t":"violation","file":"a.py","line":5}\n'
+        )
+        files = _extract_files_from_jsonl(jsonl)
+        assert files == {"a.py", "b.py"}
+
+    def test_missing_file_returns_empty(self, tmp_path):
+        """Non-existent JSONL returns empty set."""
+        files = _extract_files_from_jsonl(tmp_path / "missing.jsonl")
+        assert files == set()
+
+    def test_skips_malformed_lines(self, tmp_path):
+        """Malformed JSON lines are skipped gracefully."""
+        jsonl = tmp_path / "security_evidence.jsonl"
+        jsonl.write_text(
+            '{"p":"Mod","t":"violation","file":"a.py","line":1}\n'
+            'not valid json\n'
+            '\n'
+            '{"p":"Mod","t":"violation","line":1}\n'
+            '{"p":"Mod","t":"violation","file":"","line":1}\n'
+        )
+        files = _extract_files_from_jsonl(jsonl)
+        assert files == {"a.py"}
+
+    def test_empty_file_returns_empty(self, tmp_path):
+        """Empty JSONL returns empty set."""
+        jsonl = tmp_path / "security_evidence.jsonl"
+        jsonl.write_text("")
+        files = _extract_files_from_jsonl(jsonl)
+        assert files == set()
+
+

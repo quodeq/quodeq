@@ -8,6 +8,8 @@ import pytest
 from quodeq.core.types import JobSnapshot
 from quodeq.provider.jobs import JobManager
 
+_FAKE_REPORT_PATH = "Report path: /app/reports/sample-project/20260220/evaluation"
+
 
 class FakeProcess:
     """Simulate a subprocess with merged stdout/stderr (subprocess.STDOUT)."""
@@ -37,7 +39,7 @@ def completed_success_job() -> JobSnapshot:
     """Run a successful job and return the final result snapshot."""
     def spawn_impl(*_args, **_kwargs):
         return FakeProcess(
-            stdout="Report path: /app/reports/sample-project/20260220/evaluation\nhello\n",
+            stdout=_FAKE_REPORT_PATH + "\nhello\n",
             stderr="warning\n",
             returncode=0,
         )

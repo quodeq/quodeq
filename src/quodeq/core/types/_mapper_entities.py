@@ -138,8 +138,8 @@ def parse_plugin_info(raw: dict[str, object]) -> PluginInfo:
 def _parse_progress_info(raw: dict[str, object]) -> ProgressInfo:
     return ProgressInfo(
         files_read=_int(raw, "filesRead"),
-        violations=_int(raw, "violations"),
-        compliance=_int(raw, "compliance"),
+        violation_count=_int(raw, "violationCount") or _int(raw, "violations"),
+        compliance_count=_int(raw, "complianceCount") or _int(raw, "compliance"),
     )
 
 
@@ -211,11 +211,15 @@ def parse_trend_point(raw: dict[str, object]) -> TrendPoint:
     if not isinstance(run_id, str):
         msg = f"TrendPoint.runId must be str, got {type(run_id).__name__}"
         raise TypeError(msg)
+    raw_dims = raw.get("dimensions")
+    dims = tuple(raw_dims) if isinstance(raw_dims, list) else ()
     return TrendPoint(
         run_id=run_id,
         date_iso=_opt_str(raw.get("dateIso")),
         date_label=_str(raw, "dateLabel"),
         dimensions_count=_int(raw, "dimensionsCount"),
+        dimensions=dims,
+        accumulated_dimensions_count=_int(raw, "accumulatedDimensionsCount"),
         overall_grade=_opt_str(raw.get("overallGrade")),
         numeric_average=_opt_float(raw.get("numericAverage")),
     )

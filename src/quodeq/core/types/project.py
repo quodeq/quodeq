@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 @dataclass(frozen=True, slots=True)
@@ -29,3 +29,4 @@ class ProjectEntry:
     files_count: int | None = None
     latest_grade: str | None = None
     latest_score: float | None = None
+    language_stats: dict[str, int] = field(default_factory=dict)

@@ -22,13 +22,18 @@ from _helpers import (
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
+_AUTO_START_DELAY_S = 1.5
+_HEALTH_POLL_INTERVAL_S = 0.5
+_STDERR_READ_MAX = 500
+_ERROR_DISPLAY_MAX = 200
+_DEFAULT_PORTS = "4173,4174,4175,4180,4181,4182,4183"
 
 
 def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
     env = env or os.environ
     app_port = int(env.get("QUODEQ_PORT", "4173"))
-    ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", "4173,4174,4175,4180,4181,4182,4183").split(","))
+    ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", _DEFAULT_PORTS).split(","))
     return app_port, ports
 
 
@@ -37,6 +42,8 @@ class QuodeqApp(rumps.App):
         super().__init__("Quodeq", icon=_find_icon("menubar_iconTemplate.png"), template=True)
         self._app_port, self._ports = _load_config()
         self._last_known_port: int | None = None
+        self._port_cache_time: float = 0
+        self._port_cached_result: int | None = None
         self._process: subprocess.Popen | None = None
         self._port: int | None = None
         self._starting = False
@@ -52,7 +59,8 @@ class QuodeqApp(rumps.App):
         self._error_item = rumps.MenuItem("")
 
         # Check prereqs on main thread so menu items render correctly
-        cmds = _find_commands()
+        self._cached_cmds = _find_commands()
+        cmds = self._cached_cmds
         self._prereq_items = {}
         for label, cmd in [("Python", "python3"), ("Node.js", "node"), ("Claude", "claude"), ("Quodeq", "quodeq")]:
             path = cmds.get(cmd)
@@ -80,7 +88,7 @@ class QuodeqApp(rumps.App):
     def _find_running_port(self) -> int | None:
         """Find the running dashboard port, checking last known port first (TTL-cached)."""
         now = time.monotonic()
-        if hasattr(self, '_port_cache_time') and (now - self._port_cache_time) < _POLL_INTERVAL:
+        if (now - self._port_cache_time) < _POLL_INTERVAL:
             return self._port_cached_result
         if self._last_known_port is not None and _health_check(self._last_known_port):
             self._port_cached_result = self._last_known_port
@@ -117,9 +125,15 @@ class QuodeqApp(rumps.App):
     @rumps.timer(_POLL_INTERVAL)
     def _poll(self, _):
         """Periodically check if the dashboard is running."""
-        port = self._find_running_port()
+        with self._state_lock:
+            port = self._port
+        if port and not _health_check(port):
+            port = None
+        if not port:
+            port = self._find_running_port()
         if port:
-            self._port = port
+            with self._state_lock:
+                self._port = port
             self._clear_error()
             if _is_evaluating(port):
                 self._status_item.title = "Evaluating..."
@@ -130,7 +144,8 @@ class QuodeqApp(rumps.App):
             self.template = False
             self._set_ui_state(running=True)
         else:
-            self._port = None
+            with self._state_lock:
+                self._port = None
             if not self._starting:
                 self._status_item.title = "Stopped"
             self.icon = self._icon_stopped
@@ -139,12 +154,14 @@ class QuodeqApp(rumps.App):
 
     def _auto_start(self):
         """Auto-start the dashboard if not already running."""
-        time.sleep(1.5)
+        time.sleep(_AUTO_START_DELAY_S)
         if self._find_running_port() is None:
             self._do_start()
 
     def _on_open(self, _):
-        port = self._port or self._find_running_port()
+        with self._state_lock:
+            port = self._port
+        port = port or self._find_running_port()
         if port:
             webbrowser.open(f"http://127.0.0.1:{port}")
 
@@ -196,7 +213,7 @@ class QuodeqApp(rumps.App):
         return cmd
 
     def _do_start_inner(self):
-        cmds = _find_commands()
+        cmds = self._cached_cmds
         quodeq_cmd = cmds.get("quodeq")
         if not quodeq_cmd:
             self._set_error("quodeq not in PATH")
@@ -213,50 +230,64 @@ class QuodeqApp(rumps.App):
                 cmd, stdout=subprocess.DEVNULL, stderr=stderr_log, start_new_session=True,
             )
         except OSError as e:
+            stderr_log.close()
             self._set_error(f"Failed: {e}")
             self._status_item.title = "Stopped"
+            self._cleanup_stderr_log()
             return
         self._wait_for_dashboard(stderr_log)
 
     def _wait_for_dashboard(self, stderr_log):
         """Poll until the dashboard responds or process crashes."""
-        for _ in range(_MAX_START_RETRIES):
-            time.sleep(0.5)
-            if self._process.poll() is not None:
+        try:
+            for _ in range(_MAX_START_RETRIES):
+                time.sleep(_HEALTH_POLL_INTERVAL_S)
+                if self._process.poll() is not None:
+                    stderr_log.close()
+                    try:
+                        with open(stderr_log.name) as f:
+                            err = f.read(_STDERR_READ_MAX).strip()
+                    except OSError:
+                        err = "unknown error"
+                    self._set_error(f"Crashed (exit {self._process.returncode}): {err[:_ERROR_DISPLAY_MAX]}")
+                    self._status_item.title = "Stopped"
+                    self._cleanup_stderr_log()
+                    return
+                port = self._find_running_port()
+                if port:
+                    with self._state_lock:
+                        self._port = port
+                    self._clear_error()
+                    self._cleanup_stderr_log()
+                    return
+            self._set_error("Timeout: dashboard did not respond")
+            self._status_item.title = "Stopped"
+            self._cleanup_stderr_log()
+        finally:
+            try:
                 stderr_log.close()
-                try:
-                    with open(stderr_log.name) as f:
-                        err = f.read(500).strip()
-                except OSError:
-                    err = "unknown error"
-                self._set_error(f"Crashed (exit {self._process.returncode}): {err[:200]}")
-                self._status_item.title = "Stopped"
-                self._cleanup_stderr_log()
-                return
-            port = self._find_running_port()
-            if port:
-                self._port = port
-                self._clear_error()
-                return
-        self._set_error("Timeout: dashboard did not respond")
-        self._status_item.title = "Stopped"
-        self._cleanup_stderr_log()
+            except OSError:
+                pass
 
     @staticmethod
-    def _kill_port_processes(port: int) -> None:
-        """Send SIGTERM to all processes listening on *port*."""
+    def _find_pids_on_port(port: int) -> list[int]:
+        """Return PIDs listening on *port* (macOS: uses lsof)."""
         try:
             result = subprocess.run(
                 ["lsof", f"-ti:{port}"], capture_output=True, text=True, timeout=5,
             )
-            for pid in result.stdout.strip().split("\n"):
-                if pid.strip():
-                    try:
-                        os.kill(int(pid.strip()), signal.SIGTERM)
-                    except (OSError, ValueError):
-                        pass
-        except (subprocess.TimeoutExpired, OSError):
-            pass
+            return [int(pid.strip()) for pid in result.stdout.strip().split("\n") if pid.strip()]
+        except (subprocess.TimeoutExpired, OSError, ValueError):
+            return []
+
+    @staticmethod
+    def _kill_port_processes(port: int) -> None:
+        """Send SIGTERM to all processes listening on *port*."""
+        for pid in QuodeqApp._find_pids_on_port(port):
+            try:
+                os.kill(pid, signal.SIGTERM)
+            except (OSError, ValueError):
+                pass
 
     def _on_stop(self, _):
         if self._process and self._process.poll() is None:
@@ -272,7 +303,8 @@ class QuodeqApp(rumps.App):
                 subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=5)
             except (subprocess.TimeoutExpired, OSError):
                 pass
-        self._port = None
+        with self._state_lock:
+            self._port = None
         self._status_item.title = "Stopped"
         self._set_ui_state(running=False)
         self._cleanup_stderr_log()

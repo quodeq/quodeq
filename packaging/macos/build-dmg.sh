@@ -10,6 +10,18 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 BUILD_DIR="$REPO_ROOT/dist/macos-build"
 DMG_DIR="$REPO_ROOT/dist"
 
+# DMG layout settings
+DMG_WINDOW_X=200
+DMG_WINDOW_Y=120
+DMG_WINDOW_WIDTH=540
+DMG_WINDOW_HEIGHT=380
+DMG_ICON_SIZE=100
+DMG_TEXT_SIZE=13
+DMG_APP_ICON_X=150
+DMG_APP_ICON_Y=180
+DMG_DROP_LINK_X=390
+DMG_DROP_LINK_Y=180
+
 VERSION=$(python3 -c "
 import re
 text = open('$REPO_ROOT/pyproject.toml').read()
@@ -71,13 +83,13 @@ if command -v create-dmg &>/dev/null; then
         --volname "Quodeq"
         --volicon "$SCRIPT_DIR/volicon.icns"
         --background "$SCRIPT_DIR/dmg-background.png"
-        --window-pos 200 120
-        --window-size 540 380
-        --icon-size 100
-        --text-size 13
-        --icon "QuodeqBar.app" 150 180
+        --window-pos "$DMG_WINDOW_X" "$DMG_WINDOW_Y"
+        --window-size "$DMG_WINDOW_WIDTH" "$DMG_WINDOW_HEIGHT"
+        --icon-size "$DMG_ICON_SIZE"
+        --text-size "$DMG_TEXT_SIZE"
+        --icon "QuodeqBar.app" "$DMG_APP_ICON_X" "$DMG_APP_ICON_Y"
         --hide-extension "QuodeqBar.app"
-        --app-drop-link 390 180
+        --app-drop-link "$DMG_DROP_LINK_X" "$DMG_DROP_LINK_Y"
         --no-internet-enable
     )
     create-dmg "${DMGOPTS[@]}" "$DMG_PATH" "$APP" || true

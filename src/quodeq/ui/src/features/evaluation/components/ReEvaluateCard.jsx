@@ -1,11 +1,16 @@
 import { useState, useEffect } from 'react';
-import { getProjectInfo, listPlugins } from '../../../api/index.js';
+import { getProjectInfo } from '../../../api/index.js';
+import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { ISO_25010_URL } from '../../../constants.js';
+
+const BUTTON_GAP = '8px';
+const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_GAP, alignItems: 'center' };
+const flexButtonStyle = { flex: 1, marginTop: 0 };
 
 export default function ReEvaluateCard({ project, onStart, disabled }) {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState(null);
-  const [allDimensions, setAllDimensions] = useState([]);
+  const { allDimensions } = usePluginDimensions();
   const [selectedDims, setSelectedDims] = useState(new Set());
 
   useEffect(() => {
@@ -19,23 +24,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
       });
   }, [project]);
 
-  useEffect(() => {
-    listPlugins()
-      .then((plugins) => {
-        const seen = new Map();
-        for (const p of plugins) {
-          for (const d of p.dimensions) {
-            if (!seen.has(d.id)) {
-              seen.set(d.id, d);
-            }
-          }
-        }
-        setAllDimensions([...seen.values()]);
-      })
-      .catch((err) => { console.warn('Failed to load dimensions:', err); setAllDimensions([]); });
-  }, []);
-
-  if (error) return <div className="inline-error">{error}</div>;
+  if (error) return null;
   if (!info) return null;
 
   function toggleDim(id) {
@@ -110,12 +99,12 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
           </div>
         )}
 
-        <div style={{ display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' }}>
+        <div style={buttonRowStyle}>
           {info.hasFingerprints && (
             <button
               type="button"
               className="evaluate-submit-btn"
-              style={{ flex: 1, marginTop: 0 }}
+              style={flexButtonStyle}
               disabled={!canStart}
               onClick={handleIncremental}
               title="Only analyze files changed since last evaluation"
@@ -126,7 +115,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
           <button
             type="button"
             className="evaluate-submit-btn"
-            style={{ flex: 1, marginTop: 0 }}
+            style={flexButtonStyle}
             disabled={!canStart}
             onClick={handleStart}
             title="Fresh re-evaluation of all selected dimensions"

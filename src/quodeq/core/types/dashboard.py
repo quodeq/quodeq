@@ -13,6 +13,8 @@ class TrendPoint:
     date_iso: str | None = None
     date_label: str = ""
     dimensions_count: int = 0
+    dimensions: tuple[str, ...] = ()
+    accumulated_dimensions_count: int = 0
     overall_grade: str | None = None
     numeric_average: float | None = None
 

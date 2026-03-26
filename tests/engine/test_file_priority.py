@@ -180,14 +180,14 @@ class TestPrioritizeFiles:
         (tmp_path / "tests" / "boring.py").write_text("x" * 10)
 
         files = ["tests/boring.py", "src/important.py"]
-        result = prioritize_files(files, tmp_path, "security", category=None)
+        result = prioritize_files(files, tmp_path, "security")
         assert result[0] == "src/important.py"
 
     def test_all_files_preserved(self, tmp_path):
         files = [f"file{i}.py" for i in range(20)]
         for f in files:
             (tmp_path / f).write_text("")
-        result = prioritize_files(files, tmp_path, "security", category=None)
+        result = prioritize_files(files, tmp_path, "security")
         assert set(result) == set(files)
         assert len(result) == 20
 

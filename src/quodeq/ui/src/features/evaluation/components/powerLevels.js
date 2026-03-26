@@ -15,7 +15,7 @@ export function getLevels(storage = typeof localStorage !== 'undefined' ? localS
         if (stored) overrides[lvl] = stored;
       }
     }
-  } catch { /* storage unavailable (private browsing) */ }
+  } catch (err) { console.debug('localStorage unavailable, using default models:', err?.message); }
   return [
     { level: 1, model: overrides[1] || DEFAULT_MODELS[1], label: 'Fast' },
     { level: 2, model: overrides[2] || DEFAULT_MODELS[2], label: 'Balanced' },

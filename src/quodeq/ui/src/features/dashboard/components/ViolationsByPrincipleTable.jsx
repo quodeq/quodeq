@@ -4,6 +4,8 @@
 
 import { memo, useMemo, useState } from 'react';
 
+const DEFAULT_PAGE_SIZE = 20;
+
 function PrincipleRow({ p, idx, onPrincipleClick }) {
   return (
     <li
@@ -31,38 +33,40 @@ function PrincipleRow({ p, idx, onPrincipleClick }) {
   );
 }
 
-const ViolationsByPrincipleTable = memo(function ViolationsByPrincipleTable({ violations, onPrincipleClick, pageSize = 20 }) {
+function groupViolationsByPrinciple(violations) {
+  const bucket = new Map();
+  violations.forEach(v => {
+    const name = v.principle || '(unknown)';
+    const sev = (v.severity || 'minor').toLowerCase();
+    const cur = bucket.get(name) || {
+      principle: name,
+      total: 0,
+      critical: 0,
+      major: 0,
+      minor: 0,
+      violations: [],
+      dimensions: new Set(),
+    };
+    cur.total++;
+    if (cur[sev] !== undefined) cur[sev]++;
+    cur.violations.push(v);
+    if (v.dimension) cur.dimensions.add(v.dimension);
+    bucket.set(name, cur);
+  });
+  return Array.from(bucket.values()).map(p => ({
+    ...p,
+    dimensionsStr: p.dimensions.size > 0 ? Array.from(p.dimensions).sort().join(', ') : '',
+  })).sort((a, b) => {
+    if (b.critical !== a.critical) return b.critical - a.critical;
+    if (b.major !== a.major) return b.major - a.major;
+    return b.minor - a.minor;
+  });
+}
+
+const ViolationsByPrincipleTable = memo(function ViolationsByPrincipleTable({ violations, onPrincipleClick, pageSize = DEFAULT_PAGE_SIZE }) {
   const [showAll, setShowAll] = useState(false);
 
-  const grouped = useMemo(() => {
-    const bucket = new Map();
-    violations.forEach(v => {
-      const name = v.principle || '(unknown)';
-      const sev = (v.severity || 'minor').toLowerCase();
-      const cur = bucket.get(name) || {
-        principle: name,
-        total: 0,
-        critical: 0,
-        major: 0,
-        minor: 0,
-        violations: [],
-        dimensions: new Set(),
-      };
-      cur.total++;
-      if (cur[sev] !== undefined) cur[sev]++;
-      cur.violations.push(v);
-      if (v.dimension) cur.dimensions.add(v.dimension);
-      bucket.set(name, cur);
-    });
-    return Array.from(bucket.values()).map(p => ({
-      ...p,
-      dimensionsStr: p.dimensions.size > 0 ? Array.from(p.dimensions).sort().join(', ') : '',
-    })).sort((a, b) => {
-      if (b.critical !== a.critical) return b.critical - a.critical;
-      if (b.major !== a.major) return b.major - a.major;
-      return b.minor - a.minor;
-    });
-  }, [violations]);
+  const grouped = useMemo(() => groupViolationsByPrinciple(violations), [violations]);
 
   const displayItems = showAll ? grouped : grouped.slice(0, pageSize);
   const hasMore = grouped.length > pageSize;

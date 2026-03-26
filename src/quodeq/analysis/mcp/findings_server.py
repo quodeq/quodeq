@@ -58,24 +58,15 @@ class FindingsRouter:
     def __init__(
         self,
         output_fh: TextIO,
-        compiled_refs: dict[str, list[dict]] | None = None,
-        seen_store: DeduplicationStore | None = None,
-        compiled_reqs: dict[str, dict] | None = None,
-        dimension: str | None = None,
-        req_to_dim: dict[str, str] | None = None,
-        *,
         context: CompiledContext | None = None,
+        seen_store: DeduplicationStore | None = None,
     ):
-        if context is not None:
-            compiled_refs = compiled_refs or context.compiled_refs
-            compiled_reqs = compiled_reqs or context.compiled_reqs
-            req_to_dim = req_to_dim or context.req_to_dim
-            dimension = dimension or context.dimension
+        ctx = context or CompiledContext()
         self._fh = output_fh
-        self._refs = compiled_refs or {}
-        self._reqs = compiled_reqs or {}
-        self._dimension = dimension
-        self._req_to_dim = req_to_dim or {}
+        self._refs = ctx.compiled_refs
+        self._reqs = ctx.compiled_reqs
+        self._dimension = ctx.dimension
+        self._req_to_dim = ctx.req_to_dim
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self.counter = 0
 

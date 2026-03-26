@@ -1,4 +1,6 @@
 """Tests for shared SSRF protection utility."""
+from unittest.mock import patch
+
 import pytest
 
 from quodeq.shared.ssrf import is_private_address
@@ -29,8 +31,8 @@ class TestIsPrivateAddress:
     def test_public_ip(self):
         assert is_private_address("8.8.8.8") is False
 
-    def test_public_hostname(self):
-        # This does DNS resolution — github.com should resolve to public IPs
+    @patch("socket.getaddrinfo", return_value=[(2, 1, 6, '', ('140.82.121.3', 0))])
+    def test_public_hostname(self, _mock_dns):
         assert is_private_address("github.com") is False
 
     def test_link_local(self):

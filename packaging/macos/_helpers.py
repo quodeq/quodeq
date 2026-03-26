@@ -1,6 +1,7 @@
 """Helper functions for the macOS menu bar app — command discovery and health checks."""
 from __future__ import annotations
 
+import functools
 import json
 import os
 import subprocess
@@ -8,20 +9,26 @@ import urllib.error
 import urllib.request
 
 _HEALTH_TIMEOUT = 1.0
+_HOMEBREW_ARM64 = "/opt/homebrew/bin"
+_HOMEBREW_X86 = "/usr/local/bin"
 
 
-def _homebrew_bin_dirs() -> str:
-    """Return Homebrew bin directories based on the CPU architecture."""
+def _homebrew_bin_dirs(
+    arm64_path: str = _HOMEBREW_ARM64,
+    x86_path: str = _HOMEBREW_X86,
+) -> str:
+    """Return Homebrew bin directories based on the CPU architecture.
+
+    *arm64_path* and *x86_path* can be overridden for testing or
+    non-standard Homebrew installations.
+    """
     import platform
     arch = platform.machine()
     if arch == "arm64":
-        return "/opt/homebrew/bin"
+        return arm64_path
     elif arch == "x86_64":
-        return "/usr/local/bin"
-    return "/opt/homebrew/bin:/usr/local/bin"
-
-_cached_commands: dict[str, str | None] | None = None
-
+        return x86_path
+    return f"{arm64_path}:{x86_path}"
 
 def source_user_path() -> None:
     """Load the user's shell PATH since .app bundles don't inherit it."""
@@ -49,21 +56,35 @@ def find_icon(name: str) -> str | None:
     return None
 
 
-def find_commands() -> dict[str, str | None]:
-    """Check which required commands are available (cached after first call)."""
-    global _cached_commands
-    if _cached_commands is not None:
-        return _cached_commands
-    cmds = {}
+def find_commands(env: dict[str, str] | None = None) -> dict[str, str | None]:
+    """Check which required commands are available.
+
+    An optional *env* mapping can be passed to override the subprocess
+    environment (useful for testing).  When *env* is ``None`` the result
+    is cached; when a custom *env* is supplied the cache is bypassed so
+    callers can test with different PATH values.
+    """
+    if env is None:
+        return _find_commands_cached()
+    return _find_commands_uncached(env)
+
+
+@functools.lru_cache(maxsize=1)
+def _find_commands_cached() -> dict[str, str | None]:
+    return _find_commands_uncached(env=None)
+
+
+def _find_commands_uncached(env: dict[str, str] | None) -> dict[str, str | None]:
+    cmds: dict[str, str | None] = {}
     for name in ("python3", "node", "claude", "quodeq"):
         try:
             result = subprocess.run(
                 ["which", name], capture_output=True, text=True, timeout=5,
+                env=env,
             )
             cmds[name] = result.stdout.strip() if result.returncode == 0 else None
         except (subprocess.TimeoutExpired, OSError):
             cmds[name] = None
-    _cached_commands = cmds
     return cmds
 
 

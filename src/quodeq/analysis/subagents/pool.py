@@ -8,56 +8,29 @@ from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
 
+from quodeq.analysis.subagents._heartbeat import HeartbeatContext, heartbeat_loop
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.analysis.subagents.file_queue import FileQueue
-from quodeq.shared.logging import log_info, log_success, log_warning
-from quodeq.shared.utils import open_text
+from quodeq.shared.logging import log_info, log_warning
 
 _AGENT_ID_PREFIX = "agent"
-_HEARTBEAT_INTERVAL = 10
 _FUTURE_POLL_INTERVAL_S = 0.5
 _HEARTBEAT_JOIN_TIMEOUT_S = 2
 
 _DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
-_SECONDS_PER_MINUTE = 60
 _SCOUT_TIMEOUT_S = 180  # 3 minutes before forcing scale-up
+_DEFAULT_MAX_DURATION_S = 1800
+_DEFAULT_FILES_PER_AGENT = 30
 
 
-def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> int:
-    """Count non-empty lines in a JSONL file under a lock."""
-    try:
-        if not jsonl_path.exists():
-            return 0
-        with lock:
-            with open_text(jsonl_path) as f:
-                return sum(1 for line in f if line.strip())
-    except OSError:
-        return 0
-
-
-def _heartbeat_loop(
-    stop: threading.Event, finished: dict[str, bool],
-    queue_path: Path, dimension_key: str, jsonl_path: Path, lock: threading.Lock,
-) -> None:
-    """Emit periodic progress lines for the subagent pool."""
-    start = time.monotonic()
-    while not stop.wait(_HEARTBEAT_INTERVAL):
-        try:
-            elapsed = int(time.monotonic() - start)
-            mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
-            total_findings = _count_jsonl_findings(jsonl_path, lock)
-            remaining, taken = FileQueue(queue_path).stats()
-            total_agents = len(finished)
-            active = sum(1 for v in finished.values() if not v)
-            log_info(
-                f"  [{dimension_key}] {mins}m{secs:02d}s | "
-                f"{active} active ({total_agents} total) | "
-                f"{taken} files taken ({remaining} left) | "
-                f"{total_findings} findings"
-            )
-        except (OSError, ValueError, RuntimeError) as exc:
-            log_warning(f"Heartbeat error: {exc}")
+@dataclass
+class ScaleUpState:
+    """Grouped parameters for scale-up decision logic."""
+    pool_start: float
+    max_duration: float
+    scout_timeout: float
+    scout_done: bool = False
 
 
 @dataclass
@@ -126,7 +99,7 @@ class SubagentPool:
             jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
             heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,
             ai_cmd=bc.ai_cmd, ai_model=bc.ai_model, max_turns=bc.max_turns,
-            max_duration=bc.max_duration or 1800,
+            max_duration=bc.max_duration or _DEFAULT_MAX_DURATION_S,
             compiled_dir=bc.compiled_dir, dimension=self._dimension,
             queue_path=self._queue_path, agent_id=agent_id,
             max_files_per_agent=bc.max_files_per_agent,
@@ -172,7 +145,7 @@ class SubagentPool:
         """Compute how many overflow agents to spawn after scout completes."""
         if remaining <= 0:
             return 0
-        needed = ceil(remaining / (self._base_config.max_files_per_agent or 30))
+        needed = ceil(remaining / (self._base_config.max_files_per_agent or _DEFAULT_FILES_PER_AGENT))
         return min(needed, self._n - 1) if needed > 1 else 0
 
     def _collect_done(
@@ -210,10 +183,13 @@ class SubagentPool:
     def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
         """Create and start the heartbeat monitoring thread."""
         stop = threading.Event()
+        ctx = HeartbeatContext(
+            queue_path=self._queue_path, dimension_key=self._dimension_key,
+            jsonl_path=self._shared_jsonl_path(), lock=self._jsonl_lock,
+        )
         heartbeat = threading.Thread(
-            target=_heartbeat_loop,
-            args=(stop, self._finished, self._queue_path, self._dimension_key,
-                  self._shared_jsonl_path(), self._jsonl_lock),
+            target=heartbeat_loop,
+            args=(stop, self._finished, ctx),
             daemon=True,
         )
         heartbeat.start()
@@ -226,21 +202,52 @@ class SubagentPool:
         self._next_idx += 1
 
     def _maybe_scale_up(
-        self, done: set, pool_start: float, max_duration: float,
-        scout_timeout: float, scout_done: bool, executor: ThreadPoolExecutor,
+        self, done: set, state: ScaleUpState, executor: ThreadPoolExecutor,
     ) -> bool:
         """Check if scout phase is complete and scale up if needed. Returns updated scout_done."""
-        if scout_done:
+        if state.scout_done:
             return True
-        elapsed = time.monotonic() - pool_start
+        elapsed = time.monotonic() - state.pool_start
         scout_completed = len(done) > 0
-        scout_timed_out = elapsed >= scout_timeout and self._n > 1
+        scout_timed_out = elapsed >= state.scout_timeout and self._n > 1
         if not (scout_completed or scout_timed_out):
             return False
-        remaining = self._should_respawn(pool_start, max_duration)
+        remaining = self._should_respawn(state.pool_start, state.max_duration)
         for _ in range(self._compute_scale_up(remaining)):
             self._submit_agent(executor)
         return True
+
+    def _scout_loop(
+        self, results: list[SubagentResult], max_duration: float, pool_start: float,
+        executor: ThreadPoolExecutor,
+    ) -> None:
+        """Run scout-then-scale loop inside an executor."""
+        scout_timeout = min(_SCOUT_TIMEOUT_S, max_duration / max(self._n, 1) * 0.5)
+        scale_state = ScaleUpState(pool_start=pool_start, max_duration=max_duration, scout_timeout=scout_timeout)
+        self._submit_agent(executor)
+
+        while self._futures:
+            done = self._collect_done(results)
+            scale_state.scout_done = self._maybe_scale_up(done, scale_state, executor)
+            if not done:
+                time.sleep(_FUTURE_POLL_INTERVAL_S)
+                continue
+            if scale_state.scout_done:
+                self._process_completed_futures(done, pool_start, max_duration, executor)
+
+    def _immediate_loop(
+        self, results: list[SubagentResult], max_duration: float, pool_start: float,
+        executor: ThreadPoolExecutor,
+    ) -> None:
+        """Run all agents immediately inside an executor."""
+        for _ in range(self._n):
+            self._submit_agent(executor)
+        while self._futures:
+            done = self._collect_done(results)
+            if not done:
+                time.sleep(_FUTURE_POLL_INTERVAL_S)
+                continue
+            self._process_completed_futures(done, pool_start, max_duration, executor)
 
     def _run_pool_loop(
         self, results: list[SubagentResult], max_duration: float, pool_start: float,
@@ -248,27 +255,9 @@ class SubagentPool:
         """Execute the pool loop: scout-then-scale or immediate launch."""
         with ThreadPoolExecutor(max_workers=self._n) as pool:
             if self._scout_first:
-                scout_timeout = min(_SCOUT_TIMEOUT_S, max_duration / max(self._n, 1) * 0.5)
-                scout_done = False
-                self._submit_agent(pool)
-
-                while self._futures:
-                    done = self._collect_done(results)
-                    scout_done = self._maybe_scale_up(done, pool_start, max_duration, scout_timeout, scout_done, pool)
-                    if not done:
-                        time.sleep(_FUTURE_POLL_INTERVAL_S)
-                        continue
-                    if scout_done:
-                        self._process_completed_futures(done, pool_start, max_duration, pool)
+                self._scout_loop(results, max_duration, pool_start, pool)
             else:
-                for _ in range(self._n):
-                    self._submit_agent(pool)
-                while self._futures:
-                    done = self._collect_done(results)
-                    if not done:
-                        time.sleep(_FUTURE_POLL_INTERVAL_S)
-                        continue
-                    self._process_completed_futures(done, pool_start, max_duration, pool)
+                self._immediate_loop(results, max_duration, pool_start, pool)
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, returning a SubagentResult per agent."""

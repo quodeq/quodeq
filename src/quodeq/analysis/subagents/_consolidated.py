@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from quodeq.analysis.subprocess import AnalysisConfig
+from quodeq.services.base import _DEFAULT_POOL_BUDGET
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
@@ -33,7 +34,7 @@ def _build_consolidated_config(
         ai_model=subagent_model,
         dimension=",".join(dimensions),
         max_files_per_agent=files_per_agent,
-        pool_budget=pool_budget_val if pool_budget_val is not None else 600,
+        pool_budget=pool_budget_val if pool_budget_val is not None else _DEFAULT_POOL_BUDGET,
     )
 
 
@@ -67,22 +68,9 @@ def _collect_consolidated_results(
     return parse_jsonl_to_evidence_by_dimension(merged_jsonl, ev_ctx, compiled_dir=compiled_dir)
 
 
-def process_consolidated_dimensions(
-    config: "RunConfig", dimensions: list[str], ctx: Any,
-) -> dict[str, Evidence]:
-    """Run all dimensions in a single pass -- files read once, not per dimension."""
-    from quodeq.analysis.subagents.runner import _list_source_files, _compute_files_per_agent
-
-    evidence_dir = config.work_dir or config.src
-
-    # 1. List source files
-    files, extensions = _list_source_files(config, dimensions[0])
-    if not files:
-        log_warning("No source files for consolidated analysis")
-        return {}
-
-    # 2. Build consolidated prompt
-    prompt = build_consolidated_prompt(
+def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
+    """Build the consolidated prompt for multi-dimension analysis."""
+    return build_consolidated_prompt(
         dimensions=dimensions,
         context=PromptContext(
             language=config.language,
@@ -98,13 +86,29 @@ def process_consolidated_dimensions(
         ),
     )
 
-    # 3. Create file queue
+
+def process_consolidated_dimensions(
+    config: "RunConfig", dimensions: list[str], ctx: Any,
+) -> dict[str, Evidence]:
+    """Run all dimensions in a single pass -- files read once, not per dimension."""
+    from quodeq.analysis.subagents.runner import _list_source_files, _compute_files_per_agent
+
+    evidence_dir = config.work_dir or config.src
+
+    # 1. List source files
+    files, extensions = _list_source_files(config, dimensions[0])
+    if not files:
+        log_warning("No source files for consolidated analysis")
+        return {}
+
+    # 2. Build consolidated prompt and create file queue
+    prompt = _build_prompt(config, dimensions, ctx)
     files_per_agent = _compute_files_per_agent(len(files))
     queue_path = evidence_dir / "consolidated_queue.json"
     FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
     log_info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
 
-    # 4. Build config and launch pool
+    # 3. Build config and launch pool
     base_ac = _build_consolidated_config(config, dimensions, files_per_agent)
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
@@ -117,5 +121,5 @@ def process_consolidated_dimensions(
     )
     results = pool.run()
 
-    # 5. Collect and return per-dimension evidence
+    # 4. Collect and return per-dimension evidence
     return _collect_consolidated_results(config, dimensions, ctx, results, evidence_dir)

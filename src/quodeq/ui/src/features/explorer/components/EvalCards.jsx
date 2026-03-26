@@ -10,11 +10,26 @@ function filterValidRefs(refs) {
   return (refs || []).filter((r) => r.url && /^https?:\/\//.test(r.url));
 }
 
-export function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
-  const { filePath, line } = parseFileRef(v.file, v.line);
+function useFileInfo(file, fileLine) {
+  const { filePath, line } = parseFileRef(file, fileLine);
   const filename = filePath ? filePath.split('/').pop() : null;
   const ref = line != null ? `${filePath}:${line}` : filePath;
   const display = line != null ? `${filename}:${line}` : filename;
+  return { filePath, filename, ref, display };
+}
+
+function RefsLinks({ reqRefs }) {
+  const valid = filterValidRefs(reqRefs);
+  if (valid.length === 0) return null;
+  return (
+    <span className="cwe-link-group">{valid.map((r, i) => (
+      <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
+    ))}</span>
+  );
+}
+
+export function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
+  const { filename, ref, display } = useFileInfo(v.file, v.line);
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
       <div className="vdetail-row-main">
@@ -28,11 +43,7 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              {filterValidRefs(v.reqRefs).length > 0 &&
-                <span className="cwe-link-group">{filterValidRefs(v.reqRefs).map((ref, i) => (
-                  <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                ))}</span>
-              }
+              <RefsLinks reqRefs={v.reqRefs} />
             </div>
             {v.title && <p className="vlive-detail-title">{v.title}</p>}
             {v.reason && <>
@@ -48,10 +59,7 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
 }
 
 export function ComplianceCard({ c, principle, index }) {
-  const { filePath, line } = parseFileRef(c.file, c.line);
-  const filename = filePath ? filePath.split('/').pop() : null;
-  const ref = line != null ? `${filePath}:${line}` : filePath;
-  const display = line != null ? `${filename}:${line}` : filename;
+  const { filename, ref, display } = useFileInfo(c.file, c.line);
   return (
     <div className="vdetail-row vdetail-row--compliant" style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
       <div className="vdetail-row-main">
@@ -64,11 +72,7 @@ export function ComplianceCard({ c, principle, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               {c.title && <span className="vlive-detail-section-label">Reason</span>}
-              {filterValidRefs(c.reqRefs).length > 0 &&
-                <span className="cwe-link-group">{filterValidRefs(c.reqRefs).map((ref, i) => (
-                  <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                ))}</span>
-              }
+              <RefsLinks reqRefs={c.reqRefs} />
             </div>
             {c.title && <p className="vlive-detail-title">{c.title}</p>}
             {c.reason && <>

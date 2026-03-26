@@ -7,6 +7,8 @@ from pathlib import Path
 
 from quodeq.analysis.fingerprint import build_fingerprint, load_fingerprint, save_fingerprint
 
+_SHA256_HEX_LEN = 64
+
 
 class TestBuildFingerprint:
     def test_includes_file_hashes(self, tmp_path):
@@ -23,7 +25,7 @@ class TestBuildFingerprint:
         (standards / "security.json").write_text('{"id":"security"}')
         fp = build_fingerprint(src=tmp_path, files=[], dimension="security", standards_dir=tmp_path / "standards")
         assert fp["standards_checksum"] is not None
-        assert len(fp["standards_checksum"]) == 64
+        assert len(fp["standards_checksum"]) == _SHA256_HEX_LEN
 
     def test_no_standards_dir(self, tmp_path):
         fp = build_fingerprint(src=tmp_path, files=[], dimension="security", standards_dir=None)
@@ -64,3 +66,53 @@ class TestSaveLoadFingerprint:
 
     def test_returns_none_when_missing(self, tmp_path):
         assert load_fingerprint(tmp_path, "security") is None
+
+
+from unittest.mock import patch
+from quodeq.analysis.fingerprint import find_previous_fingerprint
+
+
+class TestFindPreviousFingerprint:
+    def test_returns_none_when_no_previous_runs(self, tmp_path):
+        """No previous runs → (None, None)."""
+        evidence_dir = tmp_path / "proj" / "run1" / "evidence"
+        evidence_dir.mkdir(parents=True)
+        fp, prev_dir = find_previous_fingerprint(evidence_dir, "security")
+        assert fp is None
+        assert prev_dir is None
+
+    def test_returns_none_when_cannot_resolve_paths(self, tmp_path):
+        """evidence_dir that doesn't have 'evidence' in path → (None, None)."""
+        fp, prev_dir = find_previous_fingerprint(tmp_path, "security")
+        assert fp is None
+        assert prev_dir is None
+
+    @patch("quodeq.analysis.fingerprint.list_runs")
+    def test_finds_fingerprint_from_previous_run(self, mock_list_runs, tmp_path):
+        """Previous run has a fingerprint → returns it with evidence dir."""
+        from quodeq.data.fs.report_parser.runs import RunInfo
+
+        reports = tmp_path / "reports"
+        proj = reports / "proj-uuid"
+
+        # Previous run with fingerprint
+        prev_evidence = proj / "run-old" / "evidence"
+        prev_evidence.mkdir(parents=True)
+        prev_fp = {"dimension": "security", "file_hashes": {"a.py": "abc123"}, "standards_checksum": None}
+        import json
+        (prev_evidence / "security_fingerprint.json").write_text(json.dumps(prev_fp))
+
+        # Current run evidence dir
+        current_evidence = proj / "run-current" / "evidence"
+        current_evidence.mkdir(parents=True)
+
+        # Mock list_runs to return controlled run order
+        mock_list_runs.return_value = [
+            RunInfo(run_id="run-current", date_iso="2026-03-24T12:00:00Z", date_label=""),
+            RunInfo(run_id="run-old", date_iso="2026-03-24T11:00:00Z", date_label=""),
+        ]
+
+        fp, prev_dir = find_previous_fingerprint(current_evidence, "security")
+        assert fp is not None
+        assert fp["file_hashes"]["a.py"] == "abc123"
+        assert prev_dir == prev_evidence

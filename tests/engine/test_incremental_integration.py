@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint, load_fingerprint
-from quodeq.analysis.incremental import classify_files, carry_forward_findings
+from quodeq.analysis.incremental import classify_files, ClassificationInput, carry_forward_findings
 
 
 class TestIncrementalEndToEnd:
@@ -34,11 +34,11 @@ class TestIncrementalEndToEnd:
         # === Second run: change auth.py only ===
         (tmp_path / "auth.py").write_text("def login(): secure_pass()")
 
-        classification = classify_files(
+        classification = classify_files(inputs=ClassificationInput(
             src=tmp_path, files=files,
             prev_fingerprint=fp1, standards_dir=None,
             dimension="security", language="python",
-        )
+        ))
 
         # auth.py changed, routes.py depends on auth.py (imports it)
         assert "auth.py" in classification.to_analyze
@@ -71,11 +71,11 @@ class TestIncrementalEndToEnd:
             + json.dumps({"p": "FT", "d": "reliability", "t": "compliance", "file": "b.py", "line": 1, "w": "ok"}) + "\n"
         )
 
-        classification = classify_files(
+        classification = classify_files(inputs=ClassificationInput(
             src=tmp_path, files=files,
             prev_fingerprint=fp, standards_dir=None,
             dimension="reliability", language="python",
-        )
+        ))
 
         assert len(classification.to_analyze) == 0
         assert classification.unchanged == {"a.py", "b.py"}
@@ -103,10 +103,10 @@ class TestIncrementalEndToEnd:
         (tmp_path / "a.py").write_text("content")
 
         # No previous fingerprint for "performance"
-        classification = classify_files(
+        classification = classify_files(inputs=ClassificationInput(
             src=tmp_path, files=["a.py"],
             prev_fingerprint=None, standards_dir=None,
             dimension="performance", language="python",
-        )
+        ))
         assert classification.full_reanalysis is True
         assert set(classification.to_analyze) == {"a.py"}

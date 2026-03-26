@@ -94,26 +94,26 @@ def _apply_env_log_level(level: str | None = None, env: dict | None = None) -> N
 _apply_env_log_level()
 
 
-def log_info(message: str) -> None:
+def log_info(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log an informational message."""
-    _logger.info(message)
+    (logger or _logger).info(message)
 
 
-def log_success(message: str) -> None:
+def log_success(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log a success message."""
-    _logger.log(_LOG_SUCCESS, message)
+    (logger or _logger).log(_LOG_SUCCESS, message)
 
 
-def log_warning(message: str) -> None:
+def log_warning(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log a warning message."""
-    _logger.warning(message)
+    (logger or _logger).warning(message)
 
 
-def log_debug(message: str) -> None:
+def log_debug(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log a debug message."""
-    _logger.debug(message)
+    (logger or _logger).debug(message)
 
 
-def log_error(message: str) -> None:
+def log_error(message: str, *, logger: logging.Logger | None = None) -> None:
     """Log an error message."""
-    _logger.error(message)
+    (logger or _logger).error(message)

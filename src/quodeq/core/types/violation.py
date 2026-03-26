@@ -8,8 +8,8 @@ from .finding import Finding
 @dataclass(frozen=True, slots=True)
 class ProgressInfo:
     files_read: int = 0
-    violations: int = 0
-    compliance: int = 0
+    violation_count: int = 0
+    compliance_count: int = 0
 
 
 @dataclass(frozen=True, slots=True)

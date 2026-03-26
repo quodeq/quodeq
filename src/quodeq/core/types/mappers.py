@@ -57,7 +57,7 @@ def _extract_totals(raw: dict[str, object]) -> Totals | None:
 
 def parse_principle_grade(raw: dict[str, object]) -> PrincipleGrade:
     return PrincipleGrade(
-        name=_opt_str(raw.get("name")),
+        principle=_opt_str(raw.get("name")) or _opt_str(raw.get("principle")),
         score=_opt_str(raw.get("score")),
         grade=_opt_str(raw.get("grade")),
     )

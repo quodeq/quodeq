@@ -59,6 +59,21 @@ export async function getProjectInfo(projectId) {
   return createProject(data);
 }
 
+export function deleteProject(projectId) {
+  return request(`/projects/${encodeURIComponent(projectId)}?confirm=true`, { method: 'DELETE' });
+}
+
+export function getProjectExportUrl(projectId) {
+  return `${BASE}/projects/${encodeURIComponent(projectId)}/export`;
+}
+
+export function relocateProject(projectId, newPath) {
+  return request(`/projects/${encodeURIComponent(projectId)}/path`, {
+    method: 'PATCH',
+    body: JSON.stringify({ path: newPath }),
+  });
+}
+
 // ── Dashboard ───────────────────────────────────────────────────────────
 
 /** @returns {Promise<import('../models/dashboard.js').Dashboard>} */

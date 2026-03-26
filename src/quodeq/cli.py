@@ -9,10 +9,9 @@ import os
 import subprocess
 import sys
 import uuid
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
-
-from dataclasses import dataclass
 
 from quodeq.cli_parser import build_parser as build_parser  # re-export
 from quodeq.config.paths import default_paths, load_env_file
@@ -40,7 +39,6 @@ class ResolvedInputs:
 _ENV_MAX_TURNS = "QUODEQ_MAX_TURNS"
 _ENV_MAX_DURATION = "QUODEQ_MAX_DURATION"
 _ENV_POOL_BUDGET = "QUODEQ_POOL_BUDGET"
-
 
 def _env_int(var: str, default: int | None, env: dict[str, str] | None = None) -> int | None:
     """Read an environment variable as an int, returning *default* if unset or invalid."""
@@ -98,24 +96,16 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     return reports_root, evidence_dir, evaluation_dir
 
 
-
 def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
-    """Detect or validate the language for a repo using universal detection.
-
-    Returns language string or None on error.
-    """
+    """Detect or validate the language for a repo using universal detection."""
     if args.language:
         validate_path_segment(args.language)
         return args.language
-
-    detection_file = paths.detection_file
-    if not detection_file.exists():
+    if not paths.detection_file.exists():
         return None
-
     try:
         from quodeq.analysis.manifest import detect_language
-        language = detect_language(src, detection_file)
-        return language
+        return detect_language(src, paths.detection_file)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return None
@@ -144,7 +134,6 @@ def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManife
         print(f"Detected: {langs}", file=sys.stderr)
     print(f"Source files: {manifest.total_files}", file=sys.stderr)
     return manifest
-
 
 
 def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
@@ -250,6 +239,22 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     return ResolvedInputs(src=src, language=language, manifest=manifest, dims_data=dims_data)
 
 
+def _run_pipeline_with_cleanup(
+    args: argparse.Namespace, inputs: ResolvedInputs, paths: tuple[Path, Path, Path],
+) -> int:
+    """Set up directories, build config, run the pipeline, and clean up cloned repos."""
+    _reports_root, evidence_dir, evaluation_dir = paths
+    print(f"Report path: {evaluation_dir}", file=sys.stderr)
+    _save_manifest(inputs.manifest, evidence_dir)
+
+    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
+    try:
+        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+    finally:
+        if is_repo_url(args.repo):
+            cleanup_cloned_repo(str(inputs.src))
+
+
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
     from quodeq.shared.prereqs import check_evaluate_prereqs
@@ -263,25 +268,11 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if inputs is None:
         return 1
 
-    _reports_root, evidence_dir, evaluation_dir = _setup_run_dirs(args, inputs.src)
-    print(f"Report path: {evaluation_dir}", file=sys.stderr)
-    _save_manifest(inputs.manifest, evidence_dir)
-
-    config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
-    try:
-        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-    finally:
-        if is_repo_url(args.repo):
-            cleanup_cloned_repo(str(inputs.src))
-
-
-def _run_dashboard(argv: list[str] | None) -> int:
-    sub_argv = argv[1:] if argv is not None else sys.argv[2:]
-    return dashboard_main(sub_argv)
+    return _run_pipeline_with_cleanup(args, inputs, _setup_run_dirs(args, inputs.src))
 
 
 _COMMAND_HANDLERS: dict[str, Callable] = {
-    "dashboard": _run_dashboard,
+    "dashboard": lambda argv: dashboard_main(argv[1:] if argv is not None else sys.argv[2:]),
 }
 
 
