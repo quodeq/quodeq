@@ -57,6 +57,10 @@ The Quodeq Dashboard is the main way to use Quodeq. Launch evaluations, browse r
 quodeq dashboard
 ```
 
+<p align="center">
+  <img src="res/dashboard.png" alt="Quodeq Dashboard" width="900" />
+</p>
+
 Opens at `http://localhost:4173` with:
 
 - **Overall grade & score** — A-F letter grade, numeric score /10, trend across runs
