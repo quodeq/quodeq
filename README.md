@@ -25,9 +25,8 @@
 ## Getting Started
 
 ```bash
-pipx install quodeq                  # Install quodeq (or: brew install quodeq/tap/quodeq)
-npm i -g @anthropic-ai/claude-code   # Install Claude Code CLI
-quodeq dashboard                     # Launch the dashboard
+pipx install quodeq    # Install quodeq
+quodeq dashboard       # Launch the dashboard
 ```
 
 That's it. The dashboard lets you point to any project and run evaluations from the UI.
@@ -38,10 +37,9 @@ That's it. The dashboard lets you point to any project and run evaluations from 
 
 | Dependency | Version | |
 |---|---|---|
-| [Python](https://www.python.org/downloads/) | 3.12+ | Runtime |
-| [Node.js](https://nodejs.org/) | 18+ | Dashboard UI |
-| [npm](https://www.npmjs.com/get-npm) | 9+ | Bundled with Node.js |
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | latest | AI analysis engine |
+| [Python](https://www.python.org/downloads/) | 3.12+ | Runtime (`brew install python` or [download](https://www.python.org/downloads/)) |
+| [Node.js](https://nodejs.org/) | 18+ | Dashboard UI (`brew install node` or [download](https://nodejs.org/)) |
+| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | latest | AI analysis engine (`npm i -g @anthropic-ai/claude-code`) |
 
 > During the current development phase, Quodeq uses Claude Code as its AI analysis engine. We plan to expand LLM ecosystem support in future releases, including other providers and local LLMs.
 
