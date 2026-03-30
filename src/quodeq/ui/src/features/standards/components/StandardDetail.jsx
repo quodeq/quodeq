@@ -1,22 +1,22 @@
 import PrincipleForm from './PrincipleForm.jsx';
 import RequirementForm from './RequirementForm.jsx';
 
-function RootDetail({ standard, onUpdateField, editable }) {
+function slugify(text) {
+  return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+}
+
+function RootDetail({ standard, onUpdateField, editable, isNew }) {
+  const handleNameChange = (e) => {
+    const name = e.target.value;
+    onUpdateField(['name'], name);
+    if (isNew || !standard.id || standard.id === slugify(standard.name || '')) {
+      onUpdateField(['id'], slugify(name));
+    }
+  };
+
   return (
     <div className="standard-root-detail">
       <h3 className="detail-form-title">Standard Details</h3>
-
-      <div className="form-group">
-        <label htmlFor="std-id">ID</label>
-        <input
-          id="std-id"
-          className="form-input"
-          value={standard.id || ''}
-          onChange={(e) => onUpdateField(['id'], e.target.value)}
-          disabled={!editable}
-          placeholder="e.g. my-standard"
-        />
-      </div>
 
       <div className="form-group">
         <label htmlFor="std-name">Name</label>
@@ -24,9 +24,22 @@ function RootDetail({ standard, onUpdateField, editable }) {
           id="std-name"
           className="form-input"
           value={standard.name || ''}
-          onChange={(e) => onUpdateField(['name'], e.target.value)}
+          onChange={handleNameChange}
           disabled={!editable}
-          placeholder="Standard name"
+          placeholder="e.g. Clean Architecture"
+          autoFocus={isNew}
+        />
+      </div>
+
+      <div className="form-group">
+        <label htmlFor="std-id">ID <span className="form-hint">(auto-generated from name)</span></label>
+        <input
+          id="std-id"
+          className="form-input form-input--muted"
+          value={standard.id || ''}
+          onChange={(e) => onUpdateField(['id'], e.target.value)}
+          disabled={!editable}
+          placeholder="auto-generated"
         />
       </div>
 
@@ -79,11 +92,11 @@ function RootDetail({ standard, onUpdateField, editable }) {
   );
 }
 
-export default function StandardDetail({ standard, selectedNode, onUpdateField, editable }) {
+export default function StandardDetail({ standard, selectedNode, onUpdateField, editable, isNew }) {
   if (!selectedNode || !standard) return null;
 
   if (selectedNode.type === 'root') {
-    return <RootDetail standard={standard} onUpdateField={onUpdateField} editable={editable} />;
+    return <RootDetail standard={standard} onUpdateField={onUpdateField} editable={editable} isNew={isNew} />;
   }
 
   if (selectedNode.type === 'principle') {

@@ -84,6 +84,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
             selectedNode={selectedNode}
             onUpdateField={updateField}
             editable={editable}
+            isNew={isNew}
           />
         </div>
       </div>

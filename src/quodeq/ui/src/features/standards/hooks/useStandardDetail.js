@@ -55,7 +55,12 @@ export function useStandardDetail(standardId, isNew) {
   const addRequirement = useCallback((principleIndex) => {
     setStandard((prev) => {
       const next = JSON.parse(JSON.stringify(prev));
-      next.principles[principleIndex].requirements.push({ id: '', text: '', refs: [] });
+      const principle = next.principles[principleIndex];
+      const prefix = (next.id || 'std').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
+      const pPrefix = (principle.name || 'P').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+      const seq = (principle.requirements?.length || 0) + 1;
+      const autoId = `${prefix}-${pPrefix}-${String(seq).padStart(2, '0')}`;
+      principle.requirements.push({ id: autoId, text: '', refs: [] });
       return next;
     });
     setDirty(true);
@@ -73,9 +78,12 @@ export function useStandardDetail(standardId, isNew) {
 
   const save = useCallback(async () => {
     if (!standard) return;
+    if (!standard.id) { setError('ID is required'); return; }
+    if (!standard.name) { setError('Name is required'); return; }
     try {
       if (isNew) { await createStandard(standard); } else { await updateStandard(standard.id, standard); }
       setDirty(false);
+      setError(null);
     } catch (err) { setError(err.message); }
   }, [standard, isNew]);
 
