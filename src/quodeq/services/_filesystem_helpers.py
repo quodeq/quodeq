@@ -220,6 +220,11 @@ def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
 
 _cached_dimensions: tuple[str, ...] | None = None
 
+def reset_dimensions_cache() -> None:
+    """Reset the module-level dimensions cache. Useful for test isolation."""
+    global _cached_dimensions
+    _cached_dimensions = None
+
 def _list_available_dimensions_for_discipline(paths: object | None = None) -> tuple[str, ...]:
     """Resolve available dimensions from universal dimensions.json (cached after first read).
 
