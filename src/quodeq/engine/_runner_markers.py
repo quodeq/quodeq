@@ -6,9 +6,8 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.shared.constants import CC_MARKER_KEY  # noqa: F401 — re-export
 from quodeq.shared.logging import log_info
-
-CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
 _SECONDS_PER_MINUTE = 60
 
 

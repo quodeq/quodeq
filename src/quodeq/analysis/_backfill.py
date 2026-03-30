@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from quodeq.analysis.incremental import identify_backfill_files
-from quodeq.services.base import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_debug, log_info
 
 if TYPE_CHECKING:

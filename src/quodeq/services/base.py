@@ -6,10 +6,10 @@ from dataclasses import dataclass
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types import JobSnapshot, ViolationSummary
-
-
-_DEFAULT_MAX_SUBAGENTS = 5
-_DEFAULT_POOL_BUDGET = 600
+from quodeq.shared.constants import (  # noqa: F401 — re-export for backward compat
+    _DEFAULT_MAX_SUBAGENTS,
+    _DEFAULT_POOL_BUDGET,
+)
 
 
 @dataclass

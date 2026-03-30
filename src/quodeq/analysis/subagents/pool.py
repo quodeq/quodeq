@@ -12,13 +12,12 @@ from quodeq.analysis.subagents._heartbeat import HeartbeatContext, heartbeat_loo
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
 from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_info, log_warning
 
 _AGENT_ID_PREFIX = "agent"
 _FUTURE_POLL_INTERVAL_S = 0.5
 _HEARTBEAT_JOIN_TIMEOUT_S = 2
-
-_DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
 _SCOUT_TIMEOUT_S = 180  # 3 minutes before forcing scale-up
 _DEFAULT_MAX_DURATION_S = 1800
 _DEFAULT_FILES_PER_AGENT = 30
