@@ -65,7 +65,10 @@ def _collect_consolidated_results(
     )
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    return parse_jsonl_to_evidence_by_dimension(merged_jsonl, ev_ctx, compiled_dir=compiled_dir)
+    return parse_jsonl_to_evidence_by_dimension(
+        merged_jsonl, ev_ctx, compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
+    )
 
 
 def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:

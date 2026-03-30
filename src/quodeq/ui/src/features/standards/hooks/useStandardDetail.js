@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getStandard, createStandard, updateStandard } from '../../../api/index.js';
+import { generateRequirementId } from '../utils.js';
 
 export function useStandardDetail(standardId, isNew) {
   const [standard, setStandard] = useState(null);
@@ -57,10 +58,8 @@ export function useStandardDetail(standardId, isNew) {
     setStandard((prev) => {
       const next = JSON.parse(JSON.stringify(prev));
       const principle = next.principles[principleIndex];
-      const prefix = (next.id || 'std').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
-      const pPrefix = (principle.name || 'P').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
       const seq = (principle.requirements?.length || 0) + 1;
-      const autoId = `${prefix}-${pPrefix}-${String(seq).padStart(2, '0')}`;
+      const autoId = generateRequirementId(next.id, principle.name, seq);
       principle.requirements.push({ id: autoId, text: '', description: '', refs: [] });
       setSelectedNode({ type: 'requirement', principleIndex, reqIndex: principle.requirements.length - 1 });
       return next;

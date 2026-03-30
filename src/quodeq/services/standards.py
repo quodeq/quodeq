@@ -10,6 +10,16 @@ from quodeq.core.types.standard import StandardDetail, StandardMeta
 logger = logging.getLogger(__name__)
 
 
+def _read_json(path: Path) -> dict:
+    """Read and parse a JSON file."""
+    return json.loads(path.read_text())
+
+
+def _write_json(path: Path, data: dict) -> None:
+    """Serialize *data* to JSON and write it to *path*."""
+    path.write_text(json.dumps(data, indent=2))
+
+
 class StandardsService:
     def __init__(self, evaluators_dir: Path, compiled_dir: Path, dimensions_file: Path) -> None:
         self._evaluators_dir = evaluators_dir
@@ -24,7 +34,7 @@ class StandardsService:
 
     def _list_builtin(self) -> list[StandardMeta]:
         try:
-            data = json.loads(self._dimensions_file.read_text())
+            data = _read_json(self._dimensions_file)
         except (OSError, ValueError) as exc:
             logger.warning("Cannot read dimensions file: %s", exc)
             return []
@@ -45,7 +55,7 @@ class StandardsService:
         if not path.is_file():
             return 0, 0
         try:
-            data = json.loads(path.read_text())
+            data = _read_json(path)
             principles = data.get("principles", [])
             req_count = sum(len(p.get("requirements", [])) for p in principles)
             return len(principles), req_count
@@ -58,7 +68,7 @@ class StandardsService:
         out: list[StandardMeta] = []
         for path in sorted(self._evaluators_dir.glob("*.json")):
             try:
-                data = json.loads(path.read_text())
+                data = _read_json(path)
                 principles = data.get("principles", [])
                 req_count = sum(len(p.get("requirements", [])) for p in principles)
                 out.append(StandardMeta(
@@ -83,7 +93,7 @@ class StandardsService:
         raise FileNotFoundError(f"Standard not found: {standard_id}")
 
     def _load_detail(self, path: Path) -> StandardDetail:
-        data = json.loads(path.read_text())
+        data = _read_json(path)
         return StandardDetail(
             id=data["id"], name=data.get("name", data["id"]),
             description=data.get("description", ""),
@@ -94,7 +104,7 @@ class StandardsService:
         )
 
     def _load_builtin_detail(self, path: Path, standard_id: str) -> StandardDetail:
-        data = json.loads(path.read_text())
+        data = _read_json(path)
         return StandardDetail(
             id=standard_id, name=data.get("name", standard_id),
             description=f"Built-in {data.get('name', standard_id)} standard",
@@ -112,18 +122,18 @@ class StandardsService:
             raise ValueError(f"Standard '{standard_id}' already exists")
         self._evaluators_dir.mkdir(parents=True, exist_ok=True)
         payload = {**data, "type": "custom", "managed": False, "origin": None, "origin_hash": None}
-        path.write_text(json.dumps(payload, indent=2))
+        _write_json(path, payload)
         return self._load_detail(path)
 
     def update_standard(self, standard_id: str, data: dict) -> StandardDetail:
         path = self._evaluators_dir / f"{standard_id}.json"
         if not path.is_file():
             raise FileNotFoundError(f"Standard not found: {standard_id}")
-        existing = json.loads(path.read_text())
+        existing = _read_json(path)
         if existing.get("managed", False):
             raise PermissionError(f"Cannot edit managed standard '{standard_id}'")
         payload = {**data, "id": standard_id, "type": "custom", "managed": False}
-        path.write_text(json.dumps(payload, indent=2))
+        _write_json(path, payload)
         return self._load_detail(path)
 
     def delete_standard(self, standard_id: str) -> None:
@@ -132,7 +142,7 @@ class StandardsService:
             if (self._compiled_dir / f"{standard_id}.json").is_file() or self._is_builtin_id(standard_id):
                 raise PermissionError(f"Cannot delete built-in standard '{standard_id}'")
             raise FileNotFoundError(f"Standard not found: {standard_id}")
-        existing = json.loads(path.read_text())
+        existing = _read_json(path)
         if existing.get("managed", False):
             raise PermissionError(f"Cannot delete managed standard '{standard_id}'")
         path.unlink()
@@ -149,12 +159,12 @@ class StandardsService:
             "weight": source.weight, "source": source.source, "type": "custom",
             "managed": False, "origin": None, "origin_hash": None, "principles": source.principles,
         }
-        new_path.write_text(json.dumps(payload, indent=2))
+        _write_json(new_path, payload)
         return self._load_detail(new_path)
 
     def _is_builtin_id(self, standard_id: str) -> bool:
         try:
-            data = json.loads(self._dimensions_file.read_text())
+            data = _read_json(self._dimensions_file)
             return any(dim["id"] == standard_id for dim in data.get("applies", []))
         except (OSError, ValueError):
             return False
@@ -164,9 +174,26 @@ class StandardsService:
         if not standard_id or "/" in standard_id or "\\" in standard_id or ".." in standard_id:
             raise ValueError(f"Invalid standard ID: {standard_id}")
 
+    def load_cwe_list(self) -> list[dict]:
+        """Load the CWE reference list from the compiled standards directory."""
+        cwe_path = self._compiled_dir.parent / "cwe" / "audit.json"
+        if not cwe_path.is_file():
+            return []
+        try:
+            entries = _read_json(cwe_path)
+            return [
+                {"id": e["id"], "name": e["name"],
+                 "abstraction": e.get("abstraction", ""),
+                 "dimensions": e.get("dimensions", [])}
+                for e in entries
+            ]
+        except (OSError, ValueError, KeyError) as exc:
+            logger.warning("Cannot read CWE list: %s", exc)
+            return []
+
     def _get_builtin_weight(self, dimension_id: str) -> float:
         try:
-            data = json.loads(self._dimensions_file.read_text())
+            data = _read_json(self._dimensions_file)
             for dim in data.get("applies", []):
                 if dim["id"] == dimension_id:
                     return dim.get("weight", 1.0)

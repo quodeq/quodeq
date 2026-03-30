@@ -174,6 +174,7 @@ def _parse_dimension_evidence(
             module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
     )
 
 

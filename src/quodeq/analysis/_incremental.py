@@ -131,6 +131,7 @@ def _parse_evidence_from_jsonl(
             files_read=files_read, module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
     )
 
 
