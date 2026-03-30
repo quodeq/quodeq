@@ -923,6 +923,33 @@
 }
 
 /* Dimension grid */
+.dimension-section {
+  margin-bottom: 12px;
+}
+
+.dimension-section:last-child {
+  margin-bottom: 0;
+}
+
+.dimension-section-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-text-secondary, #888);
+  margin-bottom: 6px;
+  padding-left: 2px;
+}
+
+.dimension-section-label .iso-link {
+  color: var(--color-text-secondary, #888);
+  text-decoration: none;
+}
+
+.dimension-section-label .iso-link:hover {
+  color: var(--color-accent, #58a6ff);
+  text-decoration: underline;
+}
+
 .dimension-grid {
   display: grid;
   grid-template-columns: repeat(6, 1fr);
@@ -931,6 +958,19 @@
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+}
+
+.dimension-chip-btn--custom,
+.dimension-chip-btn--community {
+  border-color: var(--color-success, #2d5a3d);
+  color: var(--color-success-text, #6fcf97);
+}
+
+.dimension-chip-btn--custom.selected,
+.dimension-chip-btn--community.selected {
+  background: var(--color-success, #2d5a3d);
+  border-color: var(--color-success-text, #6fcf97);
+  color: #fff;
 }
 
 .dimension-chip-btn {
