@@ -144,3 +144,29 @@ export function getAiClients() {
 export function getClientModels(clientId) {
   return request(`/ai-clients/${encodeURIComponent(clientId)}/models`);
 }
+
+// ── Standards ──────────────────────────────────────────────
+export async function listStandards() {
+  return request('/standards');
+}
+export async function getStandard(standardId) {
+  return request(`/standards/${encodeURIComponent(standardId)}`);
+}
+export async function createStandard(data) {
+  return request('/standards', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function updateStandard(standardId, data) {
+  return request(`/standards/${encodeURIComponent(standardId)}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function deleteStandard(standardId) {
+  return request(`/standards/${encodeURIComponent(standardId)}`, { method: 'DELETE' });
+}
+export async function duplicateStandard(standardId, newId) {
+  return request(`/standards/${encodeURIComponent(standardId)}/duplicate`, { method: 'POST', body: JSON.stringify({ newId }) });
+}
+export async function listLibrary() {
+  return request('/standards/library');
+}
+export async function importFromLibrary(file) {
+  return request('/standards/library/import', { method: 'POST', body: JSON.stringify({ file }) });
+}
