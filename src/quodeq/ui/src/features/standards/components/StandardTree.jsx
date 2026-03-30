@@ -1,8 +1,9 @@
 import { useState } from 'react';
 
-function TreeNode({ label, isSelected, onClick, onAdd, onRemove, addTitle, removeTitle, children, depth = 0 }) {
-  const [expanded, setExpanded] = useState(true);
+function TreeNode({ label, isSelected, onClick, onAdd, onRemove, addTitle, removeTitle, children, depth = 0, alwaysExpanded = false, defaultExpanded = true }) {
+  const [expanded, setExpanded] = useState(alwaysExpanded || defaultExpanded);
   const hasChildren = children && children.length > 0;
+  const showExpand = hasChildren && !alwaysExpanded;
 
   return (
     <div className={`tree-node tree-node--depth-${depth}`}>
@@ -13,17 +14,21 @@ function TreeNode({ label, isSelected, onClick, onAdd, onRemove, addTitle, remov
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && onClick()}
       >
-        <button
-          type="button"
-          className={`tree-expand-btn${hasChildren ? '' : ' tree-expand-btn--invisible'}`}
-          onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
-          aria-label={expanded ? 'Collapse' : 'Expand'}
-        >
-          <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"
-            style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}>
-            <path d="M3 2l4 3-4 3V2z" />
-          </svg>
-        </button>
+        {showExpand ? (
+          <button
+            type="button"
+            className="tree-expand-btn"
+            onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
+            aria-label={expanded ? 'Collapse' : 'Expand'}
+          >
+            <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"
+              style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}>
+              <path d="M3 2l4 3-4 3V2z" />
+            </svg>
+          </button>
+        ) : (
+          <span className="tree-expand-btn tree-expand-btn--invisible" />
+        )}
 
         <span className="tree-node-label">{label}</span>
 
@@ -45,7 +50,7 @@ function TreeNode({ label, isSelected, onClick, onAdd, onRemove, addTitle, remov
         </div>
       </div>
 
-      {expanded && hasChildren && (
+      {(alwaysExpanded || expanded) && hasChildren && (
         <div className="tree-node-children">
           {children}
         </div>
@@ -68,6 +73,7 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, onA
         onAdd={editable ? onAddPrinciple : undefined}
         addTitle="Add Principle"
         depth={0}
+        alwaysExpanded
       >
         {(standard.principles || []).map((principle, pi) => {
           const isPrincipleSelected = selectedNode?.type === 'principle' && selectedNode.index === pi;
@@ -89,6 +95,7 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, onA
               addTitle="Add Requirement"
               removeTitle="Remove Principle"
               depth={1}
+              defaultExpanded={false}
             >
               {(principle.requirements || []).map((req, ri) => {
                 const isReqSelected = selectedNode?.type === 'requirement' && selectedNode.principleIndex === pi && selectedNode.reqIndex === ri;
