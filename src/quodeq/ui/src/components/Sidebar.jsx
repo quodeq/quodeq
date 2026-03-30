@@ -1,4 +1,4 @@
-import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_HISTORY, ICON_EVALUATE, ICON_PROJECTS, ICON_SETTINGS } from '../constants/navigation.jsx';
+import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_HISTORY, ICON_EVALUATE, ICON_PROJECTS, ICON_SETTINGS, ICON_STANDARDS } from '../constants/navigation.jsx';
 
 function Logo() {
   return (
@@ -52,6 +52,7 @@ export default function Sidebar({ activeTab, onNavTab }) {
         <NavButton id="violations" label="Violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="history" label="History" icon={ICON_HISTORY} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="evaluate" label="Evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={onNavTab} />
+        <NavButton id="standards" label="Standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="projects" label="Projects" icon={ICON_PROJECTS} activeTab={activeTab} onNavTab={onNavTab} />
       </nav>
 
