@@ -149,6 +149,7 @@ class PromptContext:
     source_file_count: int
     dimensions_data: dict
     standards_dir: Path | None = None
+    evaluators_dir: Path | None = None
     manifest: "SourceManifest | None" = None
     target: "AnalysisTarget | None" = None
     extra_vars: dict[str, str] = field(default_factory=dict)
@@ -228,8 +229,8 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
     standards_checklist = _NO_STANDARDS
     if context.standards_dir:
         compiled_dir = context.standards_dir / "compiled"
-        _eval_dir = default_paths().evaluators_dir
-        if compiled_dir.exists() or (_eval_dir.is_dir()):
+        _eval_dir = context.evaluators_dir
+        if compiled_dir.exists() or (_eval_dir and _eval_dir.is_dir()):
             if context.work_dir:
                 compact = render_compact_standards(compiled_dir, context.dimension, evaluators_dir=_eval_dir)
                 if compact not in (_NO_STANDARDS_FOR_DIM,):
@@ -261,11 +262,11 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
     return render_template(template, values)
 
 
-def _render_all_standards(standards_dir: Path, dimensions: list[str]) -> str:
+def _render_all_standards(standards_dir: Path, dimensions: list[str], evaluators_dir: Path | None = None) -> str:
     """Render compact standards for all dimensions, separated by headers."""
     compiled_dir = standards_dir / "compiled"
-    _eval_dir = default_paths().evaluators_dir
-    if not compiled_dir.exists() and not _eval_dir.is_dir():
+    _eval_dir = evaluators_dir
+    if not compiled_dir.exists() and not (_eval_dir and _eval_dir.is_dir()):
         return _NO_STANDARDS
     sections = []
     for dim in dimensions:
@@ -285,7 +286,7 @@ def build_consolidated_prompt(
         template = load_template(template_name="consolidated.md")
 
     standards_text = _render_all_standards(
-        context.standards_dir, dimensions,
+        context.standards_dir, dimensions, evaluators_dir=context.evaluators_dir,
     ) if context.standards_dir else _NO_STANDARDS
 
     manifest_context = _render_manifest_context(context)

@@ -19,7 +19,7 @@ from quodeq.config.paths import default_paths
 from quodeq.core.types import ProjectEntry, ViolationResponse, ViolationSummary, to_camel_dict
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import build_dashboard
-from quodeq.adapters.fs.report_parser import (
+from quodeq.services.ports import (
     list_runs,
     safe_read_dir,
 )

@@ -85,9 +85,9 @@ def find_previous_fingerprint(
     Walks the run history to find the latest run (other than the current one)
     that has a fingerprint for the given dimension.
     """
-    from quodeq.analysis.subagents.verify import _resolve_evidence_paths
+    from quodeq.analysis.subagents.verify import resolve_evidence_paths
 
-    paths_info = _resolve_evidence_paths(evidence_dir)
+    paths_info = resolve_evidence_paths(evidence_dir)
     if not paths_info:
         return None, None
 

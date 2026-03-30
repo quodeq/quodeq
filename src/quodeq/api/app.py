@@ -273,7 +273,7 @@ def create_app(
 
 def _register_all_routes(
     app: Flask, provider: ActionProvider,
-    eval_store: InMemoryRateLimitStore, static_dist: str | None,
+    eval_store: RateLimitStore, static_dist: str | None,
 ) -> None:
     """Register all API route groups on the app."""
     register_project_list_routes(app, provider)
