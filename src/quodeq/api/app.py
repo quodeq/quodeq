@@ -26,6 +26,7 @@ from quodeq.api.routes import (
     register_discovery_routes,
     register_static_routes,
 )
+from quodeq.api.standards_routes import register_standards_routes
 
 _HEALTH_PATH = "/api/health"
 _RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
@@ -216,14 +217,24 @@ def create_app(
     static_dist: str | None = None,
     rate_limit_store: RateLimitStore | None = None,
     api_key: str | None = None,
+    test_config: dict | None = None,
 ) -> Flask:
     """Create and configure the Flask application with all API routes."""
     app = Flask(__name__)
+    if test_config is not None:
+        app.config.update(test_config)
     provider = provider or _default_provider()
     store = rate_limit_store or create_rate_limit_store()
     eval_store = InMemoryRateLimitStore(
         window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
     )
+    if "STANDARDS_EVALUATORS_DIR" not in app.config:
+        from quodeq.config.paths import default_paths
+        paths = default_paths()
+        app.config["STANDARDS_EVALUATORS_DIR"] = str(paths.evaluators_dir)
+        app.config["STANDARDS_COMPILED_DIR"] = str(paths.standards_dir / "compiled")
+        app.config["STANDARDS_DIMENSIONS_FILE"] = str(paths.dimensions_file)
+
     if api_key is None:
         _logger.warning(
             "QUODEQ_API_KEY is not set — API restricted to localhost only. "
@@ -270,6 +281,7 @@ def _register_all_routes(
     register_evaluation_list_routes(app, provider, eval_store)
     register_evaluation_item_routes(app, provider)
     register_discovery_routes(app, provider)
+    register_standards_routes(app)
     register_static_routes(app, static_dist)
 
 

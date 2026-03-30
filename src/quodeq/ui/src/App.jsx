@@ -11,6 +11,7 @@ import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
 import HistoryPage from './features/history/components/HistoryPage.jsx';
 import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
+import StandardsPage from './features/standards/StandardsPage.jsx';
 import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -115,11 +116,12 @@ const ROUTE_RENDERERS = {
   'eval-principle-detail': (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
   settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
+  standards: () => <StandardsPage />,
 };
 
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  const noProjectTabs = ['evaluate', 'settings'];
+  const noProjectTabs = ['evaluate', 'standards', 'settings'];
   if (!noProjectTabs.includes(page)) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
@@ -204,7 +206,7 @@ function useAppState() {
     return { headerMeta: meta, ...display };
   }, [accumulated, dashboard, selectedProject, projects]);
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
-  const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'settings'];
+  const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
   const activeTab = knownTabs.includes(activePage.page) ? activePage.page
     : activePage.sourceTab && knownTabs.includes(activePage.sourceTab) ? activePage.sourceTab
     : activePage.page === 'history-run' ? 'history'
