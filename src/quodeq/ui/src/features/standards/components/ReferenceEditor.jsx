@@ -22,54 +22,102 @@ function formatRefDisplay(ref) {
   return n.name ? `${id}: ${n.name}` : id;
 }
 
-function CweSearch({ value, onSelect, disabled }) {
+const ABSTRACTION_ORDER = ['Base', 'Variant', 'Class', 'Compound', 'Pillar', 'Category'];
+
+function CweBrowserModal({ onSelect, onClose }) {
   const [cwes, setCwes] = useState([]);
   const [query, setQuery] = useState('');
-  const [open, setOpen] = useState(false);
-  const wrapperRef = useRef(null);
+  const [filterAbstraction, setFilterAbstraction] = useState('');
+  const searchRef = useRef(null);
 
   useEffect(() => {
     listCwes().then(setCwes).catch(() => setCwes([]));
   }, []);
 
   useEffect(() => {
-    function handleClickOutside(e) {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    if (searchRef.current) searchRef.current.focus();
   }, []);
 
-  const filtered = query
-    ? cwes.filter((c) => String(c.id).includes(query) || c.name.toLowerCase().includes(query.toLowerCase())).slice(0, 20)
-    : cwes.slice(0, 20);
+  const filtered = cwes.filter((c) => {
+    if (filterAbstraction && c.abstraction !== filterAbstraction) return false;
+    if (!query) return true;
+    return String(c.id).includes(query) || c.name.toLowerCase().includes(query.toLowerCase());
+  });
 
   return (
-    <div className="cwe-search" ref={wrapperRef}>
-      <input
-        className="ref-id-input"
-        placeholder="Search CWE..."
-        value={open ? query : (value ? `CWE-${value}` : '')}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
-        onFocus={() => setOpen(true)}
-        disabled={disabled}
-        aria-label="Search CWE"
-      />
-      {open && filtered.length > 0 && (
-        <div className="cwe-search-dropdown">
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="cwe-browser-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="cwe-browser-header">
+          <h3 className="cwe-browser-title">Select CWE</h3>
+          <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
+        </div>
+
+        <div className="cwe-browser-toolbar">
+          <input
+            ref={searchRef}
+            className="cwe-browser-search"
+            placeholder="Search by ID or name..."
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <select
+            className="cwe-browser-filter"
+            value={filterAbstraction}
+            onChange={(e) => setFilterAbstraction(e.target.value)}
+          >
+            <option value="">All types</option>
+            {ABSTRACTION_ORDER.map((a) => (
+              <option key={a} value={a}>{a}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="cwe-browser-count">{filtered.length} of {cwes.length} CWEs</div>
+
+        <div className="cwe-browser-list">
           {filtered.map((c) => (
             <div
               key={c.id}
-              className={`cwe-search-option${String(c.id) === String(value) ? ' cwe-search-option--selected' : ''}`}
-              onClick={() => { onSelect(c); setQuery(''); setOpen(false); }}
+              className="cwe-browser-item"
+              onClick={() => { onSelect(c); onClose(); }}
             >
-              <span className="cwe-search-id">CWE-{c.id}</span>
-              <span className="cwe-search-name">{c.name}</span>
+              <div className="cwe-browser-item-header">
+                <span className="cwe-browser-item-id">CWE-{c.id}</span>
+                <span className="cwe-browser-item-abstraction">{c.abstraction}</span>
+              </div>
+              <div className="cwe-browser-item-name">{c.name}</div>
             </div>
           ))}
+          {filtered.length === 0 && (
+            <div className="cwe-browser-empty">No CWEs match your search.</div>
+          )}
         </div>
-      )}
+      </div>
     </div>
+  );
+}
+
+function CweSelector({ value, name, onSelect, disabled }) {
+  const [showBrowser, setShowBrowser] = useState(false);
+
+  return (
+    <>
+      <button
+        type="button"
+        className="cwe-select-btn"
+        onClick={() => !disabled && setShowBrowser(true)}
+        disabled={disabled}
+      >
+        {value ? `CWE-${value}` : 'Select CWE...'}
+      </button>
+      {name && <span className="ref-cwe-name" title={name}>{name}</span>}
+      {showBrowser && (
+        <CweBrowserModal
+          onSelect={onSelect}
+          onClose={() => setShowBrowser(false)}
+        />
+      )}
+    </>
   );
 }
 
@@ -115,10 +163,7 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
       </select>
 
       {isCwe ? (
-        <>
-          <CweSearch value={ref.refId} onSelect={handleCweSelect} disabled={disabled} />
-          {ref.name && <span className="ref-cwe-name" title={ref.name}>{ref.name}</span>}
-        </>
+        <CweSelector value={ref.refId} name={ref.name} onSelect={handleCweSelect} disabled={disabled} />
       ) : (
         <input
           className="ref-name-input"

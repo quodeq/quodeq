@@ -33,7 +33,7 @@ def _load_cwe_list(app: Flask) -> list[dict]:
         if cwe_path.is_file():
             import json as _json
             entries = _json.loads(cwe_path.read_text())
-            app._cwe_list = [{"id": e["id"], "name": e["name"]} for e in entries]
+            app._cwe_list = [{"id": e["id"], "name": e["name"], "abstraction": e.get("abstraction", ""), "dimensions": e.get("dimensions", [])} for e in entries]
         else:
             app._cwe_list = []
     return app._cwe_list
