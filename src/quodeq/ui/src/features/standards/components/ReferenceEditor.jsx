@@ -1,13 +1,24 @@
-const REF_TYPES = ['url', 'rfc', 'cwe', 'cve', 'owasp', 'nist', 'iso', 'other'];
+const REF_TYPES = ['cwe', 'cve', 'owasp', 'nist', 'iso', 'rfc', 'book', 'url', 'other'];
 
-function ReferenceRow({ refData, index, onChange, onRemove }) {
-  const ref = refData;
+/** Normalize built-in format {source, id, name, url} to editor format {type, label, url} */
+function normalizeRef(ref) {
+  if (ref.source && !ref.type) {
+    const id = ref.id ? `${ref.source.toUpperCase()}-${ref.id}` : '';
+    const label = ref.name ? `${id}: ${ref.name}`.trim() : id;
+    return { type: ref.source, label: label || '', url: ref.url || '' };
+  }
+  return { type: ref.type || 'url', label: ref.label || ref.name || '', url: ref.url || '' };
+}
+
+function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
+  const ref = normalizeRef(refData);
   return (
     <div className="ref-row">
       <select
         className="ref-type-select"
-        value={ref.type || 'url'}
+        value={ref.type}
         onChange={(e) => onChange(index, 'type', e.target.value)}
+        disabled={disabled}
         aria-label="Reference type"
       >
         {REF_TYPES.map((t) => (
@@ -16,41 +27,45 @@ function ReferenceRow({ refData, index, onChange, onRemove }) {
       </select>
       <input
         className="ref-label-input"
-        placeholder="Label"
-        value={ref.label || ''}
+        placeholder="Label (e.g. CWE-798: Hardcoded Credentials)"
+        value={ref.label}
         onChange={(e) => onChange(index, 'label', e.target.value)}
+        disabled={disabled}
         aria-label="Reference label"
       />
       <input
         className="ref-url-input"
-        placeholder="URL or identifier"
-        value={ref.url || ''}
+        placeholder="URL (optional)"
+        value={ref.url}
         onChange={(e) => onChange(index, 'url', e.target.value)}
+        disabled={disabled}
         aria-label="Reference URL"
       />
-      <button
-        type="button"
-        className="ref-remove-btn"
-        onClick={() => onRemove(index)}
-        aria-label="Remove reference"
-        title="Remove"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-          <path d="M18 6L6 18M6 6l12 12" />
-        </svg>
-      </button>
+      {!disabled && (
+        <button
+          type="button"
+          className="ref-remove-btn"
+          onClick={() => onRemove(index)}
+          aria-label="Remove reference"
+          title="Remove"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M18 6L6 18M6 6l12 12" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }
 
 export default function ReferenceEditor({ refs, onChange, disabled }) {
   const handleChange = (index, field, value) => {
-    const updated = refs.map((r, i) => i === index ? { ...r, [field]: value } : r);
+    const updated = refs.map((r, i) => i === index ? { ...normalizeRef(r), [field]: value } : r);
     onChange(updated);
   };
 
   const handleAdd = () => {
-    onChange([...refs, { type: 'url', label: '', url: '' }]);
+    onChange([...refs, { type: 'cwe', label: '', url: '' }]);
   };
 
   const handleRemove = (index) => {
@@ -75,8 +90,9 @@ export default function ReferenceEditor({ refs, onChange, disabled }) {
           key={i}
           refData={ref}
           index={i}
-          onChange={disabled ? () => {} : handleChange}
-          onRemove={disabled ? () => {} : handleRemove}
+          onChange={handleChange}
+          onRemove={handleRemove}
+          disabled={disabled}
         />
       ))}
     </div>
