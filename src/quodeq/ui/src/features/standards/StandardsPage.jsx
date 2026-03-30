@@ -50,13 +50,6 @@ export default function StandardsPage() {
         <div className="standards-page-header-actions">
           <button
             type="button"
-            className="btn-secondary"
-            onClick={() => setShowLibrary(true)}
-          >
-            Browse Library
-          </button>
-          <button
-            type="button"
             className="btn-primary"
             onClick={handleNewStandard}
           >
