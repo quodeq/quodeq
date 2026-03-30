@@ -1,4 +1,12 @@
+import { useRef, useEffect } from 'react';
+
 export default function PrincipleForm({ principle, principleIndex, onUpdateField, editable }) {
+  const nameRef = useRef(null);
+
+  useEffect(() => {
+    if (!principle.name && nameRef.current) nameRef.current.focus();
+  }, [principleIndex]);
+
   return (
     <div className="principle-form">
       <h3 className="detail-form-title">Principle</h3>
@@ -6,13 +14,13 @@ export default function PrincipleForm({ principle, principleIndex, onUpdateField
       <div className="form-group">
         <label htmlFor={`principle-name-${principleIndex}`}>Name</label>
         <input
+          ref={nameRef}
           id={`principle-name-${principleIndex}`}
           className="form-input"
           value={principle.name || ''}
           onChange={(e) => onUpdateField(['principles', principleIndex, 'name'], e.target.value)}
           disabled={!editable}
           placeholder="e.g. Dependency Rule"
-          autoFocus={!principle.name}
         />
       </div>
 

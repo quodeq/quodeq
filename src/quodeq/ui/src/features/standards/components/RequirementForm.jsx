@@ -1,7 +1,13 @@
+import { useRef, useEffect } from 'react';
 import ReferenceEditor from './ReferenceEditor.jsx';
 
 export default function RequirementForm({ requirement, principleIndex, reqIndex, onUpdateField, editable }) {
   const basePath = ['principles', principleIndex, 'requirements', reqIndex];
+  const ruleRef = useRef(null);
+
+  useEffect(() => {
+    if (!requirement.text && ruleRef.current) ruleRef.current.focus();
+  }, [principleIndex, reqIndex]);
 
   return (
     <div className="requirement-form">
@@ -10,13 +16,13 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
       <div className="form-group">
         <label htmlFor={`req-text-${principleIndex}-${reqIndex}`}>Rule</label>
         <input
+          ref={ruleRef}
           id={`req-text-${principleIndex}-${reqIndex}`}
           className="form-input"
           value={requirement.text || ''}
           onChange={(e) => onUpdateField([...basePath, 'text'], e.target.value)}
           disabled={!editable}
           placeholder="e.g. Source code dependencies must point inward only"
-          autoFocus={!requirement.text}
         />
       </div>
 
