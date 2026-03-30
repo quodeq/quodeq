@@ -315,7 +315,7 @@
 .standard-editor-tree-panel {
   flex-shrink: 0;
   overflow-y: auto;
-  padding: 16px 0;
+  padding: 8px 0;
   background: var(--color-surface);
 }
 
@@ -350,18 +350,18 @@
 }
 
 .tree-node--depth-1 {
-  padding-left: 12px;
+  padding-left: 8px;
 }
 
 .tree-node--depth-2 {
-  padding-left: 24px;
+  padding-left: 16px;
 }
 
 .tree-node-row {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 5px 8px;
+  gap: 3px;
+  padding: 4px 6px;
   border-radius: var(--radius-md, 6px);
   cursor: pointer;
   user-select: none;
@@ -402,11 +402,11 @@
 
 .tree-node-label {
   flex: 1;
-  font-size: 0.85rem;
+  font-size: 0.82rem;
   color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  line-height: 1.3;
+  min-width: 0;
+  overflow-wrap: break-word;
 }
 
 .tree-node-actions {
