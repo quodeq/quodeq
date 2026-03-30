@@ -71,6 +71,13 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, onA
       >
         {(standard.principles || []).map((principle, pi) => {
           const isPrincipleSelected = selectedNode?.type === 'principle' && selectedNode.index === pi;
+          const reqCount = principle.requirements?.length || 0;
+          const handleRemovePrinciple = () => {
+            if (reqCount > 0) {
+              if (!window.confirm(`Delete "${principle.name || 'Untitled'}" and its ${reqCount} requirement${reqCount !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+            }
+            onRemovePrinciple(pi);
+          };
           return (
             <TreeNode
               key={pi}
@@ -78,20 +85,27 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, onA
               isSelected={isPrincipleSelected}
               onClick={() => onSelectNode({ type: 'principle', index: pi })}
               onAdd={editable ? () => onAddRequirement(pi) : undefined}
-              onRemove={editable ? () => onRemovePrinciple(pi) : undefined}
+              onRemove={editable ? handleRemovePrinciple : undefined}
               addTitle="Add Requirement"
               removeTitle="Remove Principle"
               depth={1}
             >
               {(principle.requirements || []).map((req, ri) => {
                 const isReqSelected = selectedNode?.type === 'requirement' && selectedNode.principleIndex === pi && selectedNode.reqIndex === ri;
+                const hasContent = req.text || req.description || (req.refs && req.refs.length > 0);
+                const handleRemoveReq = () => {
+                  if (hasContent) {
+                    if (!window.confirm(`Delete requirement "${req.text ? (req.text.length > 40 ? req.text.slice(0, 40) + '...' : req.text) : 'Untitled'}"?`)) return;
+                  }
+                  onRemoveRequirement(pi, ri);
+                };
                 return (
                   <TreeNode
                     key={ri}
                     label={req.text ? (req.text.length > 50 ? req.text.slice(0, 50) + '...' : req.text) : `Requirement ${ri + 1}`}
                     isSelected={isReqSelected}
                     onClick={() => onSelectNode({ type: 'requirement', principleIndex: pi, reqIndex: ri })}
-                    onRemove={editable ? () => onRemoveRequirement(pi, ri) : undefined}
+                    onRemove={editable ? handleRemoveReq : undefined}
                     removeTitle="Remove Requirement"
                     depth={2}
                   />
