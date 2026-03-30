@@ -60,12 +60,15 @@ function DimensionGrid({ allDimensions, selectedDims, onToggle, onSelectAll, onC
           <button
             key={dim.id}
             type="button"
-            className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}`}
-            title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
+            className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}${dim.standardType ? ` dimension-chip-btn--${dim.standardType}` : ''}`}
+            title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : dim.label || dim.id}
             aria-pressed={selectedDims.has(dim.id)}
             onClick={() => onToggle(dim.id)}
           >
             {dim.id}
+            {dim.standardType && (
+              <span className={`dim-chip-badge dim-chip-badge--${dim.standardType}`} aria-hidden="true" />
+            )}
           </button>
         ))}
       </div>
