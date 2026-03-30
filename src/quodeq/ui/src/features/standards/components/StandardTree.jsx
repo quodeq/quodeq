@@ -104,7 +104,7 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, onA
                 return (
                   <TreeNode
                     key={ri}
-                    label={req.text ? (req.text.length > 50 ? req.text.slice(0, 50) + '...' : req.text) : `Requirement ${ri + 1}`}
+                    label={req.text || `Requirement ${ri + 1}`}
                     isSelected={isReqSelected}
                     onClick={() => onSelectNode({ type: 'requirement', principleIndex: pi, reqIndex: ri })}
                     onRemove={editable ? handleRemoveReq : undefined}
