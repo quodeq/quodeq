@@ -45,9 +45,9 @@ def _load_dimension_data(
         return None
 
 
-def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
+def render_compiled_standards(compiled_dir: Path, dimension: str, evaluators_dir: Path | None = None) -> str:
     """Render compiled standards as a requirements checklist organized by principle."""
-    data = _load_dimension_data(compiled_dir, dimension)
+    data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
         return _NO_STANDARDS_FOR_DIM
     lines = []
@@ -67,14 +67,14 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
     return "\n".join(lines)
 
 
-def render_compact_standards(compiled_dir: Path, dimension: str) -> str:
+def render_compact_standards(compiled_dir: Path, dimension: str, evaluators_dir: Path | None = None) -> str:
     """Render a compact standards checklist for the AI analyzer.
 
     One line per requirement: ``REQ-ID: text``.
     No principle headings (server derives principle from req ID),
     no markdown formatting, no CWE refs (server enriches at report time).
     """
-    data = _load_dimension_data(compiled_dir, dimension)
+    data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
         return _NO_STANDARDS_FOR_DIM
     lines = []
@@ -228,9 +228,10 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
     standards_checklist = _NO_STANDARDS
     if context.standards_dir:
         compiled_dir = context.standards_dir / "compiled"
-        if compiled_dir.exists():
+        _eval_dir = default_paths().evaluators_dir
+        if compiled_dir.exists() or (_eval_dir.is_dir()):
             if context.work_dir:
-                compact = render_compact_standards(compiled_dir, context.dimension)
+                compact = render_compact_standards(compiled_dir, context.dimension, evaluators_dir=_eval_dir)
                 if compact not in (_NO_STANDARDS_FOR_DIM,):
                     standards_path = _write_standards_file(
                         context.work_dir, context.dimension, compact,
@@ -239,7 +240,7 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
                 else:
                     standards_checklist = compact
             else:
-                standards_checklist = render_compiled_standards(compiled_dir, context.dimension)
+                standards_checklist = render_compiled_standards(compiled_dir, context.dimension, evaluators_dir=_eval_dir)
 
     manifest_context = _render_manifest_context(context)
 
@@ -263,11 +264,12 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
 def _render_all_standards(standards_dir: Path, dimensions: list[str]) -> str:
     """Render compact standards for all dimensions, separated by headers."""
     compiled_dir = standards_dir / "compiled"
-    if not compiled_dir.exists():
+    _eval_dir = default_paths().evaluators_dir
+    if not compiled_dir.exists() and not _eval_dir.is_dir():
         return _NO_STANDARDS
     sections = []
     for dim in dimensions:
-        compact = render_compact_standards(compiled_dir, dim)
+        compact = render_compact_standards(compiled_dir, dim, evaluators_dir=_eval_dir)
         if compact != _NO_STANDARDS_FOR_DIM:
             sections.append(f"## {dim.title()}\n\n{compact}")
     return "\n\n".join(sections) if sections else _NO_STANDARDS

@@ -43,6 +43,25 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
         raise ValueError("RunConfig.dimensions_data is required")
 
     all_dims_raw = [d.get("id") for d in dims_data.get("applies", []) if d.get("id")]
+
+    # Include custom evaluators from evaluators directory (only when dimensions are explicitly requested)
+    if config.options.dimensions:
+        _evaluators_dir = getattr(config, 'evaluators_dir', None)
+        if _evaluators_dir is None:
+            from quodeq.config.paths import default_paths
+            _evaluators_dir = default_paths().evaluators_dir
+    else:
+        _evaluators_dir = None
+    if _evaluators_dir and _evaluators_dir.is_dir():
+        import json as _json
+        for _p in _evaluators_dir.glob("*.json"):
+            try:
+                _eid = _json.loads(_p.read_text()).get("id")
+                if _eid and _eid not in all_dims_raw:
+                    all_dims_raw.append(_eid)
+            except (OSError, ValueError, KeyError):
+                pass
+
     if config.options.dimensions:
         all_dims_set = set(all_dims_raw)
         unknown = [d for d in config.options.dimensions if d not in all_dims_set]

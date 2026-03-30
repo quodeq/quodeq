@@ -57,6 +57,7 @@ class RunConfig:
     manifest: SourceManifest | None = None
     dimensions_data: DimensionsConfig | None = None
     target: AnalysisTarget | None = None
+    evaluators_dir: Path | None = None
 
     @property
     def source_file_count(self) -> int:
