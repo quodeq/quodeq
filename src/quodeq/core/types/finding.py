@@ -36,5 +36,6 @@ class Finding:
     cwe: int | str | None = None
     req: str | None = None
     req_refs: list[ReqRef] = field(default_factory=list)
+    context: str | None = None
     dimension: str | None = None
     violation_type: str | None = None

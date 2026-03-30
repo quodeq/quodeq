@@ -35,6 +35,7 @@ REPORT_FINDING_SCHEMA = {
         "severity": {"type": "string", "enum": ["critical", "major", "minor"], "description": "Severity level"},
         "w": {"type": "string", "description": "Short description of the finding"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
+        "context": {"type": "string", "description": "~10 lines of surrounding code with violation line marked by >>>"},
         "p": {"type": "string", "description": "Sub-characteristic name — auto-filled from req if omitted"},
         "d": {"type": "string", "description": "Dimension — auto-filled from server config if omitted"},
     },

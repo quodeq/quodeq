@@ -27,6 +27,7 @@ class FindingSpec:
     cwe: int | str | None = None
     req: str | None = None
     req_refs: list[dict] | None = None
+    context: str | None = None
     include_severity: bool = True
 
 
@@ -53,6 +54,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
         cwe=spec.cwe if spec.cwe else None,
         req=spec.req if spec.req else None,
         req_refs=req_refs,
+        context=spec.context if spec.context else None,
     )
 
 

@@ -76,6 +76,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         cwe=obj.get("cwe"),
         req=req,
         req_refs=req_refs,
+        context=obj.get("context"),
     ))
     return replace(entry, dimension=obj.get("d", dimension), violation_type=obj.get("vt"))
 
