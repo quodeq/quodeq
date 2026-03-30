@@ -18,11 +18,47 @@ def _get_service(app: Flask) -> StandardsService:
         )
     return app._standards_service
 
+def _get_library_client(app: Flask):
+    base_url = app.config.get("STANDARDS_LIBRARY_URL")
+    if not base_url:
+        return None
+    from quodeq.services.standards_library import StandardsLibraryClient, UrllibJsonClient
+    token = app.config.get("STANDARDS_LIBRARY_TOKEN")
+    return StandardsLibraryClient(base_url=base_url, http_client=UrllibJsonClient(), token=token)
+
 def register_standards_routes(app: Flask) -> None:
     @app.get("/api/standards")
     def list_standards() -> Response:
         svc = _get_service(app)
         return jsonify([to_camel_dict(s) for s in svc.list_standards()])
+
+    @app.get("/api/standards/library")
+    def list_library() -> Response:
+        library = _get_library_client(app)
+        if library is None:
+            return jsonify([])
+        try:
+            index = library.fetch_index()
+        except Exception as exc:
+            logger.warning("Failed to fetch library index: %s", exc)
+            return error_response("Failed to connect to standards library", 502, "library_error")
+        return jsonify(index)
+
+    @app.post("/api/standards/library/import")
+    def import_from_library() -> tuple[Response, int]:
+        library = _get_library_client(app)
+        if library is None:
+            return error_response("Standards library not configured", 400, "library_not_configured")
+        payload = request.get_json(force=True)
+        file_path = payload.get("file")
+        if not file_path:
+            return error_response("file is required", 400, "bad_request")
+        try:
+            library.import_standard(file_path, Path(app.config["STANDARDS_EVALUATORS_DIR"]))
+        except Exception as exc:
+            logger.warning("Failed to import standard: %s", exc)
+            return error_response(f"Import failed: {exc}", 502, "import_error")
+        return jsonify({"status": "imported"}), 201
 
     @app.get("/api/standards/<standard_id>")
     def get_standard(standard_id: str) -> Response:
