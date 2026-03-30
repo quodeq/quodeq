@@ -8,16 +8,28 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
       <h3 className="detail-form-title">Requirement</h3>
 
       <div className="form-group">
-        <label htmlFor={`req-text-${principleIndex}-${reqIndex}`}>Text</label>
-        <textarea
+        <label htmlFor={`req-text-${principleIndex}-${reqIndex}`}>Rule</label>
+        <input
           id={`req-text-${principleIndex}-${reqIndex}`}
-          className="form-textarea"
+          className="form-input"
           value={requirement.text || ''}
           onChange={(e) => onUpdateField([...basePath, 'text'], e.target.value)}
           disabled={!editable}
           placeholder="e.g. Source code dependencies must point inward only"
-          rows={5}
           autoFocus={!requirement.text}
+        />
+      </div>
+
+      <div className="form-group">
+        <label htmlFor={`req-desc-${principleIndex}-${reqIndex}`}>Description</label>
+        <textarea
+          id={`req-desc-${principleIndex}-${reqIndex}`}
+          className="form-textarea"
+          value={requirement.description || ''}
+          onChange={(e) => onUpdateField([...basePath, 'description'], e.target.value)}
+          disabled={!editable}
+          placeholder="Context and rationale for this rule..."
+          rows={3}
         />
       </div>
 
