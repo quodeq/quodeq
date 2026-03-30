@@ -38,7 +38,12 @@ class AnalysisTarget:
         return " ".join(parts)
 
     def to_prompt_context(self, repo_total_files: int = 0, other_targets: list[AnalysisTarget] | None = None) -> str:
-        """Render target as context for inclusion in analysis prompts."""
+        """Render target as context for inclusion in analysis prompts.
+
+        Intentionally co-located: the prompt context IS how the analysis
+        target describes itself to the AI model — this is domain behavior,
+        not user-facing presentation.
+        """
         lines = [
             f"**Project type:** {self.project_description}",
             f"**Source files:** {self.total_files}"

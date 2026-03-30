@@ -2,6 +2,10 @@
 
 Provides ``lock_file`` and ``unlock_file`` that dispatch to the correct
 OS primitive (``fcntl`` on Unix, ``msvcrt`` on Windows).
+
+Kept in the analysis layer because it is a small, self-contained adapter
+used only by the subagent pool.  Moving it to a generic ``adapters/``
+package would add indirection without meaningful reuse.
 """
 from __future__ import annotations
 

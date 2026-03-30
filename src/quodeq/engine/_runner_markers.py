@@ -12,7 +12,12 @@ _SECONDS_PER_MINUTE = 60
 
 
 def emit_marker(phase: str, **kwargs: Any) -> None:
-    """Emit a structured JSON marker (only when stdout is not a TTY)."""
+    """Emit a structured JSON marker for inter-process communication.
+
+    This writes to stdout only when it is *not* a TTY, i.e. when the
+    runner is invoked as a child process.  The output is machine-parsed
+    IPC, not user-facing presentation.
+    """
     if sys.stdout.isatty():
         return
     print(json.dumps({CC_MARKER_KEY: phase, **kwargs}), flush=True)

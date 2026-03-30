@@ -1,5 +1,10 @@
 import { mostFrequentGrade } from '../../utils/formatters.js';
 
+/**
+ * Build an aggregate run summary from dimension data already received
+ * from the API.  This duplicates some backend logic but avoids an extra
+ * round-trip — the API does not always provide a pre-computed summary.
+ */
 export default function buildRunSummary(dimensions) {
   if (!dimensions || dimensions.length === 0) {
     return {
