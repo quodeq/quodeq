@@ -1,6 +1,7 @@
 """Evidence parser -- converts extracted JSONL lines into V2 Evidence model."""
 from __future__ import annotations
 
+import functools
 import json
 import logging
 from dataclasses import dataclass
@@ -150,8 +151,12 @@ class _GroupedJudgments:
     severity: dict[str, str]
 
 
+@functools.lru_cache(maxsize=32)
 def _build_req_to_principle_map(dimension: str) -> dict[str, str]:
-    """Build a mapping from requirement IDs to principle names for custom evaluators."""
+    """Build a mapping from requirement IDs to principle names for custom evaluators.
+
+    Cached per dimension — evaluator files don't change during a single run.
+    """
     from quodeq.config.paths import default_paths
     evaluators_dir = default_paths().evaluators_dir
     if not evaluators_dir.is_dir():

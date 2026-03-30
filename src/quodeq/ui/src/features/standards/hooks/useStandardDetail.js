@@ -37,11 +37,11 @@ export function useStandardDetail(standardId, isNew) {
     setStandard((prev) => {
       const next = JSON.parse(JSON.stringify(prev));
       next.principles.push({ name: '', description: '', requirements: [] });
+      setSelectedNode({ type: 'principle', index: next.principles.length - 1 });
       return next;
     });
-    setSelectedNode({ type: 'principle', index: standard?.principles?.length || 0 });
     setDirty(true);
-  }, [standard]);
+  }, []);
 
   const removePrinciple = useCallback((index) => {
     setStandard((prev) => {

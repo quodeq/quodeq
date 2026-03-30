@@ -37,8 +37,16 @@ class StandardsLibraryClient:
     def fetch_standard(self, file_path: str) -> dict:
         return self._http.get_json(f"{self._base_url}/{file_path}", headers=self._headers())
 
+    @staticmethod
+    def _validate_id(standard_id: str) -> None:
+        if not standard_id or "/" in standard_id or "\\" in standard_id or ".." in standard_id:
+            raise ValueError(f"Invalid standard ID from library: {standard_id}")
+
     def import_standard(self, file_path: str, evaluators_dir: Path) -> Path:
+        if ".." in file_path:
+            raise ValueError(f"Invalid library file path: {file_path}")
         data = self.fetch_standard(file_path)
+        self._validate_id(data.get("id", ""))
         content_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
         evaluators_dir.mkdir(parents=True, exist_ok=True)
         dest = evaluators_dir / f"{data['id']}.json"
