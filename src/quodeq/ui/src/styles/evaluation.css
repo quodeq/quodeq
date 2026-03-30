@@ -941,12 +941,12 @@
 }
 
 .dimension-section-label .iso-link {
-  color: var(--color-text-secondary, #888);
+  color: var(--color-accent, #58a6ff);
   text-decoration: none;
+  font-size: inherit;
 }
 
 .dimension-section-label .iso-link:hover {
-  color: var(--color-accent, #58a6ff);
   text-decoration: underline;
 }
 
