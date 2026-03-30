@@ -11,7 +11,8 @@ export default function PrincipleForm({ principle, principleIndex, onUpdateField
           value={principle.name || ''}
           onChange={(e) => onUpdateField(['principles', principleIndex, 'name'], e.target.value)}
           disabled={!editable}
-          placeholder="Principle name"
+          placeholder="e.g. Dependency Rule"
+          autoFocus={!principle.name}
         />
       </div>
 

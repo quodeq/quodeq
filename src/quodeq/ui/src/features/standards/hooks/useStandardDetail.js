@@ -36,11 +36,12 @@ export function useStandardDetail(standardId, isNew) {
   const addPrinciple = useCallback(() => {
     setStandard((prev) => {
       const next = JSON.parse(JSON.stringify(prev));
-      next.principles.push({ name: 'New Principle', description: '', requirements: [] });
+      next.principles.push({ name: '', description: '', requirements: [] });
       return next;
     });
+    setSelectedNode({ type: 'principle', index: standard?.principles?.length || 0 });
     setDirty(true);
-  }, []);
+  }, [standard]);
 
   const removePrinciple = useCallback((index) => {
     setStandard((prev) => {
@@ -53,6 +54,7 @@ export function useStandardDetail(standardId, isNew) {
   }, []);
 
   const addRequirement = useCallback((principleIndex) => {
+    let newReqIndex = 0;
     setStandard((prev) => {
       const next = JSON.parse(JSON.stringify(prev));
       const principle = next.principles[principleIndex];
@@ -61,8 +63,10 @@ export function useStandardDetail(standardId, isNew) {
       const seq = (principle.requirements?.length || 0) + 1;
       const autoId = `${prefix}-${pPrefix}-${String(seq).padStart(2, '0')}`;
       principle.requirements.push({ id: autoId, text: '', refs: [] });
+      newReqIndex = principle.requirements.length - 1;
       return next;
     });
+    setSelectedNode({ type: 'requirement', principleIndex, reqIndex: newReqIndex });
     setDirty(true);
   }, []);
 

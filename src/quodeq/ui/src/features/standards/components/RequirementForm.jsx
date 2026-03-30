@@ -27,8 +27,9 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
           value={requirement.text || ''}
           onChange={(e) => onUpdateField([...basePath, 'text'], e.target.value)}
           disabled={!editable}
-          placeholder="Describe the requirement..."
+          placeholder="e.g. Source code dependencies must point inward only"
           rows={5}
+          autoFocus={!requirement.text}
         />
       </div>
 
