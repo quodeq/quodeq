@@ -794,6 +794,15 @@
   margin: 0 0 16px 0;
   color: var(--color-text);
   font-size: 0.9rem;
+}
+
+.modal-body--warning {
+  background: rgba(220, 60, 60, 0.1);
+  border: 1px solid rgba(220, 60, 60, 0.3);
+  border-radius: var(--radius-md, 6px);
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  font-size: 0.9rem;
   line-height: 1.5;
 }
 

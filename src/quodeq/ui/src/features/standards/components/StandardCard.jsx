@@ -2,17 +2,40 @@ import { useState } from 'react';
 
 const TYPE_LABELS = { builtin: 'Built-in', community: 'Community', custom: 'Custom' };
 
-function ConfirmDeleteModal({ standardName, onConfirm, onCancel }) {
+function ConfirmDeleteModal({ standardName, principleCount, requirementCount, onConfirm, onCancel }) {
+  const [typed, setTyped] = useState('');
+  const hasContent = principleCount > 0 || requirementCount > 0;
+  const confirmText = standardName.toLowerCase().trim();
+  const canDelete = !hasContent || typed.toLowerCase().trim() === confirmText;
+
   return (
     <div className="modal-overlay" onClick={onCancel}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
         <h3 className="modal-title">Delete Standard</h3>
-        <p className="modal-body">
-          Are you sure you want to delete <strong>{standardName}</strong>? This action cannot be undone.
-        </p>
+        {hasContent ? (
+          <>
+            <p className="modal-body modal-body--warning">
+              <strong>{standardName}</strong> contains <strong>{principleCount} principle{principleCount !== 1 ? 's' : ''}</strong> and <strong>{requirementCount} requirement{requirementCount !== 1 ? 's' : ''}</strong>. This action cannot be undone.
+            </p>
+            <p className="modal-body">
+              Type <strong>{standardName}</strong> to confirm:
+            </p>
+            <input
+              className="modal-input"
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              placeholder={standardName}
+              autoFocus
+            />
+          </>
+        ) : (
+          <p className="modal-body">
+            Are you sure you want to delete <strong>{standardName}</strong>?
+          </p>
+        )}
         <div className="modal-actions">
           <button type="button" className="btn-secondary" onClick={onCancel}>Cancel</button>
-          <button type="button" className="btn-danger" onClick={onConfirm}>Delete</button>
+          <button type="button" className="btn-danger" onClick={onConfirm} disabled={!canDelete}>Delete</button>
         </div>
       </div>
     </div>
@@ -127,6 +150,8 @@ export default function StandardCard({ standard, onEdit, onDelete, onDuplicate }
       {showDeleteModal && (
         <ConfirmDeleteModal
           standardName={standard.name}
+          principleCount={principleCount}
+          requirementCount={requirementCount}
           onConfirm={() => { setShowDeleteModal(false); onDelete(standard.id); }}
           onCancel={() => setShowDeleteModal(false)}
         />
