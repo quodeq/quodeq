@@ -9,23 +9,18 @@ function TreeNode({ label, isSelected, onClick, onAdd, onRemove, addTitle, remov
     <div className={`tree-node tree-node--depth-${depth}`}>
       <div
         className={`tree-node-row${isSelected ? ' tree-node-row--selected' : ''}`}
-        onClick={onClick}
+        onClick={() => { onClick(); if (showExpand) setExpanded((v) => !v); }}
         role="button"
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && onClick()}
       >
         {showExpand ? (
-          <button
-            type="button"
-            className="tree-expand-btn"
-            onClick={(e) => { e.stopPropagation(); setExpanded((v) => !v); }}
-            aria-label={expanded ? 'Collapse' : 'Expand'}
-          >
+          <span className="tree-expand-btn" aria-hidden="true">
             <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true"
               style={{ transform: expanded ? 'rotate(90deg)' : 'rotate(0deg)', transition: 'transform 150ms' }}>
               <path d="M3 2l4 3-4 3V2z" />
             </svg>
-          </button>
+          </span>
         ) : (
           <span className="tree-expand-btn tree-expand-btn--invisible" />
         )}
