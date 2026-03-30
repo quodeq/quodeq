@@ -43,7 +43,7 @@ export default function StandardsList({ grouped, onEdit, onDelete, onDuplicate }
   return (
     <div className="standards-list">
       <StandardsSection
-        title="Built-in"
+        title="ISO 25010"
         standards={grouped.builtin || []}
         onEdit={onEdit}
         onDelete={onDelete}
@@ -57,7 +57,7 @@ export default function StandardsList({ grouped, onEdit, onDelete, onDuplicate }
         onDuplicate={onDuplicate}
       />
       <StandardsSection
-        title="Custom"
+        title="Custom Standards"
         standards={grouped.custom || []}
         onEdit={onEdit}
         onDelete={onDelete}
