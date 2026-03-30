@@ -46,3 +46,22 @@ def test_import_standard(tmp_path):
     assert saved["type"] == "community"
     assert saved["origin"] == "standards/clean-arch.json"
     assert saved["origin_hash"] is not None
+
+
+def test_reimport_same_origin_updates(tmp_path):
+    http = FakeHttpClient({"https://example.com/standards/clean-arch.json": STANDARD_DATA})
+    client = StandardsLibraryClient(base_url="https://example.com", http_client=http)
+    client.import_standard("standards/clean-arch.json", tmp_path)
+    # Re-import same origin should succeed (update)
+    client.import_standard("standards/clean-arch.json", tmp_path)
+    assert (tmp_path / "clean-arch.json").is_file()
+
+
+def test_import_collision_different_origin_raises(tmp_path):
+    # Pre-create a standard with a different origin
+    existing = {**STANDARD_DATA, "origin": "other-repo/clean-arch.json", "managed": False, "type": "custom"}
+    (tmp_path / "clean-arch.json").write_text(json.dumps(existing))
+    http = FakeHttpClient({"https://example.com/standards/clean-arch.json": STANDARD_DATA})
+    client = StandardsLibraryClient(base_url="https://example.com", http_client=http)
+    with pytest.raises(ValueError, match="already exists"):
+        client.import_standard("standards/clean-arch.json", tmp_path)

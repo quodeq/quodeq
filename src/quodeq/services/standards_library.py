@@ -40,11 +40,23 @@ class StandardsLibraryClient:
     def import_standard(self, file_path: str, evaluators_dir: Path) -> Path:
         data = self.fetch_standard(file_path)
         content_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
+        evaluators_dir.mkdir(parents=True, exist_ok=True)
+        dest = evaluators_dir / f"{data['id']}.json"
+        # Check for collision with existing standard
+        if dest.is_file():
+            existing = json.loads(dest.read_text())
+            if existing.get("origin") == file_path:
+                # Same origin — update in place
+                pass
+            else:
+                raise ValueError(
+                    f"A standard with ID '{data['id']}' already exists "
+                    f"from a different source. Duplicate to customize it first, "
+                    f"or delete the existing one."
+                )
         data["type"] = "community"
         data["managed"] = True
         data["origin"] = file_path
         data["origin_hash"] = content_hash
-        evaluators_dir.mkdir(parents=True, exist_ok=True)
-        dest = evaluators_dir / f"{data['id']}.json"
         dest.write_text(json.dumps(data, indent=2))
         return dest

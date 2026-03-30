@@ -55,6 +55,8 @@ def register_standards_routes(app: Flask) -> None:
             return error_response("file is required", 400, "bad_request")
         try:
             library.import_standard(file_path, Path(app.config["STANDARDS_EVALUATORS_DIR"]))
+        except ValueError as exc:
+            return error_response(str(exc), 409, "conflict")
         except Exception as exc:
             logger.warning("Failed to import standard: %s", exc)
             return error_response(f"Import failed: {exc}", 502, "import_error")
