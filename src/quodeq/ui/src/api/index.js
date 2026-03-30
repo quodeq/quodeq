@@ -167,6 +167,9 @@ export async function duplicateStandard(standardId, newId) {
 export async function listLibrary() {
   return request('/standards/library');
 }
+export async function listCwes() {
+  return request('/standards/refs/cwe');
+}
 export async function importFromLibrary(file) {
   return request('/standards/library/import', { method: 'POST', body: JSON.stringify({ file }) });
 }

@@ -655,6 +655,69 @@
   background: color-mix(in srgb, var(--color-danger) 10%, transparent);
 }
 
+/* ── CWE Search ─────────────────────────────────────────── */
+
+.cwe-search {
+  position: relative;
+  flex: 0 0 160px;
+}
+
+.cwe-search-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 240px;
+  overflow-y: auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 6px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  margin-top: 2px;
+}
+
+.cwe-search-option {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  padding: 6px 10px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.cwe-search-option:hover {
+  background: var(--color-surface-alt);
+}
+
+.cwe-search-option--selected {
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+}
+
+.cwe-search-id {
+  font-weight: 600;
+  color: var(--color-accent);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cwe-search-name {
+  color: var(--color-text-secondary, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ref-cwe-name {
+  flex: 1;
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #888);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 6px 0;
+}
+
 /* ── Library Browser ─────────────────────────────────────── */
 
 .library-browser-subtitle {

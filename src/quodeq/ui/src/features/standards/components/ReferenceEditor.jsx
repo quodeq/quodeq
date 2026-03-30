@@ -1,46 +1,98 @@
-const REF_TYPES = ['cwe', 'cve', 'owasp', 'nist', 'iso', 'rfc', 'book', 'url', 'other'];
+import { useState, useEffect, useRef } from 'react';
+import { listCwes } from '../../../api/index.js';
+
+const REF_TYPES = ['cwe', 'owasp', 'nist', 'iso', 'rfc', 'book', 'url', 'other'];
 
 const URL_TEMPLATES = {
   cwe: (id) => `https://cwe.mitre.org/data/definitions/${id}.html`,
-  cve: (id) => `https://www.cve.org/CVERecord?id=CVE-${id}`,
 };
 
-/** Normalize built-in format {source, id, name, url} to editor format {type, refId, name, url} */
+/** Normalize built-in format {source, id, name, url} to editor format */
 function normalizeRef(ref) {
   if (ref.source && !ref.type) {
-    return {
-      type: ref.source,
-      refId: ref.id || '',
-      name: ref.name || '',
-      url: ref.url || '',
-    };
+    return { type: ref.source, refId: String(ref.id || ''), name: ref.name || '', url: ref.url || '' };
   }
-  return {
-    type: ref.type || 'url',
-    refId: ref.refId || ref.id || '',
-    name: ref.name || ref.label || '',
-    url: ref.url || '',
-  };
+  return { type: ref.type || 'url', refId: ref.refId || ref.id || '', name: ref.name || ref.label || '', url: ref.url || '' };
+}
+
+function formatRefDisplay(ref) {
+  const n = normalizeRef(ref);
+  const prefix = n.type ? n.type.toUpperCase() : '';
+  const id = n.refId ? `${prefix}-${n.refId}` : prefix;
+  return n.name ? `${id}: ${n.name}` : id;
+}
+
+function CweSearch({ value, onSelect, disabled }) {
+  const [cwes, setCwes] = useState([]);
+  const [query, setQuery] = useState('');
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    listCwes().then(setCwes).catch(() => setCwes([]));
+  }, []);
+
+  useEffect(() => {
+    function handleClickOutside(e) {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const filtered = query
+    ? cwes.filter((c) => String(c.id).includes(query) || c.name.toLowerCase().includes(query.toLowerCase())).slice(0, 20)
+    : cwes.slice(0, 20);
+
+  return (
+    <div className="cwe-search" ref={wrapperRef}>
+      <input
+        className="ref-id-input"
+        placeholder="Search CWE..."
+        value={open ? query : (value ? `CWE-${value}` : '')}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        disabled={disabled}
+        aria-label="Search CWE"
+      />
+      {open && filtered.length > 0 && (
+        <div className="cwe-search-dropdown">
+          {filtered.map((c) => (
+            <div
+              key={c.id}
+              className={`cwe-search-option${String(c.id) === String(value) ? ' cwe-search-option--selected' : ''}`}
+              onClick={() => { onSelect(c); setQuery(''); setOpen(false); }}
+            >
+              <span className="cwe-search-id">CWE-{c.id}</span>
+              <span className="cwe-search-name">{c.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   const ref = normalizeRef(refData);
-  const showId = ['cwe', 'cve', 'owasp', 'nist', 'iso', 'rfc'].includes(ref.type);
+  const isCwe = ref.type === 'cwe';
+  const showFreeId = !isCwe && ['owasp', 'nist', 'iso', 'rfc'].includes(ref.type);
 
   const handleTypeChange = (newType) => {
-    const updated = { ...ref, type: newType };
-    if (URL_TEMPLATES[newType] && ref.refId) {
-      updated.url = URL_TEMPLATES[newType](ref.refId);
-    }
-    onChange(index, updated);
+    onChange(index, { ...ref, type: newType, refId: '', name: '', url: '' });
+  };
+
+  const handleCweSelect = (cwe) => {
+    onChange(index, {
+      type: 'cwe',
+      refId: String(cwe.id),
+      name: cwe.name,
+      url: URL_TEMPLATES.cwe(cwe.id),
+    });
   };
 
   const handleIdChange = (newId) => {
-    const updated = { ...ref, refId: newId };
-    if (URL_TEMPLATES[ref.type] && newId) {
-      updated.url = URL_TEMPLATES[ref.type](newId);
-    }
-    onChange(index, updated);
+    onChange(index, { ...ref, refId: newId });
   };
 
   const handleFieldChange = (field, value) => {
@@ -60,32 +112,46 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
           <option key={t} value={t}>{t.toUpperCase()}</option>
         ))}
       </select>
-      {showId && (
+
+      {isCwe && (
+        <CweSearch value={ref.refId} onSelect={handleCweSelect} disabled={disabled} />
+      )}
+
+      {showFreeId && (
         <input
           className="ref-id-input"
-          placeholder="ID (e.g. 209)"
+          placeholder="ID"
           value={ref.refId}
           onChange={(e) => handleIdChange(e.target.value)}
           disabled={disabled}
           aria-label="Reference ID"
         />
       )}
-      <input
-        className="ref-name-input"
-        placeholder={showId ? 'Name (e.g. Hardcoded Credentials)' : 'Description'}
-        value={ref.name}
-        onChange={(e) => handleFieldChange('name', e.target.value)}
-        disabled={disabled}
-        aria-label="Reference name"
-      />
+
+      {!isCwe && (
+        <input
+          className="ref-name-input"
+          placeholder={ref.type === 'book' ? 'Title (e.g. Clean Architecture Ch.22)' : ref.type === 'url' ? 'Description' : 'Name'}
+          value={ref.name}
+          onChange={(e) => handleFieldChange('name', e.target.value)}
+          disabled={disabled}
+          aria-label="Reference name"
+        />
+      )}
+
+      {isCwe && ref.name && (
+        <span className="ref-cwe-name" title={ref.name}>{ref.name}</span>
+      )}
+
       <input
         className="ref-url-input"
-        placeholder="URL (optional)"
+        placeholder="URL"
         value={ref.url}
         onChange={(e) => handleFieldChange('url', e.target.value)}
         disabled={disabled}
         aria-label="Reference URL"
       />
+
       {!disabled && (
         <button
           type="button"

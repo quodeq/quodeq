@@ -26,7 +26,24 @@ def _get_library_client(app: Flask):
     token = app.config.get("STANDARDS_LIBRARY_TOKEN")
     return StandardsLibraryClient(base_url=base_url, http_client=UrllibJsonClient(), token=token)
 
+def _load_cwe_list(app: Flask) -> list[dict]:
+    """Load and cache the CWE list."""
+    if not hasattr(app, "_cwe_list"):
+        cwe_path = Path(app.config["STANDARDS_COMPILED_DIR"]).parent / "cwe" / "audit.json"
+        if cwe_path.is_file():
+            import json as _json
+            entries = _json.loads(cwe_path.read_text())
+            app._cwe_list = [{"id": e["id"], "name": e["name"]} for e in entries]
+        else:
+            app._cwe_list = []
+    return app._cwe_list
+
+
 def register_standards_routes(app: Flask) -> None:
+    @app.get("/api/standards/refs/cwe")
+    def list_cwes() -> Response:
+        return jsonify(_load_cwe_list(app))
+
     @app.get("/api/standards")
     def list_standards() -> Response:
         svc = _get_service(app)
