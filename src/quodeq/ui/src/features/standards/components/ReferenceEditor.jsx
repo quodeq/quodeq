@@ -1,6 +1,7 @@
 const REF_TYPES = ['url', 'rfc', 'cwe', 'cve', 'owasp', 'nist', 'iso', 'other'];
 
-function ReferenceRow({ ref, index, onChange, onRemove }) {
+function ReferenceRow({ refData, index, onChange, onRemove }) {
+  const ref = refData;
   return (
     <div className="ref-row">
       <select
@@ -72,7 +73,7 @@ export default function ReferenceEditor({ refs, onChange, disabled }) {
       {refs.map((ref, i) => (
         <ReferenceRow
           key={i}
-          ref={ref}
+          refData={ref}
           index={i}
           onChange={disabled ? () => {} : handleChange}
           onRemove={disabled ? () => {} : handleRemove}
