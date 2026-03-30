@@ -32,3 +32,49 @@ def register_standards_routes(app: Flask) -> None:
         except FileNotFoundError:
             return error_response(f"Standard not found: {standard_id}", 404, "not_found")
         return jsonify(to_camel_dict(detail))
+
+    @app.post("/api/standards")
+    def create_standard() -> tuple[Response, int]:
+        svc = _get_service(app)
+        payload = request.get_json(force=True)
+        try:
+            detail = svc.create_standard(payload)
+        except ValueError as exc:
+            return error_response(str(exc), 400, "bad_request")
+        return jsonify(to_camel_dict(detail)), 201
+
+    @app.put("/api/standards/<standard_id>")
+    def update_standard(standard_id: str) -> Response:
+        svc = _get_service(app)
+        payload = request.get_json(force=True)
+        try:
+            detail = svc.update_standard(standard_id, payload)
+        except FileNotFoundError:
+            return error_response(f"Standard not found: {standard_id}", 404, "not_found")
+        except PermissionError as exc:
+            return error_response(str(exc), 403, "forbidden")
+        return jsonify(to_camel_dict(detail))
+
+    @app.delete("/api/standards/<standard_id>")
+    def delete_standard(standard_id: str) -> tuple[str, int]:
+        svc = _get_service(app)
+        try:
+            svc.delete_standard(standard_id)
+        except FileNotFoundError:
+            return error_response(f"Standard not found: {standard_id}", 404, "not_found")
+        except PermissionError as exc:
+            return error_response(str(exc), 403, "forbidden")
+        return "", 204
+
+    @app.post("/api/standards/<standard_id>/duplicate")
+    def duplicate_standard(standard_id: str) -> tuple[Response, int]:
+        svc = _get_service(app)
+        payload = request.get_json(force=True)
+        new_id = payload.get("newId") or payload.get("new_id")
+        if not new_id:
+            return error_response("newId is required", 400, "bad_request")
+        try:
+            detail = svc.duplicate_standard(standard_id, new_id)
+        except (FileNotFoundError, ValueError) as exc:
+            return error_response(str(exc), 400, "bad_request")
+        return jsonify(to_camel_dict(detail)), 201
