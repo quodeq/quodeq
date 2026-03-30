@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from quodeq.core.types import DimensionResult, DimensionSummary, to_camel_dict
 
-from quodeq.adapters.fs.report_parser import (
+from quodeq.services.ports import (
     RunInfo,
     calculate_trend,
     list_runs,

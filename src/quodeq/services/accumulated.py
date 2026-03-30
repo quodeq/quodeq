@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.adapters.fs.report_parser import (
+from quodeq.services.ports import (
     RunInfo,
     calculate_trend,
     list_runs,

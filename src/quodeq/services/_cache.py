@@ -11,7 +11,7 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Callable
 
-from quodeq.adapters.fs.report_parser import read_run_data
+from quodeq.services.ports import read_run_data
 from quodeq.core.types import DimensionResult
 
 _logger = logging.getLogger(__name__)

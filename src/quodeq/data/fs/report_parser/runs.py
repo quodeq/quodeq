@@ -1,9 +1,9 @@
 """Run discovery, date parsing, and report aggregation for filesystem reports.
 
-The ``RunStorage`` protocol defines the interface callers depend on.
 The module-level functions (``read_run_data``, ``list_runs``) provide the
-default filesystem implementation.  Alternative backends (S3, database)
-should implement ``RunStorage`` and be injected at the call site.
+default filesystem implementation.  The ``RunStorage`` protocol is defined
+in ``quodeq.services.ports`` — alternative backends (S3, database) should
+implement that protocol and be injected at the call site.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Protocol, runtime_checkable
+from typing import Any
 
 from quodeq.core.types import DimensionResult
 from quodeq.core.types.mappers import parse_dimension_result
@@ -38,24 +38,6 @@ class RunInfo:
     run_id: str
     date_iso: str | None
     date_label: str
-
-
-@runtime_checkable
-class RunStorage(Protocol):
-    """Interface for run data storage backends.
-
-    The default filesystem implementation is provided by the module-level
-    ``read_run_data`` and ``list_runs`` functions.  Alternative backends
-    (S3, database) should implement this protocol.
-    """
-
-    def read_run_data(self, project: str, run_id: str) -> list[DimensionResult]:
-        """Load all dimension evaluations and evidence for a single run."""
-        ...
-
-    def list_runs(self, project: str, *, limit: int = 0) -> list[RunInfo]:
-        """Return runs for a project, sorted newest-first by date."""
-        ...
 
 
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:

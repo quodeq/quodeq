@@ -2,7 +2,6 @@
 from quodeq.data.fs.report_parser.runs import (
     RunInfo,
     RunLookupCache,
-    RunStorage,
     build_repository_info,
     list_runs,
     read_run_data,
@@ -12,7 +11,6 @@ from quodeq.data.fs.report_parser.runs import (
 __all__ = [
     "RunInfo",
     "RunLookupCache",
-    "RunStorage",
     "build_repository_info",
     "list_runs",
     "read_run_data",

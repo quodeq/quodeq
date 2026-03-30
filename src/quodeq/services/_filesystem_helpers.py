@@ -13,7 +13,7 @@ _logger = logging.getLogger(__name__)
 from quodeq.config.paths import default_paths
 from quodeq.core.types import ProjectEntry
 from quodeq.shared.utils import _env_int
-from quodeq.adapters.fs.report_parser import (
+from quodeq.services.ports import (
     RunInfo,
     read_run_data,
     safe_read_dir,
