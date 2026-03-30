@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { listCwes } from '../../../api/index.js';
 
-const REF_TYPES = ['cwe', 'book', 'url', 'other'];
+const EDITABLE_REF_TYPES = ['cwe', 'book', 'url', 'other'];
+const BUILTIN_REF_TYPES = ['cwe', 'asvs', 'cert', 'cisq', 'wcag22'];
 
 const URL_TEMPLATES = {
   cwe: (id) => `https://cwe.mitre.org/data/definitions/${id}.html`,
@@ -131,6 +132,11 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   const ref = normalizeRef(refData);
   const isCwe = ref.type === 'cwe';
 
+  // Build type options: editable types for custom, include current type for built-in
+  const typeOptions = disabled
+    ? [...new Set([ref.type, ...BUILTIN_REF_TYPES, ...EDITABLE_REF_TYPES])]
+    : EDITABLE_REF_TYPES;
+
   const handleTypeChange = (newType) => {
     onChange(index, { ...ref, type: newType, refId: '', name: '', url: '' });
   };
@@ -152,12 +158,12 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
     <div className="ref-row">
       <select
         className="ref-type-select"
-        value={REF_TYPES.includes(ref.type) ? ref.type : 'other'}
+        value={typeOptions.includes(ref.type) ? ref.type : 'other'}
         onChange={(e) => handleTypeChange(e.target.value)}
         disabled={disabled}
         aria-label="Reference type"
       >
-        {REF_TYPES.map((t) => (
+        {typeOptions.map((t) => (
           <option key={t} value={t}>{t.toUpperCase()}</option>
         ))}
       </select>
@@ -165,14 +171,19 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
       {isCwe ? (
         <CweSelector value={ref.refId} name={ref.name} onSelect={handleCweSelect} disabled={disabled} />
       ) : (
-        <input
-          className="ref-name-input"
-          placeholder={NAME_PLACEHOLDERS[ref.type] || 'Description'}
-          value={ref.name}
-          onChange={(e) => handleFieldChange('name', e.target.value)}
-          disabled={disabled}
-          aria-label="Reference name"
-        />
+        <>
+          {ref.refId && (
+            <span className="ref-builtin-id">{ref.type.toUpperCase()}-{ref.refId}</span>
+          )}
+          <input
+            className="ref-name-input"
+            placeholder={NAME_PLACEHOLDERS[ref.type] || 'Description'}
+            value={ref.name}
+            onChange={(e) => handleFieldChange('name', e.target.value)}
+            disabled={disabled}
+            aria-label="Reference name"
+          />
+        </>
       )}
 
       <input

@@ -90,9 +90,6 @@ export default function StandardCard({ standard, onEdit, onDelete, onDuplicate }
         </div>
 
         <h3 className="standard-card-name">{standard.name}</h3>
-        {standard.type !== 'builtin' && standard.id && (
-          <p className="standard-card-id">{standard.id}</p>
-        )}
         {standard.description && (
           <p className="standard-card-description">{standard.description}</p>
         )}
