@@ -113,14 +113,6 @@
   box-shadow: 0 2px 12px color-mix(in srgb, var(--color-accent) 12%, transparent);
 }
 
-.standard-card--builtin {
-  cursor: default;
-}
-
-.standard-card--builtin:hover {
-  border-color: var(--color-border);
-  box-shadow: none;
-}
 
 .standard-card-header {
   display: flex;

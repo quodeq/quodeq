@@ -79,7 +79,7 @@ export default function StandardCard({ standard, onEdit, onDelete, onDuplicate }
 
   return (
     <>
-      <div className={`standard-card standard-card--${standard.type}`} onClick={() => standard.type !== 'builtin' && onEdit(standard.id)}>
+      <div className={`standard-card standard-card--${standard.type}`} onClick={() => onEdit(standard.id)}>
         <div className="standard-card-header">
           <span className={`standard-type-badge standard-type-badge--${standard.type}`}>
             {TYPE_LABELS[standard.type] || standard.type}
@@ -104,20 +104,25 @@ export default function StandardCard({ standard, onEdit, onDelete, onDuplicate }
         </div>
 
         <div className="standard-card-actions" onClick={(e) => e.stopPropagation()}>
-          {standard.type !== 'builtin' && (
-            <button
-              type="button"
-              className="card-action-btn"
-              onClick={() => onEdit(standard.id)}
-              title="Edit"
-            >
+          <button
+            type="button"
+            className="card-action-btn"
+            onClick={() => onEdit(standard.id)}
+            title={standard.type === 'builtin' ? 'View' : 'Edit'}
+          >
+            {standard.type === 'builtin' ? (
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            ) : (
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
               </svg>
-              Edit
-            </button>
-          )}
+            )}
+            {standard.type === 'builtin' ? 'View' : 'Edit'}
+          </button>
           <button
             type="button"
             className="card-action-btn"
