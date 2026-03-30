@@ -18,7 +18,7 @@ from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
-from quodeq.core.scoring.report import run_full
+from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import cleanup_cloned_repo, prepare_repository
 from quodeq.shared.utils import is_repo_url, project_name_from_repo, write_text
