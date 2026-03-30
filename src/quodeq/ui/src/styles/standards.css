@@ -602,6 +602,17 @@
   font-family: var(--font-sans);
 }
 
+.ref-id-input {
+  padding: 6px 10px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 6px);
+  color: var(--color-text);
+  font-size: 0.85rem;
+  max-width: 90px;
+}
+
+.ref-name-input,
 .ref-label-input,
 .ref-url-input {
   padding: 6px 10px;
@@ -615,6 +626,8 @@
   box-sizing: border-box;
 }
 
+.ref-id-input:focus,
+.ref-name-input:focus,
 .ref-label-input:focus,
 .ref-url-input:focus,
 .ref-type-select:focus {

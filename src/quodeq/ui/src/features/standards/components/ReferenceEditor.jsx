@@ -1,23 +1,58 @@
 const REF_TYPES = ['cwe', 'cve', 'owasp', 'nist', 'iso', 'rfc', 'book', 'url', 'other'];
 
-/** Normalize built-in format {source, id, name, url} to editor format {type, label, url} */
+const URL_TEMPLATES = {
+  cwe: (id) => `https://cwe.mitre.org/data/definitions/${id}.html`,
+  cve: (id) => `https://www.cve.org/CVERecord?id=CVE-${id}`,
+};
+
+/** Normalize built-in format {source, id, name, url} to editor format {type, refId, name, url} */
 function normalizeRef(ref) {
   if (ref.source && !ref.type) {
-    const id = ref.id ? `${ref.source.toUpperCase()}-${ref.id}` : '';
-    const label = ref.name ? `${id}: ${ref.name}`.trim() : id;
-    return { type: ref.source, label: label || '', url: ref.url || '' };
+    return {
+      type: ref.source,
+      refId: ref.id || '',
+      name: ref.name || '',
+      url: ref.url || '',
+    };
   }
-  return { type: ref.type || 'url', label: ref.label || ref.name || '', url: ref.url || '' };
+  return {
+    type: ref.type || 'url',
+    refId: ref.refId || ref.id || '',
+    name: ref.name || ref.label || '',
+    url: ref.url || '',
+  };
 }
 
 function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   const ref = normalizeRef(refData);
+  const showId = ['cwe', 'cve', 'owasp', 'nist', 'iso', 'rfc'].includes(ref.type);
+
+  const handleTypeChange = (newType) => {
+    const updated = { ...ref, type: newType };
+    if (URL_TEMPLATES[newType] && ref.refId) {
+      updated.url = URL_TEMPLATES[newType](ref.refId);
+    }
+    onChange(index, updated);
+  };
+
+  const handleIdChange = (newId) => {
+    const updated = { ...ref, refId: newId };
+    if (URL_TEMPLATES[ref.type] && newId) {
+      updated.url = URL_TEMPLATES[ref.type](newId);
+    }
+    onChange(index, updated);
+  };
+
+  const handleFieldChange = (field, value) => {
+    onChange(index, { ...ref, [field]: value });
+  };
+
   return (
     <div className="ref-row">
       <select
         className="ref-type-select"
         value={ref.type}
-        onChange={(e) => onChange(index, 'type', e.target.value)}
+        onChange={(e) => handleTypeChange(e.target.value)}
         disabled={disabled}
         aria-label="Reference type"
       >
@@ -25,19 +60,29 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
           <option key={t} value={t}>{t.toUpperCase()}</option>
         ))}
       </select>
+      {showId && (
+        <input
+          className="ref-id-input"
+          placeholder="ID (e.g. 209)"
+          value={ref.refId}
+          onChange={(e) => handleIdChange(e.target.value)}
+          disabled={disabled}
+          aria-label="Reference ID"
+        />
+      )}
       <input
-        className="ref-label-input"
-        placeholder="Label (e.g. CWE-798: Hardcoded Credentials)"
-        value={ref.label}
-        onChange={(e) => onChange(index, 'label', e.target.value)}
+        className="ref-name-input"
+        placeholder={showId ? 'Name (e.g. Hardcoded Credentials)' : 'Description'}
+        value={ref.name}
+        onChange={(e) => handleFieldChange('name', e.target.value)}
         disabled={disabled}
-        aria-label="Reference label"
+        aria-label="Reference name"
       />
       <input
         className="ref-url-input"
         placeholder="URL (optional)"
         value={ref.url}
-        onChange={(e) => onChange(index, 'url', e.target.value)}
+        onChange={(e) => handleFieldChange('url', e.target.value)}
         disabled={disabled}
         aria-label="Reference URL"
       />
@@ -59,13 +104,13 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
 }
 
 export default function ReferenceEditor({ refs, onChange, disabled }) {
-  const handleChange = (index, field, value) => {
-    const updated = refs.map((r, i) => i === index ? { ...normalizeRef(r), [field]: value } : r);
+  const handleChange = (index, updatedRef) => {
+    const updated = refs.map((r, i) => i === index ? updatedRef : r);
     onChange(updated);
   };
 
   const handleAdd = () => {
-    onChange([...refs, { type: 'cwe', label: '', url: '' }]);
+    onChange([...refs, { type: 'cwe', refId: '', name: '', url: '' }]);
   };
 
   const handleRemove = (index) => {
