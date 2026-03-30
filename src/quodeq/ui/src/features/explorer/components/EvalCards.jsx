@@ -1,6 +1,7 @@
 import { parseFileRef } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
+import ContextBlock from '../../../components/ContextBlock.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
@@ -52,7 +53,7 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
             </>}
           </div>
         )}
-        {v.snippet && <pre className="vlive-snippet">{v.snippet.replace(/\\n/g, '\n')}</pre>}
+        <ContextBlock context={v.context} snippet={v.snippet} />
       </div>
     </div>
   );
@@ -81,7 +82,7 @@ export function ComplianceCard({ c, principle, index }) {
             </>}
           </div>
         )}
-        {c.snippet && <pre className="vlive-snippet">{c.snippet.replace(/\\n/g, '\n')}</pre>}
+        <ContextBlock context={c.context} snippet={c.snippet} />
       </div>
     </div>
   );
