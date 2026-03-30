@@ -8,18 +8,6 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
       <h3 className="detail-form-title">Requirement</h3>
 
       <div className="form-group">
-        <label htmlFor={`req-id-${principleIndex}-${reqIndex}`}>ID</label>
-        <input
-          id={`req-id-${principleIndex}-${reqIndex}`}
-          className="form-input"
-          value={requirement.id || ''}
-          onChange={(e) => onUpdateField([...basePath, 'id'], e.target.value)}
-          disabled={!editable}
-          placeholder="e.g. REQ-001"
-        />
-      </div>
-
-      <div className="form-group">
         <label htmlFor={`req-text-${principleIndex}-${reqIndex}`}>Text</label>
         <textarea
           id={`req-text-${principleIndex}-${reqIndex}`}
