@@ -15,6 +15,7 @@ def _run_verification_pool(
     files_to_verify: list[str], manifest_path: Path,
 ) -> list[Any]:
     """Launch a fast verification pool to re-check previous findings."""
+    # Deferred import: breaks circular dependency with _verify_pool.
     from quodeq.analysis.subagents._verify_pool import run_verification_pool
     return run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
 
@@ -23,6 +24,7 @@ def _load_and_filter_previous(
     config: RunConfig, dim_id: str, evidence_dir: Path,
 ) -> list[dict]:
     """Load previous findings and apply incremental file filter if active."""
+    # Deferred import: breaks circular dependency with verify module.
     from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension
 
     prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)

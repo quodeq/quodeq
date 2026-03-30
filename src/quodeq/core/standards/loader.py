@@ -1,4 +1,8 @@
-"""Standards loaders — read ISO 25010, ASVS, and CISQ standards from JSON files."""
+"""Standards loaders — read ISO 25010, ASVS, and CISQ standards from JSON files.
+
+Direct file I/O is intentional: these loaders are the canonical path from
+on-disk standard definitions into the domain model.
+"""
 from __future__ import annotations
 from pathlib import Path
 

@@ -1,4 +1,8 @@
-"""Evaluation fingerprinting — tracks what was analyzed and when."""
+"""Evaluation fingerprinting — tracks what was analyzed and when.
+
+Uses subprocess to call ``git`` directly — fingerprinting needs the
+commit hash and repo state, which are only available from git itself.
+"""
 from __future__ import annotations
 
 import hashlib

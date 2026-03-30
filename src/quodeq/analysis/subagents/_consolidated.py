@@ -21,6 +21,7 @@ def _build_consolidated_config(
     config: "RunConfig", dimensions: list[str], files_per_agent: int,
 ) -> AnalysisConfig:
     """Build AnalysisConfig for consolidated mode."""
+    # Deferred import: breaks circular dependency between _consolidated and runner.
     from quodeq.analysis.subagents.runner import _default_subagent_model
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
