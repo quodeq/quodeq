@@ -58,21 +58,6 @@ function RootDetail({ standard, onUpdateField, editable, isNew }) {
         />
       </div>
 
-      <div className="form-group">
-        <label htmlFor="std-weight">Weight</label>
-        <input
-          id="std-weight"
-          className="form-input form-input--narrow"
-          type="number"
-          min="0"
-          max="10"
-          step="0.1"
-          value={standard.weight ?? 1.0}
-          onChange={(e) => onUpdateField(['weight'], parseFloat(e.target.value))}
-          disabled={!editable}
-        />
-      </div>
-
       {standard.managed && (
         <p className="detail-managed-notice">
           This is a managed standard. Fields are read-only to preserve upstream compatibility.
