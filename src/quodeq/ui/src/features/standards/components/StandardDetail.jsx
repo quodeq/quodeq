@@ -31,17 +31,7 @@ function RootDetail({ standard, onUpdateField, editable, isNew }) {
         />
       </div>
 
-      <div className="form-group">
-        <label htmlFor="std-id">ID <span className="form-hint">(auto-generated from name)</span></label>
-        <input
-          id="std-id"
-          className="form-input form-input--muted"
-          value={standard.id || ''}
-          onChange={(e) => onUpdateField(['id'], e.target.value)}
-          disabled={!editable}
-          placeholder="auto-generated"
-        />
-      </div>
+      <input type="hidden" value={standard.id || ''} />
 
       <div className="form-group">
         <label htmlFor="std-description">Description</label>
