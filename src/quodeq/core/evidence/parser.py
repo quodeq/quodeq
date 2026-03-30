@@ -150,13 +150,38 @@ class _GroupedJudgments:
     severity: dict[str, str]
 
 
-def _group_judgments(judgments: list[Judgment]) -> _GroupedJudgments:
+def _build_req_to_principle_map(dimension: str) -> dict[str, str]:
+    """Build a mapping from requirement IDs to principle names for custom evaluators."""
+    from quodeq.config.paths import default_paths
+    evaluators_dir = default_paths().evaluators_dir
+    if not evaluators_dir.is_dir():
+        return {}
+    path = evaluators_dir / f"{dimension}.json"
+    if not path.is_file():
+        return {}
+    try:
+        import json as _json
+        data = _json.loads(path.read_text())
+        mapping: dict[str, str] = {}
+        for principle in data.get("principles", []):
+            pname = principle.get("name", "")
+            for req in principle.get("requirements", []):
+                rid = req.get("id", "")
+                if rid and pname:
+                    mapping[rid] = pname
+        return mapping
+    except (OSError, ValueError):
+        return {}
+
+
+def _group_judgments(judgments: list[Judgment], dimension: str = "") -> _GroupedJudgments:
+    req_to_principle = _build_req_to_principle_map(dimension) if dimension else {}
     sc_violations: dict[str, list[Judgment]] = {}
     sc_compliance: dict[str, list[Judgment]] = {}
     sc_severity: dict[str, str] = {}
 
     for j in judgments:
-        principle = j.practice_id
+        principle = req_to_principle.get(j.practice_id, j.practice_id)
         if j.verdict == "violation":
             sc_violations.setdefault(principle, []).append(j)
         elif j.verdict == "compliance":
@@ -251,7 +276,7 @@ def parse_jsonl_to_evidence_by_dimension(
 
     result: dict[str, Evidence] = {}
     for dim, dim_judgments in by_dim.items():
-        grouped = _group_judgments(dim_judgments)
+        grouped = _group_judgments(dim_judgments, dimension=dim)
         principles = _build_principles(grouped, dim)
         result[dim] = Evidence(
             repository=context.repository,
@@ -274,8 +299,8 @@ def parse_jsonl_to_evidence(
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
     judgments = _read_judgments(jsonl_file, compiled_dir)
-    grouped = _group_judgments(judgments)
     dimension_name = judgments[0].dimension if judgments else ""
+    grouped = _group_judgments(judgments, dimension=dimension_name)
     principles = _build_principles(grouped, dimension_name)
 
     source_file_count = context.source_file_count
