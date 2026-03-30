@@ -105,3 +105,62 @@ def test_get_standard_builtin(service, compiled_dir):
 def test_get_standard_not_found(service):
     with pytest.raises(FileNotFoundError):
         service.get_standard("nonexistent")
+
+
+def test_create_standard(service, evaluators_dir):
+    new = {"id": "my-standard", "name": "My Standard", "description": "Test", "weight": 1.0, "source": "Me", "principles": []}
+    detail = service.create_standard(new)
+    assert detail.id == "my-standard"
+    assert detail.type == "custom"
+    assert not detail.managed
+    assert (evaluators_dir / "my-standard.json").is_file()
+
+def test_create_standard_duplicate_id_raises(service, evaluators_dir):
+    _write_custom(evaluators_dir, CUSTOM_STANDARD)
+    with pytest.raises(ValueError, match="already exists"):
+        service.create_standard({"id": "clean-arch", "name": "Dup", "description": "", "weight": 1.0, "source": "", "principles": []})
+
+def test_update_standard(service, evaluators_dir):
+    _write_custom(evaluators_dir, CUSTOM_STANDARD)
+    updated = {**CUSTOM_STANDARD, "name": "Updated Name"}
+    detail = service.update_standard("clean-arch", updated)
+    assert detail.name == "Updated Name"
+
+def test_update_managed_raises(service, evaluators_dir):
+    managed = {**CUSTOM_STANDARD, "id": "managed-one", "managed": True, "type": "community"}
+    _write_custom(evaluators_dir, managed)
+    with pytest.raises(PermissionError, match="managed"):
+        service.update_standard("managed-one", {**managed, "name": "Hacked"})
+
+def test_delete_standard(service, evaluators_dir):
+    _write_custom(evaluators_dir, CUSTOM_STANDARD)
+    service.delete_standard("clean-arch")
+    assert not (evaluators_dir / "clean-arch.json").is_file()
+
+def test_delete_managed_raises(service, evaluators_dir):
+    managed = {**CUSTOM_STANDARD, "id": "managed-one", "managed": True}
+    _write_custom(evaluators_dir, managed)
+    with pytest.raises(PermissionError, match="managed"):
+        service.delete_standard("managed-one")
+
+def test_delete_builtin_raises(service):
+    with pytest.raises(PermissionError, match="built-in"):
+        service.delete_standard("security")
+
+def test_duplicate_standard(service, evaluators_dir):
+    _write_custom(evaluators_dir, CUSTOM_STANDARD)
+    detail = service.duplicate_standard("clean-arch", new_id="clean-arch-copy")
+    assert detail.id == "clean-arch-copy"
+    assert detail.type == "custom"
+    assert not detail.managed
+    assert (evaluators_dir / "clean-arch-copy.json").is_file()
+
+def test_duplicate_builtin(service, compiled_dir):
+    compiled_dir.joinpath("security.json").write_text(json.dumps({
+        "id": "security", "name": "Security", "sources": ["iso25010"],
+        "principles": [{"name": "Confidentiality", "requirements": []}],
+    }))
+    detail = service.duplicate_standard("security", new_id="my-security")
+    assert detail.id == "my-security"
+    assert detail.type == "custom"
+    assert not detail.managed
