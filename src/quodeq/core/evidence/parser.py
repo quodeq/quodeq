@@ -95,7 +95,7 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         _logger.warning("Skipping malformed JSONL line: %s", exc)
         return None
 
-    practice_id = obj.get("p")
+    practice_id = obj.get("p") or obj.get("req")
     verdict = obj.get("t")
     if not practice_id or verdict not in ("violation", "compliance"):
         return None
