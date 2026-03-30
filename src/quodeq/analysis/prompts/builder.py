@@ -56,8 +56,13 @@ def render_compiled_standards(compiled_dir: Path, dimension: str) -> str:
         if not reqs:
             continue
         lines.append(f"### {principle['name']}")
+        if principle.get("description"):
+            lines.append(principle["description"])
         for req in reqs:
-            lines.append(f"- **{req['id']}**: {req['text']}")
+            req_line = f"- **{req['id']}**: {req['text']}"
+            if req.get("description"):
+                req_line += f" — {req['description']}"
+            lines.append(req_line)
         lines.append("")
     return "\n".join(lines)
 
@@ -75,7 +80,10 @@ def render_compact_standards(compiled_dir: Path, dimension: str) -> str:
     lines = []
     for principle in data.get("principles", []):
         for req in principle.get("requirements", []):
-            lines.append(f"{req['id']}: {req['text']}")
+            line = f"{req['id']}: {req['text']}"
+            if req.get("description"):
+                line += f" — {req['description']}"
+            lines.append(line)
     return "\n".join(lines)
 
 
