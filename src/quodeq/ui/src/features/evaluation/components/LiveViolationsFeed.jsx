@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
+import ContextBlock from '../../../components/ContextBlock.jsx';
 import { parseFileRef } from '../../../utils/formatters.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 40;
@@ -63,7 +64,7 @@ function ViolationLiveRow({ violation, index }) {
               </>}
             </div>
           )}
-          {v.snippet && <pre className="vlive-snippet">{v.snippet.replace(/\\n/g, '\n')}</pre>}
+          <ContextBlock context={v.context} snippet={v.snippet} />
         </div>
       )}
     </div>

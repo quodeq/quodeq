@@ -32,6 +32,7 @@ class Judgment:
     req_refs: list[dict] | None = None
     violation_type: str = ""
     title: str = ""
+    context: str = ""
 
 
 @dataclass

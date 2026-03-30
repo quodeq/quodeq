@@ -35,7 +35,9 @@ For each file in the verification manifest at `{manifest_path}`:
 2. Look up its findings in the manifest
 3. For each finding, check if the violation/compliance condition **still applies**
    to the current code — not just whether the line exists, but whether the
-   underlying issue is still present
+   underlying issue is still present. Each finding may include a `context` field
+   with ~10 lines of surrounding code that can help assess whether the violation
+   still applies
 4. If the finding still applies, report it using the `report_finding` tool
    with the same fields (principle, type, severity, file, line, reason, snippet)
 5. If the issue has been fixed or no longer applies, skip it silently

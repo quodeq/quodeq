@@ -1836,6 +1836,32 @@
 }
 
 
+.finding-context {
+  margin: 10px 0 0;
+  padding: 0;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--color-text);
+  white-space: pre;
+  overflow-x: auto;
+  line-height: 1.5;
+}
+
+.finding-context-line {
+  display: block;
+  padding: 0 12px;
+}
+
+.finding-context-line--highlighted {
+  display: block;
+  padding: 0 12px;
+  background: color-mix(in srgb, var(--color-accent) 15%, transparent);
+  font-weight: 600;
+}
+
 /* Detail rows (explorer detail pages) */
 .vdetail-row {
   animation: vlive-enter 200ms ease-out both;
