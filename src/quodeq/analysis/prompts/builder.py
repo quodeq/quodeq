@@ -23,15 +23,25 @@ _NO_STANDARDS_FOR_DIM = "_No compiled standards for this dimension._"
 _STANDARDS_READ_ERROR = "_Could not read compiled standards._"
 
 
-def _load_dimension_data(compiled_dir: Path, dimension: str) -> dict | None:
-    """Load compiled standards JSON for a dimension, or None on error."""
-    compiled_file = compiled_dir / f"{dimension}.json"
-    if not compiled_file.exists():
+def _load_dimension_data(
+    compiled_dir: Path,
+    dimension: str,
+    evaluators_dir: Path | None = None,
+) -> dict | None:
+    """Load compiled standards JSON for a dimension, or None on error.
+
+    Falls back to *evaluators_dir* when the compiled file does not exist and
+    *evaluators_dir* is provided (supports custom / user-supplied standards).
+    """
+    path = compiled_dir / f"{dimension}.json"
+    if not path.is_file() and evaluators_dir is not None:
+        path = evaluators_dir / f"{dimension}.json"
+    if not path.is_file():
         return None
     try:
-        return read_json(compiled_file)
+        return read_json(path)
     except (OSError, ValueError) as exc:
-        _logger.warning("Could not read compiled standards %s: %s", compiled_file, exc)
+        _logger.warning("Failed to load dimension %s: %s", dimension, exc)
         return None
 
 
