@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { listCwes } from '../../../api/index.js';
 
-const REF_TYPES = ['cwe', 'owasp', 'nist', 'iso', 'rfc', 'book', 'url', 'other'];
+const REF_TYPES = ['cwe', 'book', 'url', 'other'];
 
 const URL_TEMPLATES = {
   cwe: (id) => `https://cwe.mitre.org/data/definitions/${id}.html`,
@@ -73,10 +73,15 @@ function CweSearch({ value, onSelect, disabled }) {
   );
 }
 
+const NAME_PLACEHOLDERS = {
+  book: 'Title (e.g. Clean Architecture Ch.22)',
+  url: 'Description',
+  other: 'Description',
+};
+
 function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   const ref = normalizeRef(refData);
   const isCwe = ref.type === 'cwe';
-  const showFreeId = !isCwe && ['owasp', 'nist', 'iso', 'rfc'].includes(ref.type);
 
   const handleTypeChange = (newType) => {
     onChange(index, { ...ref, type: newType, refId: '', name: '', url: '' });
@@ -91,10 +96,6 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
     });
   };
 
-  const handleIdChange = (newId) => {
-    onChange(index, { ...ref, refId: newId });
-  };
-
   const handleFieldChange = (field, value) => {
     onChange(index, { ...ref, [field]: value });
   };
@@ -103,7 +104,7 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
     <div className="ref-row">
       <select
         className="ref-type-select"
-        value={ref.type}
+        value={REF_TYPES.includes(ref.type) ? ref.type : 'other'}
         onChange={(e) => handleTypeChange(e.target.value)}
         disabled={disabled}
         aria-label="Reference type"
@@ -113,25 +114,15 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
         ))}
       </select>
 
-      {isCwe && (
-        <CweSearch value={ref.refId} onSelect={handleCweSelect} disabled={disabled} />
-      )}
-
-      {showFreeId && (
-        <input
-          className="ref-id-input"
-          placeholder="ID"
-          value={ref.refId}
-          onChange={(e) => handleIdChange(e.target.value)}
-          disabled={disabled}
-          aria-label="Reference ID"
-        />
-      )}
-
-      {!isCwe && (
+      {isCwe ? (
+        <>
+          <CweSearch value={ref.refId} onSelect={handleCweSelect} disabled={disabled} />
+          {ref.name && <span className="ref-cwe-name" title={ref.name}>{ref.name}</span>}
+        </>
+      ) : (
         <input
           className="ref-name-input"
-          placeholder={ref.type === 'book' ? 'Title (e.g. Clean Architecture Ch.22)' : ref.type === 'url' ? 'Description' : 'Name'}
+          placeholder={NAME_PLACEHOLDERS[ref.type] || 'Description'}
           value={ref.name}
           onChange={(e) => handleFieldChange('name', e.target.value)}
           disabled={disabled}
@@ -139,13 +130,9 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
         />
       )}
 
-      {isCwe && ref.name && (
-        <span className="ref-cwe-name" title={ref.name}>{ref.name}</span>
-      )}
-
       <input
         className="ref-url-input"
-        placeholder="URL"
+        placeholder="URL (optional)"
         value={ref.url}
         onChange={(e) => handleFieldChange('url', e.target.value)}
         disabled={disabled}
