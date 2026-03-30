@@ -1,12 +1,18 @@
-"""Shared utilities: config loading, env-var accessors, and re-exports.
+"""Shared utilities — aggregation façade for config, env, and re-exports.
 
-I/O helpers live in ``_io.py``; security helpers in ``_security.py``.
-Both are re-exported here for backward compatibility.
+This module intentionally aggregates config loading, environment-variable
+accessors, URL validation, and diff display in one place.  Focused helpers
+live in dedicated submodules:
+
+* ``_io.py`` — file/JSON I/O with centralized encoding
+* ``_security.py`` — secret-detection and sanitization
+
+Everything is re-exported here for backward compatibility so callers can
+``from quodeq.shared.utils import …`` without knowing the internal split.
 """
 from __future__ import annotations
 
 import difflib
-import json
 import logging
 import os
 import sys
@@ -17,7 +23,7 @@ from pathlib import Path
 from typing import Any, Iterator
 
 # Re-export I/O helpers (canonical home: _io.py)
-from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text  # noqa: F401
+from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text, read_json  # noqa: F401
 
 # Re-export security helpers (canonical home: _security.py)
 from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive  # noqa: F401
@@ -130,19 +136,6 @@ def project_name_from_repo(repo: str) -> str:
     if is_repo_url(repo):
         return repo.split("/")[-1].replace(".git", "")
     return Path(repo).name
-
-
-# ---------------------------------------------------------------------------
-# JSON / file I/O
-# ---------------------------------------------------------------------------
-
-
-def read_json(path: Path) -> dict[str, Any]:
-    """Read and parse a JSON file, returning the parsed dict."""
-    try:
-        return json.loads(path.read_text(encoding=TEXT_ENCODING))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------

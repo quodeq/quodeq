@@ -2,6 +2,11 @@
 
 Used by both evidence_parser.py and mcp_findings.py to avoid duplicating
 ref-label formatting and compiled-standards loading logic.
+
+Pure logic (ref_label, extract_refs, extract_requirements) lives here in the
+core layer.  The ``load_*`` convenience helpers that perform file I/O are thin
+wrappers kept for backward compatibility; callers that already have loaded data
+should prefer the ``extract_*`` functions.
 """
 from __future__ import annotations
 
@@ -36,25 +41,15 @@ def ref_label(ref: dict) -> str:
     return source.upper() if source else "REF"
 
 
-def _load_compiled_data(compiled_dir: str | Path | None, dimension: str | None) -> dict | None:
-    """Load raw compiled standards JSON. Returns None on error."""
-    if not compiled_dir or not dimension:
-        return None
-    try:
-        return read_json(Path(compiled_dir) / f"{dimension}.json")
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
-        return None
+# ---------------------------------------------------------------------------
+# Pure extraction helpers — no file I/O, operate on pre-loaded data
+# ---------------------------------------------------------------------------
 
+def extract_refs(data: dict) -> dict[str, list[dict]]:
+    """Extract {req_id: [{label, url, ...}, ...]} from a compiled-standards dict.
 
-def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, list[dict]]:
-    """Load {req_id: [{label, url, ...}, ...]} from compiled standards.
-
-    Returns an empty dict on any I/O or parse error (logged as a warning).
+    This is the pure-logic counterpart of ``load_compiled_refs``.
     """
-    data = _load_compiled_data(compiled_dir, dimension)
-    if not data:
-        return {}
     lookup: dict[str, list[dict]] = {}
     for principle in data.get("principles", []):
         for req in principle.get("requirements", []):
@@ -68,6 +63,56 @@ def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -
             if refs:
                 lookup[req_id] = refs
     return lookup
+
+
+def extract_requirements(data: dict) -> dict[str, dict]:
+    """Extract {req_id: {principle, text}} from a compiled-standards dict.
+
+    This is the pure-logic counterpart of ``load_compiled_requirements``.
+    """
+    lookup: dict[str, dict] = {}
+    for principle in data.get("principles", []):
+        principle_name = principle.get("name", "")
+        for req in principle.get("requirements", []):
+            req_id = req.get("id")
+            if not req_id:
+                continue
+            lookup[req_id] = {
+                "principle": principle_name,
+                "text": req.get("text", ""),
+            }
+    return lookup
+
+
+# ---------------------------------------------------------------------------
+# I/O convenience wrappers (kept for backward-compatible call-sites)
+# ---------------------------------------------------------------------------
+
+def _load_compiled_data(compiled_dir: str | Path | None, dimension: str | None) -> dict | None:
+    """Load raw compiled standards JSON from *compiled_dir*. Returns None on error.
+
+    This is an I/O adapter — callers that already have the data should use
+    :func:`extract_refs` or :func:`extract_requirements` directly.
+    """
+    if not compiled_dir or not dimension:
+        return None
+    try:
+        return read_json(Path(compiled_dir) / f"{dimension}.json")
+    except (OSError, ValueError, UnicodeDecodeError) as exc:
+        _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
+        return None
+
+
+def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, list[dict]]:
+    """Load {req_id: [{label, url, ...}, ...]} from compiled standards on disk.
+
+    Returns an empty dict on any I/O or parse error (logged as a warning).
+    Prefer :func:`extract_refs` when data is already loaded.
+    """
+    data = _load_compiled_data(compiled_dir, dimension)
+    if not data:
+        return {}
+    return extract_refs(data)
 
 
 def load_compiled_refs_multi(
@@ -91,23 +136,13 @@ def load_compiled_requirements_multi(
 
 
 def load_compiled_requirements(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, dict]:
-    """Load {req_id: {principle, text}} from compiled standards.
+    """Load {req_id: {principle, text}} from compiled standards on disk.
 
     Used by the MCP server to auto-fill principle name and requirement text
     from the requirement ID, so the AI doesn't need to send them.
+    Prefer :func:`extract_requirements` when data is already loaded.
     """
     data = _load_compiled_data(compiled_dir, dimension)
     if not data:
         return {}
-    lookup: dict[str, dict] = {}
-    for principle in data.get("principles", []):
-        principle_name = principle.get("name", "")
-        for req in principle.get("requirements", []):
-            req_id = req.get("id")
-            if not req_id:
-                continue
-            lookup[req_id] = {
-                "principle": principle_name,
-                "text": req.get("text", ""),
-            }
-    return lookup
+    return extract_requirements(data)

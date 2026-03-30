@@ -61,6 +61,10 @@ def migrate_file(path: Path, cwe_names: dict[int, str], apply: bool) -> tuple[in
     """Patch a single evaluation JSON file, filling empty titles from CWE names.
 
     Returns (violations_patched, compliance_patched).
+
+    Note: this one-shot migration script intentionally mixes file I/O with
+    transformation logic — strict layering is not warranted for tooling
+    that runs once and is kept only for auditability.
     """
     try:
         data = json.loads(path.read_text(encoding=_TEXT_ENCODING))

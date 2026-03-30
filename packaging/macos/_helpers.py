@@ -74,6 +74,11 @@ def _find_commands_cached() -> dict[str, str | None]:
     return _find_commands_uncached(env=None)
 
 
+def clear_commands_cache() -> None:
+    """Clear the find_commands LRU cache. Useful for test isolation."""
+    _find_commands_cached.cache_clear()
+
+
 def _find_commands_uncached(env: dict[str, str] | None) -> dict[str, str | None]:
     cmds: dict[str, str | None] = {}
     for name in ("python3", "node", "claude", "quodeq"):

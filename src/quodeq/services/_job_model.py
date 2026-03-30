@@ -10,7 +10,7 @@ import re
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types import JobSnapshot
-from quodeq.engine._runner_markers import CC_MARKER_KEY
+from quodeq.shared.constants import CC_MARKER_KEY
 
 _MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain

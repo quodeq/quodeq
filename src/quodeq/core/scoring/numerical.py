@@ -47,6 +47,14 @@ _major_penalty = _penalty_reader("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
 _minor_penalty = _penalty_reader("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
 
 
+def reset_penalty_caches() -> None:
+    """Reset all penalty reader caches. Useful for test isolation."""
+    global _critical_penalty, _major_penalty, _minor_penalty
+    _critical_penalty = _penalty_reader("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
+    _major_penalty = _penalty_reader("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
+    _minor_penalty = _penalty_reader("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
+
+
 _CRITICAL_SCORE_CAP = 3
 _MAJOR_SCORE_CAP = 5
 _MAX_SCORE = 10

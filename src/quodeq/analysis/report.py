@@ -1,4 +1,9 @@
-"""Report builder — assembles scored evaluation data into JSON report files."""
+"""Report builder — assembles scored evaluation data into JSON report dicts.
+
+Pure report-building logic (``build_*`` functions) is separated from file I/O
+(``write_*`` / ``persist_*`` functions).  The I/O helpers act as infrastructure
+adapters and should not contain business logic.
+"""
 from __future__ import annotations
 
 import json
@@ -201,30 +206,34 @@ def build_dashboard_report(evidence: Evidence, scores: ScoringResult | dict) -> 
     return build_report_json(evidence.language, ev_dict, scores)
 
 
-def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: Path) -> None:
-    """Write report files."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+# ---------------------------------------------------------------------------
+# I/O adapters — persist pre-built report dicts to disk
+# ---------------------------------------------------------------------------
 
+def _persist_json(data: dict, path: Path) -> None:
+    """Write a report dict as formatted JSON to *path* (I/O adapter)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.write_text(json.dumps(data, indent=2))
+    except OSError as exc:
+        raise OSError(f"Failed to write report to {path}: {exc}") from exc
+
+
+def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: Path) -> None:
+    """Build and persist full + dashboard report files (I/O adapter)."""
     full_report = build_full_report(evidence, scores)
     dashboard_report = build_dashboard_report(evidence, scores)
 
     dim = evidence.language
     validate_path_segment(dim)
-    try:
-        (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
-        (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))
-    except OSError as exc:
-        raise OSError(f"Failed to write report files to {output_dir}: {exc}") from exc
+    _persist_json(full_report, output_dir / f"{dim}_full.json")
+    _persist_json(dashboard_report, output_dir / f"{dim}.json")
 
 
 def write_dimension_report(evidence: Evidence, scores: ScoringResult | dict, dimension: str, output_dir: Path) -> None:
-    """Write a per-dimension report file: <dimension>.json."""
+    """Build and persist a per-dimension report file (I/O adapter)."""
     validate_path_segment(dimension)
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     report = build_dashboard_report(evidence, scores)
     report["dimension"] = dimension
-    try:
-        (output_dir / f"{dimension}.json").write_text(json.dumps(report, indent=2))
-    except OSError as exc:
-        raise OSError(f"Failed to write dimension report {dimension} to {output_dir}: {exc}") from exc
+    _persist_json(report, output_dir / f"{dimension}.json")

@@ -13,7 +13,7 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
-from quodeq.services.base import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_info, log_success, log_warning
 
 if TYPE_CHECKING:
