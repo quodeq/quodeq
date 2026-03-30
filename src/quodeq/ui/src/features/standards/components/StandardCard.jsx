@@ -70,8 +70,8 @@ export default function StandardCard({ standard, onEdit, onDelete, onDuplicate }
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
 
-  const principleCount = standard.principles?.length ?? 0;
-  const requirementCount = (standard.principles || []).reduce(
+  const principleCount = standard.principleCount ?? standard.principles?.length ?? 0;
+  const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce(
     (sum, p) => sum + (p.requirements?.length ?? 0),
     0
   );
