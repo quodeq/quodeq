@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getProjectInfo } from '../../../api/index.js';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
-import { ISO_25010_URL } from '../../../constants.js';
+import DimensionSelector from './DimensionSelector.jsx';
 
 const BUTTON_GAP = '8px';
 const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_GAP, alignItems: 'center' };
@@ -75,28 +75,13 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         </div>
 
         {allDimensions.length > 0 && (
-          <div className="form-group">
-            <div className="dimension-label-row">
-              <label><a className="iso-link" href={ISO_25010_URL} target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
-              <div className="dimension-chip-actions">
-                <button type="button" className="dim-action-btn" onClick={selectAll}>All</button>
-                <button type="button" className="dim-action-btn" onClick={clearAll}>Clear</button>
-              </div>
-            </div>
-            <div className="dimension-grid">
-              {[...allDimensions].sort((a, b) => a.id.localeCompare(b.id)).map((dim) => (
-                <button
-                  key={dim.id}
-                  type="button"
-                  className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}`}
-                  title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
-                  onClick={() => toggleDim(dim.id)}
-                >
-                  {dim.id}
-                </button>
-              ))}
-            </div>
-          </div>
+          <DimensionSelector
+            allDimensions={allDimensions}
+            selectedDims={selectedDims}
+            onToggle={toggleDim}
+            onSelectAll={selectAll}
+            onClearAll={clearAll}
+          />
         )}
 
         <div style={buttonRowStyle}>
