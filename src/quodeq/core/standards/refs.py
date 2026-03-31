@@ -88,10 +88,13 @@ def extract_requirements(data: dict) -> dict[str, dict]:
 # I/O convenience wrappers (kept for backward-compatible call-sites)
 # ---------------------------------------------------------------------------
 
-def _load_compiled_data(compiled_dir: str | Path | None, dimension: str | None) -> dict | None:
+def _load_compiled_data(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> dict | None:
     """Load raw compiled standards JSON from *compiled_dir*. Returns None on error.
 
-    Falls back to ``~/.quodeq/evaluators/`` for custom evaluators.
+    Falls back to *evaluators_dir* for custom evaluators when provided.
     This is an I/O adapter — callers that already have the data should use
     :func:`extract_refs` or :func:`extract_requirements` directly.
     """
@@ -105,25 +108,28 @@ def _load_compiled_data(compiled_dir: str | Path | None, dimension: str | None) 
             except (OSError, ValueError, UnicodeDecodeError) as exc:
                 _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
                 return None
-    # Fallback: custom evaluators directory
-    from quodeq.config.paths import default_paths
-    evaluators_path = default_paths().evaluators_dir / f"{dimension}.json"
-    if evaluators_path.is_file():
-        try:
-            return read_json(evaluators_path)
-        except (OSError, ValueError, UnicodeDecodeError):
-            return None
+    # Fallback: custom evaluators directory (caller must supply it)
+    if evaluators_dir:
+        evaluators_path = evaluators_dir / f"{dimension}.json"
+        if evaluators_path.is_file():
+            try:
+                return read_json(evaluators_path)
+            except (OSError, ValueError, UnicodeDecodeError):
+                return None
     return None
 
 
-def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, list[dict]]:
+def load_compiled_refs(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> dict[str, list[dict]]:
     """Load {req_id: [{label, url, ...}, ...]} from compiled standards on disk.
 
     Backward-compat convenience wrapper that handles file I/O then delegates
     to the pure :func:`extract_refs`.  Prefer ``extract_refs`` when data is
     already loaded.
     """
-    data = _load_compiled_data(compiled_dir, dimension)
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if not data:
         return {}
     return extract_refs(data)
@@ -131,32 +137,37 @@ def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -
 
 def load_compiled_refs_multi(
     compiled_dir: str | Path | None, dimensions: list[str],
+    evaluators_dir: Path | None = None,
 ) -> dict[str, list[dict]]:
     """Load refs for multiple dimensions, merging into a single lookup."""
     merged: dict[str, list[dict]] = {}
     for dim in dimensions:
-        merged.update(load_compiled_refs(compiled_dir, dim))
+        merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir))
     return merged
 
 
 def load_compiled_requirements_multi(
     compiled_dir: str | Path | None, dimensions: list[str],
+    evaluators_dir: Path | None = None,
 ) -> dict[str, dict]:
     """Load requirements for multiple dimensions, merging into a single lookup."""
     merged: dict[str, dict] = {}
     for dim in dimensions:
-        merged.update(load_compiled_requirements(compiled_dir, dim))
+        merged.update(load_compiled_requirements(compiled_dir, dim, evaluators_dir=evaluators_dir))
     return merged
 
 
-def load_compiled_requirements(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, dict]:
+def load_compiled_requirements(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> dict[str, dict]:
     """Load {req_id: {principle, text}} from compiled standards on disk.
 
     Backward-compat convenience wrapper that handles file I/O then delegates
     to the pure :func:`extract_requirements`.  Used by the MCP server to
     auto-fill principle name and requirement text from the requirement ID.
     """
-    data = _load_compiled_data(compiled_dir, dimension)
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if not data:
         return {}
     return extract_requirements(data)

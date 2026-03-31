@@ -39,7 +39,7 @@ function EvaluateHelpSection() {
   );
 }
 
-function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange }) {
+function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange, onPersistPower }) {
   return (
     <header className="evaluate-header">
       <div className="evaluate-header-content">
@@ -69,19 +69,19 @@ function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange }) {
           <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
         </div>
       </div>
-      <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} />
+      <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} onPersist={onPersistPower} />
     </header>
   );
 }
 
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
-  const { selectedProject, analysisPower, onAnalysisPowerChange } = context;
+  const { selectedProject, analysisPower, onAnalysisPowerChange, onPersistPower } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader isRunning={job?.status === 'running'} analysisPower={analysisPower} onAnalysisPowerChange={onAnalysisPowerChange} />
+      <EvaluateHeader isRunning={job?.status === 'running'} analysisPower={analysisPower} onAnalysisPowerChange={onAnalysisPowerChange} onPersistPower={onPersistPower} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (

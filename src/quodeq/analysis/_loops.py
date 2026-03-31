@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import json
 from copy import copy
-from typing import TYPE_CHECKING, Callable
+from collections.abc import Callable
 
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared.logging import log_info, log_warning
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig, _AnalysisContext
 
 
 def check_zero_findings(
@@ -34,9 +32,9 @@ def check_zero_findings(
 
 
 def run_incremental_loop(
-    config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
-    *, process_fn: Callable[..., "Evidence | None"] | None = None,
-) -> dict[str, "Evidence"]:
+    config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
+    *, process_fn: Callable[..., Evidence | None] | None = None,
+) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis."""
     from quodeq.analysis._incremental import run_dimension_incremental
     from quodeq.analysis.runner import _process_single_dimension, _log_dimension_result
@@ -66,9 +64,9 @@ def run_incremental_loop(
 
 
 def run_per_dimension_loop(
-    config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
-    *, process_fn: Callable[..., "Evidence | None"] | None = None,
-) -> dict[str, "Evidence"]:
+    config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
+    *, process_fn: Callable[..., Evidence | None] | None = None,
+) -> dict[str, Evidence]:
     """Per-dimension loop (fallback or single-dimension)."""
     from quodeq.analysis.runner import _process_single_dimension
 

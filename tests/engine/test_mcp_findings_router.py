@@ -308,6 +308,32 @@ class TestSnippetEnrichment:
         assert written.get("context") is None
 
 
+class TestInjectableFileReader:
+    """Verify that FindingsRouter can use an injected file_reader instead of the filesystem."""
+
+    def test_enriches_via_injected_reader(self, tmp_path: Path) -> None:
+        file_contents = {"src/example.py": "line1\nline2\nline3\nline4\nline5\n"}
+
+        def fake_reader(path: Path) -> str:
+            rel = str(path).split(str(tmp_path) + "/", 1)[-1] if str(tmp_path) in str(path) else str(path)
+            if rel in file_contents:
+                return file_contents[rel]
+            raise FileNotFoundError(rel)
+
+        findings_file = tmp_path / "findings.jsonl"
+        ctx = CompiledContext(work_dir=tmp_path)
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh, context=ctx, file_reader=fake_reader)
+            router.receive({
+                "p": "P1", "t": "violation", "d": "d1",
+                "file": "src/example.py", "line": 3,
+                "w": "Issue", "reason": "Because", "severity": "minor", "req": "R-1",
+            })
+        written = json.loads(findings_file.read_text().strip())
+        assert written["snippet"] == "line3"
+        assert ">>> line3" in written["context"]
+
+
 class TestEnrichmentIntegration:
     def test_full_pipeline_enriches_and_preserves_scope(self, tmp_path: Path) -> None:
         """End-to-end: router enriches finding, JSONL is parseable by evidence parser."""

@@ -4,21 +4,18 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from quodeq.analysis._backfill import (
     BackfillContext, extract_files_from_jsonl, run_backfill_phase,
 )
 from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, save_fingerprint
 from quodeq.analysis.incremental import classify_files, carry_forward_findings
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.subagents.runner import _list_source_files
 from copy import copy
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.shared.logging import log_debug, log_info, log_warning
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig, _AnalysisContext
 
 # Re-export for backward compatibility
 _extract_files_from_jsonl = extract_files_from_jsonl
@@ -36,7 +33,6 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
     """Load dimensions data and resolve which dimensions to analyze."""
     from datetime import datetime, timezone
     from quodeq.analysis.prompts.builder import load_template
-    from quodeq.analysis.runner import _AnalysisContext
 
     dims_data = config.dimensions_data
     if dims_data is None:

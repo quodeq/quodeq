@@ -1,6 +1,7 @@
 """Violation resolution and aggregation for the filesystem action provider."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -27,15 +28,22 @@ def _max_violation_files(override: int | None = None, env: dict[str, str] | None
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     compiled_dir: Path | None = None,
+    exists_fn: Callable[[Path], bool] | None = None,
+    stat_fn: Callable[[Path], Any] | None = None,
 ) -> ViolationResponse | dict[str, Any] | None:
-    """Try successive file formats to load evaluation data for a dimension."""
+    """Try successive file formats to load evaluation data for a dimension.
+
+    *exists_fn* and *stat_fn* are injectable for testing without a real filesystem.
+    """
+    _exists = exists_fn or Path.exists
+    _stat = stat_fn or Path.stat
 
     eval_path = base / "evaluation" / f"{dimension}.json"
-    if eval_path.exists():
+    if _exists(eval_path):
         return parse_eval_from_json(eval_path, project, run_id, dimension)
 
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
-    if markdown_path.exists():
+    if _exists(markdown_path):
         try:
             content = read_text(markdown_path)
         except OSError:
@@ -45,15 +53,15 @@ def resolve_dimension_eval(
     ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
 
     evidence_path = base / "evidence" / f"{dimension}_evidence.json"
-    if evidence_path.exists():
+    if _exists(evidence_path):
         return parse_violations_from_evidence(evidence_path, ctx)
 
     jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
     stream_path = base / "evidence" / f"{dimension}_live.stream"
-    if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
+    if _exists(jsonl_path) and _stat(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(jsonl_path, stream_path, ctx, compiled_dir=compiled_dir)
 
-    if stream_path.exists():
+    if _exists(stream_path):
         return parse_violations_from_stream(stream_path, ctx)
 
     return None

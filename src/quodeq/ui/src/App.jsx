@@ -28,20 +28,20 @@ import { useProjectActions } from './hooks/useProjectActions.js';
 
 function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
   const { connected, setConnected } = serverHealth;
-  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
+  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, persistAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   return (
     <>
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
+        context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower, onPersistPower: persistAnalysisPower }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
       />
     </>
   );
 }
 
-function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
+function SettingsCase({ settings, analysisPower, setAnalysisPower, persistAnalysisPower }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
@@ -52,7 +52,7 @@ function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
         balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
         thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
       }}
-      analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
+      analysis={{ power: analysisPower, onPowerChange: setAnalysisPower, onPersist: persistAnalysisPower }}
       verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
     />
   );
@@ -113,7 +113,7 @@ const ROUTE_RENDERERS = {
   principle: (params) => <PrincipleDetailPage principle={params.principle} />,
   evalprinciple: (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
   'eval-principle-detail': (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
-  settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} />,
+  settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} persistAnalysisPower={props.evaluation.persistAnalysisPower} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
   standards: () => <StandardsPage />,
 };

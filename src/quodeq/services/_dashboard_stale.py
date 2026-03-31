@@ -4,7 +4,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable
 
-from quodeq.adapters.fs.report_parser import RunInfo
+from quodeq.services.ports import RunInfo
 from quodeq.core.types import DimensionResult
 
 _SKIP_GRADES = {"NA", "N/A", "INSUFFICIENT"}

@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from quodeq.analysis._types import RunConfig
 from quodeq.shared.logging import log_info, log_success
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig
 
 
 def _run_verification_pool(

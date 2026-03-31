@@ -1,8 +1,6 @@
 """Numerical-mode scoring helpers: deduction computation and grade drops."""
 from __future__ import annotations
 
-import os
-
 from quodeq.core.types import Deductions
 
 # Progressive drop tables: (min_type_count_inclusive, levels_to_drop).
@@ -11,48 +9,38 @@ _CRITICAL_DROP_TABLE: list[tuple[int, int]] = [(12, 3), (4, 2), (1, 1)]
 _MAJOR_DROP_TABLE: list[tuple[int, int]] = [(36, 3), (12, 2), (4, 1)]
 
 # Per-type deduction constants for numerical mode.
-# Override via env vars; values must be > 0.
-# Cached on first call to avoid repeated os.environ lookups in hot scoring path.
+# Override via configure_penalties(); defaults are used when no config is set.
 
 _DEFAULT_CRITICAL_PENALTY = 2.0
 _DEFAULT_MAJOR_PENALTY = 1.0
 _DEFAULT_MINOR_PENALTY = 0.25
 
-def _env_float(var: str, default: float, env: dict[str, str] | None = None) -> float:
-    """Read an env var as float, returning *default* if unset or non-numeric."""
-    raw = (env or os.environ).get(var)
-    if raw is None:
-        return default
-    try:
-        return float(raw)
-    except ValueError:
-        return default
+_configured_critical: float = _DEFAULT_CRITICAL_PENALTY
+_configured_major: float = _DEFAULT_MAJOR_PENALTY
+_configured_minor: float = _DEFAULT_MINOR_PENALTY
 
 
-def _penalty_reader(env_var: str, default: float):
-    """Create a lazy-cached penalty reader for a severity level."""
-    _cache: list[float] = []  # mutable container avoids nonlocal/global
-
-    def read(override: float | None = None) -> float:
-        if override is not None:
-            return override
-        if not _cache:
-            _cache.append(_env_float(env_var, default))
-        return _cache[0]
-    return read
-
-
-_critical_penalty = _penalty_reader("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
-_major_penalty = _penalty_reader("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
-_minor_penalty = _penalty_reader("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
+def configure_penalties(
+    critical: float | None = None,
+    major: float | None = None,
+    minor: float | None = None,
+) -> None:
+    """Set penalty values. Called by outer layers (e.g. config) at startup."""
+    global _configured_critical, _configured_major, _configured_minor
+    if critical is not None:
+        _configured_critical = critical
+    if major is not None:
+        _configured_major = major
+    if minor is not None:
+        _configured_minor = minor
 
 
 def reset_penalty_caches() -> None:
-    """Reset all penalty reader caches. Useful for test isolation."""
-    global _critical_penalty, _major_penalty, _minor_penalty
-    _critical_penalty = _penalty_reader("QUODEQ_CRITICAL_PENALTY", _DEFAULT_CRITICAL_PENALTY)
-    _major_penalty = _penalty_reader("QUODEQ_MAJOR_PENALTY", _DEFAULT_MAJOR_PENALTY)
-    _minor_penalty = _penalty_reader("QUODEQ_MINOR_PENALTY", _DEFAULT_MINOR_PENALTY)
+    """Reset all penalty values to defaults. Useful for test isolation."""
+    global _configured_critical, _configured_major, _configured_minor
+    _configured_critical = _DEFAULT_CRITICAL_PENALTY
+    _configured_major = _DEFAULT_MAJOR_PENALTY
+    _configured_minor = _DEFAULT_MINOR_PENALTY
 
 
 _CRITICAL_SCORE_CAP = 3
@@ -79,9 +67,9 @@ def build_deductions(
     - If the raw major count reaches 5*scale, the score is hard-capped at 5.
     - Both caps may apply simultaneously (take min).
     """
-    crit_pen = critical_penalty if critical_penalty is not None else _critical_penalty()
-    maj_pen = major_penalty if major_penalty is not None else _major_penalty()
-    min_pen = minor_penalty if minor_penalty is not None else _minor_penalty()
+    crit_pen = critical_penalty if critical_penalty is not None else _configured_critical
+    maj_pen = major_penalty if major_penalty is not None else _configured_major
+    min_pen = minor_penalty if minor_penalty is not None else _configured_minor
 
     n_critical = violation_type_counts.get("critical", 0)
     n_major = violation_type_counts.get("major", 0)

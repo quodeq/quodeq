@@ -141,7 +141,7 @@ function PoolBudgetRow({ subagents }) {
 }
 
 function AnalysisSection({ analysis, subagents }) {
-  const { power, onChange } = analysis;
+  const { power, onChange, onPersist } = analysis;
   return (
     <>
       <div className="settings-row">
@@ -151,7 +151,7 @@ function AnalysisSection({ analysis, subagents }) {
             Controls the AI model used for analysis. Higher power gives more thorough results but takes longer.
           </span>
         </div>
-        <PowerSelector value={power} onChange={onChange} />
+        <PowerSelector value={power} onChange={onChange} onPersist={onPersist} />
       </div>
       <SubagentsRow subagents={subagents} />
       <PoolBudgetRow subagents={subagents} />
@@ -245,7 +245,7 @@ function useSettingsState(aiCmd, onApplyAiCmd) {
 export default function SettingsPage({ theme, models, analysis, verification }) {
   const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
   const { aiCmd, onApplyAiCmd } = models;
-  const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
+  const { power: analysisPower, onPowerChange: onAnalysisPowerChange, onPersist: onPersistPower } = analysis;
   const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
   const { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase } = useSettingsState(aiCmd, onApplyAiCmd);
 
@@ -270,7 +270,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
               availableClients={availableClients}
             />
             <AnalysisSection
-              analysis={{ power: analysisPower, onChange: onAnalysisPowerChange }}
+              analysis={{ power: analysisPower, onChange: onAnalysisPowerChange, onPersist: onPersistPower }}
               subagents={{ max: maxSubagents, setMax: setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes }}
             />
             <VerificationSection verifyFindings={verifyFindings} onApplyVerifyFindings={onApplyVerifyFindings} />

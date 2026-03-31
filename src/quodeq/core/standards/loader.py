@@ -11,16 +11,19 @@ from quodeq.shared.validation import validate_path_segment
 
 
 def _resolve_standards_dir(standards_dir: Path | None = None, *, paths_fn=None) -> Path:
-    """Return *standards_dir* or fall back to the project default.
+    """Return *standards_dir* or fall back to *paths_fn()*.
 
-    *paths_fn* is an injectable factory (defaults to ``config.paths.default_paths``)
-    that breaks the circular dependency: engine.standards -> config.paths -> shared.utils.
+    *paths_fn* is an injectable factory that must be supplied by outer layers
+    (e.g. ``config.paths.default_paths``).  The core layer does not resolve
+    infrastructure paths itself.
     """
     if standards_dir is not None:
         return standards_dir
     if paths_fn is None:
-        from quodeq.config.paths import default_paths
-        paths_fn = default_paths
+        raise ValueError(
+            "standards_dir or paths_fn must be provided; "
+            "the core layer cannot resolve infrastructure paths"
+        )
     return paths_fn().standards_dir
 
 
@@ -35,24 +38,24 @@ def _load_json(path: Path, label: str) -> dict:
         raise FileNotFoundError(f"Cannot load {label}") from exc
 
 
-def load_dimension(dimension_id: str, standards_dir: Path | None = None) -> dict:
+def load_dimension(dimension_id: str, standards_dir: Path | None = None, *, paths_fn=None) -> dict:
     """Load an ISO 25010 dimension definition by its identifier."""
     validate_path_segment(dimension_id)
-    resolved = _resolve_standards_dir(standards_dir)
+    resolved = _resolve_standards_dir(standards_dir, paths_fn=paths_fn)
     path = resolved / "iso25010" / f"{dimension_id}.json"
     return _load_json(path, f"dimension '{dimension_id}'")
 
 
-def load_asvs_l1(standards_dir: Path | None = None) -> dict:
+def load_asvs_l1(standards_dir: Path | None = None, *, paths_fn=None) -> dict:
     """Load OWASP ASVS Level 1 requirements."""
-    resolved = _resolve_standards_dir(standards_dir)
+    resolved = _resolve_standards_dir(standards_dir, paths_fn=paths_fn)
     path = resolved / "asvs" / "level1.json"
     return _load_json(path, "ASVS L1 standards")
 
 
-def load_cisq(characteristic: str, standards_dir: Path | None = None) -> dict:
+def load_cisq(characteristic: str, standards_dir: Path | None = None, *, paths_fn=None) -> dict:
     """Load a CISQ quality characteristic definition by name."""
     validate_path_segment(characteristic)
-    resolved = _resolve_standards_dir(standards_dir)
+    resolved = _resolve_standards_dir(standards_dir, paths_fn=paths_fn)
     path = resolved / "cisq" / f"{characteristic}.json"
     return _load_json(path, f"CISQ '{characteristic}'")
