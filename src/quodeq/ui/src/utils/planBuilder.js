@@ -1,4 +1,20 @@
 import { SEVERITY_ORDER } from './formatters.js';
+
+const PLAN_SNIPPET_MAX_LINES = 15;
+const PLAN_SNIPPET_HEAD_TAIL = 5;
+
+/**
+ * Cap a code snippet for plan output — show head + tail with ellipsis for large blocks.
+ */
+function capSnippet(snippet) {
+  if (!snippet) return snippet;
+  const lines = snippet.split('\n');
+  if (lines.length <= PLAN_SNIPPET_MAX_LINES) return snippet;
+  const head = lines.slice(0, PLAN_SNIPPET_HEAD_TAIL);
+  const tail = lines.slice(-PLAN_SNIPPET_HEAD_TAIL);
+  const omitted = lines.length - 2 * PLAN_SNIPPET_HEAD_TAIL;
+  return [...head, `    ... (${omitted} more lines)`, ...tail].join('\n');
+}
 import {
   PLAN_SYSTEM_PREAMBLE,
   PLAN_OUTPUT_INSTRUCTIONS,
@@ -194,7 +210,7 @@ export function buildGroupPlanText({ title, violations, violationsBySeverity, co
     if (v.snippet) {
       entryLines.push('', '**Affected code:**');
       entryLines.push('```');
-      v.snippet.split('\n').forEach((l) => entryLines.push(l));
+      capSnippet(v.snippet).split('\n').forEach((l) => entryLines.push(l));
       entryLines.push('```');
     }
     entryLines.push('');
@@ -239,7 +255,7 @@ export function buildSingleViolationPlanText(v, title, opts = {}) {
     `**Severity:** ${v.severity || 'unknown'}`,
   ];
   if (loc) lines.push(`**File:** ${loc}`);
-  if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
+  if (v.snippet) lines.push('', '## Affected Code', '```', capSnippet(v.snippet), '```');
   if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
   const hint = getFixHint(v.req);
   if (hint) lines.push('', `**Expected fix:** ${hint}`);
