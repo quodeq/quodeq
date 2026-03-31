@@ -39,6 +39,10 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
   const [expanded, setExpanded] = useState(false);
   const scopeLabel = scope ? `Entire ${scope}` : null;
 
+  if (scope) {
+    return <span className="finding-scope-badge">{scopeLabel}</span>;
+  }
+
   if (context) {
     const allLines = context.replace(/\\n/g, '\n').split('\n');
     const needsCollapse = allLines.length > COLLAPSED_LINES + 3;
@@ -48,7 +52,6 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
 
     return (
       <>
-        {scopeLabel && <span className="finding-scope-badge">{scopeLabel}</span>}
         <pre className="finding-context">
           {renderContextLines(visibleLines, startLineNum)}
           {needsCollapse && !expanded && (
@@ -81,7 +84,6 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
 
     return (
       <>
-        {scopeLabel && <span className="finding-scope-badge">{scopeLabel}</span>}
         <pre className="finding-context">
           {renderSnippetLines(visibleLines, startLineNum)}
           {needsCollapse && !expanded && (
@@ -106,5 +108,5 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
     );
   }
 
-  return scopeLabel ? <span className="finding-scope-badge">{scopeLabel}</span> : null;
+  return null;
 }
