@@ -54,7 +54,7 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
             </>}
           </div>
         )}
-        <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} />
+        <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} endLine={v.endLine} />
       </div>
     </div>
   );
@@ -83,7 +83,7 @@ export function ComplianceCard({ c, principle, index }) {
             </>}
           </div>
         )}
-        <ContextBlock context={c.context} snippet={c.snippet} scope={c.scope} />
+        <ContextBlock context={c.context} snippet={c.snippet} scope={c.scope} line={c.line} endLine={c.endLine} />
       </div>
     </div>
   );
