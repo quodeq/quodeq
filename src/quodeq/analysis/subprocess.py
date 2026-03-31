@@ -54,6 +54,7 @@ class AnalysisConfig:
     queue_path: Path | None = None
     agent_id: str = ""
     max_files_per_agent: int = 30
+    work_dir: Path | None = None
 
 
 def _create_mcp_config(
@@ -62,6 +63,7 @@ def _create_mcp_config(
     dimension: str | None = None,
     queue_path: Path | None = None,
     agent_id: str = "",
+    work_dir: Path | None = None,
 ) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
     mcp_script = str(Path(__file__).resolve().parent / "mcp" / "findings_server.py")
@@ -72,6 +74,8 @@ def _create_mcp_config(
         mcp_args.extend(["--queue", str(queue_path.resolve())])
     if agent_id:
         mcp_args.extend(["--agent-id", agent_id])
+    if work_dir:
+        mcp_args.extend(["--work-dir", str(work_dir.resolve())])
     config = {
         "mcpServers": {
             "findings": {
@@ -157,6 +161,7 @@ class AnalysisError(RuntimeError):
 
 def _build_ai_cmd(
     prompt: str, config: AnalysisConfig,
+    work_dir: Path | None = None,
 ) -> tuple[list[str], Path | None]:
     """Build the AI CLI command line and optional MCP config path."""
     cmd = config.ai_cmd or get_ai_cmd()
@@ -170,6 +175,7 @@ def _build_ai_cmd(
         mcp_config_path = _create_mcp_config(
             config.jsonl_file, config.compiled_dir, config.dimension,
             config.queue_path, config.agent_id,
+            work_dir=config.work_dir or work_dir,
         )
         args.extend(["--mcp-config", str(mcp_config_path)])
         allowed = _MCP_TOOL_REPORT_FINDING
@@ -284,7 +290,7 @@ def run_analysis(
 ) -> None:
     """Spawn AI CLI subprocess, capturing stream-json to *stream_file*."""
     cfg = config or AnalysisConfig()
-    args, mcp_config_path = _build_ai_cmd(prompt, cfg)
+    args, mcp_config_path = _build_ai_cmd(prompt, cfg, work_dir=work_dir)
     env = _build_analysis_env(cfg.ai_cmd or get_ai_cmd())
     stream_err = Path(str(stream_file) + ".err")
 

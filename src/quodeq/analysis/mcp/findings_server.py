@@ -31,6 +31,7 @@ class CompiledContext:
     compiled_reqs: dict[str, dict] = field(default_factory=dict)
     req_to_dim: dict[str, str] = field(default_factory=dict)
     dimension: str | None = None
+    work_dir: Path | None = None
 
 
 @runtime_checkable
@@ -68,6 +69,7 @@ class FindingsRouter:
         self._dimension = ctx.dimension
         self._req_to_dim = ctx.req_to_dim
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
+        self._work_dir = ctx.work_dir
         self.counter = 0
 
     def _enrich(self, args: dict, finding: dict) -> None:
@@ -179,6 +181,7 @@ def main() -> None:
         compiled_reqs=compiled_reqs or {},
         req_to_dim=req_to_dim,
         dimension=sa.dimension,
+        work_dir=Path(sa.work_dir) if sa.work_dir else None,
     )
 
     queue: FileQueue | None = None
