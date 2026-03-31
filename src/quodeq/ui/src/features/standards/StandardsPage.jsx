@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useStandards } from './hooks/useStandards.js';
+import { useVisibleStandards } from './hooks/useVisibleStandards.js';
 import StandardsList from './components/StandardsList.jsx';
 import StandardEditor from './components/StandardEditor.jsx';
 import LibraryBrowser from './components/LibraryBrowser.jsx';
@@ -7,6 +8,7 @@ import ImportModal from './components/ImportModal.jsx';
 
 export default function StandardsPage() {
   const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards();
+  const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards();
   const [view, setView] = useState({ mode: 'list' }); // { mode: 'list' | 'edit' | 'new', standardId?: string }
   const [showLibrary, setShowLibrary] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -24,9 +26,15 @@ export default function StandardsPage() {
     refresh();
   };
 
-  const handleSaved = () => {
+  const handleSaved = (savedId) => {
+    if (savedId) addVisible(savedId);
     setView({ mode: 'list' });
     refresh();
+  };
+
+  const handleDeleteWithCleanup = async (id) => {
+    removeVisible(id);
+    await handleDelete(id);
   };
 
   if (view.mode === 'edit' || view.mode === 'new') {
@@ -75,8 +83,10 @@ export default function StandardsPage() {
         <StandardsList
           grouped={grouped}
           onEdit={handleEdit}
-          onDelete={handleDelete}
+          onDelete={handleDeleteWithCleanup}
           onDuplicate={handleDuplicate}
+          isVisible={isVisible}
+          onToggleVisibility={toggle}
         />
       )}
 

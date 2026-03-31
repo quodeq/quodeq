@@ -1,7 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 function TreeNode({ label, isSelected, onClick, onAdd, onRemove, addTitle, removeTitle, children, depth = 0, alwaysExpanded = false, defaultExpanded = true }) {
   const [expanded, setExpanded] = useState(alwaysExpanded || defaultExpanded);
+
+  useEffect(() => {
+    if (isSelected && !expanded) setExpanded(true);
+  }, [isSelected, expanded]);
   const hasChildren = children && children.length > 0;
   const showExpand = hasChildren && !alwaysExpanded;
 

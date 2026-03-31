@@ -76,34 +76,42 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
   return (
     <div className="standard-editor">
       <div className="standard-editor-toolbar">
-        <button type="button" className="editor-back-btn" onClick={onBack}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-          Back
-        </button>
+        <div className="editor-toolbar-top">
+          <button type="button" className="editor-back-btn" onClick={onBack}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+              <path d="M19 12H5M12 5l-7 7 7 7" />
+            </svg>
+            Back
+          </button>
 
-        <div className="editor-toolbar-center">
-          <h2 className="editor-title">
-            {isNew ? 'New Standard' : (standard?.name || standardId)}
-            {dirty && <span className="editor-dirty-indicator" title="Unsaved changes">*</span>}
-          </h2>
-          {standard?.managed && (
-            <span className="editor-managed-badge">managed</span>
-          )}
+          <div className="editor-toolbar-center">
+            <h2 className="editor-title">
+              {isNew ? 'New Standard' : (standard?.name || standardId)}
+              {dirty && <span className="editor-dirty-indicator" title="Unsaved changes">*</span>}
+            </h2>
+          </div>
+
+          <div className="editor-toolbar-actions">
+            {editable && (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handleSave}
+                disabled={!dirty}
+              >
+                Save
+              </button>
+            )}
+          </div>
         </div>
-
-        <div className="editor-toolbar-actions">
-          {editable && (
-            <button
-              type="button"
-              className="btn-primary"
-              onClick={handleSave}
-              disabled={!dirty}
-            >
-              Save
-            </button>
-          )}
+        <div className="editor-toolbar-stats">
+          <span className="editor-stat"><strong>{standard?.principles?.length || 0}</strong> principles</span>
+          <span className="editor-stat-dot" />
+          <span className="editor-stat"><strong>{(standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0)}</strong> requirements</span>
+          <span className="editor-stat-dot" />
+          <span className={`editor-stat-type editor-stat-type--${standard?.type || 'custom'}`}>
+            {standard?.type === 'builtin' ? 'ISO-25010' : standard?.type === 'quodeq' ? 'Quodeq' : standard?.type === 'community' ? 'Community' : 'Custom'}
+          </span>
         </div>
       </div>
 

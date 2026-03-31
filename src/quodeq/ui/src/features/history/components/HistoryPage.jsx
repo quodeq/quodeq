@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import HistoryRunRow from './HistoryRunRow.jsx';
 import HistoryChartPanel from './HistoryChartPanel.jsx';
-import HistoryDimensionPanel from './HistoryDimensionPanel.jsx';
+
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
 
@@ -18,7 +18,7 @@ function computeDeltas(trend) {
 }
 
 export default function HistoryPage({ trend, selection, availableRuns, dimensions, callbacks }) {
-  const { selectedRunId, selectedRunScore } = selection;
+  const { selectedRunId } = selection;
   const { accumulatedDimensions, lastRun } = dimensions;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
@@ -80,20 +80,11 @@ export default function HistoryPage({ trend, selection, availableRuns, dimension
           </div>
         )}
       </div>
-      <div className="history-panels-row">
-        <HistoryChartPanel
-          trend={trend}
-          selectedRunId={selectedRunId}
-          selectedRunScore={selectedRunScore}
-          onBarClick={(runId) => onRunChange(runId)}
-        />
-        <HistoryDimensionPanel
-          dimensions={accumulatedDimensions || []}
-          onBarClick={onDimensionClick}
-          runDate={lastRun?.date}
-          runId={lastRun?.runId}
-        />
-      </div>
+      <HistoryChartPanel
+        trend={trend}
+        selectedRunId={selectedRunId}
+        onBarClick={(runId) => onRunChange(runId)}
+      />
       <div className="dimensions-header">
         <h3 className="dimensions-title">Evaluations</h3>
       </div>

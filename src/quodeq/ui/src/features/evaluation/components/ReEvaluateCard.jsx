@@ -3,6 +3,7 @@ import { getProjectInfo } from '../../../api/index.js';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import DimensionSelector from './DimensionSelector.jsx';
 
+
 const BUTTON_GAP = '8px';
 const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_GAP, alignItems: 'center' };
 const flexButtonStyle = { flex: 1, marginTop: 0 };

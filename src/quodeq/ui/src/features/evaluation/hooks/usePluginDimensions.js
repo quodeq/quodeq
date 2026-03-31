@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { listPlugins, listStandards } from '../../../api/index.js';
+import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 
 export function usePluginDimensions() {
   const [allDimensions, setAllDimensions] = useState([]);
@@ -19,21 +20,26 @@ export function usePluginDimensions() {
         }
       }
 
-      // Merge custom and community standards as selectable dimensions
+      // Merge standards — set standardType for all, add new ones
       for (const s of standards) {
-        if (s.type === 'custom' || s.type === 'community') {
-          if (!seen.has(s.id)) {
-            seen.set(s.id, {
-              id: s.id,
-              label: s.name,
-              iso_25010: null,
-              standardType: s.type,
-            });
+        if (seen.has(s.id)) {
+          const existing = seen.get(s.id);
+          if (!existing.standardType) {
+            existing.standardType = s.type === 'builtin' ? null : s.type;
+            if (s.name && !existing.label) existing.label = s.name;
           }
+        } else if (s.type === 'custom' || s.type === 'community' || s.type === 'quodeq') {
+          seen.set(s.id, {
+            id: s.id,
+            label: s.name,
+            iso_25010: null,
+            standardType: s.type,
+          });
         }
       }
 
-      setAllDimensions([...seen.values()]);
+      const visibleSet = new Set(readVisibleStandardIds());
+      setAllDimensions([...seen.values()].filter((d) => visibleSet.has(d.id)));
       setDimLoadError(null);
     }).catch((err) => {
       console.warn('Failed to load dimensions:', err);
