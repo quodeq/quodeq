@@ -180,7 +180,6 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
     print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
 
-    from quodeq.config.paths import default_paths
     return RunConfig(
         src=inputs.src,
         language=inputs.language,
