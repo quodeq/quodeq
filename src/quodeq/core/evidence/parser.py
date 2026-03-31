@@ -1,9 +1,10 @@
 """Evidence parser -- converts extracted JSONL lines into V2 Evidence model."""
 from __future__ import annotations
 
-import functools
 import json
 import logging
+from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 import os
 from pathlib import Path
@@ -154,7 +155,6 @@ class _GroupedJudgments:
     severity: dict[str, str]
 
 
-@functools.lru_cache(maxsize=32)
 def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = None) -> dict[str, str]:
     """Build a mapping from requirement IDs to principle names for custom evaluators.
 
@@ -220,22 +220,38 @@ def _enrich_judgment(
         j.req_refs = resolved
 
 
-def _read_judgments(
-    jsonl_file: Path, compiled_dir: Path | None,
+def _parse_judgments(
+    lines: Iterable[str], compiled_dir: Path | None,
 ) -> list[Judgment]:
-    """Read JSONL lines and return enriched Judgment objects."""
-    if not jsonl_file.exists():
-        return []
+    """Parse JSONL lines and return enriched Judgment objects.
+
+    Accepts any iterable of strings — the caller is responsible for file I/O.
+    """
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
-    with open_text(jsonl_file) as _jf:
-        for line in _jf:
-            result = _parse_jsonl_line(line)
-            if result is not None:
-                j, llm_refs = result
-                _enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
-                judgments.append(j)
+    for line in lines:
+        result = _parse_jsonl_line(line)
+        if result is not None:
+            j, llm_refs = result
+            _enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
+            judgments.append(j)
     return judgments
+
+
+def _read_judgments(
+    jsonl_file: Path, compiled_dir: Path | None,
+    open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
+) -> list[Judgment]:
+    """Read JSONL lines from a file and return enriched Judgment objects.
+
+    *open_fn* is an injectable file opener; defaults to ``open_text`` for
+    backward compatibility.  Pass a custom opener to decouple from the filesystem.
+    """
+    if not jsonl_file.exists():
+        return []
+    opener = open_fn or open_text
+    with opener(jsonl_file) as _jf:
+        return _parse_judgments(_jf, compiled_dir)
 
 
 def _build_principles(

@@ -3,14 +3,12 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig
 
 _VERIFY_MAX_FILES_PER_AGENT = 40
 _VERIFY_MAX_TURNS = 100

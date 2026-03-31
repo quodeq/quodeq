@@ -17,6 +17,10 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
     try { return Number(localStorage.getItem(POWER_KEY)) || 2; } catch (e) { console.warn('localStorage unavailable:', e); return 2; }
   });
 
+  function persistAnalysisPower(level) {
+    try { localStorage.setItem(POWER_KEY, String(level)); } catch (e) { console.warn('localStorage unavailable:', e); }
+  }
+
   const prevJobRef = useRef(null);
   const refreshedRunRef = useRef(null);
   useEffect(() => {
@@ -48,7 +52,7 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
 
   return {
     job, jobError, liveViolations,
-    analysisPower, setAnalysisPower,
+    analysisPower, setAnalysisPower, persistAnalysisPower,
     handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
   };
 }

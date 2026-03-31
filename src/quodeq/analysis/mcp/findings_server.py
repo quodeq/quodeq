@@ -35,6 +35,12 @@ class CompiledContext:
 
 
 @runtime_checkable
+class FileReader(Protocol):
+    """Abstraction for reading source file content."""
+    def __call__(self, path: Path) -> str: ...
+
+
+@runtime_checkable
 class DeduplicationStore(Protocol):
     """Abstraction for finding deduplication state.
 
@@ -45,6 +51,10 @@ class DeduplicationStore(Protocol):
 
     def __contains__(self, key: tuple) -> bool: ...
     def add(self, key: tuple) -> None: ...
+
+
+def _default_read_file(path: Path) -> str:
+    return path.read_text()
 
 
 class FindingsRouter:
@@ -61,6 +71,7 @@ class FindingsRouter:
         output_fh: TextIO,
         context: CompiledContext | None = None,
         seen_store: DeduplicationStore | None = None,
+        file_reader: FileReader | None = None,
     ):
         ctx = context or CompiledContext()
         self._fh = output_fh
@@ -70,6 +81,7 @@ class FindingsRouter:
         self._req_to_dim = ctx.req_to_dim
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
         self._work_dir = ctx.work_dir
+        self._read_file = file_reader or _default_read_file
         self.counter = 0
 
     _CONTEXT_LINES = 5
@@ -84,7 +96,7 @@ class FindingsRouter:
             return
         try:
             full_path = self._work_dir / file_path
-            source_lines = full_path.read_text().splitlines()
+            source_lines = self._read_file(full_path).splitlines()
         except (OSError, UnicodeDecodeError):
             finding.setdefault("snippet", "")
             finding.setdefault("context", "")

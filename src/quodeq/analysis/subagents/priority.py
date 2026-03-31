@@ -94,13 +94,28 @@ def compute_dimension_boost(
 
 def compute_fan_in(
     files: list[str], src: Path, language: str,
+    read_file=None,
 ) -> dict[str, int]:
-    """Layer 3: count how many files import each file."""
+    """Layer 3: count how many files import each file.
+
+    *read_file* is an injectable ``(Path) -> str | None`` reader; defaults
+    to reading from the filesystem.
+    """
     config = load_priority_config()
     lang_key = _LANG_ALIASES.get(language.lower(), language.lower())
     patterns = config.get("import_patterns", {}).get(lang_key)
     if not patterns:
         return {}
+
+    def _default_read(path: Path) -> str | None:
+        if not path.exists():
+            return None
+        try:
+            return path.read_text(errors="ignore")
+        except OSError:
+            return None
+
+    _read = read_file or _default_read
 
     # Build filename lookup: stem → relative path
     stem_to_file: dict[str, str] = {}
@@ -112,12 +127,8 @@ def compute_fan_in(
     counts: dict[str, int] = {}
 
     for f in files:
-        full_path = src / f
-        if not full_path.exists():
-            continue
-        try:
-            content = full_path.read_text(errors="ignore")
-        except OSError:
+        content = _read(src / f)
+        if content is None:
             continue
         for line in content.splitlines():
             target = _match_import_target(line, compiled, stem_to_file, f)

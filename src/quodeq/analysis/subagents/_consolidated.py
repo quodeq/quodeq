@@ -2,8 +2,9 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.core.evidence.model import Evidence
@@ -12,9 +13,6 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.shared.logging import log_info, log_warning
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig
 
 
 def _build_consolidated_config(

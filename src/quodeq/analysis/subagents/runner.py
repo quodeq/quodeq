@@ -4,8 +4,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
+from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
@@ -15,9 +16,6 @@ from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
 from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_info, log_success, log_warning
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig
 
 _MAX_FILES_PER_AGENT = 30
 _MAX_FILES_PER_AGENT_CAP = 50
@@ -149,10 +147,17 @@ def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tu
 def _collect_evidence(
     config: RunConfig, dim_id: str, evidence_dir: Path,
     results: list[Any], ctx: Any, files: list[str] | None = None,
+    save_fingerprint_fn=None,
 ) -> Evidence:
-    """Deduplicate JSONL, count files read, save fingerprint, and parse into Evidence."""
-    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
+    """Deduplicate JSONL, count files read, save fingerprint, and parse into Evidence.
+
+    *save_fingerprint_fn* is an injectable ``(fingerprint, dir) -> None``
+    for persistence; defaults to ``analysis.fingerprint.save_fingerprint``.
+    """
+    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint as _default_save
     from quodeq.engine._runner_markers import cleanup_stream
+
+    _save = save_fingerprint_fn or _default_save
 
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
@@ -166,7 +171,7 @@ def _collect_evidence(
     # Save fingerprint so next run can carry forward unchanged-file findings
     if files:
         fp = build_fingerprint(config.src, files, dim_id, config.standards_dir)
-        save_fingerprint(fp, evidence_dir)
+        _save(fp, evidence_dir)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     ev = parse_jsonl_to_evidence(

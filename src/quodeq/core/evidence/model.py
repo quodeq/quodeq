@@ -109,27 +109,40 @@ class Evidence:
         }
 
     def to_evidence_dict(self) -> dict:
-        """Convert to the dict shape that run_scoring() expects."""
-        principles = {}
-        for key, pe in self.principles.items():
-            principles[key] = {
-                "display_name": pe.display_name,
-                "weight": pe.weight,
-                "violations": pe.violations,
-                "compliance": pe.compliance,
-                "metrics": pe.metrics,
-            }
-        result = {
-            "repository": self.repository,
-            "discipline": self.language.title(),
-            "date": self.date,
-            "source_file_count": self.source_file_count,
-            "files_read": self.files_read,
-            "coverage_pct": self.coverage_pct,
-            "meta": self.meta,
-            "principles": principles,
-            "evidence_summary": self.summary(),
+        """Convert to the dict shape that run_scoring() expects.
+
+        Delegates to the module-level :func:`evidence_to_scoring_dict`
+        so that serialization logic is not coupled to the entity itself.
+        """
+        return evidence_to_scoring_dict(self)
+
+
+def evidence_to_scoring_dict(evidence: Evidence) -> dict:
+    """Serialize an Evidence instance into the dict shape that run_scoring() expects.
+
+    Kept as a standalone function so adapter/engine layers can call it
+    without depending on the entity method.
+    """
+    principles = {}
+    for key, pe in evidence.principles.items():
+        principles[key] = {
+            "display_name": pe.display_name,
+            "weight": pe.weight,
+            "violations": pe.violations,
+            "compliance": pe.compliance,
+            "metrics": pe.metrics,
         }
-        if self.module:
-            result["module"] = self.module
-        return result
+    result = {
+        "repository": evidence.repository,
+        "discipline": evidence.language.title(),
+        "date": evidence.date,
+        "source_file_count": evidence.source_file_count,
+        "files_read": evidence.files_read,
+        "coverage_pct": evidence.coverage_pct,
+        "meta": evidence.meta,
+        "principles": principles,
+        "evidence_summary": evidence.summary(),
+    }
+    if evidence.module:
+        result["module"] = evidence.module
+    return result

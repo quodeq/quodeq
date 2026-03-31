@@ -6,14 +6,10 @@ import time
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
-
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.incremental import identify_backfill_files
 from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_debug, log_info
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig, _AnalysisContext
 
 
 _MIN_BACKFILL_BUDGET_S = 60
