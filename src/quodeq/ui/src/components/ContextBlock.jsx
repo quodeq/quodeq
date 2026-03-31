@@ -33,23 +33,25 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
   const [expanded, setExpanded] = useState(false);
 
   if (scope) {
-    const fileLines = snippet ? snippet.replace(/\\n/g, '\n').split('\n') : [];
-    const lineCount = fileLines.length;
+    const codeText = snippet || context || '';
+    const codeLines = codeText ? codeText.replace(/\\n/g, '\n').split('\n') : [];
+    const hasCode = codeLines.length > 0;
+    const startNum = line || 1;
     return (
       <>
         <div
-          className={`scope-bar${expanded ? ' scope-bar--expanded' : ''}`}
-          role="button"
-          tabIndex={0}
-          onClick={() => setExpanded(e => !e)}
-          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(ex => !ex); } }}
+          className={`scope-bar${expanded && hasCode ? ' scope-bar--expanded' : ''}`}
+          role={hasCode ? 'button' : undefined}
+          tabIndex={hasCode ? 0 : undefined}
+          onClick={hasCode ? () => setExpanded(e => !e) : undefined}
+          onKeyDown={hasCode ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(ex => !ex); } } : undefined}
         >
-          <span className="scope-bar-label">Entire {scope}{lineCount > 0 ? ` \u00b7 ${lineCount} lines` : ''}</span>
-          <span className="scope-bar-action">{expanded ? 'Hide \u25be' : 'View \u25b8'}</span>
+          <span className="scope-bar-label">Entire {scope}{hasCode ? ` \u00b7 ${codeLines.length} lines` : ''}</span>
+          {hasCode && <span className="scope-bar-action">{expanded ? 'Hide \u25be' : 'View \u25b8'}</span>}
         </div>
-        {expanded && lineCount > 0 && (
+        {expanded && hasCode && (
           <pre className="finding-context scope-bar-code">
-            {fileLines.map((text, i) => renderSnippetLine(text, i + 1))}
+            {codeLines.map((text, i) => renderSnippetLine(text, startNum + i))}
           </pre>
         )}
       </>
