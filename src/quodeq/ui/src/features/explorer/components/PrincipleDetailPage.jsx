@@ -4,6 +4,7 @@ import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
+import ContextBlock from '../../../components/ContextBlock.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function buildViolationPlanText(v, principleName) {
@@ -55,7 +56,7 @@ function ViolationCard({ v, principleName, index }) {
             </>}
           </div>
         )}
-        {v.snippet && <pre className="vlive-snippet">{v.snippet.replace(/\\n/g, '\n')}</pre>}
+        <ContextBlock snippet={v.snippet} line={v.line} endLine={v.endLine} />
       </div>
     </div>
   );
