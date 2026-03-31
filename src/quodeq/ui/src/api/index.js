@@ -173,3 +173,28 @@ export async function listCwes() {
 export async function importFromLibrary(file) {
   return request('/standards/library/import', { method: 'POST', body: JSON.stringify({ file }) });
 }
+export async function importStandard(data, force = false) {
+  const BASE = import.meta.env.VITE_API_BASE || '/api';
+  const res = await fetch(`${BASE}/standards/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data, force }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 409) return { ...body, _conflict: true };
+  if (!res.ok) throw new Error(body.error || `Import failed: ${res.status}`);
+  return body;
+}
+export async function downloadStandard(standardId) {
+  const detail = await getStandard(standardId);
+  const { managed, type, origin, originHash, principleCount, requirementCount, ...portable } = detail;
+  const blob = new Blob([JSON.stringify(portable, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${standardId}.quodeq`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

@@ -169,6 +169,56 @@ class StandardsService:
         self._write_json(new_path, payload)
         return self._load_detail(new_path)
 
+    def import_from_file(self, data: dict, force: bool = False) -> dict:
+        """Import an evaluator from parsed file data.
+
+        Returns a dict with keys:
+        - ``status``: ``"imported"`` or ``"conflict"``
+        - ``detail``: :class:`StandardDetail` (on success) or ``None``
+        - ``existing``: existing :class:`StandardMeta` (on conflict) or ``None``
+        - ``warnings``: list of injection scan warnings
+        """
+        from quodeq.services.import_validator import validate_import, scan_injection
+
+        validation = validate_import(data)
+        if not validation["valid"]:
+            raise ValueError("; ".join(validation["errors"]))
+
+        cleaned = validation["data"]
+        standard_id = cleaned["id"]
+        warnings = scan_injection(cleaned)
+
+        path = self._evaluators_dir / f"{standard_id}.json"
+        if path.is_file() and not force:
+            existing = self._read_json(path)
+            principles = existing.get("principles", [])
+            req_count = sum(len(p.get("requirements", [])) for p in principles)
+            return {
+                "status": "conflict",
+                "detail": None,
+                "existing": StandardMeta(
+                    id=existing["id"], name=existing.get("name", existing["id"]),
+                    description=existing.get("description", ""),
+                    weight=existing.get("weight", 1.0), source=existing.get("source", ""),
+                    type=existing.get("type", "custom"), managed=existing.get("managed", False),
+                    origin=existing.get("origin"), origin_hash=existing.get("origin_hash"),
+                    principle_count=len(principles), requirement_count=req_count,
+                ),
+                "warnings": warnings,
+            }
+
+        if path.is_file() and force:
+            existing_data = self._read_json(path)
+            if existing_data.get("managed", False):
+                raise PermissionError(f"Cannot overwrite managed standard '{standard_id}'")
+
+        self._evaluators_dir.mkdir(parents=True, exist_ok=True)
+        payload = {**cleaned, "type": "custom", "managed": False, "origin": None, "origin_hash": None}
+        self._write_json(path, payload)
+        detail = self._load_detail(path)
+
+        return {"status": "imported", "detail": detail, "existing": None, "warnings": warnings}
+
     def _is_builtin_id(self, standard_id: str) -> bool:
         try:
             data = self._read_json(self._dimensions_file)

@@ -3,11 +3,13 @@ import { useStandards } from './hooks/useStandards.js';
 import StandardsList from './components/StandardsList.jsx';
 import StandardEditor from './components/StandardEditor.jsx';
 import LibraryBrowser from './components/LibraryBrowser.jsx';
+import ImportModal from './components/ImportModal.jsx';
 
 export default function StandardsPage() {
   const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards();
   const [view, setView] = useState({ mode: 'list' }); // { mode: 'list' | 'edit' | 'new', standardId?: string }
   const [showLibrary, setShowLibrary] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   const handleEdit = (standardId) => {
     setView({ mode: 'edit', standardId });
@@ -50,6 +52,13 @@ export default function StandardsPage() {
         <div className="standards-page-header-actions">
           <button
             type="button"
+            className="btn-secondary"
+            onClick={() => setShowImport(true)}
+          >
+            Import
+          </button>
+          <button
+            type="button"
             className="btn-primary"
             onClick={handleNewStandard}
           >
@@ -75,6 +84,12 @@ export default function StandardsPage() {
         <LibraryBrowser
           onClose={() => setShowLibrary(false)}
           onImported={() => { setShowLibrary(false); refresh(); }}
+        />
+      )}
+      {showImport && (
+        <ImportModal
+          onClose={() => setShowImport(false)}
+          onImported={() => { setShowImport(false); refresh(); }}
         />
       )}
     </div>
