@@ -9,7 +9,7 @@ function SectionHeader({ title, count }) {
   );
 }
 
-function StandardsSection({ title, standards, onEdit, onDelete, onDuplicate }) {
+function StandardsSection({ title, standards, onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility }) {
   if (standards.length === 0) return null;
   return (
     <section className="standards-section">
@@ -22,6 +22,8 @@ function StandardsSection({ title, standards, onEdit, onDelete, onDuplicate }) {
             onEdit={onEdit}
             onDelete={onDelete}
             onDuplicate={onDuplicate}
+            isVisible={isVisible(s.id)}
+            onToggleVisibility={onToggleVisibility}
           />
         ))}
       </div>
@@ -29,10 +31,10 @@ function StandardsSection({ title, standards, onEdit, onDelete, onDuplicate }) {
   );
 }
 
-export default function StandardsList({ grouped, onEdit, onDelete, onDuplicate }) {
-  const total = (grouped.builtin?.length ?? 0) + (grouped.community?.length ?? 0) + (grouped.custom?.length ?? 0);
+export default function StandardsList({ grouped, onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility }) {
+  const all = [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || [])];
 
-  if (total === 0) {
+  if (all.length === 0) {
     return (
       <div className="standards-empty">
         <p>No standards found. Import from the library or create a custom standard.</p>
@@ -43,25 +45,13 @@ export default function StandardsList({ grouped, onEdit, onDelete, onDuplicate }
   return (
     <div className="standards-list">
       <StandardsSection
-        title="ISO 25010"
-        standards={grouped.builtin || []}
+        title="Standards"
+        standards={all}
         onEdit={onEdit}
         onDelete={onDelete}
         onDuplicate={onDuplicate}
-      />
-      <StandardsSection
-        title="Community"
-        standards={grouped.community || []}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onDuplicate={onDuplicate}
-      />
-      <StandardsSection
-        title="Custom Standards"
-        standards={grouped.custom || []}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onDuplicate={onDuplicate}
+        isVisible={isVisible}
+        onToggleVisibility={onToggleVisibility}
       />
     </div>
   );

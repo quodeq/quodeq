@@ -120,6 +120,10 @@
   gap: 8px;
 }
 
+.standard-card-header .eye-toggle-btn {
+  margin-left: auto;
+}
+
 .standard-type-badge {
   display: inline-block;
   padding: 2px 8px;
@@ -133,6 +137,11 @@
 .standard-type-badge--builtin {
   background: color-mix(in srgb, var(--color-accent) 12%, transparent);
   color: var(--color-accent);
+}
+
+.standard-type-badge--quodeq {
+  background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
+  color: var(--color-warning, #f59e0b);
 }
 
 .standard-type-badge--community {
@@ -193,6 +202,7 @@
 
 .standard-card-actions {
   display: flex;
+  justify-content: flex-end;
   gap: 6px;
   padding-top: 8px;
   border-top: 1px solid var(--color-border);
@@ -244,13 +254,53 @@
 
 .standard-editor-toolbar {
   display: flex;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
   padding: 12px 20px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-surface);
   flex-shrink: 0;
 }
+
+.editor-toolbar-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.editor-toolbar-stats {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.editor-stat {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.editor-stat strong {
+  color: var(--color-text-secondary);
+}
+
+.editor-stat-dot {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--color-border);
+}
+
+.editor-stat-type {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.editor-stat-type--builtin { color: var(--color-accent); }
+.editor-stat-type--quodeq { color: var(--color-warning, #f59e0b); }
+.editor-stat-type--community { color: var(--primitive-green-700, #4ade80); }
+.editor-stat-type--custom { color: var(--color-text-muted); }
 
 .editor-back-btn {
   display: inline-flex;
@@ -589,6 +639,30 @@
   border-radius: var(--radius-md, 6px);
   font-size: 0.82rem;
   color: var(--color-text-muted);
+}
+
+.detail-empty-state {
+  text-align: center;
+  padding: 32px 20px;
+  margin-top: 16px;
+  color: var(--color-text-muted);
+}
+
+.detail-empty-state svg {
+  opacity: 0.3;
+  margin-bottom: 12px;
+}
+
+.detail-empty-state h4 {
+  margin: 0 0 8px 0;
+  font-size: 0.95rem;
+  color: var(--color-text-secondary);
+}
+
+.detail-empty-state p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.5;
 }
 
 /* ── Reference Editor ────────────────────────────────────── */
@@ -1166,4 +1240,60 @@
 
 .dim-chip-badge--community {
   background: var(--primitive-green-400, #4caf7d);
+}
+
+/* ── Visibility toggle ────────────────────────────────────── */
+
+.standard-card--visible {
+  border-color: color-mix(in srgb, var(--color-accent) 30%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 8%, var(--color-surface));
+}
+
+.standard-card--hidden {
+  border-color: var(--color-border);
+  background: color-mix(in srgb, var(--color-text) 1%, var(--color-surface));
+}
+
+.standard-card--hidden .standard-card-name,
+.standard-card--hidden .standard-card-description,
+.standard-card--hidden .standard-card-counts,
+.standard-card--hidden .standard-type-badge,
+.standard-card--hidden .standard-managed-badge,
+.standard-card--hidden .standard-card-actions {
+  opacity: 0.35;
+}
+
+.standard-card--hidden:hover .standard-card-name,
+.standard-card--hidden:hover .standard-card-description,
+.standard-card--hidden:hover .standard-card-counts,
+.standard-card--hidden:hover .standard-type-badge,
+.standard-card--hidden:hover .standard-managed-badge,
+.standard-card--hidden:hover .standard-card-actions {
+  opacity: 0.55;
+}
+
+.eye-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 32px;
+  border-radius: 16px;
+  border: 1px solid color-mix(in srgb, var(--color-text-muted) 40%, transparent);
+  background: color-mix(in srgb, var(--color-text-muted) 8%, transparent);
+  cursor: pointer;
+  padding: 0;
+  color: var(--color-text-muted);
+  transition: all 0.15s;
+}
+
+.eye-toggle-btn:hover {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}
+
+.eye-toggle-btn--on {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
 }

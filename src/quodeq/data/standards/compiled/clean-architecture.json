@@ -1,0 +1,371 @@
+{
+  "id": "clean-architecture",
+  "name": "Clean Architecture",
+  "description": "Evaluates adherence to Robert C. Martin's Clean Architecture principles",
+  "managed": true,
+  "type": "quodeq",
+  "source": "Robert C. Martin",
+  "weight": 1.0,
+  "principles": [
+    {
+      "name": "Dependency Rule",
+      "description": "Source code dependencies must point inward. Inner layers must not know about outer layers",
+      "requirements": [
+        {
+          "id": "CLEA-DEP-01",
+          "text": "Source code dependencies must point inward only",
+          "description": "Outer layers (frameworks, UI, DB) may depend on inner layers (use cases, entities), never the reverse. An import from entities/ into controllers/ is fine; an import from controllers/ into entities/ is a violation",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DEP-02",
+          "text": "Entities must not import from use case or adapter layers",
+          "description": "Domain entities should have zero imports from application or infrastructure code. Check import statements in entity files — they should only reference other entities, value objects, or standard library types",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DEP-03",
+          "text": "Use cases must not reference framework-specific types",
+          "description": "Interactors/use cases should operate on plain domain objects, not framework classes. No HttpRequest, HttpResponse, DbSession, or framework DI decorators in use case files",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DEP-04",
+          "text": "Data crosses boundaries through simple transfer objects",
+          "description": "Data passed between layers must use DTOs or plain data structures, not objects that carry framework dependencies. A use case returns a plain result object, not a Django QuerySet or an ORM model instance",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DEP-05",
+          "text": "Inner layers must define interfaces that outer layers implement",
+          "description": "Dependency inversion: the use case layer defines a repository interface, the database layer implements it. The interface file lives in the use case layer, the implementation lives in the infrastructure layer",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DEP-06",
+          "text": "No transitive framework dependencies in core layers",
+          "description": "Even indirect imports of framework packages in entities or use cases violate the rule. If entity A imports utility B, and utility B imports Flask, then entity A has a transitive framework dependency",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DEP-07",
+          "text": "Configuration and environment variables are not read in inner layers",
+          "description": "Entities and use cases must not read from os.environ, config files, or settings modules directly. Configuration is injected from the outermost layer through constructor parameters or interfaces",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DEP-08",
+          "text": "Inner layers must not instantiate outer layer classes directly",
+          "description": "A use case must not do 'new PostgresRepository()' or 'new EmailService()' — it receives these through dependency injection. Direct instantiation of infrastructure classes in use cases breaks the dependency rule",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Separation of Concerns",
+      "description": "Each layer (entities, use cases, adapters, frameworks) has a distinct responsibility",
+      "requirements": [
+        {
+          "id": "CLEA-SEP-01",
+          "text": "Each layer has a single well-defined responsibility",
+          "description": "Entities hold business rules, use cases hold application logic, adapters handle format conversion, frameworks handle infrastructure. A file that does format conversion AND business logic violates separation",
+          "refs": []
+        },
+        {
+          "id": "CLEA-SEP-02",
+          "text": "UI logic must not exist in use case or entity layers",
+          "description": "Formatting, rendering decisions, user interaction handling, response status codes, and HTML/JSON construction belong exclusively in the presentation layer. A use case returning 'HTTP 404' is a violation",
+          "refs": []
+        },
+        {
+          "id": "CLEA-SEP-03",
+          "text": "Data access logic must be confined to the adapter layer",
+          "description": "SQL queries, API calls, file I/O, and ORM operations must not leak into use cases or entities. If a use case file contains 'SELECT', '.query()', or 'fetch()', data access logic has leaked",
+          "refs": []
+        },
+        {
+          "id": "CLEA-SEP-04",
+          "text": "No layer should bypass adjacent layers",
+          "description": "A controller must not directly access an entity without going through a use case. A use case must not directly write to a database without going through a repository interface. Skipped layers create hidden coupling",
+          "refs": []
+        },
+        {
+          "id": "CLEA-SEP-05",
+          "text": "Error handling respects layer boundaries",
+          "description": "Domain exceptions are thrown in entities/use cases, caught and translated in adapters. A use case must not catch SqlException (infrastructure) and an adapter must not throw InsufficientFundsError (domain). Each layer handles errors appropriate to its abstraction level",
+          "refs": []
+        },
+        {
+          "id": "CLEA-SEP-06",
+          "text": "Logging and monitoring instrumentation lives in the outer layers",
+          "description": "Entities and use cases must not import logging frameworks or emit metrics directly. Logging is a cross-cutting concern handled by adapters, middleware, or decorators wrapping use cases — not embedded in business logic",
+          "refs": []
+        },
+        {
+          "id": "CLEA-SEP-07",
+          "text": "Serialization and deserialization belong in the adapter layer",
+          "description": "JSON parsing, XML mapping, protobuf encoding — all format conversion belongs in adapters. Entities and use cases operate on domain objects, never on raw strings, dicts, or byte arrays from external formats",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Independence from Frameworks",
+      "description": "The architecture does not depend on the existence of any library or framework",
+      "requirements": [
+        {
+          "id": "CLEA-FRM-01",
+          "text": "Core business logic must not import framework packages",
+          "description": "Use case and entity files should have zero imports from web frameworks, ORMs, or DI containers. Check the import section of every file in domain/ and usecases/ — any framework import is a violation",
+          "refs": []
+        },
+        {
+          "id": "CLEA-FRM-02",
+          "text": "Framework-specific annotations must not appear on domain entities",
+          "description": "No ORM decorators (@Entity, @Column), serialization attributes (@JsonProperty), validation decorators (@NotNull), or framework markers on core domain classes. These belong on infrastructure mapping classes",
+          "refs": []
+        },
+        {
+          "id": "CLEA-FRM-03",
+          "text": "Swapping a framework should require changes only in the outermost layer",
+          "description": "Replacing Express with Fastify, Django with Flask, or Spring with Micronaut should not touch use cases or entities. If it does, the framework has penetrated too deep",
+          "refs": []
+        },
+        {
+          "id": "CLEA-FRM-04",
+          "text": "Framework base classes must not be extended by domain objects",
+          "description": "Entities must not extend Django Model, Spring JpaRepository base, or ActiveRecord. Domain objects are plain classes — ORM mapping is infrastructure's job, done through separate mapper classes or configuration",
+          "refs": []
+        },
+        {
+          "id": "CLEA-FRM-05",
+          "text": "Framework lifecycle hooks must not contain business logic",
+          "description": "Methods like @PostConstruct, on_save(), before_create() must not contain domain rules. They may trigger use cases, but the business logic itself lives in the domain layer",
+          "refs": []
+        },
+        {
+          "id": "CLEA-FRM-06",
+          "text": "Dependency injection is a mechanism, not an architecture",
+          "description": "DI container annotations (@Inject, @Autowired, @Service) must not appear in entities or use cases. Use constructor injection with plain parameters — the DI container wires things in the composition root (outermost layer)",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Independence from UI",
+      "description": "The UI can change without changing the rest of the system",
+      "requirements": [
+        {
+          "id": "CLEA-UI-01",
+          "text": "Use cases must not reference UI components or view models",
+          "description": "No imports of React components, view controllers, template engines, or UI state management in the application layer. A use case that knows about a ViewModel or a Component has UI coupling",
+          "refs": []
+        },
+        {
+          "id": "CLEA-UI-02",
+          "text": "Business logic must produce the same results regardless of presentation",
+          "description": "A use case should work identically whether called from a web app, CLI, mobile app, or test harness. If the use case's behavior changes based on the calling context, it has UI awareness it shouldn't",
+          "refs": []
+        },
+        {
+          "id": "CLEA-UI-03",
+          "text": "No UI state management in the domain layer",
+          "description": "Redux stores, view models, reactive state (RxJS observables, LiveData), or UI-specific caching must not exist in entities or use cases. These are presentation concerns",
+          "refs": []
+        },
+        {
+          "id": "CLEA-UI-04",
+          "text": "Response formatting is an adapter concern, not a use case concern",
+          "description": "Use cases return domain results. Converting them to JSON, HTML, or GraphQL responses happens in the adapter/presenter layer. A use case that builds a JSON string or sets HTTP headers has UI coupling",
+          "refs": []
+        },
+        {
+          "id": "CLEA-UI-05",
+          "text": "Validation of user input is distinct from domain validation",
+          "description": "Input format validation (is this a valid email format, is this field present) belongs in the adapter/controller. Domain validation (can this order be placed, is this account active) belongs in entities. Don't mix them",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Independence from Database",
+      "description": "Business rules are not bound to a specific database",
+      "requirements": [
+        {
+          "id": "CLEA-DB-01",
+          "text": "Entities must not use database-specific types or annotations",
+          "description": "No ORM decorators, column definitions, or database engine types on domain objects. A domain entity with @Column, @Table, or field(db_index=True) has database coupling",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DB-02",
+          "text": "Repository interfaces defined in the use case layer, implemented in the adapter layer",
+          "description": "The domain defines what data operations it needs; infrastructure decides how to fulfill them. The interface says 'findActiveOrdersByCustomer()', the implementation writes the SQL",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DB-03",
+          "text": "Changing database technology should not require changes to business rules",
+          "description": "Moving from PostgreSQL to MongoDB, or from SQL to in-memory storage, should only affect adapter implementations. If use case code changes when the database changes, the abstraction is leaking",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DB-04",
+          "text": "Database schema details must not drive domain model design",
+          "description": "Entity field names, relationships, and structure should reflect the domain — not the database schema. If your entity has a 'fk_customer_id' field or a 'order_tbl' name, the database is driving the model",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DB-05",
+          "text": "Transaction management is an outer layer concern",
+          "description": "Use cases define the logical unit of work, but the actual transaction begin/commit/rollback mechanism lives in the adapter or application service layer. No @Transactional on entities, no manual connection.commit() in use cases",
+          "refs": []
+        },
+        {
+          "id": "CLEA-DB-06",
+          "text": "Query optimization and database-specific features stay in the adapter",
+          "description": "Indexes, caching strategies, query hints, stored procedures, database-specific functions — these are all adapter implementation details. The domain interface says what it needs, the adapter optimizes how to deliver it",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Testability",
+      "description": "Business rules can be tested without UI, database, web server, or any external element",
+      "requirements": [
+        {
+          "id": "CLEA-TES-01",
+          "text": "Business rules testable without infrastructure",
+          "description": "Entity and use case tests must run without database connections, HTTP servers, or file systems. If a domain test requires Docker, a running database, or network access, the architecture has a testability problem",
+          "refs": []
+        },
+        {
+          "id": "CLEA-TES-02",
+          "text": "All dependencies injected through interfaces",
+          "description": "No hard-coded instantiation of infrastructure classes inside use cases. Every external dependency (repository, gateway, service) is received through a constructor parameter typed as an interface",
+          "refs": []
+        },
+        {
+          "id": "CLEA-TES-03",
+          "text": "No static or global state that prevents isolated testing",
+          "description": "Each test must be able to run independently without shared mutable state. Singletons, module-level caches, and global registries that persist between tests are testability violations",
+          "refs": []
+        },
+        {
+          "id": "CLEA-TES-04",
+          "text": "Use cases testable with in-memory implementations",
+          "description": "Repository and gateway interfaces must be simple enough to implement as in-memory fakes in a few lines. If creating a test double for a repository requires hundreds of lines, the interface is too complex",
+          "refs": []
+        },
+        {
+          "id": "CLEA-TES-05",
+          "text": "Domain tests verify behavior, not implementation details",
+          "description": "Tests assert on domain outcomes ('order is shipped', 'balance decreased by X') — not on internal state or method call sequences. Tests that break when refactoring internals without changing behavior are testing the wrong thing",
+          "refs": []
+        },
+        {
+          "id": "CLEA-TES-06",
+          "text": "Each layer can be tested in isolation",
+          "description": "Entity tests need no mocks. Use case tests mock only the outer boundary interfaces. Adapter tests verify integration with the actual infrastructure. If testing one layer requires setting up another, the layers are too coupled",
+          "refs": []
+        },
+        {
+          "id": "CLEA-TES-07",
+          "text": "Test speed reflects architectural boundaries",
+          "description": "Domain and use case tests should execute in milliseconds (no I/O). Adapter tests may be slower (real DB, real HTTP). If the 'fast' tests are slow, infrastructure has likely leaked inward",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Entity Design",
+      "description": "Entities are the innermost layer containing enterprise-wide business rules that are independent of any single application",
+      "requirements": [
+        {
+          "id": "CLEA-ENT-01",
+          "text": "Entities encapsulate enterprise-wide business rules",
+          "description": "Entities represent core business concepts and rules that would exist even if no application existed — they are not application-specific. An entity's rules are true across all applications that use it",
+          "refs": []
+        },
+        {
+          "id": "CLEA-ENT-02",
+          "text": "Entities are plain objects with no framework dependencies",
+          "description": "No ORM base classes, framework annotations, serialization decorators, or infrastructure imports in entity code. An entity file's imports should only reference other domain types and standard library",
+          "refs": []
+        },
+        {
+          "id": "CLEA-ENT-03",
+          "text": "Entity logic is reusable across different applications",
+          "description": "The same entity classes could be used by a web app, CLI tool, batch job, or microservice without modification. If the entity only works within one framework or application, it's too coupled",
+          "refs": []
+        },
+        {
+          "id": "CLEA-ENT-04",
+          "text": "Entities validate their own invariants",
+          "description": "Business rule validation lives inside the entity, not scattered across use cases or controllers. An entity must reject invalid state transitions at the point of mutation, not rely on external code to check first",
+          "refs": []
+        },
+        {
+          "id": "CLEA-ENT-05",
+          "text": "Entities are not anemic data structures",
+          "description": "An entity with only getters/setters and no behavior is a data structure, not a domain entity. Business logic that operates on entity data but lives in a service indicates an anemic model — move the logic into the entity",
+          "refs": []
+        },
+        {
+          "id": "CLEA-ENT-06",
+          "text": "Entities do not depend on use case layer abstractions",
+          "description": "Entities must not import or reference interfaces defined in the use case layer (like repositories or output ports). The dependency points inward: use cases depend on entities, never the reverse",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Use Case Encapsulation",
+      "description": "Each use case represents a single application-specific action, orchestrating entities and defining clear input/output boundaries",
+      "requirements": [
+        {
+          "id": "CLEA-USE-01",
+          "text": "Each use case represents a single application action",
+          "description": "One class or function per use case — no god-objects handling multiple unrelated operations. 'PlaceOrderUseCase', 'CancelOrderUseCase' — not 'OrderService' with 20 methods",
+          "refs": []
+        },
+        {
+          "id": "CLEA-USE-02",
+          "text": "Use cases define explicit input and output data structures",
+          "description": "Request and response models are defined at the use case boundary, not passed through from external layers. The use case declares what it needs (PlaceOrderRequest) and what it returns (PlaceOrderResult) — not raw dicts or framework objects",
+          "refs": []
+        },
+        {
+          "id": "CLEA-USE-03",
+          "text": "Use cases orchestrate entities, not replace their logic",
+          "description": "Business rules belong in entities; use cases coordinate the flow between entities and external interfaces. If a use case contains complex conditionals about business state, that logic should move into an entity method",
+          "refs": []
+        },
+        {
+          "id": "CLEA-USE-04",
+          "text": "Use cases must not contain presentation or persistence logic",
+          "description": "No HTML rendering, SQL queries, API response formatting, JSON serialization, or file I/O inside use case code. If a use case file imports json, requests, or an ORM, something belongs in the adapter layer",
+          "refs": []
+        },
+        {
+          "id": "CLEA-USE-05",
+          "text": "Use case dependencies are abstract interfaces, not concrete implementations",
+          "description": "Repositories, gateways, and presenters are referenced as interfaces defined in the use case layer. Constructor parameters are typed as interfaces, never as concrete infrastructure classes",
+          "refs": []
+        },
+        {
+          "id": "CLEA-USE-06",
+          "text": "Use cases are application-specific, not enterprise-wide",
+          "description": "Unlike entities (which hold universal business rules), use cases express what this specific application does. 'PlaceWebOrder' is application-specific even if the Order entity is shared across apps",
+          "refs": []
+        },
+        {
+          "id": "CLEA-USE-07",
+          "text": "Use case output does not include more data than the caller needs",
+          "description": "A use case returns only the data needed by its consumer — not entire entity graphs. If a use case returns a full Order object but the caller only needs the order ID and status, the boundary is leaking internal structure",
+          "refs": []
+        }
+      ]
+    }
+  ]
+}

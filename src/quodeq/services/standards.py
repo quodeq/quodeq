@@ -48,11 +48,12 @@ class StandardsService:
         out: list[StandardMeta] = []
         for dim in data.get("applies", []):
             p_count, r_count = self._count_compiled(dim["id"])
+            dim_type = dim.get("type", "builtin")
             out.append(StandardMeta(
-                id=dim["id"], name=dim.get("iso_25010", dim["id"]),
+                id=dim["id"], name=dim.get("iso_25010") or dim.get("name", dim["id"]),
                 description=f'{dim.get("source", "Built-in")} standard',
                 weight=dim.get("weight", 1.0), source=dim.get("source", ""),
-                type="builtin", managed=True, origin=None, origin_hash=None,
+                type=dim_type, managed=True, origin=None, origin_hash=None,
                 principle_count=p_count, requirement_count=r_count,
             ))
         return out
@@ -112,12 +113,14 @@ class StandardsService:
 
     def _load_builtin_detail(self, path: Path, standard_id: str) -> StandardDetail:
         data = self._read_json(path)
+        dim_type = data.get("type", "builtin")
+        source = data.get("source", "") or ", ".join(data.get("sources", []))
         return StandardDetail(
             id=standard_id, name=data.get("name", standard_id),
-            description=f"Built-in {data.get('name', standard_id)} standard",
+            description=f"{data.get('name', standard_id)} standard",
             weight=self._get_builtin_weight(standard_id),
-            source=", ".join(data.get("sources", [])),
-            type="builtin", managed=True, origin=None, origin_hash=None,
+            source=source,
+            type=dim_type, managed=True, origin=None, origin_hash=None,
             principles=data.get("principles", []),
         )
 

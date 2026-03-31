@@ -1,0 +1,509 @@
+{
+  "id": "domain-driven-design",
+  "name": "Domain-Driven Design",
+  "description": "Evaluates adherence to Eric Evans' Domain-Driven Design tactical and strategic patterns",
+  "managed": true,
+  "type": "quodeq",
+  "source": "Eric Evans / Vaughn Vernon",
+  "weight": 1.0,
+  "principles": [
+    {
+      "name": "Ubiquitous Language",
+      "description": "The codebase must reflect the language of the business domain, shared between developers and domain experts",
+      "requirements": [
+        {
+          "id": "DDD-UBQ-01",
+          "text": "Class, method, and variable names must use domain terminology",
+          "description": "Code identifiers should match the vocabulary used by domain experts — not technical jargon, database column names, or generic terms like 'data', 'info', 'manager'",
+          "refs": []
+        },
+        {
+          "id": "DDD-UBQ-02",
+          "text": "No translation layers between domain concepts and code names",
+          "description": "If the business calls it an 'Invoice', the code must call it 'Invoice' — not 'BillingRecord', 'PaymentDocument', or 'bill_tbl'",
+          "refs": []
+        },
+        {
+          "id": "DDD-UBQ-03",
+          "text": "Domain operations named as verbs from the business process",
+          "description": "Methods like 'placeOrder', 'approveApplication', 'cancelReservation' — not 'processData', 'handleRequest', 'doAction'",
+          "refs": []
+        },
+        {
+          "id": "DDD-UBQ-04",
+          "text": "Avoid ambiguous or overloaded terms across bounded contexts",
+          "description": "If 'Account' means different things in billing vs authentication, each context must have its own explicit model — no shared ambiguous types",
+          "refs": []
+        },
+        {
+          "id": "DDD-UBQ-05",
+          "text": "No generic suffixes that obscure domain meaning",
+          "description": "Classes named 'OrderManager', 'UserHelper', 'DataProcessor', 'PaymentHandler' signal missing domain language — name them after what they actually do in the domain (e.g., 'OrderFulfillmentService', 'PricingPolicy')",
+          "refs": []
+        },
+        {
+          "id": "DDD-UBQ-06",
+          "text": "Boolean methods and properties express domain predicates",
+          "description": "'isOverdue()', 'canBeShipped()', 'hasReachedCreditLimit()' — not 'checkStatus()', 'getFlag()', 'isValid()' without context",
+          "refs": []
+        },
+        {
+          "id": "DDD-UBQ-07",
+          "text": "Enums and constants represent domain concepts, not technical states",
+          "description": "OrderStatus.AWAITING_PAYMENT, ShipmentState.IN_TRANSIT — not Status.ACTIVE, State.STEP_2, Type.TYPE_A",
+          "refs": []
+        },
+        {
+          "id": "DDD-UBQ-08",
+          "text": "Exceptions describe domain violations, not technical failures",
+          "description": "'InsufficientFundsException', 'OrderAlreadyShippedException' — not 'InvalidStateException', 'BusinessRuleException', 'Error400'",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Bounded Contexts",
+      "description": "The system is divided into explicit bounded contexts, each with its own model and clear boundaries",
+      "requirements": [
+        {
+          "id": "DDD-CTX-01",
+          "text": "Each bounded context has its own domain model with no shared mutable state",
+          "description": "Contexts do not share entity classes, database tables, or domain objects directly — each owns its data and schema",
+          "refs": []
+        },
+        {
+          "id": "DDD-CTX-02",
+          "text": "Context boundaries are explicit in the codebase structure",
+          "description": "Separate modules, packages, or services per context — not mixed domain concepts in a single module. Look for top-level directories or packages named after business capabilities (ordering/, shipping/, billing/)",
+          "refs": []
+        },
+        {
+          "id": "DDD-CTX-03",
+          "text": "Communication between contexts uses well-defined integration patterns",
+          "description": "Contexts interact through published interfaces, events, or anti-corruption layers — not direct imports of another context's internals. Imports crossing context boundaries are a violation",
+          "refs": []
+        },
+        {
+          "id": "DDD-CTX-04",
+          "text": "No domain model leakage across context boundaries",
+          "description": "One context's entities, value objects, or aggregates must not appear in another context's code. A shipping context importing an ordering context's Order entity is a boundary violation",
+          "refs": []
+        },
+        {
+          "id": "DDD-CTX-05",
+          "text": "Context mapping relationships are documented or enforced",
+          "description": "Relationships between contexts (shared kernel, customer-supplier, conformist, anti-corruption layer) should be explicit in code structure or documentation",
+          "refs": []
+        },
+        {
+          "id": "DDD-CTX-06",
+          "text": "Shared data between contexts is exchanged through integration events or DTOs, not shared entities",
+          "description": "If ordering needs customer data, it receives a lightweight DTO or event payload — it does not import the customer context's Customer entity",
+          "refs": []
+        },
+        {
+          "id": "DDD-CTX-07",
+          "text": "Each context has independent persistence",
+          "description": "Contexts should not share database tables or schemas. If they use the same database, each context owns its own tables with no foreign keys crossing context boundaries",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Entities",
+      "description": "Objects defined by their identity rather than their attributes, with continuity through their lifecycle",
+      "requirements": [
+        {
+          "id": "DDD-ENT-01",
+          "text": "Entities have a unique, immutable identity",
+          "description": "Each entity must have a stable identifier (ID) that distinguishes it from all other entities, even if all other attributes are identical. The ID field must not have a setter",
+          "refs": []
+        },
+        {
+          "id": "DDD-ENT-02",
+          "text": "Entity equality is based on identity, not attribute values",
+          "description": "Two entities with the same ID are the same entity regardless of attribute differences — equals/hashCode must be identity-based, not field-by-field comparison",
+          "refs": []
+        },
+        {
+          "id": "DDD-ENT-03",
+          "text": "Entities encapsulate and enforce their own business rules",
+          "description": "Validation, state transitions, and invariant enforcement belong inside the entity — not in services, controllers, or external validators. If a service method checks entity state before mutating it, that logic should move into the entity",
+          "refs": []
+        },
+        {
+          "id": "DDD-ENT-04",
+          "text": "Entities must not expose mutable internal state directly",
+          "description": "State changes happen through domain methods that enforce invariants — no public setters that bypass business rules. 'order.addLineItem(product, qty)' not 'order.setItems(list)'",
+          "refs": []
+        },
+        {
+          "id": "DDD-ENT-05",
+          "text": "Entity constructors enforce creation invariants",
+          "description": "An entity must be valid from the moment of creation — constructors or factory methods must reject invalid initial state. No 'new Order()' followed by 'order.setCustomer()' — required fields go in the constructor",
+          "refs": []
+        },
+        {
+          "id": "DDD-ENT-06",
+          "text": "Entities must not be anemic data holders",
+          "description": "An entity with only getters/setters and no behavior is an anemic domain model violation. Domain logic scattered in services that manipulate entity fields externally is a code smell",
+          "refs": []
+        },
+        {
+          "id": "DDD-ENT-07",
+          "text": "State transitions are explicit domain operations with guard clauses",
+          "description": "'order.ship()' checks that order is paid and has items — it doesn't silently accept any transition. Invalid transitions throw domain exceptions, not generic errors",
+          "refs": []
+        },
+        {
+          "id": "DDD-ENT-08",
+          "text": "Entities must not depend on infrastructure or persistence concerns",
+          "description": "No ORM annotations, serialization decorators, database column mappings, or framework base classes on entity code. Persistence mapping belongs in the infrastructure layer",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Value Objects",
+      "description": "Immutable objects defined by their attributes, with no conceptual identity",
+      "requirements": [
+        {
+          "id": "DDD-VAL-01",
+          "text": "Value objects are immutable after creation",
+          "description": "No setters, no mutation methods — any change produces a new instance. 'price.withDiscount(10)' returns a new Money, does not mutate the original",
+          "refs": []
+        },
+        {
+          "id": "DDD-VAL-02",
+          "text": "Value object equality is based on attribute values",
+          "description": "Two value objects with identical attributes are equal — equals/hashCode must compare all fields, not identity/reference. Money(100, 'USD') == Money(100, 'USD')",
+          "refs": []
+        },
+        {
+          "id": "DDD-VAL-03",
+          "text": "Domain concepts that lack identity must be modeled as value objects, not entities",
+          "description": "Money, addresses, date ranges, email addresses, coordinates, phone numbers, measurement units — these are values, not things with lifecycles. If you wouldn't track its history, it's a value object",
+          "refs": []
+        },
+        {
+          "id": "DDD-VAL-04",
+          "text": "Value objects must be self-validating",
+          "description": "A value object cannot exist in an invalid state — construction must fail if inputs are invalid (e.g., negative money, malformed email, end date before start date). No 'isValid()' method needed — invalid instances simply cannot exist",
+          "refs": []
+        },
+        {
+          "id": "DDD-VAL-05",
+          "text": "Primitive obsession must be avoided for domain concepts",
+          "description": "Use value objects instead of raw strings, ints, or floats for domain concepts — 'EmailAddress' not 'string', 'Money' not 'float', 'CustomerId' not 'int'. Passing raw primitives between methods loses domain meaning and validation",
+          "refs": []
+        },
+        {
+          "id": "DDD-VAL-06",
+          "text": "Value objects encapsulate domain-specific operations",
+          "description": "Money knows how to add, subtract, and convert currencies. DateRange knows if it overlaps another range. Don't put this logic in services that operate on raw fields",
+          "refs": []
+        },
+        {
+          "id": "DDD-VAL-07",
+          "text": "Value objects replace multi-field groupings that always travel together",
+          "description": "If you always pass (street, city, zip, country) together, that's an Address value object. If you always pass (amount, currency), that's Money. Repeated field groups without a wrapping type signal a missing value object",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Aggregates",
+      "description": "Clusters of entities and value objects with a root entity that controls access and enforces consistency boundaries",
+      "requirements": [
+        {
+          "id": "DDD-AGG-01",
+          "text": "Each aggregate has a single root entity",
+          "description": "External objects may only hold references to the aggregate root — never to internal entities or value objects. If external code can reach OrderLineItem without going through Order, the aggregate boundary is broken",
+          "refs": []
+        },
+        {
+          "id": "DDD-AGG-02",
+          "text": "Aggregate boundaries enforce transactional consistency",
+          "description": "All invariants within an aggregate are enforced in a single transaction — cross-aggregate consistency is eventual. A single database transaction must not span multiple aggregates",
+          "refs": []
+        },
+        {
+          "id": "DDD-AGG-03",
+          "text": "Aggregates reference other aggregates by identity only",
+          "description": "An aggregate must not hold direct object references to another aggregate — use IDs to reference across aggregate boundaries. 'order.customerId' not 'order.customer' (where customer is a full aggregate)",
+          "refs": []
+        },
+        {
+          "id": "DDD-AGG-04",
+          "text": "Aggregates are kept small and focused",
+          "description": "Large aggregates cause contention and performance issues — prefer smaller aggregates with eventual consistency between them. An aggregate with more than 3-4 entity types inside it is likely too large",
+          "refs": []
+        },
+        {
+          "id": "DDD-AGG-05",
+          "text": "Only the aggregate root exposes public modification methods",
+          "description": "All state changes to internal entities go through the root — external code must not reach inside to modify child entities directly. 'order.removeLineItem(itemId)' not 'order.getLineItems().remove(item)'",
+          "refs": []
+        },
+        {
+          "id": "DDD-AGG-06",
+          "text": "Deleting an aggregate root cascades to all internal objects",
+          "description": "Internal entities and value objects have no independent lifecycle — they exist only within their aggregate. Orphaned child records in the database indicate a broken aggregate boundary",
+          "refs": []
+        },
+        {
+          "id": "DDD-AGG-07",
+          "text": "Aggregate invariants are checked on every state change",
+          "description": "After any mutation, the aggregate must verify its internal consistency rules hold — e.g., order total matches sum of line items, reservation dates don't overlap. Invariant checks must not be optional or deferred",
+          "refs": []
+        },
+        {
+          "id": "DDD-AGG-08",
+          "text": "Loading an aggregate loads the entire aggregate, not partial projections",
+          "description": "Repositories return complete aggregates with all internal state. If you need partial data for reads, use a separate read model (CQRS) — don't break aggregate consistency by loading partial state for writes",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Domain Services",
+      "description": "Stateless operations that belong to the domain but don't naturally fit within an entity or value object",
+      "requirements": [
+        {
+          "id": "DDD-SVC-01",
+          "text": "Domain services are stateless",
+          "description": "A domain service must not hold mutable state between invocations — it receives inputs, performs logic, and returns results. No instance fields that accumulate state across calls",
+          "refs": []
+        },
+        {
+          "id": "DDD-SVC-02",
+          "text": "Domain services express domain operations that span multiple aggregates",
+          "description": "Operations that don't belong to a single entity (e.g., transferring funds between accounts, matching a buyer with a seller) belong in a domain service",
+          "refs": []
+        },
+        {
+          "id": "DDD-SVC-03",
+          "text": "Domain services use ubiquitous language in their interface",
+          "description": "Method names must be meaningful domain verbs — 'transferFunds', 'calculateShippingCost', 'matchOrder' — not 'processTransaction', 'handleData', 'execute'",
+          "refs": []
+        },
+        {
+          "id": "DDD-SVC-04",
+          "text": "Domain services must not contain infrastructure concerns",
+          "description": "No database access, HTTP calls, or file I/O — only pure domain logic. Infrastructure is injected through interfaces. If a domain service imports a database client, it's misplaced",
+          "refs": []
+        },
+        {
+          "id": "DDD-SVC-05",
+          "text": "Avoid overuse of services — prefer rich domain models",
+          "description": "If logic can live in an entity or value object, it should — domain services are for cross-aggregate or truly stateless operations only. A codebase with many domain services and anemic entities has inverted the model",
+          "refs": []
+        },
+        {
+          "id": "DDD-SVC-06",
+          "text": "Domain services are distinct from application services",
+          "description": "Domain services contain business rules (pricing calculation, eligibility check). Application services orchestrate (load aggregate, call domain service, save, dispatch event). Don't mix orchestration with business logic in one class",
+          "refs": []
+        },
+        {
+          "id": "DDD-SVC-07",
+          "text": "Domain services operate on domain objects, not primitives or DTOs",
+          "description": "A domain service receives and returns entities, value objects, or domain types — not raw strings, maps, or infrastructure DTOs. 'calculateDiscount(Order, CustomerTier)' not 'calculateDiscount(double, String)'",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Repositories",
+      "description": "Abstractions that provide collection-like access to aggregates, hiding persistence details from the domain",
+      "requirements": [
+        {
+          "id": "DDD-REP-01",
+          "text": "Repositories provide collection-semantics for aggregate access",
+          "description": "The interface should feel like an in-memory collection (add, remove, findById, findBySpec) — not like a database API (executeQuery, commit, flush, getSession)",
+          "refs": []
+        },
+        {
+          "id": "DDD-REP-02",
+          "text": "Only aggregate roots have repositories",
+          "description": "Internal entities within an aggregate are accessed through the root — they must not have their own repository. A LineItemRepository is a violation; line items come from OrderRepository",
+          "refs": []
+        },
+        {
+          "id": "DDD-REP-03",
+          "text": "Repository interfaces are defined in the domain layer",
+          "description": "The domain declares what persistence operations it needs — the infrastructure layer provides the implementation. The interface file lives next to domain entities, not next to database code",
+          "refs": []
+        },
+        {
+          "id": "DDD-REP-04",
+          "text": "Repositories return fully reconstituted aggregates",
+          "description": "The domain receives complete aggregate objects — not partial DTOs, raw database rows, or lazy-loading proxies that leak persistence concerns. If an aggregate is returned half-loaded, the boundary is broken",
+          "refs": []
+        },
+        {
+          "id": "DDD-REP-05",
+          "text": "Repository implementations must not leak persistence details into the domain",
+          "description": "No ORM sessions, query builders, connection objects, or database transactions visible to domain code. The domain calls 'repository.save(order)' and doesn't know if it's SQL, NoSQL, or a file",
+          "refs": []
+        },
+        {
+          "id": "DDD-REP-06",
+          "text": "Repository methods accept domain-meaningful query criteria",
+          "description": "'findByCustomerAndStatus(customerId, OrderStatus.ACTIVE)' — not 'findByQuery(\"SELECT * FROM orders WHERE...\")'. Query criteria should be expressed in domain terms",
+          "refs": []
+        },
+        {
+          "id": "DDD-REP-07",
+          "text": "Repositories must not perform business logic",
+          "description": "A repository persists and retrieves — it does not validate, calculate, or enforce business rules. If the repository is checking business conditions before saving, that logic belongs in the domain",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Domain Events",
+      "description": "Explicit representation of something significant that happened in the domain, enabling decoupled communication",
+      "requirements": [
+        {
+          "id": "DDD-EVT-01",
+          "text": "Significant domain state changes are captured as domain events",
+          "description": "Events like 'OrderPlaced', 'PaymentReceived', 'AccountSuspended' are first-class objects — not implicit side effects buried in method bodies. If a state change triggers reactions elsewhere, it should raise an event",
+          "refs": []
+        },
+        {
+          "id": "DDD-EVT-02",
+          "text": "Domain events are immutable and named in past tense",
+          "description": "Events represent facts that already happened — 'OrderShipped' not 'ShipOrder'. They must not be modified after creation. All fields should be final/readonly",
+          "refs": []
+        },
+        {
+          "id": "DDD-EVT-03",
+          "text": "Domain events contain only the data needed to describe what happened",
+          "description": "Include the aggregate ID, relevant changed values, and timestamp — not entire entity graphs, infrastructure details, or data the consumer can look up themselves",
+          "refs": []
+        },
+        {
+          "id": "DDD-EVT-04",
+          "text": "Cross-aggregate side effects are triggered through domain events, not direct calls",
+          "description": "When an order is placed, inventory adjustment happens via an event handler — not by the order aggregate directly calling inventory code. Direct cross-aggregate method calls create tight coupling",
+          "refs": []
+        },
+        {
+          "id": "DDD-EVT-05",
+          "text": "Domain events are part of the domain model, not infrastructure",
+          "description": "Event classes live in the domain layer — the event bus/dispatcher is infrastructure, but the events themselves are domain concepts defined alongside the aggregates that emit them",
+          "refs": []
+        },
+        {
+          "id": "DDD-EVT-06",
+          "text": "Event handlers must not modify the emitting aggregate",
+          "description": "An event handler for 'OrderPlaced' must not reach back and modify the Order that emitted it. If the Order needs to change, that's a separate command, not a handler side effect",
+          "refs": []
+        },
+        {
+          "id": "DDD-EVT-07",
+          "text": "Events carry enough context to be processed without additional queries when possible",
+          "description": "If a handler needs the order total to proceed, include it in the event — don't force the handler to query the order aggregate. Minimize coupling between event producers and consumers",
+          "refs": []
+        },
+        {
+          "id": "DDD-EVT-08",
+          "text": "Domain events are distinct from integration events",
+          "description": "Internal domain events (within a bounded context) may carry rich domain types. Integration events (crossing context boundaries) should carry only primitive/serializable data and be versioned for evolution",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Anti-Corruption Layer",
+      "description": "A translation layer that protects the domain model from external systems and legacy code",
+      "requirements": [
+        {
+          "id": "DDD-ACL-01",
+          "text": "External system models must not pollute the domain model",
+          "description": "Third-party API responses, legacy database schemas, and external DTOs must be translated at the boundary — never used directly in domain code. Importing a Stripe SDK type in your domain layer is a violation",
+          "refs": []
+        },
+        {
+          "id": "DDD-ACL-02",
+          "text": "Integration adapters translate between external and domain models",
+          "description": "Adapter classes map external data structures to domain objects and vice versa — the domain never sees the external format. A PaymentGatewayAdapter converts Stripe responses to domain Payment objects",
+          "refs": []
+        },
+        {
+          "id": "DDD-ACL-03",
+          "text": "External API changes must not require domain model changes",
+          "description": "If a third-party API changes its response format, only the anti-corruption layer adapters need updating. If a Stripe API change forces you to modify your Payment entity, the ACL is missing or broken",
+          "refs": []
+        },
+        {
+          "id": "DDD-ACL-04",
+          "text": "Legacy system integration uses explicit translation, not shared models",
+          "description": "When integrating with legacy code, create adapters that translate — do not force the new domain to conform to legacy structures or naming",
+          "refs": []
+        },
+        {
+          "id": "DDD-ACL-05",
+          "text": "Anti-corruption layer handles data format differences and semantic mismatches",
+          "description": "If the external system uses 'client' where your domain uses 'customer', or uses cents where you use Money objects, the ACL translates — the domain code never adapts to external conventions",
+          "refs": []
+        },
+        {
+          "id": "DDD-ACL-06",
+          "text": "Each external system integration has its own dedicated adapter",
+          "description": "Don't create a generic 'ExternalServiceAdapter' that handles multiple systems — each integration gets its own adapter with its own translation logic. This prevents one external change from affecting other integrations",
+          "refs": []
+        }
+      ]
+    },
+    {
+      "name": "Application Layer",
+      "description": "Thin orchestration layer that coordinates domain objects to fulfill use cases without containing business logic",
+      "requirements": [
+        {
+          "id": "DDD-APP-01",
+          "text": "Application services orchestrate but do not contain business rules",
+          "description": "Application services coordinate entities, repositories, and domain services — business decisions live in the domain layer. If an application service has if/else logic about domain state, that logic is misplaced",
+          "refs": []
+        },
+        {
+          "id": "DDD-APP-02",
+          "text": "Application services manage transactions and cross-cutting concerns",
+          "description": "Transaction boundaries, authorization checks, logging, and event dispatching are application layer responsibilities — not domain layer concerns",
+          "refs": []
+        },
+        {
+          "id": "DDD-APP-03",
+          "text": "Application services define use case boundaries with explicit input/output",
+          "description": "Each application service method represents a use case with a clear command/query and response — not generic CRUD operations. 'placeOrder(PlaceOrderCommand)' not 'save(Order)'",
+          "refs": []
+        },
+        {
+          "id": "DDD-APP-04",
+          "text": "The application layer must not expose domain internals to external consumers",
+          "description": "API responses use DTOs assembled in the application layer — domain entities are never serialized directly to external clients. Returning an entity from a REST controller leaks the domain model",
+          "refs": []
+        },
+        {
+          "id": "DDD-APP-05",
+          "text": "Application layer is thin — if it grows complex, logic likely belongs in the domain",
+          "description": "Complex conditionals, calculations, or multi-step business rules in application services are a smell — push them into entities or domain services. An application service method longer than 10-15 lines often contains escaped domain logic",
+          "refs": []
+        },
+        {
+          "id": "DDD-APP-06",
+          "text": "Commands and queries are separate concerns",
+          "description": "Methods that change state (commands) should not return domain data. Methods that return data (queries) should not change state. Mixing reads and writes in a single method obscures intent and makes the system harder to reason about",
+          "refs": []
+        },
+        {
+          "id": "DDD-APP-07",
+          "text": "Application services receive commands/queries, not raw HTTP or framework objects",
+          "description": "The controller layer converts HTTP requests to command/query objects — the application service never sees HttpRequest, FormData, or framework types. This ensures the application layer is framework-independent",
+          "refs": []
+        }
+      ]
+    }
+  ]
+}
