@@ -56,7 +56,10 @@ quodeq dashboard
 ```
 
 <p align="center">
-  <img src="res/dashboard.png" alt="Quodeq Dashboard" width="900" />
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="res/dashboard-dark.png" />
+    <img src="res/dashboard.png" alt="Quodeq Dashboard" width="900" />
+  </picture>
 </p>
 
 Opens at `http://localhost:4173` with:
