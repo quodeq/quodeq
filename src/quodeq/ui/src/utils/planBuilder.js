@@ -95,7 +95,7 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
   if (v.snippet) {
     lines.push('', '**Affected code:**');
     lines.push('```');
-    v.snippet.split('\n').forEach((l) => lines.push(l));
+    capSnippet(v.snippet).split('\n').forEach((l) => lines.push(l));
     lines.push('```');
   }
 
