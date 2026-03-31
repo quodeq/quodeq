@@ -1,19 +1,15 @@
 import { SEVERITY_ORDER } from './formatters.js';
 
-const PLAN_SNIPPET_MAX_LINES = 15;
-const PLAN_SNIPPET_HEAD_TAIL = 5;
+const PLAN_SNIPPET_MAX_LINES = 5;
 
 /**
- * Cap a code snippet for plan output — show head + tail with ellipsis for large blocks.
+ * Cap a code snippet for plan output — show only the first few lines.
  */
 function capSnippet(snippet) {
   if (!snippet) return snippet;
   const lines = snippet.split('\n');
   if (lines.length <= PLAN_SNIPPET_MAX_LINES) return snippet;
-  const head = lines.slice(0, PLAN_SNIPPET_HEAD_TAIL);
-  const tail = lines.slice(-PLAN_SNIPPET_HEAD_TAIL);
-  const omitted = lines.length - 2 * PLAN_SNIPPET_HEAD_TAIL;
-  return [...head, `    ... (${omitted} more lines)`, ...tail].join('\n');
+  return [...lines.slice(0, PLAN_SNIPPET_MAX_LINES), `... (${lines.length - PLAN_SNIPPET_MAX_LINES} more lines)`].join('\n');
 }
 import {
   PLAN_SYSTEM_PREAMBLE,
