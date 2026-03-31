@@ -99,7 +99,12 @@ def find_previous_fingerprint(
     for run_info in list_runs(reports_base, project_uuid):
         if run_info.run_id == current_run_id:
             continue
-        prev_evidence = reports_base / project_uuid / run_info.run_id / "evidence"
+        run_dir = reports_base / project_uuid / run_info.run_id
+        # Only carry forward from runs that completed (have a scored report)
+        eval_report = run_dir / "evaluation" / f"{dimension}.json"
+        if not eval_report.is_file():
+            continue
+        prev_evidence = run_dir / "evidence"
         fp = load_fingerprint(prev_evidence, dimension)
         if fp:
             return fp, prev_evidence

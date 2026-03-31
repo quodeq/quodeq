@@ -95,12 +95,16 @@ class TestFindPreviousFingerprint:
         reports = tmp_path / "reports"
         proj = reports / "proj-uuid"
 
-        # Previous run with fingerprint
-        prev_evidence = proj / "run-old" / "evidence"
+        # Previous run with fingerprint and completed evaluation report
+        prev_run = proj / "run-old"
+        prev_evidence = prev_run / "evidence"
         prev_evidence.mkdir(parents=True)
         prev_fp = {"dimension": "security", "file_hashes": {"a.py": "abc123"}, "standards_checksum": None}
         import json
         (prev_evidence / "security_fingerprint.json").write_text(json.dumps(prev_fp))
+        eval_dir = prev_run / "evaluation"
+        eval_dir.mkdir(parents=True)
+        (eval_dir / "security.json").write_text("{}")
 
         # Current run evidence dir
         current_evidence = proj / "run-current" / "evidence"
