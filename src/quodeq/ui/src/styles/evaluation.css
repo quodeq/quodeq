@@ -1877,7 +1877,7 @@
 }
 
 .ctx-line--hl {
-  background: color-mix(in srgb, var(--color-accent) 7%, transparent);
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent);
 }
 
 .ctx-line--hl .ctx-gutter {
