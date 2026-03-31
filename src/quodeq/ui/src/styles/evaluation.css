@@ -1891,6 +1891,7 @@
 .ctx-line--toggle {
   opacity: 0.5;
   font-style: italic;
+  padding: 4px 0;
 }
 
 .finding-toggle-btn-inline {
