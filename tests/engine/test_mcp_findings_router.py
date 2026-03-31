@@ -268,11 +268,12 @@ class TestSnippetEnrichment:
                 "w": "Whole file issue", "reason": "Because", "severity": "major", "req": "R-1",
             })
         written = json.loads(findings_file.read_text().strip())
-        assert written["snippet"] is None or written["snippet"] == ""
         assert written["scope"] == "file"
-        assert "line1" in written["context"]
-        assert "line10" in written["context"]
-        assert ">>>" not in written["context"]
+        # Snippet contains the full file content
+        assert "line1" in written["snippet"]
+        assert "line20" in written["snippet"]
+        # Context is null for scope findings
+        assert written.get("context") is None
 
     def test_file_not_found_graceful(self, tmp_path: Path) -> None:
         findings_file = tmp_path / "findings.jsonl"
@@ -303,8 +304,8 @@ class TestSnippetEnrichment:
             })
         written = json.loads(findings_file.read_text().strip())
         assert written.get("scope") == "file"
-        assert "import os" in written.get("context", "")
-        assert ">>>" not in written.get("context", "")
+        assert "import os" in written.get("snippet", "")
+        assert written.get("context") is None
 
 
 class TestEnrichmentIntegration:
@@ -347,8 +348,8 @@ class TestEnrichmentIntegration:
         assert "def index():" in normal["snippet"]
         assert ">>> def index():" in normal["context"]
 
-        # Scoped: no snippet, context is first lines, scope preserved
-        assert scoped.get("snippet") is None
+        # Scoped: snippet contains full file, context is null, scope preserved
         assert scoped["scope"] == "file"
-        assert "from flask import Flask" in scoped["context"]
-        assert ">>>" not in scoped["context"]
+        assert "from flask import Flask" in scoped["snippet"]
+        assert "return 'hello'" in scoped["snippet"]
+        assert scoped.get("context") is None

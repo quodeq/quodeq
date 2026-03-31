@@ -40,7 +40,19 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
   const scopeLabel = scope ? `Entire ${scope}` : null;
 
   if (scope) {
-    return <span className="finding-scope-badge">{scopeLabel}</span>;
+    const fileLines = snippet ? snippet.replace(/\\n/g, '\n').split('\n') : [];
+    return (
+      <>
+        <button className="finding-scope-badge finding-scope-badge--clickable" onClick={() => setExpanded(e => !e)}>
+          {scopeLabel} {expanded ? '▾' : '▸'}
+        </button>
+        {expanded && fileLines.length > 0 && (
+          <pre className="finding-context">
+            {renderSnippetLines(fileLines, 1)}
+          </pre>
+        )}
+      </>
+    );
   }
 
   if (context) {

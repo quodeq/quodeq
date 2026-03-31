@@ -1998,4 +1998,14 @@
   border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
   border-radius: 4px;
 }
+
+.finding-scope-badge--clickable {
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.finding-scope-badge--clickable:hover {
+  background: color-mix(in srgb, var(--color-accent) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-accent) 40%, transparent);
+}
 .vdetail-row--compliant { border-color: color-mix(in srgb, var(--color-grade-top-text) 55%, transparent); }

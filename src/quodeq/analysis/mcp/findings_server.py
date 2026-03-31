@@ -93,12 +93,11 @@ class FindingsRouter:
         line = finding.get("line", 0)
         scope = finding.get("scope")
 
-        # Scope-level or line=0: show first N lines, no highlighting
+        # Scope-level or line=0: store full file in snippet for expand-on-click
         if scope or not line:
-            finding["snippet"] = None
+            finding["snippet"] = "\n".join(source_lines)
             finding["scope"] = scope or "file"
-            preview = source_lines[:self._SCOPE_PREVIEW_LINES]
-            finding["context"] = "\n".join(preview)
+            finding["context"] = None
             return
 
         # Normal line-level enrichment
