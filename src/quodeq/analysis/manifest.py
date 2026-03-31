@@ -27,6 +27,12 @@ class AnalysisTarget:
     total_files: int = 0
     language_stats: dict[str, int] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ValueError("AnalysisTarget requires a name")
+        if not self.language:
+            raise ValueError("AnalysisTarget requires a language")
+
     @property
     def project_description(self) -> str:
         """E.g. 'Kotlin mobile using Flutter'."""
@@ -65,6 +71,11 @@ class SourceManifest:
     targets: list[AnalysisTarget] = field(default_factory=list)
     total_files: int = 0
     language_stats: dict[str, int] = field(default_factory=dict)
+
+    def add_target(self, target: AnalysisTarget) -> None:
+        """Add an analysis target to this manifest."""
+        self.targets.append(target)
+        self.total_files = sum(t.total_files for t in self.targets)
 
     # --- backward-compat properties (delegate to primary target) ---
 
