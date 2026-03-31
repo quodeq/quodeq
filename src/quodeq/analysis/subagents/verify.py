@@ -26,7 +26,11 @@ def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_i
     for run in runs:
         if run.run_id == current_run_id:
             continue
-        prev_jsonl = reports_root / project_uuid / run.run_id / "evidence" / f"{dim_id}_evidence.jsonl"
+        run_dir = reports_root / project_uuid / run.run_id
+        # Only use evidence from runs that completed (have a scored report)
+        if not (run_dir / "evaluation" / f"{dim_id}.json").is_file():
+            continue
+        prev_jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
         if prev_jsonl.exists() and prev_jsonl.stat().st_size > 0:
             return prev_jsonl
     return None
