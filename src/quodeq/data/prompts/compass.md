@@ -24,8 +24,8 @@ For EVERY finding (violation or compliance), call `report_finding` with:
 - `snippet` — the relevant code (under 200 chars)
 - `severity` — `critical`, `major`, or `minor`
 - `w` — short description of what you found
-
-**Optional:** `reason` — why this is a violation or compliance, `context` — ~10 lines of surrounding code centered on the violation line, with the violation line prefixed by ">>>" to mark it
+- `context` — ~10 lines of surrounding code centered on the finding, with the key line prefixed by ">>>"
+- `reason` — why this is a violation or compliance
 
 ## Severity Definitions
 
