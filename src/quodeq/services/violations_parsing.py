@@ -211,7 +211,7 @@ def _try_parse_text_line(
     seen.add(key)
     entry = _build_finding_entry(obj, dimension)
     if entry.snippet:
-        entry = replace(entry, snippet=str(entry.snippet).splitlines()[0].strip())
+        entry = replace(entry, snippet=str(entry.snippet).strip())
     return obj["t"], entry
 
 

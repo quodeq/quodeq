@@ -40,6 +40,7 @@ def _build_finding(item: dict, *, include_severity: bool) -> Finding:
         cwe=item.get("cwe"),
         req=item.get("req"),
         req_refs=item.get("req_refs"),
+        context=item.get("context"),
         include_severity=include_severity,
     ))
 
@@ -127,6 +128,7 @@ def _collect_findings(
             principle_map[key] = _empty_principle(key)
         entry: dict[str, Any] = {
             "snippet": item.get("snippet", ""),
+            "context": item.get("context"),
             "file": format_file_line(item.get("file"), item.get("line")),
             "title": item.get("title", ""),
             "reason": item.get("reason", ""),

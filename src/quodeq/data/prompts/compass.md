@@ -21,7 +21,7 @@ For EVERY finding (violation or compliance), call `report_finding` with:
 - `t` — `violation` or `compliance`
 - `file` — file path relative to repo root
 - `line` — line number
-- `snippet` — the relevant code (under 200 chars)
+- `snippet` — 1-5 lines showing the complete violation pattern — include all lines that participate in the violation, not just one (under 500 chars)
 - `severity` — `critical`, `major`, or `minor`
 - `w` — short description of what you found
 - `context` — ~10 lines of surrounding code centered on the finding, with the key line prefixed by ">>>"

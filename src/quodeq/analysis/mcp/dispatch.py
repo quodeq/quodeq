@@ -31,7 +31,7 @@ REPORT_FINDING_SCHEMA = {
         "t": {"type": "string", "enum": ["violation", "compliance"], "description": "Finding type"},
         "file": {"type": "string", "description": "File path relative to repo root"},
         "line": {"type": "integer", "description": "Line number"},
-        "snippet": {"type": "string", "description": "Relevant code snippet (under 200 chars)"},
+        "snippet": {"type": "string", "description": "1-5 lines showing the complete violation pattern — include all lines that participate in the violation, not just one (under 500 chars)"},
         "severity": {"type": "string", "enum": ["critical", "major", "minor"], "description": "Severity level"},
         "w": {"type": "string", "description": "Short description of the finding"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
