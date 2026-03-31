@@ -1867,21 +1867,22 @@
   font-style: italic;
 }
 
-.finding-toggle-btn {
-  display: inline-block;
-  margin: 4px 0 0;
-  padding: 2px 10px;
-  font-size: 0.75rem;
-  font-weight: 500;
+.finding-toggle-btn-inline {
+  display: inline;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
   color: var(--color-accent);
   background: none;
-  border: 1px solid color-mix(in srgb, var(--color-accent) 30%, transparent);
-  border-radius: 4px;
+  border: none;
   cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
 }
 
-.finding-toggle-btn:hover {
-  background: color-mix(in srgb, var(--color-accent) 8%, transparent);
+.finding-toggle-btn-inline:hover {
+  text-decoration-style: solid;
 }
 
 /* Detail rows (explorer detail pages) */

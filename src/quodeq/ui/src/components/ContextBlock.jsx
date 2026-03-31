@@ -2,7 +2,7 @@
  * Renders surrounding code context with the violation line
  * (prefixed by ">>>") highlighted. Falls back to snippet display if no
  * context is available. Shows a scope badge when scope is provided.
- * Large blocks are collapsed with a "See more" / "See less" toggle.
+ * Large blocks are collapsed with an inline "See more" / "See less" toggle.
  */
 import { useState } from 'react';
 
@@ -36,15 +36,17 @@ export default function ContextBlock({ context, snippet, scope }) {
         <pre className="finding-context">
           {renderLines(visibleLines)}
           {needsCollapse && !expanded && (
-            <span className="finding-context-line finding-context-toggle">... ({allLines.length - COLLAPSED_LINES} more lines)</span>
+            <span className="finding-context-line finding-context-toggle">
+              ... ({allLines.length - COLLAPSED_LINES} more lines){' '}
+              <button className="finding-toggle-btn-inline" onClick={() => setExpanded(true)}>See more</button>
+            </span>
+          )}
+          {needsCollapse && expanded && (
+            <span className="finding-context-line finding-context-toggle">
+              <button className="finding-toggle-btn-inline" onClick={() => setExpanded(false)}>See less</button>
+            </span>
           )}
         </pre>
-        {needsCollapse && (
-          <button
-            className="finding-toggle-btn"
-            onClick={() => setExpanded(e => !e)}
-          >{expanded ? 'See less' : 'See more'}</button>
-        )}
       </>
     );
   }
@@ -59,14 +61,19 @@ export default function ContextBlock({ context, snippet, scope }) {
         {scopeLabel && <span className="finding-scope-badge">{scopeLabel}</span>}
         <pre className="vlive-snippet">
           {visibleLines.join('\n')}
-          {needsCollapse && !expanded && `\n... (${allLines.length - COLLAPSED_LINES} more lines)`}
+          {needsCollapse && !expanded && (
+            <>
+              {'\n'}... ({allLines.length - COLLAPSED_LINES} more lines){' '}
+              <button className="finding-toggle-btn-inline" onClick={() => setExpanded(true)}>See more</button>
+            </>
+          )}
+          {needsCollapse && expanded && (
+            <>
+              {'\n'}
+              <button className="finding-toggle-btn-inline" onClick={() => setExpanded(false)}>See less</button>
+            </>
+          )}
         </pre>
-        {needsCollapse && (
-          <button
-            className="finding-toggle-btn"
-            onClick={() => setExpanded(e => !e)}
-          >{expanded ? 'See less' : 'See more'}</button>
-        )}
       </>
     );
   }
