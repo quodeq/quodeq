@@ -11,11 +11,12 @@ function filterValidRefs(refs) {
   return (refs || []).filter((r) => r.url && /^https?:\/\//.test(r.url));
 }
 
-function useFileInfo(file, fileLine) {
+function useFileInfo(file, fileLine, fileEndLine) {
   const { filePath, line } = parseFileRef(file, fileLine);
   const filename = filePath ? filePath.split('/').pop() : null;
-  const ref = line != null ? `${filePath}:${line}` : filePath;
-  const display = line != null ? `${filename}:${line}` : filename;
+  const range = (fileEndLine && fileEndLine !== line) ? `${line}-${fileEndLine}` : line;
+  const ref = line != null ? `${filePath}:${range}` : filePath;
+  const display = line != null ? `${filename}:${range}` : filename;
   return { filePath, filename, ref, display };
 }
 
@@ -30,7 +31,7 @@ function RefsLinks({ reqRefs }) {
 }
 
 export function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
-  const { filename, ref, display } = useFileInfo(v.file, v.line);
+  const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
       <div className="vdetail-row-main">
@@ -60,7 +61,7 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
 }
 
 export function ComplianceCard({ c, principle, index }) {
-  const { filename, ref, display } = useFileInfo(c.file, c.line);
+  const { filename, ref, display } = useFileInfo(c.file, c.line, c.endLine);
   return (
     <div className="vdetail-row vdetail-row--compliant" style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
       <div className="vdetail-row-main">

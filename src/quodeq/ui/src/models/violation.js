@@ -13,6 +13,7 @@
  * @typedef {Object} Violation
  * @property {string|null}   file
  * @property {number|string|null} line
+ * @property {number|string|null} endLine
  * @property {'critical'|'major'|'minor'} severity
  * @property {string|null}   principle
  * @property {string|null}   title
@@ -41,6 +42,7 @@ export function createViolation(raw) {
   return {
     file:          raw.file ?? null,
     line:          raw.line ?? null,
+    endLine:       raw.endLine ?? raw.end_line ?? null,
     severity:      raw.severity ?? 'minor',
     principle:     raw.principle ?? null,
     title:         raw.title ?? null,

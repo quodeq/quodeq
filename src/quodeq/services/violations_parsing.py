@@ -69,6 +69,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         principle=obj["p"],
         file=obj.get("file"),
         line=obj.get("line"),
+        end_line=obj.get("end_line"),
         title=obj.get("w"),
         reason=obj.get("reason"),
         snippet=obj.get("snippet"),

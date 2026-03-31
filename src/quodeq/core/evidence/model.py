@@ -23,6 +23,7 @@ class Judgment:
     practice_id: str
     file: str = ""
     line: int = 0
+    end_line: int = 0
     snippet: str = ""
     verdict: str = "violation"  # violation | compliance | dismissed
     severity: str = "medium"

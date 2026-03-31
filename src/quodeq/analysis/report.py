@@ -52,8 +52,8 @@ def _build_score_lookup(per_principle_scores: dict) -> dict:
     return lookup
 
 
-_VIOLATION_FIELDS = ("file", "line", "title", "reason", "snippet", "context", "scope", "severity", "req", "req_refs")
-_COMPLIANCE_FIELDS = ("file", "line", "title", "reason", "snippet", "context", "scope", "req", "req_refs")
+_VIOLATION_FIELDS = ("file", "line", "end_line", "title", "reason", "snippet", "context", "scope", "severity", "req", "req_refs")
+_COMPLIANCE_FIELDS = ("file", "line", "end_line", "title", "reason", "snippet", "context", "scope", "req", "req_refs")
 _GRADE_INSUFFICIENT = "Insufficient"
 
 

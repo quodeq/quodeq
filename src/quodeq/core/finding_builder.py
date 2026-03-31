@@ -20,6 +20,7 @@ class FindingSpec:
     principle: str | None
     file: str | None = None
     line: int | str | None = None
+    end_line: int | str | None = None
     title: str | None = None
     reason: str | None = None
     snippet: str | None = None
@@ -48,6 +49,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
         principle=spec.principle,
         file=spec.file,
         line=spec.line,
+        end_line=spec.end_line,
         title=spec.title,
         reason=spec.reason,
         snippet=spec.snippet,
