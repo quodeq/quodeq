@@ -39,3 +39,4 @@ class Finding:
     context: str | None = None
     dimension: str | None = None
     violation_type: str | None = None
+    scope: str | None = None

@@ -28,6 +28,7 @@ class FindingSpec:
     req: str | None = None
     req_refs: list[dict] | None = None
     context: str | None = None
+    scope: str | None = None
     include_severity: bool = True
 
 
@@ -55,6 +56,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
         req=spec.req if spec.req else None,
         req_refs=req_refs,
         context=spec.context if spec.context else None,
+        scope=spec.scope if spec.scope else None,
     )
 
 

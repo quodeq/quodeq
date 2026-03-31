@@ -33,6 +33,7 @@ class Judgment:
     violation_type: str = ""
     title: str = ""
     context: str = ""
+    scope: str = ""
 
 
 @dataclass

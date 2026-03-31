@@ -41,6 +41,7 @@ def _build_finding(item: dict, *, include_severity: bool) -> Finding:
         req=item.get("req"),
         req_refs=item.get("req_refs"),
         context=item.get("context"),
+        scope=item.get("scope"),
         include_severity=include_severity,
     ))
 
@@ -129,6 +130,7 @@ def _collect_findings(
         entry: dict[str, Any] = {
             "snippet": item.get("snippet", ""),
             "context": item.get("context"),
+            "scope": item.get("scope"),
             "file": format_file_line(item.get("file"), item.get("line")),
             "title": item.get("title", ""),
             "reason": item.get("reason", ""),
