@@ -31,15 +31,15 @@ REPORT_FINDING_SCHEMA = {
         "t": {"type": "string", "enum": ["violation", "compliance"], "description": "Finding type"},
         "file": {"type": "string", "description": "File path relative to repo root"},
         "line": {"type": "integer", "description": "Line number"},
-        "snippet": {"type": "string", "description": "1-5 lines showing the complete violation pattern — include all lines that participate in the violation, not just one (under 500 chars)"},
+        "end_line": {"type": "integer", "description": "Last line of the violation pattern (omit if single line)"},
+        "scope": {"type": "string", "enum": ["file", "class", "module"], "description": "Set when the finding affects an entire file/class/module rather than specific lines"},
         "severity": {"type": "string", "enum": ["critical", "major", "minor"], "description": "Severity level"},
         "w": {"type": "string", "description": "Short description of the finding"},
         "reason": {"type": "string", "description": "Why this is a violation or compliance"},
-        "context": {"type": "string", "description": "~10 lines of surrounding code with violation line marked by >>>"},
         "p": {"type": "string", "description": "Sub-characteristic name — auto-filled from req if omitted"},
         "d": {"type": "string", "description": "Dimension — auto-filled from server config if omitted"},
     },
-    "required": ["req", "t", "file", "line", "snippet", "severity", "w", "context", "reason"],
+    "required": ["req", "t", "file", "line", "severity", "w", "reason"],
 }
 
 _DEFAULT_FILE_BATCH_SIZE = 5
