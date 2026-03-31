@@ -19,6 +19,7 @@
  * @property {string|null}   reason
  * @property {string|null}   snippet
  * @property {string|null}   context
+ * @property {string|null}   scope
  * @property {number|string|null} cwe
  * @property {string|null}   req
  * @property {ReqRef[]}      reqRefs
@@ -46,6 +47,7 @@ export function createViolation(raw) {
     reason:        raw.reason ?? raw.findings ?? null,
     snippet:       raw.snippet ?? raw.code ?? null,
     context:       raw.context ?? null,
+    scope:         raw.scope ?? null,
     cwe:           raw.cwe ?? null,
     req:           raw.req ?? null,
     reqRefs:       raw.reqRefs ?? raw.req_refs ?? [],

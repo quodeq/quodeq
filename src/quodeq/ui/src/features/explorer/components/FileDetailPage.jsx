@@ -52,7 +52,7 @@ function ViolationCard({ v, index }) {
             </>}
           </div>
         )}
-        <ContextBlock context={v.context} snippet={v.snippet} />
+        <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} />
       </div>
     </div>
   );

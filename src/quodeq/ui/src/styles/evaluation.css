@@ -1937,4 +1937,16 @@
 .vdetail-row--major     { border-color: var(--color-sev-major-border); }
 .vdetail-row--minor     { border-color: var(--color-sev-minor-border); }
 .vdetail-row--unknown   { border-color: var(--color-border); }
+
+.finding-scope-badge {
+  display: inline-block;
+  margin: 10px 0 4px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  background: color-mix(in srgb, var(--color-accent) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-accent) 25%, transparent);
+  border-radius: 4px;
+}
 .vdetail-row--compliant { border-color: color-mix(in srgb, var(--color-grade-top-text) 55%, transparent); }
