@@ -33,15 +33,22 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
   const [expanded, setExpanded] = useState(false);
 
   if (scope) {
-    const scopeLabel = `Entire ${scope}`;
     const fileLines = snippet ? snippet.replace(/\\n/g, '\n').split('\n') : [];
+    const lineCount = fileLines.length;
     return (
       <>
-        <button className="finding-scope-badge finding-scope-badge--clickable" onClick={() => setExpanded(e => !e)}>
-          {scopeLabel} {expanded ? '▾' : '▸'}
-        </button>
-        {expanded && fileLines.length > 0 && (
-          <pre className="finding-context">
+        <div
+          className={`scope-bar${expanded ? ' scope-bar--expanded' : ''}`}
+          role="button"
+          tabIndex={0}
+          onClick={() => setExpanded(e => !e)}
+          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(ex => !ex); } }}
+        >
+          <span className="scope-bar-label">Entire {scope}{lineCount > 0 ? ` \u00b7 ${lineCount} lines` : ''}</span>
+          <span className="scope-bar-action">{expanded ? 'Hide \u25be' : 'View \u25b8'}</span>
+        </div>
+        {expanded && lineCount > 0 && (
+          <pre className="finding-context scope-bar-code">
             {fileLines.map((text, i) => renderSnippetLine(text, i + 1))}
           </pre>
         )}
