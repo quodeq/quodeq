@@ -104,6 +104,7 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
             source_file_count=config.source_file_count,
             dimensions_data=ctx.dimensions_data,
             standards_dir=config.standards_dir,
+            evaluators_dir=config.evaluators_dir,
             manifest=config.manifest,
             target=config.target,
             work_dir=config.work_dir or config.src,
@@ -179,6 +180,7 @@ def _collect_evidence(
             module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
     )
     return ev
 

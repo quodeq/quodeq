@@ -80,6 +80,7 @@ def run_backfill_phase(
 
     Returns the set of backfill files actually taken.
     """
+    # Deferred import: breaks circular dependency between _backfill and runner.
     from quodeq.analysis.runner import _process_single_dimension
 
     backfill_candidates = identify_backfill_files(backfill.files, list(backfill.prev_analyzed), backfill.phase1_files)

@@ -21,6 +21,7 @@ def _build_consolidated_config(
     config: "RunConfig", dimensions: list[str], files_per_agent: int,
 ) -> AnalysisConfig:
     """Build AnalysisConfig for consolidated mode."""
+    # Deferred import: breaks circular dependency between _consolidated and runner.
     from quodeq.analysis.subagents.runner import _default_subagent_model
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
@@ -65,7 +66,10 @@ def _collect_consolidated_results(
     )
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    return parse_jsonl_to_evidence_by_dimension(merged_jsonl, ev_ctx, compiled_dir=compiled_dir)
+    return parse_jsonl_to_evidence_by_dimension(
+        merged_jsonl, ev_ctx, compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
+    )
 
 
 def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
@@ -80,6 +84,7 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
             source_file_count=config.source_file_count,
             dimensions_data=ctx.dimensions_data,
             standards_dir=config.standards_dir,
+            evaluators_dir=config.evaluators_dir,
             manifest=config.manifest,
             target=config.target,
             work_dir=config.work_dir or config.src,

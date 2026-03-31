@@ -181,7 +181,7 @@ def _write_verify_manifest(
     output_path.write_text(json.dumps(grouped, indent=2))
 
 
-def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
+def resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
     """Walk up from evidence_dir to find run_id, project_uuid, reports_base."""
     edir = Path(evidence_dir)
     while edir.name != "evidence" and edir != edir.parent:
@@ -204,7 +204,7 @@ def _resolve_previous_evidence(
     the caller should use the cache hit instead.  A ``None`` path means no
     previous evidence exists.
     """
-    paths = _resolve_evidence_paths(evidence_dir)
+    paths = resolve_evidence_paths(evidence_dir)
     if paths is None:
         if cache is not None:
             cache[cache_key] = ([], 0, 0)

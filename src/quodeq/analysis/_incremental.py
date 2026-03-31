@@ -120,6 +120,7 @@ def _parse_evidence_from_jsonl(
     jsonl_file: Path, files_read: int,
 ) -> Evidence | None:
     """Parse a JSONL file into Evidence."""
+    # File existence check is necessary — evidence may not exist yet for new dimensions.
     if not jsonl_file.exists() or jsonl_file.stat().st_size == 0:
         return None
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
@@ -131,6 +132,7 @@ def _parse_evidence_from_jsonl(
             files_read=files_read, module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
     )
 
 

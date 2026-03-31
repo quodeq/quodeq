@@ -106,8 +106,9 @@ def _load_compiled_data(compiled_dir: str | Path | None, dimension: str | None) 
 def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, list[dict]]:
     """Load {req_id: [{label, url, ...}, ...]} from compiled standards on disk.
 
-    Returns an empty dict on any I/O or parse error (logged as a warning).
-    Prefer :func:`extract_refs` when data is already loaded.
+    Backward-compat convenience wrapper that handles file I/O then delegates
+    to the pure :func:`extract_refs`.  Prefer ``extract_refs`` when data is
+    already loaded.
     """
     data = _load_compiled_data(compiled_dir, dimension)
     if not data:
@@ -138,9 +139,9 @@ def load_compiled_requirements_multi(
 def load_compiled_requirements(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, dict]:
     """Load {req_id: {principle, text}} from compiled standards on disk.
 
-    Used by the MCP server to auto-fill principle name and requirement text
-    from the requirement ID, so the AI doesn't need to send them.
-    Prefer :func:`extract_requirements` when data is already loaded.
+    Backward-compat convenience wrapper that handles file I/O then delegates
+    to the pure :func:`extract_requirements`.  Used by the MCP server to
+    auto-fill principle name and requirement text from the requirement ID.
     """
     data = _load_compiled_data(compiled_dir, dimension)
     if not data:
