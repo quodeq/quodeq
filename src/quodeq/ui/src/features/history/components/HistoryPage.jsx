@@ -20,7 +20,7 @@ function computeDeltas(trend) {
 export default function HistoryPage({ trend, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId, selectedRunScore } = selection;
   const { accumulatedDimensions, lastRun } = dimensions;
-  const { onRunClick, onBarClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
+  const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
@@ -85,7 +85,7 @@ export default function HistoryPage({ trend, selection, availableRuns, dimension
           trend={trend}
           selectedRunId={selectedRunId}
           selectedRunScore={selectedRunScore}
-          onBarClick={onBarClick}
+          onBarClick={(runId) => onRunChange(runId)}
         />
         <HistoryDimensionPanel
           dimensions={accumulatedDimensions || []}

@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import { buildDailyRuns } from './utils/dailyGrouping.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
@@ -89,7 +89,7 @@ const ROUTE_RENDERERS = {
       <HistoryPage
         trend={trend}
         selection={{
-          selectedRunId: resolveHistorySelectedRunId(props.dashboardData.selectedRun, trend),
+          selectedRunId: resolveHistorySelectedRunId(props.navigation.historySelectedRun, trend),
           selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
         }}
         availableRuns={runs}
@@ -99,10 +99,9 @@ const ROUTE_RENDERERS = {
         }}
         callbacks={{
           onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
-          onBarClick: props.navigation.handleRunSelect,
           onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel }),
           onNavigate: props.navigation.handleNavigate,
-          onRunChange: props.navigation.handleRunSelect,
+          onRunChange: props.navigation.setHistorySelectedRun,
         }}
       />
     );
@@ -188,16 +187,22 @@ function useAppNavigation() {
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
   const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
-  function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
-  return { serverConnected, setServerConnected, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange };
+  const [historySelectedRun, setHistorySelectedRun] = useState('latest');
+  function handleNavigate(page, params = {}) {
+    if (page === 'run' && params.runId) setSelectedRun(params.runId);
+    if (page === 'history-run' && params.runId) setHistorySelectedRun(params.runId);
+    navPush({ page, ...params });
+  }
+  return { serverConnected, setServerConnected, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun };
 }
 
 function useAppState() {
   const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange } = nav;
+  const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
   const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
   const settings = useAppSettings();
-  const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
+  const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
+  const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun: effectiveRun });
   const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
@@ -221,6 +226,7 @@ function useAppState() {
     dashboard, accumulated, latestAccumulated, loading, error, availableRuns, dailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
+    historySelectedRun, setHistorySelectedRun,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav,
   };
 }
@@ -255,6 +261,7 @@ export default function App() {
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
       handleProjectChange: state.handleProjectChange, navTab,
       handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
+      historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
     },
     evaluation: state.evalLifecycle,
