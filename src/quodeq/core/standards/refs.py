@@ -91,16 +91,29 @@ def extract_requirements(data: dict) -> dict[str, dict]:
 def _load_compiled_data(compiled_dir: str | Path | None, dimension: str | None) -> dict | None:
     """Load raw compiled standards JSON from *compiled_dir*. Returns None on error.
 
+    Falls back to ``~/.quodeq/evaluators/`` for custom evaluators.
     This is an I/O adapter — callers that already have the data should use
     :func:`extract_refs` or :func:`extract_requirements` directly.
     """
-    if not compiled_dir or not dimension:
+    if not dimension:
         return None
-    try:
-        return read_json(Path(compiled_dir) / f"{dimension}.json")
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
-        return None
+    if compiled_dir:
+        path = Path(compiled_dir) / f"{dimension}.json"
+        if path.is_file():
+            try:
+                return read_json(path)
+            except (OSError, ValueError, UnicodeDecodeError) as exc:
+                _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
+                return None
+    # Fallback: custom evaluators directory
+    from quodeq.config.paths import default_paths
+    evaluators_path = default_paths().evaluators_dir / f"{dimension}.json"
+    if evaluators_path.is_file():
+        try:
+            return read_json(evaluators_path)
+        except (OSError, ValueError, UnicodeDecodeError):
+            return None
+    return None
 
 
 def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, list[dict]]:
