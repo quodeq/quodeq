@@ -15,8 +15,9 @@ function ViolationLiveRow({ violation, index }) {
   const v = violation;
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
-  const ref = line != null ? `${filePath}:${line}` : filePath;
-  const display = line != null ? `${filename}:${line}` : filename;
+  const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
+  const ref = line != null ? `${filePath}:${range}` : filePath;
+  const display = line != null ? `${filename}:${range}` : filename;
 
   return (
     <div
@@ -64,7 +65,7 @@ function ViolationLiveRow({ violation, index }) {
               </>}
             </div>
           )}
-          <ContextBlock context={v.context} snippet={v.snippet} />
+          <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} />
         </div>
       )}
     </div>

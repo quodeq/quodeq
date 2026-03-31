@@ -107,6 +107,7 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         dimension=obj.get("d", ""),
         file=obj.get("file", ""),
         line=obj.get("line", 0),
+        end_line=obj.get("end_line", 0),
         snippet=obj.get("snippet", ""),
         severity=obj.get("severity", "medium"),
         violation_type=obj.get("vt", ""),
@@ -114,6 +115,7 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         req=obj.get("req"),
         title=obj.get("w", ""),
         context=obj.get("context", ""),
+        scope=obj.get("scope", ""),
     )
     # Pre-resolved req_refs from MCP server enrichment take priority
     pre_resolved = obj.get("req_refs")
@@ -125,7 +127,7 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
 def _judgment_to_dict(j: Judgment) -> dict:
     """Convert a Judgment to the dict format used in PrincipleEvidence lists."""
     d: dict = {"file": j.file}
-    _optional = {"line": j.line, "snippet": j.snippet, "severity": j.severity, "violation_type": j.violation_type, "context": j.context}
+    _optional = {"line": j.line, "end_line": j.end_line, "snippet": j.snippet, "severity": j.severity, "violation_type": j.violation_type, "context": j.context, "scope": j.scope}
     d.update({k: v for k, v in _optional.items() if v})
     if j.req:
         d["req"] = j.req

@@ -20,8 +20,9 @@ function filterHttpRefs(reqRefs) {
 function ViolationCard({ v, principleName, index }) {
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
-  const ref = line != null ? `${filePath}:${line}` : filePath;
-  const display = line != null ? `${filename}:${line}` : filename;
+  const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
+  const ref = line != null ? `${filePath}:${range}` : filePath;
+  const display = line != null ? `${filename}:${range}` : filename;
   const linkedRefs = filterHttpRefs(v.reqRefs);
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>

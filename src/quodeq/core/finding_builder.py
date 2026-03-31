@@ -20,6 +20,7 @@ class FindingSpec:
     principle: str | None
     file: str | None = None
     line: int | str | None = None
+    end_line: int | str | None = None
     title: str | None = None
     reason: str | None = None
     snippet: str | None = None
@@ -28,6 +29,7 @@ class FindingSpec:
     req: str | None = None
     req_refs: list[dict] | None = None
     context: str | None = None
+    scope: str | None = None
     include_severity: bool = True
 
 
@@ -47,6 +49,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
         principle=spec.principle,
         file=spec.file,
         line=spec.line,
+        end_line=spec.end_line,
         title=spec.title,
         reason=spec.reason,
         snippet=spec.snippet,
@@ -55,6 +58,7 @@ def build_finding_base(spec: FindingSpec) -> Finding:
         req=spec.req if spec.req else None,
         req_refs=req_refs,
         context=spec.context if spec.context else None,
+        scope=spec.scope if spec.scope else None,
     )
 
 

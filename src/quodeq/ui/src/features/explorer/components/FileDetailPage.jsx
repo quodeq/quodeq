@@ -18,8 +18,9 @@ function buildViolationPlanText(v) {
 function ViolationCard({ v, index }) {
   const { filePath, line } = parseFileRef(v.file, v.line);
   const filename = filePath ? filePath.split('/').pop() : null;
-  const ref = line != null ? `${filePath}:${line}` : filePath;
-  const display = line != null ? `${filename}:${line}` : filename;
+  const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
+  const ref = line != null ? `${filePath}:${range}` : filePath;
+  const display = line != null ? `${filename}:${range}` : filename;
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
       <div className="vdetail-row-main">
@@ -52,7 +53,7 @@ function ViolationCard({ v, index }) {
             </>}
           </div>
         )}
-        <ContextBlock context={v.context} snippet={v.snippet} />
+        <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} />
       </div>
     </div>
   );
