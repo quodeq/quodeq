@@ -305,3 +305,50 @@ class TestSnippetEnrichment:
         assert written.get("scope") == "file"
         assert "import os" in written.get("context", "")
         assert ">>>" not in written.get("context", "")
+
+
+class TestEnrichmentIntegration:
+    def test_full_pipeline_enriches_and_preserves_scope(self, tmp_path: Path) -> None:
+        """End-to-end: router enriches finding, JSONL is parseable by evidence parser."""
+        src_file = tmp_path / "src" / "app.py"
+        src_file.parent.mkdir(parents=True)
+        src_file.write_text(
+            "from flask import Flask\n"
+            "\n"
+            "app = Flask(__name__)\n"
+            "\n"
+            "@app.route('/')\n"
+            "def index():\n"
+            "    return 'hello'\n"
+        )
+        findings_file = tmp_path / "findings.jsonl"
+        ctx = CompiledContext(work_dir=tmp_path)
+
+        with open(findings_file, "w") as fh:
+            router = mcp_findings.FindingsRouter(fh, context=ctx)
+            # Normal finding
+            router.receive({
+                "p": "Testability", "t": "violation", "d": "test",
+                "file": "src/app.py", "line": 6, "end_line": 7,
+                "w": "No tests", "reason": "Missing", "severity": "major", "req": "T-1",
+            })
+            # Scope finding
+            router.receive({
+                "p": "Structure", "t": "violation", "d": "test",
+                "file": "src/app.py", "line": 1, "scope": "file",
+                "w": "Wrong layer", "reason": "Because", "severity": "major", "req": "T-2",
+            })
+
+        lines = findings_file.read_text().strip().splitlines()
+        normal = json.loads(lines[0])
+        scoped = json.loads(lines[1])
+
+        # Normal: snippet + context with >>>
+        assert "def index():" in normal["snippet"]
+        assert ">>> def index():" in normal["context"]
+
+        # Scoped: no snippet, context is first lines, scope preserved
+        assert scoped.get("snippet") is None
+        assert scoped["scope"] == "file"
+        assert "from flask import Flask" in scoped["context"]
+        assert ">>>" not in scoped["context"]
