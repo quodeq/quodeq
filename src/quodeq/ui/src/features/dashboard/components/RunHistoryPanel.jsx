@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { formatShortDate, gradeLetter, scoreColorClass } from '../../../utils/formatters.js';
 import {
   ComposedChart,
@@ -50,12 +50,9 @@ function scoreBarColor(score) {
 }
 
 
-function buildTrendData(trend, selectedRunId, selectedRunScore) {
+function buildTrendData(trend, selectedRunId) {
   return [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
-    const isSelected = row.runId === selectedRunId;
-    const numericAverage = isSelected && selectedRunScore != null
-      ? parseFloat(selectedRunScore)
-      : parseFloat(row.numericAverage);
+    const numericAverage = parseFloat(row.numericAverage);
     return {
       ...row,
       numericAverage,
@@ -160,12 +157,12 @@ function ScoreHistoryChart({ data, interaction }) {
   );
 }
 
-export default function RunHistoryPanel({ trend = [], selectedRunId = null, selectedRunScore, onBarClick }) {
+export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
 
   if (!trend || trend.length < 2) return null;
 
-  const data = buildTrendData(trend, selectedRunId, selectedRunScore);
+  const data = useMemo(() => buildTrendData(trend, selectedRunId), [trend, selectedRunId]);
 
   return (
     <section className="run-history-panel panel" aria-label="Score history chart">

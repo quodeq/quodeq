@@ -12,8 +12,10 @@
         "properties": {
           "id": { "type": "string", "minLength": 1 },
           "weight": { "type": "number", "minimum": 0 },
+          "name": { "type": "string" },
           "iso_25010": { "type": "string" },
-          "source": { "type": "string" }
+          "source": { "type": "string" },
+          "type": { "type": "string" }
         },
         "additionalProperties": false
       },

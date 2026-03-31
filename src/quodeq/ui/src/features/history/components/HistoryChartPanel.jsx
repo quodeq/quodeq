@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { formatShortDate, angleFromDelta, scoreTierLabel, gradeLetter } from '../../../utils/formatters.js';
 import {
   ComposedChart,
@@ -13,7 +13,7 @@ import {
   ReferenceLine,
 } from 'recharts';
 
-const MAX_CHART_RUNS = 20;
+const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
@@ -80,17 +80,14 @@ function windowAroundSelected(trend, selectedRunId) {
   return trend.slice(start, end);
 }
 
-function buildTrendData(trend, selectedRunId, selectedRunScore) {
+function buildTrendData(trend, selectedRunId) {
   const windowed = windowAroundSelected(trend, selectedRunId);
   return [...windowed].reverse().map((row, i, arr) => {
-    const isSelected = row.runId === selectedRunId;
-    const numericAverage = isSelected && selectedRunScore != null
-      ? parseFloat(selectedRunScore)
-      : parseFloat(row.numericAverage);
+    const runScore = parseFloat(row.runNumericAverage ?? row.numericAverage);
     return {
       ...row,
-      numericAverage,
-      delta: i > 0 ? numericAverage - parseFloat(arr[i - 1].numericAverage) : null,
+      numericAverage: runScore,
+      delta: i > 0 ? runScore - parseFloat(arr[i - 1].numericAverage) : null,
     };
   });
 }
@@ -207,12 +204,12 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
   );
 }
 
-export default function RunHistoryPanel({ trend = [], selectedRunId = null, selectedRunScore, onBarClick }) {
+export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
 
   if (!trend || trend.length < 2) return null;
 
-  const data = buildTrendData(trend, selectedRunId, selectedRunScore);
+  const data = useMemo(() => buildTrendData(trend, selectedRunId), [trend, selectedRunId]);
   const renderTrendLabel = (props) => <TrendBarLabel {...props} data={data} />;
 
   return (

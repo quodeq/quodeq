@@ -3,6 +3,7 @@ import FolderBrowser from './FolderBrowser.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import DimensionSelector from './DimensionSelector.jsx';
 
+
 const FOLDER_MARGIN_BOTTOM = 8;
 
 function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {

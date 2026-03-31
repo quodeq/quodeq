@@ -5,6 +5,7 @@ import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByP
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import { complianceRatio } from '../../../utils/formatters.js';
+import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
 
 const SUB_TABS = [
   { id: 'dimension', label: 'By Dimension' },
@@ -159,29 +160,49 @@ export default function ViolationsPage({ data, callbacks }) {
   const { onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
   const [activeSubTab, setActiveSubTab] = useState('dimension');
 
+  const visibleDimensions = useMemo(() => {
+    const visibleSet = new Set(readVisibleStandardIds());
+    return accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
+  }, [accumulatedDimensions]);
+
   const topFilesCount = useMemo(
     () => new Set(
-      accumulatedDimensions.flatMap((d) => (d.violations || []).map((v) => v.file)).filter(Boolean)
+      visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.file)).filter(Boolean)
     ).size,
-    [accumulatedDimensions]
+    [visibleDimensions]
   );
 
   const uniquePrinciples = useMemo(
     () => new Set(
-      accumulatedDimensions.flatMap((d) => (d.violations || []).map((v) => v.principle)).filter(Boolean)
+      visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.principle)).filter(Boolean)
     ).size,
-    [accumulatedDimensions]
+    [visibleDimensions]
   );
+
+  const filteredAccumulated = useMemo(() => {
+    if (!accumulated) return accumulated;
+    const { totalViolations, totalCompliance, severity } = computeSummaryFromDimensions(visibleDimensions);
+    return {
+      ...accumulated,
+      summary: {
+        ...accumulated.summary,
+        totalViolations,
+        totalCompliance,
+        dimensionCount: visibleDimensions.length,
+        severity,
+      },
+    };
+  }, [accumulated, visibleDimensions]);
 
   return (
     <div className="violations-page">
-      <ViolationsHeader accumulated={accumulated} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} />
+      <ViolationsHeader accumulated={filteredAccumulated} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} />
       <ViolationsPillNav activeSubTab={activeSubTab} onSubTabChange={setActiveSubTab} />
       {activeSubTab === 'dimension' && (
-        <DimensionSubTab dimensions={accumulatedDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} />
+        <DimensionSubTab dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} />
       )}
       {activeSubTab === 'file' && (
-        <FileSubTab dimensions={accumulatedDimensions} onFileClick={onFileClick} />
+        <FileSubTab dimensions={visibleDimensions} onFileClick={onFileClick} />
       )}
     </div>
   );

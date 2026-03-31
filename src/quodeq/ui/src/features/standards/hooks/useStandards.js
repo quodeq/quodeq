@@ -21,6 +21,7 @@ export function useStandards() {
 
   const grouped = {
     builtin: standards.filter((s) => s.type === 'builtin'),
+    quodeq: standards.filter((s) => s.type === 'quodeq'),
     community: standards.filter((s) => s.type === 'community'),
     custom: standards.filter((s) => s.type === 'custom'),
   };
