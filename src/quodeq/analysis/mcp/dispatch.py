@@ -39,7 +39,7 @@ REPORT_FINDING_SCHEMA = {
         "p": {"type": "string", "description": "Sub-characteristic name — auto-filled from req if omitted"},
         "d": {"type": "string", "description": "Dimension — auto-filled from server config if omitted"},
     },
-    "required": ["req", "t", "file", "line", "snippet", "severity", "w"],
+    "required": ["req", "t", "file", "line", "snippet", "severity", "w", "context", "reason"],
 }
 
 _DEFAULT_FILE_BATCH_SIZE = 5
