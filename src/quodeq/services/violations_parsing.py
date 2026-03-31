@@ -83,6 +83,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
 
 def _parse_jsonl_findings(
     lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
+    req_to_principle: dict[str, str] | None = None,
 ) -> tuple[list[Finding], list[Finding]]:
     """Parse raw JSONL lines into deduplicated violation and compliance lists."""
     violations: list[Finding] = []
@@ -96,9 +97,11 @@ def _parse_jsonl_findings(
             obj = json.loads(raw)
         except json.JSONDecodeError:
             continue
-        if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
+        principle = obj.get("p") or obj.get("req")
+        if not principle or obj.get("t") not in _FINDING_TYPES:
             continue
-        dedup_key = (obj.get("p"), obj.get("t"), obj.get("file"), obj.get("line"))
+        obj["p"] = req_to_principle.get(principle, principle) if req_to_principle else principle
+        dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
@@ -110,15 +113,39 @@ def _parse_jsonl_findings(
     return violations, compliance
 
 
+def _load_req_to_principle(dimension: str) -> dict[str, str]:
+    """Load req ID → principle name mapping for custom evaluators."""
+    from quodeq.config.paths import default_paths
+    evaluators_dir = default_paths().evaluators_dir
+    if not evaluators_dir.is_dir():
+        return {}
+    path = evaluators_dir / f"{dimension}.json"
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        mapping: dict[str, str] = {}
+        for p in data.get("principles", []):
+            pname = p.get("name", "")
+            for req in p.get("requirements", []):
+                rid = req.get("id", "")
+                if rid and pname:
+                    mapping[rid] = pname
+        return mapping
+    except (OSError, ValueError):
+        return {}
+
+
 def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
 ) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
+    req_to_principle = _load_req_to_principle(ctx.dimension)
     try:
         with open_text(jsonl_path) as _f:
-            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup)
+            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup, req_to_principle)
     except OSError as exc:
         _logger.warning("Failed to read findings file: %s", exc)
         return None
