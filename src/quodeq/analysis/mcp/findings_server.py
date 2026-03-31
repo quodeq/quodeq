@@ -74,6 +74,8 @@ class FindingsRouter:
 
     _CONTEXT_LINES = 5
     _SCOPE_PREVIEW_LINES = 10
+    _MAX_SNIPPET_LINES = 15
+    _SNIPPET_HEAD_TAIL = 5
 
     def _enrich_code(self, finding: dict) -> None:
         """Fill snippet and context by reading the source file from work_dir."""
@@ -109,18 +111,28 @@ class FindingsRouter:
         line = max(1, min(line, len(source_lines)))
         end_line = max(line, min(end_line, len(source_lines)))
 
-        # Build snippet (the offending lines)
+        # Build snippet (the offending lines), capped for large spans
         snippet_lines = source_lines[line - 1:end_line]
-        finding["snippet"] = "\n".join(snippet_lines)
+        if len(snippet_lines) > self._MAX_SNIPPET_LINES:
+            head = snippet_lines[:self._SNIPPET_HEAD_TAIL]
+            tail = snippet_lines[-self._SNIPPET_HEAD_TAIL:]
+            omitted = len(snippet_lines) - 2 * self._SNIPPET_HEAD_TAIL
+            finding["snippet"] = "\n".join(head + [f"    ... ({omitted} more lines)"] + tail)
+        else:
+            finding["snippet"] = "\n".join(snippet_lines)
 
-        # Build context with >>> markers
-        ctx_start = max(0, line - 1 - self._CONTEXT_LINES)
-        ctx_end = min(len(source_lines), end_line + self._CONTEXT_LINES)
-        context_parts = []
-        for i in range(ctx_start, ctx_end):
-            prefix = ">>> " if line - 1 <= i < end_line else ""
-            context_parts.append(f"{prefix}{source_lines[i]}")
-        finding["context"] = "\n".join(context_parts)
+        # Build context: only add surrounding lines for small snippets
+        if len(snippet_lines) > 10:
+            # Large snippet IS the context — no surrounding lines needed
+            finding["context"] = finding["snippet"]
+        else:
+            ctx_start = max(0, line - 1 - self._CONTEXT_LINES)
+            ctx_end = min(len(source_lines), end_line + self._CONTEXT_LINES)
+            context_parts = []
+            for i in range(ctx_start, ctx_end):
+                prefix = ">>> " if line - 1 <= i < end_line else ""
+                context_parts.append(f"{prefix}{source_lines[i]}")
+            finding["context"] = "\n".join(context_parts)
 
     def _enrich(self, args: dict, finding: dict) -> None:
         """Auto-fill principle, dimension, and refs from compiled standards."""
