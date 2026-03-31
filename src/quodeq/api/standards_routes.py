@@ -68,6 +68,32 @@ def register_standards_routes(app: Flask) -> None:
             return error_response(f"Import failed: {exc}", 502, "import_error")
         return jsonify({"status": "imported"}), 201
 
+    @app.post("/api/standards/import")
+    def import_standard() -> tuple[Response, int]:
+        svc = _get_service(app)
+        payload = request.get_json(force=True)
+        data = payload.get("data")
+        if not data or not isinstance(data, dict):
+            return error_response("'data' field is required and must be an object", 400, "bad_request")
+        force = payload.get("force", False)
+        try:
+            result = svc.import_from_file(data, force=force)
+        except ValueError as exc:
+            return error_response(str(exc), 400, "validation_error")
+        except PermissionError as exc:
+            return error_response(str(exc), 403, "forbidden")
+        if result["status"] == "conflict":
+            return jsonify({
+                "status": "conflict",
+                "existing": to_camel_dict(result["existing"]),
+                "warnings": result["warnings"],
+            }), 409
+        return jsonify({
+            "status": "imported",
+            "detail": to_camel_dict(result["detail"]),
+            "warnings": result["warnings"],
+        }), 201
+
     @app.get("/api/standards/<standard_id>")
     def get_standard(standard_id: str) -> Response:
         svc = _get_service(app)

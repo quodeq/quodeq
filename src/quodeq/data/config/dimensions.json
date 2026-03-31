@@ -35,6 +35,20 @@
       "weight": 0.6,
       "iso_25010": "Flexibility",
       "source": "ISO/IEC 25010:2023"
+    },
+    {
+      "id": "clean-architecture",
+      "name": "Clean Architecture",
+      "weight": 1.0,
+      "source": "Robert C. Martin",
+      "type": "quodeq"
+    },
+    {
+      "id": "domain-driven-design",
+      "name": "Domain-Driven Design",
+      "weight": 1.0,
+      "source": "Eric Evans / Vaughn Vernon",
+      "type": "quodeq"
     }
   ]
 }
