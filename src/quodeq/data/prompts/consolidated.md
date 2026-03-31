@@ -20,7 +20,7 @@ You are a code quality analyst evaluating **{{REPO_NAME}}** across these dimensi
 
 ## report_finding parameters
 
-**Required:** `req` (the **bold requirement ID**, e.g. `M-MOD-1`, `S-CON-3` — server auto-fills principle name and dimension), `t` (`violation` or `compliance`), `file`, `line`, `snippet` (under 200 chars), `severity` (`critical`/`major`/`minor`), `w` (short description)
+**Required:** `req` (the **exact requirement ID from the checklist below**, e.g. `M-MOD-1`, `S-CON-3` — you MUST use the IDs exactly as listed, do NOT invent new ones), `t` (`violation` or `compliance`), `file`, `line`, `snippet` (under 200 chars), `severity` (`critical`/`major`/`minor`), `w` (short description)
 
 **Optional:** `reason` (why this is a violation or compliance), `context` (~10 lines of surrounding code centered on the violation line, with the violation line prefixed by ">>>" to mark it)
 
