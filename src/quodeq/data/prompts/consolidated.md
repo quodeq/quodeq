@@ -29,7 +29,7 @@ You are a code quality analyst evaluating **{{REPO_NAME}}** across these dimensi
 - Call `report_finding` immediately after confirming each finding — do not batch
 - If it says "Duplicate", move on — already captured
 - **Report BOTH violations AND compliance** — scoring uses the ratio
-- Every finding must have a specific file, line, and snippet
+- Every finding must have a specific file and line
 - Do not fabricate findings — only report what you can see in the code
 - Skip generated, vendored, and dependency directories
 
