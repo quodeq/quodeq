@@ -13,6 +13,7 @@ class ServerArgs:
     dimension: str | None = None
     queue_path: str | None = None
     agent_id: str = ""
+    work_dir: str | None = None
 
     @property
     def dimensions(self) -> list[str]:
@@ -27,6 +28,7 @@ _FLAG_MAP = {
     "--dimension": "dimension",
     "--queue": "queue_path",
     "--agent-id": "agent_id",
+    "--work-dir": "work_dir",
 }
 
 _USAGE = """\
@@ -37,6 +39,7 @@ Options:
   --dimension DIM      Dimension to evaluate
   --queue PATH         Path to the file queue JSON
   --agent-id ID        Agent identifier
+  --work-dir DIR       Source repo root for snippet enrichment
   -h, --help           Show this help message and exit
 """
 

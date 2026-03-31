@@ -9,6 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
+from quodeq.analysis.mcp.args import parse_args
 from quodeq.engine import mcp_findings
 from quodeq.analysis.mcp.findings_server import CompiledContext
 
@@ -189,3 +190,13 @@ class TestFindingsRouterMultiDimension:
         import json
         line = json.loads(fh.getvalue().strip())
         assert line["d"] == "security"
+
+
+class TestParseArgs:
+    def test_work_dir_flag(self) -> None:
+        sa = parse_args(["findings.jsonl", "--work-dir", "/tmp/repo"])
+        assert sa.work_dir == "/tmp/repo"
+
+    def test_work_dir_default_none(self) -> None:
+        sa = parse_args(["findings.jsonl"])
+        assert sa.work_dir is None
