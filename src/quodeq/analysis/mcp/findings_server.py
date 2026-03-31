@@ -72,6 +72,56 @@ class FindingsRouter:
         self._work_dir = ctx.work_dir
         self.counter = 0
 
+    _CONTEXT_LINES = 5
+    _SCOPE_PREVIEW_LINES = 10
+
+    def _enrich_code(self, finding: dict) -> None:
+        """Fill snippet and context by reading the source file from work_dir."""
+        if self._work_dir is None:
+            return
+        file_path = finding.get("file")
+        if not file_path:
+            return
+        try:
+            full_path = self._work_dir / file_path
+            source_lines = full_path.read_text().splitlines()
+        except (OSError, UnicodeDecodeError):
+            finding.setdefault("snippet", "")
+            finding.setdefault("context", "")
+            return
+
+        line = finding.get("line", 0)
+        scope = finding.get("scope")
+
+        # Scope-level or line=0: show first N lines, no highlighting
+        if scope or not line:
+            finding["snippet"] = None
+            finding["scope"] = scope or "file"
+            preview = source_lines[:self._SCOPE_PREVIEW_LINES]
+            finding["context"] = "\n".join(preview)
+            return
+
+        # Normal line-level enrichment
+        end_line = finding.get("end_line") or line
+        if end_line < line:
+            line, end_line = end_line, line
+        # Clamp to file boundaries (1-indexed)
+        line = max(1, min(line, len(source_lines)))
+        end_line = max(line, min(end_line, len(source_lines)))
+
+        # Build snippet (the offending lines)
+        snippet_lines = source_lines[line - 1:end_line]
+        finding["snippet"] = "\n".join(snippet_lines)
+
+        # Build context with >>> markers
+        ctx_start = max(0, line - 1 - self._CONTEXT_LINES)
+        ctx_end = min(len(source_lines), end_line + self._CONTEXT_LINES)
+        context_parts = []
+        for i in range(ctx_start, ctx_end):
+            prefix = ">>> " if line - 1 <= i < end_line else ""
+            context_parts.append(f"{prefix}{source_lines[i]}")
+        finding["context"] = "\n".join(context_parts)
+
     def _enrich(self, args: dict, finding: dict) -> None:
         """Auto-fill principle, dimension, and refs from compiled standards."""
         req = args.get("req")
@@ -107,6 +157,7 @@ class FindingsRouter:
         finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
         finding.update({k: v for k, v in args.items() if v is not None})
         self._enrich(args, finding)
+        self._enrich_code(finding)
 
         self._fh.write(json.dumps(finding) + "\n")
         self._fh.flush()
