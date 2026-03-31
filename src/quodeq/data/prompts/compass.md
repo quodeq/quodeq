@@ -21,10 +21,10 @@ For EVERY finding (violation or compliance), call `report_finding` with:
 - `t` — `violation` or `compliance`
 - `file` — file path relative to repo root
 - `line` — line number
-- `snippet` — 1-5 lines showing the complete violation pattern — include all lines that participate in the violation, not just one (under 500 chars)
+- `end_line` — last line of the violation pattern (omit if single line)
+- `scope` — set to `file`, `class`, or `module` when the finding affects an entire scope rather than specific lines
 - `severity` — `critical`, `major`, or `minor`
 - `w` — short description of what you found
-- `context` — ~10 lines of surrounding code centered on the finding, with the key line prefixed by ">>>"
 - `reason` — why this is a violation or compliance
 
 ## Severity Definitions
