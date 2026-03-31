@@ -2003,8 +2003,8 @@
 }
 
 .dimension-chip-type--quodeq {
-  background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
-  color: var(--color-warning, #f59e0b);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
 }
 
 .dimension-chip-type--custom {

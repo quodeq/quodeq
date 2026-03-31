@@ -62,7 +62,7 @@ function useEvaluationForm(onStart) {
   const handleSubmit = (e) => {
     e.preventDefault();
     const payload = { repo };
-    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) payload.dimensions = [...selectedDims];
+    if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
     onStart(payload);
     setRepo('');
     setSelectedDims(new Set());

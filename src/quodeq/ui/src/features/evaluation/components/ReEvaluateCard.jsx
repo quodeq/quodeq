@@ -47,7 +47,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
 
   function buildPayload(extra) {
     const payload = { repo: info.path, ...extra };
-    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
+    if (selectedDims.size > 0) {
       payload.dimensions = [...selectedDims];
     }
     return payload;

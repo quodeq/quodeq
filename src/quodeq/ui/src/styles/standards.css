@@ -140,8 +140,8 @@
 }
 
 .standard-type-badge--quodeq {
-  background: color-mix(in srgb, var(--color-warning, #f59e0b) 15%, transparent);
-  color: var(--color-warning, #f59e0b);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
 }
 
 .standard-type-badge--community {
@@ -298,7 +298,7 @@
 }
 
 .editor-stat-type--builtin { color: var(--color-accent); }
-.editor-stat-type--quodeq { color: var(--color-warning, #f59e0b); }
+.editor-stat-type--quodeq { color: var(--color-accent); }
 .editor-stat-type--community { color: var(--primitive-green-700, #4ade80); }
 .editor-stat-type--custom { color: var(--color-text-muted); }
 
