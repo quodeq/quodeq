@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -25,6 +26,13 @@ def _max_violation_files(override: int | None = None, env: dict[str, str] | None
     return _env_int("QUODEQ_MAX_VIOLATION_FILES", _DEFAULT_MAX_VIOLATION_FILES, env=env)
 
 
+@dataclass(frozen=True)
+class _FsCallbacks:
+    """Injectable filesystem callbacks for testing resolve_dimension_eval without a real FS."""
+    exists_fn: Callable[[Path], bool] = Path.exists
+    stat_fn: Callable[[Path], Any] = Path.stat
+
+
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     compiled_dir: Path | None = None,
@@ -35,8 +43,12 @@ def resolve_dimension_eval(
 
     *exists_fn* and *stat_fn* are injectable for testing without a real filesystem.
     """
-    _exists = exists_fn or Path.exists
-    _stat = stat_fn or Path.stat
+    fs = _FsCallbacks(
+        exists_fn=exists_fn if exists_fn is not None else Path.exists,
+        stat_fn=stat_fn if stat_fn is not None else Path.stat,
+    )
+    _exists = fs.exists_fn
+    _stat = fs.stat_fn
 
     eval_path = base / "evaluation" / f"{dimension}.json"
     if _exists(eval_path):

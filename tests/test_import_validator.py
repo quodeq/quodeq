@@ -1,7 +1,7 @@
 # tests/test_import_validator.py
 """Tests for evaluator import validation pipeline."""
 import pytest
-from quodeq.services.import_validator import validate_import, scan_injection
+from quodeq.services.import_validator import validate_import, scan_injection, _MAX_NAME, _MAX_DESCRIPTION, _MAX_REQ_TEXT
 
 
 class TestValidateImport:
@@ -95,7 +95,7 @@ class TestValidateImport:
         data = {"id": "test", "name": "A" * 1000, "principles": []}
         result = validate_import(data)
         assert result["valid"] is True
-        assert len(result["data"]["name"]) == 500
+        assert len(result["data"]["name"]) == _MAX_NAME
 
     def test_truncates_long_description(self):
         data = {
@@ -105,7 +105,7 @@ class TestValidateImport:
         }
         result = validate_import(data)
         assert result["valid"] is True
-        assert len(result["data"]["description"]) == 2000
+        assert len(result["data"]["description"]) == _MAX_DESCRIPTION
 
     def test_truncates_long_requirement_text(self):
         data = {
@@ -119,7 +119,7 @@ class TestValidateImport:
         }
         result = validate_import(data)
         assert result["valid"] is True
-        assert len(result["data"]["principles"][0]["requirements"][0]["text"]) == 2000
+        assert len(result["data"]["principles"][0]["requirements"][0]["text"]) == _MAX_REQ_TEXT
 
 
 class TestScanInjection:

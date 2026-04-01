@@ -125,10 +125,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
             standard={standard}
             selectedNode={selectedNode}
             onSelectNode={setSelectedNode}
-            onAddPrinciple={addPrinciple}
-            onRemovePrinciple={removePrinciple}
-            onAddRequirement={addRequirement}
-            onRemoveRequirement={removeRequirement}
+            actions={{ onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement }}
             editable={editable}
           />
         </div>

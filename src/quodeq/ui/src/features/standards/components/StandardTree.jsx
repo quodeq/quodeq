@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 
-function TreeNode({ label, isSelected, onClick, onAdd, onRemove, addTitle, removeTitle, children, depth = 0, alwaysExpanded = false, defaultExpanded = true }) {
+function TreeNode({ node, actions, titles, children }) {
+  const { label, isSelected, depth = 0, alwaysExpanded = false, defaultExpanded = true } = node;
+  const { onClick, onAdd, onRemove } = actions;
+  const { addTitle, removeTitle } = titles || {};
   const [expanded, setExpanded] = useState(alwaysExpanded || defaultExpanded);
 
   useEffect(() => {
@@ -58,7 +61,8 @@ function TreeNode({ label, isSelected, onClick, onAdd, onRemove, addTitle, remov
   );
 }
 
-export default function StandardTree({ standard, selectedNode, onSelectNode, onAddPrinciple, onRemovePrinciple, onAddRequirement, onRemoveRequirement, editable }) {
+export default function StandardTree({ standard, selectedNode, onSelectNode, actions, editable }) {
+  const { onAddPrinciple, onRemovePrinciple, onAddRequirement, onRemoveRequirement } = actions || {};
   if (!standard) return null;
 
   const isRootSelected = selectedNode?.type === 'root';
@@ -66,13 +70,9 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, onA
   return (
     <div className="standard-tree">
       <TreeNode
-        label={standard.name || 'Standard'}
-        isSelected={isRootSelected}
-        onClick={() => onSelectNode({ type: 'root' })}
-        onAdd={editable ? onAddPrinciple : undefined}
-        addTitle="Add Principle"
-        depth={0}
-        alwaysExpanded
+        node={{ label: standard.name || 'Standard', isSelected: isRootSelected, depth: 0, alwaysExpanded: true }}
+        actions={{ onClick: () => onSelectNode({ type: 'root' }), onAdd: editable ? onAddPrinciple : undefined }}
+        titles={{ addTitle: 'Add Principle' }}
       >
         {(standard.principles || []).map((principle, pi) => {
           const isPrincipleSelected = selectedNode?.type === 'principle' && selectedNode.index === pi;
@@ -86,15 +86,13 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, onA
           return (
             <TreeNode
               key={pi}
-              label={principle.name || `Principle ${pi + 1}`}
-              isSelected={isPrincipleSelected}
-              onClick={() => onSelectNode({ type: 'principle', index: pi })}
-              onAdd={editable ? () => onAddRequirement(pi) : undefined}
-              onRemove={editable ? handleRemovePrinciple : undefined}
-              addTitle="Add Requirement"
-              removeTitle="Remove Principle"
-              depth={1}
-              defaultExpanded={false}
+              node={{ label: principle.name || `Principle ${pi + 1}`, isSelected: isPrincipleSelected, depth: 1, defaultExpanded: false }}
+              actions={{
+                onClick: () => onSelectNode({ type: 'principle', index: pi }),
+                onAdd: editable ? () => onAddRequirement(pi) : undefined,
+                onRemove: editable ? handleRemovePrinciple : undefined,
+              }}
+              titles={{ addTitle: 'Add Requirement', removeTitle: 'Remove Principle' }}
             >
               {(principle.requirements || []).map((req, ri) => {
                 const isReqSelected = selectedNode?.type === 'requirement' && selectedNode.principleIndex === pi && selectedNode.reqIndex === ri;
@@ -108,12 +106,12 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, onA
                 return (
                   <TreeNode
                     key={ri}
-                    label={req.text || `Requirement ${ri + 1}`}
-                    isSelected={isReqSelected}
-                    onClick={() => onSelectNode({ type: 'requirement', principleIndex: pi, reqIndex: ri })}
-                    onRemove={editable ? handleRemoveReq : undefined}
-                    removeTitle="Remove Requirement"
-                    depth={2}
+                    node={{ label: req.text || `Requirement ${ri + 1}`, isSelected: isReqSelected, depth: 2 }}
+                    actions={{
+                      onClick: () => onSelectNode({ type: 'requirement', principleIndex: pi, reqIndex: ri }),
+                      onRemove: editable ? handleRemoveReq : undefined,
+                    }}
+                    titles={{ removeTitle: 'Remove Requirement' }}
                   />
                 );
               })}

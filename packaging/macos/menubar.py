@@ -237,21 +237,25 @@ class QuodeqApp(rumps.App):
             return
         self._wait_for_dashboard(stderr_log)
 
+    def _handle_crashed_process(self, stderr_log) -> None:
+        """Report a crashed dashboard process and clean up."""
+        stderr_log.close()
+        try:
+            with open(stderr_log.name) as f:
+                err = f.read(_STDERR_READ_MAX).strip()
+        except OSError:
+            err = "unknown error"
+        self._set_error(f"Crashed (exit {self._process.returncode}): {err[:_ERROR_DISPLAY_MAX]}")
+        self._status_item.title = "Stopped"
+        self._cleanup_stderr_log()
+
     def _wait_for_dashboard(self, stderr_log):
         """Poll until the dashboard responds or process crashes."""
         try:
             for _ in range(_MAX_START_RETRIES):
                 time.sleep(_HEALTH_POLL_INTERVAL_S)
                 if self._process.poll() is not None:
-                    stderr_log.close()
-                    try:
-                        with open(stderr_log.name) as f:
-                            err = f.read(_STDERR_READ_MAX).strip()
-                    except OSError:
-                        err = "unknown error"
-                    self._set_error(f"Crashed (exit {self._process.returncode}): {err[:_ERROR_DISPLAY_MAX]}")
-                    self._status_item.title = "Stopped"
-                    self._cleanup_stderr_log()
+                    self._handle_crashed_process(stderr_log)
                     return
                 port = self._find_running_port()
                 if port:

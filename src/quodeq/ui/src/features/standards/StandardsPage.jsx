@@ -82,11 +82,7 @@ export default function StandardsPage() {
       ) : (
         <StandardsList
           grouped={grouped}
-          onEdit={handleEdit}
-          onDelete={handleDeleteWithCleanup}
-          onDuplicate={handleDuplicate}
-          isVisible={isVisible}
-          onToggleVisibility={toggle}
+          actions={{ onEdit: handleEdit, onDelete: handleDeleteWithCleanup, onDuplicate: handleDuplicate, isVisible, onToggleVisibility: toggle }}
         />
       )}
 

@@ -57,25 +57,32 @@ class AnalysisConfig:
     work_dir: Path | None = None
 
 
+@dataclass(frozen=True)
+class _AgentParams:
+    """Optional grouping of per-agent MCP config parameters."""
+    queue_path: Path | None = None
+    agent_id: str = ""
+    work_dir: Path | None = None
+
+
 def _create_mcp_config(
     jsonl_file: Path,
     compiled_dir: Path | None = None,
     dimension: str | None = None,
-    queue_path: Path | None = None,
-    agent_id: str = "",
-    work_dir: Path | None = None,
+    agent_params: _AgentParams | None = None,
 ) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
+    ap = agent_params or _AgentParams()
     mcp_script = str(Path(__file__).resolve().parent / "mcp" / "findings_server.py")
     mcp_args = [mcp_script, str(jsonl_file.resolve())]
     if compiled_dir and dimension:
         mcp_args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
-    if queue_path:
-        mcp_args.extend(["--queue", str(queue_path.resolve())])
-    if agent_id:
-        mcp_args.extend(["--agent-id", agent_id])
-    if work_dir:
-        mcp_args.extend(["--work-dir", str(work_dir.resolve())])
+    if ap.queue_path:
+        mcp_args.extend(["--queue", str(ap.queue_path.resolve())])
+    if ap.agent_id:
+        mcp_args.extend(["--agent-id", ap.agent_id])
+    if ap.work_dir:
+        mcp_args.extend(["--work-dir", str(ap.work_dir.resolve())])
     config = {
         "mcpServers": {
             "findings": {
@@ -131,8 +138,7 @@ def _build_ai_cmd(
     if config.jsonl_file is not None:
         mcp_config_path = _create_mcp_config(
             config.jsonl_file, config.compiled_dir, config.dimension,
-            config.queue_path, config.agent_id,
-            work_dir=config.work_dir or work_dir,
+            _AgentParams(queue_path=config.queue_path, agent_id=config.agent_id, work_dir=config.work_dir or work_dir),
         )
         args.extend(["--mcp-config", str(mcp_config_path)])
         allowed = _MCP_TOOL_REPORT_FINDING

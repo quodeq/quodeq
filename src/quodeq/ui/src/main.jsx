@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './styles/index.css';
+import { resolveDataTheme } from './utils/themeResolver.js';
 
 const LS_THEME = 'cc-theme';
 const LS_THEME_MODE = 'cc-theme-mode';
@@ -26,12 +27,9 @@ function applyInitialTheme() {
   const mode = localStorage.getItem(LS_THEME_MODE) || 'system';
   const family = localStorage.getItem(LS_THEME_FAMILY) || 'daruma';
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const effectiveMode = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
-  // NOTE: This logic must mirror resolveDataTheme() in useAppSettings.js
-  if (family === 'daruma') {
-    if (mode !== 'system') document.documentElement.setAttribute('data-theme', effectiveMode);
-  } else {
-    document.documentElement.setAttribute('data-theme', `${family}-${effectiveMode}`);
+  const dataTheme = resolveDataTheme(mode, family, prefersDark);
+  if (dataTheme !== null) {
+    document.documentElement.setAttribute('data-theme', dataTheme);
   }
 }
 

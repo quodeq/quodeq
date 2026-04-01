@@ -1,3 +1,4 @@
+# DEPRECATED: import directly from quodeq.analysis.subagents.pool
 """Re-export for backward compatibility -- moved to quodeq.analysis.subagents.pool.
 
 Deprecated: import directly from ``quodeq.analysis.subagents.pool`` instead.
