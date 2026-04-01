@@ -37,7 +37,11 @@ _CWE_API_URL = "https://cwe-api.mitre.org/api/v1/cwe"
 
 def _default_api_base(env: dict[str, str] | None = None) -> str:
     """Return CWE API base URL, reading from *env* (or os.environ) lazily."""
-    return (env if env is not None else os.environ).get("CWE_API_BASE", _CWE_API_URL)
+    value = (env if env is not None else os.environ).get("CWE_API_BASE", _CWE_API_URL)
+    if not value.startswith(("http://", "https://")):
+        # Env var contains an invalid scheme; fall back to the known-good default.
+        return _CWE_API_URL
+    return value
 
 
 def get_all_cwes(standards_dir: Path | None = None) -> dict[int, list[str]]:
@@ -59,6 +63,8 @@ def _fetch_cwe_endpoint(
 ) -> dict | None:
     """Fetch a CWE entity from *endpoint* and return the first item under *collection_key*."""
     url = f"{api_base}/{endpoint}/{cwe_id}"
+    if not url.startswith(("http://", "https://")):
+        return None
     try:
         req = urllib.request.Request(url, headers={"Accept": "application/json"})
         with urllib.request.urlopen(req, timeout=_API_TIMEOUT_S) as resp:
