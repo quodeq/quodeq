@@ -87,6 +87,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
 def _parse_jsonl_findings(
     lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
     req_to_principle: dict[str, str] | None = None,
+    dismissed_keys: "set[tuple] | None" = None,
 ) -> tuple[list[Finding], list[Finding]]:
     """Parse raw JSONL lines into deduplicated violation and compliance lists."""
     violations: list[Finding] = []
@@ -103,6 +104,12 @@ def _parse_jsonl_findings(
         principle = obj.get("p") or obj.get("req")
         if not principle or obj.get("t") not in _FINDING_TYPES:
             continue
+        # Skip dismissed findings — match by req ID (e.g. "M-MOD-3"), not principle name
+        if dismissed_keys and obj.get("t") == _TYPE_VIOLATION:
+            req_id = obj.get("req") or principle
+            dismissed_key = (req_id, obj.get("file", ""), obj.get("line", 0))
+            if dismissed_key in dismissed_keys:
+                continue
         obj["p"] = req_to_principle.get(principle, principle) if req_to_principle else principle
         dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
         if dedup_key in seen:
@@ -149,13 +156,16 @@ def _load_req_to_principle(dimension: str, evaluators_dir: "Path | None" = None)
 def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
+    dismissed_keys: "set[tuple] | None" = None,
 ) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
     req_to_principle = _load_req_to_principle(ctx.dimension)
     try:
         with open_text(jsonl_path) as _f:
-            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup, req_to_principle)
+            violations, compliance = _parse_jsonl_findings(
+                _f, ctx.dimension, req_refs_lookup, req_to_principle, dismissed_keys=dismissed_keys,
+            )
     except OSError as exc:
         _logger.warning("Failed to read findings file: %s", exc)
         return None

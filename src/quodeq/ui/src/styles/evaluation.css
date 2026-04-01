@@ -1953,6 +1953,23 @@
   margin-left: auto;
 }
 
+/* Dismiss button on violation cards */
+.dismiss-btn {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+}
+.dismiss-btn:hover {
+  color: #f0883e;
+  border-color: #f0883e;
+}
+
 /* Dimension label inline in the row (file detail page) */
 .vlive-dimension-inline {
   font-family: var(--font-data);
@@ -2086,4 +2103,102 @@
 .folder-new-btn {
   font-size: 1.1rem;
   font-weight: bold;
+}
+
+/* ── Dismissed findings section ─────────────────────── */
+.dismissed-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding: 10px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 150ms ease;
+  user-select: none;
+}
+.dismissed-bar:hover { background: var(--color-surface-alt); }
+.dismissed-bar-icon {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  transition: transform 200ms ease;
+  display: inline-block;
+  width: 12px;
+}
+.dismissed-bar-icon.open { transform: rotate(90deg); }
+.dismissed-bar-label { font-size: 0.82rem; color: var(--color-text-muted); }
+.dismissed-bar-count {
+  font-size: 0.68rem;
+  background: rgba(139, 148, 158, 0.15);
+  color: var(--color-text-muted);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.dismissed-bar-note {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+.dismissed-list-inner { padding-top: 12px; }
+.dismissed-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  margin-bottom: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  opacity: 0.55;
+  transition: opacity 200ms ease;
+}
+.dismissed-card:hover { opacity: 0.8; }
+.dismissed-card-body { flex: 1; min-width: 0; }
+.dismissed-card-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.dismissed-tag {
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(139, 148, 158, 0.12);
+  color: var(--color-text-muted);
+}
+.dismissed-label { font-size: 0.78rem; color: var(--color-text-muted); }
+.dismissed-file {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--color-text-muted);
+}
+.dismissed-reason {
+  font-size: 0.78rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  margin-top: 2px;
+}
+.restore-btn {
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.restore-btn:hover {
+  border-color: var(--color-accent);
+  background: rgba(88, 166, 255, 0.08);
 }

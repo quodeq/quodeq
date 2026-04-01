@@ -30,6 +30,7 @@ from quodeq.api.routes import (
     register_static_routes,
 )
 from quodeq.api.standards_routes import register_standards_routes
+from quodeq.api.routes_findings import register_findings_routes
 
 _HEALTH_PATH = "/api/health"
 _RATE_LIMITED_GET_PATHS = frozenset({"/api/browse"})
@@ -172,6 +173,7 @@ def _register_all_routes(
     register_evaluation_item_routes(app, provider)
     register_discovery_routes(app, provider)
     register_standards_routes(app)
+    register_findings_routes(app)
     register_static_routes(app, static_dist)
 
 

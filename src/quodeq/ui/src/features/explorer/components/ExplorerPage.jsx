@@ -186,6 +186,7 @@ function buildEvalPrincipalFn(evalData, complianceByPrinciple) {
     const pg = (evalData.principleGrades || []).find((p) => p.principle === principleId);
     return {
       principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
+      dimension: evalData.dimension || '',
       principleData, dimViolations: principleData?.violations || [],
       dimCompliance: complianceByPrinciple.get(principleId) || [],
     };

@@ -34,6 +34,50 @@ class _ResolveOptions:
     compiled_dir: Path | None = None
 
 
+def _dismissed_key_for_violation(v: dict) -> tuple:
+    """Build a (req, file, line) key from a violation dict.
+
+    Handles two formats:
+    - Separated: file="path/to/file.py", line=42
+    - Combined: file="path/to/file.py:42", line=None
+    """
+    req = v.get("req", "")
+    raw_file = v.get("file", "")
+    line = v.get("line")
+    if line is not None:
+        return (req, raw_file, line)
+    # Parse line from "file:line" format
+    if ":" in raw_file:
+        parts = raw_file.rsplit(":", 1)
+        try:
+            return (req, parts[0], int(parts[1]))
+        except (ValueError, IndexError):
+            pass
+    return (req, raw_file, 0)
+
+
+def _filter_dismissed_from_result(
+    result: "ViolationResponse | dict[str, Any] | None",
+    dkeys: "set[tuple]",
+) -> "ViolationResponse | dict[str, Any] | None":
+    """Remove dismissed violations from any result format."""
+    if not result or not dkeys:
+        return result
+    if isinstance(result, dict):
+        if "violations" in result:
+            result["violations"] = [
+                v for v in result["violations"]
+                if _dismissed_key_for_violation(v) not in dkeys
+            ]
+        for p in result.get("principles", []):
+            if "violations" in p:
+                p["violations"] = [
+                    v for v in p["violations"]
+                    if _dismissed_key_for_violation(v) not in dkeys
+                ]
+    return result
+
+
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     options: _ResolveOptions | None = None,
@@ -43,14 +87,19 @@ def resolve_dimension_eval(
     *options* bundles injectable filesystem callbacks and the compiled
     standards directory for testing without a real FS.
     """
+    from quodeq.services.dismissed import dismissed_keys as _dismissed_keys
+
     opts = options or _ResolveOptions()
     _exists = opts.exists_fn
     _stat = opts.stat_fn
     compiled_dir = opts.compiled_dir
+    dkeys = _dismissed_keys(base.parent)
 
     eval_path = base / "evaluation" / f"{dimension}.json"
     if _exists(eval_path):
-        return parse_eval_from_json(eval_path, project, run_id, dimension)
+        return _filter_dismissed_from_result(
+            parse_eval_from_json(eval_path, project, run_id, dimension), dkeys,
+        )
 
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
     if _exists(markdown_path):
@@ -58,18 +107,25 @@ def resolve_dimension_eval(
             content = read_text(markdown_path)
         except OSError:
             return None
-        return parse_eval_markdown(content, project, run_id, dimension)
+        return _filter_dismissed_from_result(
+            parse_eval_markdown(content, project, run_id, dimension), dkeys,
+        )
 
     ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
 
     evidence_path = base / "evidence" / f"{dimension}_evidence.json"
     if _exists(evidence_path):
-        return parse_violations_from_evidence(evidence_path, ctx)
+        return _filter_dismissed_from_result(
+            parse_violations_from_evidence(evidence_path, ctx), dkeys,
+        )
 
     jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
     stream_path = base / "evidence" / f"{dimension}_live.stream"
     if _exists(jsonl_path) and _stat(jsonl_path).st_size > 0:
-        return parse_violations_from_jsonl(jsonl_path, stream_path, ctx, compiled_dir=compiled_dir)
+        return parse_violations_from_jsonl(
+            jsonl_path, stream_path, ctx, compiled_dir=compiled_dir,
+            dismissed_keys=dkeys,
+        )
 
     if _exists(stream_path):
         return parse_violations_from_stream(stream_path, ctx)

@@ -1,25 +1,28 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import DimensionViolationsRow from '../../dashboard/components/DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
+import { listDismissedFindings, restoreFinding } from '../../../api/index.js';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import { complianceRatio } from '../../../utils/formatters.js';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
 
-const SUB_TABS = [
-  { id: 'dimension', label: 'By Dimension' },
-  { id: 'file', label: 'By File' },
-];
-
-function ViolationsPillNav({ activeSubTab, onSubTabChange }) {
+function ViolationsPillNav({ activeSubTab, onSubTabChange, dismissedCount }) {
+  const tabs = [
+    { id: 'dimension', label: 'By Dimension' },
+    { id: 'file', label: 'By File' },
+  ];
+  if (dismissedCount > 0) {
+    tabs.push({ id: 'dismissed', label: `Dismissed (${dismissedCount})` });
+  }
   return (
     <div className="violations-pill-nav">
-      {SUB_TABS.map((tab) => (
+      {tabs.map((tab) => (
         <button
           key={tab.id}
           type="button"
-          className={`pill-btn${activeSubTab === tab.id ? ' active' : ''}`}
+          className={`pill-btn${activeSubTab === tab.id ? ' active' : ''}${tab.id === 'dismissed' ? ' pill-btn--dismissed' : ''}`}
           onClick={() => onSubTabChange(tab.id)}
         >
           {tab.label}
@@ -155,10 +158,55 @@ function FileSubTab({ dimensions, onFileClick }) {
   );
 }
 
+function DismissedSubTab({ dismissed, onRestore }) {
+  if (dismissed.length === 0) {
+    return <p className="empty-state">No dismissed findings.</p>;
+  }
+  return (
+    <>
+      <div className="section-header">
+        <h3 className="section-title">Dismissed Findings</h3>
+        <span className="section-count">{dismissed.length} findings · not included in scoring</span>
+      </div>
+      <div className="dismissed-list-inner">
+        {dismissed.map((d) => (
+          <div key={`${d.req}-${d.file}-${d.line}`} className="dismissed-card">
+            <div className="dismissed-card-body">
+              <div className="dismissed-card-top">
+                <span className="dismissed-tag">dismissed</span>
+                <span className="dismissed-label">[{d.principle || d.dimension || d.req || '?'}]</span>
+                <span className="dismissed-file">{d.file}:{d.line}</span>
+              </div>
+              {d.reason && <div className="dismissed-reason">{d.reason}</div>}
+            </div>
+            <button type="button" className="restore-btn" onClick={() => onRestore(d)}>Restore</button>
+          </div>
+        ))}
+      </div>
+    </>
+  );
+}
+
 export default function ViolationsPage({ data, callbacks }) {
-  const { accumulated, accumulatedDimensions } = data;
-  const { onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
+  const { accumulated, accumulatedDimensions, selectedProject } = data;
+  const { onDimensionClick, onFileClick, onPrincipleClick, onRefresh } = callbacks;
   const [activeSubTab, setActiveSubTab] = useState('dimension');
+  const [dismissed, setDismissed] = useState([]);
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    listDismissedFindings(selectedProject).then(setDismissed).catch(() => setDismissed([]));
+  }, [selectedProject]);
+
+  const handleRestore = useCallback(async (d) => {
+    try {
+      await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
+      setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to restore finding:', err);
+    }
+  }, [selectedProject, onRefresh]);
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -197,12 +245,15 @@ export default function ViolationsPage({ data, callbacks }) {
   return (
     <div className="violations-page">
       <ViolationsHeader accumulated={filteredAccumulated} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} />
-      <ViolationsPillNav activeSubTab={activeSubTab} onSubTabChange={setActiveSubTab} />
+      <ViolationsPillNav activeSubTab={activeSubTab} onSubTabChange={setActiveSubTab} dismissedCount={dismissed.length} />
       {activeSubTab === 'dimension' && (
         <DimensionSubTab dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} />
       )}
       {activeSubTab === 'file' && (
         <FileSubTab dimensions={visibleDimensions} onFileClick={onFileClick} />
+      )}
+      {activeSubTab === 'dismissed' && (
+        <DismissedSubTab dismissed={dismissed} onRestore={handleRestore} />
       )}
     </div>
   );

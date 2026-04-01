@@ -1,4 +1,4 @@
-import { memo, useState } from 'react';
+import { memo, useState, useCallback } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
@@ -8,7 +8,7 @@ import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 
 const PAGE_SIZE = 20;
 
-function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText }) {
+function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
   return EVAL_SEVERITY_ORDER.map((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return null;
@@ -20,7 +20,7 @@ function ViolationListSection({ violationsBySeverity, principle, buildViolationP
         </div>
         <div className="vlive-violations-group">
           {vs.map((v, idx) => (
-            <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} />
+            <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
           ))}
         </div>
       </div>
@@ -147,11 +147,26 @@ function PrincipleContext({ principleData }) {
   );
 }
 
-const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal }) {
+const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal, onDismiss }) {
   const { principleData, principle, score, grade } = evalPrincipal;
   const [showAllCompliance, setShowAllCompliance] = useState(false);
+  const [dismissedSet, setDismissedSet] = useState(new Set());
   const { violations, compliance, violationsBySeverity, sevCounts } = computeEvalPrincipleData(evalPrincipal);
   const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
+
+  const handleDismiss = useCallback((v) => {
+    if (!onDismiss) return;
+    onDismiss(v);
+    setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
+  }, [onDismiss]);
+
+  // Filter dismissed violations from each severity group
+  const filteredBySeverity = {};
+  for (const sev of Object.keys(violationsBySeverity)) {
+    filteredBySeverity[sev] = (violationsBySeverity[sev] || []).filter(
+      (v) => !dismissedSet.has(`${v.file}:${v.line}`)
+    );
+  }
 
   return (
     <>
@@ -160,7 +175,7 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
         onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
       />
       <PrincipleContext principleData={principleData} />
-      <ViolationListSection violationsBySeverity={violationsBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} />
+      <ViolationListSection violationsBySeverity={filteredBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} onDismiss={handleDismiss} />
       <ComplianceListSection
         data={{ compliance, displayedCompliance, principle }}
         controls={{ hasMore: compliance.length > PAGE_SIZE, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
