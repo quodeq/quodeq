@@ -103,6 +103,17 @@ Run `quodeq evaluate --help` and `quodeq dashboard --help` for all available opt
 
 Results are stored in `~/.quodeq/evaluations/` and persist across sessions.
 
+## Standards
+
+By default, Quodeq evaluates six quality dimensions based on **ISO 25010**: Security, Reliability, Maintainability, Performance, Flexibility, and Usability.
+
+It also ships with additional built-in standards:
+
+- **Clean Architecture** — dependency rules, layer boundaries, separation of concerns
+- **Domain-Driven Design** — bounded contexts, aggregates, ubiquitous language
+
+You can **create your own standards** from the dashboard — define custom principles and requirements, then evaluate any codebase against them. Import and export standards to share with your team.
+
 ## Supported Languages
 
 Quodeq can evaluate **any codebase in any language**. The AI analysis engine reads and understands code regardless of the tech stack.
