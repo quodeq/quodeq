@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getStandard, createStandard, updateStandard } from '../../../api/index.js';
 import { generateRequirementId } from '../utils.js';
+import { deepClone } from '../../../utils/deepClone.js';
 
 export function useStandardDetail(standardId, isNew) {
   const [standard, setStandard] = useState(null);
@@ -25,7 +26,7 @@ export function useStandardDetail(standardId, isNew) {
 
   const updateField = useCallback((path, value) => {
     setStandard((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
+      const next = deepClone(prev);
       let target = next;
       for (let i = 0; i < path.length - 1; i++) target = target[path[i]];
       target[path[path.length - 1]] = value;
@@ -36,7 +37,7 @@ export function useStandardDetail(standardId, isNew) {
 
   const addPrinciple = useCallback(() => {
     setStandard((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
+      const next = deepClone(prev);
       next.principles.push({ name: '', description: '', requirements: [] });
       setSelectedNode({ type: 'principle', index: next.principles.length - 1 });
       return next;
@@ -46,7 +47,7 @@ export function useStandardDetail(standardId, isNew) {
 
   const removePrinciple = useCallback((index) => {
     setStandard((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
+      const next = deepClone(prev);
       next.principles.splice(index, 1);
       return next;
     });
@@ -56,7 +57,7 @@ export function useStandardDetail(standardId, isNew) {
 
   const addRequirement = useCallback((principleIndex) => {
     setStandard((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
+      const next = deepClone(prev);
       const principle = next.principles[principleIndex];
       const seq = (principle.requirements?.length || 0) + 1;
       const autoId = generateRequirementId(next.id, principle.name, seq);
@@ -69,7 +70,7 @@ export function useStandardDetail(standardId, isNew) {
 
   const removeRequirement = useCallback((principleIndex, reqIndex) => {
     setStandard((prev) => {
-      const next = JSON.parse(JSON.stringify(prev));
+      const next = deepClone(prev);
       next.principles[principleIndex].requirements.splice(reqIndex, 1);
       return next;
     });

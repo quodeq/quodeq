@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.engine.file_queue import FileQueue, FileQueueError
+from quodeq.analysis.subagents.file_queue import FileQueue, FileQueueError
 
 
 SAMPLE_FILES = [f"src/file_{i}.py" for i in range(30)]

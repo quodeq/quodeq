@@ -219,12 +219,23 @@ def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
         return ()
 
 
-_cached_dimensions: tuple[str, ...] | None = None
+class _DimensionsCache:
+    """Explicit holder for the mutable dimensions cache (testable, no bare globals)."""
+
+    def __init__(self) -> None:
+        self.value: tuple[str, ...] | None = None
+
+    def reset(self) -> None:
+        self.value = None
+
+
+_dimensions_cache = _DimensionsCache()
+
 
 def reset_dimensions_cache() -> None:
-    """Reset the module-level dimensions cache. Useful for test isolation."""
-    global _cached_dimensions
-    _cached_dimensions = None
+    """Reset the dimensions cache. Useful for test isolation."""
+    _dimensions_cache.reset()
+
 
 def _list_available_dimensions_for_discipline(paths: object | None = None) -> tuple[str, ...]:
     """Resolve available dimensions from universal dimensions.json (cached after first read).
@@ -232,9 +243,8 @@ def _list_available_dimensions_for_discipline(paths: object | None = None) -> tu
     Pass *paths* to override the default path resolution (useful for testing).
     Returns a tuple (immutable) so the result is safe for caching.
     """
-    global _cached_dimensions
-    if paths is None and _cached_dimensions is not None:
-        return _cached_dimensions
+    if paths is None and _dimensions_cache.value is not None:
+        return _dimensions_cache.value
     try:
         resolved = paths or default_paths()
         result = _read_dimensions_from_file(str(resolved.dimensions_file))
@@ -242,5 +252,5 @@ def _list_available_dimensions_for_discipline(paths: object | None = None) -> tu
         _logger.warning("Failed to load dimensions config: %s", exc)
         return ()
     if paths is None:
-        _cached_dimensions = result
+        _dimensions_cache.value = result
     return result

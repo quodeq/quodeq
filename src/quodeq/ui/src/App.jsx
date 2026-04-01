@@ -134,29 +134,34 @@ function MainContent({ activePage, props }) {
   return null;
 }
 
-function computeHeaderMeta(accumulated, dashboard, selectedProject, projects) {
+function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
+  // Header meta
   const accDims = accumulated?.dimensions || [];
-  if (accDims.length === 0) return null;
-  const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
-  const repository = accDims.find((d) => d.repository)?.repository ?? null;
-  const runDims = dashboard?.dimensions || [];
-  const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
-  const project = projects.find((p) => p.id === selectedProject);
-  const languageStats = project?.languageStats ?? null;
-  return { discipline, repository, totalFiles, languageStats };
-}
+  let headerMeta = null;
+  if (accDims.length > 0) {
+    const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
+    const repository = accDims.find((d) => d.repository)?.repository ?? null;
+    const runDims = dashboard?.dimensions || [];
+    const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
+    const project = projects.find((p) => p.id === selectedProject);
+    const languageStats = project?.languageStats ?? null;
+    headerMeta = { discipline, repository, totalFiles, languageStats };
+  }
 
-function computeProjectDisplay(selectedProject, projects) {
-  if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
-  const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
-  const parentRef = data?.parent || null;
-  const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
-  const parentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
-  return {
-    selectedDisplayName: data?.displayName || data?.name || selectedProject,
-    selectedProjectParent: parentData?.displayName || parentData?.name || parentRef,
-    selectedProjectParentId: parentId,
-  };
+  // Project display
+  let selectedDisplayName = selectedProject;
+  let selectedProjectParent = null;
+  let selectedProjectParentId = null;
+  if (selectedProject && projects.length) {
+    const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
+    const parentRef = data?.parent || null;
+    const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
+    selectedDisplayName = data?.displayName || data?.name || selectedProject;
+    selectedProjectParent = parentData?.displayName || parentData?.name || parentRef;
+    selectedProjectParentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
+  }
+
+  return { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId };
 }
 
 function AppShell({ sidebar, header, breadcrumb, content }) {
@@ -207,11 +212,10 @@ function useAppState() {
   const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
   const visibleDailyRuns = useVisibleRuns(dailyRuns, dashboard, activePage.page, setSelectedRun);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
-  const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
-    const meta = computeHeaderMeta(accumulated, dashboard, selectedProject, projects);
-    const display = computeProjectDisplay(selectedProject, projects);
-    return { headerMeta: meta, ...display };
-  }, [accumulated, dashboard, selectedProject, projects]);
+  const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(
+    () => computeDerivedState(accumulated, dashboard, selectedProject, projects),
+    [accumulated, dashboard, selectedProject, projects]
+  );
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
   const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
   const activeTab = knownTabs.includes(activePage.page) ? activePage.page

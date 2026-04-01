@@ -16,6 +16,8 @@ class PrincipleGrade:
 
 @dataclass(frozen=True, slots=True)
 class PrincipleGradeWithOverall:
+    """PrincipleGrade extended with an ``is_overall`` flag for aggregate rows."""
+
     principle: str | None = None
     score: str | None = None
     grade: str | None = None
@@ -24,6 +26,8 @@ class PrincipleGradeWithOverall:
 
 @dataclass(frozen=True, slots=True)
 class ParsedReport:
+    """Fully parsed dimension report with grades, findings, and totals."""
+
     dimension: str | None = None
     overall_score: str | None = None
     overall_grade: str | None = None

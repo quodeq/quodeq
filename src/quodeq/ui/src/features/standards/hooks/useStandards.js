@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { listStandards, deleteStandard, duplicateStandard } from '../../../api/index.js';
 
+const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
+
 export function useStandards() {
   const [standards, setStandards] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -20,10 +22,10 @@ export function useStandards() {
   const handleDuplicate = useCallback(async (id, newId) => { await duplicateStandard(id, newId); refresh(); }, [refresh]);
 
   const grouped = {
-    builtin: standards.filter((s) => s.type === 'builtin'),
-    quodeq: standards.filter((s) => s.type === 'quodeq'),
-    community: standards.filter((s) => s.type === 'community'),
-    custom: standards.filter((s) => s.type === 'custom'),
+    [STANDARD_TYPES.BUILTIN]: standards.filter((s) => s.type === STANDARD_TYPES.BUILTIN),
+    [STANDARD_TYPES.QUODEQ]: standards.filter((s) => s.type === STANDARD_TYPES.QUODEQ),
+    [STANDARD_TYPES.COMMUNITY]: standards.filter((s) => s.type === STANDARD_TYPES.COMMUNITY),
+    [STANDARD_TYPES.CUSTOM]: standards.filter((s) => s.type === STANDARD_TYPES.CUSTOM),
   };
 
   return { standards, grouped, loading, error, refresh, handleDelete, handleDuplicate };

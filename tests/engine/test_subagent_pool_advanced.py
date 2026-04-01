@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError
-from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool, SubagentResult
 
 

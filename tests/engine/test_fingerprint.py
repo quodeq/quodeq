@@ -4,8 +4,9 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+from unittest.mock import patch
 
-from quodeq.analysis.fingerprint import build_fingerprint, load_fingerprint, save_fingerprint
+from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, load_fingerprint, save_fingerprint
 
 _SHA256_HEX_LEN = 64
 
@@ -68,10 +69,6 @@ class TestSaveLoadFingerprint:
         assert load_fingerprint(tmp_path, "security") is None
 
 
-from unittest.mock import patch
-from quodeq.analysis.fingerprint import find_previous_fingerprint
-
-
 class TestFindPreviousFingerprint:
     def test_returns_none_when_no_previous_runs(self, tmp_path):
         """No previous runs → (None, None)."""
@@ -100,7 +97,6 @@ class TestFindPreviousFingerprint:
         prev_evidence = prev_run / "evidence"
         prev_evidence.mkdir(parents=True)
         prev_fp = {"dimension": "security", "file_hashes": {"a.py": "abc123"}, "standards_checksum": None}
-        import json
         (prev_evidence / "security_fingerprint.json").write_text(json.dumps(prev_fp))
         eval_dir = prev_run / "evaluation"
         eval_dir.mkdir(parents=True)

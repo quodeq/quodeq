@@ -37,6 +37,29 @@ def _fetch_dimensions_from_disk(
         return []
 
 
+def _cache_lookup(
+    key: tuple, cache: OrderedDict, lock: threading.Lock,
+) -> list[DimensionResult] | None:
+    """Return cached data for *key* (promoting it in LRU order), or None."""
+    with lock:
+        if key in cache:
+            cache.move_to_end(key)
+            return cache[key]
+    return None
+
+
+def _cache_store(
+    key: tuple, data: list[DimensionResult],
+    cache: OrderedDict, lock: threading.Lock, max_size: int,
+) -> None:
+    """Insert *data* into the cache under *key*, evicting if necessary."""
+    with lock:
+        cache[key] = data
+        cache.move_to_end(key)
+        while len(cache) > max_size:
+            cache.popitem(last=False)
+
+
 def make_lru_dimension_fetcher(
     reports_root: Path,
     project: str,
@@ -56,27 +79,11 @@ def make_lru_dimension_fetcher(
     """
     _inflight: dict[tuple, threading.Event] = {}
 
-    def _cache_lookup(key: tuple) -> list[DimensionResult] | None:
-        """Return cached data for *key* (promoting it in LRU order), or None."""
-        with lock:
-            if key in cache:
-                cache.move_to_end(key)
-                return cache[key]
-        return None
-
-    def _cache_store(key: tuple, data: list[DimensionResult]) -> None:
-        """Insert *data* into the cache under *key*, evicting if necessary."""
-        with lock:
-            cache[key] = data
-            cache.move_to_end(key)
-            while len(cache) > max_size:
-                cache.popitem(last=False)
-
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
         key = (reports_root, project, run_id)
 
         # Fast path: already cached
-        cached = _cache_lookup(key)
+        cached = _cache_lookup(key, cache, lock)
         if cached is not None:
             return cached
 
@@ -102,7 +109,7 @@ def make_lru_dimension_fetcher(
         data = _fetch_dimensions_from_disk(reports_root, project, run_id)
 
         if data:
-            _cache_store(key, data)
+            _cache_store(key, data, cache, lock, max_size)
 
         with lock:
             notify_event = _inflight.pop(key, None)

@@ -36,17 +36,14 @@ class _FsCallbacks:
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     compiled_dir: Path | None = None,
-    exists_fn: Callable[[Path], bool] | None = None,
-    stat_fn: Callable[[Path], Any] | None = None,
+    fs: _FsCallbacks | None = None,
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try successive file formats to load evaluation data for a dimension.
 
-    *exists_fn* and *stat_fn* are injectable for testing without a real filesystem.
+    *fs* provides injectable filesystem callbacks for testing without a real FS.
     """
-    fs = _FsCallbacks(
-        exists_fn=exists_fn if exists_fn is not None else Path.exists,
-        stat_fn=stat_fn if stat_fn is not None else Path.stat,
-    )
+    if fs is None:
+        fs = _FsCallbacks()
     _exists = fs.exists_fn
     _stat = fs.stat_fn
 

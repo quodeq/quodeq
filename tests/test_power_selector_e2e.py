@@ -103,7 +103,7 @@ class TestSubagentPoolModelPropagation:
     """SubagentPool._build_agent_config must copy ai_model from base config."""
 
     def test_pool_agents_inherit_model(self, tmp_path: Path) -> None:
-        from quodeq.engine.file_queue import FileQueue
+        from quodeq.analysis.subagents.file_queue import FileQueue
         from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
         queue_path = tmp_path / "queue.json"
@@ -123,7 +123,7 @@ class TestSubagentPoolModelPropagation:
             )
 
     def test_pool_agents_inherit_haiku(self, tmp_path: Path) -> None:
-        from quodeq.engine.file_queue import FileQueue
+        from quodeq.analysis.subagents.file_queue import FileQueue
         from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
         queue_path = tmp_path / "queue.json"

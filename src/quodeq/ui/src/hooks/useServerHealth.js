@@ -20,31 +20,31 @@ export function useServerHealth({ altPorts = DEFAULT_ALT_PORTS, baseUrl = SERVER
   useEffect(() => {
     let mounted = true;
 
+    async function tryFindPort(candidates) {
+      const results = await Promise.allSettled(
+        candidates.map(async (port) => {
+          const ac = new AbortController();
+          const tid = setTimeout(() => ac.abort(), HEALTH_CHECK_TIMEOUT_MS);
+          try {
+            const res = await fetch(`${baseUrl}:${port}${HEALTH_ENDPOINT}`, { signal: ac.signal });
+            clearTimeout(tid);
+            if (res.ok) return port;
+          } catch { clearTimeout(tid); return null; }
+          return null;
+        })
+      );
+      const found = results.find(r => r.status === 'fulfilled' && r.value !== null);
+      return found ? found.value : null;
+    }
+
     async function checkHealth() {
       try {
         await getHealth();
         if (mounted) setServerConnected(true);
       } catch {
-        // Server unreachable on current origin — check if it moved to another port
         const currentPort = window.location.port;
-        const candidates = altPorts.filter(p => String(p) !== currentPort);
-        const results = await Promise.allSettled(
-          candidates.map(async (port) => {
-            const ac = new AbortController();
-            const tid = setTimeout(() => ac.abort(), HEALTH_CHECK_TIMEOUT_MS);
-            try {
-              const res = await fetch(`${baseUrl}:${port}${HEALTH_ENDPOINT}`, { signal: ac.signal });
-              clearTimeout(tid);
-              if (res.ok) return port;
-            } catch { clearTimeout(tid); return null; }
-            return null;
-          })
-        );
-        const found = results.find(r => r.status === 'fulfilled' && r.value !== null);
-        if (found) {
-          window.location.href = `${baseUrl}:${found.value}`;
-          return;
-        }
+        const foundPort = await tryFindPort(altPorts.filter(p => String(p) !== currentPort));
+        if (foundPort) { window.location.href = `${baseUrl}:${foundPort}`; return; }
         if (mounted) setServerConnected(false);
       }
     }

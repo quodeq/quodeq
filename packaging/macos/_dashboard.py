@@ -13,11 +13,20 @@ from _helpers import health_check as _health_check
 if TYPE_CHECKING:
     pass
 
+from typing import NamedTuple
+
 _POLL_INTERVAL = 5
 _MAX_START_RETRIES = 20
 _HEALTH_POLL_INTERVAL_S = 0.5
 _STDERR_READ_MAX = 500
 _ERROR_DISPLAY_MAX = 200
+
+
+class DashboardCallbacks(NamedTuple):
+    """Callbacks for dashboard startup lifecycle events."""
+    on_port_found: object  # (port: int, stderr_log) -> None
+    on_crash: object       # (stderr_log) -> None
+    on_timeout: object     # () -> None
 
 
 def find_running_port(ports: tuple[int, ...], last_known: int | None, cache: dict) -> int | None:
@@ -93,22 +102,20 @@ def wait_for_dashboard(
     cache: dict,
     last_known: int | None,
     stderr_log,
-    on_port_found,
-    on_crash,
-    on_timeout,
+    callbacks: DashboardCallbacks,
 ) -> None:
     """Poll until the dashboard responds or process crashes."""
     try:
         for _ in range(_MAX_START_RETRIES):
             time.sleep(_HEALTH_POLL_INTERVAL_S)
             if process.poll() is not None:
-                on_crash(stderr_log)
+                callbacks.on_crash(stderr_log)
                 return
             port = find_running_port(ports, last_known, cache)
             if port:
-                on_port_found(port, stderr_log)
+                callbacks.on_port_found(port, stderr_log)
                 return
-        on_timeout()
+        callbacks.on_timeout()
     finally:
         try:
             stderr_log.close()

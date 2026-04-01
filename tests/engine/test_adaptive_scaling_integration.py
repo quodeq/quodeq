@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
 

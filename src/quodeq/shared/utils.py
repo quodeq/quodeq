@@ -1,14 +1,20 @@
-"""Shared utilities — aggregation façade for config, env, and re-exports.
+"""Shared utilities — convenience façade consolidating config, env, I/O, and helpers.
 
-This module intentionally aggregates config loading, environment-variable
-accessors, URL validation, and diff display in one place.  Focused helpers
-live in dedicated submodules:
+**Why a single façade?**  This module provides a stable public import surface so
+that callers can ``from quodeq.shared.utils import …`` without tracking which
+internal submodule each helper lives in.  The trade-off (broader module) is
+intentional: it keeps imports simple for a fast-moving CLI codebase.
 
-* ``_io.py`` — file/JSON I/O with centralized encoding
-* ``_security.py`` — secret-detection and sanitization
+Organisation
+~~~~~~~~~~~~
+The re-exports and definitions are grouped by category:
 
-Everything is re-exported here for backward compatibility so callers can
-``from quodeq.shared.utils import …`` without knowing the internal split.
+1. **Re-exports** — I/O helpers (``_io.py``), security helpers (``_security.py``)
+2. **Config loading** — ``Config`` dataclass, lazy singleton, ``_get_config()``
+3. **Platform detection** — ``IS_WIN32``
+4. **Repository URL helpers** — ``is_repo_url``, ``project_name_from_repo``
+5. **Environment accessors** — ``get_ai_provider``, ``get_dashboard_port``, etc.
+6. **Diff display** — ``show_diff``
 """
 from __future__ import annotations
 
@@ -22,11 +28,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
-# Re-export I/O helpers (canonical home: _io.py)
-from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text, read_json  # noqa: F401
+# ---------------------------------------------------------------------------
+# 1. Re-exports — I/O and security helpers from dedicated submodules
+# ---------------------------------------------------------------------------
 
-# Re-export security helpers (canonical home: _security.py)
+from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text, read_json  # noqa: F401
 from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive  # noqa: F401
+
+# ---------------------------------------------------------------------------
+# 2. Config loading — Config dataclass, lazy singleton
+# ---------------------------------------------------------------------------
 
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
 _DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"

@@ -1,16 +1,12 @@
-function typeLabel(dim) {
-  if (dim.standardType === 'quodeq') return 'Quodeq';
-  if (dim.standardType === 'custom') return 'Custom';
-  if (dim.standardType === 'community') return 'Community';
-  return 'ISO';
-}
+const TYPE_CONFIG = {
+  quodeq:    { label: 'Quodeq',    className: 'dimension-chip-type--quodeq' },
+  custom:    { label: 'Custom',    className: 'dimension-chip-type--custom' },
+  community: { label: 'Community', className: 'dimension-chip-type--community' },
+};
+const DEFAULT_TYPE_CONFIG = { label: 'ISO', className: 'dimension-chip-type--builtin' };
 
-function typeClass(dim) {
-  if (dim.standardType === 'quodeq') return 'dimension-chip-type--quodeq';
-  if (dim.standardType === 'custom') return 'dimension-chip-type--custom';
-  if (dim.standardType === 'community') return 'dimension-chip-type--community';
-  return 'dimension-chip-type--builtin';
-}
+function typeLabel(dim) { return (TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG).label; }
+function typeClass(dim) { return (TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG).className; }
 
 function DimensionChip({ dim, isSelected, onToggle }) {
   return (

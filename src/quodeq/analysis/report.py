@@ -133,30 +133,11 @@ def _extract_scores(scores: ScoringResult | dict | None) -> tuple[dict, dict]:
     return scores.principles, to_camel_dict(scores.overall) if scores.overall else {}
 
 
-def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
-    """Build a complete JSON report dict from evidence and scoring data for one dimension.
-
-    Args:
-        dimension: Quality dimension identifier (e.g. ``"maintainability"``).
-        evidence: Raw evidence dict produced by the analysis pipeline.
-        scores: Scoring result (DTO or plain dict) for the dimension, or *None*.
-
-    Parameter count is intentional: dimension identity, raw evidence, and
-    scoring result are each a distinct pipeline output with no shared container.
-    """
-    per_principle_scores, aggregate = _extract_scores(scores)
-    lookup = _build_score_lookup(per_principle_scores)
-    principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
-
-    # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
-    weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
-    if weighted is not None:
-        top_score = f"{round(weighted, 1)}/10"
-        top_grade = aggregate.get("grade") or grade_from_score(top_score)
-    else:
-        top_score = None
-        top_grade = None
-
+def _assemble_report_dict(
+    dimension: str, evidence: dict, top_score: str | None, top_grade: str | None,
+    principle_rows: list, flat_violations: list, flat_compliance: list, sev_tally: dict,
+) -> dict:
+    """Assemble the final report dict from pre-computed components."""
     raw_meta = evidence.get("meta", {})
     report: dict = {
         "schema_version": _REPORT_SCHEMA_VERSION,
@@ -188,6 +169,37 @@ def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | di
     module = evidence.get("module")
     if module:
         report["module"] = module
+    return report
+
+
+def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
+    """Build a complete JSON report dict from evidence and scoring data for one dimension.
+
+    Args:
+        dimension: Quality dimension identifier (e.g. ``"maintainability"``).
+        evidence: Raw evidence dict produced by the analysis pipeline.
+        scores: Scoring result (DTO or plain dict) for the dimension, or *None*.
+
+    Parameter count is intentional: dimension identity, raw evidence, and
+    scoring result are each a distinct pipeline output with no shared container.
+    """
+    per_principle_scores, aggregate = _extract_scores(scores)
+    lookup = _build_score_lookup(per_principle_scores)
+    principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
+
+    # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
+    weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
+    if weighted is not None:
+        top_score = f"{round(weighted, 1)}/10"
+        top_grade = aggregate.get("grade") or grade_from_score(top_score)
+    else:
+        top_score = None
+        top_grade = None
+
+    report = _assemble_report_dict(
+        dimension, evidence, top_score, top_grade,
+        principle_rows, flat_violations, flat_compliance, sev_tally,
+    )
     return report
 
 

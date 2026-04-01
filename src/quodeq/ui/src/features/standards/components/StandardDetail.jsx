@@ -19,7 +19,7 @@ function EmptyState() {
   );
 }
 
-function RootDetail({ standard, onUpdateField, editable, isNew }) {
+function NameField({ standard, editable, isNew, onUpdateField }) {
   const handleNameChange = (e) => {
     const name = e.target.value;
     onUpdateField(['name'], name);
@@ -27,57 +27,41 @@ function RootDetail({ standard, onUpdateField, editable, isNew }) {
       onUpdateField(['id'], slugify(name));
     }
   };
+  return (
+    <div className="form-group">
+      <label htmlFor="std-name">Name</label>
+      <input id="std-name" className="form-input" value={standard.name || ''} onChange={handleNameChange} disabled={!editable} placeholder="e.g. Clean Architecture" autoFocus={isNew} />
+    </div>
+  );
+}
 
+function DescriptionField({ standard, editable, onUpdateField }) {
+  return (
+    <div className="form-group">
+      <label htmlFor="std-description">Description</label>
+      <textarea id="std-description" className="form-textarea" value={standard.description || ''} onChange={(e) => onUpdateField(['description'], e.target.value)} disabled={!editable} placeholder="Describe this standard..." rows={4} />
+    </div>
+  );
+}
+
+function SourceField({ standard, editable, onUpdateField }) {
+  return (
+    <div className="form-group">
+      <label htmlFor="std-source">Source</label>
+      <input id="std-source" className="form-input" value={standard.source || ''} onChange={(e) => onUpdateField(['source'], e.target.value)} disabled={!editable} placeholder="e.g. https://example.com/standard" />
+    </div>
+  );
+}
+
+function RootDetail({ standard, onUpdateField, editable, isNew }) {
   return (
     <div className="standard-root-detail">
       <h3 className="detail-form-title">Standard Details</h3>
-
-      <div className="form-group">
-        <label htmlFor="std-name">Name</label>
-        <input
-          id="std-name"
-          className="form-input"
-          value={standard.name || ''}
-          onChange={handleNameChange}
-          disabled={!editable}
-          placeholder="e.g. Clean Architecture"
-          autoFocus={isNew}
-        />
-      </div>
-
+      <NameField standard={standard} editable={editable} isNew={isNew} onUpdateField={onUpdateField} />
       <input type="hidden" value={standard.id || ''} />
-
-      <div className="form-group">
-        <label htmlFor="std-description">Description</label>
-        <textarea
-          id="std-description"
-          className="form-textarea"
-          value={standard.description || ''}
-          onChange={(e) => onUpdateField(['description'], e.target.value)}
-          disabled={!editable}
-          placeholder="Describe this standard..."
-          rows={4}
-        />
-      </div>
-
-      <div className="form-group">
-        <label htmlFor="std-source">Source</label>
-        <input
-          id="std-source"
-          className="form-input"
-          value={standard.source || ''}
-          onChange={(e) => onUpdateField(['source'], e.target.value)}
-          disabled={!editable}
-          placeholder="e.g. https://example.com/standard"
-        />
-      </div>
-
-      {standard.managed && (
-        <p className="detail-managed-notice">
-          This is a managed standard. Fields are read-only to preserve upstream compatibility.
-        </p>
-      )}
-
+      <DescriptionField standard={standard} editable={editable} onUpdateField={onUpdateField} />
+      <SourceField standard={standard} editable={editable} onUpdateField={onUpdateField} />
+      {standard.managed && <p className="detail-managed-notice">This is a managed standard. Fields are read-only to preserve upstream compatibility.</p>}
       {editable && (!standard.principles || standard.principles.length === 0) && <EmptyState />}
     </div>
   );

@@ -11,6 +11,7 @@ _logger = logging.getLogger(__name__)
 _DEFAULT_RATE_LIMIT_WINDOW = 60
 _DEFAULT_RATE_LIMIT_MAX = 60
 _RATE_STORE_MAX_IPS = 10_000  # max tracked IPs to prevent unbounded memory growth
+_PRUNE_THRESHOLD_MULTIPLIER = 2  # prune per-IP list when it exceeds max_requests * this
 
 
 def _rate_limit_window(env: dict[str, str] | None = None) -> int:
@@ -94,7 +95,7 @@ class InMemoryRateLimitStore:
         self._periodic_cleanup(now)
         timestamps = self._store.setdefault(ip, [])
         timestamps.append(now)
-        if len(timestamps) > self._max_requests * 2:
+        if len(timestamps) > self._max_requests * _PRUNE_THRESHOLD_MULTIPLIER:
             self._store[ip] = [t for t in timestamps if now - t < self._window]
         self._store.move_to_end(ip)
 

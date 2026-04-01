@@ -1,6 +1,11 @@
 import { buildGroupPlanText } from './planBuilder.js';
 import { SEVERITY_ORDER } from './formatters.js';
 
+/**
+ * Build a copy-friendly plan text summarising violations for a single file.
+ * @param {{ file: string, violationsBySeverity: Object }} file - File object with violation data.
+ * @returns {string} Formatted plan text.
+ */
 export function buildFilePlanText(file) {
   const allViolations = SEVERITY_ORDER.flatMap((sev) =>
     (file.violationsBySeverity?.[sev] || []).map((v) => ({ ...v, _entryTitle: v.principle || 'Violation' }))
@@ -16,8 +21,22 @@ export function buildFilePlanText(file) {
   });
 }
 
+/**
+ * Build plan text for a principle's violations.
+ *
+ * Supports two calling conventions:
+ * 1. Pre-split data: `buildPrinciplePlanText(principleName, violations, violationsBySeverity, principleData)`
+ *    where `principle` is a string name and violations/violationsBySeverity are provided explicitly.
+ * 2. Principle object: `buildPrinciplePlanText(principleObj)` where `principleObj` has `.principle`,
+ *    `.violations`, etc. — violations are derived automatically.
+ *
+ * @param {string|Object} principle - Principle name (string) or principle object with `.principle` and `.violations`.
+ * @param {Array} [violations] - Flat array of violation objects (convention 1 only).
+ * @param {Object} [violationsBySeverity] - Violations keyed by severity (convention 1 only).
+ * @param {Object} [principleData] - Optional extra data (e.g. `.findings`) for convention 1.
+ * @returns {string} Formatted plan text.
+ */
 export function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData) {
-  // When violations are provided directly, use them; otherwise derive from principle object.
   if (violations !== undefined) {
     return buildGroupPlanText({ title: principle, violations, violationsBySeverity, context: principleData?.findings || undefined });
   }

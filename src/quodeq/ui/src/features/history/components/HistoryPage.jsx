@@ -17,9 +17,54 @@ function computeDeltas(trend) {
   });
 }
 
+function HistoryEmpty() {
+  return (
+    <div className="history-page">
+      <div className="page-header">
+        <h2 className="page-title">History</h2>
+      </div>
+      <div className="empty-state">
+        <p>No evaluations yet. Run one from the Evaluate tab.</p>
+      </div>
+    </div>
+  );
+}
+
+function HistoryContent({ trend, selectedRunId, availableRuns, onRunClick, onRunChange, showAll, setShowAll, runNav }) {
+  const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
+  const deltas = computeDeltas(trend);
+  const visible = showAll ? trend : trend.slice(0, MAX_VISIBLE);
+  const hasMore = trend.length > MAX_VISIBLE && !showAll;
+
+  return (
+    <div className="history-page">
+      <div className="page-header">
+        <h2 className="page-title">History</h2>
+        <span className="page-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
+        {availableRuns && availableRuns.length > 0 && (
+          <div className="history-run-nav">
+            <RunNavigator currentRun={runNavLabel} isLatest={overviewRunIndex === 0} isOldest={overviewRunIndex >= availableRuns.length - 1} actions={{ onPrev: handleRunPrev, onNext: handleRunNext, onLatest: handleRunLatest, onView: () => { if (currentOverviewRun) onRunClick(currentOverviewRun); } }} />
+          </div>
+        )}
+      </div>
+      <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
+      <div className="dimensions-header"><h3 className="dimensions-title">Evaluations</h3></div>
+      <div className="history-list">
+        {visible.map((entry, i) => (
+          <HistoryRunRow key={entry.runId} entry={entry} delta={deltas[i]} isSelected={entry.runId === selectedRunId} onClick={onRunClick} />
+        ))}
+      </div>
+      {hasMore && (
+        <div className="history-load-more">
+          <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>Load all {trend.length} evaluations</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function HistoryPage({ trend, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId } = selection;
-  const { accumulatedDimensions, lastRun } = dimensions;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
 
@@ -35,77 +80,19 @@ export default function HistoryPage({ trend, selection, availableRuns, dimension
     if (entry?.dateISO) {
       try {
         const d = new Date(entry.dateISO);
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
-          + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
       } catch { return entry.dateISO || ''; }
     }
     return entry?.dateLabel || currentOverviewRun;
   }, [trend, currentOverviewRun]);
 
-  if (!trend || trend.length === 0) {
-    return (
-      <div className="history-page">
-        <div className="page-header">
-          <h2 className="page-title">History</h2>
-        </div>
-        <div className="empty-state">
-          <p>No evaluations yet. Run one from the Evaluate tab.</p>
-        </div>
-      </div>
-    );
-  }
-
-  const deltas = computeDeltas(trend);
-  const visible = showAll ? trend : trend.slice(0, MAX_VISIBLE);
-  const hasMore = trend.length > MAX_VISIBLE && !showAll;
+  if (!trend || trend.length === 0) return <HistoryEmpty />;
 
   return (
-    <div className="history-page">
-      <div className="page-header">
-        <h2 className="page-title">History</h2>
-        <span className="page-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
-        {availableRuns && availableRuns.length > 0 && (
-          <div className="history-run-nav">
-            <RunNavigator
-              currentRun={runNavLabel}
-              isLatest={overviewRunIndex === 0}
-              isOldest={overviewRunIndex >= availableRuns.length - 1}
-              actions={{
-                onPrev: handleRunPrev,
-                onNext: handleRunNext,
-                onLatest: handleRunLatest,
-                onView: () => { if (currentOverviewRun) onRunClick(currentOverviewRun); },
-              }}
-            />
-          </div>
-        )}
-      </div>
-      <HistoryChartPanel
-        trend={trend}
-        selectedRunId={selectedRunId}
-        onBarClick={(runId) => onRunChange(runId)}
-      />
-      <div className="dimensions-header">
-        <h3 className="dimensions-title">Evaluations</h3>
-      </div>
-          <div className="history-list">
-            {visible.map((entry, i) => (
-              <HistoryRunRow
-                key={entry.runId}
-                entry={entry}
-                delta={deltas[i]}
-                isSelected={entry.runId === selectedRunId}
-                onClick={onRunClick}
-              />
-            ))}
-          </div>
-          {hasMore && (
-            <div className="history-load-more">
-              <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>
-                Load all {trend.length} evaluations
-              </button>
-            </div>
-          )}
-    </div>
+    <HistoryContent
+      trend={trend} selectedRunId={selectedRunId} availableRuns={availableRuns}
+      onRunClick={onRunClick} onRunChange={onRunChange} showAll={showAll} setShowAll={setShowAll}
+      runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
+    />
   );
 }

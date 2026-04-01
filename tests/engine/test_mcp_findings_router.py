@@ -70,7 +70,7 @@ class TestFindingsRouter:
 
 class TestGetNextFiles:
     def test_tools_list_includes_get_next_files(self, tmp_path: Path) -> None:
-        from quodeq.engine.file_queue import FileQueue
+        from quodeq.analysis.subagents.file_queue import FileQueue
         qp = tmp_path / "queue.json"
         FileQueue(qp, ["a.py", "b.py"])
         responses = _run_server_with_queue(
@@ -94,7 +94,7 @@ class TestGetNextFiles:
         assert "get_next_files" not in names
 
     def test_get_next_files_returns_batch(self, tmp_path: Path) -> None:
-        from quodeq.engine.file_queue import FileQueue
+        from quodeq.analysis.subagents.file_queue import FileQueue
         files = ["src/a.py", "src/b.py", "src/c.py"]
         qp = tmp_path / "queue.json"
         FileQueue(qp, files)
@@ -109,7 +109,7 @@ class TestGetNextFiles:
         assert "src/b.py" in text
 
     def test_get_next_files_drains_queue(self, tmp_path: Path) -> None:
-        from quodeq.engine.file_queue import FileQueue
+        from quodeq.analysis.subagents.file_queue import FileQueue
         qp = tmp_path / "queue.json"
         FileQueue(qp, ["a.py", "b.py"])
         responses = _run_server_with_queue(
@@ -124,7 +124,7 @@ class TestGetNextFiles:
         assert "done" in responses[1]["result"]["content"][0]["text"].lower()
 
     def test_get_next_files_records_agent_id(self, tmp_path: Path) -> None:
-        from quodeq.engine.file_queue import FileQueue
+        from quodeq.analysis.subagents.file_queue import FileQueue
         qp = tmp_path / "queue.json"
         FileQueue(qp, ["a.py"])
         _run_server_with_queue(
@@ -168,7 +168,6 @@ class TestFindingsRouterMultiDimension:
         msg1, dup1 = router.receive({"req": "S-CON-1", "t": "violation", "file": "a.py", "line": 1, "w": "test"})
         msg2, dup2 = router.receive({"req": "M-MOD-1", "t": "violation", "file": "b.py", "line": 2, "w": "test2"})
 
-        import json
         lines = [json.loads(l) for l in fh.getvalue().strip().split("\n")]
         assert lines[0]["d"] == "security"
         assert lines[1]["d"] == "maintainability"
