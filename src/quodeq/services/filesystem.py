@@ -97,10 +97,13 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         return result
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
-        """Update the local filesystem path stored in a project's metadata."""
-        resolved_path = Path(new_path).resolve()
-        if not resolved_path.is_absolute() or not resolved_path.is_dir():
-            return False
+        """Update the path stored in a project's metadata.
+
+        Accepts both local directory paths and remote repository URLs.
+        """
+        from quodeq.shared.utils import is_repo_url
+        from quodeq.shared.repo_handler import is_valid_repo_url
+
         reports_root = Path(reports_dir).resolve()
         info_path = (reports_root / project).resolve()
         if not info_path.is_relative_to(reports_root):
@@ -108,10 +111,28 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         info_path = info_path / "repository_info.json"
         if not info_path.exists():
             return False
+
+        try:
+            is_url = is_repo_url(new_path)
+        except ValueError:
+            return False
+
+        if is_url:
+            if not is_valid_repo_url(new_path):
+                return False
+            resolved_path = new_path
+            location = "online"
+        else:
+            resolved = Path(new_path).resolve()
+            if not resolved.is_absolute() or not resolved.is_dir():
+                return False
+            resolved_path = str(resolved)
+            location = "local"
+
         try:
             info = json.loads(info_path.read_text())
-            info["path"] = str(resolved_path)
-            info["location"] = "local"
+            info["path"] = resolved_path
+            info["location"] = location
             info_path.write_text(json.dumps(info, indent=2))
             return True
         except (json.JSONDecodeError, OSError):

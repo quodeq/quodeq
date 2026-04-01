@@ -88,3 +88,16 @@ def test_get_project_info_valid_online_not_missing(tmp_path: Path) -> None:
     info = provider.get_project_info(str(tmp_path), project_uuid)
     assert info is not None
     assert info["pathMissing"] is False
+
+
+def test_update_project_path_accepts_url(tmp_path: Path) -> None:
+    """update_project_path should accept a URL for online projects."""
+    project_uuid = _create_online_project_with_temp_path(tmp_path)
+    provider = FilesystemActionProvider()
+    ok = provider.update_project_path(
+        str(tmp_path), project_uuid, "https://github.com/shaka-project/shaka-player"
+    )
+    assert ok is True
+    info = json.loads((tmp_path / project_uuid / "repository_info.json").read_text())
+    assert info["path"] == "https://github.com/shaka-project/shaka-player"
+    assert info["location"] == "online"
