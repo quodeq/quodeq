@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from quodeq.cli_parser import build_parser as build_parser  # re-export
+from quodeq.cli_parser import build_parser  # noqa: F401 — re-export
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 from quodeq.analysis.subprocess import AnalysisError

@@ -201,6 +201,22 @@ function ProjectPathContent({ id, p, relocateActions }) {
   );
 }
 
+function ProjectChildren({ childList, selectedProject, onSelect, confirmActions }) {
+  const { confirming, setConfirming, onDelete, onExport } = confirmActions;
+  return (
+    <div className="project-children-outer">
+      {childList.map((child) => {
+        const childId = child.id || child.name || child;
+        return (
+          <div key={childId} className="project-child-entry">
+            <ProjectCard project={child} isSelected={childId === selectedProject} cardProps={{ onSelect, isChild: true, footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }} />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions }) {
   const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
@@ -213,18 +229,7 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
       <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }}>
         <ProjectPathContent id={id} p={p} relocateActions={relocateActions} />
       </ProjectCard>
-      {hasChildren && (
-        <div className="project-children-outer">
-          {childProjects[id].map((child) => {
-            const childId = child.id || child.name || child;
-            return (
-              <div key={childId} className="project-child-entry">
-                <ProjectCard project={child} isSelected={childId === selectedProject} cardProps={{ onSelect, isChild: true, footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }} />
-              </div>
-            );
-          })}
-        </div>
-      )}
+      {hasChildren && <ProjectChildren childList={childProjects[id]} selectedProject={selectedProject} onSelect={onSelect} confirmActions={confirmActions} />}
     </div>
   );
 }

@@ -27,6 +27,16 @@ function resolveInitialProject(list, currentProject, onChangeProject, onNoProjec
   }
 }
 
+/**
+ * Manages the selected project, run, and project list state.
+ *
+ * @param {Object} params
+ * @param {Function} [params.onNoProjects] - Callback invoked when the loaded project list is empty
+ *   (e.g. to redirect to the evaluate tab).
+ * @returns {{ projects: Array, setProjects: Function, selectedProject: string, selectedRun: string,
+ *   setSelectedRun: Function, loadProjects: Function, handleProjectChange: Function,
+ *   handleRunChange: Function, selectProjectAndRun: Function }}
+ */
 export function useProjectState({ onNoProjects }) {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(readStoredProject);

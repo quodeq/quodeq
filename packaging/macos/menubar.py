@@ -19,6 +19,7 @@ from _helpers import (
 from _dashboard import (
     build_dashboard_cmd as _build_dashboard_cmd,
     cleanup_stderr_log as _cleanup_stderr_log_file,
+    DashboardCallbacks as _DashboardCallbacks,
     find_pids_on_port as _find_pids_on_port,
     find_running_port as _find_running_port_cached,
     kill_port_processes as _kill_port_processes,
@@ -233,9 +234,11 @@ class QuodeqApp(rumps.App):
             cache=self._port_cache,
             last_known=self._port_cache.get("last_known"),
             stderr_log=stderr_log,
-            on_port_found=on_port_found,
-            on_crash=self._handle_crashed_process,
-            on_timeout=on_timeout,
+            callbacks=_DashboardCallbacks(
+                on_port_found=on_port_found,
+                on_crash=self._handle_crashed_process,
+                on_timeout=on_timeout,
+            ),
         )
 
     def _on_stop(self, _):

@@ -47,6 +47,57 @@ function useResizable(defaultWidth) {
   return { width, onMouseDown };
 }
 
+function EditorToolbar({ isNew, standard, standardId, dirty, editable, onBack, onSave }) {
+  return (
+    <div className="standard-editor-toolbar">
+      <div className="editor-toolbar-top">
+        <button type="button" className="editor-back-btn" onClick={onBack}>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+            <path d="M19 12H5M12 5l-7 7 7 7" />
+          </svg>
+          Back
+        </button>
+        <div className="editor-toolbar-center">
+          <h2 className="editor-title">
+            {isNew ? 'New Standard' : (standard?.name || standardId)}
+            {dirty && <span className="editor-dirty-indicator" title="Unsaved changes">*</span>}
+          </h2>
+        </div>
+        <div className="editor-toolbar-actions">
+          {editable && <button type="button" className="btn-primary" onClick={onSave} disabled={!dirty}>Save</button>}
+        </div>
+      </div>
+      <EditorStatsRow standard={standard} />
+    </div>
+  );
+}
+
+function EditorStatsRow({ standard }) {
+  return (
+    <div className="editor-toolbar-stats">
+      <span className="editor-stat"><strong>{standard?.principles?.length || 0}</strong> principles</span>
+      <span className="editor-stat-dot" />
+      <span className="editor-stat"><strong>{(standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0)}</strong> requirements</span>
+      <span className="editor-stat-dot" />
+      <span className={`editor-stat-type editor-stat-type--${standard?.type || 'custom'}`}>{TYPE_LABELS[standard?.type] || 'Custom'}</span>
+    </div>
+  );
+}
+
+function EditorBody({ standard, selectedNode, setSelectedNode, treeWidth, onDividerMouseDown, actions, updateField, editable, isNew }) {
+  return (
+    <div className="standard-editor-body">
+      <div className="standard-editor-tree-panel" style={{ width: treeWidth, minWidth: MIN_TREE_WIDTH, maxWidth: MAX_TREE_WIDTH }}>
+        <StandardTree standard={standard} selectedNode={selectedNode} onSelectNode={setSelectedNode} actions={actions} editable={editable} />
+      </div>
+      <div className="standard-editor-divider" onMouseDown={onDividerMouseDown} />
+      <div className="standard-editor-detail-panel">
+        <StandardDetail standard={standard} selectedNode={selectedNode} onUpdateField={updateField} editable={editable} isNew={isNew} />
+      </div>
+    </div>
+  );
+}
+
 export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
   const {
     standard, loading, error, dirty, editable,
@@ -57,16 +108,10 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
 
   const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
 
-  const handleSave = async () => {
-    await save();
-    if (onSaved) onSaved(standard?.id);
-  };
+  const handleSave = async () => { await save(); if (onSaved) onSaved(standard?.id); };
 
-  if (loading) {
-    return <div className="standard-editor-loading">Loading standard...</div>;
-  }
-
-  if (error) {
+  if (loading) return <div className="standard-editor-loading">Loading standard...</div>;
+  if (error && !standard) {
     return (
       <div className="standard-editor-error">
         <p className="inline-error">{error}</p>
@@ -75,73 +120,13 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
     );
   }
 
+  const treeActions = { onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement };
+
   return (
     <div className="standard-editor">
-      <div className="standard-editor-toolbar">
-        <div className="editor-toolbar-top">
-          <button type="button" className="editor-back-btn" onClick={onBack}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-              <path d="M19 12H5M12 5l-7 7 7 7" />
-            </svg>
-            Back
-          </button>
-
-          <div className="editor-toolbar-center">
-            <h2 className="editor-title">
-              {isNew ? 'New Standard' : (standard?.name || standardId)}
-              {dirty && <span className="editor-dirty-indicator" title="Unsaved changes">*</span>}
-            </h2>
-          </div>
-
-          <div className="editor-toolbar-actions">
-            {editable && (
-              <button
-                type="button"
-                className="btn-primary"
-                onClick={handleSave}
-                disabled={!dirty}
-              >
-                Save
-              </button>
-            )}
-          </div>
-        </div>
-        <div className="editor-toolbar-stats">
-          <span className="editor-stat"><strong>{standard?.principles?.length || 0}</strong> principles</span>
-          <span className="editor-stat-dot" />
-          <span className="editor-stat"><strong>{(standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0)}</strong> requirements</span>
-          <span className="editor-stat-dot" />
-          <span className={`editor-stat-type editor-stat-type--${standard?.type || 'custom'}`}>
-            {TYPE_LABELS[standard?.type] || 'Custom'}
-          </span>
-        </div>
-      </div>
-
+      <EditorToolbar isNew={isNew} standard={standard} standardId={standardId} dirty={dirty} editable={editable} onBack={onBack} onSave={handleSave} />
       {error && <p className="inline-error" style={{ margin: '8px 16px' }}>{error}</p>}
-
-      <div className="standard-editor-body">
-        <div className="standard-editor-tree-panel" style={{ width: treeWidth, minWidth: MIN_TREE_WIDTH, maxWidth: MAX_TREE_WIDTH }}>
-          <StandardTree
-            standard={standard}
-            selectedNode={selectedNode}
-            onSelectNode={setSelectedNode}
-            actions={{ onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement }}
-            editable={editable}
-          />
-        </div>
-
-        <div className="standard-editor-divider" onMouseDown={onDividerMouseDown} />
-
-        <div className="standard-editor-detail-panel">
-          <StandardDetail
-            standard={standard}
-            selectedNode={selectedNode}
-            onUpdateField={updateField}
-            editable={editable}
-            isNew={isNew}
-          />
-        </div>
-      </div>
+      <EditorBody standard={standard} selectedNode={selectedNode} setSelectedNode={setSelectedNode} treeWidth={treeWidth} onDividerMouseDown={onDividerMouseDown} actions={treeActions} updateField={updateField} editable={editable} isNew={isNew} />
     </div>
   );
 }

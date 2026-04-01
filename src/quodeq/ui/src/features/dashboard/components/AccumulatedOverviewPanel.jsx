@@ -196,15 +196,11 @@ function buildFilteredAccumulated(accumulated, filteredDimensions, filteredDaily
 // Accumulated overview panel
 // ---------------------------------------------------------------------------
 
-export default function AccumulatedOverviewPanel({ data, callbacks }) {
+function useAccumulatedComputations(data) {
   const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId } = data;
   const dayRuns = dailyRuns || availableRuns;
-  const { onRunClick, onDimensionClick } = callbacks;
-
   const dailyTrend = useMemo(() => collapseByDay(trend), [trend]);
 
-  // Find which daily entry matches the current selection
-  // selectedRunId may be any runId — find the day it belongs to
   const effectiveSelectedId = useMemo(() => {
     if (!selectedRunId || !trend.length) return dailyTrend[0]?.runId || null;
     const direct = dailyTrend.find((t) => t.runId === selectedRunId);
@@ -228,19 +224,16 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const visibleIds = useMemo(() => readVisibleStandardIds(), [accumulatedDimensions]);
   const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
   const filteredDailyTrend = useMemo(() => buildFilteredTrend(trend, dailyTrend, visibleSet), [trend, dailyTrend, visibleSet]);
-  const filteredDimensions = useMemo(
-    () => accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase())),
-    [accumulatedDimensions, visibleIds]
-  );
-  const filteredAccumulated = useMemo(
-    () => buildFilteredAccumulated(accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun),
-    [accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]
-  );
+  const filteredDimensions = useMemo(() => accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase())), [accumulatedDimensions, visibleIds]);
+  const filteredAccumulated = useMemo(() => buildFilteredAccumulated(accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun), [accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]);
+  const filteredStats = useMemo(() => computeAccumulatedStats(filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun), [filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]);
 
-  const filteredStats = useMemo(
-    () => computeAccumulatedStats(filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun),
-    [filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]
-  );
+  return { currentOverviewRun, referenceRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats };
+}
+
+export default function AccumulatedOverviewPanel({ data, callbacks }) {
+  const { onRunClick, onDimensionClick } = callbacks;
+  const { currentOverviewRun, referenceRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
 
   return (
     <>

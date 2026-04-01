@@ -10,12 +10,8 @@ _MODE_NUMERICAL = "numerical"
 _MODE_GRADES = "grades"
 
 
-def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
-    """Register arguments for the evaluate subcommand."""
-    parser.add_argument("repo", help="Path or URL to the repository")
-    parser.add_argument(
-        "-l", "--language", default=None, help="Language (overrides auto-detection)"
-    )
+def _add_output_args(parser: argparse.ArgumentParser) -> None:
+    """Register output and scoring mode arguments."""
     parser.add_argument(
         "-o", "--output", default=get_evaluations_dir(), help="Reports output directory"
     )
@@ -24,15 +20,24 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         choices=[_MODE_NUMERICAL, _MODE_GRADES], help="Scoring mode",
     )
     parser.add_argument(
+        "--evidence-only", action="store_true",
+        help="Produce evidence JSON only (skip scoring)",
+    )
+
+
+def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
+    """Register arguments for the evaluate subcommand."""
+    parser.add_argument("repo", help="Path or URL to the repository")
+    parser.add_argument(
+        "-l", "--language", default=None, help="Language (overrides auto-detection)"
+    )
+    _add_output_args(parser)
+    parser.add_argument(
         "--no-prescan", action="store_true", help="Skip source-file counting"
     )
     parser.add_argument(
         "-d", "--dimensions", default=None,
         help="Comma-separated dimensions to evaluate (default: all)",
-    )
-    parser.add_argument(
-        "--evidence-only", action="store_true",
-        help="Produce evidence JSON only (skip scoring)",
     )
     parser.add_argument(
         "--max-turns", type=int, default=None,

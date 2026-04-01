@@ -1,9 +1,5 @@
 import TrendArrow from './TrendArrow';
-
-const IMPROVING_THRESHOLD = 1;
-const DECLINING_THRESHOLD = -1;
-const SOFT_UP_THRESHOLD = 0.1;
-const SOFT_DOWN_THRESHOLD = -0.1;
+import { trendDirection, IMPROVING_THRESHOLD, DECLINING_THRESHOLD } from '../utils/trendUtils.js';
 
 export default function TrendBadge({ delta, trend, showLabel = false }) {
   if (delta === null || delta === undefined) return null;
@@ -15,13 +11,7 @@ export default function TrendBadge({ delta, trend, showLabel = false }) {
   else if (d < DECLINING_THRESHOLD) label = 'Declining';
   else label = 'Stable';
 
-  let dir;
-  if (trend) dir = trend;
-  else if (d > IMPROVING_THRESHOLD) dir = 'up';
-  else if (d > SOFT_UP_THRESHOLD) dir = 'soft-up';
-  else if (d < DECLINING_THRESHOLD) dir = 'down';
-  else if (d < SOFT_DOWN_THRESHOLD) dir = 'soft-down';
-  else dir = 'same';
+  const dir = trend || trendDirection(d);
 
   return (
     <span className={`trend-badge trend-badge-${dir}`}>

@@ -83,80 +83,44 @@ function ConflictStep({ parsedData, conflict, warnings, onClose, onImportAsCopy,
   );
 }
 
-export default function ImportModal({ onClose, onImported }) {
-  const [step, setStep] = useState(STEP.PICK); // pick | warnings | conflict | importing | error
+function useImportModal(onImported) {
+  const [step, setStep] = useState(STEP.PICK);
   const [error, setError] = useState(null);
   const [warnings, setWarnings] = useState([]);
   const [conflict, setConflict] = useState(null);
   const [parsedData, setParsedData] = useState(null);
   const fileRef = useRef(null);
 
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (file.size > MAX_FILE_SIZE) {
-      setError(`File too large (${(file.size / 1024).toFixed(0)} KB). Maximum is 1 MB.`);
-      setStep(STEP.ERROR);
-      return;
-    }
-
-    let data;
-    try {
-      const text = await file.text();
-      data = JSON.parse(text);
-    } catch {
-      setError('Invalid file: could not parse as JSON.');
-      setStep(STEP.ERROR);
-      return;
-    }
-
-    if (typeof data !== 'object' || Array.isArray(data)) {
-      setError('Invalid file: expected a JSON object.');
-      setStep(STEP.ERROR);
-      return;
-    }
-
-    setParsedData(data);
-    await doImport(data, false);
-  };
-
   const doImport = async (data, force) => {
     setStep(STEP.IMPORTING);
     try {
       const result = await importStandard(data, force);
-      if (result._conflict) {
-        setConflict(result.existing);
-        setWarnings(result.warnings || []);
-        setStep(STEP.CONFLICT);
-        return;
-      }
-      if (result.warnings?.length > 0 && !force) {
-        setWarnings(result.warnings);
-        setStep(STEP.WARNINGS);
-        return;
-      }
+      if (result._conflict) { setConflict(result.existing); setWarnings(result.warnings || []); setStep(STEP.CONFLICT); return; }
+      if (result.warnings?.length > 0 && !force) { setWarnings(result.warnings); setStep(STEP.WARNINGS); return; }
       onImported();
-    } catch (err) {
-      setError(err.message || 'Import failed');
-      setStep(STEP.ERROR);
-    }
+    } catch (err) { setError(err.message || 'Import failed'); setStep(STEP.ERROR); }
   };
 
-  const handleForceImport = async () => {
-    await doImport(parsedData, true);
+  const handleFile = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > MAX_FILE_SIZE) { setError(`File too large (${(file.size / 1024).toFixed(0)} KB). Maximum is 1 MB.`); setStep(STEP.ERROR); return; }
+    let data;
+    try { const text = await file.text(); data = JSON.parse(text); } catch { setError('Invalid file: could not parse as JSON.'); setStep(STEP.ERROR); return; }
+    if (typeof data !== 'object' || Array.isArray(data)) { setError('Invalid file: expected a JSON object.'); setStep(STEP.ERROR); return; }
+    setParsedData(data);
+    await doImport(data, false);
   };
 
-  const handleImportAsCopy = async () => {
-    const newId = `${parsedData.id}-imported`;
-    const copied = { ...parsedData, id: newId };
-    setParsedData(copied);
-    await doImport(copied, false);
-  };
+  const handleForceImport = async () => { await doImport(parsedData, true); };
+  const handleImportAsCopy = async () => { const copied = { ...parsedData, id: `${parsedData.id}-imported` }; setParsedData(copied); await doImport(copied, false); };
+  const handleProceedWithWarnings = async () => { await doImport(parsedData, true); };
 
-  const handleProceedWithWarnings = async () => {
-    await doImport(parsedData, true);
-  };
+  return { step, error, warnings, conflict, parsedData, fileRef, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
+}
+
+export default function ImportModal({ onClose, onImported }) {
+  const { step, error, warnings, conflict, parsedData, fileRef, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings } = useImportModal(onImported);
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -165,16 +129,7 @@ export default function ImportModal({ onClose, onImported }) {
         {step === STEP.IMPORTING && <ImportingStep />}
         {step === STEP.ERROR && <ErrorStep error={error} onClose={onClose} />}
         {step === STEP.WARNINGS && <WarningsStep warnings={warnings} onClose={onClose} onProceed={handleProceedWithWarnings} />}
-        {step === STEP.CONFLICT && (
-          <ConflictStep
-            parsedData={parsedData}
-            conflict={conflict}
-            warnings={warnings}
-            onClose={onClose}
-            onImportAsCopy={handleImportAsCopy}
-            onOverwrite={handleForceImport}
-          />
-        )}
+        {step === STEP.CONFLICT && <ConflictStep parsedData={parsedData} conflict={conflict} warnings={warnings} onClose={onClose} onImportAsCopy={handleImportAsCopy} onOverwrite={handleForceImport} />}
       </div>
     </div>
   );

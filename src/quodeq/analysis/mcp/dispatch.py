@@ -10,7 +10,7 @@ import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from quodeq.engine.file_queue import FileQueue
+    from quodeq.analysis.subagents.file_queue import FileQueue
     from quodeq.analysis.mcp.findings_server import FindingsRouter
 
 _JSONRPC_VERSION = "2.0"

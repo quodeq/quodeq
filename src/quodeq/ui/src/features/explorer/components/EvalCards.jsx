@@ -30,6 +30,27 @@ function RefsLinks({ reqRefs }) {
   );
 }
 
+function ViolationDetail({ item }) {
+  return (
+    <div className="vlive-detail">
+      {(item.title || item.reason || item.findings) && (
+        <div className="vlive-detail-section">
+          <div className="vlive-detail-section-header">
+            {item.title && <span className="vlive-detail-section-label">Reason</span>}
+            <RefsLinks reqRefs={item.reqRefs} />
+          </div>
+          {item.title && <p className="vlive-detail-title">{item.title}</p>}
+          {item.reason && <>
+            <span className="vlive-detail-section-label">Detail</span>
+            <p className="vlive-detail-reason">{item.reason}</p>
+          </>}
+        </div>
+      )}
+      <ContextBlock context={item.context} snippet={item.snippet} scope={item.scope} line={item.line} endLine={item.endLine} />
+    </div>
+  );
+}
+
 export function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
   const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
   return (
@@ -40,22 +61,7 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
         {filename && <FileCopyBtn display={display} copyText={ref} />}
         <CopyButton label="Fix plan" onClick={() => copyToClipboard(buildViolationPlanText(v))} />
       </div>
-      <div className="vlive-detail">
-        {(v.title || v.reason || v.findings) && (
-          <div className="vlive-detail-section">
-            <div className="vlive-detail-section-header">
-              {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              <RefsLinks reqRefs={v.reqRefs} />
-            </div>
-            {v.title && <p className="vlive-detail-title">{v.title}</p>}
-            {v.reason && <>
-              <span className="vlive-detail-section-label">Detail</span>
-              <p className="vlive-detail-reason">{v.reason}</p>
-            </>}
-          </div>
-        )}
-        <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} endLine={v.endLine} />
-      </div>
+      <ViolationDetail item={v} />
     </div>
   );
 }
@@ -69,22 +75,7 @@ export function ComplianceCard({ c, principle, index }) {
         <span className="vrow-label">[{c.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
       </div>
-      <div className="vlive-detail">
-        {(c.title || c.reason) && (
-          <div className="vlive-detail-section">
-            <div className="vlive-detail-section-header">
-              {c.title && <span className="vlive-detail-section-label">Reason</span>}
-              <RefsLinks reqRefs={c.reqRefs} />
-            </div>
-            {c.title && <p className="vlive-detail-title">{c.title}</p>}
-            {c.reason && <>
-              <span className="vlive-detail-section-label">Detail</span>
-              <p className="vlive-detail-reason">{c.reason}</p>
-            </>}
-          </div>
-        )}
-        <ContextBlock context={c.context} snippet={c.snippet} scope={c.scope} line={c.line} endLine={c.endLine} />
-      </div>
+      <ViolationDetail item={c} />
     </div>
   );
 }

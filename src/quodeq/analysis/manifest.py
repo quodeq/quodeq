@@ -9,6 +9,7 @@ from pathlib import Path
 
 # Re-export for backward compatibility (callers import from manifest)
 from quodeq.analysis._detection import detect_language, list_source_files  # noqa: F401
+from quodeq.analysis.manifest_render import render_target_prompt_context  # noqa: F401
 
 _logger = logging.getLogger(__name__)
 
@@ -282,29 +283,5 @@ def build_manifest(
     )
 
 
-def render_target_prompt_context(
-    target: AnalysisTarget,
-    repo_total_files: int = 0,
-    other_targets: list[AnalysisTarget] | None = None,
-) -> str:
-    """Render an AnalysisTarget as markdown context for inclusion in analysis prompts.
 
-    Standalone function so the rendering concern is separate from the entity.
-    """
-    lines = [
-        f"**Project type:** {target.project_description}",
-        f"**Source files:** {target.total_files}"
-        + (f" (of {repo_total_files} total in repo)" if repo_total_files > target.total_files else ""),
-    ]
-    if other_targets:
-        others = ", ".join(
-            f"{t.project_description} ({t.total_files} files)" for t in other_targets
-        )
-        lines.append(f"**Other modules:** {others}")
-    if target.language_stats:
-        breakdown = ", ".join(
-            f"{ext}: {count}" for ext, count in
-            sorted(target.language_stats.items(), key=lambda x: -x[1])[:8]
-        )
-        lines.append(f"**Extension breakdown:** {breakdown}")
-    return "\n".join(lines)
+# render_target_prompt_context is imported from manifest_render above

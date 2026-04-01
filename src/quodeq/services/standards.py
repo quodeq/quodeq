@@ -21,6 +21,13 @@ def _default_write_json(path: Path, data: dict) -> None:
     path.write_text(json.dumps(data, indent=2))
 
 
+def _count_principles_and_requirements(data: dict) -> tuple[int, int]:
+    """Return (principle_count, requirement_count) from a standard's JSON data."""
+    principles = data.get("principles", [])
+    req_count = sum(len(p.get("requirements", [])) for p in principles)
+    return len(principles), req_count
+
+
 class StandardsService:
     def __init__(
         self, evaluators_dir: Path, compiled_dir: Path, dimensions_file: Path,
@@ -64,9 +71,7 @@ class StandardsService:
             return 0, 0
         try:
             data = self._read_json(path)
-            principles = data.get("principles", [])
-            req_count = sum(len(p.get("requirements", [])) for p in principles)
-            return len(principles), req_count
+            return _count_principles_and_requirements(data)
         except (OSError, ValueError):
             return 0, 0
 
@@ -77,15 +82,14 @@ class StandardsService:
         for path in sorted(self._evaluators_dir.glob("*.json")):
             try:
                 data = self._read_json(path)
-                principles = data.get("principles", [])
-                req_count = sum(len(p.get("requirements", [])) for p in principles)
+                p_count, r_count = _count_principles_and_requirements(data)
                 out.append(StandardMeta(
                     id=data["id"], name=data.get("name", data["id"]),
                     description=data.get("description", ""),
                     weight=data.get("weight", 1.0), source=data.get("source", ""),
                     type=data.get("type", "custom"), managed=data.get("managed", False),
                     origin=data.get("origin"), origin_hash=data.get("origin_hash"),
-                    principle_count=len(principles), requirement_count=req_count,
+                    principle_count=p_count, requirement_count=r_count,
                 ))
             except (OSError, ValueError, KeyError) as exc:
                 logger.warning("Skipping invalid evaluator %s: %s", path.name, exc)

@@ -18,10 +18,9 @@ from quodeq.shared.logging import log_info, log_warning
 _AGENT_ID_PREFIX = "agent"
 _FUTURE_POLL_INTERVAL_S = 0.5
 _HEARTBEAT_JOIN_TIMEOUT_S = 2
-_SCOUT_TIMEOUT_S = 180  # 3 minutes before forcing scale-up
-_DEFAULT_MAX_DURATION_S = 1800
+_SCOUT_TIMEOUT_S = 180             # 3 min before forcing scale-up
+_DEFAULT_MAX_DURATION_S = 1800     # 30 min default pool budget
 _DEFAULT_FILES_PER_AGENT = 30
-
 
 @dataclass
 class ScaleUpState:

@@ -10,6 +10,9 @@ from quodeq.services.standards import StandardsService
 logger = logging.getLogger(__name__)
 
 def _get_service(app: Flask) -> StandardsService:
+    # Lazy initialization: ``_standards_service`` is set on first access and
+    # reused for the lifetime of the Flask app.  Tests can pre-set
+    # ``app._standards_service`` to inject a mock before any route runs.
     if not hasattr(app, "_standards_service"):
         app._standards_service = StandardsService(
             evaluators_dir=Path(app.config["STANDARDS_EVALUATORS_DIR"]),

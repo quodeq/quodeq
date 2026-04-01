@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from quodeq.engine import mcp_findings
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
-from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue
 
 
 def _fake_run_analysis(work_dir, prompt, stream_file, config):

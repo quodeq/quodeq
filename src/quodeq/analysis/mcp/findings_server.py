@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, TextIO, runtime_checkable
 
-from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import (
     read_message,
@@ -220,6 +220,27 @@ def _select_best_refs(
     return result
 
 
+def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
+    """Build compiled-standards context from parsed server args."""
+    compiled_refs = _load_compiled_refs(sa.compiled_dir, sa.dimension)
+    compiled_reqs = _load_compiled_requirements(sa.compiled_dir, sa.dimension)
+
+    req_to_dim: dict[str, str] = {}
+    if len(sa.dimensions) > 1:
+        for dim in sa.dimensions:
+            dim_reqs = _load_compiled_requirements(sa.compiled_dir, dim)
+            for req_id in dim_reqs:
+                req_to_dim[req_id] = dim
+
+    return CompiledContext(
+        compiled_refs=compiled_refs or {},
+        compiled_reqs=compiled_reqs or {},
+        req_to_dim=req_to_dim,
+        dimension=sa.dimension,
+        work_dir=Path(sa.work_dir) if sa.work_dir else None,
+    )
+
+
 def main() -> None:
     """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
     sa = parse_args()
@@ -232,24 +253,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    compiled_refs = _load_compiled_refs(sa.compiled_dir, sa.dimension)
-    compiled_reqs = _load_compiled_requirements(sa.compiled_dir, sa.dimension)
-
-    # Build req_id → dimension mapping for consolidated multi-dimension mode
-    req_to_dim: dict[str, str] = {}
-    if len(sa.dimensions) > 1:
-        for dim in sa.dimensions:
-            dim_reqs = _load_compiled_requirements(sa.compiled_dir, dim)
-            for req_id in dim_reqs:
-                req_to_dim[req_id] = dim
-
-    ctx = CompiledContext(
-        compiled_refs=compiled_refs or {},
-        compiled_reqs=compiled_reqs or {},
-        req_to_dim=req_to_dim,
-        dimension=sa.dimension,
-        work_dir=Path(sa.work_dir) if sa.work_dir else None,
-    )
+    ctx = _build_compiled_context(sa)
 
     queue: FileQueue | None = None
     if sa.queue_path:
