@@ -53,36 +53,28 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
 // directly from App; the high prop count is intentional and not worth splitting.
 // ---------------------------------------------------------------------------
 
-function makeDashboardHandlers(onNavigate, dashboard) {
-  return {
+function useDashboardHandlers(onNavigate, dashboard) {
+  return useMemo(() => ({
     handleDimensionCardClick: (item, runId) => {
-      if (onNavigate) {
-        const dateLabel = dashboard?.selectedRun?.dateLabel || item.fromDateLabel;
-        onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel });
-      }
+      if (!onNavigate) return;
+      const dateLabel = dashboard?.selectedRun?.dateLabel || item.fromDateLabel;
+      onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel });
     },
     handleAccumulatedDimensionClick: (item) => {
       if (onNavigate) onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel });
     },
     handleFileClick: (fileObj) => { if (onNavigate) onNavigate('file', { file: fileObj }); },
-  };
+  }), [onNavigate, dashboard]);
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const {
-    selectedProject, selectedRun, projects = [],
-    dashboard, accumulated, loading, error,
-    availableRuns = [], dailyRuns, overviewRunIndex = 0,
-  } = data;
+  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, error, availableRuns = [], dailyRuns, overviewRunIndex = 0 } = data;
   const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
   const accumulatedDimensions = accumulated?.dimensions || [];
-  const focusedDimensionData = useMemo(() => {
-    if (!focusedDimension) return null;
-    return (dashboard?.dimensions || []).find((d) => d.dimension === focusedDimension) || null;
-  }, [focusedDimension, dashboard]);
-  const handlers = makeDashboardHandlers(onNavigate, dashboard);
+  const focusedDimensionData = useMemo(() => focusedDimension ? (dashboard?.dimensions || []).find((d) => d.dimension === focusedDimension) || null : null, [focusedDimension, dashboard]);
+  const handlers = useDashboardHandlers(onNavigate, dashboard);
 
   if (!projects || projects.length === 0) {
     if (loading) return <LoadingScreen />;
@@ -96,26 +88,9 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       {dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{
-            dashboard,
-            selectedRunId,
-            accumulated,
-            accumulatedDimensions,
-            availableRuns,
-            dailyRuns,
-            overviewRunIndex,
-          }}
-          focus={{
-            dimension: focusedDimension,
-            setDimension: setFocusedDimension,
-            dimensionData: focusedDimensionData,
-          }}
-          callbacks={{
-            onRunSelect,
-            onDimensionCardClick: handlers.handleDimensionCardClick,
-            onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick,
-            onFileClick: handlers.handleFileClick,
-          }}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex }}
+          focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
+          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick }}
         />
       )}
     </div>

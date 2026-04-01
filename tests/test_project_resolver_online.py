@@ -1,5 +1,6 @@
 import json
 import subprocess
+import uuid as _uuid
 from pathlib import Path
 
 from quodeq.data.fs.project_resolver import (
@@ -41,7 +42,6 @@ def test_online_project_with_temp_path_logs_warning(tmp_path: Path, capsys) -> N
 
 def _create_online_project_with_temp_path(reports_dir: Path) -> str:
     """Helper: create a project with location=online but a local temp path (simulates the bug)."""
-    import uuid as _uuid
     project_uuid = str(_uuid.uuid4())
     project_dir = reports_dir / project_uuid
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -58,7 +58,6 @@ def _create_online_project_with_temp_path(reports_dir: Path) -> str:
 
 def _create_online_project_with_url(reports_dir: Path) -> str:
     """Helper: create a project with location=online and a proper URL path."""
-    import uuid as _uuid
     project_uuid = str(_uuid.uuid4())
     project_dir = reports_dir / project_uuid
     project_dir.mkdir(parents=True, exist_ok=True)
@@ -117,7 +116,6 @@ def test_clone_to_local_updates_project(tmp_path: Path, monkeypatch) -> None:
 
 def _create_local_project(reports_dir: Path, local_path: Path) -> str:
     """Helper: create a project with location=local."""
-    import uuid as _uuid
     project_uuid = str(_uuid.uuid4())
     project_dir = reports_dir / project_uuid
     project_dir.mkdir(parents=True, exist_ok=True)

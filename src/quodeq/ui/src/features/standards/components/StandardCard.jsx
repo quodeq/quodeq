@@ -123,71 +123,58 @@ function EyeToggle({ isVisible, standardId, onToggleVisibility }) {
   );
 }
 
+async function downloadStandard(standardId) {
+  const { data, fileName } = await exportStandard(standardId);
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function StandardCardBody({ standard, isVisible, onToggleVisibility, principleCount, requirementCount }) {
+  return (
+    <>
+      <div className="standard-card-header">
+        <span className={`standard-type-badge standard-type-badge--${standard.type}`}>
+          {TYPE_LABELS[standard.type] || standard.type}
+        </span>
+        {standard.managed && (
+          <span className="standard-managed-badge" title="Managed standard — read-only">managed</span>
+        )}
+        <EyeToggle isVisible={isVisible} standardId={standard.id} onToggleVisibility={onToggleVisibility} />
+      </div>
+      <h3 className="standard-card-name">{standard.name}</h3>
+      {standard.description && <p className="standard-card-description">{standard.description}</p>}
+      <div className="standard-card-counts">
+        <span>{principleCount} {principleCount === 1 ? 'principle' : 'principles'}</span>
+        <span className="standard-card-counts-sep">·</span>
+        <span>{requirementCount} {requirementCount === 1 ? 'requirement' : 'requirements'}</span>
+      </div>
+    </>
+  );
+}
+
 export default function StandardCard({ standard, onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility }) {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
-
   const principleCount = standard.principleCount ?? standard.principles?.length ?? 0;
-  const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce(
-    (sum, p) => sum + (p.requirements?.length ?? 0), 0
-  );
+  const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce((sum, p) => sum + (p.requirements?.length ?? 0), 0);
   const isDeletable = standard.type !== STANDARD_TYPES.BUILTIN && standard.type !== STANDARD_TYPES.QUODEQ;
   const visClass = isVisible ? 'standard-card--visible' : 'standard-card--hidden';
 
   return (
     <>
       <div className={`standard-card ${visClass}`} onClick={() => onEdit(standard.id)}>
-        <div className="standard-card-header">
-          <span className={`standard-type-badge standard-type-badge--${standard.type}`}>
-            {TYPE_LABELS[standard.type] || standard.type}
-          </span>
-          {standard.managed && (
-            <span className="standard-managed-badge" title="Managed standard — read-only">managed</span>
-          )}
-          <EyeToggle isVisible={isVisible} standardId={standard.id} onToggleVisibility={onToggleVisibility} />
-        </div>
-        <h3 className="standard-card-name">{standard.name}</h3>
-        {standard.description && <p className="standard-card-description">{standard.description}</p>}
-        <div className="standard-card-counts">
-          <span>{principleCount} {principleCount === 1 ? 'principle' : 'principles'}</span>
-          <span className="standard-card-counts-sep">·</span>
-          <span>{requirementCount} {requirementCount === 1 ? 'requirement' : 'requirements'}</span>
-        </div>
-        <CardActions
-          isDeletable={isDeletable}
-          onDuplicate={() => setShowDuplicateModal(true)}
-          onDownload={async () => {
-            const { data, fileName } = await exportStandard(standard.id);
-            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-          }}
-          onDelete={() => setShowDeleteModal(true)}
-        />
+        <StandardCardBody standard={standard} isVisible={isVisible} onToggleVisibility={onToggleVisibility} principleCount={principleCount} requirementCount={requirementCount} />
+        <CardActions isDeletable={isDeletable} onDuplicate={() => setShowDuplicateModal(true)} onDownload={() => downloadStandard(standard.id)} onDelete={() => setShowDeleteModal(true)} />
       </div>
-
-      {showDeleteModal && (
-        <ConfirmDeleteModal
-          standardName={standard.name}
-          principleCount={principleCount}
-          requirementCount={requirementCount}
-          onConfirm={() => { setShowDeleteModal(false); onDelete(standard.id); }}
-          onCancel={() => setShowDeleteModal(false)}
-        />
-      )}
-      {showDuplicateModal && (
-        <DuplicateModal
-          standardId={standard.id}
-          onConfirm={(newId) => { setShowDuplicateModal(false); onDuplicate(standard.id, newId); }}
-          onCancel={() => setShowDuplicateModal(false)}
-        />
-      )}
+      {showDeleteModal && <ConfirmDeleteModal standardName={standard.name} principleCount={principleCount} requirementCount={requirementCount} onConfirm={() => { setShowDeleteModal(false); onDelete(standard.id); }} onCancel={() => setShowDeleteModal(false)} />}
+      {showDuplicateModal && <DuplicateModal standardId={standard.id} onConfirm={(newId) => { setShowDuplicateModal(false); onDuplicate(standard.id, newId); }} onCancel={() => setShowDuplicateModal(false)} />}
     </>
   );
 }

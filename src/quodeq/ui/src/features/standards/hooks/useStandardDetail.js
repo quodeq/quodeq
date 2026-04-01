@@ -4,20 +4,7 @@ import { generateRequirementId } from '../utils.js';
 import { deepClone } from '../../../utils/deepClone.js';
 import { STANDARD_TYPES } from './useStandards.js';
 
-function useStandardMutations(standard, setStandard, setDirty, standardId, isNew) {
-  const [selectedNode, setSelectedNode] = useState(null);
-
-  const updateField = useCallback((path, value) => {
-    setStandard((prev) => {
-      const next = deepClone(prev);
-      let target = next;
-      for (let i = 0; i < path.length - 1; i++) target = target[path[i]];
-      target[path[path.length - 1]] = value;
-      return next;
-    });
-    setDirty(true);
-  }, [setStandard, setDirty]);
-
+function useTreeMutations(setStandard, setDirty, setSelectedNode) {
   const addPrinciple = useCallback(() => {
     setStandard((prev) => {
       const next = deepClone(prev);
@@ -61,6 +48,25 @@ function useStandardMutations(standard, setStandard, setDirty, standardId, isNew
     setSelectedNode({ type: 'principle', index: principleIndex });
   }, [setStandard, setDirty]);
 
+  return { addPrinciple, removePrinciple, addRequirement, removeRequirement };
+}
+
+function useStandardMutations(standard, setStandard, setDirty, standardId, isNew) {
+  const [selectedNode, setSelectedNode] = useState(null);
+
+  const updateField = useCallback((path, value) => {
+    setStandard((prev) => {
+      const next = deepClone(prev);
+      let target = next;
+      for (let i = 0; i < path.length - 1; i++) target = target[path[i]];
+      target[path[path.length - 1]] = value;
+      return next;
+    });
+    setDirty(true);
+  }, [setStandard, setDirty]);
+
+  const tree = useTreeMutations(setStandard, setDirty, setSelectedNode);
+
   const save = useCallback(async () => {
     if (!standard) return;
     if (!standard.id) return { error: 'ID is required' };
@@ -72,7 +78,7 @@ function useStandardMutations(standard, setStandard, setDirty, standardId, isNew
     } catch (err) { return { error: err.message }; }
   }, [standard, isNew, setDirty]);
 
-  return { selectedNode, setSelectedNode, updateField, addPrinciple, removePrinciple, addRequirement, removeRequirement, save };
+  return { selectedNode, setSelectedNode, updateField, ...tree, save };
 }
 
 export function useStandardDetail(standardId, isNew) {
