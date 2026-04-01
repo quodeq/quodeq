@@ -17,7 +17,12 @@ function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisibl
   const handleSaved = (savedId) => { if (savedId) addVisible(savedId); setView({ mode: 'list' }); refresh(); };
   const handleDeleteWithCleanup = async (id) => { removeVisible(id); await handleDelete(id); };
 
-  return { view, showLibrary, setShowLibrary, showImport, setShowImport, handleEdit, handleNewStandard, handleEditorBack, handleSaved, handleDeleteWithCleanup };
+  return {
+    view, showLibrary, setShowLibrary,
+    showImport, setShowImport,
+    handleEdit, handleNewStandard, handleEditorBack,
+    handleSaved, handleDeleteWithCleanup,
+  };
 }
 
 function StandardsListView({ grouped, loading, error, actions }) {

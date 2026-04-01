@@ -27,25 +27,26 @@ def _max_violation_files(override: int | None = None, env: dict[str, str] | None
 
 
 @dataclass(frozen=True)
-class _FsCallbacks:
-    """Injectable filesystem callbacks for testing resolve_dimension_eval without a real FS."""
+class _ResolveOptions:
+    """Injectable options for resolve_dimension_eval: filesystem callbacks and paths."""
     exists_fn: Callable[[Path], bool] = Path.exists
     stat_fn: Callable[[Path], Any] = Path.stat
+    compiled_dir: Path | None = None
 
 
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
-    compiled_dir: Path | None = None,
-    fs: _FsCallbacks | None = None,
+    options: _ResolveOptions | None = None,
 ) -> ViolationResponse | dict[str, Any] | None:
     """Try successive file formats to load evaluation data for a dimension.
 
-    *fs* provides injectable filesystem callbacks for testing without a real FS.
+    *options* bundles injectable filesystem callbacks and the compiled
+    standards directory for testing without a real FS.
     """
-    if fs is None:
-        fs = _FsCallbacks()
-    _exists = fs.exists_fn
-    _stat = fs.stat_fn
+    opts = options or _ResolveOptions()
+    _exists = opts.exists_fn
+    _stat = opts.stat_fn
+    compiled_dir = opts.compiled_dir
 
     eval_path = base / "evaluation" / f"{dimension}.json"
     if _exists(eval_path):

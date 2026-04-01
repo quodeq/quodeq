@@ -95,19 +95,46 @@ function useImportModal(onImported) {
     setStep(STEP.IMPORTING);
     try {
       const result = await importStandard(data, force);
-      if (result._conflict) { setConflict(result.existing); setWarnings(result.warnings || []); setStep(STEP.CONFLICT); return; }
-      if (result.warnings?.length > 0 && !force) { setWarnings(result.warnings); setStep(STEP.WARNINGS); return; }
+      if (result._conflict) {
+        setConflict(result.existing);
+        setWarnings(result.warnings || []);
+        setStep(STEP.CONFLICT);
+        return;
+      }
+      if (result.warnings?.length > 0 && !force) {
+        setWarnings(result.warnings);
+        setStep(STEP.WARNINGS);
+        return;
+      }
       onImported();
-    } catch (err) { setError(err.message || 'Import failed'); setStep(STEP.ERROR); }
+    } catch (err) {
+      setError(err.message || 'Import failed');
+      setStep(STEP.ERROR);
+    }
   };
 
   const handleFile = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > MAX_FILE_SIZE) { setError(`File too large (${(file.size / 1024).toFixed(0)} KB). Maximum is 1 MB.`); setStep(STEP.ERROR); return; }
+    if (file.size > MAX_FILE_SIZE) {
+      setError(`File too large (${(file.size / 1024).toFixed(0)} KB). Maximum is 1 MB.`);
+      setStep(STEP.ERROR);
+      return;
+    }
     let data;
-    try { const text = await file.text(); data = JSON.parse(text); } catch { setError('Invalid file: could not parse as JSON.'); setStep(STEP.ERROR); return; }
-    if (typeof data !== 'object' || Array.isArray(data)) { setError('Invalid file: expected a JSON object.'); setStep(STEP.ERROR); return; }
+    try {
+      const text = await file.text();
+      data = JSON.parse(text);
+    } catch {
+      setError('Invalid file: could not parse as JSON.');
+      setStep(STEP.ERROR);
+      return;
+    }
+    if (typeof data !== 'object' || Array.isArray(data)) {
+      setError('Invalid file: expected a JSON object.');
+      setStep(STEP.ERROR);
+      return;
+    }
     setParsedData(data);
     await doImport(data, false);
   };

@@ -93,20 +93,21 @@ def _discover_from_detection(detection_file: Path, dimensions_file: Path) -> lis
     return result
 
 
-def discover_plugins(*, cache: _PluginCache | None = None) -> list[PluginInfo]:
+def discover_plugins(*, cache: _PluginCache | None = None, paths: object | None = None) -> list[PluginInfo]:
     """Return available plugin metadata from detection.json + dimensions.json.
 
     Results are cached for _PLUGIN_CACHE_TTL seconds so that configuration
     changes are picked up on the next request after the TTL expires.
 
     Pass *cache* to override the module-level cache (useful for testing).
+    Pass *paths* to override path resolution (useful for testing).
     """
     _cache = cache if cache is not None else _get_plugin_cache()
     cached = _cache.get()
     if cached is not None:
         return cached
 
-    paths = default_paths()
+    paths = paths or default_paths()
     if paths.detection_file.exists() and paths.dimensions_file.exists():
         result = _discover_from_detection(paths.detection_file, paths.dimensions_file)
         _cache.set(result)

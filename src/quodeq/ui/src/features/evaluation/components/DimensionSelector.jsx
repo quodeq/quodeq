@@ -5,10 +5,10 @@ const TYPE_CONFIG = {
 };
 const DEFAULT_TYPE_CONFIG = { label: 'ISO', className: 'dimension-chip-type--builtin' };
 
-function typeLabel(dim) { return (TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG).label; }
-function typeClass(dim) { return (TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG).className; }
+function typeInfo(dim) { return TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG; }
 
 function DimensionChip({ dim, isSelected, onToggle }) {
+  const info = typeInfo(dim);
   return (
     <button
       type="button"
@@ -18,7 +18,7 @@ function DimensionChip({ dim, isSelected, onToggle }) {
       onClick={() => onToggle(dim.id)}
     >
       {dim.label || dim.id}
-      <span className={`dimension-chip-type ${typeClass(dim)}`}>{typeLabel(dim)}</span>
+      <span className={`dimension-chip-type ${info.className}`}>{info.label}</span>
     </button>
   );
 }

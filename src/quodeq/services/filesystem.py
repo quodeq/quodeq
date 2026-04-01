@@ -162,7 +162,8 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         if not base.is_relative_to(Path(reports_dir).resolve()):
             return None
         compiled_dir = self._compiled_dir or default_paths().standards_dir / "compiled"
-        result = resolve_dimension_eval(base, project, run_id, dimension, compiled_dir=compiled_dir if compiled_dir.exists() else None)
+        from quodeq.services.violations import _ResolveOptions
+        result = resolve_dimension_eval(base, project, run_id, dimension, options=_ResolveOptions(compiled_dir=compiled_dir if compiled_dir.exists() else None))
         if result is not None:
             return to_camel_dict(result) if isinstance(result, ViolationResponse) else result
         # Run exists but dimension hasn't started yet

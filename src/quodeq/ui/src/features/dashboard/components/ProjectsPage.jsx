@@ -260,7 +260,17 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
       ) : (
         <div className="projects-cards">
           {roots.map((p) => (
-            <ProjectCardGroup key={p.id || p.name || p} p={p} children={children} selectedProject={selectedProject} onSelect={onSelect} dialogActions={{ confirmActions: { confirming, setConfirming, onDelete, onExport }, relocateActions: { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } }} />
+            <ProjectCardGroup
+              key={p.id || p.name || p}
+              p={p}
+              children={children}
+              selectedProject={selectedProject}
+              onSelect={onSelect}
+              dialogActions={{
+                confirmActions: { confirming, setConfirming, onDelete, onExport },
+                relocateActions: { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate },
+              }}
+            />
           ))}
         </div>
       )}

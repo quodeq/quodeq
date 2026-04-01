@@ -1,20 +1,25 @@
-"""Shared utilities — convenience façade consolidating config, env, I/O, and helpers.
+"""Shared utilities -- intentional convenience facade for the quodeq package.
 
-**Why a single façade?**  This module provides a stable public import surface so
-that callers can ``from quodeq.shared.utils import …`` without tracking which
-internal submodule each helper lives in.  The trade-off (broader module) is
-intentional: it keeps imports simple for a fast-moving CLI codebase.
+**Architectural rationale:**  This module provides a single, stable public
+import surface so that callers can write
+``from quodeq.shared.utils import ...`` without tracking which internal
+submodule each helper lives in.  The trade-off (broader module surface) is
+a deliberate design choice that keeps imports simple and predictable across
+a fast-moving CLI codebase.
 
-Organisation
-~~~~~~~~~~~~
-The re-exports and definitions are grouped by category:
+Categories of re-exported and defined utilities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-1. **Re-exports** — I/O helpers (``_io.py``), security helpers (``_security.py``)
-2. **Config loading** — ``Config`` dataclass, lazy singleton, ``_get_config()``
-3. **Platform detection** — ``IS_WIN32``
-4. **Repository URL helpers** — ``is_repo_url``, ``project_name_from_repo``
-5. **Environment accessors** — ``get_ai_provider``, ``get_dashboard_port``, etc.
-6. **Diff display** — ``show_diff``
+1. **I/O helpers** -- ``read_text``, ``write_text``, ``open_text``, ``read_json``
+   (from ``_io.py``)
+2. **Security helpers** -- ``SENSITIVE_PATTERNS``, ``sanitize_sensitive``
+   (from ``_security.py``)
+3. **Config loading** -- ``Config`` dataclass, lazy singleton via ``_get_config()``
+4. **Platform detection** -- ``IS_WIN32``
+5. **Repository URL helpers** -- ``is_repo_url``, ``project_name_from_repo``
+6. **Environment accessors** -- ``get_ai_provider``, ``get_dashboard_port``,
+   ``get_evaluations_dir``, ``get_anthropic_api_key``, etc.
+7. **Diff display** -- ``show_diff``
 """
 from __future__ import annotations
 
@@ -261,3 +266,25 @@ def show_diff(path: Path, new_content: str) -> None:
         print("".join(diff))
     else:
         print(f"[no changes] {path}")
+
+
+__all__ = [
+    # I/O helpers (re-exported from _io.py)
+    "TEXT_ENCODING", "read_text", "write_text", "open_text", "read_json",
+    # Security helpers (re-exported from _security.py)
+    "SENSITIVE_PATTERNS", "sanitize_sensitive",
+    # Config
+    "Config", "ACTION_API_MODULE",
+    # Platform
+    "IS_WIN32",
+    # Repo URL helpers
+    "is_repo_url", "project_name_from_repo",
+    # Environment accessors
+    "get_ai_provider", "get_ai_cmd", "get_ai_model", "_env_int",
+    "get_action_api_port", "get_action_api_host",
+    "get_dashboard_port", "get_static_dist", "get_evaluations_dir",
+    "get_anthropic_api_key", "get_asvs_url",
+    "get_github_search_url", "get_github_raw_base_url", "get_findings_file",
+    # Diff
+    "show_diff",
+]

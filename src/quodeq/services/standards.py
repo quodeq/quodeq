@@ -7,6 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from quodeq.core.types.standard import StandardDetail, StandardMeta
+from quodeq.services.import_validator import validate_import, scan_injection
 
 logger = logging.getLogger(__name__)
 
@@ -185,8 +186,6 @@ class StandardsService:
         - ``existing``: existing :class:`StandardMeta` (on conflict) or ``None``
         - ``warnings``: list of injection scan warnings
         """
-        from quodeq.services.import_validator import validate_import, scan_injection
-
         validation = validate_import(data)
         if not validation["valid"]:
             raise ValueError("; ".join(validation["errors"]))

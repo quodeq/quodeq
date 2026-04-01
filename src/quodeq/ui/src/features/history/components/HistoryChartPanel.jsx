@@ -12,6 +12,7 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
+import { trendDirection } from '../../../utils/trendUtils.js';
 
 const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = 160;
@@ -37,8 +38,6 @@ function scoreBarColor(score) {
   if (n >= SCORE_POOR)      return cssVar('--color-grade-low-text');
   return cssVar('--color-grade-bottom-text');
 }
-
-import { trendDirection } from '../../../utils/trendUtils.js';
 
 function trendColor(dir) {
   const map = {

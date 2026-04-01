@@ -1,6 +1,8 @@
 import { buildGroupPlanText } from './planBuilder.js';
 import { SEVERITY_ORDER } from './formatters.js';
 
+const addEntryTitle = (v) => ({ ...v, _entryTitle: v.principle || 'Violation' });
+
 /**
  * Build a copy-friendly plan text summarising violations for a single file.
  * @param {{ file: string, violationsBySeverity: Object }} file - File object with violation data.
@@ -8,11 +10,11 @@ import { SEVERITY_ORDER } from './formatters.js';
  */
 export function buildFilePlanText(file) {
   const allViolations = SEVERITY_ORDER.flatMap((sev) =>
-    (file.violationsBySeverity?.[sev] || []).map((v) => ({ ...v, _entryTitle: v.principle || 'Violation' }))
+    (file.violationsBySeverity?.[sev] || []).map(addEntryTitle)
   );
   const violationsBySeverity = {};
   for (const sev of SEVERITY_ORDER) {
-    violationsBySeverity[sev] = (file.violationsBySeverity?.[sev] || []).map((v) => ({ ...v, _entryTitle: v.principle || 'Violation' }));
+    violationsBySeverity[sev] = (file.violationsBySeverity?.[sev] || []).map(addEntryTitle);
   }
   return buildGroupPlanText({
     title: `\`${file.file}\``,

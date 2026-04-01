@@ -98,7 +98,12 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
           runMode={runMode}
           data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
-          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick }}
+          callbacks={{
+            onRunSelect,
+            onDimensionCardClick: handlers.handleDimensionCardClick,
+            onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick,
+            onFileClick: handlers.handleFileClick,
+          }}
         />
       )}
     </div>
