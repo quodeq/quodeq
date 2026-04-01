@@ -7,7 +7,7 @@
 
 <h2 align="center">The quality code compass</h2>
 <p align="center"><em>Your guide to drive any codebase to excellence.</em></p>
-<p align="center"><strong>v0.8.1</strong></p>
+<p align="center"><strong>v0.9.0</strong></p>
 
 <p align="center">
   Quodeq scans any codebase with AI and scores it across six quality dimensions —
