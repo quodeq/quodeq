@@ -139,15 +139,38 @@ function useImportModal(onImported) {
     await doImport(data, false);
   };
 
-  const handleForceImport = async () => { await doImport(parsedData, true); };
-  const handleImportAsCopy = async () => { const copied = { ...parsedData, id: `${parsedData.id}-imported` }; setParsedData(copied); await doImport(copied, false); };
-  const handleProceedWithWarnings = async () => { await doImport(parsedData, true); };
+  const handleForceImport = async () => {
+    await doImport(parsedData, true);
+  };
+  const handleImportAsCopy = async () => {
+    const copied = { ...parsedData, id: `${parsedData.id}-imported` };
+    setParsedData(copied);
+    await doImport(copied, false);
+  };
+  const handleProceedWithWarnings = async () => {
+    await doImport(parsedData, true);
+  };
 
-  return { step, error, warnings, conflict, parsedData, fileRef, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
+  return {
+    step,
+    error,
+    warnings,
+    conflict,
+    parsedData,
+    fileRef,
+    handleFile,
+    handleForceImport,
+    handleImportAsCopy,
+    handleProceedWithWarnings,
+  };
 }
 
 export default function ImportModal({ onClose, onImported }) {
-  const { step, error, warnings, conflict, parsedData, fileRef, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings } = useImportModal(onImported);
+  const {
+    step, error, warnings, conflict, parsedData,
+    fileRef, handleFile, handleForceImport,
+    handleImportAsCopy, handleProceedWithWarnings,
+  } = useImportModal(onImported);
 
   return (
     <div className="modal-overlay" onClick={onClose}>

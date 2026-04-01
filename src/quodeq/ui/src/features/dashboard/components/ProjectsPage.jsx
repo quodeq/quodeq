@@ -267,8 +267,20 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
               selectedProject={selectedProject}
               onSelect={onSelect}
               dialogActions={{
-                confirmActions: { confirming, setConfirming, onDelete, onExport },
-                relocateActions: { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate },
+                confirmActions: {
+                  confirming,
+                  setConfirming,
+                  onDelete,
+                  onExport,
+                },
+                relocateActions: {
+                  relocating,
+                  relocatePath,
+                  setRelocatePath,
+                  submitRelocate,
+                  setRelocating,
+                  startRelocate,
+                },
               }}
             />
           ))}

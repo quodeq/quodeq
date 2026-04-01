@@ -92,9 +92,18 @@ export function useStandardDetail(standardId, isNew) {
   const editable = standard && !standard.managed;
 
   return {
-    standard, loading, error, dirty, editable,
-    selectedNode, setSelectedNode,
-    updateField, addPrinciple, removePrinciple,
-    addRequirement, removeRequirement, save,
+    standard,
+    loading,
+    error,
+    dirty,
+    editable,
+    selectedNode,
+    setSelectedNode,
+    updateField,
+    addPrinciple,
+    removePrinciple,
+    addRequirement,
+    removeRequirement,
+    save,
   };
 }

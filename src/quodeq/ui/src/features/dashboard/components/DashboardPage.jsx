@@ -96,8 +96,20 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       {dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex }}
-          focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
+          data={{
+            dashboard,
+            selectedRunId,
+            accumulated,
+            accumulatedDimensions,
+            availableRuns,
+            dailyRuns,
+            overviewRunIndex,
+          }}
+          focus={{
+            dimension: focusedDimension,
+            setDimension: setFocusedDimension,
+            dimensionData: focusedDimensionData,
+          }}
           callbacks={{
             onRunSelect,
             onDimensionCardClick: handlers.handleDimensionCardClick,

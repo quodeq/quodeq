@@ -194,7 +194,17 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
 
 
 def _render_all_standards(standards_dir: Path, dimensions: list[str], evaluators_dir: Path | None = None) -> str:
-    """Render compact standards for all dimensions, separated by headers."""
+    """Render compact standards for all dimensions, separated by headers.
+
+    Args:
+        standards_dir: Root standards directory containing a ``compiled/`` subdirectory.
+        dimensions: Dimension IDs to include (e.g. ``["security", "reliability"]``).
+        evaluators_dir: Optional path to custom evaluator JSON files.
+
+    Returns:
+        Markdown string with per-dimension sections, or a fallback message
+        when no standards are available.
+    """
     compiled_dir = standards_dir / "compiled"
     _eval_dir = evaluators_dir
     if not compiled_dir.exists() and not (_eval_dir and _eval_dir.is_dir()):
