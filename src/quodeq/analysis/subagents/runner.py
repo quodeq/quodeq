@@ -116,7 +116,7 @@ class LaunchPoolParams:
     evidence_dir: Path
     queue_path: Path
     prompt: str
-    max_files_per_agent: int = 30
+    max_files_per_agent: int = _MAX_FILES_PER_AGENT
 
 
 def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tuple[Any, list[Any]]:

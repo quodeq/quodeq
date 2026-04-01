@@ -3,24 +3,28 @@ import { createRoot } from 'react-dom/client';
 import App from './App.jsx';
 import './styles/index.css';
 
+const LS_THEME = 'cc-theme';
+const LS_THEME_MODE = 'cc-theme-mode';
+const LS_THEME_FAMILY = 'cc-theme-family';
+
 function applyInitialTheme() {
-  const oldTheme = localStorage.getItem('cc-theme');
+  const oldTheme = localStorage.getItem(LS_THEME);
   if (oldTheme !== null) {
     const map = { system: ['system','daruma'], light: ['light','daruma'], dark: ['dark','daruma'],
       ember: ['dark','ifrit'], forest: ['light','galadriel'], midnight: ['dark','flynn'],
       slate: ['light','daruma'], horizon: ['light','flynn'] };
     const [m, f] = map[oldTheme] || ['system','daruma'];
-    localStorage.setItem('cc-theme-mode', m);
-    localStorage.setItem('cc-theme-family', f);
-    localStorage.removeItem('cc-theme');
+    localStorage.setItem(LS_THEME_MODE, m);
+    localStorage.setItem(LS_THEME_FAMILY, f);
+    localStorage.removeItem(LS_THEME);
   }
-  const oldFamily = localStorage.getItem('cc-theme-family');
+  const oldFamily = localStorage.getItem(LS_THEME_FAMILY);
   const familyMap = { 'default': 'daruma', 'midnight': 'flynn', 'forest': 'galadriel', 'ember': 'ifrit', 'cyber': 'deckard' };
   if (oldFamily && familyMap[oldFamily]) {
-    localStorage.setItem('cc-theme-family', familyMap[oldFamily]);
+    localStorage.setItem(LS_THEME_FAMILY, familyMap[oldFamily]);
   }
-  const mode = localStorage.getItem('cc-theme-mode') || 'system';
-  const family = localStorage.getItem('cc-theme-family') || 'daruma';
+  const mode = localStorage.getItem(LS_THEME_MODE) || 'system';
+  const family = localStorage.getItem(LS_THEME_FAMILY) || 'daruma';
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const effectiveMode = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
   // NOTE: This logic must mirror resolveDataTheme() in useAppSettings.js

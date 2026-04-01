@@ -3,6 +3,7 @@ import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import PowerSelector from './PowerSelector.jsx';
 
+const INITIAL_ANIM_DELAY = '0s';
 const CHIP_DELAY_1 = '0.55s';
 const CHIP_DELAY_2 = '1.1s';
 
@@ -53,7 +54,7 @@ function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange, onPer
             </svg>
           </div>
           <div className="eval-icon-animated">
-            <span className="eval-file-chip" style={{animationDelay: '0s'}} />
+            <span className="eval-file-chip" style={{animationDelay: INITIAL_ANIM_DELAY}} />
             <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_1}} />
             <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_2}} />
             <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">

@@ -16,6 +16,8 @@ from quodeq.core.types import DimensionResult
 
 _logger = logging.getLogger(__name__)
 
+_CACHE_WAIT_TIMEOUT_S = 30
+
 
 def _fetch_dimensions_from_disk(
     reports_root: Path, project: str, run_id: str,
@@ -92,7 +94,7 @@ def make_lru_dimension_fetcher(
                 _inflight[key] = threading.Event()
 
         if wait_event is not None:
-            wait_event.wait(timeout=30)
+            wait_event.wait(timeout=_CACHE_WAIT_TIMEOUT_S)
             with lock:
                 return list(cache.get(key, []))
 

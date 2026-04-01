@@ -168,8 +168,7 @@ def _build_req_to_principle_map(dimension: str, evaluators_dir: Path | None = No
     if not path.is_file():
         return {}
     try:
-        import json as _json
-        data = _json.loads(path.read_text())
+        data = json.loads(path.read_text())
         mapping: dict[str, str] = {}
         for principle in data.get("principles", []):
             pname = principle.get("name", "")

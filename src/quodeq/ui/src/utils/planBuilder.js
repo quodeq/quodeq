@@ -1,4 +1,11 @@
 import { SEVERITY_ORDER } from './formatters.js';
+import {
+  PLAN_SYSTEM_PREAMBLE,
+  PLAN_OUTPUT_INSTRUCTIONS,
+  GROUP_PLAN_PREAMBLE,
+  GROUP_PLAN_OUTPUT,
+  FIX_HINTS,
+} from './planConstants.js';
 
 const PLAN_SNIPPET_MAX_LINES = 5;
 
@@ -11,13 +18,6 @@ function capSnippet(snippet) {
   if (lines.length <= PLAN_SNIPPET_MAX_LINES) return snippet;
   return [...lines.slice(0, PLAN_SNIPPET_MAX_LINES), `... (${lines.length - PLAN_SNIPPET_MAX_LINES} more lines)`].join('\n');
 }
-import {
-  PLAN_SYSTEM_PREAMBLE,
-  PLAN_OUTPUT_INSTRUCTIONS,
-  GROUP_PLAN_PREAMBLE,
-  GROUP_PLAN_OUTPUT,
-  FIX_HINTS,
-} from './planConstants.js';
 
 // ---------------------------------------------------------------------------
 // Plan text constants (authoritative home — re-exported by explorerUtils.js)

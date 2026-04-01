@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
@@ -76,7 +77,6 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 return None
             return _build_project_entry(reports_root, name, runs)
 
-        from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=min(8, len(dir_names) or 1)) as pool:
             results = pool.map(_build_one, dir_names)
         projects = [p for p in results if p is not None]

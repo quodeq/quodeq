@@ -2,9 +2,10 @@ import { useState, useRef } from 'react';
 import { importStandard } from '../../../api/index.js';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+const STEP = { PICK: 'pick', IMPORTING: 'importing', ERROR: 'error', WARNINGS: 'warnings', CONFLICT: 'conflict' };
 
 export default function ImportModal({ onClose, onImported }) {
-  const [step, setStep] = useState('pick'); // pick | warnings | conflict | importing | error
+  const [step, setStep] = useState(STEP.PICK); // pick | warnings | conflict | importing | error
   const [error, setError] = useState(null);
   const [warnings, setWarnings] = useState([]);
   const [conflict, setConflict] = useState(null);
@@ -17,7 +18,7 @@ export default function ImportModal({ onClose, onImported }) {
 
     if (file.size > MAX_FILE_SIZE) {
       setError(`File too large (${(file.size / 1024).toFixed(0)} KB). Maximum is 1 MB.`);
-      setStep('error');
+      setStep(STEP.ERROR);
       return;
     }
 
@@ -27,13 +28,13 @@ export default function ImportModal({ onClose, onImported }) {
       data = JSON.parse(text);
     } catch {
       setError('Invalid file: could not parse as JSON.');
-      setStep('error');
+      setStep(STEP.ERROR);
       return;
     }
 
     if (typeof data !== 'object' || Array.isArray(data)) {
       setError('Invalid file: expected a JSON object.');
-      setStep('error');
+      setStep(STEP.ERROR);
       return;
     }
 
@@ -42,24 +43,24 @@ export default function ImportModal({ onClose, onImported }) {
   };
 
   const doImport = async (data, force) => {
-    setStep('importing');
+    setStep(STEP.IMPORTING);
     try {
       const result = await importStandard(data, force);
       if (result._conflict) {
         setConflict(result.existing);
         setWarnings(result.warnings || []);
-        setStep('conflict');
+        setStep(STEP.CONFLICT);
         return;
       }
       if (result.warnings?.length > 0 && !force) {
         setWarnings(result.warnings);
-        setStep('warnings');
+        setStep(STEP.WARNINGS);
         return;
       }
       onImported();
     } catch (err) {
       setError(err.message || 'Import failed');
-      setStep('error');
+      setStep(STEP.ERROR);
     }
   };
 
@@ -81,7 +82,7 @@ export default function ImportModal({ onClose, onImported }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
-        {step === 'pick' && (
+        {step === STEP.PICK && (
           <>
             <h3 className="modal-title">Import Evaluator</h3>
             <p className="modal-body">
@@ -100,14 +101,14 @@ export default function ImportModal({ onClose, onImported }) {
           </>
         )}
 
-        {step === 'importing' && (
+        {step === STEP.IMPORTING && (
           <>
             <h3 className="modal-title">Importing...</h3>
             <p className="modal-body">Validating and importing evaluator.</p>
           </>
         )}
 
-        {step === 'error' && (
+        {step === STEP.ERROR && (
           <>
             <h3 className="modal-title">Import Failed</h3>
             <p className="modal-body modal-body--warning">{error}</p>
@@ -117,7 +118,7 @@ export default function ImportModal({ onClose, onImported }) {
           </>
         )}
 
-        {step === 'warnings' && (
+        {step === STEP.WARNINGS && (
           <>
             <h3 className="modal-title">Security Warnings</h3>
             <p className="modal-body modal-body--warning">
@@ -133,7 +134,7 @@ export default function ImportModal({ onClose, onImported }) {
           </>
         )}
 
-        {step === 'conflict' && (
+        {step === STEP.CONFLICT && (
           <>
             <h3 className="modal-title">ID Already Exists</h3>
             <p className="modal-body">

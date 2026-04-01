@@ -174,7 +174,6 @@ export async function importFromLibrary(file) {
   return request('/standards/library/import', { method: 'POST', body: JSON.stringify({ file }) });
 }
 export async function importStandard(data, force = false) {
-  const BASE = import.meta.env.VITE_API_BASE || '/api';
   const res = await fetch(`${BASE}/standards/import`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

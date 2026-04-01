@@ -212,6 +212,30 @@ def _check_rate_limit(store: RateLimitStore) -> Response | tuple[Response, int] 
     return None
 
 
+def _configure_security(app: Flask, rate_limit_store: RateLimitStore, api_key: str | None) -> None:
+    """Register before/after request hooks for auth, CSRF, rate-limiting, and security headers."""
+
+    @app.before_request
+    def _audit_log() -> None:
+        actor = ""
+        if api_key:
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer ") and len(auth) > 11:
+                actor = f", actor=key:***{auth[-4:]}"
+        _logger.info("API: %s %s (remote_addr=%s%s)", request.method, request.path, request.remote_addr, actor)
+
+    @app.before_request
+    def _security_checks() -> Response | tuple[Response, int] | None:
+        return _check_auth(api_key) or _check_csrf() or _check_rate_limit(rate_limit_store)
+
+    @app.after_request
+    def _add_security_headers(response: Response) -> Response:
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
+        return response
+
+
 def create_app(
     provider: ActionProvider | None = None,
     static_dist: str | None = None,
@@ -241,25 +265,7 @@ def create_app(
             "Set QUODEQ_API_KEY to enable authenticated remote access."
         )
 
-    @app.before_request
-    def _audit_log() -> None:
-        actor = ""
-        if api_key:
-            auth = request.headers.get("Authorization", "")
-            if auth.startswith("Bearer ") and len(auth) > 11:
-                actor = f", actor=key:***{auth[-4:]}"
-        _logger.info("API: %s %s (remote_addr=%s%s)", request.method, request.path, request.remote_addr, actor)
-
-    @app.before_request
-    def _security_checks() -> Response | tuple[Response, int] | None:
-        return _check_auth(api_key) or _check_csrf() or _check_rate_limit(store)
-
-    @app.after_request
-    def _add_security_headers(response: Response) -> Response:
-        response.headers["X-Frame-Options"] = "DENY"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'"
-        return response
+    _configure_security(app, store, api_key)
 
     @app.get("/api/health")
     def health() -> Response:
