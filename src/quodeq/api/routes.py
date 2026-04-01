@@ -291,5 +291,40 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
             return jsonify(body), status
         return jsonify(payload)
 
+    @app.post("/api/browse/mkdir")
+    def browse_mkdir() -> Response | tuple[Response, int]:
+        """Create a new subdirectory inside a given parent path."""
+        data = request.get_json(silent=True) or {}
+        parent = data.get("path", "").strip()
+        name = data.get("name", "").strip()
+        if not parent or not name:
+            body, status = error_response("path and name are required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+        if "/" in name or "\\" in name or name in (".", ".."):
+            body, status = error_response("Invalid folder name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+        resolved = Path(parent).resolve()
+        home = Path.home().resolve()
+        if not resolved.is_relative_to(home):
+            body, status = error_response(
+                "Path must be within the user's home directory",
+                HTTPStatus.FORBIDDEN,
+                "FORBIDDEN",
+            )
+            return jsonify(body), status
+        if not resolved.is_dir():
+            body, status = error_response("Parent path not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        target = resolved / name
+        try:
+            target.mkdir(parents=False, exist_ok=False)
+        except FileExistsError:
+            body, status = error_response("Folder already exists", HTTPStatus.CONFLICT, "CONFLICT")
+            return jsonify(body), status
+        except OSError as exc:
+            body, status = error_response(f"Could not create folder: {exc}", HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR")
+            return jsonify(body), status
+        return jsonify({"created": True, "path": str(target)})
+
 
 __all__ = ["register_static_routes"]  # re-exported from quodeq.api.helpers
