@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { getDashboard, getAccumulated } from '../../../api/index.js';
 
 /**
@@ -75,6 +75,16 @@ export function useDashboard({ selectedProject, selectedRun }) {
   const [latestAccumulated, setLatestAccumulated] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  // Clear stale data immediately when project changes to prevent rendering old data for a new project
+  const prevProjectRef = useRef(selectedProject);
+  if (prevProjectRef.current !== selectedProject) {
+    prevProjectRef.current = selectedProject;
+    setDashboard(null);
+    setAccumulated(null);
+    setLatestAccumulated(null);
+    setError(null);
+  }
 
   useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun]);

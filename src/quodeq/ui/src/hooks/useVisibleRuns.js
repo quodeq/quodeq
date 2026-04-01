@@ -27,11 +27,14 @@ export function useVisibleRuns(dailyRuns, dashboard, activePage, setSelectedRun)
   const visibleRunIdsKey = visibleDailyRuns.map((r) => r.runId).join(',');
   const prevRunIdsKeyRef = useRef(visibleRunIdsKey);
   useEffect(() => {
-    if (prevRunIdsKeyRef.current !== visibleRunIdsKey && visibleDailyRuns.length > 0) {
+    // Only reset when the visible runs actually change content (not when transitioning through empty during project switch)
+    if (prevRunIdsKeyRef.current !== visibleRunIdsKey && visibleRunIdsKey !== '' && prevRunIdsKeyRef.current !== '') {
       setSelectedRun('latest');
     }
-    prevRunIdsKeyRef.current = visibleRunIdsKey;
-  }, [visibleRunIdsKey, visibleDailyRuns.length, setSelectedRun]);
+    if (visibleRunIdsKey !== '') {
+      prevRunIdsKeyRef.current = visibleRunIdsKey;
+    }
+  }, [visibleRunIdsKey, setSelectedRun]);
 
   return visibleDailyRuns;
 }
