@@ -17,6 +17,10 @@ def compute_coverage_pct(files_read: int, source_file_count: int) -> float:
     return 0.0
 
 
+_VALID_VERDICTS = frozenset({"violation", "compliance", "dismissed"})
+_VALID_SEVERITIES = frozenset({"critical", "high", "medium", "low", "minor"})
+
+
 @dataclass
 class Judgment:
     """One LLM judgment per finding."""
@@ -36,6 +40,16 @@ class Judgment:
     context: str = ""
     scope: str = ""
 
+    def __post_init__(self) -> None:
+        if not self.practice_id:
+            raise ValueError("Judgment requires a practice_id")
+
+    def is_violation(self) -> bool:
+        return self.verdict == "violation"
+
+    def is_compliance(self) -> bool:
+        return self.verdict == "compliance"
+
 
 @dataclass
 class PrincipleEvidence:
@@ -48,6 +62,26 @@ class PrincipleEvidence:
     violations: list[dict] = field(default_factory=list)
     compliance: list[dict] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.practice_id:
+            raise ValueError("PrincipleEvidence requires a practice_id")
+
+    def add_violations(self, items: list[dict]) -> None:
+        """Append violation findings and recompute metrics."""
+        self.violations.extend(items)
+        self.compute_metrics()
+
+    def add_compliance(self, items: list[dict]) -> None:
+        """Append compliance findings and recompute metrics."""
+        self.compliance.extend(items)
+        self.compute_metrics()
+
+    def merge_findings(self, other: PrincipleEvidence) -> None:
+        """Merge another PrincipleEvidence's findings into this one."""
+        self.violations.extend(other.violations)
+        self.compliance.extend(other.compliance)
+        self.compute_metrics()
 
     def compute_metrics(self, scale_multiplier: int = 1) -> None:
         """Calculate compliance percentage and confidence level from violation/compliance counts."""
