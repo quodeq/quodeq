@@ -87,15 +87,12 @@ function FolderFooter({ selectedFolder, onClose, onConfirm, confirmText = 'Use T
 }
 
 async function navigateFolder(path, navigation) {
-  const { setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder } = navigation;
+  const { setLoading, setNavError, updateNavState } = navigation;
   setLoading(true);
   setNavError(null);
   try {
     const result = await browseDirectory(path || '');
-    setData(result);
-    setCurrentPath(result.current);
-    setPathInput(result.current);
-    setSelectedFolder(result.current);
+    updateNavState({ data: result, path: result.current, pathInput: result.current, selectedFolder: result.current });
   } catch (err) {
     setNavError(err.message || 'Failed to load folder');
   } finally {
@@ -169,7 +166,13 @@ export default function FolderBrowser({ onSelect, onClose, title = 'Select Repos
   const [navError, setNavError] = useState(null);
   const [selectedFolder, setSelectedFolder] = useState(null);
 
-  const navigation = { setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder };
+  function updateNavState({ data: d, path: p, pathInput: pi, selectedFolder: sf }) {
+    if (d !== undefined) setData(d);
+    if (p !== undefined) setCurrentPath(p);
+    if (pi !== undefined) setPathInput(pi);
+    if (sf !== undefined) setSelectedFolder(sf);
+  }
+  const navigation = { setLoading, setNavError, updateNavState };
 
   function navigate(path) {
     navigateFolder(path, navigation);

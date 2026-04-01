@@ -3,26 +3,8 @@ import { getStandard, createStandard, updateStandard } from '../../../api/index.
 import { generateRequirementId } from '../utils.js';
 import { deepClone } from '../../../utils/deepClone.js';
 
-export function useStandardDetail(standardId, isNew) {
-  const [standard, setStandard] = useState(null);
-  const [loading, setLoading] = useState(!isNew);
-  const [error, setError] = useState(null);
-  const [dirty, setDirty] = useState(false);
+function useStandardMutations(standard, setStandard, setDirty, standardId, isNew) {
   const [selectedNode, setSelectedNode] = useState(null);
-
-  useEffect(() => {
-    if (isNew) {
-      setStandard({ id: '', name: '', description: '', weight: 1.0, source: '', type: 'custom', managed: false, origin: null, originHash: null, principles: [] });
-      setSelectedNode({ type: 'root' });
-      return;
-    }
-    if (!standardId) return;
-    setLoading(true);
-    getStandard(standardId)
-      .then((data) => { setStandard(data); setSelectedNode({ type: 'root' }); setError(null); })
-      .catch((err) => setError(err.message))
-      .finally(() => setLoading(false));
-  }, [standardId, isNew]);
 
   const updateField = useCallback((path, value) => {
     setStandard((prev) => {
@@ -33,7 +15,7 @@ export function useStandardDetail(standardId, isNew) {
       return next;
     });
     setDirty(true);
-  }, []);
+  }, [setStandard, setDirty]);
 
   const addPrinciple = useCallback(() => {
     setStandard((prev) => {
@@ -43,7 +25,7 @@ export function useStandardDetail(standardId, isNew) {
       return next;
     });
     setDirty(true);
-  }, []);
+  }, [setStandard, setDirty]);
 
   const removePrinciple = useCallback((index) => {
     setStandard((prev) => {
@@ -53,7 +35,7 @@ export function useStandardDetail(standardId, isNew) {
     });
     setDirty(true);
     setSelectedNode({ type: 'root' });
-  }, []);
+  }, [setStandard, setDirty]);
 
   const addRequirement = useCallback((principleIndex) => {
     setStandard((prev) => {
@@ -66,7 +48,7 @@ export function useStandardDetail(standardId, isNew) {
       return next;
     });
     setDirty(true);
-  }, []);
+  }, [setStandard, setDirty]);
 
   const removeRequirement = useCallback((principleIndex, reqIndex) => {
     setStandard((prev) => {
@@ -76,18 +58,49 @@ export function useStandardDetail(standardId, isNew) {
     });
     setDirty(true);
     setSelectedNode({ type: 'principle', index: principleIndex });
-  }, []);
+  }, [setStandard, setDirty]);
 
   const save = useCallback(async () => {
     if (!standard) return;
-    if (!standard.id) { setError('ID is required'); return; }
-    if (!standard.name) { setError('Name is required'); return; }
+    if (!standard.id) return { error: 'ID is required' };
+    if (!standard.name) return { error: 'Name is required' };
     try {
       if (isNew) { await createStandard(standard); } else { await updateStandard(standard.id, standard); }
       setDirty(false);
-      setError(null);
-    } catch (err) { setError(err.message); }
-  }, [standard, isNew]);
+      return { error: null };
+    } catch (err) { return { error: err.message }; }
+  }, [standard, isNew, setDirty]);
+
+  return { selectedNode, setSelectedNode, updateField, addPrinciple, removePrinciple, addRequirement, removeRequirement, save };
+}
+
+export function useStandardDetail(standardId, isNew) {
+  const [standard, setStandard] = useState(null);
+  const [loading, setLoading] = useState(!isNew);
+  const [error, setError] = useState(null);
+  const [dirty, setDirty] = useState(false);
+
+  const mutations = useStandardMutations(standard, setStandard, setDirty, standardId, isNew);
+
+  useEffect(() => {
+    if (isNew) {
+      setStandard({ id: '', name: '', description: '', weight: 1.0, source: '', type: 'custom', managed: false, origin: null, originHash: null, principles: [] });
+      mutations.setSelectedNode({ type: 'root' });
+      return;
+    }
+    if (!standardId) return;
+    setLoading(true);
+    getStandard(standardId)
+      .then((data) => { setStandard(data); mutations.setSelectedNode({ type: 'root' }); setError(null); })
+      .catch((err) => setError(err.message))
+      .finally(() => setLoading(false));
+  }, [standardId, isNew]);
+
+  const save = useCallback(async () => {
+    const result = await mutations.save();
+    if (result?.error) setError(result.error);
+    else setError(null);
+  }, [mutations.save]);
 
   const editable = standard && !standard.managed;
 
@@ -97,13 +110,13 @@ export function useStandardDetail(standardId, isNew) {
     error,
     dirty,
     editable,
-    selectedNode,
-    setSelectedNode,
-    updateField,
-    addPrinciple,
-    removePrinciple,
-    addRequirement,
-    removeRequirement,
+    selectedNode: mutations.selectedNode,
+    setSelectedNode: mutations.setSelectedNode,
+    updateField: mutations.updateField,
+    addPrinciple: mutations.addPrinciple,
+    removePrinciple: mutations.removePrinciple,
+    addRequirement: mutations.addRequirement,
+    removeRequirement: mutations.removeRequirement,
     save,
   };
 }

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { downloadStandard } from '../../../api/index.js';
+import { exportStandard } from '../../../api/index.js';
 
 const TYPE_LABELS = { builtin: 'ISO-25010', quodeq: 'Quodeq', community: 'Community', custom: 'Custom' };
 
@@ -155,7 +155,18 @@ export default function StandardCard({ standard, onEdit, onDelete, onDuplicate, 
         <CardActions
           isDeletable={isDeletable}
           onDuplicate={() => setShowDuplicateModal(true)}
-          onDownload={() => downloadStandard(standard.id)}
+          onDownload={async () => {
+            const { data, fileName } = await exportStandard(standard.id);
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}
           onDelete={() => setShowDeleteModal(true)}
         />
       </div>

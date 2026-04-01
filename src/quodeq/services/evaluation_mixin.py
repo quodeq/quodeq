@@ -16,6 +16,9 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_n
 if TYPE_CHECKING:
     from quodeq.services.jobs import JobManager
 
+_LOCATION_ONLINE = "online"
+_LOCATION_LOCAL = "local"
+
 
 class EvaluationDispatcher(Protocol):
     """Abstraction for dispatching evaluation work.
@@ -80,7 +83,7 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str) -> No
     """Resolve and register the project UUID before evaluation starts."""
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = project_name_from_repo(repo)
-    location = "online" if is_repo_url(repo) else "local"
+    location = _LOCATION_ONLINE if is_repo_url(repo) else _LOCATION_LOCAL
     resolve_project_uuid(Path(reports_dir), ProjectIdentity(project_name, repo_resolved, discipline, location))
 
 
