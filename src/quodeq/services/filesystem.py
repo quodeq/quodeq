@@ -162,8 +162,21 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         if not dest_dir.is_dir():
             return None
 
+        from quodeq.data.fs.repo_handler import _PRIVATE_HOST_RE, _resolves_to_private
+
+        if _PRIVATE_HOST_RE.match(url):
+            return None
+        if url.startswith("http"):
+            import urllib.parse
+            hostname = urllib.parse.urlparse(url).hostname or ""
+            if hostname and _resolves_to_private(hostname):
+                return None
+
         project_name = info.get("name", url.split("/")[-1].replace(".git", ""))
         clone_dest = dest_dir / project_name
+
+        if clone_dest.exists():
+            return None
 
         env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
         try:
