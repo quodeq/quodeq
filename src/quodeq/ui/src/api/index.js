@@ -74,6 +74,13 @@ export function relocateProject(projectId, newPath) {
   });
 }
 
+export function cloneToLocal(projectId, destination) {
+  return request(`/projects/${encodeURIComponent(projectId)}/clone-local`, {
+    method: 'POST',
+    body: JSON.stringify({ destination }),
+  });
+}
+
 // ── Dashboard ───────────────────────────────────────────────────────────
 
 /** @returns {Promise<import('../models/dashboard.js').Dashboard>} */
@@ -131,6 +138,13 @@ export async function getDimensionEval(projectId, runId, dimension) {
 export function browseDirectory(dirPath = '') {
   const q = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';
   return request(`/browse${q}`);
+}
+
+export function createDirectory(path, name) {
+  return request('/browse/mkdir', {
+    method: 'POST',
+    body: JSON.stringify({ path, name }),
+  });
 }
 
 export function listPlugins() {
