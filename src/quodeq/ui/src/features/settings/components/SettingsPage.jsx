@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getHealth, getAiClients } from '../../../api/index.js';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import SettingsAside from './SettingsAside.jsx';
@@ -224,12 +224,13 @@ function useSettingsState(aiCmd, onApplyAiCmd) {
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
 
+  // Stable reference so it can be included in the effect dep array without re-running
+  const stableApplyAiCmd = useCallback(onApplyAiCmd, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     setSettingsPhrase(_SETTINGS_PHRASES[Math.floor(Math.random() * _SETTINGS_PHRASES.length)]);
-    if (appVersion === null) {
-      getHealth().then((d) => setAppVersion(d.version || null)).catch((err) => console.warn('Failed to fetch app version:', err));
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    getHealth().then((d) => setAppVersion(d.version || null)).catch((err) => console.warn('Failed to fetch app version:', err));
+  }, []);
 
   useEffect(() => {
     if (availableClients !== null) return;
@@ -238,15 +239,15 @@ function useSettingsState(aiCmd, onApplyAiCmd) {
         const clients = data.clients || [];
         setAvailableClients(clients);
         if (aiCmd && !clients.some((c) => c.id === aiCmd)) {
-          onApplyAiCmd('');
+          stableApplyAiCmd('');
           localStorage.removeItem(AI_CMD_STORAGE_KEY);
         }
         if (!aiCmd && clients.length > 0) {
-          onApplyAiCmd(clients[0].id);
+          stableApplyAiCmd(clients[0].id);
         }
       })
       .catch(() => setAvailableClients([]));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [aiCmd, stableApplyAiCmd]);
 
   return { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase };
 }

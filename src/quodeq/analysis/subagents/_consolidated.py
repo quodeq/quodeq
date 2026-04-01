@@ -12,6 +12,7 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+# NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
 
 

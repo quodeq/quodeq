@@ -8,6 +8,7 @@ from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
+# NOTE: logging in inner layer — tracked for middleware extraction
 _logger = logging.getLogger(__name__)
 
 from quodeq.config.paths import default_paths

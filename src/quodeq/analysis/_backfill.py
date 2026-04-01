@@ -9,6 +9,7 @@ from pathlib import Path
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.incremental import identify_backfill_files
 from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
+# NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_debug, log_info
 
 

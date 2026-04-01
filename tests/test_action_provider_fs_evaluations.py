@@ -11,6 +11,19 @@ def _write_json(path: Path, payload: dict) -> None:
     path.write_text(json.dumps(payload))
 
 
+class StubJobs:
+    """Minimal job manager stub that captures the command passed to start_job."""
+
+    def __init__(self):
+        self.captured: dict = {}
+
+    def start_job(self, cmd, cwd, env):
+        self.captured["cmd"] = cmd
+        self.captured["cwd"] = cwd
+        self.captured["env"] = env
+        return {"jobId": "test"}
+
+
 def test_list_projects_returns_latest_run(tmp_path: Path) -> None:
     reports = tmp_path / "reports"
     _write_json(
@@ -82,16 +95,8 @@ def test_start_evaluation_uses_cli_module(tmp_path: Path) -> None:
     repo_path.mkdir()
     reports_dir = tmp_path / "reports"
 
-    captured = {}
-
-    class StubJobs:
-        def start_job(self, cmd, cwd, env):
-            captured["cmd"] = cmd
-            captured["cwd"] = cwd
-            captured["env"] = env
-            return {"jobId": "test"}
-
-    provider = FilesystemActionProvider(job_manager=StubJobs())
+    jobs = StubJobs()
+    provider = FilesystemActionProvider(job_manager=jobs)
 
     provider.start_evaluation(
         repo=str(repo_path),
@@ -99,30 +104,24 @@ def test_start_evaluation_uses_cli_module(tmp_path: Path) -> None:
         options=EvaluationOptions(),
     )
 
-    assert captured["cmd"][:5] == [
+    assert jobs.captured["cmd"][:5] == [
         sys.executable,
         "-m",
         "quodeq.cli",
         "evaluate",
         str(repo_path.resolve()),
     ]
-    assert "-o" in captured["cmd"]
-    idx = captured["cmd"].index("-o")
-    assert captured["cmd"][idx + 1] == str(reports_dir.resolve())
+    assert "-o" in jobs.captured["cmd"]
+    idx = jobs.captured["cmd"].index("-o")
+    assert jobs.captured["cmd"][idx + 1] == str(reports_dir.resolve())
 
 
 def test_start_evaluation_always_passes_absolute_reports_path(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
 
-    captured = {}
-
-    class StubJobs:
-        def start_job(self, cmd, cwd, env):
-            captured["cmd"] = cmd
-            return {"jobId": "test"}
-
-    provider = FilesystemActionProvider(job_manager=StubJobs())
+    jobs = StubJobs()
+    provider = FilesystemActionProvider(job_manager=jobs)
 
     provider.start_evaluation(
         repo=str(repo_path),
@@ -130,19 +129,15 @@ def test_start_evaluation_always_passes_absolute_reports_path(tmp_path: Path) ->
         options=EvaluationOptions(),
     )
 
-    assert "-o" in captured["cmd"]
-    idx = captured["cmd"].index("-o")
-    assert Path(captured["cmd"][idx + 1]).is_absolute()
+    assert "-o" in jobs.captured["cmd"]
+    idx = jobs.captured["cmd"].index("-o")
+    assert Path(jobs.captured["cmd"][idx + 1]).is_absolute()
 
 
 def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:
     repo_path = tmp_path / "repo"
     repo_path.mkdir()
     reports_dir = tmp_path / "reports"
-
-    class StubJobs:
-        def start_job(self, cmd, cwd, env):
-            return {"jobId": "test"}
 
     provider = FilesystemActionProvider(job_manager=StubJobs())
 
@@ -167,10 +162,6 @@ def test_start_evaluation_writes_repository_info(tmp_path: Path) -> None:
 def test_start_evaluation_writes_repository_info_for_online_repo(tmp_path: Path) -> None:
     repo_url = "git@github.com:example/acme-service.git"
     reports_dir = tmp_path / "reports"
-
-    class StubJobs:
-        def start_job(self, cmd, cwd, env):
-            return {"jobId": "test"}
 
     provider = FilesystemActionProvider(job_manager=StubJobs())
 

@@ -153,6 +153,16 @@ def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tu
     return pool, pool.run()
 
 
+def _collect_all_evidence(results: list[Any], cleanup_stream_fn: Any) -> int:
+    """Sum files-read counts across all subagent result stream files, cleaning up each."""
+    total = 0
+    for r in results:
+        if r.stream_file.exists():
+            total += count_files_from_stream(r.stream_file)
+            cleanup_stream_fn(r.stream_file)
+    return total
+
+
 def _collect_evidence(
     config: RunConfig, dim_id: str, evidence_dir: Path,
     collection: _CollectionContext,
@@ -170,11 +180,7 @@ def _collect_evidence(
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
-    total_files_read = 0
-    for r in collection.results:
-        if r.stream_file.exists():
-            total_files_read += count_files_from_stream(r.stream_file)
-            cleanup_stream(r.stream_file)
+    total_files_read = _collect_all_evidence(collection.results, cleanup_stream)
 
     # Save fingerprint so next run can carry forward unchanged-file findings
     if collection.files:

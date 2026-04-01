@@ -7,6 +7,8 @@ from .finding import Finding, Totals
 
 @dataclass(frozen=True, slots=True)
 class PrincipleGrade:
+    """Grade result for a single principle within a dimension report."""
+
     principle: str | None = None
     score: str | None = None
     grade: str | None = None

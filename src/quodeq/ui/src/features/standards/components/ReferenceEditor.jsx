@@ -42,19 +42,38 @@ function CweList({ filtered, onSelect, onClose }) {
   );
 }
 
+function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilterAbstraction }) {
+  return (
+    <div className="cwe-browser-toolbar">
+      <input
+        ref={searchRef}
+        className="cwe-browser-search"
+        placeholder="Search by ID or name..."
+        value={query}
+        onChange={(e) => setQuery(e.target.value)}
+      />
+      <select
+        className="cwe-browser-filter"
+        value={filterAbstraction}
+        onChange={(e) => setFilterAbstraction(e.target.value)}
+      >
+        <option value="">All types</option>
+        {ABSTRACTION_ORDER.map((a) => (
+          <option key={a} value={a}>{a}</option>
+        ))}
+      </select>
+    </div>
+  );
+}
+
 function CweBrowserModal({ onSelect, onClose }) {
   const [cwes, setCwes] = useState([]);
   const [query, setQuery] = useState('');
   const [filterAbstraction, setFilterAbstraction] = useState('');
   const searchRef = useRef(null);
 
-  useEffect(() => {
-    listCwes().then(setCwes).catch(() => setCwes([]));
-  }, []);
-
-  useEffect(() => {
-    if (searchRef.current) searchRef.current.focus();
-  }, []);
+  useEffect(() => { listCwes().then(setCwes).catch(() => setCwes([])); }, []);
+  useEffect(() => { if (searchRef.current) searchRef.current.focus(); }, []);
 
   const filtered = cwes.filter((c) => {
     if (filterAbstraction && c.abstraction !== filterAbstraction) return false;
@@ -69,29 +88,8 @@ function CweBrowserModal({ onSelect, onClose }) {
           <h3 className="cwe-browser-title">Select CWE</h3>
           <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
         </div>
-
-        <div className="cwe-browser-toolbar">
-          <input
-            ref={searchRef}
-            className="cwe-browser-search"
-            placeholder="Search by ID or name..."
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-          <select
-            className="cwe-browser-filter"
-            value={filterAbstraction}
-            onChange={(e) => setFilterAbstraction(e.target.value)}
-          >
-            <option value="">All types</option>
-            {ABSTRACTION_ORDER.map((a) => (
-              <option key={a} value={a}>{a}</option>
-            ))}
-          </select>
-        </div>
-
+        <CweFilterBar searchRef={searchRef} query={query} setQuery={setQuery} filterAbstraction={filterAbstraction} setFilterAbstraction={setFilterAbstraction} />
         <div className="cwe-browser-count">{filtered.length} of {cwes.length} CWEs</div>
-
         <CweList filtered={filtered} onSelect={onSelect} onClose={onClose} />
       </div>
     </div>

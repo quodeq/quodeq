@@ -201,7 +201,8 @@ function ProjectPathContent({ id, p, relocateActions }) {
   );
 }
 
-function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, confirmActions, relocateActions }) {
+function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions }) {
+  const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   const id = p.id || p.name || p;
   const isSelected = id === selectedProject;
@@ -254,7 +255,7 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
       ) : (
         <div className="projects-cards">
           {roots.map((p) => (
-            <ProjectCardGroup key={p.id || p.name || p} p={p} children={children} selectedProject={selectedProject} onSelect={onSelect} confirmActions={{ confirming, setConfirming, onDelete, onExport }} relocateActions={{ relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate }} />
+            <ProjectCardGroup key={p.id || p.name || p} p={p} children={children} selectedProject={selectedProject} onSelect={onSelect} dialogActions={{ confirmActions: { confirming, setConfirming, onDelete, onExport }, relocateActions: { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } }} />
           ))}
         </div>
       )}

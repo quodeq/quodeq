@@ -14,6 +14,7 @@ from quodeq.core.evidence.parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 from quodeq.shared.utils import open_text, read_json
 
+# NOTE: logging in inner layer — tracked for middleware extraction
 _logger = logging.getLogger(__name__)
 
 _TYPE_VIOLATION = "violation"

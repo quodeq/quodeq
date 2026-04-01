@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 from typing import Any, Protocol
 
+# NOTE: logging in inner layer — tracked for middleware extraction
 logger = logging.getLogger(__name__)
 
 class HttpClient(Protocol):

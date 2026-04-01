@@ -21,11 +21,18 @@ from ._mapper_helpers import (
 )
 
 
-def parse_project_metadata(raw: dict[str, object]) -> ProjectMetadata:
-    name = raw.get("name")
-    if not isinstance(name, str):
-        msg = f"ProjectMetadata.name must be str, got {type(name).__name__}"
+def _require_str(raw: dict[str, object], field_name: str, context: str = "") -> str:
+    """Return raw[field_name] as str, or raise TypeError with a descriptive message."""
+    value = raw.get(field_name)
+    if not isinstance(value, str):
+        prefix = f"{context}." if context else ""
+        msg = f"{prefix}{field_name} must be str, got {type(value).__name__}"
         raise TypeError(msg)
+    return value
+
+
+def parse_project_metadata(raw: dict[str, object]) -> ProjectMetadata:
+    name = _require_str(raw, "name", "ProjectMetadata")
     return ProjectMetadata(
         name=name,
         parent=_opt_str(raw.get("parent")),
@@ -37,14 +44,8 @@ def parse_project_metadata(raw: dict[str, object]) -> ProjectMetadata:
 
 
 def parse_project_entry(raw: dict[str, object]) -> ProjectEntry:
-    pid = raw.get("id")
-    if not isinstance(pid, str):
-        msg = f"ProjectEntry.id must be str, got {type(pid).__name__}"
-        raise TypeError(msg)
-    name = raw.get("name")
-    if not isinstance(name, str):
-        msg = f"ProjectEntry.name must be str, got {type(name).__name__}"
-        raise TypeError(msg)
+    pid = _require_str(raw, "id", "ProjectEntry")
+    name = _require_str(raw, "name", "ProjectEntry")
     return ProjectEntry(
         id=pid,
         name=name,
@@ -64,14 +65,8 @@ def parse_project_entry(raw: dict[str, object]) -> ProjectEntry:
 
 
 def parse_job_snapshot(raw: dict[str, object]) -> JobSnapshot:
-    job_id = raw.get("jobId")
-    if not isinstance(job_id, str):
-        msg = f"JobSnapshot.jobId must be str, got {type(job_id).__name__}"
-        raise TypeError(msg)
-    status = raw.get("status")
-    if not isinstance(status, str):
-        msg = f"JobSnapshot.status must be str, got {type(status).__name__}"
-        raise TypeError(msg)
+    job_id = _require_str(raw, "jobId", "JobSnapshot")
+    status = _require_str(raw, "status", "JobSnapshot")
 
     logs_raw = raw.get("logs")
     logs: list[str] = []
@@ -101,10 +96,7 @@ def parse_job_snapshot(raw: dict[str, object]) -> JobSnapshot:
 
 
 def parse_plugin_dimension(raw: dict[str, object]) -> PluginDimension:
-    pid = raw.get("id")
-    if not isinstance(pid, str):
-        msg = f"PluginDimension.id must be str, got {type(pid).__name__}"
-        raise TypeError(msg)
+    pid = _require_str(raw, "id", "PluginDimension")
     return PluginDimension(
         id=pid,
         weight=_int(raw, "weight", 1),
@@ -113,14 +105,8 @@ def parse_plugin_dimension(raw: dict[str, object]) -> PluginDimension:
 
 
 def parse_plugin_info(raw: dict[str, object]) -> PluginInfo:
-    pid = raw.get("id")
-    if not isinstance(pid, str):
-        msg = f"PluginInfo.id must be str, got {type(pid).__name__}"
-        raise TypeError(msg)
-    name = raw.get("name")
-    if not isinstance(name, str):
-        msg = f"PluginInfo.name must be str, got {type(name).__name__}"
-        raise TypeError(msg)
+    pid = _require_str(raw, "id", "PluginInfo")
+    name = _require_str(raw, "name", "PluginInfo")
 
     dims_raw = raw.get("dimensions")
     dims: list[PluginDimension] = []
@@ -144,18 +130,9 @@ def _parse_progress_info(raw: dict[str, object]) -> ProgressInfo:
 
 
 def parse_violation_response(raw: dict[str, object]) -> ViolationResponse:
-    dim = raw.get("dimension")
-    if not isinstance(dim, str):
-        msg = f"ViolationResponse.dimension must be str, got {type(dim).__name__}"
-        raise TypeError(msg)
-    run_id = raw.get("runId")
-    if not isinstance(run_id, str):
-        msg = f"ViolationResponse.runId must be str, got {type(run_id).__name__}"
-        raise TypeError(msg)
-    project = raw.get("project")
-    if not isinstance(project, str):
-        msg = f"ViolationResponse.project must be str, got {type(project).__name__}"
-        raise TypeError(msg)
+    dim = _require_str(raw, "dimension", "ViolationResponse")
+    run_id = _require_str(raw, "runId", "ViolationResponse")
+    project = _require_str(raw, "project", "ViolationResponse")
 
     violations_raw = raw.get("violations")
     violations: list[Finding] = []
@@ -207,10 +184,7 @@ def parse_violation_summary(raw: dict[str, object]) -> ViolationSummary:
 
 
 def parse_trend_point(raw: dict[str, object]) -> TrendPoint:
-    run_id = raw.get("runId")
-    if not isinstance(run_id, str):
-        msg = f"TrendPoint.runId must be str, got {type(run_id).__name__}"
-        raise TypeError(msg)
+    run_id = _require_str(raw, "runId", "TrendPoint")
     raw_dims = raw.get("dimensions")
     dims = tuple(raw_dims) if isinstance(raw_dims, list) else ()
     return TrendPoint(

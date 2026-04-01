@@ -18,6 +18,7 @@ echo "==> Syncing engine_version in plugin files..."
 VERSION=$(python3 -c "import tomllib; print(tomllib.load(open('$ROOT/pyproject.toml','rb'))['project']['version'])")
 ENGINE_VERSION_PATTERN='"engine_version": "==[^"]*"'
 ENGINE_VERSION_REPLACE="\"engine_version\": \"==$VERSION\""
+# Updates the engine_version constraint in every plugin.json to match the current pyproject.toml version
 find "$ROOT/evaluators" "$ROOT/tests" -name "plugin.json" -exec \
   sed -i '' "s/$ENGINE_VERSION_PATTERN/$ENGINE_VERSION_REPLACE/" {} +
 echo "    engine_version set to ==$VERSION"

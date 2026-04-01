@@ -14,6 +14,7 @@ from typing import Any, Iterable
 
 from quodeq.shared.utils import read_text
 
+# NOTE: logging in inner layer — tracked for middleware extraction
 _logger = logging.getLogger(__name__)
 
 
