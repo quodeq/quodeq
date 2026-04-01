@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { browseDirectory } from '../../../api/index.js';
+import { browseDirectory, createDirectory } from '../../../api/index.js';
 
 function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigate }) {
   return (
@@ -117,7 +117,6 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
     if (!newFolderName.trim() || !data?.current) return;
     setNewFolderError(null);
     try {
-      const { createDirectory } = await import('../../../api/index.js');
       await createDirectory(data.current, newFolderName.trim());
       setCreatingFolder(false);
       setNewFolderName('');
