@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -97,10 +98,13 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         return result
 
     def update_project_path(self, reports_dir: str, project: str, new_path: str) -> bool:
-        """Update the local filesystem path stored in a project's metadata."""
-        resolved_path = Path(new_path).resolve()
-        if not resolved_path.is_absolute() or not resolved_path.is_dir():
-            return False
+        """Update the path stored in a project's metadata.
+
+        Accepts both local directory paths and remote repository URLs.
+        """
+        from quodeq.shared.utils import is_repo_url
+        from quodeq.shared.repo_handler import is_valid_repo_url
+
         reports_root = Path(reports_dir).resolve()
         info_path = (reports_root / project).resolve()
         if not info_path.is_relative_to(reports_root):
@@ -108,14 +112,92 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         info_path = info_path / "repository_info.json"
         if not info_path.exists():
             return False
+
+        try:
+            is_url = is_repo_url(new_path)
+        except ValueError:
+            return False
+
+        if is_url:
+            if not is_valid_repo_url(new_path):
+                return False
+            resolved_path = new_path
+            location = "online"
+        else:
+            resolved = Path(new_path).resolve()
+            if not resolved.is_absolute() or not resolved.is_dir():
+                return False
+            resolved_path = str(resolved)
+            location = "local"
+
         try:
             info = json.loads(info_path.read_text())
-            info["path"] = str(resolved_path)
-            info["location"] = "local"
+            info["path"] = resolved_path
+            info["location"] = location
             info_path.write_text(json.dumps(info, indent=2))
             return True
         except (json.JSONDecodeError, OSError):
             return False
+
+    def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict[str, Any] | None:
+        """Clone an online project's repo to a local path and update its metadata."""
+        import subprocess as _subprocess
+
+        from quodeq.shared.repo_handler import is_valid_repo_url
+
+        reports_root = Path(reports_dir).resolve()
+        info_path = (reports_root / project / "repository_info.json").resolve()
+        if not info_path.is_relative_to(reports_root) or not info_path.exists():
+            return None
+        try:
+            info = json.loads(info_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return None
+
+        url = info.get("path", "")
+        if info.get("location") != "online" or not is_valid_repo_url(url):
+            return None
+
+        dest_dir = Path(destination).resolve()
+        if not dest_dir.is_dir():
+            return None
+
+        from quodeq.data.fs.repo_handler import _PRIVATE_HOST_RE, _resolves_to_private
+
+        if _PRIVATE_HOST_RE.match(url):
+            return None
+        if url.startswith("http"):
+            import urllib.parse
+            hostname = urllib.parse.urlparse(url).hostname or ""
+            if hostname and _resolves_to_private(hostname):
+                return None
+
+        project_name = info.get("name", url.split("/")[-1].replace(".git", ""))
+        clone_dest = dest_dir / project_name
+
+        if clone_dest.exists():
+            return None
+
+        env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
+        try:
+            _subprocess.run(
+                ["git", "clone", "--progress", url, str(clone_dest)],
+                check=True,
+                env=env,
+                timeout=300,
+            )
+        except (_subprocess.CalledProcessError, _subprocess.TimeoutExpired, OSError):
+            return None
+
+        resolved_clone = str(clone_dest.resolve())
+        info["path"] = resolved_clone
+        info["location"] = "local"
+        try:
+            info_path.write_text(json.dumps(info, indent=2))
+        except OSError:
+            return None
+
+        return self.get_project_info(reports_dir, project)
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         """Remove a project directory and all its report data."""
@@ -146,7 +228,18 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
         available_dimensions = _list_available_dimensions_for_discipline() if discipline else []
         has_fingerprints = _has_fingerprints(Path(reports_dir), project)
-        return {**info, "discipline": discipline, "availableDimensions": available_dimensions, "hasFingerprints": has_fingerprints}
+        # Detect stale path: online project with a local path instead of a URL
+        path_missing = (
+            info.get("location") == "online"
+            and not (info.get("path", "").startswith(("https://", "git@")))
+        )
+        return {
+            **info,
+            "discipline": discipline,
+            "availableDimensions": available_dimensions,
+            "hasFingerprints": has_fingerprints,
+            "pathMissing": path_missing,
+        }
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
         """Return the dashboard payload for a specific project run."""

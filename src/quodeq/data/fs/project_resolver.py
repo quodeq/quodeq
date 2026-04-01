@@ -183,6 +183,12 @@ def _create_project(
     save_fn: Callable[[Path, dict[str, str]], None] = _save_index,
 ) -> str:
     """Create a new UUID project directory, write repository_info.json, and index it."""
+    if identity.location == "online" and not identity.repo_path.startswith(("https://", "git@")):
+        logging.getLogger(__name__).warning(
+            "Online project '%s' has a non-URL path '%s'; expected a remote URL.",
+            identity.project_name,
+            identity.repo_path,
+        )
     project_uuid = str(uuid.uuid4())
     project_dir = reports_dir / project_uuid
     project_dir.mkdir(parents=True, exist_ok=True)

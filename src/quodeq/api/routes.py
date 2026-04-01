@@ -104,6 +104,33 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             return jsonify(body), status
         return jsonify(info)
 
+    @app.post("/api/projects/<project>/clone-local")
+    def clone_project_local(project: str) -> Response | tuple[Response, int]:
+        """Clone an online project's repo to a local directory."""
+        data = request.get_json(silent=True) or {}
+        destination = data.get("destination", "").strip()
+        if not destination:
+            body, status = error_response("destination is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+        dest_resolved = Path(destination).resolve()
+        home = Path.home().resolve()
+        if not dest_resolved.is_relative_to(home):
+            body, status = error_response(
+                "Destination must be within the user's home directory",
+                HTTPStatus.FORBIDDEN,
+                "FORBIDDEN",
+            )
+            return jsonify(body), status
+        if not dest_resolved.is_dir():
+            body, status = error_response("Destination directory not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        _logger.info("clone_project_local: project=%s, dest=%s, remote_addr=%s", project, destination, request.remote_addr)
+        result = provider.clone_to_local(_reports_dir(), project, str(dest_resolved))
+        if result is None:
+            body, status = error_response("Clone failed — check project exists and is an online project", HTTPStatus.BAD_REQUEST, "CLONE_FAILED")
+            return jsonify(body), status
+        return jsonify(result)
+
 
 def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
     """Register project dashboard, accumulated, evaluation, and violation routes."""
@@ -290,6 +317,41 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
             body, status = error_response(safe_msg, browse_status, "INVALID_INPUT")
             return jsonify(body), status
         return jsonify(payload)
+
+    @app.post("/api/browse/mkdir")
+    def browse_mkdir() -> Response | tuple[Response, int]:
+        """Create a new subdirectory inside a given parent path."""
+        data = request.get_json(silent=True) or {}
+        parent = data.get("path", "").strip()
+        name = data.get("name", "").strip()
+        if not parent or not name:
+            body, status = error_response("path and name are required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+        if "/" in name or "\\" in name or name in (".", ".."):
+            body, status = error_response("Invalid folder name", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            return jsonify(body), status
+        resolved = Path(parent).resolve()
+        home = Path.home().resolve()
+        if not resolved.is_relative_to(home):
+            body, status = error_response(
+                "Path must be within the user's home directory",
+                HTTPStatus.FORBIDDEN,
+                "FORBIDDEN",
+            )
+            return jsonify(body), status
+        if not resolved.is_dir():
+            body, status = error_response("Parent path not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        target = resolved / name
+        try:
+            target.mkdir(parents=False, exist_ok=False)
+        except FileExistsError:
+            body, status = error_response("Folder already exists", HTTPStatus.CONFLICT, "CONFLICT")
+            return jsonify(body), status
+        except OSError as exc:
+            body, status = error_response(f"Could not create folder: {exc}", HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR")
+            return jsonify(body), status
+        return jsonify({"created": True, "path": str(target)})
 
 
 __all__ = ["register_static_routes"]  # re-exported from quodeq.api.helpers
