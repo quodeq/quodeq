@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import time
 from concurrent.futures import ThreadPoolExecutor
@@ -137,6 +138,53 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             return True
         except (json.JSONDecodeError, OSError):
             return False
+
+    def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict[str, Any] | None:
+        """Clone an online project's repo to a local path and update its metadata."""
+        import subprocess as _subprocess
+
+        from quodeq.shared.repo_handler import is_valid_repo_url
+
+        reports_root = Path(reports_dir).resolve()
+        info_path = (reports_root / project / "repository_info.json").resolve()
+        if not info_path.is_relative_to(reports_root) or not info_path.exists():
+            return None
+        try:
+            info = json.loads(info_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return None
+
+        url = info.get("path", "")
+        if info.get("location") != "online" or not is_valid_repo_url(url):
+            return None
+
+        dest_dir = Path(destination).resolve()
+        if not dest_dir.is_dir():
+            return None
+
+        project_name = info.get("name", url.split("/")[-1].replace(".git", ""))
+        clone_dest = dest_dir / project_name
+
+        env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
+        try:
+            _subprocess.run(
+                ["git", "clone", "--progress", url, str(clone_dest)],
+                check=True,
+                env=env,
+                timeout=300,
+            )
+        except (_subprocess.CalledProcessError, _subprocess.TimeoutExpired, OSError):
+            return None
+
+        resolved_clone = str(clone_dest.resolve())
+        info["path"] = resolved_clone
+        info["location"] = "local"
+        try:
+            info_path.write_text(json.dumps(info, indent=2))
+        except OSError:
+            return None
+
+        return self.get_project_info(reports_dir, project)
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
         """Remove a project directory and all its report data."""
