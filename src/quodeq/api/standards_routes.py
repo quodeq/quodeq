@@ -79,8 +79,9 @@ def _register_write_routes(app: Flask) -> None:
         except ValueError as exc:
             return error_response(str(exc), 409, "conflict")
         except Exception as exc:
-            logger.warning("Failed to import standard: %s", exc)
-            return error_response(f"Import failed: {exc}", 502, "import_error")
+            logger.warning("Library import failed: %s", exc)
+            return error_response("Import from library failed", 502, "import_error")
+        logger.info("standards.import_from_library file=%s", file_path)
         return jsonify({"status": "imported"}), 201
 
     @app.post("/api/standards/import")
@@ -91,6 +92,7 @@ def _register_write_routes(app: Flask) -> None:
         if not data or not isinstance(data, dict):
             return error_response("'data' field is required and must be an object", 400, "bad_request")
         force = payload.get("force", False)
+        logger.info("standards.import id=%s", data.get("id", "<unknown>"))
         try:
             result = svc.import_from_file(data, force=force)
         except ValueError as exc:
@@ -113,6 +115,7 @@ def _register_write_routes(app: Flask) -> None:
     def create_standard() -> tuple[Response, int]:
         svc = _get_service(app)
         payload = request.get_json(force=True)
+        logger.info("standards.create id=%s", payload.get("id", "<unknown>"))
         try:
             detail = svc.create_standard(payload)
         except ValueError as exc:
@@ -123,6 +126,7 @@ def _register_write_routes(app: Flask) -> None:
     def update_standard(standard_id: str) -> Response:
         svc = _get_service(app)
         payload = request.get_json(force=True)
+        logger.info("standards.update id=%s", standard_id)
         try:
             detail = svc.update_standard(standard_id, payload)
         except FileNotFoundError:
@@ -134,6 +138,7 @@ def _register_write_routes(app: Flask) -> None:
     @app.delete("/api/standards/<standard_id>")
     def delete_standard(standard_id: str) -> tuple[str, int]:
         svc = _get_service(app)
+        logger.info("standards.delete id=%s", standard_id)
         try:
             svc.delete_standard(standard_id)
         except FileNotFoundError:
@@ -149,6 +154,7 @@ def _register_write_routes(app: Flask) -> None:
         new_id = payload.get("newId") or payload.get("new_id")
         if not new_id:
             return error_response("newId is required", 400, "bad_request")
+        logger.info("standards.duplicate id=%s new_id=%s", standard_id, new_id)
         try:
             detail = svc.duplicate_standard(standard_id, new_id)
         except (FileNotFoundError, ValueError) as exc:

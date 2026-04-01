@@ -58,7 +58,9 @@ if [ -z "$QUODEQ" ]; then
         # SECURITY: No pinned hashes available — install from PyPI over TLS.
         # Using --only-binary :all: to reduce supply chain risk by avoiding
         # arbitrary code execution in source distributions (setup.py).
-        python3 -m pip install --user --only-binary :all: quodeq 2>&1
+        # Using --no-deps to prevent transitive dependency attacks.
+        # Pin to known minimum version to mitigate supply-chain risk.
+        python3 -m pip install --user --only-binary :all: --no-deps "quodeq>=0.8.1" 2>&1
     fi
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)

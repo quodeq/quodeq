@@ -96,6 +96,11 @@ class FindingsRouter:
             return
         try:
             full_path = self._work_dir / file_path
+            # Path containment check: prevent traversal outside the work directory.
+            if not full_path.resolve().is_relative_to(self._work_dir.resolve()):
+                finding.setdefault("snippet", "")
+                finding.setdefault("context", "")
+                return
             source_lines = self._read_file(full_path).splitlines()
         except (OSError, UnicodeDecodeError):
             finding.setdefault("snippet", "")

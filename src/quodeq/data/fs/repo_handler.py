@@ -1,10 +1,12 @@
 """Repository preparation utility — clones remote repos to temporary directories."""
 from __future__ import annotations
 
+import ipaddress
 import logging
 import os
 import re
 import shutil
+import socket
 import subprocess
 import tempfile
 from pathlib import Path
@@ -24,6 +26,27 @@ _PRIVATE_HOST_RE = re.compile(
     r"|\[::1\]|\[fc[0-9a-fA-F]{2}:.*\]|\[fd[0-9a-fA-F]{2}:.*\]|\[fe80:.*\]"
     r")[:/]"
 )
+
+
+def _resolves_to_private(hostname: str) -> bool:
+    """Return True if *hostname* resolves to a private/loopback IP address.
+
+    Used to block DNS-rebinding attacks where a public-looking hostname
+    resolves to an internal address at request time.
+    """
+    try:
+        results = socket.getaddrinfo(hostname, None)
+    except OSError:
+        # If we can't resolve, treat as private to fail safe.
+        return True
+    for _family, _type, _proto, _canonname, sockaddr in results:
+        addr = sockaddr[0]
+        try:
+            if ipaddress.ip_address(addr).is_private:
+                return True
+        except ValueError:
+            continue
+    return False
 
 
 _DEFAULT_CLONE_TIMEOUT_S = 300
@@ -51,6 +74,13 @@ def prepare_repository(repo_input: str) -> str:
         raise ValueError(f"Invalid repository URL format: {repo_input}. Expected: https://github.com/user/repo or git@github.com:user/repo.git")
     if _PRIVATE_HOST_RE.match(repo_input):
         raise ValueError("Repository URLs pointing to private/internal addresses are not allowed")
+    # Post-resolution check: guard against DNS rebinding where a public hostname
+    # resolves to a private IP at clone time.
+    if repo_input.startswith("http"):
+        import urllib.parse
+        hostname = urllib.parse.urlparse(repo_input).hostname or ""
+        if hostname and _resolves_to_private(hostname):
+            raise ValueError("Repository URL resolves to a private/internal address")
     repo_name = repo_input.split("/")[-1].replace(".git", "")
     tmp_dir = tempfile.mkdtemp()
     dest = Path(tmp_dir) / repo_name
