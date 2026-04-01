@@ -146,7 +146,18 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         discipline = info.get("discipline") or _infer_discipline(Path(reports_dir), project)
         available_dimensions = _list_available_dimensions_for_discipline() if discipline else []
         has_fingerprints = _has_fingerprints(Path(reports_dir), project)
-        return {**info, "discipline": discipline, "availableDimensions": available_dimensions, "hasFingerprints": has_fingerprints}
+        # Detect stale path: online project with a local path instead of a URL
+        path_missing = (
+            info.get("location") == "online"
+            and not (info.get("path", "").startswith(("https://", "git@")))
+        )
+        return {
+            **info,
+            "discipline": discipline,
+            "availableDimensions": available_dimensions,
+            "hasFingerprints": has_fingerprints,
+            "pathMissing": path_missing,
+        }
 
     def get_dashboard(self, reports_dir: str, project: str, run: str) -> dict[str, Any]:
         """Return the dashboard payload for a specific project run."""
