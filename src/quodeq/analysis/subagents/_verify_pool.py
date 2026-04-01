@@ -36,9 +36,17 @@ For each file in the verification manifest at `{manifest_path}`:
    underlying issue is still present. Each finding may include a `context` field
    with ~10 lines of surrounding code that can help assess whether the violation
    still applies
-4. If the finding still applies, report it using the `report_finding` tool
-   with the same fields (principle, type, severity, file, line, reason, snippet)
-5. If the issue has been fixed or no longer applies, skip it silently
+4. Before confirming, check for false positives:
+   - A string/number literal inside a constant, enum, or config definition is
+     NOT a "magic literal" violation — the definition IS the extraction
+   - A long function that only registers routes/handlers with no extractable
+     logic may not be meaningfully splittable
+   - Duplicated code in test fixtures may be intentional for test clarity
+   - If the finding targets the fix itself (the code IS the remediation), skip it
+5. If the finding still applies after the false-positive check, report it using
+   the `report_finding` tool with the same fields
+6. If the issue has been fixed, no longer applies, or is a false positive, skip
+   it silently
 
 ## Important
 

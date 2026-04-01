@@ -18,6 +18,7 @@ from quodeq.services.ports import (
 from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.services._cache import make_lru_dimension_fetcher
+from quodeq.services.dismissed import filter_dismissed_from_dimensions
 from quodeq.shared.utils import _env_int
 
 _DEFAULT_ACC_CACHE_MAX = 256
@@ -220,6 +221,11 @@ def _compute_result(
         reports_root, project, all_run_infos, runs, get_run_data
     )
     all_dimensions = list(latest_by_dimension.values())
+    all_dimensions = filter_dismissed_from_dimensions(
+        all_dimensions, reports_root / project,
+    )
+    # Rebuild lookup so downstream trend computation uses filtered data
+    latest_by_dimension = {d.dimension: d for d in all_dimensions if d.dimension}
     dimensions_with_trend = _compute_accumulated_trends(all_dimensions, prev_occurrence)
     severity = _aggregate_severity_counts(all_dimensions)
     avg_score, prev_avg_score = _compute_accumulated_scores(all_dimensions, prev_run_latest)
