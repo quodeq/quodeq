@@ -20,6 +20,7 @@ from _dashboard import (
     build_dashboard_cmd as _build_dashboard_cmd,
     cleanup_stderr_log as _cleanup_stderr_log_file,
     DashboardCallbacks as _DashboardCallbacks,
+    DashboardState as _DashboardState,
     find_pids_on_port as _find_pids_on_port,
     find_running_port as _find_running_port_cached,
     kill_port_processes as _kill_port_processes,
@@ -180,6 +181,21 @@ class QuodeqApp(rumps.App):
         _cleanup_stderr_log_file(self._stderr_log_path)
         self._stderr_log_path = None
 
+    def _launch_dashboard_process(self, quodeq_cmd: str, stderr_log) -> bool:
+        """Launch the dashboard subprocess. Returns True on success, False on failure."""
+        try:
+            cmd = _build_dashboard_cmd(quodeq_cmd, self._app_port)
+            self._process = subprocess.Popen(
+                cmd, stdout=subprocess.DEVNULL, stderr=stderr_log, start_new_session=True,
+            )
+            return True
+        except OSError as e:
+            stderr_log.close()
+            self._set_error(f"Failed: {e}")
+            self._status_item.title = "Stopped"
+            self._cleanup_stderr_log()
+            return False
+
     def _do_start_inner(self):
         cmds = self._cached_cmds
         quodeq_cmd = cmds.get("quodeq")
@@ -190,16 +206,7 @@ class QuodeqApp(rumps.App):
         self._status_item.title = "Starting..."
         stderr_log = _open_stderr_log()
         self._stderr_log_path = stderr_log.name
-        try:
-            cmd = _build_dashboard_cmd(quodeq_cmd, self._app_port)
-            self._process = subprocess.Popen(
-                cmd, stdout=subprocess.DEVNULL, stderr=stderr_log, start_new_session=True,
-            )
-        except OSError as e:
-            stderr_log.close()
-            self._set_error(f"Failed: {e}")
-            self._status_item.title = "Stopped"
-            self._cleanup_stderr_log()
+        if not self._launch_dashboard_process(quodeq_cmd, stderr_log):
             return
         self._wait_for_dashboard(stderr_log)
 
@@ -231,8 +238,7 @@ class QuodeqApp(rumps.App):
         _wait_for_dashboard(
             process=self._process,
             ports=self._ports,
-            cache=self._port_cache,
-            last_known=self._port_cache.get("last_known"),
+            state=_DashboardState(cache=self._port_cache, last_known=self._port_cache.get("last_known")),
             stderr_log=stderr_log,
             callbacks=_DashboardCallbacks(
                 on_port_found=on_port_found,

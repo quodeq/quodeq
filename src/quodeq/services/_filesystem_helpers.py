@@ -220,12 +220,18 @@ def _read_dimensions_from_file(dims_file: str) -> tuple[str, ...]:
 
 
 class _DimensionsCache:
-    """Explicit holder for the mutable dimensions cache (testable, no bare globals)."""
+    """Explicit holder for the mutable dimensions cache (testable, no bare globals).
+
+    Encapsulates a single ``value`` slot that caches the resolved dimension
+    tuple.  Call :func:`reset_dimensions_cache` (or ``_dimensions_cache.reset()``)
+    to clear cached state between tests or after configuration changes.
+    """
 
     def __init__(self) -> None:
         self.value: tuple[str, ...] | None = None
 
     def reset(self) -> None:
+        """Clear the cached dimensions, forcing a re-read on next access."""
         self.value = None
 
 

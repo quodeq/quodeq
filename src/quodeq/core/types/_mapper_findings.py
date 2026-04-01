@@ -30,7 +30,15 @@ def parse_req_ref(raw: dict[str, object]) -> ReqRef:
 
 
 def parse_finding(raw: dict[str, object]) -> Finding:
-    """Parse a raw dict into a Finding instance with nested ReqRef list."""
+    """Parse a raw dict into a Finding instance with nested ReqRef list.
+
+    Args:
+        raw: Dictionary with camelCase keys matching the Finding fields
+            (e.g. ``"principle"``, ``"severity"``, ``"reqRefs"``).
+
+    Returns:
+        A fully populated :class:`Finding` dataclass.
+    """
     req_refs_raw = raw.get("reqRefs")
     req_refs: list[ReqRef] = []
     if isinstance(req_refs_raw, list):
@@ -53,7 +61,15 @@ def parse_finding(raw: dict[str, object]) -> Finding:
 
 
 def parse_severity_tally(raw: dict[str, object]) -> SeverityTally:
-    """Parse a raw dict into a SeverityTally (critical/major/minor/unknown counts)."""
+    """Parse a raw dict into a SeverityTally (critical/major/minor/unknown counts).
+
+    Args:
+        raw: Dictionary with ``"critical"``, ``"major"``, ``"minor"``,
+            and ``"unknown"`` integer keys.
+
+    Returns:
+        A :class:`SeverityTally` with zero-defaulted counts.
+    """
     return SeverityTally(
         critical=_int(raw, "critical"),
         major=_int(raw, "major"),
@@ -63,7 +79,15 @@ def parse_severity_tally(raw: dict[str, object]) -> SeverityTally:
 
 
 def parse_totals(raw: dict[str, object]) -> Totals:
-    """Parse a raw dict into a Totals instance with embedded SeverityTally."""
+    """Parse a raw dict into a Totals instance with embedded SeverityTally.
+
+    Args:
+        raw: Dictionary with ``"violationCount"``, ``"complianceCount"``,
+            and an optional ``"severity"`` sub-dict.
+
+    Returns:
+        A :class:`Totals` with parsed severity breakdown.
+    """
     sev_raw = raw.get("severity")
     severity = parse_severity_tally(sev_raw) if isinstance(sev_raw, dict) else SeverityTally()
     return Totals(

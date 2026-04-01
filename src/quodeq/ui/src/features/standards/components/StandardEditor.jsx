@@ -47,7 +47,8 @@ function useResizable(defaultWidth) {
   return { width, onMouseDown };
 }
 
-function EditorToolbar({ isNew, standard, standardId, dirty, editable, onBack, onSave }) {
+function EditorToolbar({ meta, dirty, editable, onBack, onSave }) {
+  const { isNew, standard, standardId } = meta;
   return (
     <div className="standard-editor-toolbar">
       <div className="editor-toolbar-top">
@@ -84,7 +85,9 @@ function EditorStatsRow({ standard }) {
   );
 }
 
-function EditorBody({ standard, selectedNode, setSelectedNode, treeWidth, onDividerMouseDown, actions, updateField, editable, isNew }) {
+function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
+  const { standard, selectedNode, setSelectedNode, actions, editable } = treeProps;
+  const { updateField, isNew } = detailProps;
   return (
     <div className="standard-editor-body">
       <div className="standard-editor-tree-panel" style={{ width: treeWidth, minWidth: MIN_TREE_WIDTH, maxWidth: MAX_TREE_WIDTH }}>
@@ -124,9 +127,18 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
 
   return (
     <div className="standard-editor">
-      <EditorToolbar isNew={isNew} standard={standard} standardId={standardId} dirty={dirty} editable={editable} onBack={onBack} onSave={handleSave} />
+      <EditorToolbar
+        meta={{ isNew, standard, standardId }}
+        dirty={dirty} editable={editable}
+        onBack={onBack} onSave={handleSave}
+      />
       {error && <p className="inline-error" style={{ margin: '8px 16px' }}>{error}</p>}
-      <EditorBody standard={standard} selectedNode={selectedNode} setSelectedNode={setSelectedNode} treeWidth={treeWidth} onDividerMouseDown={onDividerMouseDown} actions={treeActions} updateField={updateField} editable={editable} isNew={isNew} />
+      <EditorBody
+        treeProps={{ standard, selectedNode, setSelectedNode, actions: treeActions, editable }}
+        detailProps={{ updateField, isNew }}
+        treeWidth={treeWidth}
+        onDividerMouseDown={onDividerMouseDown}
+      />
     </div>
   );
 }

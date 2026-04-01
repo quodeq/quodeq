@@ -29,6 +29,12 @@ class DashboardCallbacks(NamedTuple):
     on_timeout: object     # () -> None
 
 
+class DashboardState(NamedTuple):
+    """Mutable port-discovery state passed through the wait loop."""
+    cache: dict
+    last_known: int | None
+
+
 def find_running_port(ports: tuple[int, ...], last_known: int | None, cache: dict) -> int | None:
     """Find the running dashboard port, checking last known port first (TTL-cached)."""
     now = time.monotonic()
@@ -99,8 +105,7 @@ def kill_port_processes(port: int) -> None:
 def wait_for_dashboard(
     process: subprocess.Popen,
     ports: tuple[int, ...],
-    cache: dict,
-    last_known: int | None,
+    state: DashboardState,
     stderr_log,
     callbacks: DashboardCallbacks,
 ) -> None:
@@ -111,7 +116,7 @@ def wait_for_dashboard(
             if process.poll() is not None:
                 callbacks.on_crash(stderr_log)
                 return
-            port = find_running_port(ports, last_known, cache)
+            port = find_running_port(ports, state.last_known, state.cache)
             if port:
                 callbacks.on_port_found(port, stderr_log)
                 return

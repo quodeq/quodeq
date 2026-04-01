@@ -70,7 +70,13 @@ function useEvaluationForm(onStart) {
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
   const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
 
-  return { repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen, toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError };
+  return {
+    repo, setRepo, allDimensions, selectedDims,
+    folderBrowserOpen, setFolderBrowserOpen,
+    toggleDim, selectAll, clearAll,
+    handleSubmit, handleFolderSelect, handleRepoClear,
+    dimLoadError,
+  };
 }
 
 export default function EvaluationForm({ onStart, disabled }) {

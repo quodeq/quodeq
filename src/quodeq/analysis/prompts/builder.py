@@ -138,8 +138,23 @@ def _standards_read_instruction(standards_path: Path) -> str:
     )
 
 
+def _write_standards_and_instruction(work_dir: Path, dimension: str, content: str) -> str:
+    """Write standards to a file and return the read instruction for the prompt."""
+    standards_path = _write_standards_file(work_dir, dimension, content)
+    return _standards_read_instruction(standards_path)
+
+
 def build_analysis_prompt(template: str, context: PromptContext) -> str:
-    """Build a complete per-dimension analysis prompt from the template."""
+    """Build a complete per-dimension analysis prompt from the template.
+
+    Args:
+        template: Raw template string with ``{{PLACEHOLDER}}`` markers.
+        context: Populated :class:`PromptContext` providing all substitution
+            values (language, dimension, standards directory, etc.).
+
+    Returns:
+        Fully rendered prompt string with all placeholders resolved.
+    """
     dimensions_text = render_dimensions(context.dimensions_data, context.dimension)
     prompt_hash = _template_hash(template)
 
@@ -151,10 +166,9 @@ def build_analysis_prompt(template: str, context: PromptContext) -> str:
             if context.work_dir:
                 compact = render_compact_standards(compiled_dir, context.dimension, evaluators_dir=_eval_dir)
                 if compact not in (_NO_STANDARDS_FOR_DIM,):
-                    standards_path = _write_standards_file(
+                    standards_checklist = _write_standards_and_instruction(
                         context.work_dir, context.dimension, compact,
                     )
-                    standards_checklist = _standards_read_instruction(standards_path)
                 else:
                     standards_checklist = compact
             else:
@@ -198,7 +212,16 @@ def build_consolidated_prompt(
     context: PromptContext,
     template: str | None = None,
 ) -> str:
-    """Build a multi-dimension analysis prompt with all standards inline."""
+    """Build a multi-dimension analysis prompt with all standards inline.
+
+    Args:
+        dimensions: List of dimension IDs to include (e.g. ``["security", "reliability"]``).
+        context: Populated :class:`PromptContext` with shared substitution values.
+        template: Optional pre-loaded template string; defaults to ``consolidated.md``.
+
+    Returns:
+        Fully rendered multi-dimension prompt string.
+    """
     if template is None:
         template = load_template(template_name="consolidated.md")
 

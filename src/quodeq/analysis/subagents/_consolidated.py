@@ -1,6 +1,7 @@
 """Consolidated multi-dimension analysis — extracted from subagents/runner.py."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -12,8 +13,14 @@ from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-# NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
+
+
+@dataclass(frozen=True)
+class _ConsolidatedPaths:
+    """Paths for consolidated evidence collection."""
+    evidence_dir: Path
+    compiled_dir: "Path | None" = None
 
 
 def _build_consolidated_config(
@@ -40,14 +47,13 @@ def _build_consolidated_config(
 
 def _collect_consolidated_results(
     config: "RunConfig", dimensions: list[str], ctx: Any,
-    results: list[Any], evidence_dir: Path,
-    compiled_dir: "Path | None" = None,
+    results: list[Any], paths: _ConsolidatedPaths,
 ) -> dict[str, Evidence]:
     """Deduplicate and parse consolidated results into per-dimension Evidence."""
     from quodeq.analysis.stream.counters import count_files_in_stream
     from quodeq.engine._runner_markers import cleanup_stream
 
-    merged_jsonl = evidence_dir / "consolidated_evidence.jsonl"
+    merged_jsonl = paths.evidence_dir / "consolidated_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
     total_files_read = 0
@@ -66,7 +72,7 @@ def _collect_consolidated_results(
     )
 
     return parse_jsonl_to_evidence_by_dimension(
-        merged_jsonl, ev_ctx, compiled_dir=compiled_dir,
+        merged_jsonl, ev_ctx, compiled_dir=paths.compiled_dir,
         evaluators_dir=config.evaluators_dir,
     )
 
@@ -127,4 +133,4 @@ def process_consolidated_dimensions(
     results = pool.run()
 
     # 4. Collect and return per-dimension evidence
-    return _collect_consolidated_results(config, dimensions, ctx, results, evidence_dir, compiled_dir=compiled_dir)
+    return _collect_consolidated_results(config, dimensions, ctx, results, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir))

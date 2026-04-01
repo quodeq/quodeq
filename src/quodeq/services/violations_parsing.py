@@ -116,10 +116,17 @@ def _parse_jsonl_findings(
     return violations, compliance
 
 
-def _load_req_to_principle(dimension: str) -> dict[str, str]:
-    """Load req ID → principle name mapping for custom evaluators."""
-    from quodeq.config.paths import default_paths
-    evaluators_dir = default_paths().evaluators_dir
+def _load_req_to_principle(dimension: str, evaluators_dir: "Path | None" = None) -> dict[str, str]:
+    """Load req ID -> principle name mapping for custom evaluators.
+
+    Args:
+        dimension: The dimension ID to look up.
+        evaluators_dir: Directory containing evaluator JSON files.
+            Defaults to ``default_paths().evaluators_dir`` when not provided.
+    """
+    if evaluators_dir is None:
+        from quodeq.config.paths import default_paths
+        evaluators_dir = default_paths().evaluators_dir
     if not evaluators_dir.is_dir():
         return {}
     path = evaluators_dir / f"{dimension}.json"

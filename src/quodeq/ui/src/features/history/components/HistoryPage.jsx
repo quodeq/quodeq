@@ -30,7 +30,9 @@ function HistoryEmpty() {
   );
 }
 
-function HistoryContent({ trend, selectedRunId, availableRuns, onRunClick, onRunChange, showAll, setShowAll, runNav }) {
+function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
+  const { trend, selectedRunId, availableRuns } = data;
+  const { onRunClick, onRunChange } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   const deltas = computeDeltas(trend);
   const visible = showAll ? trend : trend.slice(0, MAX_VISIBLE);
@@ -90,8 +92,9 @@ export default function HistoryPage({ trend, selection, availableRuns, dimension
 
   return (
     <HistoryContent
-      trend={trend} selectedRunId={selectedRunId} availableRuns={availableRuns}
-      onRunClick={onRunClick} onRunChange={onRunChange} showAll={showAll} setShowAll={setShowAll}
+      data={{ trend, selectedRunId, availableRuns }}
+      callbacks={{ onRunClick, onRunChange }}
+      showAll={showAll} setShowAll={setShowAll}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
     />
   );

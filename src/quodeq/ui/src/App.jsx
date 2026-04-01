@@ -209,13 +209,12 @@ function useAppState() {
   const settings = useAppSettings();
   const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
   const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun: effectiveRun });
-  const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
-  const visibleDailyRuns = useVisibleRuns(dailyRuns, dashboard, activePage.page, setSelectedRun);
+  const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
+    dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
+    ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
+  }), [availableRuns, dashboard, accumulated, selectedProject, projects]);
+  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
-  const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(
-    () => computeDerivedState(accumulated, dashboard, selectedProject, projects),
-    [accumulated, dashboard, selectedProject, projects]
-  );
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
   const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
   const activeTab = knownTabs.includes(activePage.page) ? activePage.page

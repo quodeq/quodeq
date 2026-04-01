@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from quodeq.analysis.manifest import AnalysisTarget
 
+_MAX_LANGUAGE_EXTENSIONS = 8
+
 
 def render_target_prompt_context(
     target: AnalysisTarget,
@@ -29,7 +31,7 @@ def render_target_prompt_context(
     if target.language_stats:
         breakdown = ", ".join(
             f"{ext}: {count}" for ext, count in
-            sorted(target.language_stats.items(), key=lambda x: -x[1])[:8]
+            sorted(target.language_stats.items(), key=lambda x: -x[1])[:_MAX_LANGUAGE_EXTENSIONS]
         )
         lines.append(f"**Extension breakdown:** {breakdown}")
     return "\n".join(lines)
