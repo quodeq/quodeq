@@ -1,7 +1,7 @@
 import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/components/powerLevels.js';
+import { AI_CMD_STORAGE_KEY } from '../../../constants.js';
 
 const AI_MODEL_STORAGE_KEY = 'cc-ai-model';
-const AI_CMD_STORAGE_KEY = 'cc-ai-cmd';
 
 const MODEL_LEVEL_FAST = 1;
 const MODEL_LEVEL_BALANCED = 2;

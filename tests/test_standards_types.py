@@ -1,3 +1,6 @@
+from pathlib import Path
+
+from quodeq.config.paths import ConfigPaths
 from quodeq.core.types.standard import StandardMeta, StandardDetail, StandardReference
 
 
@@ -31,10 +34,6 @@ def test_standard_reference_no_url():
     assert ref.url is None
 
 
-from pathlib import Path
-from quodeq.config.paths import ConfigPaths
-
-
-def test_config_paths_has_evaluators_dir():
-    cp = ConfigPaths(root=Path("/tmp/fake"))
+def test_config_paths_has_evaluators_dir(tmp_path):
+    cp = ConfigPaths(root=tmp_path / "fake")
     assert cp.evaluators_dir == Path.home() / ".quodeq" / "evaluators"

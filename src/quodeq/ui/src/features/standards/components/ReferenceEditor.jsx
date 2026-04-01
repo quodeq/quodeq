@@ -25,6 +25,23 @@ function formatRefDisplay(ref) {
 
 const ABSTRACTION_ORDER = ['Base', 'Variant', 'Class', 'Compound', 'Pillar', 'Category'];
 
+function CweList({ filtered, onSelect, onClose }) {
+  return (
+    <div className="cwe-browser-list">
+      {filtered.map((c) => (
+        <div key={c.id} className="cwe-browser-item" onClick={() => { onSelect(c); onClose(); }}>
+          <div className="cwe-browser-item-header">
+            <span className="cwe-browser-item-id">CWE-{c.id}</span>
+            <span className="cwe-browser-item-abstraction">{c.abstraction}</span>
+          </div>
+          <div className="cwe-browser-item-name">{c.name}</div>
+        </div>
+      ))}
+      {filtered.length === 0 && <div className="cwe-browser-empty">No CWEs match your search.</div>}
+    </div>
+  );
+}
+
 function CweBrowserModal({ onSelect, onClose }) {
   const [cwes, setCwes] = useState([]);
   const [query, setQuery] = useState('');
@@ -75,24 +92,7 @@ function CweBrowserModal({ onSelect, onClose }) {
 
         <div className="cwe-browser-count">{filtered.length} of {cwes.length} CWEs</div>
 
-        <div className="cwe-browser-list">
-          {filtered.map((c) => (
-            <div
-              key={c.id}
-              className="cwe-browser-item"
-              onClick={() => { onSelect(c); onClose(); }}
-            >
-              <div className="cwe-browser-item-header">
-                <span className="cwe-browser-item-id">CWE-{c.id}</span>
-                <span className="cwe-browser-item-abstraction">{c.abstraction}</span>
-              </div>
-              <div className="cwe-browser-item-name">{c.name}</div>
-            </div>
-          ))}
-          {filtered.length === 0 && (
-            <div className="cwe-browser-empty">No CWEs match your search.</div>
-          )}
-        </div>
+        <CweList filtered={filtered} onSelect={onSelect} onClose={onClose} />
       </div>
     </div>
   );
@@ -128,11 +128,29 @@ const NAME_PLACEHOLDERS = {
   other: 'Description',
 };
 
+function CweRefInputs({ refData, onSelect, disabled }) {
+  return <CweSelector value={refData.refId} name={refData.name} onSelect={onSelect} disabled={disabled} />;
+}
+
+function GenericRefInputs({ refData, onFieldChange, disabled }) {
+  return (
+    <>
+      {refData.refId && <span className="ref-builtin-id">{refData.type.toUpperCase()}-{refData.refId}</span>}
+      <input
+        className="ref-name-input"
+        placeholder={NAME_PLACEHOLDERS[refData.type] || 'Description'}
+        value={refData.name}
+        onChange={(e) => onFieldChange('name', e.target.value)}
+        disabled={disabled}
+        aria-label="Reference name"
+      />
+    </>
+  );
+}
+
 function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   const ref = normalizeRef(refData);
   const isCwe = ref.type === 'cwe';
-
-  // Build type options: editable types for custom, include current type for built-in
   const typeOptions = disabled
     ? [...new Set([ref.type, ...BUILTIN_REF_TYPES, ...EDITABLE_REF_TYPES])]
     : EDITABLE_REF_TYPES;
@@ -142,12 +160,7 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   };
 
   const handleCweSelect = (cwe) => {
-    onChange(index, {
-      type: 'cwe',
-      refId: String(cwe.id),
-      name: cwe.name,
-      url: URL_TEMPLATES.cwe(cwe.id),
-    });
+    onChange(index, { type: 'cwe', refId: String(cwe.id), name: cwe.name, url: URL_TEMPLATES.cwe(cwe.id) });
   };
 
   const handleFieldChange = (field, value) => {
@@ -163,28 +176,13 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
         disabled={disabled}
         aria-label="Reference type"
       >
-        {typeOptions.map((t) => (
-          <option key={t} value={t}>{t.toUpperCase()}</option>
-        ))}
+        {typeOptions.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}
       </select>
 
-      {isCwe ? (
-        <CweSelector value={ref.refId} name={ref.name} onSelect={handleCweSelect} disabled={disabled} />
-      ) : (
-        <>
-          {ref.refId && (
-            <span className="ref-builtin-id">{ref.type.toUpperCase()}-{ref.refId}</span>
-          )}
-          <input
-            className="ref-name-input"
-            placeholder={NAME_PLACEHOLDERS[ref.type] || 'Description'}
-            value={ref.name}
-            onChange={(e) => handleFieldChange('name', e.target.value)}
-            disabled={disabled}
-            aria-label="Reference name"
-          />
-        </>
-      )}
+      {isCwe
+        ? <CweRefInputs refData={ref} onSelect={handleCweSelect} disabled={disabled} />
+        : <GenericRefInputs refData={ref} onFieldChange={handleFieldChange} disabled={disabled} />
+      }
 
       <input
         className="ref-url-input"
@@ -196,13 +194,7 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
       />
 
       {!disabled && (
-        <button
-          type="button"
-          className="ref-remove-btn"
-          onClick={() => onRemove(index)}
-          aria-label="Remove reference"
-          title="Remove"
-        >
+        <button type="button" className="ref-remove-btn" onClick={() => onRemove(index)} aria-label="Remove reference" title="Remove">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
             <path d="M18 6L6 18M6 6l12 12" />
           </svg>

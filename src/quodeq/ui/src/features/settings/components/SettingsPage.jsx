@@ -4,14 +4,17 @@ import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import SettingsAside from './SettingsAside.jsx';
 import AboutSection from './AboutSection.jsx';
 import ModelSection from './ModelSection.jsx';
-import { AI_CMD_STORAGE_KEY } from './ModelSection.jsx';
-import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY } from '../../../constants.js';
+import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY, AI_CMD_STORAGE_KEY } from '../../../constants.js';
 
 const MIN_SUBAGENTS = 1;
 const MAX_SUBAGENTS = 10;
 const MIN_POOL_BUDGET_MINS = 1;
 const MAX_POOL_BUDGET_MINS = 60;
 const DEFAULT_POOL_BUDGET_MINS = 10;
+
+function persistSetting(key, value) {
+  localStorage.setItem(key, String(value));
+}
 
 const MODE_OPTIONS = [
   { value: 'system',   label: 'System' },
@@ -89,7 +92,17 @@ function clampSubagents(value) {
 function persistSubagents(value, setter) {
   const v = clampSubagents(value);
   setter(v);
-  localStorage.setItem(SUBAGENTS_STORAGE_KEY, String(v));
+  persistSetting(SUBAGENTS_STORAGE_KEY, v);
+}
+
+function clampPoolBudget(value) {
+  return Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parseInt(value, 10) || DEFAULT_POOL_BUDGET_MINS));
+}
+
+function persistPoolBudget(value, setter) {
+  const v = clampPoolBudget(value);
+  setter(v);
+  persistSetting(POOL_BUDGET_STORAGE_KEY, v * 60);
 }
 
 function SubagentsRow({ subagents }) {
@@ -130,11 +143,7 @@ function PoolBudgetRow({ subagents }) {
         min={MIN_POOL_BUDGET_MINS}
         max={MAX_POOL_BUDGET_MINS}
         value={poolBudgetMinutes}
-        onChange={(e) => {
-          const v = Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parseInt(e.target.value, 10) || DEFAULT_POOL_BUDGET_MINS));
-          setPoolBudgetMinutes(v);
-          localStorage.setItem(POOL_BUDGET_STORAGE_KEY, String(v * 60));
-        }}
+        onChange={(e) => persistPoolBudget(e.target.value, setPoolBudgetMinutes)}
       />
     </div>
   );

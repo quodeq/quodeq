@@ -1,6 +1,8 @@
 """Numerical-mode scoring helpers: deduction computation and grade drops."""
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from quodeq.core.types import Deductions
 
 # Progressive drop tables: (min_type_count_inclusive, levels_to_drop).
@@ -15,9 +17,19 @@ _DEFAULT_CRITICAL_PENALTY = 2.0
 _DEFAULT_MAJOR_PENALTY = 1.0
 _DEFAULT_MINOR_PENALTY = 0.25
 
-_configured_critical: float = _DEFAULT_CRITICAL_PENALTY
-_configured_major: float = _DEFAULT_MAJOR_PENALTY
-_configured_minor: float = _DEFAULT_MINOR_PENALTY
+
+@dataclass(frozen=True)
+class _PenaltyConfig:
+    critical: float
+    major: float
+    minor: float
+
+
+_penalty_config: _PenaltyConfig = _PenaltyConfig(
+    critical=_DEFAULT_CRITICAL_PENALTY,
+    major=_DEFAULT_MAJOR_PENALTY,
+    minor=_DEFAULT_MINOR_PENALTY,
+)
 
 
 def configure_penalties(
@@ -26,21 +38,22 @@ def configure_penalties(
     minor: float | None = None,
 ) -> None:
     """Set penalty values. Called by outer layers (e.g. config) at startup."""
-    global _configured_critical, _configured_major, _configured_minor
-    if critical is not None:
-        _configured_critical = critical
-    if major is not None:
-        _configured_major = major
-    if minor is not None:
-        _configured_minor = minor
+    global _penalty_config
+    _penalty_config = _PenaltyConfig(
+        critical=critical if critical is not None else _penalty_config.critical,
+        major=major if major is not None else _penalty_config.major,
+        minor=minor if minor is not None else _penalty_config.minor,
+    )
 
 
 def reset_penalty_caches() -> None:
     """Reset all penalty values to defaults. Useful for test isolation."""
-    global _configured_critical, _configured_major, _configured_minor
-    _configured_critical = _DEFAULT_CRITICAL_PENALTY
-    _configured_major = _DEFAULT_MAJOR_PENALTY
-    _configured_minor = _DEFAULT_MINOR_PENALTY
+    global _penalty_config
+    _penalty_config = _PenaltyConfig(
+        critical=_DEFAULT_CRITICAL_PENALTY,
+        major=_DEFAULT_MAJOR_PENALTY,
+        minor=_DEFAULT_MINOR_PENALTY,
+    )
 
 
 _CRITICAL_SCORE_CAP = 3
@@ -67,9 +80,9 @@ def build_deductions(
     - If the raw major count reaches 5*scale, the score is hard-capped at 5.
     - Both caps may apply simultaneously (take min).
     """
-    crit_pen = critical_penalty if critical_penalty is not None else _configured_critical
-    maj_pen = major_penalty if major_penalty is not None else _configured_major
-    min_pen = minor_penalty if minor_penalty is not None else _configured_minor
+    crit_pen = critical_penalty if critical_penalty is not None else _penalty_config.critical
+    maj_pen = major_penalty if major_penalty is not None else _penalty_config.major
+    min_pen = minor_penalty if minor_penalty is not None else _penalty_config.minor
 
     n_critical = violation_type_counts.get("critical", 0)
     n_major = violation_type_counts.get("major", 0)

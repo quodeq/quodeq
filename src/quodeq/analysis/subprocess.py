@@ -7,11 +7,11 @@ import re
 import subprocess
 import sys
 import tempfile
-import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.stream.counters import (
     count_files_in_stream,
     count_jsonl_lines,
@@ -111,49 +111,6 @@ def _get_ai_tools(env: dict[str, str] | None = None) -> str:
 def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
     """Return base AI CLI args from QUODEQ_AI_BASE_ARGS env var."""
     return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
-
-_AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
-
-# Fallback provider configs used when the primary JSON file
-# (data/config/ai_providers.json) cannot be loaded.
-_PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
-    "claude": {
-        "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
-        "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
-        "env_remove": ["CLAUDECODE"],
-    },
-    "codex": {
-        "mcp_permission_args": [],
-        "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
-        "env_remove": [],
-    },
-}
-
-
-class _ProviderConfigCache:
-    """Thread-safe lazy cache for provider configurations."""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._configs: dict[str, dict] | None = None
-
-    def get(self) -> dict[str, dict]:
-        if self._configs is None:
-            with self._lock:
-                if self._configs is None:
-                    try:
-                        self._configs = json.loads(_AI_PROVIDERS_PATH.read_text())
-                    except (OSError, json.JSONDecodeError):
-                        self._configs = _PROVIDER_CONFIGS_FALLBACK
-        return self._configs
-
-
-_provider_config_cache = _ProviderConfigCache()
-
-
-def _get_provider_configs() -> dict[str, dict]:
-    return _provider_config_cache.get()
-
 
 class AnalysisError(RuntimeError):
     """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""

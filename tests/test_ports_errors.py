@@ -11,11 +11,11 @@ def test_data_errors_are_distinct_types():
     assert issubclass(InvalidDataError, Exception)
 
 
-def test_data_errors_can_be_raised_and_caught():
+@pytest.mark.parametrize("cls", [AuthError, NotFoundError, NetworkError, ServerError, InvalidDataError])
+def test_data_errors_can_be_raised_and_caught(cls):
     """Each error can be raised with a message and caught by its type."""
-    for cls in (AuthError, NotFoundError, NetworkError, ServerError, InvalidDataError):
-        with pytest.raises(cls, match="test message"):
-            raise cls("test message")
+    with pytest.raises(cls, match="test message"):
+        raise cls("test message")
 
 
 def test_data_errors_carry_message():

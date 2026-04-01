@@ -10,6 +10,9 @@ import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.runner import process_consolidated_dimensions
+from quodeq.analysis.runner import AnalysisOptions, RunConfig
+from quodeq.analysis.manifest import SourceManifest, AnalysisTarget
 
 
 def _write_compiled_standards(tmp_path):
@@ -69,9 +72,6 @@ def _consolidated_run_analysis(work_dir, prompt, stream_file, config):
 class TestConsolidatedIntegration:
     def test_consolidated_produces_per_dimension_evidence(self, tmp_path):
         """Consolidated mode splits findings by dimension correctly."""
-        from quodeq.analysis.subagents.runner import process_consolidated_dimensions
-        from quodeq.analysis.runner import AnalysisOptions, RunConfig
-        from quodeq.analysis.manifest import SourceManifest, AnalysisTarget
 
         standards_dir = _write_compiled_standards(tmp_path)
         work_dir = tmp_path / "work"

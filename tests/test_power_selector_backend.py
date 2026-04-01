@@ -158,6 +158,7 @@ class TestApiRouteSubagentModel:
             "repo": str(tmp_path),
             "subagentModel": _MODEL_SONNET,
         }, headers={"Origin": "http://localhost"})
+        assert response.status_code == 202
         assert captured.get("options") is not None
         assert captured["options"].subagent_model == _MODEL_SONNET
 
