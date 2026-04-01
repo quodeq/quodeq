@@ -1,4 +1,5 @@
 import json
+import subprocess
 from pathlib import Path
 
 from quodeq.data.fs.project_resolver import (
@@ -88,9 +89,6 @@ def test_get_project_info_valid_online_not_missing(tmp_path: Path) -> None:
     info = provider.get_project_info(str(tmp_path), project_uuid)
     assert info is not None
     assert info["pathMissing"] is False
-
-
-import subprocess
 
 
 def test_clone_to_local_updates_project(tmp_path: Path, monkeypatch) -> None:

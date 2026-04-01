@@ -1,6 +1,21 @@
 import { useState, useEffect } from 'react';
 import { listPlugins, listStandards } from '../../../api/index.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
+import { STANDARD_TYPES } from '../../standards/hooks/useStandards.js';
+
+function mergeStandardsDimensions(standards, seen) {
+  for (const s of standards) {
+    if (seen.has(s.id)) {
+      const existing = seen.get(s.id);
+      if (!existing.standardType) {
+        existing.standardType = s.type === STANDARD_TYPES.BUILTIN ? null : s.type;
+        if (s.name && !existing.label) existing.label = s.name;
+      }
+    } else if (s.type === STANDARD_TYPES.CUSTOM || s.type === STANDARD_TYPES.COMMUNITY || s.type === STANDARD_TYPES.QUODEQ) {
+      seen.set(s.id, { id: s.id, label: s.name, iso_25010: null, standardType: s.type });
+    }
+  }
+}
 
 function deduplicateDimensions(plugins, standards) {
   const seen = new Map();
@@ -9,17 +24,7 @@ function deduplicateDimensions(plugins, standards) {
       if (!seen.has(d.id)) seen.set(d.id, d);
     }
   }
-  for (const s of standards) {
-    if (seen.has(s.id)) {
-      const existing = seen.get(s.id);
-      if (!existing.standardType) {
-        existing.standardType = s.type === 'builtin' ? null : s.type;
-        if (s.name && !existing.label) existing.label = s.name;
-      }
-    } else if (s.type === 'custom' || s.type === 'community' || s.type === 'quodeq') {
-      seen.set(s.id, { id: s.id, label: s.name, iso_25010: null, standardType: s.type });
-    }
-  }
+  mergeStandardsDimensions(standards, seen);
   return seen;
 }
 

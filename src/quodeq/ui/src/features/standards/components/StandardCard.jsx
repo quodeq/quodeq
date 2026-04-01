@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { downloadStandard } from '../../../api/index.js';
+import { exportStandard } from '../../../api/index.js';
+import { STANDARD_TYPES } from '../hooks/useStandards.js';
 
-const TYPE_LABELS = { builtin: 'ISO-25010', quodeq: 'Quodeq', community: 'Community', custom: 'Custom' };
+const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: 'ISO-25010', [STANDARD_TYPES.QUODEQ]: 'Quodeq', [STANDARD_TYPES.COMMUNITY]: 'Community', [STANDARD_TYPES.CUSTOM]: 'Custom' };
 
 function ConfirmDeleteModal({ standardName, principleCount, requirementCount, onConfirm, onCancel }) {
   const [typed, setTyped] = useState('');
@@ -130,7 +131,7 @@ export default function StandardCard({ standard, onEdit, onDelete, onDuplicate, 
   const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce(
     (sum, p) => sum + (p.requirements?.length ?? 0), 0
   );
-  const isDeletable = standard.type !== 'builtin' && standard.type !== 'quodeq';
+  const isDeletable = standard.type !== STANDARD_TYPES.BUILTIN && standard.type !== STANDARD_TYPES.QUODEQ;
   const visClass = isVisible ? 'standard-card--visible' : 'standard-card--hidden';
 
   return (
@@ -155,7 +156,18 @@ export default function StandardCard({ standard, onEdit, onDelete, onDuplicate, 
         <CardActions
           isDeletable={isDeletable}
           onDuplicate={() => setShowDuplicateModal(true)}
-          onDownload={() => downloadStandard(standard.id)}
+          onDownload={async () => {
+            const { data, fileName } = await exportStandard(standard.id);
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+          }}
           onDelete={() => setShowDeleteModal(true)}
         />
       </div>

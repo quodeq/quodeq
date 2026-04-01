@@ -11,6 +11,10 @@ from quodeq.services.import_validator import validate_import, scan_injection
 
 logger = logging.getLogger(__name__)
 
+_TYPE_CUSTOM = "custom"
+_TYPE_BUILTIN = "builtin"
+_TYPE_MANAGED = "managed"
+
 
 def _default_read_json(path: Path) -> dict:
     """Read and parse a JSON file."""
@@ -42,6 +46,7 @@ class StandardsService:
         self._write_json = write_json or _default_write_json
 
     def list_standards(self) -> list[StandardMeta]:
+        """Return all standards (built-in and custom) as metadata entries."""
         result: list[StandardMeta] = []
         result.extend(self._list_builtin())
         result.extend(self._list_custom())
@@ -56,7 +61,7 @@ class StandardsService:
         out: list[StandardMeta] = []
         for dim in data.get("applies", []):
             p_count, r_count = self._count_compiled(dim["id"])
-            dim_type = dim.get("type", "builtin")
+            dim_type = dim.get("type", _TYPE_BUILTIN)
             out.append(StandardMeta(
                 id=dim["id"], name=dim.get("iso_25010") or dim.get("name", dim["id"]),
                 description=f'{dim.get("source", "Built-in")} standard',
@@ -88,7 +93,7 @@ class StandardsService:
                     id=data["id"], name=data.get("name", data["id"]),
                     description=data.get("description", ""),
                     weight=data.get("weight", 1.0), source=data.get("source", ""),
-                    type=data.get("type", "custom"), managed=data.get("managed", False),
+                    type=data.get("type", _TYPE_CUSTOM), managed=data.get("managed", False),
                     origin=data.get("origin"), origin_hash=data.get("origin_hash"),
                     principle_count=p_count, requirement_count=r_count,
                 ))
@@ -97,6 +102,7 @@ class StandardsService:
         return out
 
     def get_standard(self, standard_id: str) -> StandardDetail:
+        """Return full detail for a single standard, checking custom then built-in."""
         custom_path = self._evaluators_dir / f"{standard_id}.json"
         if custom_path.is_file():
             return self._load_detail(custom_path)
@@ -111,14 +117,14 @@ class StandardsService:
             id=data["id"], name=data.get("name", data["id"]),
             description=data.get("description", ""),
             weight=data.get("weight", 1.0), source=data.get("source", ""),
-            type=data.get("type", "custom"), managed=data.get("managed", False),
+            type=data.get("type", _TYPE_CUSTOM), managed=data.get("managed", False),
             origin=data.get("origin"), origin_hash=data.get("origin_hash"),
             principles=data.get("principles", []),
         )
 
     def _load_builtin_detail(self, path: Path, standard_id: str) -> StandardDetail:
         data = self._read_json(path)
-        dim_type = data.get("type", "builtin")
+        dim_type = data.get("type", _TYPE_BUILTIN)
         source = data.get("source", "") or ", ".join(data.get("sources", []))
         return StandardDetail(
             id=standard_id, name=data.get("name", standard_id),
@@ -130,28 +136,31 @@ class StandardsService:
         )
 
     def create_standard(self, data: dict) -> StandardDetail:
+        """Create a new custom standard from *data* and persist it to disk."""
         standard_id = data["id"]
         self._validate_id(standard_id)
         path = self._evaluators_dir / f"{standard_id}.json"
         if path.exists():
             raise ValueError(f"Standard '{standard_id}' already exists")
         self._evaluators_dir.mkdir(parents=True, exist_ok=True)
-        payload = {**data, "type": "custom", "managed": False, "origin": None, "origin_hash": None}
+        payload = {**data, "type": _TYPE_CUSTOM, "managed": False, "origin": None, "origin_hash": None}
         self._write_json(path, payload)
         return self._load_detail(path)
 
     def update_standard(self, standard_id: str, data: dict) -> StandardDetail:
+        """Update an existing custom standard with new *data*."""
         path = self._evaluators_dir / f"{standard_id}.json"
         if not path.is_file():
             raise FileNotFoundError(f"Standard not found: {standard_id}")
         existing = self._read_json(path)
         if existing.get("managed", False):
             raise PermissionError(f"Cannot edit managed standard '{standard_id}'")
-        payload = {**data, "id": standard_id, "type": "custom", "managed": False}
+        payload = {**data, "id": standard_id, "type": _TYPE_CUSTOM, "managed": False}
         self._write_json(path, payload)
         return self._load_detail(path)
 
     def delete_standard(self, standard_id: str) -> None:
+        """Delete a custom standard. Raises for built-in or managed standards."""
         path = self._evaluators_dir / f"{standard_id}.json"
         if not path.is_file():
             if (self._compiled_dir / f"{standard_id}.json").is_file() or self._is_builtin_id(standard_id):
@@ -163,6 +172,7 @@ class StandardsService:
         path.unlink()
 
     def duplicate_standard(self, standard_id: str, new_id: str) -> StandardDetail:
+        """Duplicate an existing standard under *new_id* as a custom copy."""
         self._validate_id(new_id)
         new_path = self._evaluators_dir / f"{new_id}.json"
         if new_path.exists():
@@ -171,7 +181,7 @@ class StandardsService:
         self._evaluators_dir.mkdir(parents=True, exist_ok=True)
         payload = {
             "id": new_id, "name": source.name, "description": source.description,
-            "weight": source.weight, "source": source.source, "type": "custom",
+            "weight": source.weight, "source": source.source, "type": _TYPE_CUSTOM,
             "managed": False, "origin": None, "origin_hash": None, "principles": source.principles,
         }
         self._write_json(new_path, payload)
@@ -206,7 +216,7 @@ class StandardsService:
                     id=existing["id"], name=existing.get("name", existing["id"]),
                     description=existing.get("description", ""),
                     weight=existing.get("weight", 1.0), source=existing.get("source", ""),
-                    type=existing.get("type", "custom"), managed=existing.get("managed", False),
+                    type=existing.get("type", _TYPE_CUSTOM), managed=existing.get("managed", False),
                     origin=existing.get("origin"), origin_hash=existing.get("origin_hash"),
                     principle_count=len(principles), requirement_count=req_count,
                 ),
@@ -219,7 +229,7 @@ class StandardsService:
                 raise PermissionError(f"Cannot overwrite managed standard '{standard_id}'")
 
         self._evaluators_dir.mkdir(parents=True, exist_ok=True)
-        payload = {**cleaned, "type": "custom", "managed": False, "origin": None, "origin_hash": None}
+        payload = {**cleaned, "type": _TYPE_CUSTOM, "managed": False, "origin": None, "origin_hash": None}
         self._write_json(path, payload)
         detail = self._load_detail(path)
 

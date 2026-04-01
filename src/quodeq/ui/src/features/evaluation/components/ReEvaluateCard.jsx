@@ -91,7 +91,8 @@ function useReEvaluateCard(project, onStart) {
   };
 }
 
-function ReEvaluateCardView({ info, project, disabled, allDimensions, selectedDims, actions }) {
+function ReEvaluateCardView({ info, project, disabled, dimensions, actions }) {
+  const { all: allDimensions, selected: selectedDims } = dimensions;
   const {
     toggleDim, selectAll, clearAll, handleStart, handleIncremental,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
@@ -115,7 +116,7 @@ function ReEvaluateCardView({ info, project, disabled, allDimensions, selectedDi
         {info.pathMissing && (
           <div className="re-eval-stale-warning">
             <p>This project was evaluated from a remote repo but the original URL was not saved. Enter the URL to restore reevaluation.</p>
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: BUTTON_GAP, alignItems: 'center' }}>
               <input
                 type="text"
                 value={urlInput}
@@ -223,8 +224,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
       info={info}
       project={project}
       disabled={disabled}
-      allDimensions={allDimensions}
-      selectedDims={selectedDims}
+      dimensions={{ all: allDimensions, selected: selectedDims }}
       actions={{
         toggleDim, selectAll, clearAll, handleStart, handleIncremental,
         urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,

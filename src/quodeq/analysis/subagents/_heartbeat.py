@@ -63,16 +63,17 @@ def _read_findings_from_file(jsonl_path: Path) -> FindingCounts:
     with open_text(jsonl_path) as f:
         for line in f:
             stripped = line.strip()
-            if stripped:
-                _classify_jsonl_line(stripped, counts)
+            if not stripped:
+                continue
+            _classify_jsonl_line(stripped, counts)
     return counts
 
 
 def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> FindingCounts:
     """Count total, violation, and compliance lines in a JSONL file under a lock."""
+    if not jsonl_path.exists():
+        return FindingCounts()
     try:
-        if not jsonl_path.exists():
-            return FindingCounts()
         with lock:
             return _read_findings_from_file(jsonl_path)
     except OSError:

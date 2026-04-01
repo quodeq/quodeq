@@ -27,6 +27,10 @@ import { useProjectActions } from './hooks/useProjectActions.js';
 import { useVisibleRuns } from './hooks/useVisibleRuns.js';
 
 
+/**
+ * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
+ * @returns {JSX.Element}
+ */
 function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, analysisPower, setAnalysisPower, persistAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
@@ -42,6 +46,10 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
   );
 }
 
+/**
+ * @param {{ settings: Object, analysisPower: string, setAnalysisPower: Function, persistAnalysisPower: Function }} props
+ * @returns {JSX.Element}
+ */
 function SettingsCase({ settings, analysisPower, setAnalysisPower, persistAnalysisPower }) {
   return (
     <SettingsPage
@@ -63,6 +71,8 @@ function resolveHistorySelectedRunId(selectedRun, trend) {
   if (selectedRun && selectedRun !== 'latest' && trend.some((t) => t.runId === selectedRun)) return selectedRun;
   return trend.length > 0 ? trend[0].runId : null;
 }
+
+const KNOWN_TABS = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
 
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
@@ -119,6 +129,10 @@ const ROUTE_RENDERERS = {
   standards: () => <StandardsPage />,
 };
 
+/**
+ * @param {{ activePage: { page: string }, props: Object }} params
+ * @returns {JSX.Element|null}
+ */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
   const noProjectTabs = ['evaluate', 'standards', 'settings'];
@@ -164,6 +178,10 @@ function computeDerivedState(accumulated, dashboard, selectedProject, projects) 
   return { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId };
 }
 
+/**
+ * @param {{ sidebar: JSX.Element, header: JSX.Element|null, breadcrumb: JSX.Element|null, content: JSX.Element }} props
+ * @returns {JSX.Element}
+ */
 function AppShell({ sidebar, header, breadcrumb, content }) {
   return (
     <div className="app-shell">
@@ -216,9 +234,8 @@ function useAppState() {
   const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
-  const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
-  const activeTab = knownTabs.includes(activePage.page) ? activePage.page
-    : activePage.sourceTab && knownTabs.includes(activePage.sourceTab) ? activePage.sourceTab
+  const activeTab = KNOWN_TABS.includes(activePage.page) ? activePage.page
+    : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab
     : activePage.page === 'history-run' ? 'history'
     : 'overview';
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;

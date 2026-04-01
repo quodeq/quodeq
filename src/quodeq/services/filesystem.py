@@ -11,6 +11,8 @@ from pathlib import Path
 from typing import Any, Callable
 
 _PROJECT_CACHE_TTL_S = 5  # seconds before project list is re-read
+_MAX_PROJECT_BUILD_WORKERS = 8
+_GIT_CLONE_TIMEOUT_S = 300
 
 from quodeq.services.base import ActionProvider
 from quodeq.services.jobs import JobManager
@@ -78,7 +80,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 return None
             return _build_project_entry(reports_root, name, runs)
 
-        with ThreadPoolExecutor(max_workers=min(8, len(dir_names) or 1)) as pool:
+        with ThreadPoolExecutor(max_workers=min(_MAX_PROJECT_BUILD_WORKERS, len(dir_names) or 1)) as pool:
             results = pool.map(_build_one, dir_names)
         projects = [p for p in results if p is not None]
         projects.sort(key=lambda p: p.name)
@@ -139,10 +141,28 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         except (json.JSONDecodeError, OSError):
             return False
 
-    def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict[str, Any] | None:
-        """Clone an online project's repo to a local path and update its metadata."""
+    @staticmethod
+    def _run_git_clone(url: str, clone_dest: Path) -> bool:
+        """Execute ``git clone`` for *url* into *clone_dest*.
+
+        Returns True on success, False on any failure.
+        """
         import subprocess as _subprocess
 
+        env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
+        try:
+            _subprocess.run(
+                ["git", "clone", "--progress", url, str(clone_dest)],
+                check=True,
+                env=env,
+                timeout=_GIT_CLONE_TIMEOUT_S,
+            )
+            return True
+        except (_subprocess.CalledProcessError, _subprocess.TimeoutExpired, OSError):
+            return False
+
+    def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict[str, Any] | None:
+        """Clone an online project's repo to a local path and update its metadata."""
         from quodeq.shared.repo_handler import is_valid_repo_url
 
         reports_root = Path(reports_dir).resolve()
@@ -178,15 +198,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         if clone_dest.exists():
             return None
 
-        env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
-        try:
-            _subprocess.run(
-                ["git", "clone", "--progress", url, str(clone_dest)],
-                check=True,
-                env=env,
-                timeout=300,
-            )
-        except (_subprocess.CalledProcessError, _subprocess.TimeoutExpired, OSError):
+        if not self._run_git_clone(url, clone_dest):
             return None
 
         resolved_clone = str(clone_dest.resolve())

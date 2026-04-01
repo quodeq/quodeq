@@ -2,8 +2,9 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useStandardDetail } from '../hooks/useStandardDetail.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
+import { STANDARD_TYPES } from '../hooks/useStandards.js';
 
-const TYPE_LABELS = { builtin: 'ISO-25010', quodeq: 'Quodeq', community: 'Community', custom: 'Custom' };
+const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: 'ISO-25010', [STANDARD_TYPES.QUODEQ]: 'Quodeq', [STANDARD_TYPES.COMMUNITY]: 'Community', [STANDARD_TYPES.CUSTOM]: 'Custom' };
 
 const MIN_TREE_WIDTH = 180;
 const MAX_TREE_WIDTH = 600;
@@ -80,7 +81,7 @@ function EditorStatsRow({ standard }) {
       <span className="editor-stat-dot" />
       <span className="editor-stat"><strong>{(standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0)}</strong> requirements</span>
       <span className="editor-stat-dot" />
-      <span className={`editor-stat-type editor-stat-type--${standard?.type || 'custom'}`}>{TYPE_LABELS[standard?.type] || 'Custom'}</span>
+      <span className={`editor-stat-type editor-stat-type--${standard?.type || STANDARD_TYPES.CUSTOM}`}>{TYPE_LABELS[standard?.type] || 'Custom'}</span>
     </div>
   );
 }
