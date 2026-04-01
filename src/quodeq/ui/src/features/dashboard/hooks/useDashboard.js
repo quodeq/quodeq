@@ -75,6 +75,7 @@ export function useDashboard({ selectedProject, selectedRun }) {
   const [latestAccumulated, setLatestAccumulated] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   // Clear stale data immediately when project changes to prevent rendering old data for a new project
   const prevProjectRef = useRef(selectedProject);
@@ -86,10 +87,12 @@ export function useDashboard({ selectedProject, selectedRun }) {
     setError(null);
   }
 
-  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun]);
-  useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun]);
-  useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject]);
+  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun, refreshKey]);
+  useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun, refreshKey]);
+  useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject, refreshKey]);
   const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
 
-  return { dashboard, accumulated, latestAccumulated, loading, error, availableRuns };
+  const refreshDashboard = () => setRefreshKey((k) => k + 1);
+
+  return { dashboard, accumulated, latestAccumulated, loading, error, availableRuns, refreshDashboard };
 }

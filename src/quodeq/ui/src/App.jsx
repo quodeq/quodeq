@@ -12,6 +12,7 @@ import SettingsPage from './features/settings/components/SettingsPage.jsx';
 import StandardsPage from './features/standards/StandardsPage.jsx';
 import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
+import { dismissFinding } from './api/index.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
@@ -63,6 +64,21 @@ function resolveHistorySelectedRunId(selectedRun, trend) {
   return trend.length > 0 ? trend[0].runId : null;
 }
 
+function buildDismissPayload(v, fallbackDimension) {
+  const fileParts = (v.file || '').split(':');
+  const file = fileParts[0];
+  const line = v.line ?? (fileParts[1] ? parseInt(fileParts[1], 10) : 0);
+  return {
+    req: v.req || v.principle,
+    file,
+    line,
+    dimension: v.dimension || fallbackDimension || '',
+    severity: v.severity,
+    reason: v.reason,
+    principle: v.principle || '',
+  };
+}
+
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
   violations: (params, props) => {
@@ -71,11 +87,12 @@ const ROUTE_RENDERERS = {
     const nav = props.navigation.handleNavigate;
     return (
       <ViolationsPage
-        data={{ accumulated: acc, accumulatedDimensions: dims }}
+        data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
         callbacks={{
           onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, sourceTab: 'violations' }),
           onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
           onPrincipleClick: (principleObj) => nav('principle', { principle: principleObj, sourceTab: 'violations' }),
+          onRefresh: props.refreshDashboard,
         }}
       />
     );
@@ -111,8 +128,16 @@ const ROUTE_RENDERERS = {
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
   file: (params) => <FileDetailPage file={params.file} />,
   principle: (params) => <PrincipleDetailPage principle={params.principle} />,
-  evalprinciple: (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
-  'eval-principle-detail': (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
+  evalprinciple: (params, props) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} onDismiss={(v) => {
+    dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.evalPrincipal?.dimension))
+      .then(() => props.refreshDashboard?.())
+      .catch((e) => console.error('[Dismiss] failed:', e));
+  }} />,
+  'eval-principle-detail': (params, props) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} onDismiss={(v) => {
+    dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.evalPrincipal?.dimension))
+      .then(() => props.refreshDashboard?.())
+      .catch((e) => console.error('[Dismiss] failed:', e));
+  }} />,
   settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} persistAnalysisPower={props.evaluation.persistAnalysisPower} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
   standards: () => <StandardsPage />,
@@ -180,6 +205,7 @@ export default function App() {
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,
+    refreshDashboard: state.refreshDashboard,
   };
 
   return (

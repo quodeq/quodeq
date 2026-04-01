@@ -51,7 +51,7 @@ function ViolationDetail({ item }) {
   );
 }
 
-export function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
+export function EvalViolationCard({ v, principle, buildViolationPlanText, index, onDismiss }) {
   const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
@@ -60,6 +60,16 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
         <CopyButton label="Fix plan" onClick={() => copyToClipboard(buildViolationPlanText(v))} />
+        {onDismiss && (
+          <button
+            type="button"
+            className="dismiss-btn"
+            onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
+            title="Dismiss this finding (exclude from scoring)"
+          >
+            Dismiss
+          </button>
+        )}
       </div>
       <ViolationDetail item={v} />
     </div>

@@ -81,7 +81,7 @@ export function useAppState() {
   const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
   const settings = useAppSettings();
   const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
-  const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun: effectiveRun });
+  const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns, refreshDashboard } = useDashboard({ selectedProject, selectedRun: effectiveRun });
   const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
     dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
     ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
@@ -104,6 +104,6 @@ export function useAppState() {
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
     historySelectedRun, setHistorySelectedRun,
-    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav,
+    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav, refreshDashboard,
   };
 }
