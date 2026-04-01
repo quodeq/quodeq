@@ -174,13 +174,17 @@ class FsToolingMixin:
         fetcher = self._model_fetchers.get(client_id, self._get_cli_models)
         return fetcher(client_id)
 
-    def _get_claude_models(self, _client_id: str = "claude", api_key: str | None = None) -> dict[str, list[str]]:
+    def _get_claude_models(
+        self, _client_id: str = "claude", api_key: str | None = None,
+        key_fn: Callable[[], str | None] | None = None,
+    ) -> dict[str, list[str]]:
         """Fetch Claude model list from the Anthropic API, with fallback.
 
-        Pass *api_key* to override the global ``get_anthropic_api_key()``
-        accessor, e.g. for testing or per-request credential injection.
+        Pass *api_key* to supply a concrete key directly, or *key_fn* to
+        override the global ``get_anthropic_api_key()`` accessor (e.g. for
+        testing or per-request credential injection).
         """
-        key = api_key or get_anthropic_api_key()
+        key = api_key or (key_fn or get_anthropic_api_key)()
         if key:
             models = _fetch_anthropic_models(key)
             if models:

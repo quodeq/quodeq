@@ -115,6 +115,12 @@ function PrincipleNode({ principle, pi, selectedNode, actions }) {
   );
 }
 
+function PrinciplesList({ principles, selectedNode, actions }) {
+  return (principles || []).map((principle, pi) => (
+    <PrincipleNode key={pi} principle={principle} pi={pi} selectedNode={selectedNode} actions={actions} />
+  ));
+}
+
 export default function StandardTree({ standard, selectedNode, onSelectNode, actions, editable }) {
   const { onAddPrinciple, onRemovePrinciple, onAddRequirement, onRemoveRequirement } = actions || {};
   if (!standard) return null;
@@ -128,9 +134,7 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, act
         actions={{ onClick: () => onSelectNode({ type: 'root' }), onAdd: editable ? onAddPrinciple : undefined }}
         titles={{ addTitle: 'Add Principle' }}
       >
-        {(standard.principles || []).map((principle, pi) => (
-          <PrincipleNode key={pi} principle={principle} pi={pi} selectedNode={selectedNode} actions={treeActions} />
-        ))}
+        <PrinciplesList principles={standard.principles} selectedNode={selectedNode} actions={treeActions} />
       </TreeNode>
     </div>
   );

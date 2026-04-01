@@ -41,7 +41,18 @@ function StandardsListView({ grouped, loading, error, actions }) {
 export default function StandardsPage() {
   const { grouped, loading, error, refresh, handleDelete, handleDuplicate } = useStandards();
   const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards();
-  const { view, showLibrary, setShowLibrary, showImport, setShowImport, handleEdit, handleNewStandard, handleEditorBack, handleSaved, handleDeleteWithCleanup } = useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible);
+  const {
+    view,
+    showLibrary,
+    setShowLibrary,
+    showImport,
+    setShowImport,
+    handleEdit,
+    handleNewStandard,
+    handleEditorBack,
+    handleSaved,
+    handleDeleteWithCleanup,
+  } = useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible);
 
   if (view.mode === 'edit' || view.mode === 'new') {
     return <StandardEditor standardId={view.standardId} isNew={view.mode === 'new'} onBack={handleEditorBack} onSaved={handleSaved} />;
