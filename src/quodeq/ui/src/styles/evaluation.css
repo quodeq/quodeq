@@ -559,7 +559,6 @@
 /* --- Power Selector (signal-bars) --- */
 .power-selector {
   display: flex;
-  flex-direction: row-reverse;
   align-items: flex-end;
   gap: 10px;
   flex-shrink: 0;
@@ -924,9 +923,9 @@
 
 /* Dimension grid */
 .dimension-grid {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
-  gap: 6px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
   padding: 12px;
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
@@ -934,10 +933,10 @@
 }
 
 .dimension-chip-btn {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 7px 10px;
+  gap: 6px;
+  padding: 7px 12px;
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -945,12 +944,9 @@
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
   color: var(--color-text-muted);
-  text-align: center;
   cursor: pointer;
   transition: border-color 150ms, background 150ms, color 150ms, box-shadow 150ms;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .dimension-chip-btn:hover:not(:disabled) {
@@ -1796,6 +1792,82 @@
 }
 
 
+.finding-context {
+  margin: 10px 0 0;
+  padding: 0;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--color-text);
+  overflow-x: auto;
+  line-height: 1.6;
+}
+
+.ctx-line {
+  display: flex;
+}
+
+.ctx-line:hover {
+  background: color-mix(in srgb, var(--color-text) 3%, transparent);
+}
+
+.ctx-gutter {
+  display: inline-block;
+  width: 48px;
+  text-align: right;
+  padding-right: 16px;
+  color: var(--color-text-secondary);
+  opacity: 0.5;
+  user-select: none;
+  flex-shrink: 0;
+  background: var(--color-surface);
+  border-right: 1px solid var(--color-border);
+}
+
+.ctx-code {
+  padding: 0 12px;
+  flex: 1;
+  white-space: pre;
+}
+
+.ctx-line--hl {
+  background: color-mix(in srgb, var(--color-accent) 5%, transparent);
+}
+
+.ctx-line--hl .ctx-gutter {
+  color: var(--color-accent);
+  font-weight: 500;
+  opacity: 1;
+  background: color-mix(in srgb, var(--color-accent) 6%, transparent);
+  border-right-color: var(--color-accent);
+}
+
+.ctx-line--toggle {
+  opacity: 0.5;
+  font-style: italic;
+  padding: 4px 0;
+}
+
+.finding-toggle-btn-inline {
+  display: inline;
+  padding: 0;
+  font-family: inherit;
+  font-size: inherit;
+  font-weight: 600;
+  color: var(--color-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+
+.finding-toggle-btn-inline:hover {
+  text-decoration-style: solid;
+}
+
 /* Detail rows (explorer detail pages) */
 .vdetail-row {
   animation: vlive-enter 200ms ease-out both;
@@ -1871,4 +1943,76 @@
 .vdetail-row--major     { border-color: var(--color-sev-major-border); }
 .vdetail-row--minor     { border-color: var(--color-sev-minor-border); }
 .vdetail-row--unknown   { border-color: var(--color-border); }
+
+.scope-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 0;
+  margin-top: 8px;
+  background: none;
+  border: none;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: var(--color-accent);
+  cursor: pointer;
+}
+
+.scope-bar:hover .scope-bar-label {
+  text-decoration: underline;
+}
+
+.scope-bar--expanded {
+  /* no visual change needed for minimal link */
+}
+
+.scope-bar-chevron {
+  display: inline-block;
+  transition: transform 150ms;
+  font-size: 0.65rem;
+}
+
+.scope-bar-chevron--open {
+  transform: rotate(90deg);
+}
+
+.scope-bar-label {
+  /* inherits accent color from parent */
+}
+
+.scope-bar-code {
+  margin-top: 4px;
+}
 .vdetail-row--compliant { border-color: color-mix(in srgb, var(--color-grade-top-text) 55%, transparent); }
+
+/* ── Dimension chip type badge ──────────────────────────── */
+
+.dimension-chip-type {
+  font-size: 0.55rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 5px;
+  border-radius: 3px;
+  margin-left: 4px;
+}
+
+.dimension-chip-type--builtin {
+  background: color-mix(in srgb, var(--color-accent) 20%, transparent);
+  color: var(--color-accent);
+}
+
+.dimension-chip-type--quodeq {
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+  color: var(--color-accent);
+}
+
+.dimension-chip-type--custom {
+  background: color-mix(in srgb, var(--color-text-muted) 15%, transparent);
+  color: var(--color-text-muted);
+}
+
+.dimension-chip-type--community {
+  background: color-mix(in srgb, var(--primitive-green-400, #4ade80) 15%, transparent);
+  color: var(--primitive-green-700, #4ade80);
+}

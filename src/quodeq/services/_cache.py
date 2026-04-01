@@ -11,10 +11,12 @@ from collections import OrderedDict
 from pathlib import Path
 from typing import Callable
 
-from quodeq.adapters.fs.report_parser import read_run_data
+from quodeq.services.ports import read_run_data
 from quodeq.core.types import DimensionResult
 
 _logger = logging.getLogger(__name__)
+
+_CACHE_WAIT_TIMEOUT_S = 30
 
 
 def _fetch_dimensions_from_disk(
@@ -33,6 +35,55 @@ def _fetch_dimensions_from_disk(
             "Failed to read run data for %s/%s: %s", project, run_id, exc,
         )
         return []
+
+
+def _cache_lookup(
+    key: tuple, cache: OrderedDict, lock: threading.Lock,
+) -> list[DimensionResult] | None:
+    """Return cached data for *key* (promoting it in LRU order), or None."""
+    with lock:
+        if key in cache:
+            cache.move_to_end(key)
+            return cache[key]
+    return None
+
+
+def _cache_store(
+    key: tuple, data: list[DimensionResult],
+    cache: OrderedDict, lock: threading.Lock, max_size: int,
+) -> None:
+    """Insert *data* into the cache under *key*, evicting if necessary."""
+    with lock:
+        cache[key] = data
+        cache.move_to_end(key)
+        while len(cache) > max_size:
+            cache.popitem(last=False)
+
+
+def _wait_for_inflight(
+    key: tuple, event: threading.Event,
+    cache: OrderedDict, lock: threading.Lock,
+) -> list[DimensionResult]:
+    """Wait for another thread's in-flight fetch and return the cached result."""
+    event.wait(timeout=_CACHE_WAIT_TIMEOUT_S)
+    with lock:
+        return list(cache.get(key, []))
+
+
+def _fetch_and_store(
+    key: tuple, reports_root: Path, project: str, run_id: str,
+    cache: OrderedDict, lock: threading.Lock, max_size: int,
+    inflight: dict[tuple, threading.Event],
+) -> list[DimensionResult]:
+    """Perform the disk fetch, store in cache, and notify waiters."""
+    data = _fetch_dimensions_from_disk(reports_root, project, run_id)
+    if data:
+        _cache_store(key, data, cache, lock, max_size)
+    with lock:
+        notify_event = inflight.pop(key, None)
+    if notify_event is not None:
+        notify_event.set()
+    return data
 
 
 def make_lru_dimension_fetcher(
@@ -54,33 +105,14 @@ def make_lru_dimension_fetcher(
     """
     _inflight: dict[tuple, threading.Event] = {}
 
-    def _cache_lookup(key: tuple) -> list[DimensionResult] | None:
-        """Return cached data for *key* (promoting it in LRU order), or None."""
-        with lock:
-            if key in cache:
-                cache.move_to_end(key)
-                return cache[key]
-        return None
-
-    def _cache_store(key: tuple, data: list[DimensionResult]) -> None:
-        """Insert *data* into the cache under *key*, evicting if necessary."""
-        with lock:
-            cache[key] = data
-            cache.move_to_end(key)
-            while len(cache) > max_size:
-                cache.popitem(last=False)
-
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
         key = (reports_root, project, run_id)
 
-        # Fast path: already cached
-        cached = _cache_lookup(key)
+        cached = _cache_lookup(key, cache, lock)
         if cached is not None:
             return cached
 
-        # Coordinate concurrent misses via per-key events
         with lock:
-            # Double-check after acquiring lock
             if key in cache:
                 cache.move_to_end(key)
                 return cache[key]
@@ -92,21 +124,11 @@ def make_lru_dimension_fetcher(
                 _inflight[key] = threading.Event()
 
         if wait_event is not None:
-            wait_event.wait(timeout=30)
-            with lock:
-                return list(cache.get(key, []))
+            return _wait_for_inflight(key, wait_event, cache, lock)
 
-        # This thread is responsible for the fetch
-        data = _fetch_dimensions_from_disk(reports_root, project, run_id)
-
-        if data:
-            _cache_store(key, data)
-
-        with lock:
-            notify_event = _inflight.pop(key, None)
-        if notify_event is not None:
-            notify_event.set()
-
-        return data
+        return _fetch_and_store(
+            key, reports_root, project, run_id,
+            cache, lock, max_size, _inflight,
+        )
 
     return get_run_dimensions

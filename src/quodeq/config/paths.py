@@ -22,10 +22,15 @@ class ConfigPaths:
     """Immutable set of resolved paths to all configuration directories and files."""
 
     root: Path
-    prompts_dir: Path
-    standards_dir: Path
-    env_file: Path
-    gitignore_file: Path
+    prompts_dir: Path | None = None
+    standards_dir: Path | None = None
+    env_file: Path | None = None
+    gitignore_file: Path | None = None
+
+    @property
+    def evaluators_dir(self) -> Path:
+        """Global directory for custom evaluator JSON files."""
+        return Path.home() / ".quodeq" / "evaluators"
 
     @property
     def vroot(self) -> Path:

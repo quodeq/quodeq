@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { formatShortDate, angleFromDelta, scoreTierLabel, gradeLetter } from '../../../utils/formatters.js';
 import {
   ComposedChart,
@@ -12,8 +12,9 @@ import {
   Cell,
   ReferenceLine,
 } from 'recharts';
+import { trendDirection } from '../../../utils/trendUtils.js';
 
-const MAX_CHART_RUNS = 20;
+const MAX_CHART_RUNS = 40;
 const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
@@ -36,21 +37,6 @@ function scoreBarColor(score) {
   if (n >= SCORE_ADEQUATE)  return cssVar('--color-grade-mid-text');
   if (n >= SCORE_POOR)      return cssVar('--color-grade-low-text');
   return cssVar('--color-grade-bottom-text');
-}
-
-const DELTA_UP = 1;
-const DELTA_SOFT_UP = 0.1;
-const DELTA_DOWN = -1;
-const DELTA_SOFT_DOWN = -0.1;
-
-// Trend direction — mirrors TrendBadge thresholds
-function trendDir(delta) {
-  if (delta === null || delta === undefined) return null;
-  if (delta > DELTA_UP)        return 'up';
-  if (delta > DELTA_SOFT_UP)   return 'soft-up';
-  if (delta < DELTA_DOWN)      return 'down';
-  if (delta < DELTA_SOFT_DOWN) return 'soft-down';
-  return 'same';
 }
 
 function trendColor(dir) {
@@ -80,17 +66,14 @@ function windowAroundSelected(trend, selectedRunId) {
   return trend.slice(start, end);
 }
 
-function buildTrendData(trend, selectedRunId, selectedRunScore) {
+function buildTrendData(trend, selectedRunId) {
   const windowed = windowAroundSelected(trend, selectedRunId);
   return [...windowed].reverse().map((row, i, arr) => {
-    const isSelected = row.runId === selectedRunId;
-    const numericAverage = isSelected && selectedRunScore != null
-      ? parseFloat(selectedRunScore)
-      : parseFloat(row.numericAverage);
+    const runScore = parseFloat(row.runNumericAverage ?? row.numericAverage);
     return {
       ...row,
-      numericAverage,
-      delta: i > 0 ? numericAverage - parseFloat(arr[i - 1].numericAverage) : null,
+      numericAverage: runScore,
+      delta: i > 0 ? runScore - parseFloat(arr[i - 1].numericAverage) : null,
     };
   });
 }
@@ -101,7 +84,7 @@ function TrendBarLabel({ x, y, width, height, index, data }) {
   const tier = scoreTierLabel(entry?.numericAverage);
   const cx = x + width / 2;
   const hasDelta = d !== null && d !== undefined;
-  const dir = hasDelta ? (trendDir(d) ?? 'same') : null;
+  const dir = hasDelta ? (trendDirection(d) ?? 'same') : null;
   const color = hasDelta ? trendColor(dir) : null;
   return (
     <g>
@@ -142,77 +125,49 @@ function RunHistoryTooltip({ active, hoveredIndex, data }) {
   );
 }
 
+function buildAxisTick() {
+  return { fontSize: 11, fill: cssVar('--color-chart-axis') };
+}
+
+function ReferenceLines() {
+  const stroke = cssVar('--color-chart-axis');
+  return (
+    <>
+      <ReferenceLine y={REF_LINE_LOW}  stroke={stroke} strokeDasharray="4 4" strokeOpacity={0.15} />
+      <ReferenceLine y={REF_LINE_MID}  stroke={stroke} strokeDasharray="4 4" strokeOpacity={0.3} />
+      <ReferenceLine y={REF_LINE_HIGH} stroke={stroke} strokeDasharray="4 4" strokeOpacity={0.15} />
+    </>
+  );
+}
+
 function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
   const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
+  const axisTick = buildAxisTick();
   return (
     <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
       <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
         <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
-        <XAxis
-          dataKey="dateLabel"
-          tickFormatter={formatShortDate}
-          tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          domain={[0, 10]}
-          ticks={[0, REF_LINE_LOW, REF_LINE_MID, REF_LINE_HIGH, 10]}
-          tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <Tooltip
-          cursor={false}
-          isAnimationActive={false}
-          offset={20}
-          content={({ active }) => <RunHistoryTooltip active={active} hoveredIndex={hoveredIndex} data={data} />}
-        />
-        <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
-        <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-        <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
-        <Bar
-          dataKey="numericAverage"
-          radius={[3, 3, 0, 0]}
-          maxBarSize={40}
-          label={renderTrendLabel}
-          isAnimationActive={false}
-          cursor={onBarClick ? 'pointer' : 'default'}
-          onMouseEnter={(_, index) => setHoveredIndex(index)}
-          onMouseLeave={() => setHoveredIndex(null)}
-          onClick={(entry) => onBarClick?.(entry.runId)}
-        >
+        <XAxis dataKey="dateLabel" tickFormatter={formatShortDate} tick={axisTick} axisLine={false} tickLine={false} />
+        <YAxis domain={[0, 10]} ticks={[0, REF_LINE_LOW, REF_LINE_MID, REF_LINE_HIGH, 10]} tick={axisTick} axisLine={false} tickLine={false} />
+        <Tooltip cursor={false} isAnimationActive={false} offset={20} content={({ active }) => <RunHistoryTooltip active={active} hoveredIndex={hoveredIndex} data={data} />} />
+        <ReferenceLines />
+        <Bar dataKey="numericAverage" radius={[3, 3, 0, 0]} maxBarSize={40} label={renderTrendLabel} isAnimationActive={false} cursor={onBarClick ? 'pointer' : 'default'} onMouseEnter={(_, index) => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)} onClick={(entry) => onBarClick?.(entry.runId)}>
           {data.map((entry, i) => (
-            <Cell
-              key={entry.runId ?? i}
-              fill={scoreBarColor(entry.numericAverage)}
-              opacity={entry.runId === selectedRunId ? 1 : 0.55}
-              stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-              strokeWidth={hoveredIndex === i ? 1.5 : 0}
-            />
+            <Cell key={entry.runId ?? i} fill={scoreBarColor(entry.numericAverage)} opacity={entry.runId === selectedRunId ? 1 : 0.55} stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'} strokeWidth={hoveredIndex === i ? 1.5 : 0} />
           ))}
         </Bar>
-        <Line
-          isAnimationActive={false}
-          dataKey="numericAverage"
-          type="monotone"
-          stroke={cssVar('--color-chart-line')}
-          strokeOpacity={0.55}
-          strokeWidth={2.5}
-          dot={false}
-          activeDot={false}
-        />
+        <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-chart-line')} strokeOpacity={0.55} strokeWidth={2.5} dot={false} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );
 }
 
-export default function RunHistoryPanel({ trend = [], selectedRunId = null, selectedRunScore, onBarClick }) {
+export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
 
   if (!trend || trend.length < 2) return null;
 
-  const data = buildTrendData(trend, selectedRunId, selectedRunScore);
+  const data = useMemo(() => buildTrendData(trend, selectedRunId), [trend, selectedRunId]);
   const renderTrendLabel = (props) => <TrendBarLabel {...props} data={data} />;
 
   return (

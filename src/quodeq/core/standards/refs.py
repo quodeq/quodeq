@@ -2,6 +2,11 @@
 
 Used by both evidence_parser.py and mcp_findings.py to avoid duplicating
 ref-label formatting and compiled-standards loading logic.
+
+Pure logic (ref_label, extract_refs, extract_requirements) lives here in the
+core layer.  The ``load_*`` convenience helpers that perform file I/O are thin
+wrappers kept for backward compatibility; callers that already have loaded data
+should prefer the ``extract_*`` functions.
 """
 from __future__ import annotations
 
@@ -36,25 +41,15 @@ def ref_label(ref: dict) -> str:
     return source.upper() if source else "REF"
 
 
-def _load_compiled_data(compiled_dir: str | Path | None, dimension: str | None) -> dict | None:
-    """Load raw compiled standards JSON. Returns None on error."""
-    if not compiled_dir or not dimension:
-        return None
-    try:
-        return read_json(Path(compiled_dir) / f"{dimension}.json")
-    except (OSError, ValueError, UnicodeDecodeError) as exc:
-        _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
-        return None
+# ---------------------------------------------------------------------------
+# Pure extraction helpers — no file I/O, operate on pre-loaded data
+# ---------------------------------------------------------------------------
 
+def extract_refs(data: dict) -> dict[str, list[dict]]:
+    """Extract {req_id: [{label, url, ...}, ...]} from a compiled-standards dict.
 
-def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, list[dict]]:
-    """Load {req_id: [{label, url, ...}, ...]} from compiled standards.
-
-    Returns an empty dict on any I/O or parse error (logged as a warning).
+    This is the pure-logic counterpart of ``load_compiled_refs``.
     """
-    data = _load_compiled_data(compiled_dir, dimension)
-    if not data:
-        return {}
     lookup: dict[str, list[dict]] = {}
     for principle in data.get("principles", []):
         for req in principle.get("requirements", []):
@@ -70,35 +65,11 @@ def load_compiled_refs(compiled_dir: str | Path | None, dimension: str | None) -
     return lookup
 
 
-def load_compiled_refs_multi(
-    compiled_dir: str | Path | None, dimensions: list[str],
-) -> dict[str, list[dict]]:
-    """Load refs for multiple dimensions, merging into a single lookup."""
-    merged: dict[str, list[dict]] = {}
-    for dim in dimensions:
-        merged.update(load_compiled_refs(compiled_dir, dim))
-    return merged
+def extract_requirements(data: dict) -> dict[str, dict]:
+    """Extract {req_id: {principle, text}} from a compiled-standards dict.
 
-
-def load_compiled_requirements_multi(
-    compiled_dir: str | Path | None, dimensions: list[str],
-) -> dict[str, dict]:
-    """Load requirements for multiple dimensions, merging into a single lookup."""
-    merged: dict[str, dict] = {}
-    for dim in dimensions:
-        merged.update(load_compiled_requirements(compiled_dir, dim))
-    return merged
-
-
-def load_compiled_requirements(compiled_dir: str | Path | None, dimension: str | None) -> dict[str, dict]:
-    """Load {req_id: {principle, text}} from compiled standards.
-
-    Used by the MCP server to auto-fill principle name and requirement text
-    from the requirement ID, so the AI doesn't need to send them.
+    This is the pure-logic counterpart of ``load_compiled_requirements``.
     """
-    data = _load_compiled_data(compiled_dir, dimension)
-    if not data:
-        return {}
     lookup: dict[str, dict] = {}
     for principle in data.get("principles", []):
         principle_name = principle.get("name", "")
@@ -111,3 +82,92 @@ def load_compiled_requirements(compiled_dir: str | Path | None, dimension: str |
                 "text": req.get("text", ""),
             }
     return lookup
+
+
+# ---------------------------------------------------------------------------
+# I/O convenience wrappers (kept for backward-compatible call-sites)
+# ---------------------------------------------------------------------------
+
+def _load_compiled_data(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> dict | None:
+    """Load raw compiled standards JSON from *compiled_dir*. Returns None on error.
+
+    Falls back to *evaluators_dir* for custom evaluators when provided.
+    This is an I/O adapter — callers that already have the data should use
+    :func:`extract_refs` or :func:`extract_requirements` directly.
+    """
+    if not dimension:
+        return None
+    if compiled_dir:
+        path = Path(compiled_dir) / f"{dimension}.json"
+        if path.is_file():
+            try:
+                return read_json(path)
+            except (OSError, ValueError, UnicodeDecodeError) as exc:
+                _logger.warning("Failed to load compiled standards for %s: %s", dimension, exc)
+                return None
+    # Fallback: custom evaluators directory (caller must supply it)
+    if evaluators_dir:
+        evaluators_path = evaluators_dir / f"{dimension}.json"
+        if evaluators_path.is_file():
+            try:
+                return read_json(evaluators_path)
+            except (OSError, ValueError, UnicodeDecodeError):
+                return None
+    return None
+
+
+def load_compiled_refs(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> dict[str, list[dict]]:
+    """Load {req_id: [{label, url, ...}, ...]} from compiled standards on disk.
+
+    Backward-compat convenience wrapper that handles file I/O then delegates
+    to the pure :func:`extract_refs`.  Prefer ``extract_refs`` when data is
+    already loaded.
+    """
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    if not data:
+        return {}
+    return extract_refs(data)
+
+
+def load_compiled_refs_multi(
+    compiled_dir: str | Path | None, dimensions: list[str],
+    evaluators_dir: Path | None = None,
+) -> dict[str, list[dict]]:
+    """Load refs for multiple dimensions, merging into a single lookup."""
+    merged: dict[str, list[dict]] = {}
+    for dim in dimensions:
+        merged.update(load_compiled_refs(compiled_dir, dim, evaluators_dir=evaluators_dir))
+    return merged
+
+
+def load_compiled_requirements_multi(
+    compiled_dir: str | Path | None, dimensions: list[str],
+    evaluators_dir: Path | None = None,
+) -> dict[str, dict]:
+    """Load requirements for multiple dimensions, merging into a single lookup."""
+    merged: dict[str, dict] = {}
+    for dim in dimensions:
+        merged.update(load_compiled_requirements(compiled_dir, dim, evaluators_dir=evaluators_dir))
+    return merged
+
+
+def load_compiled_requirements(
+    compiled_dir: str | Path | None, dimension: str | None,
+    evaluators_dir: Path | None = None,
+) -> dict[str, dict]:
+    """Load {req_id: {principle, text}} from compiled standards on disk.
+
+    Backward-compat convenience wrapper that handles file I/O then delegates
+    to the pure :func:`extract_requirements`.  Used by the MCP server to
+    auto-fill principle name and requirement text from the requirement ID.
+    """
+    data = _load_compiled_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
+    if not data:
+        return {}
+    return extract_requirements(data)

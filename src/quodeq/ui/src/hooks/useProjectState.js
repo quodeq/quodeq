@@ -13,6 +13,30 @@ function readStoredProject() {
   try { return localStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
 }
 
+/** Resolve which project to select from a loaded list, migrating stale storage if needed. */
+function resolveInitialProject(list, currentProject, onChangeProject, onNoProjects) {
+  if (list.length === 0) {
+    if (onNoProjects) onNoProjects();
+    return;
+  }
+  const current = currentProject || readStoredProject();
+  const match = current && list.find((p) => (p.id || p.name) === current);
+  if (!match) {
+    const pick = list[0].id || list[0].name || list[0];
+    onChangeProject(pick);
+  }
+}
+
+/**
+ * Manages the selected project, run, and project list state.
+ *
+ * @param {Object} params
+ * @param {Function} [params.onNoProjects] - Callback invoked when the loaded project list is empty
+ *   (e.g. to redirect to the evaluate tab).
+ * @returns {{ projects: Array, setProjects: Function, selectedProject: string, selectedRun: string,
+ *   setSelectedRun: Function, loadProjects: Function, handleProjectChange: Function,
+ *   handleRunChange: Function, selectProjectAndRun: Function }}
+ */
 export function useProjectState({ onNoProjects }) {
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(readStoredProject);
@@ -29,18 +53,7 @@ export function useProjectState({ onNoProjects }) {
   }, []);
 
   useEffect(() => {
-    loadProjects().then((list) => {
-      if (list.length > 0) {
-        const current = selectedProject || localStorage.getItem(STORAGE_KEY) || '';
-        const match = current && list.find((p) => (p.id || p.name) === current);
-        if (!match) {
-          const pick = list[0].id || list[0].name || list[0];
-          handleProjectChange(pick);
-        }
-      } else if (list.length === 0 && onNoProjects) {
-        onNoProjects();
-      }
-    });
+    loadProjects().then((list) => resolveInitialProject(list, selectedProject, handleProjectChange, onNoProjects));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleProjectChange(name) {

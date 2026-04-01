@@ -1,4 +1,8 @@
-"""Evaluation fingerprinting — tracks what was analyzed and when."""
+"""Evaluation fingerprinting — tracks what was analyzed and when.
+
+Uses subprocess to call ``git`` directly — fingerprinting needs the
+commit hash and repo state, which are only available from git itself.
+"""
 from __future__ import annotations
 
 import hashlib
@@ -85,9 +89,9 @@ def find_previous_fingerprint(
     Walks the run history to find the latest run (other than the current one)
     that has a fingerprint for the given dimension.
     """
-    from quodeq.analysis.subagents.verify import _resolve_evidence_paths
+    from quodeq.analysis.subagents.verify import resolve_evidence_paths
 
-    paths_info = _resolve_evidence_paths(evidence_dir)
+    paths_info = resolve_evidence_paths(evidence_dir)
     if not paths_info:
         return None, None
 
@@ -95,7 +99,12 @@ def find_previous_fingerprint(
     for run_info in list_runs(reports_base, project_uuid):
         if run_info.run_id == current_run_id:
             continue
-        prev_evidence = reports_base / project_uuid / run_info.run_id / "evidence"
+        run_dir = reports_base / project_uuid / run_info.run_id
+        # Only carry forward from runs that completed (have a scored report)
+        eval_report = run_dir / "evaluation" / f"{dimension}.json"
+        if not eval_report.is_file():
+            continue
+        prev_evidence = run_dir / "evidence"
         fp = load_fingerprint(prev_evidence, dimension)
         if fp:
             return fp, prev_evidence

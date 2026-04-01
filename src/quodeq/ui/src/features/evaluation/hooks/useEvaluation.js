@@ -55,6 +55,15 @@ function handleJobUpdate(updated, refs, setJob, callbacks) {
   }
 }
 
+async function pollPartialDimensions(partialDimensionsRef, project, runId, refs, setLiveViolations) {
+  const partial = [...partialDimensionsRef.current];
+  if (!partial.length) return false;
+  const results = await Promise.allSettled(
+    partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
+  );
+  return results.some((r) => r.status === 'rejected');
+}
+
 function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef, setLiveViolations) {
   return function startDimensionPolling(project, runId) {
     stopTimer(dimPollRef);
@@ -63,12 +72,7 @@ function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef
     const refs = { dimFailCount: dimFailCountRef.current, partialDimensions: partialDimensionsRef.current };
     function scheduleNext() {
       dimPollRef.current = setTimeout(async () => {
-        const partial = [...partialDimensionsRef.current];
-        if (!partial.length) { scheduleNext(); return; }
-        const results = await Promise.allSettled(
-          partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
-        );
-        const anyFailed = results.some((r) => r.status === 'rejected');
+        const anyFailed = await pollPartialDimensions(partialDimensionsRef, project, runId, refs, setLiveViolations);
         delay = anyFailed ? Math.min(delay * 1.5, DIMENSION_POLL_MAX_MS) : DIMENSION_POLL_INITIAL_MS;
         scheduleNext();
       }, delay);

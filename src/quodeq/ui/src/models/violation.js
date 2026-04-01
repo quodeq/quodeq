@@ -13,11 +13,14 @@
  * @typedef {Object} Violation
  * @property {string|null}   file
  * @property {number|string|null} line
+ * @property {number|string|null} endLine
  * @property {'critical'|'major'|'minor'} severity
  * @property {string|null}   principle
  * @property {string|null}   title
  * @property {string|null}   reason
  * @property {string|null}   snippet
+ * @property {string|null}   context
+ * @property {string|null}   scope
  * @property {number|string|null} cwe
  * @property {string|null}   req
  * @property {ReqRef[]}      reqRefs
@@ -39,11 +42,14 @@ export function createViolation(raw) {
   return {
     file:          raw.file ?? null,
     line:          raw.line ?? null,
+    endLine:       raw.endLine ?? raw.end_line ?? null,
     severity:      raw.severity ?? 'minor',
     principle:     raw.principle ?? null,
     title:         raw.title ?? null,
     reason:        raw.reason ?? raw.findings ?? null,
     snippet:       raw.snippet ?? raw.code ?? null,
+    context:       raw.context ?? null,
+    scope:         raw.scope ?? null,
     cwe:           raw.cwe ?? null,
     req:           raw.req ?? null,
     reqRefs:       raw.reqRefs ?? raw.req_refs ?? [],

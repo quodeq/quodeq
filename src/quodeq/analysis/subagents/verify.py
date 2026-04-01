@@ -11,6 +11,7 @@ main analysis), so they appear on the dashboard immediately.
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +27,11 @@ def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_i
     for run in runs:
         if run.run_id == current_run_id:
             continue
-        prev_jsonl = reports_root / project_uuid / run.run_id / "evidence" / f"{dim_id}_evidence.jsonl"
+        run_dir = reports_root / project_uuid / run.run_id
+        # Only use evidence from runs that completed (have a scored report)
+        if not (run_dir / "evaluation" / f"{dim_id}.json").is_file():
+            continue
+        prev_jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
         if prev_jsonl.exists() and prev_jsonl.stat().st_size > 0:
             return prev_jsonl
     return None
@@ -46,12 +51,19 @@ def _parse_finding_line(line: str) -> dict | None:
     return None
 
 
-def _load_previous_findings(jsonl_path: Path) -> list[dict]:
-    """Load all findings from a JSONL file."""
+def _load_previous_findings(
+    jsonl_path: Path,
+    open_fn: Callable[[Path], Any] | None = None,
+) -> list[dict]:
+    """Load all findings from a JSONL file.
+
+    *open_fn* is an injectable file opener (defaults to ``open_text``).
+    """
     if not jsonl_path.exists():
         return []
+    _open = open_fn or open_text
     try:
-        with open_text(jsonl_path) as f:
+        with _open(jsonl_path) as f:
             return [e for line in f if (e := _parse_finding_line(line)) is not None]
     except OSError as exc:
         log_debug(f"Cannot read findings JSONL {jsonl_path}: {exc}")
@@ -140,6 +152,7 @@ def partition_findings_by_fingerprint(
 
 def write_carry_forward_findings(
     findings: list[dict], evidence_dir: Path, dim_id: str,
+    write_fn: Callable[[Path, str], None] | None = None,
 ) -> int:
     """Append carry-forward findings to the evidence JSONL.
 
@@ -148,15 +161,21 @@ def write_carry_forward_findings(
     incremental.py which filters file-to-file, this writes pre-partitioned
     results directly.
 
+    *write_fn* is an injectable writer ``(path, text) -> None``.  Defaults
+    to creating parent dirs and appending to file.
+
     Returns the number of findings written.
     """
     if not findings:
         return 0
     output = evidence_dir / f"{dim_id}_evidence.jsonl"
-    output.parent.mkdir(parents=True, exist_ok=True)
-    with open(output, "a") as f:
-        for finding in findings:
-            f.write(json.dumps(finding) + "\n")
+    text = "".join(json.dumps(finding) + "\n" for finding in findings)
+    if write_fn:
+        write_fn(output, text)
+    else:
+        output.parent.mkdir(parents=True, exist_ok=True)
+        with open(output, "a") as f:
+            f.write(text)
     return len(findings)
 
 
@@ -181,7 +200,7 @@ def _write_verify_manifest(
     output_path.write_text(json.dumps(grouped, indent=2))
 
 
-def _resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
+def resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
     """Walk up from evidence_dir to find run_id, project_uuid, reports_base."""
     edir = Path(evidence_dir)
     while edir.name != "evidence" and edir != edir.parent:
@@ -204,7 +223,7 @@ def _resolve_previous_evidence(
     the caller should use the cache hit instead.  A ``None`` path means no
     previous evidence exists.
     """
-    paths = _resolve_evidence_paths(evidence_dir)
+    paths = resolve_evidence_paths(evidence_dir)
     if paths is None:
         if cache is not None:
             cache[cache_key] = ([], 0, 0)

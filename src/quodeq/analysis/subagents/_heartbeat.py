@@ -40,6 +40,20 @@ class FindingCounts:
     compliances: int = 0
 
 
+def _classify_jsonl_line(line: str, counts: FindingCounts) -> None:
+    """Classify a single non-empty JSONL line and update *counts* in place."""
+    counts.total += 1
+    try:
+        entry = json.loads(line)
+        t = entry.get("t")
+        if t == FINDING_TYPE_VIOLATION:
+            counts.violations += 1
+        elif t == FINDING_TYPE_COMPLIANCE:
+            counts.compliances += 1
+    except json.JSONDecodeError:
+        pass
+
+
 def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> FindingCounts:
     """Count total, violation, and compliance lines in a JSONL file under a lock."""
     try:
@@ -49,19 +63,9 @@ def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> FindingCoun
         with lock:
             with open_text(jsonl_path) as f:
                 for line in f:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    counts.total += 1
-                    try:
-                        entry = json.loads(line)
-                        t = entry.get("t")
-                        if t == FINDING_TYPE_VIOLATION:
-                            counts.violations += 1
-                        elif t == FINDING_TYPE_COMPLIANCE:
-                            counts.compliances += 1
-                    except json.JSONDecodeError:
-                        pass
+                    stripped = line.strip()
+                    if stripped:
+                        _classify_jsonl_line(stripped, counts)
         return counts
     except OSError:
         return FindingCounts()

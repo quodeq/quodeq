@@ -6,14 +6,11 @@ import time
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
-
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.incremental import identify_backfill_files
-from quodeq.services.base import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
+# NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_debug, log_info
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig, _AnalysisContext
 
 
 _MIN_BACKFILL_BUDGET_S = 60
@@ -80,6 +77,7 @@ def run_backfill_phase(
 
     Returns the set of backfill files actually taken.
     """
+    # Deferred import: breaks circular dependency between _backfill and runner.
     from quodeq.analysis.runner import _process_single_dimension
 
     backfill_candidates = identify_backfill_files(backfill.files, list(backfill.prev_analyzed), backfill.phase1_files)

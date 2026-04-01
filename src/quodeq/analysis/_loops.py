@@ -3,13 +3,13 @@ from __future__ import annotations
 
 import json
 from copy import copy
-from typing import TYPE_CHECKING, Callable
+from dataclasses import replace
+from collections.abc import Callable
 
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
+# NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig, _AnalysisContext
 
 
 def check_zero_findings(
@@ -34,9 +34,9 @@ def check_zero_findings(
 
 
 def run_incremental_loop(
-    config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
-    *, process_fn: Callable[..., "Evidence | None"] | None = None,
-) -> dict[str, "Evidence"]:
+    config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
+    *, process_fn: Callable[..., Evidence | None] | None = None,
+) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis."""
     from quodeq.analysis._incremental import run_dimension_incremental
     from quodeq.analysis.runner import _process_single_dimension, _log_dimension_result
@@ -51,13 +51,10 @@ def run_incremental_loop(
             ev = run_dimension_incremental(config, dimension, idx, ctx)
         except (OSError, KeyError, ValueError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 incremental failed: {exc}, falling back to full")
-            original_options = config.options
-            config.options = copy(original_options)
-            config.options.incremental_file_filter = None
-            try:
-                ev = _process(config, dimension, idx, ctx)
-            finally:
-                config.options = original_options
+            fallback_options = copy(config.options)
+            fallback_options.incremental_file_filter = None
+            fallback_config = replace(config, options=fallback_options)
+            ev = _process(fallback_config, dimension, idx, ctx)
         if ev:
             _log_dimension_result(ev, dimension, idx, ctx.total)
             result[dimension] = ev
@@ -66,9 +63,9 @@ def run_incremental_loop(
 
 
 def run_per_dimension_loop(
-    config: "RunConfig", dimensions: list[str], ctx: "_AnalysisContext",
-    *, process_fn: Callable[..., "Evidence | None"] | None = None,
-) -> dict[str, "Evidence"]:
+    config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
+    *, process_fn: Callable[..., Evidence | None] | None = None,
+) -> dict[str, Evidence]:
     """Per-dimension loop (fallback or single-dimension)."""
     from quodeq.analysis.runner import _process_single_dimension
 

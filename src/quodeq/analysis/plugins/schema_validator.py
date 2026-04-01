@@ -27,6 +27,12 @@ def _get_validator(schema_file: str) -> jsonschema.Draft202012Validator:
     return jsonschema.Draft202012Validator(schema)
 
 
+def clear_schema_cache() -> None:
+    """Clear the schema and validator LRU caches. Useful for test isolation."""
+    _load_schema.cache_clear()
+    _get_validator.cache_clear()
+
+
 def validate_dimensions(data: dict) -> list[str]:
     """Validate dimensions.json data."""
     return _validate(data, "dimensions_schema.json")

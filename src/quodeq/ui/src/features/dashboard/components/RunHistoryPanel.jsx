@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { formatShortDate, gradeLetter, scoreColorClass } from '../../../utils/formatters.js';
 import {
   ComposedChart,
@@ -50,12 +50,9 @@ function scoreBarColor(score) {
 }
 
 
-function buildTrendData(trend, selectedRunId, selectedRunScore) {
+function buildTrendData(trend, selectedRunId) {
   return [...trend].slice(0, MAX_CHART_RUNS).reverse().map((row, i, arr) => {
-    const isSelected = row.runId === selectedRunId;
-    const numericAverage = isSelected && selectedRunScore != null
-      ? parseFloat(selectedRunScore)
-      : parseFloat(row.numericAverage);
+    const numericAverage = parseFloat(row.numericAverage);
     return {
       ...row,
       numericAverage,
@@ -83,6 +80,31 @@ function SelectedDot({ cx, cy, payload, selectedRunId }) {
   return <circle cx={cx} cy={cy} r={4} fill={cssVar('--color-chart-line')} stroke="white" strokeWidth={1.5} />;
 }
 
+function ScoreBars({ data, hoveredIndex, setHoveredIndex, selectedRunId, onBarClick }) {
+  return (
+    <Bar
+      dataKey="numericAverage"
+      radius={[3, 3, 0, 0]}
+      maxBarSize={18}
+      isAnimationActive={false}
+      cursor={onBarClick ? 'pointer' : 'default'}
+      onMouseEnter={(_, index) => setHoveredIndex(index)}
+      onMouseLeave={() => setHoveredIndex(null)}
+      onClick={(entry) => onBarClick?.(entry.runId)}
+    >
+      {data.map((entry, i) => (
+        <Cell
+          key={entry.runId ?? i}
+          fill={scoreBarColor(entry.numericAverage)}
+          opacity={entry.runId === selectedRunId ? 0.85 : 0.4}
+          stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
+          strokeWidth={hoveredIndex === i ? 1.5 : 0}
+        />
+      ))}
+    </Bar>
+  );
+}
+
 function ScoreHistoryChart({ data, interaction }) {
   const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
   return (
@@ -95,77 +117,26 @@ function ScoreHistoryChart({ data, interaction }) {
           </linearGradient>
         </defs>
         <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
-        <XAxis
-          dataKey="dateLabel"
-          tickFormatter={formatShortDate}
-          tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <YAxis
-          domain={[0, 10]}
-          ticks={[0, REF_LINE_LOW, REF_LINE_MID, REF_LINE_HIGH, 10]}
-          tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
-          axisLine={false}
-          tickLine={false}
-        />
-        <Tooltip
-          cursor={false}
-          isAnimationActive={false}
-          offset={20}
-          content={({ active }) => <RunHistoryTooltip active={active} hoveredIndex={hoveredIndex} data={data} />}
-        />
+        <XAxis dataKey="dateLabel" tickFormatter={formatShortDate} tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }} axisLine={false} tickLine={false} />
+        <YAxis domain={[0, 10]} ticks={[0, REF_LINE_LOW, REF_LINE_MID, REF_LINE_HIGH, 10]} tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }} axisLine={false} tickLine={false} />
+        <Tooltip cursor={false} isAnimationActive={false} offset={20} content={({ active }) => <RunHistoryTooltip active={active} hoveredIndex={hoveredIndex} data={data} />} />
         <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
         <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
         <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
-        <Area
-          dataKey="numericAverage"
-          type="monotone"
-          fill="url(#scoreAreaGrad)"
-          stroke="none"
-          isAnimationActive={false}
-        />
-        <Bar
-          dataKey="numericAverage"
-          radius={[3, 3, 0, 0]}
-          maxBarSize={18}
-          isAnimationActive={false}
-          cursor={onBarClick ? 'pointer' : 'default'}
-          onMouseEnter={(_, index) => setHoveredIndex(index)}
-          onMouseLeave={() => setHoveredIndex(null)}
-          onClick={(entry) => onBarClick?.(entry.runId)}
-        >
-          {data.map((entry, i) => (
-            <Cell
-              key={entry.runId ?? i}
-              fill={scoreBarColor(entry.numericAverage)}
-              opacity={entry.runId === selectedRunId ? 0.85 : 0.4}
-              stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'}
-              strokeWidth={hoveredIndex === i ? 1.5 : 0}
-            />
-          ))}
-        </Bar>
-        <Line
-          isAnimationActive={false}
-          dataKey="numericAverage"
-          type="monotone"
-          stroke={cssVar('--color-chart-line')}
-          strokeOpacity={0.65}
-          strokeWidth={2.5}
-          dot={<SelectedDot selectedRunId={selectedRunId} />}
-          activeDot={false}
-        />
+        <Area dataKey="numericAverage" type="monotone" fill="url(#scoreAreaGrad)" stroke="none" isAnimationActive={false} />
+        <ScoreBars data={data} hoveredIndex={hoveredIndex} setHoveredIndex={setHoveredIndex} selectedRunId={selectedRunId} onBarClick={onBarClick} />
+        <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-chart-line')} strokeOpacity={0.65} strokeWidth={2.5} dot={<SelectedDot selectedRunId={selectedRunId} />} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );
 }
 
-export default function RunHistoryPanel({ trend = [], selectedRunId = null, selectedRunScore, onBarClick }) {
+export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
 
   if (!trend || trend.length < 2) return null;
 
-  const data = buildTrendData(trend, selectedRunId, selectedRunScore);
+  const data = useMemo(() => buildTrendData(trend, selectedRunId), [trend, selectedRunId]);
 
   return (
     <section className="run-history-panel panel" aria-label="Score history chart">

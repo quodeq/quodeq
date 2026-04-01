@@ -7,6 +7,18 @@ import {
   FIX_HINTS,
 } from './planConstants.js';
 
+const PLAN_SNIPPET_MAX_LINES = 5;
+
+/**
+ * Cap a code snippet for plan output — show only the first few lines.
+ */
+function capSnippet(snippet) {
+  if (!snippet) return snippet;
+  const lines = snippet.split('\n');
+  if (lines.length <= PLAN_SNIPPET_MAX_LINES) return snippet;
+  return [...lines.slice(0, PLAN_SNIPPET_MAX_LINES), `... (${lines.length - PLAN_SNIPPET_MAX_LINES} more lines)`].join('\n');
+}
+
 // ---------------------------------------------------------------------------
 // Plan text constants (authoritative home — re-exported by explorerUtils.js)
 // ---------------------------------------------------------------------------
@@ -83,7 +95,7 @@ function renderViolationEntry(v, index, { principleKey, reasonKey }) {
   if (v.snippet) {
     lines.push('', '**Affected code:**');
     lines.push('```');
-    v.snippet.split('\n').forEach((l) => lines.push(l));
+    capSnippet(v.snippet).split('\n').forEach((l) => lines.push(l));
     lines.push('```');
   }
 
@@ -194,7 +206,7 @@ export function buildGroupPlanText({ title, violations, violationsBySeverity, co
     if (v.snippet) {
       entryLines.push('', '**Affected code:**');
       entryLines.push('```');
-      v.snippet.split('\n').forEach((l) => entryLines.push(l));
+      capSnippet(v.snippet).split('\n').forEach((l) => entryLines.push(l));
       entryLines.push('```');
     }
     entryLines.push('');
@@ -239,7 +251,7 @@ export function buildSingleViolationPlanText(v, title, opts = {}) {
     `**Severity:** ${v.severity || 'unknown'}`,
   ];
   if (loc) lines.push(`**File:** ${loc}`);
-  if (v.snippet) lines.push('', '## Affected Code', '```', v.snippet, '```');
+  if (v.snippet) lines.push('', '## Affected Code', '```', capSnippet(v.snippet), '```');
   if (v.reason) lines.push('', "## Why It's a Violation", v.reason);
   const hint = getFixHint(v.req);
   if (hint) lines.push('', `**Expected fix:** ${hint}`);

@@ -1,4 +1,8 @@
-"""Discipline detection rules parsed from a .conf file."""
+"""Discipline detection rules parsed from a .conf file.
+
+Direct file I/O is intentional — the registry IS the detection adapter
+and reading project files is its core responsibility.
+"""
 
 from __future__ import annotations
 
@@ -10,6 +14,7 @@ from typing import Any, Iterable
 
 from quodeq.shared.utils import read_text
 
+# NOTE: logging in inner layer — tracked for middleware extraction
 _logger = logging.getLogger(__name__)
 
 

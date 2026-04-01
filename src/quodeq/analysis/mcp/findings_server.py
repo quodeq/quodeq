@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, TextIO, runtime_checkable
 
-from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.mcp.args import ServerArgs, parse_args
 from quodeq.analysis.mcp.dispatch import (
     read_message,
@@ -31,6 +31,13 @@ class CompiledContext:
     compiled_reqs: dict[str, dict] = field(default_factory=dict)
     req_to_dim: dict[str, str] = field(default_factory=dict)
     dimension: str | None = None
+    work_dir: Path | None = None
+
+
+@runtime_checkable
+class FileReader(Protocol):
+    """Abstraction for reading source file content."""
+    def __call__(self, path: Path) -> str: ...
 
 
 @runtime_checkable
@@ -44,6 +51,10 @@ class DeduplicationStore(Protocol):
 
     def __contains__(self, key: tuple) -> bool: ...
     def add(self, key: tuple) -> None: ...
+
+
+def _default_read_file(path: Path) -> str:
+    return path.read_text()
 
 
 class FindingsRouter:
@@ -60,6 +71,7 @@ class FindingsRouter:
         output_fh: TextIO,
         context: CompiledContext | None = None,
         seen_store: DeduplicationStore | None = None,
+        file_reader: FileReader | None = None,
     ):
         ctx = context or CompiledContext()
         self._fh = output_fh
@@ -68,7 +80,63 @@ class FindingsRouter:
         self._dimension = ctx.dimension
         self._req_to_dim = ctx.req_to_dim
         self._seen: DeduplicationStore = seen_store if seen_store is not None else set()
+        self._work_dir = ctx.work_dir
+        self._read_file = file_reader or _default_read_file
         self.counter = 0
+
+    _CONTEXT_LINES = 5
+    _SCOPE_PREVIEW_LINES = 10
+
+    def _enrich_code(self, finding: dict) -> None:
+        """Fill snippet and context by reading the source file from work_dir."""
+        if self._work_dir is None:
+            return
+        file_path = finding.get("file")
+        if not file_path:
+            return
+        try:
+            full_path = self._work_dir / file_path
+            # Path containment check: prevent traversal outside the work directory.
+            if not full_path.resolve().is_relative_to(self._work_dir.resolve()):
+                finding.setdefault("snippet", "")
+                finding.setdefault("context", "")
+                return
+            source_lines = self._read_file(full_path).splitlines()
+        except (OSError, UnicodeDecodeError):
+            finding.setdefault("snippet", "")
+            finding.setdefault("context", "")
+            return
+
+        line = finding.get("line", 0)
+        scope = finding.get("scope")
+
+        # Scope-level or line=0: store full file in snippet for expand-on-click
+        if scope or not line:
+            finding["snippet"] = "\n".join(source_lines)
+            finding["scope"] = scope or "file"
+            finding["context"] = None
+            return
+
+        # Normal line-level enrichment
+        end_line = finding.get("end_line") or line
+        if end_line < line:
+            line, end_line = end_line, line
+        # Clamp to file boundaries (1-indexed)
+        line = max(1, min(line, len(source_lines)))
+        end_line = max(line, min(end_line, len(source_lines)))
+
+        # Build snippet (the offending lines)
+        snippet_lines = source_lines[line - 1:end_line]
+        finding["snippet"] = "\n".join(snippet_lines)
+
+        # Build context with >>> markers
+        ctx_start = max(0, line - 1 - self._CONTEXT_LINES)
+        ctx_end = min(len(source_lines), end_line + self._CONTEXT_LINES)
+        context_parts = []
+        for i in range(ctx_start, ctx_end):
+            prefix = ">>> " if line - 1 <= i < end_line else ""
+            context_parts.append(f"{prefix}{source_lines[i]}")
+        finding["context"] = "\n".join(context_parts)
 
     def _enrich(self, args: dict, finding: dict) -> None:
         """Auto-fill principle, dimension, and refs from compiled standards."""
@@ -105,6 +173,7 @@ class FindingsRouter:
         finding: dict = {"schema_version": _FINDING_SCHEMA_VERSION}
         finding.update({k: v for k, v in args.items() if v is not None})
         self._enrich(args, finding)
+        self._enrich_code(finding)
 
         self._fh.write(json.dumps(finding) + "\n")
         self._fh.flush()
@@ -151,6 +220,27 @@ def _select_best_refs(
     return result
 
 
+def _build_compiled_context(sa: ServerArgs) -> CompiledContext:
+    """Build compiled-standards context from parsed server args."""
+    compiled_refs = _load_compiled_refs(sa.compiled_dir, sa.dimension)
+    compiled_reqs = _load_compiled_requirements(sa.compiled_dir, sa.dimension)
+
+    req_to_dim: dict[str, str] = {}
+    if len(sa.dimensions) > 1:
+        for dim in sa.dimensions:
+            dim_reqs = _load_compiled_requirements(sa.compiled_dir, dim)
+            for req_id in dim_reqs:
+                req_to_dim[req_id] = dim
+
+    return CompiledContext(
+        compiled_refs=compiled_refs or {},
+        compiled_reqs=compiled_reqs or {},
+        req_to_dim=req_to_dim,
+        dimension=sa.dimension,
+        work_dir=Path(sa.work_dir) if sa.work_dir else None,
+    )
+
+
 def main() -> None:
     """Run the MCP findings server, reading JSON-RPC from stdin and writing JSONL to a file."""
     sa = parse_args()
@@ -163,23 +253,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    compiled_refs = _load_compiled_refs(sa.compiled_dir, sa.dimension)
-    compiled_reqs = _load_compiled_requirements(sa.compiled_dir, sa.dimension)
-
-    # Build req_id → dimension mapping for consolidated multi-dimension mode
-    req_to_dim: dict[str, str] = {}
-    if len(sa.dimensions) > 1:
-        for dim in sa.dimensions:
-            dim_reqs = _load_compiled_requirements(sa.compiled_dir, dim)
-            for req_id in dim_reqs:
-                req_to_dim[req_id] = dim
-
-    ctx = CompiledContext(
-        compiled_refs=compiled_refs or {},
-        compiled_reqs=compiled_reqs or {},
-        req_to_dim=req_to_dim,
-        dimension=sa.dimension,
-    )
+    ctx = _build_compiled_context(sa)
 
     queue: FileQueue | None = None
     if sa.queue_path:

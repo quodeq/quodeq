@@ -14,6 +14,7 @@ from quodeq.core.evidence.parser import build_req_refs_lookup, resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
 from quodeq.shared.utils import open_text, read_json
 
+# NOTE: logging in inner layer — tracked for middleware extraction
 _logger = logging.getLogger(__name__)
 
 _TYPE_VIOLATION = "violation"
@@ -69,6 +70,7 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         principle=obj["p"],
         file=obj.get("file"),
         line=obj.get("line"),
+        end_line=obj.get("end_line"),
         title=obj.get("w"),
         reason=obj.get("reason"),
         snippet=obj.get("snippet"),
@@ -76,12 +78,15 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
         cwe=obj.get("cwe"),
         req=req,
         req_refs=req_refs,
+        context=obj.get("context"),
+        scope=obj.get("scope"),
     ))
     return replace(entry, dimension=obj.get("d", dimension), violation_type=obj.get("vt"))
 
 
 def _parse_jsonl_findings(
     lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
+    req_to_principle: dict[str, str] | None = None,
 ) -> tuple[list[Finding], list[Finding]]:
     """Parse raw JSONL lines into deduplicated violation and compliance lists."""
     violations: list[Finding] = []
@@ -95,9 +100,11 @@ def _parse_jsonl_findings(
             obj = json.loads(raw)
         except json.JSONDecodeError:
             continue
-        if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
+        principle = obj.get("p") or obj.get("req")
+        if not principle or obj.get("t") not in _FINDING_TYPES:
             continue
-        dedup_key = (obj.get("p"), obj.get("t"), obj.get("file"), obj.get("line"))
+        obj["p"] = req_to_principle.get(principle, principle) if req_to_principle else principle
+        dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
         if dedup_key in seen:
             continue
         seen.add(dedup_key)
@@ -109,15 +116,46 @@ def _parse_jsonl_findings(
     return violations, compliance
 
 
+def _load_req_to_principle(dimension: str, evaluators_dir: "Path | None" = None) -> dict[str, str]:
+    """Load req ID -> principle name mapping for custom evaluators.
+
+    Args:
+        dimension: The dimension ID to look up.
+        evaluators_dir: Directory containing evaluator JSON files.
+            Defaults to ``default_paths().evaluators_dir`` when not provided.
+    """
+    if evaluators_dir is None:
+        from quodeq.config.paths import default_paths
+        evaluators_dir = default_paths().evaluators_dir
+    if not evaluators_dir.is_dir():
+        return {}
+    path = evaluators_dir / f"{dimension}.json"
+    if not path.is_file():
+        return {}
+    try:
+        data = json.loads(path.read_text())
+        mapping: dict[str, str] = {}
+        for p in data.get("principles", []):
+            pname = p.get("name", "")
+            for req in p.get("requirements", []):
+                rid = req.get("id", "")
+                if rid and pname:
+                    mapping[rid] = pname
+        return mapping
+    except (OSError, ValueError):
+        return {}
+
+
 def parse_violations_from_jsonl(
     jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
     compiled_dir: Path | None = None,
 ) -> ViolationResponse | None:
     """Parse live JSONL findings written by the MCP server."""
     req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
+    req_to_principle = _load_req_to_principle(ctx.dimension)
     try:
         with open_text(jsonl_path) as _f:
-            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup)
+            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup, req_to_principle)
     except OSError as exc:
         _logger.warning("Failed to read findings file: %s", exc)
         return None
@@ -183,7 +221,7 @@ def _try_parse_text_line(
     seen.add(key)
     entry = _build_finding_entry(obj, dimension)
     if entry.snippet:
-        entry = replace(entry, snippet=str(entry.snippet).splitlines()[0].strip())
+        entry = replace(entry, snippet=str(entry.snippet).strip())
     return obj["t"], entry
 
 

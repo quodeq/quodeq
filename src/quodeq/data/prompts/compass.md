@@ -17,15 +17,15 @@ Analyse the codebase for the **{{DIMENSION}}** quality dimension. Use the tools 
 
 For EVERY finding (violation or compliance), call `report_finding` with:
 
-- `req` — the **bold requirement ID** from the checklist (e.g. `M-MOD-1`, `S-CON-3`). The server auto-fills principle name and dimension from this.
+- `req` — the **exact requirement ID from the checklist** (e.g. `M-MOD-1`, `S-CON-3`). You MUST use the IDs exactly as listed, do NOT invent new ones. The server auto-fills principle name and dimension from this.
 - `t` — `violation` or `compliance`
 - `file` — file path relative to repo root
 - `line` — line number
-- `snippet` — the relevant code (under 200 chars)
+- `end_line` — last line of the violation pattern (omit if single line)
+- `scope` — set to `file`, `class`, or `module` when the finding affects an entire scope rather than specific lines
 - `severity` — `critical`, `major`, or `minor`
 - `w` — short description of what you found
-
-**Optional:** `reason` — why this is a violation or compliance
+- `reason` — why this is a violation or compliance
 
 ## Severity Definitions
 
@@ -80,7 +80,7 @@ Focus on the project's **own source code** — skip generated, vendored, compile
 
 ## Standards Checklist
 
-The checklist is organized by ISO 25010 sub-characteristic (`###` headings) with numbered requirements (**bold IDs**). Use the **bold ID** as the `req` field (e.g. `M-MOD-1`, `S-CON-3`).
+The checklist is organized by sub-characteristic (`###` headings) with numbered requirements. Use the **exact requirement ID** as the `req` field (e.g. `M-MOD-1`, `S-CON-3`) — do NOT create your own IDs.
 
 {{STANDARDS_CHECKLIST}}
 

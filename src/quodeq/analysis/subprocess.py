@@ -7,11 +7,11 @@ import re
 import subprocess
 import sys
 import tempfile
-import threading
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.analysis._provider_cache import get_provider_configs as _get_provider_configs
 from quodeq.analysis.stream.counters import (
     count_files_in_stream,
     count_jsonl_lines,
@@ -54,24 +54,35 @@ class AnalysisConfig:
     queue_path: Path | None = None
     agent_id: str = ""
     max_files_per_agent: int = 30
+    work_dir: Path | None = None
+
+
+@dataclass(frozen=True)
+class _AgentParams:
+    """Optional grouping of per-agent MCP config parameters."""
+    queue_path: Path | None = None
+    agent_id: str = ""
+    work_dir: Path | None = None
 
 
 def _create_mcp_config(
     jsonl_file: Path,
     compiled_dir: Path | None = None,
     dimension: str | None = None,
-    queue_path: Path | None = None,
-    agent_id: str = "",
+    agent_params: _AgentParams | None = None,
 ) -> Path:
     """Create a temporary MCP config file pointing to the findings server."""
+    ap = agent_params or _AgentParams()
     mcp_script = str(Path(__file__).resolve().parent / "mcp" / "findings_server.py")
     mcp_args = [mcp_script, str(jsonl_file.resolve())]
     if compiled_dir and dimension:
         mcp_args.extend(["--compiled-dir", str(compiled_dir.resolve()), "--dimension", dimension])
-    if queue_path:
-        mcp_args.extend(["--queue", str(queue_path.resolve())])
-    if agent_id:
-        mcp_args.extend(["--agent-id", agent_id])
+    if ap.queue_path:
+        mcp_args.extend(["--queue", str(ap.queue_path.resolve())])
+    if ap.agent_id:
+        mcp_args.extend(["--agent-id", ap.agent_id])
+    if ap.work_dir:
+        mcp_args.extend(["--work-dir", str(ap.work_dir.resolve())])
     config = {
         "mcpServers": {
             "findings": {
@@ -108,55 +119,13 @@ def _get_base_ai_args(env: dict[str, str] | None = None) -> tuple[str, ...]:
     """Return base AI CLI args from QUODEQ_AI_BASE_ARGS env var."""
     return tuple((env or os.environ).get("QUODEQ_AI_BASE_ARGS", _DEFAULT_BASE_AI_ARGS).split())
 
-_AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
-
-# Fallback provider configs used when the primary JSON file
-# (data/config/ai_providers.json) cannot be loaded.
-_PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
-    "claude": {
-        "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
-        "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
-        "env_remove": ["CLAUDECODE"],
-    },
-    "codex": {
-        "mcp_permission_args": [],
-        "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
-        "env_remove": [],
-    },
-}
-
-
-class _ProviderConfigCache:
-    """Thread-safe lazy cache for provider configurations."""
-
-    def __init__(self) -> None:
-        self._lock = threading.Lock()
-        self._configs: dict[str, dict] | None = None
-
-    def get(self) -> dict[str, dict]:
-        if self._configs is None:
-            with self._lock:
-                if self._configs is None:
-                    try:
-                        self._configs = json.loads(_AI_PROVIDERS_PATH.read_text())
-                    except (OSError, json.JSONDecodeError):
-                        self._configs = _PROVIDER_CONFIGS_FALLBACK
-        return self._configs
-
-
-_provider_config_cache = _ProviderConfigCache()
-
-
-def _get_provider_configs() -> dict[str, dict]:
-    return _provider_config_cache.get()
-
-
 class AnalysisError(RuntimeError):
     """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""
 
 
 def _build_ai_cmd(
     prompt: str, config: AnalysisConfig,
+    work_dir: Path | None = None,
 ) -> tuple[list[str], Path | None]:
     """Build the AI CLI command line and optional MCP config path."""
     cmd = config.ai_cmd or get_ai_cmd()
@@ -169,7 +138,7 @@ def _build_ai_cmd(
     if config.jsonl_file is not None:
         mcp_config_path = _create_mcp_config(
             config.jsonl_file, config.compiled_dir, config.dimension,
-            config.queue_path, config.agent_id,
+            _AgentParams(queue_path=config.queue_path, agent_id=config.agent_id, work_dir=config.work_dir or work_dir),
         )
         args.extend(["--mcp-config", str(mcp_config_path)])
         allowed = _MCP_TOOL_REPORT_FINDING
@@ -284,7 +253,7 @@ def run_analysis(
 ) -> None:
     """Spawn AI CLI subprocess, capturing stream-json to *stream_file*."""
     cfg = config or AnalysisConfig()
-    args, mcp_config_path = _build_ai_cmd(prompt, cfg)
+    args, mcp_config_path = _build_ai_cmd(prompt, cfg, work_dir=work_dir)
     env = _build_analysis_env(cfg.ai_cmd or get_ai_cmd())
     stream_err = Path(str(stream_file) + ".err")
 

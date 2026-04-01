@@ -3,10 +3,13 @@ from __future__ import annotations
 
 import json
 import logging
+from collections.abc import Callable, Iterable
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 import os
 from pathlib import Path
 
+from quodeq.core.evidence._req_mapping import _GroupedJudgments, _group_judgments
 from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, compute_coverage_pct
 from quodeq.shared.utils import open_text
 from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
@@ -95,7 +98,7 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         _logger.warning("Skipping malformed JSONL line: %s", exc)
         return None
 
-    practice_id = obj.get("p")
+    practice_id = obj.get("p") or obj.get("req")
     verdict = obj.get("t")
     if not practice_id or verdict not in ("violation", "compliance"):
         return None
@@ -106,12 +109,15 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
         dimension=obj.get("d", ""),
         file=obj.get("file", ""),
         line=obj.get("line", 0),
+        end_line=obj.get("end_line", 0),
         snippet=obj.get("snippet", ""),
         severity=obj.get("severity", "medium"),
         violation_type=obj.get("vt", ""),
         reason=obj.get("reason", ""),
         req=obj.get("req"),
         title=obj.get("w", ""),
+        context=obj.get("context", ""),
+        scope=obj.get("scope", ""),
     )
     # Pre-resolved req_refs from MCP server enrichment take priority
     pre_resolved = obj.get("req_refs")
@@ -123,7 +129,7 @@ def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
 def _judgment_to_dict(j: Judgment) -> dict:
     """Convert a Judgment to the dict format used in PrincipleEvidence lists."""
     d: dict = {"file": j.file}
-    _optional = {"line": j.line, "snippet": j.snippet, "severity": j.severity, "violation_type": j.violation_type}
+    _optional = {"line": j.line, "end_line": j.end_line, "snippet": j.snippet, "severity": j.severity, "violation_type": j.violation_type, "context": j.context, "scope": j.scope}
     d.update({k: v for k, v in _optional.items() if v})
     if j.req:
         d["req"] = j.req
@@ -134,38 +140,6 @@ def _judgment_to_dict(j: Judgment) -> dict:
     if j.reason:
         d["reason"] = j.reason
     return d
-
-
-_SEV_RANKS = {"low": 0, "medium": 1, "high": 2, "critical": 3}
-
-
-def _sev_rank(sev: str) -> int:
-    return _SEV_RANKS.get(sev, 1)
-
-
-@dataclass
-class _GroupedJudgments:
-    violations: dict[str, list[Judgment]]
-    compliance: dict[str, list[Judgment]]
-    severity: dict[str, str]
-
-
-def _group_judgments(judgments: list[Judgment]) -> _GroupedJudgments:
-    sc_violations: dict[str, list[Judgment]] = {}
-    sc_compliance: dict[str, list[Judgment]] = {}
-    sc_severity: dict[str, str] = {}
-
-    for j in judgments:
-        principle = j.practice_id
-        if j.verdict == "violation":
-            sc_violations.setdefault(principle, []).append(j)
-        elif j.verdict == "compliance":
-            sc_compliance.setdefault(principle, []).append(j)
-        sev = j.severity or "medium"
-        if principle not in sc_severity or _sev_rank(sev) > _sev_rank(sc_severity[principle]):
-            sc_severity[principle] = sev
-
-    return _GroupedJudgments(sc_violations, sc_compliance, sc_severity)
 
 
 def _enrich_judgment(
@@ -187,22 +161,38 @@ def _enrich_judgment(
         j.req_refs = resolved
 
 
-def _read_judgments(
-    jsonl_file: Path, compiled_dir: Path | None,
+def _parse_judgments(
+    lines: Iterable[str], compiled_dir: Path | None,
 ) -> list[Judgment]:
-    """Read JSONL lines and return enriched Judgment objects."""
-    if not jsonl_file.exists():
-        return []
+    """Parse JSONL lines and return enriched Judgment objects.
+
+    Accepts any iterable of strings — the caller is responsible for file I/O.
+    """
     judgments: list[Judgment] = []
     req_refs_cache: dict[str, dict[str, list[dict]]] = {}
-    with open_text(jsonl_file) as _jf:
-        for line in _jf:
-            result = _parse_jsonl_line(line)
-            if result is not None:
-                j, llm_refs = result
-                _enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
-                judgments.append(j)
+    for line in lines:
+        result = _parse_jsonl_line(line)
+        if result is not None:
+            j, llm_refs = result
+            _enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
+            judgments.append(j)
     return judgments
+
+
+def _read_judgments(
+    jsonl_file: Path, compiled_dir: Path | None,
+    open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
+) -> list[Judgment]:
+    """Read JSONL lines from a file and return enriched Judgment objects.
+
+    *open_fn* is an injectable file opener; defaults to ``open_text`` for
+    backward compatibility.  Pass a custom opener to decouple from the filesystem.
+    """
+    if not jsonl_file.exists():
+        return []
+    opener = open_fn or open_text
+    with opener(jsonl_file) as _jf:
+        return _parse_judgments(_jf, compiled_dir)
 
 
 def _build_principles(
@@ -229,6 +219,7 @@ def parse_jsonl_to_evidence_by_dimension(
     jsonl_file: Path,
     context: EvidenceContext,
     compiled_dir: Path | None = None,
+    evaluators_dir: Path | None = None,
 ) -> dict[str, Evidence]:
     """Parse a multi-dimension JSONL file into per-dimension Evidence objects.
 
@@ -251,7 +242,7 @@ def parse_jsonl_to_evidence_by_dimension(
 
     result: dict[str, Evidence] = {}
     for dim, dim_judgments in by_dim.items():
-        grouped = _group_judgments(dim_judgments)
+        grouped = _group_judgments(dim_judgments, dimension=dim, evaluators_dir=evaluators_dir)
         principles = _build_principles(grouped, dim)
         result[dim] = Evidence(
             repository=context.repository,
@@ -271,11 +262,12 @@ def parse_jsonl_to_evidence(
     jsonl_file: Path,
     context: EvidenceContext,
     compiled_dir: Path | None = None,
+    evaluators_dir: Path | None = None,
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
     judgments = _read_judgments(jsonl_file, compiled_dir)
-    grouped = _group_judgments(judgments)
     dimension_name = judgments[0].dimension if judgments else ""
+    grouped = _group_judgments(judgments, dimension=dimension_name, evaluators_dir=evaluators_dir)
     principles = _build_principles(grouped, dimension_name)
 
     source_file_count = context.source_file_count

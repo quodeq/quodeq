@@ -1,4 +1,9 @@
-"""Report builder — assembles scored evaluation data into JSON report files."""
+"""Report builder — assembles scored evaluation data into JSON report dicts.
+
+Pure report-building logic (``build_*`` functions) is separated from file I/O
+(``write_*`` / ``persist_*`` functions).  The I/O helpers act as infrastructure
+adapters and should not contain business logic.
+"""
 from __future__ import annotations
 
 import json
@@ -47,8 +52,8 @@ def _build_score_lookup(per_principle_scores: dict) -> dict:
     return lookup
 
 
-_VIOLATION_FIELDS = ("file", "line", "title", "reason", "snippet", "severity", "req", "req_refs")
-_COMPLIANCE_FIELDS = ("file", "line", "title", "reason", "snippet", "req", "req_refs")
+_VIOLATION_FIELDS = ("file", "line", "end_line", "title", "reason", "snippet", "context", "scope", "severity", "req", "req_refs")
+_COMPLIANCE_FIELDS = ("file", "line", "end_line", "title", "reason", "snippet", "context", "scope", "req", "req_refs")
 _GRADE_INSUFFICIENT = "Insufficient"
 
 
@@ -128,30 +133,11 @@ def _extract_scores(scores: ScoringResult | dict | None) -> tuple[dict, dict]:
     return scores.principles, to_camel_dict(scores.overall) if scores.overall else {}
 
 
-def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
-    """Build a complete JSON report dict from evidence and scoring data for one dimension.
-
-    Args:
-        dimension: Quality dimension identifier (e.g. ``"maintainability"``).
-        evidence: Raw evidence dict produced by the analysis pipeline.
-        scores: Scoring result (DTO or plain dict) for the dimension, or *None*.
-
-    Parameter count is intentional: dimension identity, raw evidence, and
-    scoring result are each a distinct pipeline output with no shared container.
-    """
-    per_principle_scores, aggregate = _extract_scores(scores)
-    lookup = _build_score_lookup(per_principle_scores)
-    principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
-
-    # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
-    weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
-    if weighted is not None:
-        top_score = f"{round(weighted, 1)}/10"
-        top_grade = aggregate.get("grade") or grade_from_score(top_score)
-    else:
-        top_score = None
-        top_grade = None
-
+def _assemble_report_dict(
+    dimension: str, evidence: dict, top_score: str | None, top_grade: str | None,
+    principle_rows: list, flat_violations: list, flat_compliance: list, sev_tally: dict,
+) -> dict:
+    """Assemble the final report dict from pre-computed components."""
     raw_meta = evidence.get("meta", {})
     report: dict = {
         "schema_version": _REPORT_SCHEMA_VERSION,
@@ -186,6 +172,37 @@ def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | di
     return report
 
 
+def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
+    """Build a complete JSON report dict from evidence and scoring data for one dimension.
+
+    Args:
+        dimension: Quality dimension identifier (e.g. ``"maintainability"``).
+        evidence: Raw evidence dict produced by the analysis pipeline.
+        scores: Scoring result (DTO or plain dict) for the dimension, or *None*.
+
+    Parameter count is intentional: dimension identity, raw evidence, and
+    scoring result are each a distinct pipeline output with no shared container.
+    """
+    per_principle_scores, aggregate = _extract_scores(scores)
+    lookup = _build_score_lookup(per_principle_scores)
+    principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
+
+    # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
+    weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
+    if weighted is not None:
+        top_score = f"{round(weighted, 1)}/10"
+        top_grade = aggregate.get("grade") or grade_from_score(top_score)
+    else:
+        top_score = None
+        top_grade = None
+
+    report = _assemble_report_dict(
+        dimension, evidence, top_score, top_grade,
+        principle_rows, flat_violations, flat_compliance, sev_tally,
+    )
+    return report
+
+
 def build_full_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
     """Build report with engine metadata fields."""
     ev_dict = evidence.to_evidence_dict()
@@ -201,30 +218,34 @@ def build_dashboard_report(evidence: Evidence, scores: ScoringResult | dict) -> 
     return build_report_json(evidence.language, ev_dict, scores)
 
 
-def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: Path) -> None:
-    """Write report files."""
-    output_dir.mkdir(parents=True, exist_ok=True)
+# ---------------------------------------------------------------------------
+# I/O adapters — persist pre-built report dicts to disk
+# ---------------------------------------------------------------------------
 
+def _persist_json(data: dict, path: Path) -> None:
+    """Write a report dict as formatted JSON to *path* (I/O adapter)."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        path.write_text(json.dumps(data, indent=2))
+    except OSError as exc:
+        raise OSError(f"Failed to write report to {path}: {exc}") from exc
+
+
+def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: Path) -> None:
+    """Build and persist full + dashboard report files (I/O adapter)."""
     full_report = build_full_report(evidence, scores)
     dashboard_report = build_dashboard_report(evidence, scores)
 
     dim = evidence.language
     validate_path_segment(dim)
-    try:
-        (output_dir / f"{dim}_full.json").write_text(json.dumps(full_report, indent=2))
-        (output_dir / f"{dim}.json").write_text(json.dumps(dashboard_report, indent=2))
-    except OSError as exc:
-        raise OSError(f"Failed to write report files to {output_dir}: {exc}") from exc
+    _persist_json(full_report, output_dir / f"{dim}_full.json")
+    _persist_json(dashboard_report, output_dir / f"{dim}.json")
 
 
 def write_dimension_report(evidence: Evidence, scores: ScoringResult | dict, dimension: str, output_dir: Path) -> None:
-    """Write a per-dimension report file: <dimension>.json."""
+    """Build and persist a per-dimension report file (I/O adapter)."""
     validate_path_segment(dimension)
-    output_dir.mkdir(parents=True, exist_ok=True)
 
     report = build_dashboard_report(evidence, scores)
     report["dimension"] = dimension
-    try:
-        (output_dir / f"{dimension}.json").write_text(json.dumps(report, indent=2))
-    except OSError as exc:
-        raise OSError(f"Failed to write dimension report {dimension} to {output_dir}: {exc}") from exc
+    _persist_json(report, output_dir / f"{dimension}.json")

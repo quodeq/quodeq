@@ -73,7 +73,10 @@ def register_static_routes(app: Flask, static_dist: str | None) -> None:
     @app.route('/<path:path>')
     def serve_static_or_spa(path: str) -> Response | tuple[Response, int]:
         """Serve a static file or fall back to the SPA index."""
-        if (dist / path).is_file():
+        resolved = (dist / path).resolve()
+        if not resolved.is_relative_to(dist):
+            return None
+        if resolved.is_file():
             return send_from_directory(str(dist), path)
         if path.startswith('api/'):
             return jsonify({"error": "Not found", "code": "NOT_FOUND"}), HTTPStatus.NOT_FOUND

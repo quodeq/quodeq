@@ -144,3 +144,56 @@ export function getAiClients() {
 export function getClientModels(clientId) {
   return request(`/ai-clients/${encodeURIComponent(clientId)}/models`);
 }
+
+// ── Standards ──────────────────────────────────────────────
+export async function listStandards() {
+  return request('/standards');
+}
+export async function getStandard(standardId) {
+  return request(`/standards/${encodeURIComponent(standardId)}`);
+}
+export async function createStandard(data) {
+  return request('/standards', { method: 'POST', body: JSON.stringify(data) });
+}
+export async function updateStandard(standardId, data) {
+  return request(`/standards/${encodeURIComponent(standardId)}`, { method: 'PUT', body: JSON.stringify(data) });
+}
+export async function deleteStandard(standardId) {
+  return request(`/standards/${encodeURIComponent(standardId)}`, { method: 'DELETE' });
+}
+export async function duplicateStandard(standardId, newId) {
+  return request(`/standards/${encodeURIComponent(standardId)}/duplicate`, { method: 'POST', body: JSON.stringify({ newId }) });
+}
+export async function listLibrary() {
+  return request('/standards/library');
+}
+export async function listCwes() {
+  return request('/standards/refs/cwe');
+}
+export async function importFromLibrary(file) {
+  return request('/standards/library/import', { method: 'POST', body: JSON.stringify({ file }) });
+}
+export async function importStandard(data, force = false) {
+  const res = await fetch(`${BASE}/standards/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data, force }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (res.status === 409) return { ...body, _conflict: true };
+  if (!res.ok) throw new Error(body.error || `Import failed: ${res.status}`);
+  return body;
+}
+export async function downloadStandard(standardId) {
+  const detail = await getStandard(standardId);
+  const { managed, type, origin, originHash, principleCount, requirementCount, ...portable } = detail;
+  const blob = new Blob([JSON.stringify(portable, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${standardId}.quodeq`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}

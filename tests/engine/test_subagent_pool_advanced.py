@@ -8,25 +8,11 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError
-from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool, SubagentResult
 
 
-def _fake_run_analysis(work_dir, prompt, stream_file, config):
-    """Mock run_analysis that writes some findings and drains the queue."""
-    stream_file.parent.mkdir(parents=True, exist_ok=True)
-    stream_file.write_text("")
-    if config.queue_path:
-        queue = FileQueue(config.queue_path)
-        queue.take(queue.remaining(), agent_id=config.agent_id)
-    if config.jsonl_file:
-        agent_id = config.agent_id or "unknown"
-        with open(config.jsonl_file, "a") as f:
-            f.write(json.dumps({
-                "schema_version": 1,
-                "p": "Modularity", "t": "violation", "d": "maintainability",
-                "w": f"Found by {agent_id}", "file": f"{agent_id}.py", "line": 1,
-            }) + "\n")
+from tests.engine.conftest import _fake_run_analysis  # noqa: F401 — shared helper
 
 
 class TestComputeScaleUp:

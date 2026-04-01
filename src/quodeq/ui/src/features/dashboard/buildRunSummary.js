@@ -1,6 +1,16 @@
 import { mostFrequentGrade } from '../../utils/formatters.js';
 
-export default function buildRunSummary(dimensions) {
+/**
+ * Build an aggregate run summary from dimension data.
+ *
+ * Prefers the pre-computed `summary` from the API when available.
+ * Falls back to client-side aggregation when the API response does
+ * not include it (legacy endpoints or partial responses).
+ *
+ * TODO: once the API always returns a summary, remove the fallback.
+ */
+export default function buildRunSummary(dimensions, apiSummary) {
+  if (apiSummary) return apiSummary;
   if (!dimensions || dimensions.length === 0) {
     return {
       overallGrade: '-',

@@ -1,12 +1,29 @@
-"""Shared utilities: config loading, env-var accessors, and re-exports.
+"""Shared utilities -- intentional convenience facade for the quodeq package.
 
-I/O helpers live in ``_io.py``; security helpers in ``_security.py``.
-Both are re-exported here for backward compatibility.
+**Architectural rationale:**  This module provides a single, stable public
+import surface so that callers can write
+``from quodeq.shared.utils import ...`` without tracking which internal
+submodule each helper lives in.  The trade-off (broader module surface) is
+a deliberate design choice that keeps imports simple and predictable across
+a fast-moving CLI codebase.
+
+Categories of re-exported and defined utilities
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+1. **I/O helpers** -- ``read_text``, ``write_text``, ``open_text``, ``read_json``
+   (from ``_io.py``)
+2. **Security helpers** -- ``SENSITIVE_PATTERNS``, ``sanitize_sensitive``
+   (from ``_security.py``)
+3. **Config loading** -- ``Config`` dataclass, lazy singleton via ``_get_config()``
+4. **Platform detection** -- ``IS_WIN32``
+5. **Repository URL helpers** -- ``is_repo_url``, ``project_name_from_repo``
+6. **Environment accessors** -- ``get_ai_provider``, ``get_dashboard_port``,
+   ``get_evaluations_dir``, ``get_anthropic_api_key``, etc.
+7. **Diff display** -- ``show_diff``
 """
 from __future__ import annotations
 
 import difflib
-import json
 import logging
 import os
 import sys
@@ -16,11 +33,16 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Iterator
 
-# Re-export I/O helpers (canonical home: _io.py)
-from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text  # noqa: F401
+# ---------------------------------------------------------------------------
+# 1. Re-exports — I/O and security helpers from dedicated submodules
+# ---------------------------------------------------------------------------
 
-# Re-export security helpers (canonical home: _security.py)
+from quodeq.shared._io import TEXT_ENCODING, read_text, write_text, open_text, read_json  # noqa: F401
 from quodeq.shared._security import SENSITIVE_PATTERNS, sanitize_sensitive  # noqa: F401
+
+# ---------------------------------------------------------------------------
+# 2. Config loading — Config dataclass, lazy singleton
+# ---------------------------------------------------------------------------
 
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
 _DEFAULT_EVALUATIONS_DIR = Path.home() / ".quodeq" / "evaluations"
@@ -130,19 +152,6 @@ def project_name_from_repo(repo: str) -> str:
     if is_repo_url(repo):
         return repo.split("/")[-1].replace(".git", "")
     return Path(repo).name
-
-
-# ---------------------------------------------------------------------------
-# JSON / file I/O
-# ---------------------------------------------------------------------------
-
-
-def read_json(path: Path) -> dict[str, Any]:
-    """Read and parse a JSON file, returning the parsed dict."""
-    try:
-        return json.loads(path.read_text(encoding=TEXT_ENCODING))
-    except (OSError, json.JSONDecodeError) as exc:
-        raise ValueError(f"Cannot read JSON file {path}: {exc}") from exc
 
 
 # ---------------------------------------------------------------------------
@@ -257,3 +266,25 @@ def show_diff(path: Path, new_content: str) -> None:
         print("".join(diff))
     else:
         print(f"[no changes] {path}")
+
+
+__all__ = [
+    # I/O helpers (re-exported from _io.py)
+    "TEXT_ENCODING", "read_text", "write_text", "open_text", "read_json",
+    # Security helpers (re-exported from _security.py)
+    "SENSITIVE_PATTERNS", "sanitize_sensitive",
+    # Config
+    "Config", "ACTION_API_MODULE",
+    # Platform
+    "IS_WIN32",
+    # Repo URL helpers
+    "is_repo_url", "project_name_from_repo",
+    # Environment accessors
+    "get_ai_provider", "get_ai_cmd", "get_ai_model", "_env_int",
+    "get_action_api_port", "get_action_api_host",
+    "get_dashboard_port", "get_static_dist", "get_evaluations_dir",
+    "get_anthropic_api_key", "get_asvs_url",
+    "get_github_search_url", "get_github_raw_base_url", "get_findings_file",
+    # Diff
+    "show_diff",
+]

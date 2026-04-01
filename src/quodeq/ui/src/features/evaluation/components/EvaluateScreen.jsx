@@ -3,6 +3,7 @@ import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import PowerSelector from './PowerSelector.jsx';
 
+const INITIAL_ANIM_DELAY = '0s';
 const CHIP_DELAY_1 = '0.55s';
 const CHIP_DELAY_2 = '1.1s';
 
@@ -39,7 +40,7 @@ function EvaluateHelpSection() {
   );
 }
 
-function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange }) {
+function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange, onPersistPower }) {
   return (
     <header className="evaluate-header">
       <div className="evaluate-header-content">
@@ -53,7 +54,7 @@ function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange }) {
             </svg>
           </div>
           <div className="eval-icon-animated">
-            <span className="eval-file-chip" style={{animationDelay: '0s'}} />
+            <span className="eval-file-chip" style={{animationDelay: INITIAL_ANIM_DELAY}} />
             <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_1}} />
             <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_2}} />
             <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,19 +70,19 @@ function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange }) {
           <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
         </div>
       </div>
-      <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} />
+      <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} onPersist={onPersistPower} />
     </header>
   );
 }
 
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
-  const { selectedProject, analysisPower, onAnalysisPowerChange } = context;
+  const { selectedProject, analysisPower, onAnalysisPowerChange, onPersistPower } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader isRunning={job?.status === 'running'} analysisPower={analysisPower} onAnalysisPowerChange={onAnalysisPowerChange} />
+      <EvaluateHeader isRunning={job?.status === 'running'} analysisPower={analysisPower} onAnalysisPowerChange={onAnalysisPowerChange} onPersistPower={onPersistPower} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (

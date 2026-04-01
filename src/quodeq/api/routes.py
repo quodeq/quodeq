@@ -5,7 +5,7 @@ import re
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, abort, jsonify, request
 
 from quodeq.api.helpers import error_response, register_static_routes, validate_evaluation_payload
 from quodeq.api.zip import export_project_zip
@@ -40,7 +40,6 @@ def _reports_dir(default_path: str | None = None) -> str:
     resolved = Path(raw).resolve()
     default_resolved = Path(fallback).resolve()
     if not resolved.is_relative_to(default_resolved):
-        from flask import abort
         abort(HTTPStatus.FORBIDDEN)
     return str(resolved)
 
@@ -166,7 +165,7 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
 
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
-    from quodeq.provider.base import EvaluationOptions
+    from quodeq.provider.base import EvaluationOptions  # deferred: avoid circular import at module level
     max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
     pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
@@ -266,7 +265,7 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/plugins")
     def plugins() -> Response:
-        from quodeq.provider.plugin_discovery import discover_plugins
+        from quodeq.provider.plugin_discovery import discover_plugins  # deferred: avoid circular import at module level
         return jsonify([to_camel_dict(p) for p in discover_plugins()])
 
     @app.get("/api/browse")

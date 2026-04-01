@@ -10,7 +10,7 @@ import re
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types import JobSnapshot
-from quodeq.engine._runner_markers import CC_MARKER_KEY
+from quodeq.shared.constants import CC_MARKER_KEY
 
 _MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
@@ -36,6 +36,29 @@ class Job:
     phase: str | None = None
     current_dimension: str | None = None
     dimensions: list[str] | None = None
+
+    def complete(self, exit_code: int, ended_at: str) -> None:
+        """Transition job to a terminal state based on exit code."""
+        self.exit_code = exit_code
+        self.ended_at = ended_at
+        self.status = "completed" if exit_code == 0 else "failed"
+
+    def cancel(self, ended_at: str) -> None:
+        """Mark job as cancelled."""
+        if self.status in ("completed", "failed"):
+            return
+        self.status = "cancelled"
+        self.ended_at = ended_at
+
+    def add_log(self, line: str) -> None:
+        """Append a log line to the rolling buffer."""
+        self.logs.append(line)
+
+    def set_phase(self, phase: str, dimension: str | None = None) -> None:
+        """Update the current analysis phase."""
+        self.phase = phase
+        if dimension is not None:
+            self.current_dimension = dimension
 
     def to_dict(self) -> JobSnapshot:
         """Return a frozen snapshot of the current job state."""

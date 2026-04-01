@@ -6,14 +6,18 @@ import sys
 from pathlib import Path
 from typing import Any, Callable
 
+from quodeq.shared.constants import CC_MARKER_KEY  # noqa: F401 — re-export
 from quodeq.shared.logging import log_info
-
-CC_MARKER_KEY = "_cc"  # shared constant for structured job-tracking markers
 _SECONDS_PER_MINUTE = 60
 
 
 def emit_marker(phase: str, **kwargs: Any) -> None:
-    """Emit a structured JSON marker (only when stdout is not a TTY)."""
+    """Emit a structured JSON marker for inter-process communication.
+
+    This writes to stdout only when it is *not* a TTY, i.e. when the
+    runner is invoked as a child process.  The output is machine-parsed
+    IPC, not user-facing presentation.
+    """
     if sys.stdout.isatty():
         return
     print(json.dumps({CC_MARKER_KEY: phase, **kwargs}), flush=True)

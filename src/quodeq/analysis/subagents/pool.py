@@ -11,18 +11,16 @@ from pathlib import Path
 from quodeq.analysis.subagents._heartbeat import HeartbeatContext, heartbeat_loop
 from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl, merge_jsonl
 from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
-from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
+from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_info, log_warning
 
 _AGENT_ID_PREFIX = "agent"
 _FUTURE_POLL_INTERVAL_S = 0.5
 _HEARTBEAT_JOIN_TIMEOUT_S = 2
-
-_DEFAULT_POOL_BUDGET = 600  # 10 minutes total pool budget
-_SCOUT_TIMEOUT_S = 180  # 3 minutes before forcing scale-up
-_DEFAULT_MAX_DURATION_S = 1800
+_SCOUT_TIMEOUT_S = 180             # 3 min before forcing scale-up
+_DEFAULT_MAX_DURATION_S = 1800     # 30 min default pool budget
 _DEFAULT_FILES_PER_AGENT = 30
-
 
 @dataclass
 class ScaleUpState:
@@ -68,10 +66,12 @@ class SubagentPool:
         paths: PoolPaths,
         options: PoolOptions,
         config: AnalysisConfig | None = None,
+        queue: WorkQueue | None = None,
     ):
         self._n = max(1, options.n_agents)
         self._work_dir, self._prompt = paths.work_dir, options.prompt
         self._evidence_dir, self._queue_path = paths.evidence_dir, paths.queue_path
+        self._queue = queue
         dimension = options.dimension
         if isinstance(dimension, list):
             self._dimensions, self._dimension = dimension, ",".join(dimension)
@@ -128,9 +128,15 @@ class SubagentPool:
                 stream_file=stream_file, success=False, error=str(exc),
             )
 
+    def _get_queue(self) -> WorkQueue:
+        """Return the injected queue or construct a FileQueue from the path."""
+        if self._queue is not None:
+            return self._queue
+        return FileQueue(self._queue_path)
+
     def _should_respawn(self, pool_start: float, max_duration: float) -> int:
         """Return remaining file count if a new agent should be spawned, else 0."""
-        remaining = FileQueue(self._queue_path).remaining()
+        remaining = self._get_queue().remaining()
         elapsed = time.monotonic() - pool_start
         if elapsed >= max_duration:
             if remaining > 0:

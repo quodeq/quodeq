@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+# NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import open_text
 

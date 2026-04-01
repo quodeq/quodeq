@@ -1,16 +1,18 @@
 import { useState } from 'react';
 import { LEVELS, STORAGE_KEY } from './powerLevels.js';
 
-export default function PowerSelector({ value, onChange, storage = localStorage }) {
+const DEFAULT_POWER_LEVEL = 2;
+
+export default function PowerSelector({ value, onChange, onPersist }) {
   const [hover, setHover] = useState(null);
 
-  const active = value ?? 2;
+  const active = value ?? DEFAULT_POWER_LEVEL;
   const display = hover ?? active;
   const currentLevel = LEVELS.find(l => l.level === display);
 
   function handleClick(level) {
     onChange(level);
-    try { storage.setItem(STORAGE_KEY, String(level)); } catch (e) { console.warn('localStorage unavailable:', e); }
+    if (onPersist) onPersist(level);
   }
 
   return (

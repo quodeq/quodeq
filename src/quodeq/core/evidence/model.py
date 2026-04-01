@@ -17,12 +17,17 @@ def compute_coverage_pct(files_read: int, source_file_count: int) -> float:
     return 0.0
 
 
+_VALID_VERDICTS = frozenset({"violation", "compliance", "dismissed"})
+_VALID_SEVERITIES = frozenset({"critical", "high", "medium", "low", "minor"})
+
+
 @dataclass
 class Judgment:
     """One LLM judgment per finding."""
     practice_id: str
     file: str = ""
     line: int = 0
+    end_line: int = 0
     snippet: str = ""
     verdict: str = "violation"  # violation | compliance | dismissed
     severity: str = "medium"
@@ -32,6 +37,18 @@ class Judgment:
     req_refs: list[dict] | None = None
     violation_type: str = ""
     title: str = ""
+    context: str = ""
+    scope: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.practice_id:
+            raise ValueError("Judgment requires a practice_id")
+
+    def is_violation(self) -> bool:
+        return self.verdict == "violation"
+
+    def is_compliance(self) -> bool:
+        return self.verdict == "compliance"
 
 
 @dataclass
@@ -45,6 +62,26 @@ class PrincipleEvidence:
     violations: list[dict] = field(default_factory=list)
     compliance: list[dict] = field(default_factory=list)
     metrics: dict = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        if not self.practice_id:
+            raise ValueError("PrincipleEvidence requires a practice_id")
+
+    def add_violations(self, items: list[dict]) -> None:
+        """Append violation findings and recompute metrics."""
+        self.violations.extend(items)
+        self.compute_metrics()
+
+    def add_compliance(self, items: list[dict]) -> None:
+        """Append compliance findings and recompute metrics."""
+        self.compliance.extend(items)
+        self.compute_metrics()
+
+    def merge_findings(self, other: PrincipleEvidence) -> None:
+        """Merge another PrincipleEvidence's findings into this one."""
+        self.violations.extend(other.violations)
+        self.compliance.extend(other.compliance)
+        self.compute_metrics()
 
     def compute_metrics(self, scale_multiplier: int = 1) -> None:
         """Calculate compliance percentage and confidence level from violation/compliance counts."""
@@ -106,27 +143,40 @@ class Evidence:
         }
 
     def to_evidence_dict(self) -> dict:
-        """Convert to the dict shape that run_scoring() expects."""
-        principles = {}
-        for key, pe in self.principles.items():
-            principles[key] = {
-                "display_name": pe.display_name,
-                "weight": pe.weight,
-                "violations": pe.violations,
-                "compliance": pe.compliance,
-                "metrics": pe.metrics,
-            }
-        result = {
-            "repository": self.repository,
-            "discipline": self.language.title(),
-            "date": self.date,
-            "source_file_count": self.source_file_count,
-            "files_read": self.files_read,
-            "coverage_pct": self.coverage_pct,
-            "meta": self.meta,
-            "principles": principles,
-            "evidence_summary": self.summary(),
+        """Convert to the dict shape that run_scoring() expects.
+
+        Delegates to the module-level :func:`evidence_to_scoring_dict`
+        so that serialization logic is not coupled to the entity itself.
+        """
+        return evidence_to_scoring_dict(self)
+
+
+def evidence_to_scoring_dict(evidence: Evidence) -> dict:
+    """Serialize an Evidence instance into the dict shape that run_scoring() expects.
+
+    Kept as a standalone function so adapter/engine layers can call it
+    without depending on the entity method.
+    """
+    principles = {}
+    for key, pe in evidence.principles.items():
+        principles[key] = {
+            "display_name": pe.display_name,
+            "weight": pe.weight,
+            "violations": pe.violations,
+            "compliance": pe.compliance,
+            "metrics": pe.metrics,
         }
-        if self.module:
-            result["module"] = self.module
-        return result
+    result = {
+        "repository": evidence.repository,
+        "discipline": evidence.language.title(),
+        "date": evidence.date,
+        "source_file_count": evidence.source_file_count,
+        "files_read": evidence.files_read,
+        "coverage_pct": evidence.coverage_pct,
+        "meta": evidence.meta,
+        "principles": principles,
+        "evidence_summary": evidence.summary(),
+    }
+    if evidence.module:
+        result["module"] = evidence.module
+    return result

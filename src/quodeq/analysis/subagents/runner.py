@@ -4,8 +4,9 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable
+from typing import Any, Callable
 
+from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
@@ -13,11 +14,8 @@ from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
-from quodeq.services.base import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.shared.logging import log_info, log_success, log_warning
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig
 
 _MAX_FILES_PER_AGENT = 30
 _MAX_FILES_PER_AGENT_CAP = 50
@@ -104,6 +102,7 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
             source_file_count=config.source_file_count,
             dimensions_data=ctx.dimensions_data,
             standards_dir=config.standards_dir,
+            evaluators_dir=config.evaluators_dir,
             manifest=config.manifest,
             target=config.target,
             work_dir=config.work_dir or config.src,
@@ -112,12 +111,21 @@ def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
 
 
 @dataclass
+class _CollectionContext:
+    """Grouped parameters for collecting evidence after a subagent pool run."""
+    results: list[Any]
+    ctx: Any
+    files: list[str] | None = None
+    save_fingerprint_fn: Any = None
+
+
+@dataclass
 class LaunchPoolParams:
     """Grouped parameters for launching a subagent pool."""
     evidence_dir: Path
     queue_path: Path
     prompt: str
-    max_files_per_agent: int = 30
+    max_files_per_agent: int = _MAX_FILES_PER_AGENT
 
 
 def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tuple[Any, list[Any]]:
@@ -145,27 +153,39 @@ def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tu
     return pool, pool.run()
 
 
+def _collect_all_evidence(results: list[Any], cleanup_stream_fn: Any) -> int:
+    """Sum files-read counts across all subagent result stream files, cleaning up each."""
+    total = 0
+    for r in results:
+        if r.stream_file.exists():
+            total += count_files_from_stream(r.stream_file)
+            cleanup_stream_fn(r.stream_file)
+    return total
+
+
 def _collect_evidence(
     config: RunConfig, dim_id: str, evidence_dir: Path,
-    results: list[Any], ctx: Any, files: list[str] | None = None,
+    collection: _CollectionContext,
 ) -> Evidence:
-    """Deduplicate JSONL, count files read, save fingerprint, and parse into Evidence."""
-    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
+    """Deduplicate JSONL, count files read, save fingerprint, and parse into Evidence.
+
+    *collection.save_fingerprint_fn* is an injectable ``(fingerprint, dir) -> None``
+    for persistence; defaults to ``analysis.fingerprint.save_fingerprint``.
+    """
+    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint as _default_save
     from quodeq.engine._runner_markers import cleanup_stream
+
+    _save = collection.save_fingerprint_fn or _default_save
 
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
-    total_files_read = 0
-    for r in results:
-        if r.stream_file.exists():
-            total_files_read += count_files_from_stream(r.stream_file)
-            cleanup_stream(r.stream_file)
+    total_files_read = _collect_all_evidence(collection.results, cleanup_stream)
 
     # Save fingerprint so next run can carry forward unchanged-file findings
-    if files:
-        fp = build_fingerprint(config.src, files, dim_id, config.standards_dir)
-        save_fingerprint(fp, evidence_dir)
+    if collection.files:
+        fp = build_fingerprint(config.src, collection.files, dim_id, config.standards_dir)
+        _save(fp, evidence_dir)
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     ev = parse_jsonl_to_evidence(
@@ -173,12 +193,13 @@ def _collect_evidence(
         EvidenceContext(
             language=config.language,
             repository=str(config.src),
-            date_str=ctx.date_str,
+            date_str=collection.ctx.date_str,
             source_file_count=config.source_file_count,
             files_read=total_files_read,
             module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
     )
     return ev
 
@@ -232,4 +253,4 @@ def process_dimension_with_subagents(
 
     # 6. Collect and return evidence (includes both verified + new findings)
     all_results = verify_results + results
-    return _collect_evidence(config, dim_id, evidence_dir, all_results, ctx, files=files)
+    return _collect_evidence(config, dim_id, evidence_dir, _CollectionContext(results=all_results, ctx=ctx, files=files))

@@ -5,13 +5,12 @@ import fnmatch
 import json
 import os
 import re
-import subprocess
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
 from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+from quodeq.analysis.subagents._git_scoring import compute_git_scores
 from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension
 from quodeq.config.paths import default_paths
 
@@ -37,6 +36,11 @@ def load_priority_config() -> dict:
         return json.loads(config_path.read_text())
     except (FileNotFoundError, PermissionError, json.JSONDecodeError):
         return {}
+
+
+def reset_priority_config_cache() -> None:
+    """Clear the lru_cache on load_priority_config. Useful for test isolation."""
+    load_priority_config.cache_clear()
 
 
 def compute_base_score(filepath: str, category: str | None = None) -> int:
@@ -94,13 +98,28 @@ def compute_dimension_boost(
 
 def compute_fan_in(
     files: list[str], src: Path, language: str,
+    read_file=None,
 ) -> dict[str, int]:
-    """Layer 3: count how many files import each file."""
+    """Layer 3: count how many files import each file.
+
+    *read_file* is an injectable ``(Path) -> str | None`` reader; defaults
+    to reading from the filesystem.
+    """
     config = load_priority_config()
     lang_key = _LANG_ALIASES.get(language.lower(), language.lower())
     patterns = config.get("import_patterns", {}).get(lang_key)
     if not patterns:
         return {}
+
+    def _default_read(path: Path) -> str | None:
+        if not path.exists():
+            return None
+        try:
+            return path.read_text(errors="ignore")
+        except OSError:
+            return None
+
+    _read = read_file or _default_read
 
     # Build filename lookup: stem → relative path
     stem_to_file: dict[str, str] = {}
@@ -112,12 +131,8 @@ def compute_fan_in(
     counts: dict[str, int] = {}
 
     for f in files:
-        full_path = src / f
-        if not full_path.exists():
-            continue
-        try:
-            content = full_path.read_text(errors="ignore")
-        except OSError:
+        content = _read(src / f)
+        if content is None:
             continue
         for line in content.splitlines():
             target = _match_import_target(line, compiled, stem_to_file, f)
@@ -141,75 +156,6 @@ def _match_import_target(
                 return target
             return None
     return None
-
-
-def _run_git_log(src: Path, months: int = 3) -> str | None:
-    """Run git log and return raw output, or None if git unavailable."""
-    if not (src / ".git").exists():
-        # Check parent directories too (we might be in a subdirectory)
-        check = src
-        while check != check.parent:
-            if (check / ".git").exists():
-                break
-            check = check.parent
-        else:
-            return None
-    try:
-        result = subprocess.run(
-            ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
-            cwd=str(src), capture_output=True, text=True, timeout=10,
-        )
-        return result.stdout if result.returncode == 0 else None
-    except (OSError, subprocess.TimeoutExpired):
-        return None
-
-
-def compute_git_scores(files: list[str], src: Path) -> dict[str, float]:
-    """Layer 4: git churn and recency scoring."""
-    config = load_priority_config()
-    raw = _run_git_log(src, config.get("git_lookback_months", 3))
-    if not raw:
-        return {}
-
-    file_set = set(files)
-    churn: dict[str, int] = {}
-    last_date: dict[str, str] = {}
-
-    current_date = ""
-    for line in raw.splitlines():
-        line = line.strip()
-        if not line:
-            continue
-        # 40-char hex = commit hash, skip
-        if len(line) == 40 and all(c in "0123456789abcdef" for c in line):
-            continue
-        # Date lines: "YYYY-MM-DD HH:MM:SS +ZZZZ"
-        if len(line) >= 10 and line[4:5] == "-" and line[7:8] == "-" and " " in line:
-            current_date = line[:10]
-            continue
-        # File path
-        if line in file_set:
-            churn[line] = churn.get(line, 0) + 1
-            if line not in last_date or current_date > last_date[line]:
-                last_date[line] = current_date
-
-    divisor = config.get("git_churn_divisor", 4)
-    max_score = config.get("git_churn_max", 5)
-    recency_days = config.get("git_recency_days", 14)
-    recency_mult = config.get("git_recency_multiplier", 1.5)
-    cutoff = (datetime.now() - timedelta(days=recency_days)).strftime("%Y-%m-%d")
-
-    scores: dict[str, float] = {}
-    for f in files:
-        c = churn.get(f, 0)
-        if c == 0:
-            continue
-        score = min(max_score, c / divisor)
-        if last_date.get(f, "") >= cutoff:
-            score = min(max_score, score * recency_mult)
-        scores[f] = score
-
-    return scores
 
 
 def compute_previous_violations(
@@ -264,7 +210,7 @@ def prioritize_files(
 
     # Batch computations (one pass each)
     fan_in = compute_fan_in(files, src, language or "") if language else {}
-    git_scores = compute_git_scores(files, src)
+    git_scores = compute_git_scores(files, src, config=priority_config)
     prev_violations = compute_previous_violations(config, evidence_dir, dimension) if evidence_dir and config else {}
 
     inputs = ScoringInputs(

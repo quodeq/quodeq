@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
-import { ISO_25010_URL } from '../../../constants.js';
+import DimensionSelector from './DimensionSelector.jsx';
+
 
 const FOLDER_MARGIN_BOTTOM = 8;
 
@@ -45,34 +46,6 @@ function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   );
 }
 
-function DimensionGrid({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll }) {
-  return (
-    <div className="form-group">
-      <div className="dimension-label-row">
-        <label><a className="iso-link" href={ISO_25010_URL} target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
-        <div className="dimension-chip-actions">
-          <button type="button" className="dim-action-btn" onClick={onSelectAll}>All</button>
-          <button type="button" className="dim-action-btn" onClick={onClearAll}>Clear</button>
-        </div>
-      </div>
-      <div className="dimension-grid">
-        {[...allDimensions].sort((a, b) => a.id.localeCompare(b.id)).map((dim) => (
-          <button
-            key={dim.id}
-            type="button"
-            className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}`}
-            title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
-            aria-pressed={selectedDims.has(dim.id)}
-            onClick={() => onToggle(dim.id)}
-          >
-            {dim.id}
-          </button>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function useEvaluationForm(onStart) {
   const [repo, setRepo] = useState('');
   const { allDimensions, dimLoadError } = usePluginDimensions();
@@ -89,7 +62,7 @@ function useEvaluationForm(onStart) {
   const handleSubmit = (e) => {
     e.preventDefault();
     const payload = { repo };
-    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) payload.dimensions = [...selectedDims];
+    if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
     onStart(payload);
     setRepo('');
     setSelectedDims(new Set());
@@ -97,7 +70,13 @@ function useEvaluationForm(onStart) {
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
   const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
 
-  return { repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen, toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError };
+  return {
+    repo, setRepo, allDimensions, selectedDims,
+    folderBrowserOpen, setFolderBrowserOpen,
+    toggleDim, selectAll, clearAll,
+    handleSubmit, handleFolderSelect, handleRepoClear,
+    dimLoadError,
+  };
 }
 
 export default function EvaluationForm({ onStart, disabled }) {
@@ -120,7 +99,7 @@ export default function EvaluationForm({ onStart, disabled }) {
 
         {dimLoadError && <p className="inline-error" style={{ marginBottom: FOLDER_MARGIN_BOTTOM }}>{dimLoadError}</p>}
         {repo && allDimensions.length > 0 && (
-          <DimensionGrid
+          <DimensionSelector
             allDimensions={allDimensions}
             selectedDims={selectedDims}
             onToggle={toggleDim}

@@ -120,13 +120,13 @@ class TestComputeFanIn:
 class TestComputeGitScores:
     def test_parses_git_log(self, tmp_path):
         mock_output = "abc123abc123abc123abc123abc123abc123abcd\n2026-03-20 10:00:00 +0000\nfile1.py\nfile2.py\n\ndef456def456def456def456def456def456defg\n2026-03-10 10:00:00 +0000\nfile1.py\n\n"
-        with patch("quodeq.analysis.subagents.priority._run_git_log", return_value=mock_output):
+        with patch("quodeq.analysis.subagents._git_scoring._run_git_log", return_value=mock_output):
             scores = compute_git_scores(["file1.py", "file2.py"], tmp_path)
         # file1.py has 2 commits, file2.py has 1
         assert scores.get("file1.py", 0) > scores.get("file2.py", 0)
 
     def test_git_not_available(self, tmp_path):
-        with patch("quodeq.analysis.subagents.priority._run_git_log", return_value=None):
+        with patch("quodeq.analysis.subagents._git_scoring._run_git_log", return_value=None):
             scores = compute_git_scores(["file1.py"], tmp_path)
         assert scores == {}
 
@@ -135,7 +135,7 @@ class TestComputeGitScores:
         today = datetime.now().strftime("%Y-%m-%d")
         old = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")
         mock_output = f"a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1\n{today} 10:00:00 +0000\nrecent.py\n\nb2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2b2\n{old} 10:00:00 +0000\nold.py\n\n"
-        with patch("quodeq.analysis.subagents.priority._run_git_log", return_value=mock_output):
+        with patch("quodeq.analysis.subagents._git_scoring._run_git_log", return_value=mock_output):
             scores = compute_git_scores(["recent.py", "old.py"], tmp_path)
         assert scores.get("recent.py", 0) >= scores.get("old.py", 0)
 

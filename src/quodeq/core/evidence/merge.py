@@ -18,10 +18,7 @@ def merge_evidence(
         total_dismissed += ev.dismissed_count
         for pid, pe in ev.principles.items():
             if pid in merged_principles:
-                existing = merged_principles[pid]
-                existing.violations.extend(pe.violations)
-                existing.compliance.extend(pe.compliance)
-                existing.compute_metrics()
+                merged_principles[pid].merge_findings(pe)
             else:
                 merged_principles[pid] = pe
 

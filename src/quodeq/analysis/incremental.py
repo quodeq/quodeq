@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.analysis.fingerprint import _hash_file, _hash_standards
+from quodeq.analysis.subagents.priority import load_priority_config, _LANG_ALIASES
 
 
 @dataclass
@@ -102,8 +103,6 @@ def _safe_read(path: Path) -> str | None:
 
 def find_dependents(changed: set[str], files: list[str], src: Path, language: str) -> set[str]:
     """Find files that directly import any changed file (1 level deep)."""
-    from quodeq.analysis.subagents.priority import load_priority_config, _LANG_ALIASES
-
     config = load_priority_config()
     lang_key = _LANG_ALIASES.get(language.lower(), language.lower())
     patterns = config.get("import_patterns", {}).get(lang_key)
@@ -124,14 +123,21 @@ def find_dependents(changed: set[str], files: list[str], src: Path, language: st
     return dependents
 
 
-def carry_forward_findings(prev_jsonl: Path, output_jsonl: Path, unchanged_files: set[str]) -> int:
-    """Copy findings for unchanged files from previous JSONL to output. Returns count."""
+def carry_forward_findings(
+    prev_jsonl: Path, output_jsonl: Path, unchanged_files: set[str],
+    open_fn=None,
+) -> int:
+    """Copy findings for unchanged files from previous JSONL to output. Returns count.
+
+    *open_fn* is an injectable file opener; defaults to the built-in ``open``.
+    """
     if not prev_jsonl.exists():
         return 0
+    _open = open_fn or open
     count = 0
     try:
         output_jsonl.parent.mkdir(parents=True, exist_ok=True)
-        with open(prev_jsonl) as inp, open(output_jsonl, "a") as out:
+        with _open(prev_jsonl) as inp, _open(output_jsonl, "a") as out:
             for line in inp:
                 line = line.strip()
                 if not line:

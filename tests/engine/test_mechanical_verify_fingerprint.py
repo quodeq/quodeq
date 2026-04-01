@@ -6,6 +6,7 @@ import hashlib
 import json
 import pytest
 
+from quodeq.analysis.subagents.runner import _run_verification_step
 from quodeq.analysis.subagents.verify import (
     write_carry_forward_findings,
 )
@@ -92,7 +93,6 @@ class TestRunVerificationStepFingerprint:
         mock_find_fp.return_value = (fingerprint, None)
         mock_pool.return_value = []
 
-        from quodeq.analysis.subagents.runner import _run_verification_step
         _run_verification_step(config, "security", evidence_dir, ["unchanged.py", "changed.py"])
 
         # Pool should only receive the changed file
@@ -143,7 +143,6 @@ class TestRunVerificationStepFingerprint:
         mock_find_fp.return_value = (fingerprint, None)
         mock_pool.return_value = []
 
-        from quodeq.analysis.subagents.runner import _run_verification_step
         _run_verification_step(config, "security", evidence_dir, ["changed.py", "unchanged.py"])
 
         # JSONL should NOT have unchanged.py findings (that's _maybe_carry_forward's job)

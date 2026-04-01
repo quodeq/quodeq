@@ -8,12 +8,16 @@ from .report import PrincipleGrade
 
 @dataclass(frozen=True, slots=True)
 class GradeBreakdown:
+    """Single grade bucket with its count (e.g. 'Good': 3)."""
+
     grade: str
     count: int
 
 
 @dataclass(frozen=True, slots=True)
 class DimensionSummary:
+    """Aggregate summary across all evaluated dimensions."""
+
     dimensions_count: int = 0
     overall_grade: str | None = None
     numeric_average: float | None = None
@@ -22,6 +26,8 @@ class DimensionSummary:
 
 @dataclass(frozen=True, slots=True)
 class DimensionResult:
+    """Full evaluation result for a single quality dimension."""
+
     dimension: str
     overall_score: str | None = None
     overall_grade: str | None = None

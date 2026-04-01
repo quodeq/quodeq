@@ -109,6 +109,42 @@ function computeRunScoreDelta(dashboard) {
   return (curr - prev).toFixed(1);
 }
 
+function StatsGrid({ runSummary, runTopFiles, runUniquePrinciples }) {
+  return (
+    <div className="acc-eval-stats-row">
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Violations</span>
+        <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
+        <div className="acc-eval-tags">
+          {(runSummary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{runSummary.severity.critical} crit</span>}
+          {(runSummary.severity?.major || 0) > 0 && <span className="severity-tag major">{runSummary.severity.major} maj</span>}
+          {(runSummary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{runSummary.severity.minor} min</span>}
+        </div>
+      </div>
+      <div className="acc-eval-stats-divider" />
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Ratio</span>
+        <span className="acc-eval-stat-value">{complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}</span>
+      </div>
+      <div className="acc-eval-stats-divider" />
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Files</span>
+        <span className="acc-eval-stat-value">{runTopFiles.length}</span>
+      </div>
+      <div className="acc-eval-stats-divider" />
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Principles</span>
+        <span className="acc-eval-stat-value">{runUniquePrinciples}</span>
+      </div>
+      <div className="acc-eval-stats-divider" />
+      <div className="acc-eval-stat-block">
+        <span className="acc-eval-stat-label">Dimensions</span>
+        <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
+      </div>
+    </div>
+  );
+}
+
 function RunHeroSection({ dashboard, selectedRunId, stats }) {
   const { runSummary, runScoreDelta, runTopFiles, runUniquePrinciples } = stats;
   return (
@@ -129,51 +165,13 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
       </div>
       <div className="acc-eval-golden">
         <div className="acc-eval-circle-col">
-          <ScoreCircle
-            score={runSummary.numericAverage}
-            grade={runSummary.overallGrade}
-            size={120}
-          />
+          <ScoreCircle score={runSummary.numericAverage} grade={runSummary.overallGrade} size={120} />
           {runScoreDelta !== null && (
-            <div className="acc-eval-trend">
-              <TrendBadge delta={runScoreDelta} showLabel={false} />
-            </div>
+            <div className="acc-eval-trend"><TrendBadge delta={runScoreDelta} showLabel={false} /></div>
           )}
         </div>
         <div className="acc-eval-stats-col">
-          <div className="acc-eval-stats-row">
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Violations</span>
-              <span className="acc-eval-stat-value">{runSummary.totalViolations || 0}</span>
-              <div className="acc-eval-tags">
-                {(runSummary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{runSummary.severity.critical} crit</span>}
-                {(runSummary.severity?.major || 0) > 0 && <span className="severity-tag major">{runSummary.severity.major} maj</span>}
-                {(runSummary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{runSummary.severity.minor} min</span>}
-              </div>
-            </div>
-            <div className="acc-eval-stats-divider" />
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Ratio</span>
-              <span className="acc-eval-stat-value">
-                {complianceRatio(runSummary.totalViolations || 0, runSummary.totalCompliance || 0)}
-              </span>
-            </div>
-            <div className="acc-eval-stats-divider" />
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Files</span>
-              <span className="acc-eval-stat-value">{runTopFiles.length}</span>
-            </div>
-            <div className="acc-eval-stats-divider" />
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Principles</span>
-              <span className="acc-eval-stat-value">{runUniquePrinciples}</span>
-            </div>
-            <div className="acc-eval-stats-divider" />
-            <div className="acc-eval-stat-block">
-              <span className="acc-eval-stat-label">Dimensions</span>
-              <span className="acc-eval-stat-value">{runSummary.dimensionCount || 0}</span>
-            </div>
-          </div>
+          <StatsGrid runSummary={runSummary} runTopFiles={runTopFiles} runUniquePrinciples={runUniquePrinciples} />
         </div>
       </div>
     </section>

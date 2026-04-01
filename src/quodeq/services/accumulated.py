@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any, Callable
 
-from quodeq.adapters.fs.report_parser import (
+from quodeq.services.ports import (
     RunInfo,
     calculate_trend,
     list_runs,
@@ -35,27 +35,33 @@ def _acc_dim_cache_max(override: int | None = None, env: dict[str, str] | None =
     return _env_int("QUODEQ_ACC_CACHE_MAX", _DEFAULT_ACC_CACHE_MAX, env=env)
 
 
+@dataclass
+class _DimensionBuckets:
+    """Mutable accumulation buckets used during a single _read_all_run_data pass."""
+    latest_by_dimension: dict[str, DimensionResult] = field(default_factory=dict)
+    prev_occurrence: dict[str, DimensionResult] = field(default_factory=dict)
+    prev_run_latest_map: dict[str, DimensionResult] = field(default_factory=dict)
+
+
 def _classify_dimension(
     dim: DimensionResult, run_id: str, run_info: RunInfo | None, is_first_run: bool,
-    latest_by_dimension: dict[str, DimensionResult],
-    prev_occurrence: dict[str, DimensionResult],
-    prev_run_latest_map: dict[str, DimensionResult],
+    buckets: _DimensionBuckets,
 ) -> None:
     """Classify a single dimension into latest, previous-occurrence, or previous-run buckets."""
     dim_name = dim.dimension
     if not dim_name:
         return
-    if dim_name not in latest_by_dimension:
-        latest_by_dimension[dim_name] = replace(
+    if dim_name not in buckets.latest_by_dimension:
+        buckets.latest_by_dimension[dim_name] = replace(
             dim,
             from_run_id=run_id,
             from_date_iso=run_info.date_iso if run_info else None,
             from_date_label=run_info.date_label if run_info else None,
         )
-    elif dim_name not in prev_occurrence:
-        prev_occurrence[dim_name] = replace(dim, run_id=run_id)
-    if not is_first_run and dim_name not in prev_run_latest_map:
-        prev_run_latest_map[dim_name] = dim
+    elif dim_name not in buckets.prev_occurrence:
+        buckets.prev_occurrence[dim_name] = replace(dim, run_id=run_id)
+    if not is_first_run and dim_name not in buckets.prev_run_latest_map:
+        buckets.prev_run_latest_map[dim_name] = dim
 
 
 def _read_all_run_data(
@@ -71,20 +77,15 @@ def _read_all_run_data(
         prev_run_latest: most recent dimension data from runs[1:] (for previous average).
     """
     run_lookup = {r.run_id: r for r in all_run_infos}
-    latest_by_dimension: dict[str, DimensionResult] = {}
-    prev_occurrence: dict[str, DimensionResult] = {}
-    prev_run_latest_map: dict[str, DimensionResult] = {}
+    buckets = _DimensionBuckets()
     _fetch = get_run_data or (lambda rid: read_run_data(reports_root, project, rid))
 
     for run_idx_i, run_id in enumerate(runs):
         run_info = run_lookup.get(run_id)
         for dim in _fetch(run_id):
-            _classify_dimension(
-                dim, run_id, run_info, run_idx_i == 0,
-                latest_by_dimension, prev_occurrence, prev_run_latest_map,
-            )
+            _classify_dimension(dim, run_id, run_info, run_idx_i == 0, buckets)
 
-    return latest_by_dimension, prev_occurrence, list(prev_run_latest_map.values())
+    return buckets.latest_by_dimension, buckets.prev_occurrence, list(buckets.prev_run_latest_map.values())
 
 
 def _compute_accumulated_trends(

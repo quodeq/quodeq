@@ -3,10 +3,9 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from quodeq.adapters.fs.report_parser import RunInfo, most_frequent_grade
 from quodeq.core.scoring.internals import score_to_grade_label
 from quodeq.core.types import DimensionResult
-from quodeq.data.fs.report_parser.grades import parse_numeric_score
+from quodeq.services.ports import RunInfo, most_frequent_grade, parse_numeric_score
 from quodeq.services.accumulated import numeric_average
 
 

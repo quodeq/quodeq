@@ -9,7 +9,10 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.analysis.subagents.runner import process_consolidated_dimensions
+from quodeq.analysis.runner import AnalysisOptions, RunConfig
+from quodeq.analysis.manifest import SourceManifest, AnalysisTarget
 
 
 def _write_compiled_standards(tmp_path):
@@ -43,7 +46,7 @@ def _consolidated_run_analysis(work_dir, prompt, stream_file, config):
     stream_file.write_text("")
     # Drain queue
     if config.queue_path:
-        from quodeq.engine.file_queue import FileQueue
+        from quodeq.analysis.subagents.file_queue import FileQueue
         queue = FileQueue(config.queue_path)
         queue.take(queue.remaining(), agent_id=config.agent_id)
     # Write findings from both dimensions
@@ -66,52 +69,42 @@ def _consolidated_run_analysis(work_dir, prompt, stream_file, config):
             }) + "\n")
 
 
+def _make_consolidated_config(tmp_path):
+    """Build a RunConfig and context for consolidated multi-dimension tests."""
+    standards_dir = _write_compiled_standards(tmp_path)
+    work_dir = tmp_path / "work"
+    work_dir.mkdir()
+    for i in range(10):
+        (work_dir / f"file{i}.py").write_text(f"# file {i}")
+
+    target = AnalysisTarget(
+        name="python", language="python",
+        source_files=[f"file{i}.py" for i in range(10)], total_files=10,
+    )
+    manifest = SourceManifest(targets=[target], total_files=10)
+    config = RunConfig(
+        src=work_dir, language="python", standards_dir=standards_dir,
+        work_dir=work_dir,
+        options=AnalysisOptions(max_subagents=5, consolidated=True),
+        manifest=manifest, target=target,
+        dimensions_data={
+            "applies": [
+                {"id": "security", "weight": 1.0},
+                {"id": "maintainability", "weight": 1.0},
+            ],
+        },
+    )
+    ctx = SimpleNamespace(
+        dimensions_data=config.dimensions_data,
+        date_str="2026-03-22", template="", subagent_template="", total=2,
+    )
+    return config, ctx
+
+
 class TestConsolidatedIntegration:
     def test_consolidated_produces_per_dimension_evidence(self, tmp_path):
         """Consolidated mode splits findings by dimension correctly."""
-        from quodeq.analysis.subagents.runner import process_consolidated_dimensions
-        from quodeq.analysis.runner import AnalysisOptions, RunConfig
-        from quodeq.analysis.manifest import SourceManifest, AnalysisTarget
-
-        standards_dir = _write_compiled_standards(tmp_path)
-        work_dir = tmp_path / "work"
-        work_dir.mkdir()
-
-        # Create some source files
-        for i in range(10):
-            (work_dir / f"file{i}.py").write_text(f"# file {i}")
-
-        target = AnalysisTarget(
-            name="python",
-            language="python",
-            source_files=[f"file{i}.py" for i in range(10)],
-            total_files=10,
-        )
-        manifest = SourceManifest(targets=[target], total_files=10)
-
-        config = RunConfig(
-            src=work_dir,
-            language="python",
-            standards_dir=standards_dir,
-            work_dir=work_dir,
-            options=AnalysisOptions(max_subagents=5, consolidated=True),
-            manifest=manifest,
-            target=target,
-            dimensions_data={
-                "applies": [
-                    {"id": "security", "weight": 1.0},
-                    {"id": "maintainability", "weight": 1.0},
-                ],
-            },
-        )
-
-        ctx = SimpleNamespace(
-            dimensions_data=config.dimensions_data,
-            date_str="2026-03-22",
-            template="",
-            subagent_template="",
-            total=2,
-        )
+        config, ctx = _make_consolidated_config(tmp_path)
 
         with patch("quodeq.analysis.subagents.pool.run_analysis", _consolidated_run_analysis):
             result = process_consolidated_dimensions(config, ["security", "maintainability"], ctx)
@@ -119,14 +112,12 @@ class TestConsolidatedIntegration:
         assert "security" in result
         assert "maintainability" in result
 
-        # Security: 1 violation + 1 compliance
         sec = result["security"]
         sec_v = sum(len(pe.violations) for pe in sec.principles.values())
         sec_c = sum(len(pe.compliance) for pe in sec.principles.values())
         assert sec_v == 1
         assert sec_c == 1
 
-        # Maintainability: 1 violation
         maint = result["maintainability"]
         maint_v = sum(len(pe.violations) for pe in maint.principles.values())
         assert maint_v == 1

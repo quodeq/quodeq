@@ -1,13 +1,14 @@
 import { useState, useEffect } from 'react';
 import { getProjectInfo } from '../../../api/index.js';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
-import { ISO_25010_URL } from '../../../constants.js';
+import DimensionSelector from './DimensionSelector.jsx';
+
 
 const BUTTON_GAP = '8px';
 const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_GAP, alignItems: 'center' };
 const flexButtonStyle = { flex: 1, marginTop: 0 };
 
-export default function ReEvaluateCard({ project, onStart, disabled }) {
+function useReEvaluateCard(project, onStart) {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState(null);
   const { allDimensions } = usePluginDimensions();
@@ -24,42 +25,29 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
       });
   }, [project]);
 
-  if (error) return null;
-  if (!info) return null;
-
-  function toggleDim(id) {
+  const toggleDim = (id) => {
     setSelectedDims((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  }
-
-  function selectAll() {
-    setSelectedDims(new Set(allDimensions.map((d) => d.id)));
-  }
-
-  function clearAll() {
-    setSelectedDims(new Set());
-  }
-
-  function buildPayload(extra) {
+  };
+  const selectAll = () => setSelectedDims(new Set(allDimensions.map((d) => d.id)));
+  const clearAll = () => setSelectedDims(new Set());
+  const buildPayload = (extra) => {
     const payload = { repo: info.path, ...extra };
-    if (selectedDims.size > 0 && selectedDims.size < allDimensions.length) {
-      payload.dimensions = [...selectedDims];
-    }
+    if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
     return payload;
-  }
+  };
+  const handleStart = () => onStart(buildPayload());
+  const handleIncremental = () => onStart(buildPayload({ incremental: true }));
 
-  function handleStart() {
-    onStart(buildPayload());
-  }
+  return { info, error, allDimensions, selectedDims, toggleDim, selectAll, clearAll, handleStart, handleIncremental };
+}
 
-  function handleIncremental() {
-    onStart(buildPayload({ incremental: true }));
-  }
-
+function ReEvaluateCardView({ info, project, disabled, allDimensions, selectedDims, actions }) {
+  const { toggleDim, selectAll, clearAll, handleStart, handleIncremental } = actions;
   const canStart = !disabled && selectedDims.size > 0;
 
   return (
@@ -75,28 +63,13 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         </div>
 
         {allDimensions.length > 0 && (
-          <div className="form-group">
-            <div className="dimension-label-row">
-              <label><a className="iso-link" href={ISO_25010_URL} target="_blank" rel="noopener noreferrer">ISO 25010</a> Dimensions</label>
-              <div className="dimension-chip-actions">
-                <button type="button" className="dim-action-btn" onClick={selectAll}>All</button>
-                <button type="button" className="dim-action-btn" onClick={clearAll}>Clear</button>
-              </div>
-            </div>
-            <div className="dimension-grid">
-              {[...allDimensions].sort((a, b) => a.id.localeCompare(b.id)).map((dim) => (
-                <button
-                  key={dim.id}
-                  type="button"
-                  className={`dimension-chip-btn ${selectedDims.has(dim.id) ? 'selected' : ''}`}
-                  title={dim.iso_25010 ? `ISO 25010: ${dim.iso_25010}` : undefined}
-                  onClick={() => toggleDim(dim.id)}
-                >
-                  {dim.id}
-                </button>
-              ))}
-            </div>
-          </div>
+          <DimensionSelector
+            allDimensions={allDimensions}
+            selectedDims={selectedDims}
+            onToggle={toggleDim}
+            onSelectAll={selectAll}
+            onClearAll={clearAll}
+          />
         )}
 
         <div style={buttonRowStyle}>
@@ -125,5 +98,25 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function ReEvaluateCard({ project, onStart, disabled }) {
+  const {
+    info, error, allDimensions, selectedDims,
+    toggleDim, selectAll, clearAll, handleStart, handleIncremental,
+  } = useReEvaluateCard(project, onStart);
+
+  if (error || !info) return null;
+
+  return (
+    <ReEvaluateCardView
+      info={info}
+      project={project}
+      disabled={disabled}
+      allDimensions={allDimensions}
+      selectedDims={selectedDims}
+      actions={{ toggleDim, selectAll, clearAll, handleStart, handleIncremental }}
+    />
   );
 }

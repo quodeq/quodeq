@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import json
 import os
+import random
 import subprocess
 import sys
 import time
@@ -21,6 +22,7 @@ _HEALTH_CHECK_TIMEOUT_S = 0.5
 _HEALTH_POLL_INTERVAL_S = 0.2
 _DEFAULT_WAIT_TIMEOUT_S = 10
 _MAX_HEALTH_POLL_ATTEMPTS = 200
+_MAX_JITTER_DELAY_S = 2.0
 
 _ENV_ACTION_API_PORT = "QUODEQ_ACTION_API_PORT"
 _ENV_ACTION_API_HOST = "QUODEQ_ACTION_API_HOST"
@@ -59,12 +61,11 @@ def action_api_healthy(base_url: str) -> bool:
 
 def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_S) -> None:
     """Block until the action API becomes healthy, or raise TimeoutError."""
-    import random
     log_info(f"Waiting for Action API at {base_url}...")
     start = time.monotonic()
     attempts = 0
     delay = _HEALTH_POLL_INTERVAL_S
-    max_delay = 2.0
+    max_delay = _MAX_JITTER_DELAY_S
     while time.monotonic() - start < timeout_s and attempts < _MAX_HEALTH_POLL_ATTEMPTS:
         if action_api_healthy(base_url):
             return None

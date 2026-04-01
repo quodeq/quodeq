@@ -36,6 +36,7 @@ __all__ = [
     "JobManager",
 ]
 
+# NOTE: logging in inner layer — tracked for middleware extraction
 _logger = logging.getLogger(__name__)
 _REPORT_PATH_MARKER = "Report path:"
 _PROCESS_WAIT_TIMEOUT_S = 30

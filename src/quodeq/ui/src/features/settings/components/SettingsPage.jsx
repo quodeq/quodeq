@@ -1,17 +1,20 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { getHealth, getAiClients } from '../../../api/index.js';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import SettingsAside from './SettingsAside.jsx';
 import AboutSection from './AboutSection.jsx';
 import ModelSection from './ModelSection.jsx';
-import { AI_CMD_STORAGE_KEY } from './ModelSection.jsx';
-import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY } from '../../../constants.js';
+import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY, AI_CMD_STORAGE_KEY } from '../../../constants.js';
 
 const MIN_SUBAGENTS = 1;
 const MAX_SUBAGENTS = 10;
 const MIN_POOL_BUDGET_MINS = 1;
 const MAX_POOL_BUDGET_MINS = 60;
 const DEFAULT_POOL_BUDGET_MINS = 10;
+
+function persistSetting(key, value) {
+  localStorage.setItem(key, String(value));
+}
 
 const MODE_OPTIONS = [
   { value: 'system',   label: 'System' },
@@ -89,7 +92,17 @@ function clampSubagents(value) {
 function persistSubagents(value, setter) {
   const v = clampSubagents(value);
   setter(v);
-  localStorage.setItem(SUBAGENTS_STORAGE_KEY, String(v));
+  persistSetting(SUBAGENTS_STORAGE_KEY, v);
+}
+
+function clampPoolBudget(value) {
+  return Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parseInt(value, 10) || DEFAULT_POOL_BUDGET_MINS));
+}
+
+function persistPoolBudget(value, setter) {
+  const v = clampPoolBudget(value);
+  setter(v);
+  persistSetting(POOL_BUDGET_STORAGE_KEY, v * 60);
 }
 
 function SubagentsRow({ subagents }) {
@@ -130,18 +143,14 @@ function PoolBudgetRow({ subagents }) {
         min={MIN_POOL_BUDGET_MINS}
         max={MAX_POOL_BUDGET_MINS}
         value={poolBudgetMinutes}
-        onChange={(e) => {
-          const v = Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parseInt(e.target.value, 10) || DEFAULT_POOL_BUDGET_MINS));
-          setPoolBudgetMinutes(v);
-          localStorage.setItem(POOL_BUDGET_STORAGE_KEY, String(v * 60));
-        }}
+        onChange={(e) => persistPoolBudget(e.target.value, setPoolBudgetMinutes)}
       />
     </div>
   );
 }
 
 function AnalysisSection({ analysis, subagents }) {
-  const { power, onChange } = analysis;
+  const { power, onChange, onPersist } = analysis;
   return (
     <>
       <div className="settings-row">
@@ -151,7 +160,7 @@ function AnalysisSection({ analysis, subagents }) {
             Controls the AI model used for analysis. Higher power gives more thorough results but takes longer.
           </span>
         </div>
-        <PowerSelector value={power} onChange={onChange} />
+        <PowerSelector value={power} onChange={onChange} onPersist={onPersist} />
       </div>
       <SubagentsRow subagents={subagents} />
       <PoolBudgetRow subagents={subagents} />
@@ -215,12 +224,13 @@ function useSettingsState(aiCmd, onApplyAiCmd) {
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
 
+  // Stable reference so it can be included in the effect dep array without re-running
+  const stableApplyAiCmd = useCallback(onApplyAiCmd, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     setSettingsPhrase(_SETTINGS_PHRASES[Math.floor(Math.random() * _SETTINGS_PHRASES.length)]);
-    if (appVersion === null) {
-      getHealth().then((d) => setAppVersion(d.version || null)).catch((err) => console.warn('Failed to fetch app version:', err));
-    }
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    getHealth().then((d) => setAppVersion(d.version || null)).catch((err) => console.warn('Failed to fetch app version:', err));
+  }, []);
 
   useEffect(() => {
     if (availableClients !== null) return;
@@ -229,15 +239,15 @@ function useSettingsState(aiCmd, onApplyAiCmd) {
         const clients = data.clients || [];
         setAvailableClients(clients);
         if (aiCmd && !clients.some((c) => c.id === aiCmd)) {
-          onApplyAiCmd('');
+          stableApplyAiCmd('');
           localStorage.removeItem(AI_CMD_STORAGE_KEY);
         }
         if (!aiCmd && clients.length > 0) {
-          onApplyAiCmd(clients[0].id);
+          stableApplyAiCmd(clients[0].id);
         }
       })
       .catch(() => setAvailableClients([]));
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [aiCmd, stableApplyAiCmd]);
 
   return { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase };
 }
@@ -245,7 +255,7 @@ function useSettingsState(aiCmd, onApplyAiCmd) {
 export default function SettingsPage({ theme, models, analysis, verification }) {
   const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
   const { aiCmd, onApplyAiCmd } = models;
-  const { power: analysisPower, onPowerChange: onAnalysisPowerChange } = analysis;
+  const { power: analysisPower, onPowerChange: onAnalysisPowerChange, onPersist: onPersistPower } = analysis;
   const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
   const { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase } = useSettingsState(aiCmd, onApplyAiCmd);
 
@@ -270,7 +280,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
               availableClients={availableClients}
             />
             <AnalysisSection
-              analysis={{ power: analysisPower, onChange: onAnalysisPowerChange }}
+              analysis={{ power: analysisPower, onChange: onAnalysisPowerChange, onPersist: onPersistPower }}
               subagents={{ max: maxSubagents, setMax: setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes }}
             />
             <VerificationSection verifyFindings={verifyFindings} onApplyVerifyFindings={onApplyVerifyFindings} />

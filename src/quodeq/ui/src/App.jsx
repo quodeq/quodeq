@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import { buildDailyRuns } from './utils/dailyGrouping.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
@@ -11,6 +11,7 @@ import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
 import HistoryPage from './features/history/components/HistoryPage.jsx';
 import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
+import StandardsPage from './features/standards/StandardsPage.jsx';
 import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -23,24 +24,25 @@ import { useProjectState } from './hooks/useProjectState.js';
 import { useAppSettings } from './hooks/useAppSettings.js';
 import { useEvaluationLifecycle } from './hooks/useEvaluationLifecycle.js';
 import { useProjectActions } from './hooks/useProjectActions.js';
+import { useVisibleRuns } from './hooks/useVisibleRuns.js';
 
 
 function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
   const { connected, setConnected } = serverHealth;
-  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
+  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, persistAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   return (
     <>
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower }}
+        context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower, onPersistPower: persistAnalysisPower }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
       />
     </>
   );
 }
 
-function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
+function SettingsCase({ settings, analysisPower, setAnalysisPower, persistAnalysisPower }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
@@ -51,7 +53,7 @@ function SettingsCase({ settings, analysisPower, setAnalysisPower }) {
         balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
         thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
       }}
-      analysis={{ power: analysisPower, onPowerChange: setAnalysisPower }}
+      analysis={{ power: analysisPower, onPowerChange: setAnalysisPower, onPersist: persistAnalysisPower }}
       verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
     />
   );
@@ -88,7 +90,7 @@ const ROUTE_RENDERERS = {
       <HistoryPage
         trend={trend}
         selection={{
-          selectedRunId: resolveHistorySelectedRunId(props.dashboardData.selectedRun, trend),
+          selectedRunId: resolveHistorySelectedRunId(props.navigation.historySelectedRun, trend),
           selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
         }}
         availableRuns={runs}
@@ -98,10 +100,9 @@ const ROUTE_RENDERERS = {
         }}
         callbacks={{
           onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
-          onBarClick: props.navigation.handleRunSelect,
           onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel }),
           onNavigate: props.navigation.handleNavigate,
-          onRunChange: props.navigation.handleRunSelect,
+          onRunChange: props.navigation.setHistorySelectedRun,
         }}
       />
     );
@@ -113,13 +114,14 @@ const ROUTE_RENDERERS = {
   principle: (params) => <PrincipleDetailPage principle={params.principle} />,
   evalprinciple: (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
   'eval-principle-detail': (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
-  settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} />,
+  settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} persistAnalysisPower={props.evaluation.persistAnalysisPower} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
+  standards: () => <StandardsPage />,
 };
 
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  const noProjectTabs = ['evaluate', 'settings'];
+  const noProjectTabs = ['evaluate', 'standards', 'settings'];
   if (!noProjectTabs.includes(page)) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
@@ -132,29 +134,34 @@ function MainContent({ activePage, props }) {
   return null;
 }
 
-function computeHeaderMeta(accumulated, dashboard, selectedProject, projects) {
+function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
+  // Header meta
   const accDims = accumulated?.dimensions || [];
-  if (accDims.length === 0) return null;
-  const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
-  const repository = accDims.find((d) => d.repository)?.repository ?? null;
-  const runDims = dashboard?.dimensions || [];
-  const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
-  const project = projects.find((p) => p.id === selectedProject);
-  const languageStats = project?.languageStats ?? null;
-  return { discipline, repository, totalFiles, languageStats };
-}
+  let headerMeta = null;
+  if (accDims.length > 0) {
+    const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
+    const repository = accDims.find((d) => d.repository)?.repository ?? null;
+    const runDims = dashboard?.dimensions || [];
+    const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
+    const project = projects.find((p) => p.id === selectedProject);
+    const languageStats = project?.languageStats ?? null;
+    headerMeta = { discipline, repository, totalFiles, languageStats };
+  }
 
-function computeProjectDisplay(selectedProject, projects) {
-  if (!selectedProject || !projects.length) return { selectedDisplayName: selectedProject, selectedProjectParent: null, selectedProjectParentId: null };
-  const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
-  const parentRef = data?.parent || null;
-  const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
-  const parentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
-  return {
-    selectedDisplayName: data?.displayName || data?.name || selectedProject,
-    selectedProjectParent: parentData?.displayName || parentData?.name || parentRef,
-    selectedProjectParentId: parentId,
-  };
+  // Project display
+  let selectedDisplayName = selectedProject;
+  let selectedProjectParent = null;
+  let selectedProjectParentId = null;
+  if (selectedProject && projects.length) {
+    const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
+    const parentRef = data?.parent || null;
+    const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
+    selectedDisplayName = data?.displayName || data?.name || selectedProject;
+    selectedProjectParent = parentData?.displayName || parentData?.name || parentRef;
+    selectedProjectParentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
+  }
+
+  return { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId };
 }
 
 function AppShell({ sidebar, header, breadcrumb, content }) {
@@ -186,39 +193,45 @@ function useAppNavigation() {
   const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
   const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
   const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
-  function handleNavigate(page, params = {}) { if ((page === 'run' || page === 'history-run') && params.runId) setSelectedRun(params.runId); navPush({ page, ...params }); }
-  return { serverConnected, setServerConnected, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange };
+  const [historySelectedRun, setHistorySelectedRun] = useState('latest');
+  function handleNavigate(page, params = {}) {
+    if (page === 'run' && params.runId) setSelectedRun(params.runId);
+    if (page === 'history-run' && params.runId) setHistorySelectedRun(params.runId);
+    navPush({ page, ...params });
+  }
+  return { serverConnected, setServerConnected, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun };
 }
 
 function useAppState() {
   const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange } = nav;
+  const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
   const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
   const settings = useAppSettings();
-  const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun });
-  const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
-  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: dailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
-  const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
-    const meta = computeHeaderMeta(accumulated, dashboard, selectedProject, projects);
-    const display = computeProjectDisplay(selectedProject, projects);
-    return { headerMeta: meta, ...display };
-  }, [accumulated, dashboard, selectedProject, projects]);
+  const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
+  const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun: effectiveRun });
+  const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
+    dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
+    ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
+  }), [availableRuns, dashboard, accumulated, selectedProject, projects]);
+  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
+  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
-  const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'settings'];
+  const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
   const activeTab = knownTabs.includes(activePage.page) ? activePage.page
     : activePage.sourceTab && knownTabs.includes(activePage.sourceTab) ? activePage.sourceTab
     : activePage.page === 'history-run' ? 'history'
     : 'overview';
   const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
-  const showRunNav = showProjectHeader && dailyRuns.length > 0 && navStack.length === 1;
+  const showRunNav = showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 
   return {
     serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
     projects, selectedProject, selectedRun, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
-    dashboard, accumulated, latestAccumulated, loading, error, availableRuns, dailyRuns, overviewRunIndex,
+    dashboard, accumulated, latestAccumulated, loading, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
     headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
+    historySelectedRun, setHistorySelectedRun,
     evalLifecycle, settings, activeTab, showProjectHeader, showRunNav,
   };
 }
@@ -253,6 +266,7 @@ export default function App() {
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
       handleProjectChange: state.handleProjectChange, navTab,
       handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
+      historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,
     },
     evaluation: state.evalLifecycle,

@@ -10,7 +10,7 @@ from typing import Any, Callable
 
 from quodeq.core.types import DimensionResult, DimensionSummary, to_camel_dict
 
-from quodeq.adapters.fs.report_parser import (
+from quodeq.services.ports import (
     RunInfo,
     calculate_trend,
     list_runs,
@@ -168,7 +168,7 @@ def _resolve_selected_run(runs: list[RunInfo], run: str) -> tuple[RunInfo, int]:
     """
     selected_run = runs[0] if run == _LATEST_RUN else next((item for item in runs if item.run_id == run), None)
     if not selected_run:
-        raise FileNotFoundError(f"Run not found: {run}")
+        raise FileNotFoundError("Run not found")
     selected_index = next((idx for idx, item in enumerate(runs) if item.run_id == selected_run.run_id), None)
     if selected_index is None:
         raise RuntimeError(f"Run {selected_run.run_id!r} disappeared from the run list unexpectedly.")

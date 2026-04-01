@@ -5,7 +5,6 @@ Merge per-dimension Evidence into a single Evidence object.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +12,11 @@ from quodeq.analysis._dimensions import (
     DimensionEntry as DimensionEntry,
     DimensionsConfig as DimensionsConfig,
     load_universal_dimensions as load_universal_dimensions,
+)
+from quodeq.analysis._types import (  # noqa: F401 — re-export
+    AnalysisOptions as AnalysisOptions,
+    RunConfig as RunConfig,
+    _AnalysisContext as _AnalysisContext,
 )
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
 from quodeq.analysis.subprocess import AnalysisConfig, HeartbeatCallback, count_files_from_stream, run_analysis
@@ -26,54 +30,6 @@ from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 from quodeq.analysis.subagents.runner import DimensionCallbacks, process_dimension_with_subagents
 from quodeq.shared.logging import log_info, log_success, log_warning
 from quodeq.shared.validation import validate_path_segment
-
-
-@dataclass
-class AnalysisOptions:
-    """Optional runtime settings for an evaluation run."""
-    analysis_budget: str | None = None
-    heartbeat_callback: HeartbeatCallback | None = None
-    template_path: Path | None = None
-    dimensions: list[str] | None = None
-    max_turns: int | None = None
-    max_duration: int | None = None
-    max_subagents: int = 1
-    subagent_model: str | None = None
-    verify_findings: bool = True
-    consolidated: bool = True
-    pool_budget: int | None = None
-    incremental: bool = False
-    incremental_file_filter: set[str] | None = None
-
-
-@dataclass
-class RunConfig:
-    """Configuration for a single evaluation run."""
-    src: Path
-    language: str
-    standards_dir: Path | None = None
-    work_dir: Path | None = None
-    options: AnalysisOptions = field(default_factory=AnalysisOptions)
-    manifest: SourceManifest | None = None
-    dimensions_data: DimensionsConfig | None = None
-    target: AnalysisTarget | None = None
-
-    @property
-    def source_file_count(self) -> int:
-        """Derive source file count from the target or manifest."""
-        if self.target:
-            return self.target.total_files
-        return self.manifest.total_files if self.manifest else 0
-
-
-@dataclass(frozen=True)
-class _AnalysisContext:
-    """Pre-loaded data reused across dimensions."""
-    dimensions_data: DimensionsConfig
-    date_str: str
-    template: str
-    subagent_template: str
-    total: int
 
 
 def _build_dimension_prompt(
@@ -90,6 +46,7 @@ def _build_dimension_prompt(
             source_file_count=config.source_file_count,
             dimensions_data=ctx.dimensions_data,
             standards_dir=config.standards_dir,
+            evaluators_dir=config.evaluators_dir,
             manifest=config.manifest,
             target=config.target,
             work_dir=config.work_dir or config.src,
@@ -173,6 +130,7 @@ def _parse_dimension_evidence(
             module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
     )
 
 

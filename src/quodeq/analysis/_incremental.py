@@ -4,21 +4,18 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 from quodeq.analysis._backfill import (
     BackfillContext, extract_files_from_jsonl, run_backfill_phase,
 )
 from quodeq.analysis.fingerprint import build_fingerprint, find_previous_fingerprint, save_fingerprint
 from quodeq.analysis.incremental import classify_files, carry_forward_findings
+from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.subagents.runner import _list_source_files
 from copy import copy
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.shared.logging import log_debug, log_info, log_warning
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig, _AnalysisContext
 
 # Re-export for backward compatibility
 _extract_files_from_jsonl = extract_files_from_jsonl
@@ -32,17 +29,42 @@ class IncrementalCoverage:
     files_read: int
 
 
+def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[str]:
+    """Load evaluator IDs from JSON files in *evaluators_dir* not already in *dims_data*."""
+    import json as _json
+    result = list(dims_data)
+    for _p in evaluators_dir.glob("*.json"):
+        try:
+            _eid = _json.loads(_p.read_text()).get("id")
+            if _eid and _eid not in result:
+                result.append(_eid)
+        except (OSError, ValueError, KeyError):
+            pass
+    return result
+
+
 def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisContext"]:
     """Load dimensions data and resolve which dimensions to analyze."""
     from datetime import datetime, timezone
     from quodeq.analysis.prompts.builder import load_template
-    from quodeq.analysis.runner import _AnalysisContext
 
     dims_data = config.dimensions_data
     if dims_data is None:
         raise ValueError("RunConfig.dimensions_data is required")
 
     all_dims_raw = [d.get("id") for d in dims_data.get("applies", []) if d.get("id")]
+
+    # Include custom evaluators from evaluators directory (only when dimensions are explicitly requested)
+    if config.options.dimensions:
+        _evaluators_dir = getattr(config, 'evaluators_dir', None)
+        if _evaluators_dir is None:
+            from quodeq.config.paths import default_paths
+            _evaluators_dir = default_paths().evaluators_dir
+    else:
+        _evaluators_dir = None
+    if _evaluators_dir and _evaluators_dir.is_dir():
+        all_dims_raw = _load_custom_dimensions(_evaluators_dir, all_dims_raw)
+
     if config.options.dimensions:
         all_dims_set = set(all_dims_raw)
         unknown = [d for d in config.options.dimensions if d not in all_dims_set]
@@ -101,6 +123,7 @@ def _parse_evidence_from_jsonl(
     jsonl_file: Path, files_read: int,
 ) -> Evidence | None:
     """Parse a JSONL file into Evidence."""
+    # File existence check is necessary — evidence may not exist yet for new dimensions.
     if not jsonl_file.exists() or jsonl_file.stat().st_size == 0:
         return None
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
@@ -112,6 +135,7 @@ def _parse_evidence_from_jsonl(
             files_read=files_read, module=config.target.name if config.target else "",
         ),
         compiled_dir=compiled_dir,
+        evaluators_dir=config.evaluators_dir,
     )
 
 

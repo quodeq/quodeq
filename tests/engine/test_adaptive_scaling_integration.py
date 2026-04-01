@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.engine.file_queue import FileQueue
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
 
@@ -17,7 +17,6 @@ def _counting_run_analysis(call_log):
         stream_file.write_text("")
         call_log.append(config.agent_id)
         if config.queue_path:
-            from quodeq.engine.file_queue import FileQueue
             queue = FileQueue(config.queue_path)
             queue.take(queue.remaining(), agent_id=config.agent_id)
         if config.jsonl_file:

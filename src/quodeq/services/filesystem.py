@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import shutil
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Callable
 
@@ -19,7 +20,7 @@ from quodeq.config.paths import default_paths
 from quodeq.core.types import ProjectEntry, ViolationResponse, ViolationSummary, to_camel_dict
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import build_dashboard
-from quodeq.adapters.fs.report_parser import (
+from quodeq.services.ports import (
     list_runs,
     safe_read_dir,
 )
@@ -76,7 +77,6 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
                 return None
             return _build_project_entry(reports_root, name, runs)
 
-        from concurrent.futures import ThreadPoolExecutor
         with ThreadPoolExecutor(max_workers=min(8, len(dir_names) or 1)) as pool:
             results = pool.map(_build_one, dir_names)
         projects = [p for p in results if p is not None]
@@ -162,7 +162,8 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         if not base.is_relative_to(Path(reports_dir).resolve()):
             return None
         compiled_dir = self._compiled_dir or default_paths().standards_dir / "compiled"
-        result = resolve_dimension_eval(base, project, run_id, dimension, compiled_dir=compiled_dir if compiled_dir.exists() else None)
+        from quodeq.services.violations import _ResolveOptions
+        result = resolve_dimension_eval(base, project, run_id, dimension, options=_ResolveOptions(compiled_dir=compiled_dir if compiled_dir.exists() else None))
         if result is not None:
             return to_camel_dict(result) if isinstance(result, ViolationResponse) else result
         # Run exists but dimension hasn't started yet

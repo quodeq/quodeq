@@ -13,12 +13,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
-from quodeq.cli_parser import build_parser as build_parser  # re-export
+from quodeq.cli_parser import build_parser  # noqa: F401 — re-export
 from quodeq.config.paths import default_paths, load_env_file
 from quodeq.dashboard.cli import main as dashboard_main
 from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
-from quodeq.core.scoring.report import run_full
+from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import cleanup_cloned_repo, prepare_repository
 from quodeq.shared.utils import is_repo_url, project_name_from_repo, write_text
@@ -187,6 +187,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
         work_dir=evidence_dir,
         manifest=inputs.manifest,
         dimensions_data=inputs.dims_data,
+        evaluators_dir=default_paths().evaluators_dir,
         options=AnalysisOptions(
             dimensions=dimensions_filter,
             max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None, env=env),

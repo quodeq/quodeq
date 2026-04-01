@@ -1,6 +1,8 @@
 """Violation resolution and aggregation for the filesystem action provider."""
 from __future__ import annotations
 
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
@@ -24,18 +26,34 @@ def _max_violation_files(override: int | None = None, env: dict[str, str] | None
     return _env_int("QUODEQ_MAX_VIOLATION_FILES", _DEFAULT_MAX_VIOLATION_FILES, env=env)
 
 
+@dataclass(frozen=True)
+class _ResolveOptions:
+    """Injectable options for resolve_dimension_eval: filesystem callbacks and paths."""
+    exists_fn: Callable[[Path], bool] = Path.exists
+    stat_fn: Callable[[Path], Any] = Path.stat
+    compiled_dir: Path | None = None
+
+
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
-    compiled_dir: Path | None = None,
+    options: _ResolveOptions | None = None,
 ) -> ViolationResponse | dict[str, Any] | None:
-    """Try successive file formats to load evaluation data for a dimension."""
+    """Try successive file formats to load evaluation data for a dimension.
+
+    *options* bundles injectable filesystem callbacks and the compiled
+    standards directory for testing without a real FS.
+    """
+    opts = options or _ResolveOptions()
+    _exists = opts.exists_fn
+    _stat = opts.stat_fn
+    compiled_dir = opts.compiled_dir
 
     eval_path = base / "evaluation" / f"{dimension}.json"
-    if eval_path.exists():
+    if _exists(eval_path):
         return parse_eval_from_json(eval_path, project, run_id, dimension)
 
     markdown_path = base / "evaluation" / f"{dimension}_eval.md"
-    if markdown_path.exists():
+    if _exists(markdown_path):
         try:
             content = read_text(markdown_path)
         except OSError:
@@ -45,15 +63,15 @@ def resolve_dimension_eval(
     ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
 
     evidence_path = base / "evidence" / f"{dimension}_evidence.json"
-    if evidence_path.exists():
+    if _exists(evidence_path):
         return parse_violations_from_evidence(evidence_path, ctx)
 
     jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
     stream_path = base / "evidence" / f"{dimension}_live.stream"
-    if jsonl_path.exists() and jsonl_path.stat().st_size > 0:
+    if _exists(jsonl_path) and _stat(jsonl_path).st_size > 0:
         return parse_violations_from_jsonl(jsonl_path, stream_path, ctx, compiled_dir=compiled_dir)
 
-    if stream_path.exists():
+    if _exists(stream_path):
         return parse_violations_from_stream(stream_path, ctx)
 
     return None

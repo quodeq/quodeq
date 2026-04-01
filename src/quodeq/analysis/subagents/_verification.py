@@ -2,12 +2,10 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from quodeq.analysis._types import RunConfig
 from quodeq.shared.logging import log_info, log_success
-
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig
 
 
 def _run_verification_pool(
@@ -15,7 +13,7 @@ def _run_verification_pool(
     files_to_verify: list[str], manifest_path: Path,
 ) -> list[Any]:
     """Launch a fast verification pool to re-check previous findings."""
-    from quodeq.analysis.subagents._verify_pool import run_verification_pool
+    from quodeq.analysis.subagents._verify_pool import run_verification_pool  # deferred to avoid circular import
     return run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
 
 
@@ -23,7 +21,7 @@ def _load_and_filter_previous(
     config: RunConfig, dim_id: str, evidence_dir: Path,
 ) -> list[dict]:
     """Load previous findings and apply incremental file filter if active."""
-    from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension
+    from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension  # deferred to avoid circular import
 
     prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)
     if not prev_findings:
@@ -38,7 +36,7 @@ def _dispatch_verification_pool(
     config: RunConfig, dim_id: str, evidence_dir: Path, needs_verify: list[dict],
 ) -> list:
     """Write manifest and launch the AI verification pool for changed-file findings."""
-    from quodeq.analysis.subagents.verify import _group_by_file, _write_verify_manifest
+    from quodeq.analysis.subagents.verify import _group_by_file, _write_verify_manifest  # deferred to avoid circular import
 
     grouped = _group_by_file(needs_verify)
     manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
@@ -60,7 +58,7 @@ def _run_verification_step(
     their findings are carried forward directly to the evidence JSONL.
     Only changed-file findings are sent to the AI verification pool.
     """
-    from quodeq.analysis.subagents.verify import (
+    from quodeq.analysis.subagents.verify import (  # deferred to avoid circular import
         partition_findings_by_fingerprint, write_carry_forward_findings,
     )
 
@@ -69,7 +67,7 @@ def _run_verification_step(
         return []
 
     if prev_fingerprint is None:
-        from quodeq.analysis.fingerprint import find_previous_fingerprint
+        from quodeq.analysis.fingerprint import find_previous_fingerprint  # deferred to avoid circular import
         prev_fingerprint, _ = find_previous_fingerprint(evidence_dir, dim_id)
         if prev_fingerprint is None:
             log_info(f"  [{dim_id}] No previous fingerprint — all findings need verification")

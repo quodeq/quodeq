@@ -1,11 +1,13 @@
 """Consolidated multi-dimension analysis — extracted from subagents/runner.py."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
+from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig
-from quodeq.services.base import _DEFAULT_POOL_BUDGET
+from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
@@ -13,17 +15,22 @@ from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_pr
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.shared.logging import log_info, log_warning
 
-if TYPE_CHECKING:
-    from quodeq.analysis.runner import RunConfig
+
+@dataclass(frozen=True)
+class _ConsolidatedPaths:
+    """Paths for consolidated evidence collection."""
+    evidence_dir: Path
+    compiled_dir: "Path | None" = None
 
 
 def _build_consolidated_config(
     config: "RunConfig", dimensions: list[str], files_per_agent: int,
+    compiled_dir: "Path | None" = None,
 ) -> AnalysisConfig:
     """Build AnalysisConfig for consolidated mode."""
+    # Deferred import: breaks circular dependency between _consolidated and runner.
     from quodeq.analysis.subagents.runner import _default_subagent_model
 
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     subagent_model = config.options.subagent_model or _default_subagent_model()
     pool_budget_val = config.options.pool_budget
     return AnalysisConfig(
@@ -40,13 +47,13 @@ def _build_consolidated_config(
 
 def _collect_consolidated_results(
     config: "RunConfig", dimensions: list[str], ctx: Any,
-    results: list[Any], evidence_dir: Path,
+    results: list[Any], paths: _ConsolidatedPaths,
 ) -> dict[str, Evidence]:
     """Deduplicate and parse consolidated results into per-dimension Evidence."""
     from quodeq.analysis.stream.counters import count_files_in_stream
     from quodeq.engine._runner_markers import cleanup_stream
 
-    merged_jsonl = evidence_dir / "consolidated_evidence.jsonl"
+    merged_jsonl = paths.evidence_dir / "consolidated_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
     total_files_read = 0
@@ -64,8 +71,10 @@ def _collect_consolidated_results(
         module=config.target.name if config.target else "",
     )
 
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    return parse_jsonl_to_evidence_by_dimension(merged_jsonl, ev_ctx, compiled_dir=compiled_dir)
+    return parse_jsonl_to_evidence_by_dimension(
+        merged_jsonl, ev_ctx, compiled_dir=paths.compiled_dir,
+        evaluators_dir=config.evaluators_dir,
+    )
 
 
 def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
@@ -80,6 +89,7 @@ def _build_prompt(config: "RunConfig", dimensions: list[str], ctx: Any) -> str:
             source_file_count=config.source_file_count,
             dimensions_data=ctx.dimensions_data,
             standards_dir=config.standards_dir,
+            evaluators_dir=config.evaluators_dir,
             manifest=config.manifest,
             target=config.target,
             work_dir=config.work_dir or config.src,
@@ -93,6 +103,7 @@ def process_consolidated_dimensions(
     """Run all dimensions in a single pass -- files read once, not per dimension."""
     from quodeq.analysis.subagents.runner import _list_source_files, _compute_files_per_agent
 
+    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     evidence_dir = config.work_dir or config.src
 
     # 1. List source files
@@ -109,7 +120,7 @@ def process_consolidated_dimensions(
     log_info(f"Consolidated analysis: {len(files)} files, {len(dimensions)} dimensions, max {config.options.max_subagents} agents")
 
     # 3. Build config and launch pool
-    base_ac = _build_consolidated_config(config, dimensions, files_per_agent)
+    base_ac = _build_consolidated_config(config, dimensions, files_per_agent, compiled_dir=compiled_dir)
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
         options=PoolOptions(
@@ -122,4 +133,4 @@ def process_consolidated_dimensions(
     results = pool.run()
 
     # 4. Collect and return per-dimension evidence
-    return _collect_consolidated_results(config, dimensions, ctx, results, evidence_dir)
+    return _collect_consolidated_results(config, dimensions, ctx, results, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir))

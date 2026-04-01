@@ -18,9 +18,8 @@ def test_principle_evidence_compute_metrics():
         dimension="security",
         severity="high",
     )
-    pe.violations = [{"file": "a.ts", "line": 1}]
-    pe.compliance = [{"file": "b.ts", "line": 2}, {"file": "c.ts", "line": 3}]
-    pe.compute_metrics()
+    pe.add_violations([{"file": "a.ts", "line": 1}])
+    pe.add_compliance([{"file": "b.ts", "line": 2}, {"file": "c.ts", "line": 3}])
 
     assert pe.metrics["total_instances"] == 3
     assert pe.metrics["compliant"] == 2
@@ -37,8 +36,7 @@ def test_principle_evidence_unbalanced():
         dimension="security",
         severity="high",
     )
-    pe.violations = [{"file": "a.ts"} for _ in range(5)]
-    pe.compute_metrics()
+    pe.add_violations([{"file": "a.ts"} for _ in range(5)])
     assert pe.metrics["is_balanced"] is False
 
 

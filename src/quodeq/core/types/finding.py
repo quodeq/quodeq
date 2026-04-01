@@ -29,6 +29,7 @@ class Finding:
     principle: str | None = None
     file: str | None = None
     line: int | str | None = None
+    end_line: int | str | None = None
     title: str | None = None
     reason: str | None = None
     snippet: str | None = None
@@ -36,5 +37,7 @@ class Finding:
     cwe: int | str | None = None
     req: str | None = None
     req_refs: list[ReqRef] = field(default_factory=list)
+    context: str | None = None
     dimension: str | None = None
     violation_type: str | None = None
+    scope: str | None = None

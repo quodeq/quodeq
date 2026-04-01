@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 
 from quodeq.analysis.manifest import AnalysisTarget, SourceManifest
-from quodeq.core.scoring.report import run_full
+from quodeq.engine.scoring_pipeline import run_full
 from quodeq.analysis.runner import run, RunConfig, EvaluationError
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence

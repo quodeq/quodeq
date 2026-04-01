@@ -9,6 +9,7 @@ from pathlib import Path
 
 # Re-export for backward compatibility (callers import from manifest)
 from quodeq.analysis._detection import detect_language, list_source_files  # noqa: F401
+from quodeq.analysis.manifest_render import render_target_prompt_context  # noqa: F401
 
 _logger = logging.getLogger(__name__)
 
@@ -27,6 +28,12 @@ class AnalysisTarget:
     total_files: int = 0
     language_stats: dict[str, int] = field(default_factory=dict)
 
+    def __post_init__(self) -> None:
+        if not self.name:
+            raise ValueError("AnalysisTarget requires a name")
+        if not self.language:
+            raise ValueError("AnalysisTarget requires a language")
+
     @property
     def project_description(self) -> str:
         """E.g. 'Kotlin mobile using Flutter'."""
@@ -38,24 +45,11 @@ class AnalysisTarget:
         return " ".join(parts)
 
     def to_prompt_context(self, repo_total_files: int = 0, other_targets: list[AnalysisTarget] | None = None) -> str:
-        """Render target as context for inclusion in analysis prompts."""
-        lines = [
-            f"**Project type:** {self.project_description}",
-            f"**Source files:** {self.total_files}"
-            + (f" (of {repo_total_files} total in repo)" if repo_total_files > self.total_files else ""),
-        ]
-        if other_targets:
-            others = ", ".join(
-                f"{t.project_description} ({t.total_files} files)" for t in other_targets
-            )
-            lines.append(f"**Other modules:** {others}")
-        if self.language_stats:
-            breakdown = ", ".join(
-                f"{ext}: {count}" for ext, count in
-                sorted(self.language_stats.items(), key=lambda x: -x[1])[:8]
-            )
-            lines.append(f"**Extension breakdown:** {breakdown}")
-        return "\n".join(lines)
+        """Render target as context for inclusion in analysis prompts.
+
+        Delegates to :func:`render_target_prompt_context`.
+        """
+        return render_target_prompt_context(self, repo_total_files, other_targets)
 
     def to_dict(self) -> dict:
         """Serialize for JSON debugging output."""
@@ -78,6 +72,11 @@ class SourceManifest:
     targets: list[AnalysisTarget] = field(default_factory=list)
     total_files: int = 0
     language_stats: dict[str, int] = field(default_factory=dict)
+
+    def add_target(self, target: AnalysisTarget) -> None:
+        """Add an analysis target to this manifest."""
+        self.targets.append(target)
+        self.total_files = sum(t.total_files for t in self.targets)
 
     # --- backward-compat properties (delegate to primary target) ---
 
@@ -282,3 +281,7 @@ def build_manifest(
         total_files=all_source_files_count,
         language_stats=dict(ext_counts),
     )
+
+
+
+# render_target_prompt_context is imported from manifest_render above

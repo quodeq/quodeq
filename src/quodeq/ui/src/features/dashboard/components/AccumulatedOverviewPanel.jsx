@@ -8,19 +8,22 @@ import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGroupin
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
+import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
 
 // ---------------------------------------------------------------------------
 // Accumulated overview panel helpers
 // ---------------------------------------------------------------------------
 
-function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend) {
+function computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend, selectedRunId) {
   const curr = parseFloat(accumulated?.summary?.numericAverage);
-  // Derive delta from trend data (same source as the bar chart)
+  // Derive delta from the selected run vs its predecessor in the trend
   let scoreDelta = null;
   if (dailyTrend && dailyTrend.length >= 2) {
-    const latest = parseFloat(dailyTrend[0]?.numericAverage);
-    const previous = parseFloat(dailyTrend[1]?.numericAverage);
-    if (!isNaN(latest) && !isNaN(previous)) scoreDelta = (latest - previous).toFixed(1);
+    const selectedIdx = selectedRunId ? dailyTrend.findIndex((t) => t.runId === selectedRunId) : 0;
+    const idx = selectedIdx >= 0 ? selectedIdx : 0;
+    const current = parseFloat(dailyTrend[idx]?.numericAverage);
+    const previous = idx + 1 < dailyTrend.length ? parseFloat(dailyTrend[idx + 1]?.numericAverage) : NaN;
+    if (!isNaN(current) && !isNaN(previous)) scoreDelta = (current - previous).toFixed(1);
   }
   if (scoreDelta === null) {
     const prev = parseFloat(accumulated?.summary?.previousNumericAverage);
@@ -134,24 +137,74 @@ function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimens
 }
 
 // ---------------------------------------------------------------------------
+// Pure computation helpers extracted from the component
+// ---------------------------------------------------------------------------
+
+function buildFilteredTrend(trend, dailyTrend, visibleSet) {
+  const accByDim = {};
+  const accByDate = new Map(); // date string → accAvg
+  const visibleDates = new Set();
+  const rawReversed = [...trend].reverse(); // oldest first
+  for (const entry of rawReversed) {
+    let hasVisible = false;
+    for (const d of (entry.dimensionDetails || [])) {
+      const dimId = (d.dimension || '').toLowerCase();
+      if (visibleSet.has(dimId) && d.score != null) {
+        accByDim[dimId] = d.score;
+        hasVisible = true;
+      }
+    }
+    if (hasVisible) {
+      const accScores = Object.values(accByDim).filter((s) => s != null);
+      const accAvg = accScores.length > 0 ? Math.round((accScores.reduce((a, b) => a + b, 0) / accScores.length) * 10) / 10 : null;
+      const datePart = (entry.dateISO || '').slice(0, 10);
+      accByDate.set(datePart, accAvg);
+      visibleDates.add(datePart);
+    }
+  }
+  // Match daily entries by date, only include days with visible evaluations
+  return dailyTrend
+    .filter((entry) => visibleDates.has((entry.dateISO || '').slice(0, 10)))
+    .map((entry) => {
+      const datePart = (entry.dateISO || '').slice(0, 10);
+      const accAvg = accByDate.get(datePart) ?? null;
+      const details = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
+      const runScores = details.map((d) => d.score).filter((s) => s != null);
+      const runAvg = runScores.length > 0 ? Math.round((runScores.reduce((a, b) => a + b, 0) / runScores.length) * 10) / 10 : null;
+      const dims = (entry.dimensions || []).filter((d) => visibleSet.has(d.toLowerCase()));
+      return { ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: details, dimensions: dims, dimensionsCount: dims.length };
+    });
+}
+
+function buildFilteredAccumulated(accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun) {
+  if (!accumulated) return accumulated;
+  const scores = filteredDimensions.map((d) => parseFloat(d.overallScore)).filter((s) => !isNaN(s));
+  const numericAverage = scores.length > 0
+    ? Math.round((scores.reduce((a, b) => a + b, 0) / scores.length) * 10) / 10
+    : null;
+  const selectedIdx = currentOverviewRun ? filteredDailyTrend.findIndex((t) => t.runId === currentOverviewRun) : 0;
+  const prevIdx = (selectedIdx >= 0 ? selectedIdx : 0) + 1;
+  const prevAvg = prevIdx < filteredDailyTrend.length ? parseFloat(filteredDailyTrend[prevIdx]?.numericAverage) : null;
+  const { totalViolations, totalCompliance, severity } = computeSummaryFromDimensions(filteredDimensions);
+  return {
+    ...accumulated,
+    summary: { ...accumulated.summary, numericAverage, previousNumericAverage: prevAvg, totalViolations, totalCompliance, severity },
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Accumulated overview panel
 // ---------------------------------------------------------------------------
 
-export default function AccumulatedOverviewPanel({ data, callbacks }) {
+function useAccumulatedComputations(data) {
   const { accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex, trend, selectedRunId } = data;
   const dayRuns = dailyRuns || availableRuns;
-  const { onRunClick, onDimensionClick } = callbacks;
-
   const dailyTrend = useMemo(() => collapseByDay(trend), [trend]);
 
-  // Find which daily entry matches the current selection
-  // selectedRunId may be any runId — find the day it belongs to
   const effectiveSelectedId = useMemo(() => {
     if (!selectedRunId || !trend.length) return dailyTrend[0]?.runId || null;
-    // Check if selectedRunId is directly a daily entry
     const direct = dailyTrend.find((t) => t.runId === selectedRunId);
     if (direct) return direct.runId;
-    // Find which raw trend entry matches, then find its day
     const rawEntry = trend.find((t) => t.runId === selectedRunId);
     if (rawEntry) {
       const datePart = (rawEntry.dateISO || '').slice(0, 10);
@@ -163,38 +216,45 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
 
   const currentOverviewRun = effectiveSelectedId || dayRuns[overviewRunIndex]?.runId || 'latest';
   const referenceRun = overviewRunIndex === 0 ? dayRuns[0]?.runId : currentOverviewRun;
-
   const selectedDayDimNames = useMemo(
     () => collectDayDimensions(trend, currentOverviewRun) || collectDayDimensions(trend, selectedRunId),
     [trend, currentOverviewRun, selectedRunId]
   );
 
-  const stats = useMemo(
-    () => computeAccumulatedStats(accumulated, accumulatedDimensions, dailyTrend),
-    [accumulated, accumulatedDimensions, dailyTrend]
-  );
+  const visibleIds = useMemo(() => readVisibleStandardIds(), [accumulatedDimensions]);
+  const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
+  const filteredDailyTrend = useMemo(() => buildFilteredTrend(trend, dailyTrend, visibleSet), [trend, dailyTrend, visibleSet]);
+  const filteredDimensions = useMemo(() => accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase())), [accumulatedDimensions, visibleIds]);
+  const filteredAccumulated = useMemo(() => buildFilteredAccumulated(accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun), [accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]);
+  const filteredStats = useMemo(() => computeAccumulatedStats(filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun), [filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]);
+
+  return { currentOverviewRun, referenceRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats };
+}
+
+export default function AccumulatedOverviewPanel({ data, callbacks }) {
+  const { onRunClick, onDimensionClick } = callbacks;
+  const { currentOverviewRun, referenceRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
 
   return (
     <>
       <AccumulatedHeroSection
-        accumulated={accumulated}
-        scoreDelta={stats.scoreDelta}
-        lastDate={stats.lastRun.date}
+        accumulated={filteredAccumulated}
+        scoreDelta={filteredStats.scoreDelta}
+        lastDate={filteredStats.lastRun.date}
       />
 
       <div className="history-panels-row">
-        <RunHistoryPanel trend={dailyTrend} selectedRunId={currentOverviewRun} selectedRunScore={accumulated?.summary?.numericAverage} onBarClick={onRunClick} />
-        <DimensionScorePanel dimensions={accumulatedDimensions} onBarClick={onDimensionClick} runDate={stats.lastRun.date} runId={stats.lastRun.runId} />
+        <RunHistoryPanel trend={filteredDailyTrend} selectedRunId={currentOverviewRun} onBarClick={onRunClick} />
+        <DimensionScorePanel dimensions={filteredDimensions} onBarClick={onDimensionClick} runDate={filteredStats.lastRun.date} runId={filteredStats.lastRun.runId} />
       </div>
 
       <AccumulatedDimensionsSection
-        sortedDimensions={stats.sorted}
+        sortedDimensions={filteredStats.sorted}
         referenceRun={referenceRun}
         onDimensionClick={onDimensionClick}
-        dimensionsWithViolations={stats.dimsWithViolations}
+        dimensionsWithViolations={filteredStats.dimsWithViolations}
         selectedDayDimNames={selectedDayDimNames}
       />
-
     </>
   );
 }
