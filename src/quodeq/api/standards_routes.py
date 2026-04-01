@@ -69,8 +69,8 @@ def _register_read_routes(app: Flask) -> None:
         return jsonify(to_camel_dict(detail))
 
 
-def _register_write_routes(app: Flask) -> None:
-    """Register POST/PUT/DELETE routes for the standards API."""
+def _register_import_routes(app: Flask) -> None:
+    """Register import and library routes for the standards API."""
 
     @app.post("/api/standards/library/import")
     def import_from_library() -> tuple[Response, int]:
@@ -117,6 +117,10 @@ def _register_write_routes(app: Flask) -> None:
             "detail": to_camel_dict(result["detail"]),
             "warnings": result["warnings"],
         }), 201
+
+
+def _register_standard_crud_routes(app: Flask) -> None:
+    """Register create, update, delete, and duplicate routes for standards."""
 
     @app.post("/api/standards")
     def create_standard() -> tuple[Response, int]:
@@ -171,4 +175,5 @@ def _register_write_routes(app: Flask) -> None:
 
 def register_standards_routes(app: Flask) -> None:
     _register_read_routes(app)
-    _register_write_routes(app)
+    _register_import_routes(app)
+    _register_standard_crud_routes(app)

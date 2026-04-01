@@ -117,7 +117,6 @@ def save_dimension_fingerprint(
         log_debug(f"  [{dimension}] Fingerprint save failed: {exc}")
 
 
-
 def _parse_evidence_from_jsonl(
     config: RunConfig, dimension: str, ctx: _AnalysisContext,
     jsonl_file: Path, files_read: int,

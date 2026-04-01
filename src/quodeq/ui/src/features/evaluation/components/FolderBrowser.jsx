@@ -100,28 +100,43 @@ async function navigateFolder(path, navigation) {
   }
 }
 
+function NewFolderInput({ currentPath, navigate, onClose }) {
+  const [name, setName] = useState('');
+  const [error, setError] = useState(null);
+
+  async function handleCreate() {
+    if (!name.trim() || !currentPath) return;
+    setError(null);
+    try {
+      await createDirectory(currentPath, name.trim());
+      onClose();
+      navigate(currentPath);
+    } catch (err) {
+      setError(err.message || 'Failed to create folder');
+    }
+  }
+
+  return (
+    <div className="new-folder-row">
+      <input
+        type="text" className="new-folder-input" value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose(); }}
+        placeholder="Folder name" autoFocus
+      />
+      <button className="folder-nav-btn" onClick={handleCreate} disabled={!name.trim()}>Create</button>
+      <button className="folder-nav-btn" onClick={onClose}>✕</button>
+      {error && <span className="inline-error">{error}</span>}
+    </div>
+  );
+}
+
 function FolderBrowserDialog({ state, actions, navigation, selection, title, confirmText }) {
   const { data, loading, pathInput, navError } = state;
   const { navigate, onClose, onConfirm } = actions;
   const { selectedFolder, setSelectedFolder } = selection;
   const { setPathInput } = navigation;
-
-  const [newFolderName, setNewFolderName] = useState('');
   const [creatingFolder, setCreatingFolder] = useState(false);
-  const [newFolderError, setNewFolderError] = useState(null);
-
-  async function handleNewFolder() {
-    if (!newFolderName.trim() || !data?.current) return;
-    setNewFolderError(null);
-    try {
-      await createDirectory(data.current, newFolderName.trim());
-      setCreatingFolder(false);
-      setNewFolderName('');
-      navigate(data.current);
-    } catch (err) {
-      setNewFolderError(err.message || 'Failed to create folder');
-    }
-  }
 
   return (
     <div className="modal folder-browser-modal" role="dialog" aria-modal="true" aria-labelledby="folder-browser-title" onClick={(e) => e.stopPropagation()}>
@@ -130,22 +145,7 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
         <button className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
       </div>
       <FolderPathBar data={data} loading={loading} pathInput={pathInput} setPathInput={setPathInput} onNavigate={navigate} onNewFolder={() => setCreatingFolder(true)} />
-      {creatingFolder && (
-        <div className="new-folder-row">
-          <input
-            type="text"
-            className="new-folder-input"
-            value={newFolderName}
-            onChange={(e) => setNewFolderName(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleNewFolder(); if (e.key === 'Escape') setCreatingFolder(false); }}
-            placeholder="Folder name"
-            autoFocus
-          />
-          <button className="folder-nav-btn" onClick={handleNewFolder} disabled={!newFolderName.trim()}>Create</button>
-          <button className="folder-nav-btn" onClick={() => setCreatingFolder(false)}>✕</button>
-          {newFolderError && <span className="inline-error">{newFolderError}</span>}
-        </div>
-      )}
+      {creatingFolder && <NewFolderInput currentPath={data?.current} navigate={navigate} onClose={() => setCreatingFolder(false)} />}
       <div className="folder-browser-list">
         {loading ? (
           <p className="loading" role="status" aria-live="polite">Loading...</p>

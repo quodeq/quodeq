@@ -6,21 +6,17 @@ import FolderBrowser from './FolderBrowser.jsx';
 
 
 const BUTTON_GAP = '8px';
+const BUTTON_PADDING = '8px 16px';
+const BUTTON_FONT_SIZE = '0.85rem';
 const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_GAP, alignItems: 'center' };
 const flexButtonStyle = { flex: 1, marginTop: 0 };
 
-function useReEvaluateCard(project, onStart) {
+function useReEvalInfo(project) {
   const [info, setInfo] = useState(null);
   const [error, setError] = useState(null);
-  const { allDimensions } = usePluginDimensions();
-  const [selectedDims, setSelectedDims] = useState(new Set());
   const [urlInput, setUrlInput] = useState('');
   const [urlError, setUrlError] = useState(null);
   const [urlSaving, setUrlSaving] = useState(false);
-  const [cloneBrowserOpen, setCloneBrowserOpen] = useState(false);
-  const [cloning, setCloning] = useState(false);
-  const [cloneDest, setCloneDest] = useState('');
-  const [cloneError, setCloneError] = useState(null);
 
   useEffect(() => {
     if (!project) return;
@@ -32,6 +28,35 @@ function useReEvaluateCard(project, onStart) {
         setError('Could not load project info. The project may have been removed.');
       });
   }, [project]);
+
+  async function handleUrlRestore() {
+    const url = urlInput.trim();
+    if (!url) return;
+    setUrlSaving(true);
+    setUrlError(null);
+    try {
+      await relocateProject(project, url);
+      const updated = await getProjectInfo(project);
+      setInfo(updated);
+      setUrlInput('');
+    } catch (err) {
+      setUrlError(err.message || 'Failed to update URL');
+    } finally {
+      setUrlSaving(false);
+    }
+  }
+
+  return { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
+}
+
+function useReEvaluateCard(project, onStart) {
+  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project);
+  const { allDimensions } = usePluginDimensions();
+  const [selectedDims, setSelectedDims] = useState(new Set());
+  const [cloneBrowserOpen, setCloneBrowserOpen] = useState(false);
+  const [cloning, setCloning] = useState(false);
+  const [cloneDest, setCloneDest] = useState('');
+  const [cloneError, setCloneError] = useState(null);
 
   const toggleDim = (id) => {
     setSelectedDims((prev) => {
@@ -50,23 +75,6 @@ function useReEvaluateCard(project, onStart) {
   };
   const handleStart = () => onStart(buildPayload());
   const handleIncremental = () => onStart(buildPayload({ incremental: true }));
-
-  async function handleUrlRestore() {
-    const url = urlInput.trim();
-    if (!url) return;
-    setUrlSaving(true);
-    setUrlError(null);
-    try {
-      await relocateProject(project, url);
-      const updated = await getProjectInfo(project);
-      setInfo(updated);
-      setUrlInput('');
-    } catch (err) {
-      setUrlError(err.message || 'Failed to update URL');
-    } finally {
-      setUrlSaving(false);
-    }
-  }
 
   async function handleCloneToLocal(destination) {
     setCloneBrowserOpen(false);
@@ -89,6 +97,98 @@ function useReEvaluateCard(project, onStart) {
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
   };
+}
+
+function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore }) {
+  return (
+    <div className="re-eval-stale-warning">
+      <p>This project was evaluated from a remote repo but the original URL was not saved. Enter the URL to restore reevaluation.</p>
+      <div style={{ display: 'flex', gap: BUTTON_GAP, alignItems: 'center' }}>
+        <input
+          type="text"
+          value={urlInput}
+          onChange={(e) => setUrlInput(e.target.value)}
+          onKeyDown={(e) => { if (e.key === 'Enter') handleUrlRestore(); }}
+          placeholder="https://github.com/org/repo"
+          className="re-eval-url-input"
+          disabled={urlSaving}
+        />
+        <button
+          type="button"
+          className="evaluate-submit-btn"
+          style={{ padding: BUTTON_PADDING, fontSize: BUTTON_FONT_SIZE }}
+          disabled={!urlInput.trim() || urlSaving}
+          onClick={handleUrlRestore}
+        >
+          {urlSaving ? 'Saving...' : 'Restore'}
+        </button>
+      </div>
+      {urlError && <p className="inline-error">{urlError}</p>}
+    </div>
+  );
+}
+
+function DimensionSelectionSection({ allDimensions, selectedDims, cloning, toggleDim, selectAll, clearAll }) {
+  if (allDimensions.length === 0) return null;
+  return (
+    <DimensionSelector
+      allDimensions={allDimensions}
+      selectedDims={selectedDims}
+      onToggle={cloning ? undefined : toggleDim}
+      onSelectAll={cloning ? undefined : selectAll}
+      onClearAll={cloning ? undefined : clearAll}
+    />
+  );
+}
+
+function CloneSection({ info, cloning, cloneDest, cloneError, setCloneBrowserOpen }) {
+  return (
+    <>
+      {info.location === 'online' && !info.pathMissing && !cloning && (
+        <div className="re-eval-clone-row">
+          <a href="#" className="re-eval-clone-link" onClick={(e) => { e.preventDefault(); setCloneBrowserOpen(true); }}>
+            ⬇ Clone to local storage
+          </a>
+        </div>
+      )}
+      {cloneError && <p className="inline-error">{cloneError}</p>}
+      {cloning && (
+        <div className="re-eval-clone-banner">
+          <span className="re-eval-clone-spinner" />
+          <span>Cloning to <code>{cloneDest}</code>...</span>
+        </div>
+      )}
+    </>
+  );
+}
+
+function ActionButtons({ info, project, disabled, canStart, cloning, handleIncremental, handleStart }) {
+  return (
+    <div style={buttonRowStyle}>
+      {info.hasFingerprints && (
+        <button
+          type="button"
+          className="evaluate-submit-btn"
+          style={flexButtonStyle}
+          disabled={!canStart}
+          onClick={handleIncremental}
+          title="Only analyze files changed since last evaluation"
+        >
+          Re-scan changes
+        </button>
+      )}
+      <button
+        type="button"
+        className="evaluate-submit-btn"
+        style={flexButtonStyle}
+        disabled={!canStart}
+        onClick={handleStart}
+        title="Fresh re-evaluation of all selected dimensions"
+      >
+        {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
+      </button>
+    </div>
+  );
 }
 
 function ReEvaluateCardView({ info, project, disabled, dimensions, actions }) {
@@ -114,86 +214,14 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions }) {
         </div>
 
         {info.pathMissing && (
-          <div className="re-eval-stale-warning">
-            <p>This project was evaluated from a remote repo but the original URL was not saved. Enter the URL to restore reevaluation.</p>
-            <div style={{ display: 'flex', gap: BUTTON_GAP, alignItems: 'center' }}>
-              <input
-                type="text"
-                value={urlInput}
-                onChange={(e) => setUrlInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleUrlRestore(); }}
-                placeholder="https://github.com/org/repo"
-                className="re-eval-url-input"
-                disabled={urlSaving}
-              />
-              <button
-                type="button"
-                className="evaluate-submit-btn"
-                style={{ padding: '8px 16px', fontSize: '0.85rem' }}
-                disabled={!urlInput.trim() || urlSaving}
-                onClick={handleUrlRestore}
-              >
-                {urlSaving ? 'Saving...' : 'Restore'}
-              </button>
-            </div>
-            {urlError && <p className="inline-error">{urlError}</p>}
-          </div>
+          <UrlRestoreSection urlInput={urlInput} setUrlInput={setUrlInput} urlError={urlError} urlSaving={urlSaving} handleUrlRestore={handleUrlRestore} />
         )}
 
-        {info.location === 'online' && !info.pathMissing && !cloning && (
-          <div className="re-eval-clone-row">
-            <a
-              href="#"
-              className="re-eval-clone-link"
-              onClick={(e) => { e.preventDefault(); setCloneBrowserOpen(true); }}
-            >
-              ⬇ Clone to local storage
-            </a>
-          </div>
-        )}
-        {cloneError && <p className="inline-error">{cloneError}</p>}
-        {cloning && (
-          <div className="re-eval-clone-banner">
-            <span className="re-eval-clone-spinner" />
-            <span>Cloning to <code>{cloneDest}</code>...</span>
-          </div>
-        )}
+        <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
 
         <div className={cloning ? 're-eval-disabled-section' : ''}>
-        {allDimensions.length > 0 && (
-          <DimensionSelector
-            allDimensions={allDimensions}
-            selectedDims={selectedDims}
-            onToggle={cloning ? undefined : toggleDim}
-            onSelectAll={cloning ? undefined : selectAll}
-            onClearAll={cloning ? undefined : clearAll}
-          />
-        )}
-
-        <div style={buttonRowStyle}>
-          {info.hasFingerprints && (
-            <button
-              type="button"
-              className="evaluate-submit-btn"
-              style={flexButtonStyle}
-              disabled={!canStart}
-              onClick={handleIncremental}
-              title="Only analyze files changed since last evaluation"
-            >
-              Re-scan changes
-            </button>
-          )}
-          <button
-            type="button"
-            className="evaluate-submit-btn"
-            style={flexButtonStyle}
-            disabled={!canStart}
-            onClick={handleStart}
-            title="Fresh re-evaluation of all selected dimensions"
-          >
-            {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
-          </button>
-        </div>
+          <DimensionSelectionSection allDimensions={allDimensions} selectedDims={selectedDims} cloning={cloning} toggleDim={toggleDim} selectAll={selectAll} clearAll={clearAll} />
+          <ActionButtons info={info} project={project} disabled={disabled} canStart={canStart} cloning={cloning} handleIncremental={handleIncremental} handleStart={handleStart} />
         </div>
       </div>
 
