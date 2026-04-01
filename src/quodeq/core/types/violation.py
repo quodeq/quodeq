@@ -7,6 +7,8 @@ from .finding import Finding
 
 @dataclass(frozen=True, slots=True)
 class ProgressInfo:
+    """Live progress counters streamed during an ongoing dimension analysis."""
+
     files_read: int = 0
     violation_count: int = 0
     compliance_count: int = 0

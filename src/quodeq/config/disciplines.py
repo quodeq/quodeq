@@ -6,6 +6,7 @@ import os
 
 from quodeq.config.discipline_registry import DisciplineRegistry
 from quodeq.config.paths import ConfigPaths
+# NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_error, log_warning
 
 _DEFAULT_CATEGORIES = frozenset({"backend", "frontend", "mobile", "infra"})

@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from quodeq.analysis.fingerprint import _hash_file, _hash_standards
+from quodeq.analysis.subagents.priority import load_priority_config, _LANG_ALIASES
 
 
 @dataclass
@@ -102,8 +103,6 @@ def _safe_read(path: Path) -> str | None:
 
 def find_dependents(changed: set[str], files: list[str], src: Path, language: str) -> set[str]:
     """Find files that directly import any changed file (1 level deep)."""
-    from quodeq.analysis.subagents.priority import load_priority_config, _LANG_ALIASES
-
     config = load_priority_config()
     lang_key = _LANG_ALIASES.get(language.lower(), language.lower())
     patterns = config.get("import_patterns", {}).get(lang_key)

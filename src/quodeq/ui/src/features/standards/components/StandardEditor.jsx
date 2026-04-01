@@ -3,6 +3,8 @@ import { useStandardDetail } from '../hooks/useStandardDetail.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
 
+const TYPE_LABELS = { builtin: 'ISO-25010', quodeq: 'Quodeq', community: 'Community', custom: 'Custom' };
+
 const MIN_TREE_WIDTH = 180;
 const MAX_TREE_WIDTH = 600;
 const DEFAULT_TREE_WIDTH = 280;
@@ -110,7 +112,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
           <span className="editor-stat"><strong>{(standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0)}</strong> requirements</span>
           <span className="editor-stat-dot" />
           <span className={`editor-stat-type editor-stat-type--${standard?.type || 'custom'}`}>
-            {standard?.type === 'builtin' ? 'ISO-25010' : standard?.type === 'quodeq' ? 'Quodeq' : standard?.type === 'community' ? 'Community' : 'Custom'}
+            {TYPE_LABELS[standard?.type] || 'Custom'}
           </span>
         </div>
       </div>
@@ -123,10 +125,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
             standard={standard}
             selectedNode={selectedNode}
             onSelectNode={setSelectedNode}
-            onAddPrinciple={addPrinciple}
-            onRemovePrinciple={removePrinciple}
-            onAddRequirement={addRequirement}
-            onRemoveRequirement={removeRequirement}
+            actions={{ onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement }}
             editable={editable}
           />
         </div>

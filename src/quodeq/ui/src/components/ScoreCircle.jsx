@@ -1,17 +1,19 @@
 import { scoreGradeColorVar } from '../utils/formatters.js';
 
+const SIZE_BREAKPOINT = 100;
+
 export default function ScoreCircle({ score, grade, size = 120 }) {
   const n = parseFloat(score);
   const fraction = isNaN(n) ? 0 : Math.min(n / 10, 1);
   const strokeColor = scoreGradeColorVar(score);
 
-  const strokeWidth = size >= 100 ? 8 : 6;
+  const strokeWidth = size >= SIZE_BREAKPOINT ? 8 : 6;
   const radius = (size / 2) - (strokeWidth / 2) - 2;
   const circumference = 2 * Math.PI * radius;
   const dashoffset = circumference * (1 - fraction);
 
-  const scoreFontSize = size >= 100 ? 30 : 20;
-  const gradeFontSize = size >= 100 ? 13 : 10;
+  const scoreFontSize = size >= SIZE_BREAKPOINT ? 30 : 20;
+  const gradeFontSize = size >= SIZE_BREAKPOINT ? 13 : 10;
 
   return (
     <div className="score-circle" style={{ width: size, height: size, position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>

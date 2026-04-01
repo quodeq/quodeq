@@ -8,7 +8,11 @@ export function useLibrary() {
 
   const fetchLibrary = useCallback(async () => {
     setLoading(true);
-    try { const data = await listLibrary(); setLibraryStandards(data); setError(null); }
+    try {
+      const data = await listLibrary();
+      setLibraryStandards(data);
+      setError(null);
+    }
     catch (err) { setError(err.message); }
     finally { setLoading(false); }
   }, []);

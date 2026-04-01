@@ -29,6 +29,20 @@ class IncrementalCoverage:
     files_read: int
 
 
+def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[str]:
+    """Load evaluator IDs from JSON files in *evaluators_dir* not already in *dims_data*."""
+    import json as _json
+    result = list(dims_data)
+    for _p in evaluators_dir.glob("*.json"):
+        try:
+            _eid = _json.loads(_p.read_text()).get("id")
+            if _eid and _eid not in result:
+                result.append(_eid)
+        except (OSError, ValueError, KeyError):
+            pass
+    return result
+
+
 def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisContext"]:
     """Load dimensions data and resolve which dimensions to analyze."""
     from datetime import datetime, timezone
@@ -49,14 +63,7 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
     else:
         _evaluators_dir = None
     if _evaluators_dir and _evaluators_dir.is_dir():
-        import json as _json
-        for _p in _evaluators_dir.glob("*.json"):
-            try:
-                _eid = _json.loads(_p.read_text()).get("id")
-                if _eid and _eid not in all_dims_raw:
-                    all_dims_raw.append(_eid)
-            except (OSError, ValueError, KeyError):
-                pass
+        all_dims_raw = _load_custom_dimensions(_evaluators_dir, all_dims_raw)
 
     if config.options.dimensions:
         all_dims_set = set(all_dims_raw)

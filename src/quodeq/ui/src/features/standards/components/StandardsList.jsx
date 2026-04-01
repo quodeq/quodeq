@@ -9,7 +9,8 @@ function SectionHeader({ title, count }) {
   );
 }
 
-function StandardsSection({ title, standards, onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility }) {
+function StandardsSection({ title, standards, actions }) {
+  const { onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility } = actions;
   if (standards.length === 0) return null;
   return (
     <section className="standards-section">
@@ -31,7 +32,8 @@ function StandardsSection({ title, standards, onEdit, onDelete, onDuplicate, isV
   );
 }
 
-export default function StandardsList({ grouped, onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility }) {
+export default function StandardsList({ grouped, actions }) {
+  const { onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility } = actions;
   const all = [...(grouped.builtin || []), ...(grouped.quodeq || []), ...(grouped.community || []), ...(grouped.custom || [])];
 
   if (all.length === 0) {
@@ -47,11 +49,7 @@ export default function StandardsList({ grouped, onEdit, onDelete, onDuplicate, 
       <StandardsSection
         title="Standards"
         standards={all}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onDuplicate={onDuplicate}
-        isVisible={isVisible}
-        onToggleVisibility={onToggleVisibility}
+        actions={{ onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility }}
       />
     </div>
   );

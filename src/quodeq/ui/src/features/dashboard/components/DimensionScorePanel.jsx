@@ -1,12 +1,14 @@
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { scoreGradeColorVar } from '../../../utils/formatters.js';
 
+const MAX_SCORE = 10;
+
 function DimensionRow({ dim, onBarClick }) {
   const curr = parseFloat(dim.overallScore);
   const prev = parseFloat(dim.previousScore);
   const delta = !isNaN(curr) && !isNaN(prev) ? curr - prev : null;
   const score = isNaN(curr) ? 0 : curr;
-  const pct = Math.min(score / 10, 1) * 100;
+  const pct = Math.min(score / MAX_SCORE, 1) * 100;
   const color = scoreGradeColorVar(score);
 
   return (

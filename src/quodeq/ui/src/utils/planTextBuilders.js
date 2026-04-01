@@ -17,23 +17,14 @@ export function buildFilePlanText(file) {
 }
 
 export function buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData) {
+  // When violations are provided directly, use them; otherwise derive from principle object.
   if (violations !== undefined) {
-    return buildGroupPlanText({
-      title: principle,
-      violations,
-      violationsBySeverity,
-      context: principleData?.findings || undefined,
-    });
+    return buildGroupPlanText({ title: principle, violations, violationsBySeverity, context: principleData?.findings || undefined });
   }
+  const allViolations = principle.violations || [];
   const bySeverity = {};
   for (const sev of SEVERITY_ORDER) {
-    bySeverity[sev] = (principle.violations || []).filter(
-      (v) => (v.severity || 'minor').toLowerCase() === sev
-    );
+    bySeverity[sev] = allViolations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
   }
-  return buildGroupPlanText({
-    title: principle.principle,
-    violations: principle.violations || [],
-    violationsBySeverity: bySeverity,
-  });
+  return buildGroupPlanText({ title: principle.principle, violations: allViolations, violationsBySeverity: bySeverity });
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { MODEL_STORAGE_PREFIX } from '../features/evaluation/components/powerLevels.js';
+import { resolveDataTheme } from '../utils/themeResolver.js';
 
 const MODE_KEY = 'cc-theme-mode';
 const FAMILY_KEY = 'cc-theme-family';
@@ -43,16 +44,7 @@ function migrateOldTheme() {
   }
 }
 
-/** Compute the data-theme attribute value from mode + family + OS preference. */
-export function resolveDataTheme(mode, family, prefersDark) {
-  const effectiveMode = mode === 'system' ? (prefersDark ? 'dark' : 'light') : mode;
-  if (family === 'daruma') {
-    // System mode: return null so @media (prefers-color-scheme) drives the theme
-    // Explicit mode: return 'light' or 'dark' to override OS preference
-    return mode === 'system' ? null : effectiveMode;
-  }
-  return `${family}-${effectiveMode}`;
-}
+export { resolveDataTheme };
 
 function applyDataTheme(value) {
   if (value === null) {

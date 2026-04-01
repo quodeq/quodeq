@@ -44,6 +44,7 @@ def _local_hosts(
     if extra:
         base.update(h.strip() for h in extra.split(",") if h.strip())
     return frozenset(base)
+
 _MAX_PORT_SCAN_TRIES = 20
 
 

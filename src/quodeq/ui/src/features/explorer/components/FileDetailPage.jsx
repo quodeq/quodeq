@@ -21,6 +21,7 @@ function ViolationCard({ v, index }) {
   const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
   const ref = line != null ? `${filePath}:${range}` : filePath;
   const display = line != null ? `${filename}:${range}` : filename;
+  const linkedRefs = v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url)) || [];
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
       <div className="vdetail-row-main">
@@ -40,8 +41,8 @@ function ViolationCard({ v, index }) {
           <div className="vlive-detail-section">
             <div className="vlive-detail-section-header">
               <span className="vlive-detail-section-label">Reason</span>
-              {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
-                <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
+              {linkedRefs.length > 0 &&
+                <span className="cwe-link-group">{linkedRefs.map((ref, i) => (
                   <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
                 ))}</span>
               }

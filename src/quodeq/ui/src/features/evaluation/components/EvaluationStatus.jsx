@@ -3,21 +3,23 @@ import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 
+const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
+
 function deriveProjectName(repo) {
   if (!repo) return null;
   return repo.replace(/\.git$/, '').split(/[/\\]/).filter(Boolean).pop() || null;
 }
 
 function statusTitle(status) {
-  if (status === 'running') return 'Evaluation in Progress';
-  if (status === 'done') return 'Evaluation Complete';
-  if (status === 'failed') return 'Evaluation Failed';
-  if (status === 'lost') return 'Evaluation Lost';
+  if (status === STATUS.RUNNING) return 'Evaluation in Progress';
+  if (status === STATUS.DONE) return 'Evaluation Complete';
+  if (status === STATUS.FAILED) return 'Evaluation Failed';
+  if (status === STATUS.LOST) return 'Evaluation Lost';
   return 'Evaluation Cancelled';
 }
 
 function phaseLabel(job) {
-  if (!job || job.status !== 'running') return null;
+  if (!job || job.status !== STATUS.RUNNING) return null;
   switch (job.phase) {
     case 'setup': return 'Setting up';
     case 'analyzing': return 'Analyzing';
@@ -43,9 +45,9 @@ function lastRelevantLog(logs) {
 }
 
 function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
-  const isRunning = job.status === 'running';
-  const isFailed = job.status === 'failed';
-  const isLost = job.status === 'lost';
+  const isRunning = job.status === STATUS.RUNNING;
+  const isFailed = job.status === STATUS.FAILED;
+  const isLost = job.status === STATUS.LOST;
   return (
     <>
       <div
@@ -87,8 +89,8 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
 }
 
 function JobHeader({ job, onDismiss, onCancel }) {
-  const isRunning = job.status === 'running';
-  const isDone = job.status === 'done';
+  const isRunning = job.status === STATUS.RUNNING;
+  const isDone = job.status === STATUS.DONE;
   return (
     <div className="job-header">
       <div className="job-header-left">

@@ -10,6 +10,31 @@ function severityOrder(s) {
   return s === 'critical' ? 0 : s === 'major' ? 1 : 2;
 }
 
+function ViolationDetail({ v }) {
+  return (
+    <div className="vlive-detail">
+      {(v.title || v.reason) && (
+        <div className="vlive-detail-section">
+          <div className="vlive-detail-section-header">
+            <span className="vlive-detail-section-label">Reason</span>
+            {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
+              <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
+                <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
+              ))}</span>
+            }
+          </div>
+          {v.title && <p className="vlive-detail-title">{v.title}</p>}
+          {v.reason && <>
+            <span className="vlive-detail-section-label">Detail</span>
+            <p className="vlive-detail-reason">{v.reason}</p>
+          </>}
+        </div>
+      )}
+      <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} endLine={v.endLine} />
+    </div>
+  );
+}
+
 function ViolationLiveRow({ violation, index }) {
   const [open, setOpen] = useState(false);
   const v = violation;
@@ -46,28 +71,7 @@ function ViolationLiveRow({ violation, index }) {
           <polyline points="9 18 15 12 9 6" />
         </svg>
       </div>
-      {open && (
-        <div className="vlive-detail">
-          {(v.title || v.reason) && (
-            <div className="vlive-detail-section">
-              <div className="vlive-detail-section-header">
-                <span className="vlive-detail-section-label">Reason</span>
-                {v.reqRefs?.filter(r => r.url && /^https?:\/\//.test(r.url))?.length > 0 &&
-                  <span className="cwe-link-group">{v.reqRefs.filter(r => r.url && /^https?:\/\//.test(r.url)).map((ref, i) => (
-                    <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                  ))}</span>
-                }
-              </div>
-              {v.title && <p className="vlive-detail-title">{v.title}</p>}
-              {v.reason && <>
-                <span className="vlive-detail-section-label">Detail</span>
-                <p className="vlive-detail-reason">{v.reason}</p>
-              </>}
-            </div>
-          )}
-          <ContextBlock context={v.context} snippet={v.snippet} scope={v.scope} line={v.line} endLine={v.endLine} />
-        </div>
-      )}
+      {open && <ViolationDetail v={v} />}
     </div>
   );
 }

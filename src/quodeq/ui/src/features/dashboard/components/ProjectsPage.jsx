@@ -70,7 +70,8 @@ function LanguageNumbers({ stats, filesCount }) {
   );
 }
 
-function ProjectCard({ project, isSelected, onSelect, footer, isChild = false, children: cardChildren }) {
+function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildren }) {
+  const { onSelect, footer, isChild = false } = cardProps;
   const id = project.id || project.name || project;
   const name = project.name || project;
   const grade = gradeLabel(project.overallGrade ?? project.latestGrade);
@@ -200,7 +201,8 @@ function ProjectPathContent({ id, p, relocateActions }) {
   );
 }
 
-function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, confirmActions, relocateActions }) {
+function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelect, dialogActions }) {
+  const { confirmActions, relocateActions } = dialogActions;
   const { confirming, setConfirming, onDelete, onExport } = confirmActions;
   const id = p.id || p.name || p;
   const isSelected = id === selectedProject;
@@ -208,7 +210,7 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   const childSelected = hasChildren && childProjects[id].some((c) => (c.id || c.name || c) === selectedProject);
   return (
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
-      <ProjectCard project={p} isSelected={isSelected} onSelect={onSelect} footer={<CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} />}>
+      <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }}>
         <ProjectPathContent id={id} p={p} relocateActions={relocateActions} />
       </ProjectCard>
       {hasChildren && (
@@ -217,7 +219,7 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
             const childId = child.id || child.name || child;
             return (
               <div key={childId} className="project-child-entry">
-                <ProjectCard project={child} isSelected={childId === selectedProject} onSelect={onSelect} isChild footer={<CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} />} />
+                <ProjectCard project={child} isSelected={childId === selectedProject} cardProps={{ onSelect, isChild: true, footer: <CardFooter name={childId} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }} />
               </div>
             );
           })}
@@ -253,7 +255,7 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
       ) : (
         <div className="projects-cards">
           {roots.map((p) => (
-            <ProjectCardGroup key={p.id || p.name || p} p={p} children={children} selectedProject={selectedProject} onSelect={onSelect} confirmActions={{ confirming, setConfirming, onDelete, onExport }} relocateActions={{ relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate }} />
+            <ProjectCardGroup key={p.id || p.name || p} p={p} children={children} selectedProject={selectedProject} onSelect={onSelect} dialogActions={{ confirmActions: { confirming, setConfirming, onDelete, onExport }, relocateActions: { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate } }} />
           ))}
         </div>
       )}

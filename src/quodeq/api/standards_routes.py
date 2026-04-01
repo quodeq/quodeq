@@ -26,7 +26,9 @@ def _get_library_client(app: Flask):
     token = app.config.get("STANDARDS_LIBRARY_TOKEN")
     return StandardsLibraryClient(base_url=base_url, http_client=UrllibJsonClient(), token=token)
 
-def register_standards_routes(app: Flask) -> None:
+def _register_read_routes(app: Flask) -> None:
+    """Register GET routes for the standards API."""
+
     @app.get("/api/standards/refs/cwe")
     def list_cwes() -> Response:
         if not hasattr(app, "_cwe_list"):
@@ -49,6 +51,19 @@ def register_standards_routes(app: Flask) -> None:
             logger.warning("Failed to fetch library index: %s", exc)
             return error_response("Failed to connect to standards library", 502, "library_error")
         return jsonify(index)
+
+    @app.get("/api/standards/<standard_id>")
+    def get_standard(standard_id: str) -> Response:
+        svc = _get_service(app)
+        try:
+            detail = svc.get_standard(standard_id)
+        except FileNotFoundError:
+            return error_response(f"Standard not found: {standard_id}", 404, "not_found")
+        return jsonify(to_camel_dict(detail))
+
+
+def _register_write_routes(app: Flask) -> None:
+    """Register POST/PUT/DELETE routes for the standards API."""
 
     @app.post("/api/standards/library/import")
     def import_from_library() -> tuple[Response, int]:
@@ -93,15 +108,6 @@ def register_standards_routes(app: Flask) -> None:
             "detail": to_camel_dict(result["detail"]),
             "warnings": result["warnings"],
         }), 201
-
-    @app.get("/api/standards/<standard_id>")
-    def get_standard(standard_id: str) -> Response:
-        svc = _get_service(app)
-        try:
-            detail = svc.get_standard(standard_id)
-        except FileNotFoundError:
-            return error_response(f"Standard not found: {standard_id}", 404, "not_found")
-        return jsonify(to_camel_dict(detail))
 
     @app.post("/api/standards")
     def create_standard() -> tuple[Response, int]:
@@ -148,3 +154,8 @@ def register_standards_routes(app: Flask) -> None:
         except (FileNotFoundError, ValueError) as exc:
             return error_response(str(exc), 400, "bad_request")
         return jsonify(to_camel_dict(detail)), 201
+
+
+def register_standards_routes(app: Flask) -> None:
+    _register_read_routes(app)
+    _register_write_routes(app)

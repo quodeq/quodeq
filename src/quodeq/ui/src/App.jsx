@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useRef } from 'react';
+import { useState, useMemo } from 'react';
 import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
 import { buildDailyRuns } from './utils/dailyGrouping.js';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
@@ -23,8 +23,8 @@ import { useRunNavigator } from './hooks/useRunNavigator.js';
 import { useProjectState } from './hooks/useProjectState.js';
 import { useAppSettings } from './hooks/useAppSettings.js';
 import { useEvaluationLifecycle } from './hooks/useEvaluationLifecycle.js';
-import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { useProjectActions } from './hooks/useProjectActions.js';
+import { useVisibleRuns } from './hooks/useVisibleRuns.js';
 
 
 function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
@@ -205,31 +205,7 @@ function useAppState() {
   const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
   const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun: effectiveRun });
   const dailyRuns = useMemo(() => buildDailyRuns(availableRuns, dashboard?.trend || []), [availableRuns, dashboard]);
-  const visibleDailyRuns = useMemo(() => {
-    const visibleSet = new Set(readVisibleStandardIds());
-    const trendEntries = dashboard?.trend || [];
-    // Build set of dates where at least one visible dimension was evaluated
-    const visibleDates = new Set();
-    for (const entry of trendEntries) {
-      if ((entry.dimensions || []).some((d) => visibleSet.has(d.toLowerCase()))) {
-        visibleDates.add((entry.dateISO || '').slice(0, 10));
-      }
-    }
-    const trendByRunId = new Map(trendEntries.map((t) => [t.runId, t]));
-    return dailyRuns.filter((run) => {
-      const datePart = (trendByRunId.get(run.runId)?.dateISO || '').slice(0, 10);
-      return visibleDates.has(datePart);
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dailyRuns, dashboard, activePage.page]);
-  const visibleRunIdsKey = visibleDailyRuns.map((r) => r.runId).join(',');
-  const prevRunIdsKeyRef = useRef(visibleRunIdsKey);
-  useEffect(() => {
-    if (prevRunIdsKeyRef.current !== visibleRunIdsKey && visibleDailyRuns.length > 0) {
-      setSelectedRun('latest');
-    }
-    prevRunIdsKeyRef.current = visibleRunIdsKey;
-  }, [visibleRunIdsKey, visibleDailyRuns.length, setSelectedRun]);
+  const visibleDailyRuns = useVisibleRuns(dailyRuns, dashboard, activePage.page, setSelectedRun);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => {
     const meta = computeHeaderMeta(accumulated, dashboard, selectedProject, projects);

@@ -1,10 +1,12 @@
 import { useState } from 'react';
 import { LEVELS, STORAGE_KEY } from './powerLevels.js';
 
+const DEFAULT_POWER_LEVEL = 2;
+
 export default function PowerSelector({ value, onChange, onPersist }) {
   const [hover, setHover] = useState(null);
 
-  const active = value ?? 2;
+  const active = value ?? DEFAULT_POWER_LEVEL;
   const display = hover ?? active;
   const currentLevel = LEVELS.find(l => l.level === display);
 

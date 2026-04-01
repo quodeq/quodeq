@@ -75,8 +75,8 @@ function FolderFooter({ selectedFolder, onClose, onConfirm }) {
   );
 }
 
-async function navigateFolder(path, state) {
-  const { setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder } = state;
+async function navigateFolder(path, navigation) {
+  const { setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder } = navigation;
   setLoading(true);
   setNavError(null);
   try {
@@ -92,10 +92,11 @@ async function navigateFolder(path, state) {
   }
 }
 
-function FolderBrowserDialog({ data, loading, navigation, selection, actions }) {
-  const { pathInput, setPathInput, navigate } = navigation;
-  const { navError, selectedFolder, setSelectedFolder } = selection;
-  const { onClose, onConfirm } = actions;
+function FolderBrowserDialog({ state, actions, navigation, selection }) {
+  const { data, loading, pathInput, navError } = state;
+  const { navigate, onClose, onConfirm } = actions;
+  const { selectedFolder, setSelectedFolder } = selection;
+  const { setPathInput } = navigation;
   return (
     <div className="modal folder-browser-modal" role="dialog" aria-modal="true" aria-labelledby="folder-browser-title" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
@@ -123,10 +124,10 @@ export default function FolderBrowser({ onSelect, onClose }) {
   const [navError, setNavError] = useState(null);
   const [selectedFolder, setSelectedFolder] = useState(null);
 
-  const state = { setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder };
+  const navigation = { setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder };
 
   function navigate(path) {
-    navigateFolder(path, state);
+    navigateFolder(path, navigation);
   }
 
   useEffect(() => { navigate(''); }, []);
@@ -134,11 +135,10 @@ export default function FolderBrowser({ onSelect, onClose }) {
   return (
     <div className="modal-overlay" onClick={onClose}>
       <FolderBrowserDialog
-        data={data}
-        loading={loading}
-        navigation={{ pathInput, setPathInput, navigate }}
-        selection={{ navError, selectedFolder, setSelectedFolder }}
-        actions={{ onClose, onConfirm: () => { if (selectedFolder) onSelect(selectedFolder); } }}
+        state={{ data, loading, pathInput, navError }}
+        actions={{ navigate, onClose, onConfirm: () => { if (selectedFolder) onSelect(selectedFolder); } }}
+        navigation={{ setPathInput }}
+        selection={{ selectedFolder, setSelectedFolder }}
       />
     </div>
   );

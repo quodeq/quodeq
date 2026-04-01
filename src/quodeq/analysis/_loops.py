@@ -8,6 +8,7 @@ from collections.abc import Callable
 
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
+# NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
 
 

@@ -29,39 +29,45 @@ function renderSnippetLine(text, lineNum) {
   );
 }
 
+function ScopeBar({ label, lineCount, expanded, onToggle, children }) {
+  const hasCode = lineCount > 0;
+  return (
+    <>
+      <div
+        className={`scope-bar${expanded && hasCode ? ' scope-bar--expanded' : ''}`}
+        role={hasCode ? 'button' : undefined}
+        tabIndex={hasCode ? 0 : undefined}
+        onClick={hasCode ? onToggle : undefined}
+        onKeyDown={hasCode ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onToggle(); } } : undefined}
+      >
+        <span className={`scope-bar-chevron${expanded ? ' scope-bar-chevron--open' : ''}`}>{'\u25b8'}</span>
+        <span className="scope-bar-label">{label}{hasCode ? ` \u00b7 ${lineCount} lines` : ''}</span>
+      </div>
+      {expanded && hasCode && children}
+    </>
+  );
+}
+
 export default function ContextBlock({ context, snippet, scope, line, endLine }) {
   const [expanded, setExpanded] = useState(false);
+  const toggle = () => setExpanded(e => !e);
 
   if (scope) {
     const codeText = snippet || context || '';
     const codeLines = codeText ? codeText.replace(/\\n/g, '\n').split('\n') : [];
-    const hasCode = codeLines.length > 0;
     const startNum = line || 1;
     return (
-      <>
-        <div
-          className={`scope-bar${expanded && hasCode ? ' scope-bar--expanded' : ''}`}
-          role={hasCode ? 'button' : undefined}
-          tabIndex={hasCode ? 0 : undefined}
-          onClick={hasCode ? () => setExpanded(e => !e) : undefined}
-          onKeyDown={hasCode ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(ex => !ex); } } : undefined}
-        >
-          <span className={`scope-bar-chevron${expanded ? ' scope-bar-chevron--open' : ''}`}>{'\u25b8'}</span>
-          <span className="scope-bar-label">See {scope}{hasCode ? ` \u00b7 ${codeLines.length} lines` : ''}</span>
-        </div>
-        {expanded && hasCode && (
-          <pre className="finding-context scope-bar-code">
-            {codeLines.map((text, i) => renderSnippetLine(text, startNum + i))}
-          </pre>
-        )}
-      </>
+      <ScopeBar label={`See ${scope}`} lineCount={codeLines.length} expanded={expanded} onToggle={toggle}>
+        <pre className="finding-context scope-bar-code">
+          {codeLines.map((text, i) => renderSnippetLine(text, startNum + i))}
+        </pre>
+      </ScopeBar>
     );
   }
 
   if (context) {
     const allLines = context.replace(/\\n/g, '\n').split('\n');
     const startLineNum = Math.max(1, (line || 1) - CONTEXT_PADDING);
-    const hasCode = allLines.length > 0;
 
     // Split into before / highlighted / after sections
     const before = [];
@@ -81,50 +87,25 @@ export default function ContextBlock({ context, snippet, scope, line, endLine })
     }
 
     return (
-      <>
-        <div
-          className={`scope-bar${expanded && hasCode ? ' scope-bar--expanded' : ''}`}
-          role={hasCode ? 'button' : undefined}
-          tabIndex={hasCode ? 0 : undefined}
-          onClick={hasCode ? () => setExpanded(e => !e) : undefined}
-          onKeyDown={hasCode ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(ex => !ex); } } : undefined}
-        >
-          <span className={`scope-bar-chevron${expanded ? ' scope-bar-chevron--open' : ''}`}>{'\u25b8'}</span>
-          <span className="scope-bar-label">See code{hasCode ? ` \u00b7 ${allLines.length} lines` : ''}</span>
-        </div>
-        {expanded && hasCode && (
-          <pre className="finding-context scope-bar-code">
-            {before.map(l => renderLine(l.raw, l.lineNum, false))}
-            {highlighted.map(l => renderLine(l.raw, l.lineNum, true))}
-            {after.map(l => renderLine(l.raw, l.lineNum, false))}
-          </pre>
-        )}
-      </>
+      <ScopeBar label="See code" lineCount={allLines.length} expanded={expanded} onToggle={toggle}>
+        <pre className="finding-context scope-bar-code">
+          {before.map(l => renderLine(l.raw, l.lineNum, false))}
+          {highlighted.map(l => renderLine(l.raw, l.lineNum, true))}
+          {after.map(l => renderLine(l.raw, l.lineNum, false))}
+        </pre>
+      </ScopeBar>
     );
   }
 
   if (snippet) {
     const codeLines = snippet.replace(/\\n/g, '\n').split('\n');
-    const hasCode = codeLines.length > 0;
     const startNum = line || 1;
     return (
-      <>
-        <div
-          className={`scope-bar${expanded && hasCode ? ' scope-bar--expanded' : ''}`}
-          role={hasCode ? 'button' : undefined}
-          tabIndex={hasCode ? 0 : undefined}
-          onClick={hasCode ? () => setExpanded(e => !e) : undefined}
-          onKeyDown={hasCode ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded(ex => !ex); } } : undefined}
-        >
-          <span className={`scope-bar-chevron${expanded ? ' scope-bar-chevron--open' : ''}`}>{'\u25b8'}</span>
-          <span className="scope-bar-label">See code{hasCode ? ` \u00b7 ${codeLines.length} lines` : ''}</span>
-        </div>
-        {expanded && hasCode && (
-          <pre className="finding-context scope-bar-code">
-            {codeLines.map((text, i) => renderSnippetLine(text, startNum + i))}
-          </pre>
-        )}
-      </>
+      <ScopeBar label="See code" lineCount={codeLines.length} expanded={expanded} onToggle={toggle}>
+        <pre className="finding-context scope-bar-code">
+          {codeLines.map((text, i) => renderSnippetLine(text, startNum + i))}
+        </pre>
+      </ScopeBar>
     );
   }
 

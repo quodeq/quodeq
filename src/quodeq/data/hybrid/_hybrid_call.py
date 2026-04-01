@@ -8,6 +8,8 @@ from quodeq.data.ports.data_errors import InvalidDataError, NetworkError, Server
 
 _logger = logging.getLogger(__name__)
 
+_MAX_RETRIES = 2
+
 _P = ParamSpec("_P")
 _R = TypeVar("_R")
 
@@ -20,7 +22,7 @@ def hybrid_call(primary: Callable[_P, _R], fallback: Callable[_P, _R], *args: _P
         result = hybrid_call(web_repo.list_items, fs_repo.list_items)
     """
     last_exc: Exception | None = None
-    for attempt in range(2):
+    for attempt in range(_MAX_RETRIES):
         try:
             return primary(*args, **kwargs)
         except (NetworkError, ServerError, InvalidDataError) as exc:
