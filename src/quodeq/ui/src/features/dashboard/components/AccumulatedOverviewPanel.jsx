@@ -101,14 +101,14 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate }) {
   );
 }
 
-function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimensionClick, dimensionsWithViolations, selectedDayDimNames }) {
+function AccumulatedDimensionsSection({ sortedDimensions, referenceRun, onDimensionClick, dimensionsWithViolations, selectedDayDimNames, rescoreLookup }) {
   return (
     <>
       <div className="dimensions-header">
         <h3 className="dimensions-title">Quality Dimensions</h3>
       </div>
       <div className="dimensions-panel">
-        <DimensionCardsGrid sortedDimensions={sortedDimensions} referenceRun={referenceRun} onDimensionClick={onDimensionClick} selectedDayDimNames={selectedDayDimNames} />
+        <DimensionCardsGrid sortedDimensions={sortedDimensions} referenceRun={referenceRun} onDimensionClick={onDimensionClick} selectedDayDimNames={selectedDayDimNames} rescoreLookup={rescoreLookup} />
       </div>
 
       {dimensionsWithViolations.length > 0 && (
@@ -231,7 +231,7 @@ function useAccumulatedComputations(data) {
   return { currentOverviewRun, referenceRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats };
 }
 
-export default function AccumulatedOverviewPanel({ data, callbacks }) {
+export default function AccumulatedOverviewPanel({ data, callbacks, rescoreLookup }) {
   const { onRunClick, onDimensionClick } = callbacks;
   const { currentOverviewRun, referenceRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
 
@@ -254,6 +254,7 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
         onDimensionClick={onDimensionClick}
         dimensionsWithViolations={filteredStats.dimsWithViolations}
         selectedDayDimNames={selectedDayDimNames}
+        rescoreLookup={rescoreLookup}
       />
     </>
   );

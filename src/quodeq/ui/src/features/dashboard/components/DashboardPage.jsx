@@ -44,6 +44,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
       callbacks={{
         onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick,
       }}
+      rescoreLookup={rescoreLookup}
     />
   );
 }
