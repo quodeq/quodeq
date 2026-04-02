@@ -18,7 +18,6 @@ from quodeq.core.scoring.internals import (
     violation_ceiling,
     severity_grade_floor,
     score_to_grade_label,
-    scale_multiplier,
 )
 from quodeq.core.scoring.overall import weighted_overall, MODE_NUMERICAL
 from quodeq.core.types.scoring import PrincipleScore
