@@ -224,6 +224,10 @@ function useExplorerData(project, dimension, runId) {
             // Merge rescored principle grades and overall score
             const rescPrinciples = dimData.principles || [];
             const updatedGrades = (prev.principleGrades || []).map((pg) => {
+              // Update the overall row with dimension-level rescored values
+              if (pg.isOverall || pg.principle?.includes('Overall')) {
+                return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
+              }
               const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
               return match ? { ...pg, score: match.score, grade: match.grade } : pg;
             });
