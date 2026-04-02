@@ -53,7 +53,7 @@ function TreeNode({ node, actions, titles, children }) {
   useEffect(() => {
     if (isSelected && !expanded) setExpanded(true);
   }, [isSelected, expanded]);
-  const hasChildren = children && children.length > 0;
+  const hasChildren = Array.isArray(children) ? children.length > 0 : !!children;
   const showExpand = hasChildren && !alwaysExpanded;
 
   return (
