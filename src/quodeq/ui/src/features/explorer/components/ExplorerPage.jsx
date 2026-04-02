@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { getDimensionEval } from '../../../api/index.js';
+import { getDimensionEval, getRescore } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
@@ -211,7 +211,30 @@ function useExplorerData(project, dimension, runId) {
   useEffect(() => {
     setLoading(true);
     getDimensionEval(project, runId, dimension)
-      .then((data) => { setEvalData(data); setLoading(false); })
+      .then((data) => {
+        setEvalData(data);
+        setLoading(false);
+        // Chain rescore to patch principle grades with dismissed-filtered scores
+        return getRescore(project, runId).then((rescored) => {
+          const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+          if (!dimData) return;
+          setEvalData((prev) => {
+            if (!prev) return prev;
+            // Merge rescored principle grades and overall score
+            const rescPrinciples = dimData.principles || [];
+            const updatedGrades = (prev.principleGrades || []).map((pg) => {
+              const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
+              return match ? { ...pg, score: match.score, grade: match.grade } : pg;
+            });
+            return {
+              ...prev,
+              principleGrades: updatedGrades,
+              overallScore: dimData.overallScore ?? prev.overallScore,
+              overallGrade: dimData.overallGrade ?? prev.overallGrade,
+            };
+          });
+        }).catch(() => { /* rescore failure is non-fatal */ });
+      })
       .catch((err) => { setError(err.message); setLoading(false); });
   }, [project, dimension, runId]);
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
