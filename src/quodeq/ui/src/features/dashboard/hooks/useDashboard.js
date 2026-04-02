@@ -74,18 +74,29 @@ function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, se
  */
 function rescoreAllRunsEffect(project, accumulated, setRescoreLookup) {
   if (!project || !accumulated?.dimensions) return;
-  const runIds = [...new Set(accumulated.dimensions.map((d) => d.fromRunId || d.runId).filter(Boolean))];
+  // Map each dimension to its authoritative run (the run the accumulated view selected)
+  const dimToRun = {};
+  for (const d of accumulated.dimensions) {
+    const key = (d.dimension || '').toLowerCase();
+    const rid = d.fromRunId || d.runId;
+    if (key && rid) dimToRun[key] = rid;
+  }
+  const runIds = [...new Set(Object.values(dimToRun))];
   if (runIds.length === 0) return;
 
   let active = true;
-  Promise.all(runIds.map((rid) => getRescore(project, rid).catch(() => null)))
+  Promise.all(runIds.map((rid) => getRescore(project, rid).then((r) => ({ rid, data: r })).catch(() => null)))
     .then((results) => {
       if (!active) return;
       const lookup = {};
       for (const r of results) {
-        if (!r) continue;
-        for (const d of (r.dimensions || [])) {
-          lookup[(d.dimension || '').toLowerCase()] = d;
+        if (!r?.data) continue;
+        for (const d of (r.data.dimensions || [])) {
+          const key = (d.dimension || '').toLowerCase();
+          // Only use this dimension if it came from its authoritative run
+          if (dimToRun[key] === r.rid) {
+            lookup[key] = d;
+          }
         }
       }
       setRescoreLookup(lookup);

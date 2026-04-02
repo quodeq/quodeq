@@ -159,6 +159,11 @@ def register_project_data_routes(app: Flask, provider: ActionProvider) -> None:
         if payload is None:
             body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
+        # DEBUG: log reliability score from accumulated
+        for d in (payload or {}).get("dimensions", []):
+            if "reliab" in (d.get("dimension") or "").lower():
+                _logger.warning("[DEBUG-ACC] asOf=%s reliability=%s viol=%s", as_of, d.get("overallScore"), d.get("totals", {}).get("violationCount"))
+                break
         return jsonify(payload)
 
     @app.get("/api/projects/<project>/runs/<run_id>/dimensions/<dimension>/eval")
