@@ -68,11 +68,20 @@ function useDashboardHandlers(onNavigate, dashboard) {
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, loading, error, availableRuns = [], dailyRuns, overviewRunIndex = 0 } = data;
+  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, rescoreLookup = {}, loading, error, availableRuns = [], dailyRuns, overviewRunIndex = 0 } = data;
   const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
-  const accumulatedDimensions = accumulated?.dimensions || [];
+  // Merge rescored grades into accumulated dimensions so all cards reflect live scores
+  const accumulatedDimensions = useMemo(() => {
+    const dims = accumulated?.dimensions || [];
+    if (Object.keys(rescoreLookup).length === 0) return dims;
+    return dims.map((dim) => {
+      const match = rescoreLookup[(dim.dimension || '').toLowerCase()];
+      if (!match) return dim;
+      return { ...dim, overallScore: match.overallScore, overallGrade: match.overallGrade, totals: match.totals ?? dim.totals };
+    });
+  }, [accumulated, rescoreLookup]);
   const focusedDimensionData = useMemo(() => focusedDimension ? (dashboard?.dimensions || []).find((d) => d.dimension === focusedDimension) || null : null, [focusedDimension, dashboard]);
   const handlers = useDashboardHandlers(onNavigate, dashboard);
 

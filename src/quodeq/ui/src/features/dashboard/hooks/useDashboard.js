@@ -4,49 +4,7 @@ import { createDimension } from '../../../models/dimension.js';
 
 /**
  * Fetches and manages dashboard data for a given project and run.
- *
- * @param {{ selectedProject: string, selectedRun: string }} params
- * @returns {{
- *   dashboard: object|null,
- *   accumulated: object|null,
- *   loading: boolean,
- *   error: string|null,
- *   availableRuns: Array<{ runId: string, dateLabel: string }>,
- * }}
  */
-function patchAccumulatedWithLookup(setAcc, lookup) {
-  if (Object.keys(lookup).length === 0) return;
-  setAcc((prev) => {
-    if (!prev?.dimensions) return prev;
-    const patched = prev.dimensions.map((dim) => {
-      const match = lookup[(dim.dimension || '').toLowerCase()];
-      if (!match) return dim;
-      return { ...dim, overallScore: match.overallScore, overallGrade: match.overallGrade, totals: match.totals ?? dim.totals };
-    });
-    return { ...prev, dimensions: patched };
-  });
-}
-
-function rescoreAccumulatedEffect(project, accumulated, setAcc) {
-  if (!project || !accumulated?.dimensions) return;
-  const runIds = [...new Set(accumulated.dimensions.map((d) => d.fromRunId || d.runId).filter(Boolean))];
-  if (runIds.length === 0) return;
-
-  let active = true;
-  Promise.all(runIds.map((rid) => getRescore(project, rid).catch(() => null)))
-    .then((results) => {
-      if (!active) return;
-      const lookup = {};
-      for (const r of results) {
-        if (!r) continue;
-        for (const d of (r.dimensions || [])) {
-          lookup[(d.dimension || '').toLowerCase()] = d;
-        }
-      }
-      patchAccumulatedWithLookup(setAcc, lookup);
-    });
-  return () => { active = false; };
-}
 
 function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError) {
   if (!selectedProject) {
@@ -55,18 +13,18 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
     return;
   }
 
-  const activeRef = { current: true };
+  let active = true;
   setLoading(true);
   setError(null);
 
   getDashboard(selectedProject, selectedRun)
     .then((payload) => {
-      if (!activeRef.current) return;
+      if (!active) return;
       setDashboard(payload);
       // Rescore dashboard dimensions for the selected run
       const runId = payload?.selectedRun?.runId || selectedRun;
       getRescore(selectedProject, runId).then((rescored) => {
-        if (!activeRef.current) return;
+        if (!active) return;
         setDashboard((prev) => {
           if (!prev) return prev;
           return {
@@ -79,13 +37,13 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
     })
     .catch((err) => {
       console.warn('Dashboard load failed:', err);
-      if (activeRef.current) setError('Failed to load dashboard data. Please try again.');
+      if (active) setError('Failed to load dashboard data. Please try again.');
     })
     .finally(() => {
-      if (activeRef.current) setLoading(false);
+      if (active) setLoading(false);
     });
 
-  return () => { activeRef.current = false; };
+  return () => { active = false; };
 }
 
 function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError) {
@@ -109,6 +67,32 @@ function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, se
   return () => { active = false; };
 }
 
+/**
+ * Rescore all unique runs from accumulated dimensions and build a lookup
+ * of dimension name → rescored data. Stored as separate state so patching
+ * accumulated doesn't cause re-render loops.
+ */
+function rescoreAllRunsEffect(project, accumulated, setRescoreLookup) {
+  if (!project || !accumulated?.dimensions) return;
+  const runIds = [...new Set(accumulated.dimensions.map((d) => d.fromRunId || d.runId).filter(Boolean))];
+  if (runIds.length === 0) return;
+
+  let active = true;
+  Promise.all(runIds.map((rid) => getRescore(project, rid).catch(() => null)))
+    .then((results) => {
+      if (!active) return;
+      const lookup = {};
+      for (const r of results) {
+        if (!r) continue;
+        for (const d of (r.dimensions || [])) {
+          lookup[(d.dimension || '').toLowerCase()] = d;
+        }
+      }
+      setRescoreLookup(lookup);
+    });
+  return () => { active = false; };
+}
+
 function buildAvailableRuns(dashboard) {
   const trendRows = dashboard?.trend || [];
   if (trendRows.length === 0) return [];
@@ -125,6 +109,7 @@ export function useDashboard({ selectedProject, selectedRun }) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [rescoreLookup, setRescoreLookup] = useState({});
 
   // Clear stale data immediately when project changes to prevent rendering old data for a new project
   const prevProjectRef = useRef(selectedProject);
@@ -133,26 +118,15 @@ export function useDashboard({ selectedProject, selectedRun }) {
     setDashboard(null);
     setAccumulated(null);
     setLatestAccumulated(null);
+    setRescoreLookup({});
     setError(null);
   }
 
   useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun, refreshKey]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun, refreshKey]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject, refreshKey]);
-  // Rescore accumulated dimensions — runs after accumulated loads/refreshes
-  // Uses a ref to track whether accumulated has been rescored for the current refreshKey
-  const accRescoredRef = useRef(-1);
-  useEffect(() => {
-    if (!accumulated || accRescoredRef.current === refreshKey) return;
-    accRescoredRef.current = refreshKey;
-    return rescoreAccumulatedEffect(selectedProject, accumulated, setAccumulated);
-  }, [accumulated, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
-  const latestAccRescoredRef = useRef(-1);
-  useEffect(() => {
-    if (!latestAccumulated || latestAccRescoredRef.current === refreshKey) return;
-    latestAccRescoredRef.current = refreshKey;
-    return rescoreAccumulatedEffect(selectedProject, latestAccumulated, setLatestAccumulated);
-  }, [latestAccumulated, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  // Rescore all runs that contribute to accumulated — stored as lookup, not patched into accumulated
+  useEffect(() => rescoreAllRunsEffect(selectedProject, accumulated, setRescoreLookup), [selectedProject, accumulated]);
   const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
 
   const refreshTimerRef = useRef(null);
@@ -163,5 +137,5 @@ export function useDashboard({ selectedProject, selectedRun }) {
 
   useEffect(() => () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); }, []);
 
-  return { dashboard, accumulated, latestAccumulated, loading, error, availableRuns, refreshDashboard };
+  return { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, refreshDashboard };
 }
