@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.provider.violations import (
+from quodeq.services.violations import (
     ViolationContext,
     aggregate_violations,
     resolve_dimension_eval,

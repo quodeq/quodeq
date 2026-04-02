@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from quodeq.api.app import create_app
-from quodeq.provider.base import ActionProvider, EvaluationOptions
+from quodeq.services.base import ActionProvider, EvaluationOptions
 
 
 @pytest.fixture(autouse=True)

@@ -2,8 +2,8 @@ import json
 import sys
 from pathlib import Path
 
-from quodeq.provider.base import EvaluationOptions
-from quodeq.provider.filesystem import FilesystemActionProvider
+from quodeq.services.base import EvaluationOptions
+from quodeq.services.filesystem import FilesystemActionProvider
 
 
 def _write_json(path: Path, payload: dict) -> None:

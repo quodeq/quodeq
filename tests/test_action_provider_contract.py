@@ -1,5 +1,5 @@
-from quodeq.provider.base import ActionProvider
-from quodeq.provider.filesystem import FilesystemActionProvider
+from quodeq.services.base import ActionProvider
+from quodeq.services.filesystem import FilesystemActionProvider
 
 
 def test_action_provider_contract_methods():

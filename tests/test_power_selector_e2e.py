@@ -201,7 +201,7 @@ class _StubJobManager:
 @pytest.fixture()
 def filesystem_provider_stub(tmp_path: Path):
     """Return a (repo_path, reports_dir, stub_job_manager, provider) tuple."""
-    from quodeq.provider.filesystem import FilesystemActionProvider
+    from quodeq.services.filesystem import FilesystemActionProvider
 
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -215,7 +215,7 @@ class TestApiToSubprocessIntegration:
     in the env passed to the subprocess."""
 
     def test_full_chain_sonnet(self, filesystem_provider_stub) -> None:
-        from quodeq.provider.base import EvaluationOptions
+        from quodeq.services.base import EvaluationOptions
 
         repo, reports_dir, stub, provider = filesystem_provider_stub
         provider.start_evaluation(
@@ -226,7 +226,7 @@ class TestApiToSubprocessIntegration:
         assert stub.captured_env["SUBAGENT_MODEL"] == _MODEL_SONNET
 
     def test_full_chain_opus(self, filesystem_provider_stub) -> None:
-        from quodeq.provider.base import EvaluationOptions
+        from quodeq.services.base import EvaluationOptions
 
         repo, reports_dir, stub, provider = filesystem_provider_stub
         provider.start_evaluation(
@@ -237,7 +237,7 @@ class TestApiToSubprocessIntegration:
         assert stub.captured_env["SUBAGENT_MODEL"] == _MODEL_OPUS
 
     def test_full_chain_no_model_no_env_key(self, filesystem_provider_stub) -> None:
-        from quodeq.provider.base import EvaluationOptions
+        from quodeq.services.base import EvaluationOptions
 
         repo, reports_dir, stub, provider = filesystem_provider_stub
         provider.start_evaluation(

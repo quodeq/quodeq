@@ -18,7 +18,7 @@ from quodeq.api._rate_limit import (
     RateLimitStore,
     create_rate_limit_store,
 )
-from quodeq.provider.base import ActionProvider
+from quodeq.services.base import ActionProvider
 from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_static_dist
 
 from quodeq.api.routes import (
@@ -41,7 +41,7 @@ _EVALUATION_RATE_LIMIT_MAX = 10  # max evaluations per window
 
 def _default_provider() -> ActionProvider:
     """Create the default filesystem-based provider (lazy import)."""
-    from quodeq.provider.filesystem import FilesystemActionProvider
+    from quodeq.services.filesystem import FilesystemActionProvider
     return FilesystemActionProvider()
 
 

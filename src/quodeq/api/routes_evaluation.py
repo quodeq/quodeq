@@ -8,8 +8,8 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response, validate_evaluation_payload
 from quodeq.core.types import to_camel_dict
-from quodeq.provider.base import ActionProvider
-from quodeq.provider.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
+from quodeq.services.base import ActionProvider
+from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
 
 _CREDENTIALS_RE = __import__("re").compile(r"(https?://)([^@]+)@")
@@ -45,7 +45,7 @@ def _validate_ai_cmd(ai_cmd: str | None, env: dict[str, str] | None = None) -> t
 
 def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     """Construct and validate EvaluationOptions from the request payload."""
-    from quodeq.provider.base import EvaluationOptions  # deferred: avoid circular import at module level
+    from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
     max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
     pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)

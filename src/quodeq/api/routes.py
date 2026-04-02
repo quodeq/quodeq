@@ -9,7 +9,7 @@ from flask import Flask, Response, abort, jsonify, request
 from quodeq.api.helpers import error_response, register_static_routes
 from quodeq.api.zip import export_project_zip
 from quodeq.core.types import to_camel_dict
-from quodeq.provider.base import ActionProvider
+from quodeq.services.base import ActionProvider
 from quodeq.shared.utils import get_evaluations_dir
 
 # Re-export evaluation routes so existing imports from this module keep working.
@@ -253,7 +253,7 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/plugins")
     def plugins() -> Response:
-        from quodeq.provider.plugin_discovery import discover_plugins  # deferred: avoid circular import at module level
+        from quodeq.services.plugin_discovery import discover_plugins  # deferred: avoid circular import at module level
         return jsonify([to_camel_dict(p) for p in discover_plugins()])
 
     @app.get("/api/browse")

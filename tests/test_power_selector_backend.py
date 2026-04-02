@@ -9,7 +9,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.provider.base import EvaluationOptions
+from quodeq.services.base import EvaluationOptions
 from quodeq.analysis.runner import AnalysisOptions
 
 _MODEL_HAIKU = "claude-haiku-4-5"
@@ -61,7 +61,7 @@ class TestEvaluationMixinSubagentModel:
     """start_evaluation should set SUBAGENT_MODEL in the subprocess env."""
 
     def _make_provider(self, captured: dict):
-        from quodeq.provider.filesystem import FilesystemActionProvider
+        from quodeq.services.filesystem import FilesystemActionProvider
 
         class StubJobs:
             def start_job(self, cmd, cwd, env):
@@ -114,7 +114,7 @@ class TestEvaluationMixinSubagentModel:
 
 class TestApiRouteSubagentModel:
     def _make_capturing_provider(self, captured: dict):
-        from quodeq.provider.base import ActionProvider
+        from quodeq.services.base import ActionProvider
 
         class CapturingProvider(ActionProvider):
             def list_projects(self, reports_dir):

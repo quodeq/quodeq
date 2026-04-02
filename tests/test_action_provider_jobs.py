@@ -6,7 +6,7 @@ import threading
 import pytest
 
 from quodeq.core.types import JobSnapshot
-from quodeq.provider.jobs import JobManager
+from quodeq.services.jobs import JobManager
 
 _FAKE_REPORT_PATH = "Report path: /app/reports/sample-project/20260220/evaluation"
 
