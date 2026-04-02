@@ -30,8 +30,9 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
       if (!active) return;
       setDashboard(payload);
       // Chain rescore to update grades with dismissed findings filtered
+      // Errors are caught separately so the dashboard still shows original data
       const runId = payload?.selectedRun?.runId || selectedRun;
-      return getRescore(selectedProject, runId).then((rescored) => {
+      getRescore(selectedProject, runId).then((rescored) => {
         if (!active) return;
         setDashboard((prev) => {
           if (!prev) return prev;
@@ -41,7 +42,7 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
             summary: { ...prev.summary, ...rescored.summary },
           };
         });
-      });
+      }).catch((err) => console.warn('Rescore failed (non-fatal):', err));
     })
     .catch((err) => {
       console.warn('Dashboard load failed:', err);
