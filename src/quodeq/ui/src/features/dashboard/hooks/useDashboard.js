@@ -27,31 +27,28 @@ function patchAccumulatedWithLookup(setAcc, lookup) {
   });
 }
 
-function rescoreAccumulatedDimensions(project, setAcc, setLatestAcc, active) {
-  // Collect unique run IDs from accumulated dimensions, rescore each, merge results
-  setAcc((prev) => {
-    if (!prev?.dimensions) return prev;
-    const runIds = [...new Set(prev.dimensions.map((d) => d.fromRunId).filter(Boolean))];
-    if (runIds.length === 0) return prev;
-    // Fire rescores outside setState (side-effect), return prev unchanged
-    Promise.all(runIds.map((rid) => getRescore(project, rid).catch(() => null)))
-      .then((results) => {
-        if (!active.current) return;
-        const lookup = {};
-        for (const r of results) {
-          if (!r) continue;
-          for (const d of (r.dimensions || [])) {
-            lookup[(d.dimension || '').toLowerCase()] = d;
-          }
+function rescoreAccumulatedEffect(project, accumulated, setAcc) {
+  if (!project || !accumulated?.dimensions) return;
+  const runIds = [...new Set(accumulated.dimensions.map((d) => d.fromRunId).filter(Boolean))];
+  if (runIds.length === 0) return;
+
+  let active = true;
+  Promise.all(runIds.map((rid) => getRescore(project, rid).catch(() => null)))
+    .then((results) => {
+      if (!active) return;
+      const lookup = {};
+      for (const r of results) {
+        if (!r) continue;
+        for (const d of (r.dimensions || [])) {
+          lookup[(d.dimension || '').toLowerCase()] = d;
         }
-        patchAccumulatedWithLookup(setAcc, lookup);
-        patchAccumulatedWithLookup(setLatestAcc, lookup);
-      });
-    return prev;
-  });
+      }
+      patchAccumulatedWithLookup(setAcc, lookup);
+    });
+  return () => { active = false; };
 }
 
-function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setAccumulated, setLatestAccumulated, setLoading, setError) {
+function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError) {
   if (!selectedProject) {
     setDashboard(null);
     setError(null);
@@ -79,8 +76,6 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setAcc
           };
         });
       }).catch((err) => console.warn('Rescore failed (non-fatal):', err));
-      // Rescore accumulated dimensions — each may come from a different run
-      rescoreAccumulatedDimensions(selectedProject, setAccumulated, setLatestAccumulated, activeRef);
     })
     .catch((err) => {
       console.warn('Dashboard load failed:', err);
@@ -141,9 +136,23 @@ export function useDashboard({ selectedProject, selectedRun }) {
     setError(null);
   }
 
-  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setAccumulated, setLatestAccumulated, setLoading, setError), [selectedProject, selectedRun, refreshKey]);
+  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun, refreshKey]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun, refreshKey]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject, refreshKey]);
+  // Rescore accumulated dimensions — runs after accumulated loads/refreshes
+  // Uses a ref to track whether accumulated has been rescored for the current refreshKey
+  const accRescoredRef = useRef(-1);
+  useEffect(() => {
+    if (!accumulated || accRescoredRef.current === refreshKey) return;
+    accRescoredRef.current = refreshKey;
+    return rescoreAccumulatedEffect(selectedProject, accumulated, setAccumulated);
+  }, [accumulated, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
+  const latestAccRescoredRef = useRef(-1);
+  useEffect(() => {
+    if (!latestAccumulated || latestAccRescoredRef.current === refreshKey) return;
+    latestAccRescoredRef.current = refreshKey;
+    return rescoreAccumulatedEffect(selectedProject, latestAccumulated, setLatestAccumulated);
+  }, [latestAccumulated, refreshKey]); // eslint-disable-line react-hooks/exhaustive-deps
   const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
 
   const refreshTimerRef = useRef(null);
