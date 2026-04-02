@@ -5,7 +5,7 @@ from dataclasses import replace
 from typing import Any
 
 from quodeq.core.types import DimensionResult, to_camel_dict
-from quodeq.core.types.finding import Finding, Totals, SeverityTally
+from quodeq.core.types.finding import Finding
 from quodeq.core.types.report import PrincipleGrade
 from quodeq.core.scoring.engine import compute_tallies
 from quodeq.core.scoring.internals import (
@@ -18,6 +18,7 @@ from quodeq.core.scoring.internals import (
 from quodeq.core.scoring.overall import weighted_overall, MODE_NUMERICAL
 from quodeq.core.types.scoring import PrincipleScore
 from quodeq.data.fs.report_parser.grades import summarize_dimensions
+from quodeq.services.dismissed import recount_totals
 
 
 def _finding_to_dict(f: Finding) -> dict[str, Any]:
@@ -53,19 +54,6 @@ def _score_principle(violations: list[Finding], compliance: list[Finding]) -> tu
     final = round(final, 1)
     grade = score_to_grade_label(final)
     return final, grade
-
-
-def _recount_totals(violations: list[Finding], compliance_count: int) -> Totals:
-    """Recount totals from a filtered violations list."""
-    crit = sum(1 for v in violations if (v.severity or "").lower() == "critical")
-    major = sum(1 for v in violations if (v.severity or "").lower() == "major")
-    minor = sum(1 for v in violations if (v.severity or "").lower() == "minor")
-    unknown = len(violations) - crit - major - minor
-    return Totals(
-        violation_count=len(violations),
-        compliance_count=compliance_count,
-        severity=SeverityTally(critical=crit, major=major, minor=minor, unknown=unknown),
-    )
 
 
 def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> DimensionResult:
@@ -110,7 +98,7 @@ def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> Dimension
 
     # Recount totals
     compliance_count = dim.totals.compliance_count if dim.totals else len(dim.compliance)
-    new_totals = _recount_totals(filtered_violations, compliance_count)
+    new_totals = recount_totals(filtered_violations, compliance_count=compliance_count)
 
     return replace(
         dim,

@@ -93,8 +93,13 @@ def _finding_key(f: Finding) -> tuple:
     return (f.req or "", f.file or "", f.line or 0)
 
 
-def _recount_totals(violations: list[Finding], old_totals: Totals | None) -> Totals:
-    """Recompute totals from a filtered violations list, preserving compliance count."""
+def recount_totals(
+    violations: list[Finding],
+    compliance_count: int | None = None,
+    old_totals: Totals | None = None,
+) -> Totals:
+    """Recompute totals from a filtered violations list."""
+    cc = compliance_count if compliance_count is not None else (old_totals.compliance_count if old_totals else 0)
     critical = major = minor = unknown = 0
     for v in violations:
         sev = (v.severity or "").lower()
@@ -108,7 +113,7 @@ def _recount_totals(violations: list[Finding], old_totals: Totals | None) -> Tot
             unknown += 1
     return Totals(
         violation_count=len(violations),
-        compliance_count=old_totals.compliance_count if old_totals else 0,
+        compliance_count=cc,
         severity=SeverityTally(critical=critical, major=major, minor=minor, unknown=unknown),
     )
 
@@ -133,6 +138,6 @@ def filter_dismissed_from_dimensions(
             result.append(replace(
                 dim,
                 violations=filtered,
-                totals=_recount_totals(filtered, dim.totals),
+                totals=recount_totals(filtered, old_totals=dim.totals),
             ))
     return result
