@@ -14,7 +14,22 @@ import { createDimension } from '../../../models/dimension.js';
  *   availableRuns: Array<{ runId: string, dateLabel: string }>,
  * }}
  */
-function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError) {
+function patchAccumulatedWithRescore(setAcc, rescored) {
+  const rescoredDims = rescored.dimensions || [];
+  if (rescoredDims.length === 0) return;
+  const lookup = Object.fromEntries(rescoredDims.map((d) => [(d.dimension || '').toLowerCase(), d]));
+  setAcc((prev) => {
+    if (!prev?.dimensions) return prev;
+    const patched = prev.dimensions.map((dim) => {
+      const match = lookup[(dim.dimension || '').toLowerCase()];
+      if (!match) return dim;
+      return { ...dim, overallScore: match.overallScore, overallGrade: match.overallGrade, totals: match.totals ?? dim.totals };
+    });
+    return { ...prev, dimensions: patched };
+  });
+}
+
+function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setAccumulated, setLatestAccumulated, setLoading, setError) {
   if (!selectedProject) {
     setDashboard(null);
     setError(null);
@@ -42,6 +57,8 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
             summary: { ...prev.summary, ...rescored.summary },
           };
         });
+        patchAccumulatedWithRescore(setAccumulated, rescored);
+        patchAccumulatedWithRescore(setLatestAccumulated, rescored);
       }).catch((err) => console.warn('Rescore failed (non-fatal):', err));
     })
     .catch((err) => {
@@ -103,7 +120,7 @@ export function useDashboard({ selectedProject, selectedRun }) {
     setError(null);
   }
 
-  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun, refreshKey]);
+  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setAccumulated, setLatestAccumulated, setLoading, setError), [selectedProject, selectedRun, refreshKey]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun, refreshKey]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject, refreshKey]);
   const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
