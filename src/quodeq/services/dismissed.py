@@ -43,7 +43,13 @@ def dismiss_finding(project_dir: Path, finding: dict) -> None:
         "dimension": finding.get("dimension", ""),
         "principle": finding.get("principle", ""),
         "severity": finding.get("severity", ""),
+        "title": finding.get("title", ""),
         "reason": finding.get("reason", ""),
+        "reqRefs": finding.get("reqRefs", []),
+        "context": finding.get("context", ""),
+        "snippet": finding.get("snippet", ""),
+        "scope": finding.get("scope", ""),
+        "endLine": finding.get("endLine", 0),
         "dismissed_at": datetime.now(timezone.utc).isoformat(),
     }
     entries.append(entry)
