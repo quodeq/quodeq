@@ -182,13 +182,14 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
   );
 }
 
-function buildEvalPrincipalFn(evalData, complianceByPrinciple) {
+function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId) {
   return function buildEvalPrincipal(principleId) {
     const principleData = (evalData.principles || []).find((p) => p.name === principleId);
     const pg = (evalData.principleGrades || []).find((p) => p.principle === principleId);
     return {
       principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
       dimension: evalData.dimension || '',
+      project: project || '', runId: runId || '',
       principleData, dimViolations: principleData?.violations || [],
       dimCompliance: complianceByPrinciple.get(principleId) || [],
     };
@@ -249,7 +250,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
-  const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple);
+  const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId);
 
   return (
     <>
