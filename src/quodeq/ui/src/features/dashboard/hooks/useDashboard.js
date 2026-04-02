@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { getDashboard, getAccumulated } from '../../../api/index.js';
+import { getDashboard, getAccumulated, getRescore } from '../../../api/index.js';
 
 /**
  * Fetches and manages dashboard data for a given project and run.
@@ -26,7 +26,21 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
 
   getDashboard(selectedProject, selectedRun)
     .then((payload) => {
-      if (active) setDashboard(payload);
+      if (!active) return;
+      setDashboard(payload);
+      // Chain rescore to update grades with dismissed findings filtered
+      const runId = payload?.selectedRun?.runId || selectedRun;
+      return getRescore(selectedProject, runId).then((rescored) => {
+        if (!active) return;
+        setDashboard((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            dimensions: rescored.dimensions,
+            summary: { ...prev.summary, ...rescored.summary },
+          };
+        });
+      });
     })
     .catch((err) => {
       console.warn('Dashboard load failed:', err);
