@@ -74,7 +74,13 @@ function buildDismissPayload(v, fallbackDimension) {
     line,
     dimension: v.dimension || fallbackDimension || '',
     severity: v.severity,
+    title: v.title || '',
     reason: v.reason,
+    reqRefs: v.reqRefs || [],
+    context: v.context || '',
+    snippet: v.snippet || '',
+    scope: v.scope || '',
+    endLine: v.endLine || 0,
     principle: v.principle || '',
   };
 }

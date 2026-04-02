@@ -3,6 +3,7 @@ import DimensionViolationsRow from '../../dashboard/components/DimensionViolatio
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import { listDismissedFindings, restoreFinding } from '../../../api/index.js';
+import ContextBlock from '../../../components/ContextBlock.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import { complianceRatio } from '../../../utils/formatters.js';
@@ -171,15 +172,39 @@ function DismissedSubTab({ dismissed, onRestore }) {
       <div className="dismissed-list-inner">
         {dismissed.map((d) => (
           <div key={`${d.req}-${d.file}-${d.line}`} className="dismissed-card">
-            <div className="dismissed-card-body">
-              <div className="dismissed-card-top">
-                <span className="dismissed-tag">dismissed</span>
-                <span className="dismissed-label">[{d.principle || d.dimension || d.req || '?'}]</span>
-                <span className="dismissed-file">{d.file}:{d.line}</span>
-              </div>
-              {d.reason && <div className="dismissed-reason">{d.reason}</div>}
+            <div className="dismissed-card-top">
+              <span className="dismissed-tag">dismissed</span>
+              {d.severity && <span className={`severity-tag ${d.severity}`}>{d.severity}</span>}
+              <span className="dismissed-label">[{d.principle || d.dimension || d.req || '?'}]</span>
+              <span className="dismissed-file">{d.file}:{d.line}</span>
+              <button type="button" className="restore-btn" onClick={() => onRestore(d)}>Restore</button>
             </div>
-            <button type="button" className="restore-btn" onClick={() => onRestore(d)}>Restore</button>
+            {(d.reason || d.title) && (
+              <div className="dismissed-detail">
+                {d.title && (
+                  <div className="dismissed-detail-section">
+                    <div className="dismissed-detail-header">
+                      <span className="dismissed-detail-label">Reason</span>
+                      {(d.reqRefs || []).filter((r) => r.url && /^https?:\/\//.test(r.url)).length > 0 && (
+                        <span className="cwe-link-group">
+                          {d.reqRefs.filter((r) => r.url && /^https?:\/\//.test(r.url)).map((r, i) => (
+                            <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
+                          ))}
+                        </span>
+                      )}
+                    </div>
+                    <p className="dismissed-detail-title">{d.title}</p>
+                  </div>
+                )}
+                {d.reason && (
+                  <div className="dismissed-detail-section">
+                    <span className="dismissed-detail-label">Detail</span>
+                    <p className="dismissed-detail-text">{d.reason}</p>
+                  </div>
+                )}
+                <ContextBlock context={d.context} snippet={d.snippet} scope={d.scope} line={d.line} endLine={d.endLine} />
+              </div>
+            )}
           </div>
         ))}
       </div>
