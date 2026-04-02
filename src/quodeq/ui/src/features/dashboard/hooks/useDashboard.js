@@ -14,10 +14,8 @@ import { createDimension } from '../../../models/dimension.js';
  *   availableRuns: Array<{ runId: string, dateLabel: string }>,
  * }}
  */
-function patchAccumulatedWithRescore(setAcc, rescored) {
-  const rescoredDims = rescored.dimensions || [];
-  if (rescoredDims.length === 0) return;
-  const lookup = Object.fromEntries(rescoredDims.map((d) => [(d.dimension || '').toLowerCase(), d]));
+function patchAccumulatedWithLookup(setAcc, lookup) {
+  if (Object.keys(lookup).length === 0) return;
   setAcc((prev) => {
     if (!prev?.dimensions) return prev;
     const patched = prev.dimensions.map((dim) => {
@@ -29,6 +27,30 @@ function patchAccumulatedWithRescore(setAcc, rescored) {
   });
 }
 
+function rescoreAccumulatedDimensions(project, setAcc, setLatestAcc, active) {
+  // Collect unique run IDs from accumulated dimensions, rescore each, merge results
+  setAcc((prev) => {
+    if (!prev?.dimensions) return prev;
+    const runIds = [...new Set(prev.dimensions.map((d) => d.fromRunId).filter(Boolean))];
+    if (runIds.length === 0) return prev;
+    // Fire rescores outside setState (side-effect), return prev unchanged
+    Promise.all(runIds.map((rid) => getRescore(project, rid).catch(() => null)))
+      .then((results) => {
+        if (!active.current) return;
+        const lookup = {};
+        for (const r of results) {
+          if (!r) continue;
+          for (const d of (r.dimensions || [])) {
+            lookup[(d.dimension || '').toLowerCase()] = d;
+          }
+        }
+        patchAccumulatedWithLookup(setAcc, lookup);
+        patchAccumulatedWithLookup(setLatestAcc, lookup);
+      });
+    return prev;
+  });
+}
+
 function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setAccumulated, setLatestAccumulated, setLoading, setError) {
   if (!selectedProject) {
     setDashboard(null);
@@ -36,19 +58,18 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setAcc
     return;
   }
 
-  let active = true;
+  const activeRef = { current: true };
   setLoading(true);
   setError(null);
 
   getDashboard(selectedProject, selectedRun)
     .then((payload) => {
-      if (!active) return;
+      if (!activeRef.current) return;
       setDashboard(payload);
-      // Chain rescore to update grades with dismissed findings filtered
-      // Errors are caught separately so the dashboard still shows original data
+      // Rescore dashboard dimensions for the selected run
       const runId = payload?.selectedRun?.runId || selectedRun;
       getRescore(selectedProject, runId).then((rescored) => {
-        if (!active) return;
+        if (!activeRef.current) return;
         setDashboard((prev) => {
           if (!prev) return prev;
           return {
@@ -57,19 +78,19 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setAcc
             summary: { ...prev.summary, ...rescored.summary },
           };
         });
-        patchAccumulatedWithRescore(setAccumulated, rescored);
-        patchAccumulatedWithRescore(setLatestAccumulated, rescored);
       }).catch((err) => console.warn('Rescore failed (non-fatal):', err));
+      // Rescore accumulated dimensions — each may come from a different run
+      rescoreAccumulatedDimensions(selectedProject, setAccumulated, setLatestAccumulated, activeRef);
     })
     .catch((err) => {
       console.warn('Dashboard load failed:', err);
-      if (active) setError('Failed to load dashboard data. Please try again.');
+      if (activeRef.current) setError('Failed to load dashboard data. Please try again.');
     })
     .finally(() => {
-      if (active) setLoading(false);
+      if (activeRef.current) setLoading(false);
     });
 
-  return () => { active = false; };
+  return () => { activeRef.current = false; };
 }
 
 function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError) {
