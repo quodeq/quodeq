@@ -37,7 +37,8 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   return (
     <AccumulatedOverviewPanel
       data={{
-        accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
+        accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
+        accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
         trend: dashboard?.trend || [], selectedRunId,
       }}
       callbacks={{
