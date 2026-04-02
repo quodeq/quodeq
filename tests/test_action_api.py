@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from quodeq.action_api import create_app
+from quodeq.api.app import create_app
 from quodeq.provider.base import ActionProvider, EvaluationOptions
 
 

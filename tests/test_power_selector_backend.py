@@ -148,7 +148,7 @@ class TestApiRouteSubagentModel:
         return CapturingProvider()
 
     def test_subagent_model_forwarded_from_payload(self, tmp_path: Path) -> None:
-        from quodeq.action_api import create_app
+        from quodeq.api.app import create_app
 
         captured = {}
         app = create_app(self._make_capturing_provider(captured))
@@ -163,7 +163,7 @@ class TestApiRouteSubagentModel:
         assert captured["options"].subagent_model == _MODEL_SONNET
 
     def test_subagent_model_none_when_not_provided(self, tmp_path: Path) -> None:
-        from quodeq.action_api import create_app
+        from quodeq.api.app import create_app
 
         captured = {}
         app = create_app(self._make_capturing_provider(captured))
