@@ -7,12 +7,8 @@ from typing import Any
 from quodeq.core.types import DimensionResult, to_camel_dict
 from quodeq.core.types.finding import Finding, Totals, SeverityTally
 from quodeq.core.types.report import PrincipleGrade
+from quodeq.core.scoring.engine import compute_tallies
 from quodeq.core.scoring.internals import (
-    evidence_has_taxonomy,
-    tally_types_by_taxonomy,
-    tally_types_by_reason,
-    tally_compliance_types_by_taxonomy,
-    tally_compliance_types_by_reason,
     violation_base,
     compliance_lift,
     violation_ceiling,
@@ -36,22 +32,14 @@ def _finding_to_dict(f: Finding) -> dict[str, Any]:
     }
 
 
-def _compute_tallies(violations: list[Finding], compliance: list[Finding]):
-    """Count violation and compliance types, auto-selecting taxonomy or reason mode."""
-    v_dicts = [_finding_to_dict(v) for v in violations]
-    c_dicts = [_finding_to_dict(c) for c in compliance]
-    using_taxonomy = evidence_has_taxonomy(v_dicts)
-    vt = tally_types_by_taxonomy(v_dicts) if using_taxonomy else tally_types_by_reason(v_dicts)
-    ct = tally_compliance_types_by_taxonomy(c_dicts) if using_taxonomy else tally_compliance_types_by_reason(c_dicts)
-    return vt, ct
-
-
 def _score_principle(violations: list[Finding], compliance: list[Finding]) -> tuple[float | None, str]:
     """Score a single principle from its filtered violations and compliance lists.
 
     Returns (final_score, grade).
     """
-    vt_counts, ct_counts = _compute_tallies(violations, compliance)
+    v_dicts = [_finding_to_dict(v) for v in violations]
+    c_dicts = [_finding_to_dict(c) for c in compliance]
+    vt_counts, ct_counts, _using_taxonomy = compute_tallies(v_dicts, c_dicts)
     if not vt_counts and not ct_counts:
         return None, "Insufficient"
 

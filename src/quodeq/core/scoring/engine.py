@@ -173,7 +173,7 @@ def _score_principle_graded(ctx: _PrincipleContext) -> PrincipleScore:
 # Main scoring entry points
 # ---------------------------------------------------------------------------
 
-def _compute_tallies(
+def compute_tallies(
     violations: list, compliance: list,
 ) -> tuple[dict[str, int], dict[str, int], bool]:
     """Tally violation and compliance type counts, selecting taxonomy or reason mode.
@@ -202,7 +202,7 @@ def _build_principle_context(
 ) -> _PrincipleContext:
     """Extract evidence data for a single principle and return a scoring context."""
     pct, conf_level, is_balanced, total_instances = _extract_metrics(pdata)
-    vt_counts, ct_counts, using_taxonomy = _compute_tallies(
+    vt_counts, ct_counts, using_taxonomy = compute_tallies(
         pdata.get("violations", []), pdata.get("compliance", []),
     )
     dampen = compliance_dampening(ct_counts, vt_counts)
