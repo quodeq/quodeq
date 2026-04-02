@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
@@ -153,7 +153,9 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
         <span className="acc-eval-date">{dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId)}</span>
         {(dashboard?.dimensions || []).some((d) => (d.violations?.length || 0) > 0) && (
           <CopyButton
-            label="Fix plan"
+            label="Full fix plan"
+            className="fix-plan-btn-header"
+            icon={<SparkleIcon />}
             onClick={() => {
               const allViolations = (dashboard.dimensions || []).flatMap(
                 (d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))

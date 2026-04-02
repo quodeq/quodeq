@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildFilePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
@@ -33,6 +33,8 @@ function ViolationCard({ v, index }) {
         )}
         <CopyButton
           label="Fix plan"
+          className="fix-plan-btn"
+          icon={<SparkleIcon />}
           onClick={() => copyToClipboard(buildViolationPlanText(v))}
         />
       </div>
@@ -112,7 +114,9 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
         <div className="file-detail-stats-row">
           <FileSeverityStats file={file} totalViolations={totalViolations} dimensionsCount={dimensionsCount} />
           <CopyButton
-            label="File fix plan"
+            label="Full fix plan"
+            className="fix-plan-btn-header"
+            icon={<SparkleIcon />}
             onClick={() => copyToClipboard(buildFilePlanText(file))}
           />
         </div>

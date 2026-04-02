@@ -2,7 +2,7 @@ import { memo, useState, useCallback } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 
@@ -109,7 +109,12 @@ function PrincipleHeader({ data, onCopyPlan }) {
           )}
         </div>
         {violations.length > 0 && (
-          <CopyButton label="Principle fix plan" onClick={onCopyPlan} />
+          <CopyButton
+            label="Full fix plan"
+            className="fix-plan-btn-header"
+            icon={<SparkleIcon />}
+            onClick={onCopyPlan}
+          />
         )}
       </div>
       <div className="file-detail-stats" style={{ marginTop: 6 }}>
