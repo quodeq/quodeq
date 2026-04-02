@@ -1,9 +1,10 @@
-import { memo, useState, useCallback } from 'react';
+import { memo, useState, useCallback, useMemo } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import { getRescore } from '../../../api/index.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 
 const PAGE_SIZE = 20;
@@ -153,9 +154,11 @@ function PrincipleContext({ principleData }) {
 }
 
 const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal, onDismiss }) {
-  const { principleData, principle, score, grade } = evalPrincipal;
+  const { principleData, principle, score, grade, dimension, project, runId } = evalPrincipal;
   const [showAllCompliance, setShowAllCompliance] = useState(false);
   const [dismissedSet, setDismissedSet] = useState(new Set());
+  const [liveScore, setLiveScore] = useState(null);
+  const [liveGrade, setLiveGrade] = useState(null);
   const { violations, compliance, violationsBySeverity, sevCounts } = computeEvalPrincipleData(evalPrincipal);
   const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
 
@@ -163,20 +166,35 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
     if (!onDismiss) return;
     onDismiss(v);
     setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
-  }, [onDismiss]);
+    // Fire rescore to update principle score/grade
+    if (project && runId) {
+      getRescore(project, runId).then((rescored) => {
+        const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+        if (!dimData) return;
+        const pg = (dimData.principles || []).find((p) => p.principle === principle);
+        if (pg) { setLiveScore(pg.score); setLiveGrade(pg.grade); }
+      }).catch(() => {});
+    }
+  }, [onDismiss, project, runId, dimension, principle]);
 
-  // Filter dismissed violations from each severity group
-  const filteredBySeverity = {};
-  for (const sev of Object.keys(violationsBySeverity)) {
-    filteredBySeverity[sev] = (violationsBySeverity[sev] || []).filter(
-      (v) => !dismissedSet.has(`${v.file}:${v.line}`)
-    );
-  }
+  // Filter dismissed violations and recompute derived stats
+  const { filteredBySeverity, filteredViolations, liveSevCounts } = useMemo(() => {
+    const bySev = {};
+    for (const sev of Object.keys(violationsBySeverity)) {
+      bySev[sev] = (violationsBySeverity[sev] || []).filter(
+        (v) => !dismissedSet.has(`${v.file}:${v.line}`)
+      );
+    }
+    const allFiltered = Object.values(bySev).flat();
+    const counts = { critical: 0, major: 0, minor: 0 };
+    allFiltered.forEach((v) => { const s = (v.severity || 'minor').toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
+    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
+  }, [violationsBySeverity, dismissedSet]);
 
   return (
     <>
       <PrincipleHeader
-        data={{ principle, score, grade, violations, compliance, sevCounts }}
+        data={{ principle, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts }}
         onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
       />
       <PrincipleContext principleData={principleData} />

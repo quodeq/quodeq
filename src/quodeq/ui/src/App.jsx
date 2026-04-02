@@ -130,7 +130,7 @@ const ROUTE_RENDERERS = {
     );
   },
   'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
-  explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} />,
+  explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
   file: (params) => <FileDetailPage file={params.file} />,
   principle: (params) => <PrincipleDetailPage principle={params.principle} />,
@@ -197,7 +197,7 @@ export default function App() {
   const contentProps = {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
-      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, error: state.error,
+      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, rescoreLookup: state.rescoreLookup, loading: state.loading, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
     },
     navigation: {

@@ -5,7 +5,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding
+from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
 
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
@@ -48,3 +48,12 @@ def register_findings_routes(app: Flask) -> None:
             return jsonify({"error": "project, req, file, and line are required"}), 400
         restore_finding(_project_dir(_eval_dir(), project), body)
         return jsonify({"ok": True}), 200
+
+    @app.post("/api/findings/restore-all")
+    def restore_all() -> tuple[Response, int]:
+        body = request.get_json(silent=True) or {}
+        project = body.get("project", "")
+        if not project:
+            return jsonify({"error": "project is required"}), 400
+        count = restore_all_findings(_project_dir(_eval_dir(), project))
+        return jsonify({"ok": True, "restored": count}), 200

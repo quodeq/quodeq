@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import DimensionViolationsRow from '../../dashboard/components/DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
-import { listDismissedFindings, restoreFinding } from '../../../api/index.js';
+import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
@@ -159,7 +159,7 @@ function FileSubTab({ dimensions, onFileClick }) {
   );
 }
 
-function DismissedSubTab({ dismissed, onRestore }) {
+function DismissedSubTab({ dismissed, onRestore, onRestoreAll }) {
   if (dismissed.length === 0) {
     return <p className="empty-state">No dismissed findings.</p>;
   }
@@ -168,6 +168,11 @@ function DismissedSubTab({ dismissed, onRestore }) {
       <div className="section-header">
         <h3 className="section-title">Dismissed Findings</h3>
         <span className="section-count">{dismissed.length} findings · not included in scoring</span>
+        {dismissed.length > 1 && (
+          <button type="button" className="restore-btn" style={{ marginLeft: 'auto' }} onClick={onRestoreAll}>
+            Restore all
+          </button>
+        )}
       </div>
       <div className="dismissed-list-inner">
         {dismissed.map((d) => (
@@ -233,6 +238,16 @@ export default function ViolationsPage({ data, callbacks }) {
     }
   }, [selectedProject, onRefresh]);
 
+  const handleRestoreAll = useCallback(async () => {
+    try {
+      await restoreAllFindings(selectedProject);
+      setDismissed([]);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to restore all findings:', err);
+    }
+  }, [selectedProject, onRefresh]);
+
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
     return accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
@@ -278,7 +293,7 @@ export default function ViolationsPage({ data, callbacks }) {
         <FileSubTab dimensions={visibleDimensions} onFileClick={onFileClick} />
       )}
       {activeSubTab === 'dismissed' && (
-        <DismissedSubTab dismissed={dismissed} onRestore={handleRestore} />
+        <DismissedSubTab dismissed={dismissed} onRestore={handleRestore} onRestoreAll={handleRestoreAll} />
       )}
     </div>
   );

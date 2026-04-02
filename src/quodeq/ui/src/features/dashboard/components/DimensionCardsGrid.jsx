@@ -2,17 +2,19 @@ import { useMemo } from 'react';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import { formatRunId, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
 
-function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true }) {
-  const currScore = parseFloat(item.overallScore);
-  const prevScore = parseFloat(item.previousScore);
+function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true, rescoreLookup }) {
+  const match = rescoreLookup?.[(item.dimension || '').toLowerCase()];
+  const effectiveItem = match ? { ...item, overallScore: match.overallScore, overallGrade: match.overallGrade, totals: match.totals ?? item.totals } : item;
+  const currScore = parseFloat(effectiveItem.overallScore);
+  const prevScore = parseFloat(effectiveItem.previousScore);
   const delta = !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
-  const score = splitScore(item.overallScore);
+  const score = splitScore(effectiveItem.overallScore);
   const gradeClass = scoreColorClass(currScore);
   const staleClass = evaluatedToday ? 'qd-card--active' : 'qd-card-stale qd-card--carried';
   return (
     <article
       className={`qd-card ${staleClass} ${gradeClass}`}
-      onClick={() => onDimensionClick(item)}
+      onClick={() => onDimensionClick(effectiveItem)}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDimensionClick(item); } }}
@@ -31,12 +33,12 @@ function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true }) {
         <div className="qd-card-col-divider" />
         <div className="qd-card-col">
           <span className="qd-card-col-label">Viol</span>
-          <span className="qd-card-col-value">{item.totals?.violationCount ?? 0}</span>
+          <span className="qd-card-col-value">{effectiveItem.totals?.violationCount ?? 0}</span>
         </div>
         <div className="qd-card-col-divider" />
         <div className="qd-card-col">
           <span className="qd-card-col-label">Ratio</span>
-          <span className="qd-card-col-value">{complianceRatio(item.totals?.violationCount ?? 0, item.totals?.complianceCount ?? 0)}</span>
+          <span className="qd-card-col-value">{complianceRatio(effectiveItem.totals?.violationCount ?? 0, effectiveItem.totals?.complianceCount ?? 0)}</span>
         </div>
       </div>
       <div className="qd-card-footer">
@@ -48,7 +50,7 @@ function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true }) {
   );
 }
 
-export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayDimNames }) {
+export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayDimNames, rescoreLookup }) {
   const dimNameSet = selectedDayDimNames instanceof Set ? selectedDayDimNames : new Set();
   const sorted = useMemo(() => [...sortedDimensions].sort((a, b) => {
     if (dimNameSet.size === 0) return a.dimension.localeCompare(b.dimension);
@@ -68,6 +70,7 @@ export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onD
             item={item}
             onDimensionClick={onDimensionClick}
             evaluatedToday={isActive}
+            rescoreLookup={rescoreLookup}
           />
         );
       })}

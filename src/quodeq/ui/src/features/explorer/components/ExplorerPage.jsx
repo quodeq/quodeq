@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
-import { getDimensionEval } from '../../../api/index.js';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { getDimensionEval, getRescore } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
@@ -182,13 +182,14 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
   );
 }
 
-function buildEvalPrincipalFn(evalData, complianceByPrinciple) {
+function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId) {
   return function buildEvalPrincipal(principleId) {
     const principleData = (evalData.principles || []).find((p) => p.name === principleId);
     const pg = (evalData.principleGrades || []).find((p) => p.principle === principleId);
     return {
       principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
       dimension: evalData.dimension || '',
+      project: project || '', runId: runId || '',
       principleData, dimViolations: principleData?.violations || [],
       dimCompliance: complianceByPrinciple.get(principleId) || [],
     };
@@ -204,16 +205,65 @@ function useDerivedExplorerStats(evalData, allViolations) {
   return { topFiles, severityCounts, uniquePrinciples, totalCompliant, complianceByPrinciple };
 }
 
-function useExplorerData(project, dimension, runId) {
+function useExplorerData(project, dimension, runId, refreshSignal) {
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  // Fetch eval data when params change
   useEffect(() => {
     setLoading(true);
     getDimensionEval(project, runId, dimension)
-      .then((data) => { setEvalData(data); setLoading(false); })
+      .then((data) => {
+        setEvalData(data);
+        setLoading(false);
+        return getRescore(project, runId).then((rescored) => {
+          const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+          if (!dimData) return;
+          setEvalData((prev) => {
+            if (!prev) return prev;
+            // Merge rescored principle grades and overall score
+            const rescPrinciples = dimData.principles || [];
+            const updatedGrades = (prev.principleGrades || []).map((pg) => {
+              // Update the overall row with dimension-level rescored values
+              if (pg.isOverall || pg.principle?.includes('Overall')) {
+                return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
+              }
+              const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
+              return match ? { ...pg, score: match.score, grade: match.grade } : pg;
+            });
+            return {
+              ...prev,
+              principleGrades: updatedGrades,
+              overallScore: dimData.overallScore ?? prev.overallScore,
+              overallGrade: dimData.overallGrade ?? prev.overallGrade,
+            };
+          });
+        }).catch(() => { /* rescore failure is non-fatal */ });
+      })
       .catch((err) => { setError(err.message); setLoading(false); });
   }, [project, dimension, runId]);
+  // Re-run rescore when refreshSignal changes (e.g. after a dismiss on another page)
+  const initialRef = useRef(refreshSignal);
+  useEffect(() => {
+    if (refreshSignal === initialRef.current) return; // skip initial mount
+    if (!evalData || !project || !runId) return;
+    getRescore(project, runId).then((rescored) => {
+      const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+      if (!dimData) return;
+      setEvalData((prev) => {
+        if (!prev) return prev;
+        const rescPrinciples = dimData.principles || [];
+        const updatedGrades = (prev.principleGrades || []).map((pg) => {
+          if (pg.isOverall || pg.principle?.includes('Overall')) {
+            return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
+          }
+          const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
+          return match ? { ...pg, score: match.score, grade: match.grade } : pg;
+        });
+        return { ...prev, principleGrades: updatedGrades, overallScore: dimData.overallScore, overallGrade: dimData.overallGrade };
+      });
+    }).catch(() => {});
+  }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
@@ -221,12 +271,12 @@ function useExplorerData(project, dimension, runId) {
   return { evalData, loading, error, overallGrade, principleGrades, allViolations, ...stats };
 }
 
-export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate }) {
-  const d = useExplorerData(project, dimension, runId);
+export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate, refreshSignal }) {
+  const d = useExplorerData(project, dimension, runId, refreshSignal);
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
-  const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple);
+  const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId);
 
   return (
     <>
