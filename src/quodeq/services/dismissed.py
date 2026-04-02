@@ -72,6 +72,18 @@ def restore_finding(project_dir: Path, finding: dict) -> None:
         path.unlink()
 
 
+def restore_all_findings(project_dir: Path) -> int:
+    """Remove all dismissed findings. Returns the count of restored items."""
+    entries = load_dismissed(project_dir)
+    count = len(entries)
+    if count == 0:
+        return 0
+    path = _dismissed_path(project_dir)
+    if path.exists():
+        path.unlink()
+    return count
+
+
 def dismissed_keys(project_dir: Path) -> set[tuple]:
     """Return a set of (req, file, line) tuples for all dismissed findings."""
     return {_key(e) for e in load_dismissed(project_dir)}
