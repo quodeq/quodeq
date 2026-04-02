@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDashboard, getAccumulated, getRescore } from '../../../api/index.js';
+import { createDimension } from '../../../models/dimension.js';
 
 /**
  * Fetches and manages dashboard data for a given project and run.
@@ -36,7 +37,7 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
           if (!prev) return prev;
           return {
             ...prev,
-            dimensions: rescored.dimensions,
+            dimensions: (rescored.dimensions || []).map(createDimension),
             summary: { ...prev.summary, ...rescored.summary },
           };
         });
