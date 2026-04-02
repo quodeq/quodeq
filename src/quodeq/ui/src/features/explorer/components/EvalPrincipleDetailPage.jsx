@@ -177,21 +177,19 @@ const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrin
     }
   }, [onDismiss, project, runId, dimension, principle]);
 
-  // Filter dismissed violations from each severity group
-  const filteredBySeverity = {};
-  for (const sev of Object.keys(violationsBySeverity)) {
-    filteredBySeverity[sev] = (violationsBySeverity[sev] || []).filter(
-      (v) => !dismissedSet.has(`${v.file}:${v.line}`)
-    );
-  }
-
-  // Recompute counts from filtered violations
-  const filteredViolations = useMemo(() => Object.values(filteredBySeverity).flat(), [dismissedSet]); // eslint-disable-line react-hooks/exhaustive-deps
-  const liveSevCounts = useMemo(() => {
+  // Filter dismissed violations and recompute derived stats
+  const { filteredBySeverity, filteredViolations, liveSevCounts } = useMemo(() => {
+    const bySev = {};
+    for (const sev of Object.keys(violationsBySeverity)) {
+      bySev[sev] = (violationsBySeverity[sev] || []).filter(
+        (v) => !dismissedSet.has(`${v.file}:${v.line}`)
+      );
+    }
+    const allFiltered = Object.values(bySev).flat();
     const counts = { critical: 0, major: 0, minor: 0 };
-    filteredViolations.forEach((v) => { const s = (v.severity || 'minor').toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
-    return counts;
-  }, [filteredViolations]);
+    allFiltered.forEach((v) => { const s = (v.severity || 'minor').toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
+    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
+  }, [violationsBySeverity, dismissedSet]);
 
   return (
     <>
