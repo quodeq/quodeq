@@ -1,7 +1,7 @@
 import pytest
 
-from quodeq.adapters.web.http_client import HttpResponse
-from quodeq.adapters.web.evaluations_repository import WebEvaluationsRepository
+from quodeq.data.web.http_client import HttpResponse
+from quodeq.data.web.evaluations_repository import WebEvaluationsRepository
 from quodeq.data.ports.data_errors import NotFoundError
 
 

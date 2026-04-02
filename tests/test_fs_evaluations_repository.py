@@ -1,6 +1,6 @@
 import json
 import pytest
-from quodeq.adapters.fs.evaluations_repository import FilesystemEvaluationsRepository
+from quodeq.data.fs.evaluations_repository import FilesystemEvaluationsRepository
 from quodeq.data.ports.data_errors import NotFoundError
 
 

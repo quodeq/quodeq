@@ -15,7 +15,7 @@ from quodeq.services.dashboard import (
     build_dashboard,
 )
 from quodeq.services._dashboard_trend import build_accumulated_trend as _build_accumulated_trend
-from quodeq.adapters.fs.report_parser.runs import RunInfo
+from quodeq.data.fs.report_parser.runs import RunInfo
 
 
 # ---------------------------------------------------------------------------

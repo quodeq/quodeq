@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from quodeq.adapters.fs.report_parser import parse_eval_from_json, parse_eval_markdown
+from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdown
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.shared.utils import _env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export

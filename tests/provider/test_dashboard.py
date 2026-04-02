@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.adapters.fs.report_parser import RunInfo
+from quodeq.data.fs.report_parser import RunInfo
 from quodeq.core.types import DimensionResult, DimensionSummary
 from quodeq.services.dashboard import (
     _collect_previous_scores,

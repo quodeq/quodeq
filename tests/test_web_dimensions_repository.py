@@ -1,6 +1,6 @@
 import pytest
-from quodeq.adapters.web.http_client import HttpResponse
-from quodeq.adapters.web.dimensions_repository import WebDimensionsRepository
+from quodeq.data.web.http_client import HttpResponse
+from quodeq.data.web.dimensions_repository import WebDimensionsRepository
 from quodeq.data.ports.data_errors import NotFoundError
 
 
