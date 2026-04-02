@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { getDashboard, getAccumulated, getRescore } from '../../../api/index.js';
 
 /**
@@ -106,7 +106,13 @@ export function useDashboard({ selectedProject, selectedRun }) {
   useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject, refreshKey]);
   const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
 
-  const refreshDashboard = () => setRefreshKey((k) => k + 1);
+  const refreshTimerRef = useRef(null);
+  const refreshDashboard = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => setRefreshKey((k) => k + 1), 300);
+  }, []);
+
+  useEffect(() => () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); }, []);
 
   return { dashboard, accumulated, latestAccumulated, loading, error, availableRuns, refreshDashboard };
 }
