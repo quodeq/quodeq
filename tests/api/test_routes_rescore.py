@@ -22,12 +22,11 @@ def test_rescore_requires_project(client):
 
 
 @patch("quodeq.api.routes_rescore._eval_dir_from_app", return_value="/tmp/eval")
-@patch("quodeq.api.routes_rescore._reports_dir_from_app", return_value="/tmp/reports")
 @patch("quodeq.api.routes_rescore.read_run_data")
 @patch("quodeq.api.routes_rescore.list_runs")
 @patch("quodeq.api.routes_rescore.load_dismissed_keys")
 @patch("quodeq.api.routes_rescore.rescore_dimensions")
-def test_rescore_returns_rescored_data(mock_rescore, mock_dismissed, mock_list_runs, mock_read_run, _mock_reports, _mock_eval, client):
+def test_rescore_returns_rescored_data(mock_rescore, mock_dismissed, mock_list_runs, mock_read_run, _mock_eval, client):
     mock_list_runs.return_value = [MagicMock(run_id="run-1", date_iso="2026-04-02", date_label="Apr 2")]
     mock_read_run.return_value = []
     mock_dismissed.return_value = set()
