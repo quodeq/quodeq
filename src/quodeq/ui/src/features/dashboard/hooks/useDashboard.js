@@ -29,7 +29,7 @@ function patchAccumulatedWithLookup(setAcc, lookup) {
 
 function rescoreAccumulatedEffect(project, accumulated, setAcc) {
   if (!project || !accumulated?.dimensions) return;
-  const runIds = [...new Set(accumulated.dimensions.map((d) => d.fromRunId).filter(Boolean))];
+  const runIds = [...new Set(accumulated.dimensions.map((d) => d.fromRunId || d.runId).filter(Boolean))];
   if (runIds.length === 0) return;
 
   let active = true;
