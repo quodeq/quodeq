@@ -5,7 +5,7 @@ import RunOverviewPanel from './RunOverviewPanel.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, rescoreLookup, availableRuns, dailyRuns, overviewRunIndex } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, rescoreLookup, availableRuns, dailyRuns, overviewRunIndex, selectedProject } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick } = callbacks;
   if (runMode) {
@@ -39,7 +39,7 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
       data={{
         accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
         accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
-        trend: dashboard?.trend || [], selectedRunId,
+        trend: dashboard?.trend || [], selectedRunId, selectedProject,
       }}
       callbacks={{
         onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick,
@@ -99,7 +99,7 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
       {dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, rescoreLookup, availableRuns, dailyRuns, overviewRunIndex }}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, rescoreLookup, availableRuns, dailyRuns, overviewRunIndex, selectedProject }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
           callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick }}
         />

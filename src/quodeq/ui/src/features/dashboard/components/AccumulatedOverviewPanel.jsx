@@ -9,6 +9,9 @@ import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
+import CopyButton from '../../../components/CopyButton.jsx';
+import { copyToClipboard } from '../../../utils/clipboard.js';
+import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 
 // ---------------------------------------------------------------------------
 // Accumulated overview panel helpers
@@ -58,12 +61,17 @@ function SeverityTags({ severity }) {
   );
 }
 
-function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate }) {
+function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulatedDimensions, projectName }) {
   const summary = accumulated?.summary;
   return (
     <section className="acc-eval-panel panel">
       <div className="acc-eval-top">
         <span className="acc-eval-label">Accumulated Evaluation</span>
+        <CopyButton
+          label="Report"
+          className="fix-plan-btn-header"
+          onClick={() => copyToClipboard(buildOverviewReport(accumulated, accumulatedDimensions || [], projectName))}
+        />
         {lastDate && <span className="acc-eval-date">Last evaluated {lastDate}</span>}
       </div>
       <div className="acc-eval-golden">
@@ -242,6 +250,8 @@ export default function AccumulatedOverviewPanel({ data, callbacks, rescoreLooku
         accumulated={filteredAccumulated}
         scoreDelta={filteredStats.scoreDelta}
         lastDate={filteredStats.lastRun.date}
+        accumulatedDimensions={filteredDimensions}
+        projectName={data.selectedProject}
       />
 
       <div className="history-panels-row">
