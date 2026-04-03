@@ -62,6 +62,26 @@
   color: var(--color-text-muted);
 }
 
+.map-breadcrumb-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 2px 4px;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  margin-right: 4px;
+  transition: all 150ms ease;
+}
+
+.map-breadcrumb-back:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
 .map-breadcrumb-seg {
   background: none;
   border: none;
@@ -188,8 +208,15 @@
   color: var(--color-accent);
 }
 
+.heat-grid-num {
+  padding: 6px 8px;
+  text-align: center;
+  color: var(--color-text);
+  font-weight: var(--weight-medium);
+}
+
 .heat-grid-cell {
-  width: 48px;
+  min-width: 48px;
   height: 32px;
   border-radius: 3px;
   display: flex;
@@ -198,7 +225,6 @@
   font-size: 10px;
   font-weight: var(--weight-medium);
   color: rgba(255, 255, 255, 0.9);
-  cursor: pointer;
   transition: opacity 150ms ease;
 }
 
@@ -209,5 +235,19 @@
 .heat-grid-cell.empty {
   background: var(--color-surface-alt);
   color: var(--color-text-muted);
-  cursor: default;
+}
+
+/* ── Dimension filter ────────────────────────────────── */
+
+.map-dim-filter {
+  flex-wrap: wrap;
+}
+
+.map-dim-pill {
+  font-size: 11px;
+  padding: 3px 10px;
+}
+
+.map-dim-pill:not(.active) {
+  opacity: 0.5;
 }

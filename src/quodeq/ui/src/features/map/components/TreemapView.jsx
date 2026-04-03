@@ -54,18 +54,27 @@ function CustomTreemapContent(props) {
 
 export default function TreemapView({ node, viewMode, onDrillDown }) {
   const treemapData = useMemo(() => {
+    const toEntry = (n) => ({
+      name: n.name,
+      path: n.path,
+      isFile: n.isFile,
+      size: nodeSize(n, viewMode),
+      violations: n.violations,
+      compliance: n.compliance,
+      complianceRate: n.complianceRate,
+      severity: n.severity,
+      dimensions: n.dimensions,
+      // preserve children ref for drill-down check, but as a non-recharts key
+      _children: n.children,
+    });
     if (!node || !node.children || node.children.length === 0) {
-      return [{ name: node.name, size: nodeSize(node, viewMode), ...node }];
+      return [toEntry(node)];
     }
-    return node.children.map((child) => ({
-      name: child.name,
-      size: nodeSize(child, viewMode),
-      ...child,
-    }));
+    return node.children.map(toEntry);
   }, [node, viewMode]);
 
   const handleClick = (entry) => {
-    if (entry && !entry.isFile && entry.children && entry.children.length > 0) {
+    if (entry && !entry.isFile && entry._children && entry._children.length > 0) {
       onDrillDown(entry.path);
     }
   };
