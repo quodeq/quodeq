@@ -12,6 +12,7 @@ from pathlib import Path
 
 from typing import Any, Callable
 
+from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.data.fs.report_parser import safe_read_dir
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.utils import get_anthropic_api_key, read_json
@@ -155,18 +156,37 @@ class FsToolingMixin:
     ]
 
     def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:
-        """Return AI CLI clients that are installed on the system.
+        """Return available AI clients (CLI tools that are installed + API providers).
 
         *env* overrides ``os.environ`` when provided, making the method
         testable without environment mutation.
         """
         environ = env if env is not None else os.environ
+        clients: list[dict[str, str]] = []
+
+        # CLI tools: only include if installed
         if "QUODEQ_AI_CLIENTS" in environ:
             ids = [c.strip() for c in environ["QUODEQ_AI_CLIENTS"].split(",") if c.strip()]
             candidates = [{"id": c, "label": c.capitalize()} for c in ids]
         else:
             candidates = self._CLI_CANDIDATES
-        return {"clients": [c for c in candidates if shutil.which(c["id"])]}
+
+        for c in candidates:
+            if shutil.which(c["id"]):
+                clients.append({**c, "type": "cli"})
+
+        # API providers: always available (no CLI binary needed)
+        provider_configs = get_provider_configs()
+        for provider_id, cfg in provider_configs.items():
+            if cfg.get("type") == "api" and provider_id != "custom":
+                if not any(c["id"] == provider_id for c in clients):
+                    clients.append({
+                        "id": provider_id,
+                        "label": provider_id.capitalize(),
+                        "type": "api",
+                    })
+
+        return {"clients": clients}
 
     def _get_cli_models(self, client_id: str, env: dict[str, str] | None = None) -> dict[str, list[str]]:
         if client_id not in get_allowed_client_ids(env=env):
