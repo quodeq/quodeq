@@ -25,6 +25,7 @@ export default function HeatGridView({ node, viewMode, onDrillDown }) {
                 <th>Major</th>
                 <th>Minor</th>
                 <th>Total</th>
+                <th>Health</th>
               </>
             ) : (
               <>
@@ -62,6 +63,7 @@ export default function HeatGridView({ node, viewMode, onDrillDown }) {
                     <td><div className={`heat-grid-cell${row.severity.major > 0 ? '' : ' empty'}`} style={row.severity.major > 0 ? { background: 'var(--map-major)' } : undefined}>{row.severity.major || '—'}</div></td>
                     <td><div className={`heat-grid-cell${row.severity.minor > 0 ? '' : ' empty'}`} style={row.severity.minor > 0 ? { background: 'var(--map-minor)' } : undefined}>{row.severity.minor || '—'}</div></td>
                     <td><div className="heat-grid-num">{row.violations}</div></td>
+                    <td><div className={`heat-grid-cell${total > 0 ? '' : ' empty'}`} style={total > 0 ? { background: complianceRateColor(row.complianceRate) } : undefined}>{rate}</div></td>
                   </>
                 ) : (
                   <>
