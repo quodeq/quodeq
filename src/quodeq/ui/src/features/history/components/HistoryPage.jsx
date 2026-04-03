@@ -50,7 +50,7 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
         )}
       </div>
       <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
-      <div className="dimensions-header"><h3 className="dimensions-title">Evaluations</h3></div>
+      <div className="section-header"><h3 className="section-title">Evaluations</h3></div>
       <div className="history-list">
         {visible.map((entry, i) => (
           <HistoryRunRow key={entry.runId} entry={entry} delta={deltas[i]} isSelected={entry.runId === selectedRunId} onClick={onRunClick} />

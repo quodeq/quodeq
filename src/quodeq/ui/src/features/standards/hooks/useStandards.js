@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { listStandards, deleteStandard, duplicateStandard } from '../../../api/index.js';
 
-const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
+export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
 export function useStandards() {
   const [standards, setStandards] = useState([]);

@@ -1,62 +1,199 @@
-import { useMemo, useState } from 'react';
-import DimensionViolationsRow from '../../dashboard/components/DimensionViolationsRow.jsx';
-import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
-import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
-import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
-import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
-import { complianceRatio } from '../../../utils/formatters.js';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
+import { complianceRatio } from '../../../utils/formatters.js';
+import { buildFileTree, treeNodeToFileObj } from '../../map/utils/fileTree.js';
+import HeatGridView from '../../map/components/HeatGridView.jsx';
+import DimensionHeatGridView from './DimensionHeatGridView.jsx';
+import DismissedSubTab from './DismissedSubTab.jsx';
 
-const SUB_TABS = [
-  { id: 'dimension', label: 'By Dimension' },
-  { id: 'file', label: 'By File' },
-];
 
-function ViolationsPillNav({ activeSubTab, onSubTabChange }) {
+function findSubtree(root, path) {
+  if (!path) return root;
+  function walk(node) {
+    if (node.path === path) return node;
+    for (const child of node.children) {
+      const found = walk(child);
+      if (found) return found;
+    }
+    return null;
+  }
+  return walk(root) || root;
+}
+
+function findParentPath(root, currentPath) {
+  function walk(node, parentPath) {
+    if (node.path === currentPath) return parentPath;
+    for (const child of node.children) {
+      const found = walk(child, node.path);
+      if (found !== null) return found;
+    }
+    return null;
+  }
+  return walk(root, '') || '';
+}
+
+function buildBreadcrumbPath(root, path) {
+  if (!path) return [];
+  const segments = [];
+  function walk(node) {
+    if (node.path === path) { segments.push({ name: node.name, path: node.path }); return true; }
+    for (const child of node.children) {
+      if (walk(child)) { segments.unshift({ name: node.name, path: node.path }); return true; }
+    }
+    return false;
+  }
+  walk(root);
+  return segments.filter((s) => s.path);
+}
+
+function FileBreadcrumb({ path, onNavigate, onBack }) {
+  if (path.length === 0) return null;
+  const segments = [{ name: 'Root', path: '' }, ...path];
   return (
-    <div className="violations-pill-nav">
-      {SUB_TABS.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          className={`pill-btn${activeSubTab === tab.id ? ' active' : ''}`}
-          onClick={() => onSubTabChange(tab.id)}
-        >
-          {tab.label}
-        </button>
+    <div className="map-breadcrumb">
+      <button type="button" className="map-breadcrumb-back" onClick={onBack} title="Go back">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+      </button>
+      {segments.map((seg, i) => (
+        <span key={seg.path}>
+          {i > 0 && <span className="map-breadcrumb-sep">&rsaquo;</span>}
+          {i < segments.length - 1 ? (
+            <button type="button" className="map-breadcrumb-seg" onClick={() => onNavigate(seg.path)}>{seg.name}</button>
+          ) : (
+            <span className="map-breadcrumb-current">{seg.name}</span>
+          )}
+        </span>
       ))}
     </div>
   );
 }
 
-function ViolationsHeader({ accumulated, topFilesCount, uniquePrinciples }) {
-  const summary = accumulated?.summary;
+function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
+  const fullTree = useMemo(() => buildFileTree(dimensions), [dimensions]);
+  const currentNode = useMemo(() => findSubtree(fullTree, currentPath), [fullTree, currentPath]);
+  const breadcrumb = useMemo(() => buildBreadcrumbPath(fullTree, currentPath), [fullTree, currentPath]);
+
+  const handleFileClick = useCallback((treeNode) => {
+    if (treeNode.isFile) onFileClick?.(treeNodeToFileObj(treeNode));
+  }, [onFileClick]);
+
   return (
     <>
-      <div className="page-header">
+      <FileBreadcrumb path={breadcrumb} onNavigate={setCurrentPath} onBack={() => setCurrentPath(findParentPath(fullTree, currentPath))} />
+      <HeatGridView node={currentNode} onDrillDown={setCurrentPath} onFileClick={handleFileClick} />
+    </>
+  );
+}
+
+let _savedSubTab = 'dimension';
+let _savedFilePath = '';
+
+function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh }) {
+  const [activeSubTab, _setActiveSubTab] = useState(_savedSubTab);
+  const setActiveSubTab = (v) => { _savedSubTab = v; _setActiveSubTab(v); };
+  const [dismissed, setDismissed] = useState([]);
+  const [fileCurrentPath, _setFileCurrentPath] = useState(_savedFilePath);
+  const setFileCurrentPath = (v) => { _savedFilePath = v; _setFileCurrentPath(v); };
+
+  useEffect(() => {
+    if (!selectedProject) return;
+    listDismissedFindings(selectedProject).then(setDismissed).catch(() => setDismissed([]));
+  }, [selectedProject]);
+
+  const handleRestore = useCallback(async (d) => {
+    try {
+      await restoreFinding(selectedProject, { req: d.req, file: d.file, line: d.line });
+      setDismissed((prev) => prev.filter((item) => !(item.req === d.req && item.file === d.file && item.line === d.line)));
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to restore finding:', err);
+    }
+  }, [selectedProject, onRefresh]);
+
+  const handleRestoreAll = useCallback(async () => {
+    try {
+      await restoreAllFindings(selectedProject);
+      setDismissed([]);
+      onRefresh?.();
+    } catch (err) {
+      console.error('Failed to restore all findings:', err);
+    }
+  }, [selectedProject, onRefresh]);
+
+  const visibleDimensions = useMemo(() => {
+    const visibleSet = new Set(readVisibleStandardIds());
+    return accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
+  }, [accumulatedDimensions]);
+
+  const summary = useMemo(() => computeSummaryFromDimensions(visibleDimensions), [visibleDimensions]);
+
+  const topFilesCount = useMemo(
+    () => new Set(visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.file)).filter(Boolean)).size,
+    [visibleDimensions]
+  );
+
+  const uniquePrinciples = useMemo(
+    () => new Set(visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.principle)).filter(Boolean)).size,
+    [visibleDimensions]
+  );
+
+  return {
+    activeSubTab, setActiveSubTab, dismissed,
+    handleRestore, handleRestoreAll, visibleDimensions,
+    summary, topFilesCount, uniquePrinciples,
+    fileCurrentPath, setFileCurrentPath,
+  };
+}
+
+export default function ViolationsPage({ data, callbacks }) {
+  const { accumulatedDimensions, selectedProject } = data;
+  const { onDimensionClick, onFileClick, onPrincipleClick, onRefresh } = callbacks;
+
+  const {
+    activeSubTab, setActiveSubTab, dismissed,
+    handleRestore, handleRestoreAll, visibleDimensions,
+    summary, topFilesCount, uniquePrinciples,
+    fileCurrentPath, setFileCurrentPath,
+  } = useViolationsData({ accumulatedDimensions, selectedProject, onRefresh });
+
+  return (
+    <div className="violations-page">
+      <div className="map-header">
         <h2 className="page-title">Violations</h2>
+        <div className="map-pill-group">
+          {[
+            { id: 'dimension', label: 'By Dimension' },
+            { id: 'file', label: 'By File' },
+            { id: 'dismissed', label: dismissed.length > 0 ? `Dismissed (${dismissed.length})` : 'Dismissed' },
+          ].map((tab) => (
+            <button key={tab.id} type="button" className={`map-pill${activeSubTab === tab.id ? ' active' : ''}`} onClick={() => setActiveSubTab(tab.id)}>
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
       <section className="panel violations-stats-panel">
         <div className="violations-stats-grid">
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Violations</span>
-            <span className="acc-eval-stat-value">{summary?.totalViolations || 0}</span>
+            <span className="acc-eval-stat-value">{summary.totalViolations || 0}</span>
             <div className="acc-eval-tags">
-              {(summary?.severity?.critical || 0) > 0 && <span className="severity-tag critical">{summary.severity.critical} critical</span>}
-              {(summary?.severity?.major || 0) > 0 && <span className="severity-tag major">{summary.severity.major} major</span>}
-              {(summary?.severity?.minor || 0) > 0 && <span className="severity-tag minor">{summary.severity.minor} minor</span>}
+              {(summary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{summary.severity.critical} critical</span>}
+              {(summary.severity?.major || 0) > 0 && <span className="severity-tag major">{summary.severity.major} major</span>}
+              {(summary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{summary.severity.minor} minor</span>}
             </div>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Compliance</span>
-            <span className="acc-eval-stat-value">{summary?.totalCompliance || 0}</span>
+            <span className="acc-eval-stat-value">{summary.totalCompliance || 0}</span>
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Ratio</span>
-            <span className="acc-eval-stat-value">{complianceRatio(summary?.totalViolations || 0, summary?.totalCompliance || 0)}</span>
+            <span className="acc-eval-stat-value">{complianceRatio(summary.totalViolations || 0, summary.totalCompliance || 0)}</span>
           </div>
           <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Files Affected</span>
+            <span className="acc-eval-stat-label">Files</span>
             <span className="acc-eval-stat-value">{topFilesCount}</span>
           </div>
           <div className="acc-eval-stat-block">
@@ -65,144 +202,20 @@ function ViolationsHeader({ accumulated, topFilesCount, uniquePrinciples }) {
           </div>
           <div className="acc-eval-stat-block">
             <span className="acc-eval-stat-label">Dimensions</span>
-            <span className="acc-eval-stat-value">{summary?.dimensionCount || 0}</span>
+            <span className="acc-eval-stat-value">{visibleDimensions.length}</span>
           </div>
         </div>
       </section>
-    </>
-  );
-}
-
-function DimensionSubTab({ dimensions, onDimensionClick, onPrincipleClick }) {
-  const dimsWithViolations = useMemo(
-    () => sortDimensionsByViolationSeverity(dimensions),
-    [dimensions]
-  );
-
-  const violationsByPrinciple = useMemo(
-    () => dimensions.flatMap((d) =>
-      (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
-    ),
-    [dimensions]
-  );
-
-  const uniquePrinciples = useMemo(
-    () => new Set(violationsByPrinciple.map((v) => v.principle).filter(Boolean)).size,
-    [violationsByPrinciple]
-  );
-
-  if (dimsWithViolations.length === 0) {
-    return <p className="empty-state">No violations found.</p>;
-  }
-
-  return (
-    <>
-      <div className="section-header">
-        <h3 className="section-title">Violations by Dimension</h3>
-        <span className="section-count">{dimsWithViolations.length} dimensions</span>
-      </div>
-      <section className="panel violations-panel expandable">
-        <div className="dimension-violations-list">
-          {dimsWithViolations.map((dim) => (
-            <DimensionViolationsRow
-              key={dim.dimension}
-              dimension={dim}
-              onClick={() => onDimensionClick(dim)}
-            />
-          ))}
-        </div>
-      </section>
-
-      {violationsByPrinciple.length > 0 && (
-        <>
-          <div className="section-header">
-            <h3 className="section-title">Violations by Principle</h3>
-            <span className="section-count">{uniquePrinciples} principles</span>
-          </div>
-          <section className="panel wide-panel offending-panel">
-            <div className="trend-table-wrap">
-              <ViolationsByPrincipleTable violations={violationsByPrinciple} onPrincipleClick={onPrincipleClick} />
-            </div>
-          </section>
-        </>
-      )}
-    </>
-  );
-}
-
-function FileSubTab({ dimensions, onFileClick }) {
-  const topFiles = useMemo(
-    () => withDimensionsStr(buildTopOffendingFiles(dimensions)),
-    [dimensions]
-  );
-
-  if (topFiles.length === 0) {
-    return <p className="empty-state">No file violations found.</p>;
-  }
-
-  return (
-    <>
-      <div className="section-header">
-        <h3 className="section-title">Violations by File</h3>
-        <span className="section-count">{topFiles.length} files</span>
-      </div>
-      <section className="panel wide-panel offending-panel">
-        <div className="trend-table-wrap">
-          <TopOffendingFilesTable files={topFiles} onFileClick={onFileClick} />
-        </div>
-      </section>
-    </>
-  );
-}
-
-export default function ViolationsPage({ data, callbacks }) {
-  const { accumulated, accumulatedDimensions } = data;
-  const { onDimensionClick, onFileClick, onPrincipleClick } = callbacks;
-  const [activeSubTab, setActiveSubTab] = useState('dimension');
-
-  const visibleDimensions = useMemo(() => {
-    const visibleSet = new Set(readVisibleStandardIds());
-    return accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-  }, [accumulatedDimensions]);
-
-  const topFilesCount = useMemo(
-    () => new Set(
-      visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.file)).filter(Boolean)
-    ).size,
-    [visibleDimensions]
-  );
-
-  const uniquePrinciples = useMemo(
-    () => new Set(
-      visibleDimensions.flatMap((d) => (d.violations || []).map((v) => v.principle)).filter(Boolean)
-    ).size,
-    [visibleDimensions]
-  );
-
-  const filteredAccumulated = useMemo(() => {
-    if (!accumulated) return accumulated;
-    const { totalViolations, totalCompliance, severity } = computeSummaryFromDimensions(visibleDimensions);
-    return {
-      ...accumulated,
-      summary: {
-        ...accumulated.summary,
-        totalViolations,
-        totalCompliance,
-        dimensionCount: visibleDimensions.length,
-        severity,
-      },
-    };
-  }, [accumulated, visibleDimensions]);
-
-  return (
-    <div className="violations-page">
-      <ViolationsHeader accumulated={filteredAccumulated} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} />
-      <ViolationsPillNav activeSubTab={activeSubTab} onSubTabChange={setActiveSubTab} />
-      {activeSubTab === 'dimension' && (
-        <DimensionSubTab dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} />
-      )}
       {activeSubTab === 'file' && (
-        <FileSubTab dimensions={visibleDimensions} onFileClick={onFileClick} />
+        <FileSubTab dimensions={visibleDimensions} onFileClick={onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />
+      )}
+      {activeSubTab === 'dimension' && (
+        <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} />
+      )}
+      {activeSubTab === 'dismissed' && (
+        dismissed.length > 0
+          ? <DismissedSubTab dismissed={dismissed} onRestore={handleRestore} onRestoreAll={handleRestoreAll} />
+          : <p className="empty-state">No dismissed violations.</p>
       )}
     </div>
   );

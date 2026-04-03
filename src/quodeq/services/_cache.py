@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 import threading
 from collections import OrderedDict
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
@@ -17,6 +18,15 @@ from quodeq.core.types import DimensionResult
 _logger = logging.getLogger(__name__)
 
 _CACHE_WAIT_TIMEOUT_S = 30
+
+
+@dataclass
+class _CacheContext:
+    """Grouped cache state used by internal cache helpers."""
+    cache: OrderedDict
+    lock: threading.Lock
+    max_size: int
+    inflight: dict[tuple, threading.Event] = field(default_factory=dict)
 
 
 def _fetch_dimensions_from_disk(
@@ -38,49 +48,46 @@ def _fetch_dimensions_from_disk(
 
 
 def _cache_lookup(
-    key: tuple, cache: OrderedDict, lock: threading.Lock,
+    key: tuple, ctx: _CacheContext,
 ) -> list[DimensionResult] | None:
     """Return cached data for *key* (promoting it in LRU order), or None."""
-    with lock:
-        if key in cache:
-            cache.move_to_end(key)
-            return cache[key]
+    with ctx.lock:
+        if key in ctx.cache:
+            ctx.cache.move_to_end(key)
+            return ctx.cache[key]
     return None
 
 
 def _cache_store(
-    key: tuple, data: list[DimensionResult],
-    cache: OrderedDict, lock: threading.Lock, max_size: int,
+    key: tuple, data: list[DimensionResult], ctx: _CacheContext,
 ) -> None:
     """Insert *data* into the cache under *key*, evicting if necessary."""
-    with lock:
-        cache[key] = data
-        cache.move_to_end(key)
-        while len(cache) > max_size:
-            cache.popitem(last=False)
+    with ctx.lock:
+        ctx.cache[key] = data
+        ctx.cache.move_to_end(key)
+        while len(ctx.cache) > ctx.max_size:
+            ctx.cache.popitem(last=False)
 
 
 def _wait_for_inflight(
-    key: tuple, event: threading.Event,
-    cache: OrderedDict, lock: threading.Lock,
+    key: tuple, event: threading.Event, ctx: _CacheContext,
 ) -> list[DimensionResult]:
     """Wait for another thread's in-flight fetch and return the cached result."""
     event.wait(timeout=_CACHE_WAIT_TIMEOUT_S)
-    with lock:
-        return list(cache.get(key, []))
+    with ctx.lock:
+        return list(ctx.cache.get(key, []))
 
 
 def _fetch_and_store(
     key: tuple, reports_root: Path, project: str, run_id: str,
-    cache: OrderedDict, lock: threading.Lock, max_size: int,
-    inflight: dict[tuple, threading.Event],
+    ctx: _CacheContext,
 ) -> list[DimensionResult]:
     """Perform the disk fetch, store in cache, and notify waiters."""
     data = _fetch_dimensions_from_disk(reports_root, project, run_id)
     if data:
-        _cache_store(key, data, cache, lock, max_size)
-    with lock:
-        notify_event = inflight.pop(key, None)
+        _cache_store(key, data, ctx)
+    with ctx.lock:
+        notify_event = ctx.inflight.pop(key, None)
     if notify_event is not None:
         notify_event.set()
     return data
@@ -103,32 +110,31 @@ def make_lru_dimension_fetcher(
     threads that request the same key while I/O is in progress wait on the
     event and then read the result from the cache.
     """
-    _inflight: dict[tuple, threading.Event] = {}
+    ctx = _CacheContext(cache=cache, lock=lock, max_size=max_size)
 
     def get_run_dimensions(run_id: str) -> list[DimensionResult]:
         key = (reports_root, project, run_id)
 
-        cached = _cache_lookup(key, cache, lock)
+        cached = _cache_lookup(key, ctx)
         if cached is not None:
             return cached
 
-        with lock:
-            if key in cache:
-                cache.move_to_end(key)
-                return cache[key]
-            existing = _inflight.get(key)
+        with ctx.lock:
+            if key in ctx.cache:
+                ctx.cache.move_to_end(key)
+                return ctx.cache[key]
+            existing = ctx.inflight.get(key)
             if existing is not None:
                 wait_event = existing
             else:
                 wait_event = None
-                _inflight[key] = threading.Event()
+                ctx.inflight[key] = threading.Event()
 
         if wait_event is not None:
-            return _wait_for_inflight(key, wait_event, cache, lock)
+            return _wait_for_inflight(key, wait_event, ctx)
 
         return _fetch_and_store(
-            key, reports_root, project, run_id,
-            cache, lock, max_size, _inflight,
+            key, reports_root, project, run_id, ctx,
         )
 
     return get_run_dimensions

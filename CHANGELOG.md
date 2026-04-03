@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.9.0] — 2026-04-01
+
+### Features
+- **Standards visibility toggle** — show/hide standards in the dashboard, bundled evaluators
+- **Evaluator import/export** — import/export evaluators with validation and security scanning
+- **History tab** — evaluation run list with run navigator and daily grouping
+- **Overview daily grouping** — chart and navigator step by day with dimension highlights
+- **Fingerprint-aware verification** — skip AI for unchanged files
+- **Progressive coverage** — backfill unevaluated files across incremental runs
+- **Theme system redesign** — family+mode architecture
+- **UI redesign** — panels, cards, charts, settings, and project header overhaul
+
+### Fixes
+- Incremental flow fixes and dashboard --dev flag
+- Backfill efficiency — accurate analyzed_files + skip verification
+- Right-size verification pool agent count
+- Save fingerprint after subagent analysis for carry-forward
+- Raise default max export size from 100MB to 500MB
+- Blank screen when switching between parent/child projects
+
+### Code Quality
+- 500+ maintainability violations resolved across analyzability, modularity, reusability, modifiability
+- 10 security violations resolved
+- Deleted deprecated re-export shims, extracted magic numbers, added docstrings to public APIs
+- Reduced function fan-out, nesting depth, and parameter counts across codebase
+
+## [0.8.1] — 2026-03-27
+
+### Fixes
+- Collapsible code blocks with minimal link style
+- Decouple history run selection from overview
+- Scope bar shows available snippet/context data from old evaluations
+- Clickable bar for scope findings with compact accordion style
+- VS Code-style line numbers in code context blocks
+- See more/less toggle for large code blocks
+- Cap code snippets in fix plans to 5 lines
+
+### Code Quality
+- 26 clean-architecture violations resolved
+
 ## [0.8.0] — 2026-03-26
 
 ### Features
@@ -154,7 +194,13 @@ Same as 0.4.1 — initial stable release of the v0.4 feature set.
 - Accumulated view no longer hides stale dimensions
 - Timezone-aware ISO date parsing
 
-[0.6.0]: https://github.com/quodeq/quodeq/compare/v0.5.0...HEAD
+[0.9.0]: https://github.com/quodeq/quodeq/compare/v0.8.1...v0.9.0
+[0.8.1]: https://github.com/quodeq/quodeq/compare/v0.8.0...v0.8.1
+[0.8.0]: https://github.com/quodeq/quodeq/compare/v0.7.0...v0.8.0
+[0.7.0]: https://github.com/quodeq/quodeq/compare/v0.6.2...v0.7.0
+[0.6.2]: https://github.com/quodeq/quodeq/compare/v0.6.1...v0.6.2
+[0.6.1]: https://github.com/quodeq/quodeq/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/quodeq/quodeq/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/quodeq/quodeq/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/quodeq/quodeq/compare/0.4.0...v0.4.1
 [0.4.0]: https://github.com/quodeq/quodeq/compare/0.2.0-alpha...0.4.0

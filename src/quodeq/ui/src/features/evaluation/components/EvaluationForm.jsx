@@ -71,10 +71,18 @@ function useEvaluationForm(onStart) {
   const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
 
   return {
-    repo, setRepo, allDimensions, selectedDims,
-    folderBrowserOpen, setFolderBrowserOpen,
-    toggleDim, selectAll, clearAll,
-    handleSubmit, handleFolderSelect, handleRepoClear,
+    repo,
+    setRepo,
+    allDimensions,
+    selectedDims,
+    folderBrowserOpen,
+    setFolderBrowserOpen,
+    toggleDim,
+    selectAll,
+    clearAll,
+    handleSubmit,
+    handleFolderSelect,
+    handleRepoClear,
     dimLoadError,
   };
 }

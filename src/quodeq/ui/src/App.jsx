@@ -1,6 +1,4 @@
-import { useState, useMemo } from 'react';
-import { useDashboard } from './features/dashboard/hooks/useDashboard.js';
-import { buildDailyRuns } from './utils/dailyGrouping.js';
+import { useMemo } from 'react';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
@@ -13,20 +11,19 @@ import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx'
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
 import StandardsPage from './features/standards/StandardsPage.jsx';
 import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
+import MapPage from './features/map/components/MapPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
+import { dismissFinding } from './api/index.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
-import { useServerHealth } from './hooks/useServerHealth.js';
-import { useNavStack } from './hooks/useNavStack.js';
-import { useRunNavigator } from './hooks/useRunNavigator.js';
-import { useProjectState } from './hooks/useProjectState.js';
-import { useAppSettings } from './hooks/useAppSettings.js';
-import { useEvaluationLifecycle } from './hooks/useEvaluationLifecycle.js';
-import { useProjectActions } from './hooks/useProjectActions.js';
-import { useVisibleRuns } from './hooks/useVisibleRuns.js';
+import { useAppState, formatDayLabel, KNOWN_TABS } from './hooks/useAppState.js';
 
 
+/**
+ * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
+ * @returns {JSX.Element}
+ */
 function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
   const { connected, setConnected } = serverHealth;
   const { job, jobError, liveViolations, analysisPower, setAnalysisPower, persistAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
@@ -42,6 +39,10 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
   );
 }
 
+/**
+ * @param {{ settings: Object, analysisPower: string, setAnalysisPower: Function, persistAnalysisPower: Function }} props
+ * @returns {JSX.Element}
+ */
 function SettingsCase({ settings, analysisPower, setAnalysisPower, persistAnalysisPower }) {
   return (
     <SettingsPage
@@ -64,6 +65,40 @@ function resolveHistorySelectedRunId(selectedRun, trend) {
   return trend.length > 0 ? trend[0].runId : null;
 }
 
+function buildDismissPayload(v, fallbackDimension) {
+  const fileParts = (v.file || '').split(':');
+  const file = fileParts[0];
+  const line = v.line ?? (fileParts[1] ? parseInt(fileParts[1], 10) : 0);
+  return {
+    req: v.req || v.principle,
+    file,
+    line,
+    dimension: v.dimension || fallbackDimension || '',
+    severity: v.severity,
+    title: v.title || '',
+    reason: v.reason,
+    reqRefs: v.reqRefs || [],
+    context: v.context || '',
+    snippet: v.snippet || '',
+    scope: v.scope || '',
+    endLine: v.endLine || 0,
+    principle: v.principle || '',
+  };
+}
+
+function renderEvalPrincipleDetail(params, props) {
+  return (
+    <EvalPrincipleDetailPage
+      evalPrincipal={params.evalPrincipal}
+      onDismiss={(v) => {
+        dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.evalPrincipal?.dimension))
+          .then(() => props.refreshDashboard?.())
+          .catch((e) => console.error('[Dismiss] failed:', e));
+      }}
+    />
+  );
+}
+
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
   violations: (params, props) => {
@@ -72,14 +107,19 @@ const ROUTE_RENDERERS = {
     const nav = props.navigation.handleNavigate;
     return (
       <ViolationsPage
-        data={{ accumulated: acc, accumulatedDimensions: dims }}
+        data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
         callbacks={{
           onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, sourceTab: 'violations' }),
           onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
           onPrincipleClick: (principleObj) => nav('principle', { principle: principleObj, sourceTab: 'violations' }),
+          onRefresh: props.refreshDashboard,
         }}
       />
     );
+  },
+  map: (params, props) => {
+    const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
+    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard }} callbacks={{ onNavigate: props.navigation.handleNavigate }} />;
   },
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   history: (params, props) => {
@@ -108,17 +148,21 @@ const ROUTE_RENDERERS = {
     );
   },
   'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
-  explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} />,
+  explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
   file: (params) => <FileDetailPage file={params.file} />,
   principle: (params) => <PrincipleDetailPage principle={params.principle} />,
-  evalprinciple: (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
-  'eval-principle-detail': (params) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} />,
+  evalprinciple: renderEvalPrincipleDetail,
+  'eval-principle-detail': renderEvalPrincipleDetail,
   settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} persistAnalysisPower={props.evaluation.persistAnalysisPower} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
   standards: () => <StandardsPage />,
 };
 
+/**
+ * @param {{ activePage: { page: string }, props: Object }} params
+ * @returns {JSX.Element|null}
+ */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
   const noProjectTabs = ['evaluate', 'standards', 'settings'];
@@ -134,36 +178,10 @@ function MainContent({ activePage, props }) {
   return null;
 }
 
-function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
-  // Header meta
-  const accDims = accumulated?.dimensions || [];
-  let headerMeta = null;
-  if (accDims.length > 0) {
-    const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
-    const repository = accDims.find((d) => d.repository)?.repository ?? null;
-    const runDims = dashboard?.dimensions || [];
-    const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
-    const project = projects.find((p) => p.id === selectedProject);
-    const languageStats = project?.languageStats ?? null;
-    headerMeta = { discipline, repository, totalFiles, languageStats };
-  }
-
-  // Project display
-  let selectedDisplayName = selectedProject;
-  let selectedProjectParent = null;
-  let selectedProjectParentId = null;
-  if (selectedProject && projects.length) {
-    const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
-    const parentRef = data?.parent || null;
-    const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
-    selectedDisplayName = data?.displayName || data?.name || selectedProject;
-    selectedProjectParent = parentData?.displayName || parentData?.name || parentRef;
-    selectedProjectParentId = parentData ? (parentData.id || parentData.name || parentRef) : null;
-  }
-
-  return { headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId };
-}
-
+/**
+ * @param {{ sidebar: JSX.Element, header: JSX.Element|null, breadcrumb: JSX.Element|null, content: JSX.Element }} props
+ * @returns {JSX.Element}
+ */
 function AppShell({ sidebar, header, breadcrumb, content }) {
   return (
     <div className="app-shell">
@@ -175,75 +193,6 @@ function AppShell({ sidebar, header, breadcrumb, content }) {
       </main>
     </div>
   );
-}
-
-function useProjects({ onNoProjects }) {
-  const projectState = useProjectState({ onNoProjects });
-  const projectActions = useProjectActions({
-    projects: projectState.projects,
-    selectedProject: projectState.selectedProject,
-    handleProjectChange: projectState.handleProjectChange,
-    loadProjects: projectState.loadProjects,
-  });
-  return { ...projectState, ...projectActions };
-}
-
-function useAppNavigation() {
-  const [serverConnected, setServerConnected] = useServerHealth();
-  const { navStack, activePage, navPush, navPop, navGoTo, navReset, navTab } = useNavStack();
-  const projectBundle = useProjects({ onNoProjects: () => navTab('evaluate') });
-  const { selectedRun, setSelectedRun, handleRunChange } = projectBundle;
-  const [historySelectedRun, setHistorySelectedRun] = useState('latest');
-  function handleNavigate(page, params = {}) {
-    if (page === 'run' && params.runId) setSelectedRun(params.runId);
-    if (page === 'history-run' && params.runId) setHistorySelectedRun(params.runId);
-    navPush({ page, ...params });
-  }
-  return { serverConnected, setServerConnected, navStack, activePage, navPush, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun };
-}
-
-function useAppState() {
-  const nav = useAppNavigation();
-  const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
-  const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
-  const settings = useAppSettings();
-  const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
-  const { dashboard, accumulated, latestAccumulated, loading, error, availableRuns } = useDashboard({ selectedProject, selectedRun: effectiveRun });
-  const { dailyRuns: rawDailyRuns, headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId } = useMemo(() => ({
-    dailyRuns: buildDailyRuns(availableRuns, dashboard?.trend || []),
-    ...computeDerivedState(accumulated, dashboard, selectedProject, projects),
-  }), [availableRuns, dashboard, accumulated, selectedProject, projects]);
-  const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
-  const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
-  const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
-  const knownTabs = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
-  const activeTab = knownTabs.includes(activePage.page) ? activePage.page
-    : activePage.sourceTab && knownTabs.includes(activePage.sourceTab) ? activePage.sourceTab
-    : activePage.page === 'history-run' ? 'history'
-    : 'overview';
-  const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
-  const showRunNav = showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
-
-  return {
-    serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
-    projects, selectedProject, selectedRun, handleProjectChange, handleNavigate,
-    handleDeleteProject, handleExportProject, handleRelocateProject,
-    dashboard, accumulated, latestAccumulated, loading, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
-    currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
-    headerMeta, selectedDisplayName, selectedProjectParent, selectedProjectParentId,
-    historySelectedRun, setHistorySelectedRun,
-    evalLifecycle, settings, activeTab, showProjectHeader, showRunNav,
-  };
-}
-
-function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRunIndex) {
-  const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
-  if (entry?.dateISO) {
-    try {
-      return new Date(entry.dateISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-    } catch { return entry.dateISO; }
-  }
-  return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;
 }
 
 export default function App() {
@@ -258,7 +207,7 @@ export default function App() {
   const contentProps = {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
-      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, error: state.error,
+      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, rescoreLookup: state.rescoreLookup, loading: state.loading, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
     },
     navigation: {
@@ -272,6 +221,7 @@ export default function App() {
     evaluation: state.evalLifecycle,
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,
+    refreshDashboard: state.refreshDashboard,
   };
 
   return (
@@ -291,7 +241,7 @@ export default function App() {
         />
       ) : null}
       breadcrumb={navStack.length > 1 ? <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} /> : null}
-      content={<MainContent activePage={activePage} props={contentProps} />}
+      content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
     />
   );
 }

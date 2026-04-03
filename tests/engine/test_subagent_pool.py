@@ -38,7 +38,7 @@ class TestSubagentPool:
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _fake_run_analysis):
             results = pool.run()
 
         assert len(results) >= 2  # scout + at least 1 overflow
@@ -80,7 +80,7 @@ class TestSubagentPool:
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis", _mixed_run):
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _mixed_run):
             results = pool.run()
 
         failed = [r for r in results if not r.success]
@@ -99,7 +99,7 @@ class TestSubagentPool:
             options=PoolOptions(n_agents=0, prompt="test", dimension="maint"),
         )
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _fake_run_analysis):
             results = pool.run()
 
         assert len(results) == 1

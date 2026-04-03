@@ -234,21 +234,19 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
   );
 }
 
+function useRelocateDialog(onRelocate) {
+  const [relocating, setRelocating] = useState(null);
+  const [relocatePath, setRelocatePath] = useState('');
+  const startRelocate = (name, currentPath) => { setRelocating(name); setRelocatePath(currentPath || ''); };
+  const submitRelocate = (name) => { if (relocatePath.trim()) onRelocate?.(name, relocatePath.trim()); setRelocating(null); };
+  return { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate };
+}
+
 export default function ProjectsPage({ projects = [], selectedProject, actions }) {
   const { onSelect, onDelete, onExport, onRelocate } = actions;
   const { children, roots } = useMemo(() => computeProjectTree(projects), [projects]);
   const [confirming, setConfirming] = useState(null);
-  const [relocating, setRelocating] = useState(null);
-  const [relocatePath, setRelocatePath] = useState('');
-
-  function startRelocate(name, currentPath) {
-    setRelocating(name);
-    setRelocatePath(currentPath || '');
-  }
-  function submitRelocate(name) {
-    if (relocatePath.trim()) onRelocate?.(name, relocatePath.trim());
-    setRelocating(null);
-  }
+  const relocateActions = useRelocateDialog(onRelocate);
 
   return (
     <section className="projects-page">
@@ -268,7 +266,7 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
               onSelect={onSelect}
               dialogActions={{
                 confirmActions: { confirming, setConfirming, onDelete, onExport },
-                relocateActions: { relocating, relocatePath, setRelocatePath, submitRelocate, setRelocating, startRelocate },
+                relocateActions,
               }}
             />
           ))}

@@ -1,14 +1,79 @@
+/* ── Tab fade transition ─────────────────────────────── */
+
+.tab-fade {
+  animation: tab-fadein 300ms ease;
+}
+
+@keyframes tab-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Dashboard fade transitions ──────────────────────── */
+
+.dashboard-fade {
+  transition: opacity 250ms ease;
+}
+
+.dashboard-loading {
+  opacity: 0.4;
+}
+
+.dashboard-ready {
+  animation: dashboard-fadein 400ms ease;
+}
+
+@keyframes dashboard-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Run overview transitions ─────────────────────────── */
+
+.run-overview-fade {
+  transition: opacity 250ms ease;
+}
+
+.run-overview-loading {
+  opacity: 0.4;
+}
+
+.run-overview-ready {
+  animation: run-overview-fadein 300ms ease;
+}
+
+.run-overview-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.run-overview-spinner .loading-screen {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  height: auto;
+}
+
+@keyframes run-overview-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ── Stat cards ───────────────────────────────────────── */
 
 .acc-eval-panel {
   display: flex;
   flex-direction: column;
   gap: 20px;
+  margin-bottom: 28px;
 }
 
 .acc-eval-top {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 12px;
 }
@@ -119,6 +184,7 @@
 }
 
 .acc-eval-panel--compact .acc-eval-stat-value { font-size: 1.1rem; }
+.acc-eval-panel--compact { margin-bottom: var(--space-3); }
 
 .acc-eval-mini-stats {
   display: flex;
@@ -479,7 +545,7 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: calc(-1 * var(--space-4));
+  margin-bottom: var(--space-1);
 }
 
 .dimensions-title {
@@ -491,6 +557,7 @@
 
 .dimensions-panel {
   padding: 16px;
+  margin-bottom: 28px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   background: var(--card-bg);
@@ -2061,7 +2128,6 @@
 .dashboard-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
 }
 
 /* ── Project selector (in main content area) ──────────── */
@@ -2265,6 +2331,15 @@
   font-weight: var(--weight-semibold);
 }
 
+.pill-btn--dismissed {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+.pill-btn--dismissed.active {
+  background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+  opacity: 1;
+}
+
 /* Severity-specific pill active colors */
 .severity-pill.critical.active {
   background: color-mix(in srgb, var(--color-sev-critical-text) 12%, transparent);
@@ -2286,17 +2361,16 @@
 .violations-page {
   display: flex;
   flex-direction: column;
-  gap: var(--space-6);
+  gap: var(--space-4);
 }
 
 .violations-pill-nav {
   display: flex;
   gap: 8px;
-  margin-bottom: var(--space-4);
 }
 
 .violations-stats-panel {
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .violations-stats-grid {
@@ -2387,6 +2461,12 @@
   display: flex;
   gap: 12px;
   align-items: stretch;
+  margin-bottom: var(--space-12);
+}
+
+.history-panels-row > .panel {
+  margin-top: 0;
+  margin-bottom: 0;
 }
 
 .history-panels-row > .run-history-panel,
@@ -2396,6 +2476,10 @@
 }
 
 /* ── Dimension Score Panel (horizontal bars) ─────────── */
+
+.dim-score-panel {
+  margin-top: 0;
+}
 
 .dim-score-rows {
   display: flex;

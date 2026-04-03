@@ -3,40 +3,19 @@
  *
  * Every public function maps a raw JSON response to a typed model object
  * (see ../models/) so components never see raw API shapes.
+ *
+ * Standards and findings APIs are in separate modules; re-exported here
+ * for backward compatibility.
  */
 
 import { createDashboard } from '../models/dashboard.js';
 import { createDimensionEval } from '../models/dimension.js';
 import { createJob } from '../models/job.js';
 import { createProject } from '../models/project.js';
+import { request, BASE } from './request.js';
 
-const BASE = import.meta.env.VITE_API_BASE || '/api';
-const API_TIMEOUT_MS = 30000;
-
-async function request(path, options = {}) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
-  try {
-    const res = await fetch(`${BASE}${path}`, {
-      headers: {
-        'Content-Type': 'application/json',
-        ...(options.headers || {}),
-      },
-      ...options,
-      signal: controller.signal,
-    });
-
-    const payload = await res.json().catch(() => ({}));
-
-    if (!res.ok) {
-      throw new Error(payload.error || `Request failed: ${res.status}`);
-    }
-
-    return payload;
-  } finally {
-    clearTimeout(timeoutId);
-  }
-}
+export { listDismissedFindings, dismissFinding, restoreFinding, restoreAllFindings, getRescore } from './findings.js';
+export { listStandards, getStandard, createStandard, updateStandard, deleteStandard, duplicateStandard, listLibrary, listCwes, importFromLibrary, importStandard, exportStandard } from './standards.js';
 
 // ── Health ──────────────────────────────────────────────────────────────
 
@@ -59,18 +38,43 @@ export async function getProjectInfo(projectId) {
   return createProject(data);
 }
 
+/**
+ * @param {string} projectId
+ * @returns {Promise<Object>}
+ */
 export function deleteProject(projectId) {
   return request(`/projects/${encodeURIComponent(projectId)}?confirm=true`, { method: 'DELETE' });
 }
 
+/**
+ * @param {string} projectId
+ * @returns {string} Download URL for the project export
+ */
 export function getProjectExportUrl(projectId) {
   return `${BASE}/projects/${encodeURIComponent(projectId)}/export`;
 }
 
+/**
+ * @param {string} projectId
+ * @param {string} newPath
+ * @returns {Promise<Object>}
+ */
 export function relocateProject(projectId, newPath) {
   return request(`/projects/${encodeURIComponent(projectId)}/path`, {
     method: 'PATCH',
     body: JSON.stringify({ path: newPath }),
+  });
+}
+
+/**
+ * @param {string} projectId
+ * @param {string} destination
+ * @returns {Promise<Object>}
+ */
+export function cloneToLocal(projectId, destination) {
+  return request(`/projects/${encodeURIComponent(projectId)}/clone-local`, {
+    method: 'POST',
+    body: JSON.stringify({ destination }),
   });
 }
 
@@ -112,6 +116,10 @@ export async function getEvaluation(jobId) {
   return createJob(data);
 }
 
+/**
+ * @param {string} jobId
+ * @returns {Promise<Object>}
+ */
 export function cancelEvaluation(jobId) {
   return request(`/evaluations/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
 }
@@ -128,72 +136,43 @@ export async function getDimensionEval(projectId, runId, dimension) {
 
 // ── Browse / Plugins / AI Clients ───────────────────────────────────────
 
+/**
+ * @param {string} [dirPath='']
+ * @returns {Promise<{ current: string, parent: string|null, directories: Object[] }>}
+ */
 export function browseDirectory(dirPath = '') {
   const q = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';
   return request(`/browse${q}`);
 }
 
+/**
+ * @param {string} path - Parent directory path
+ * @param {string} name - New directory name
+ * @returns {Promise<Object>}
+ */
+export function createDirectory(path, name) {
+  return request('/browse/mkdir', {
+    method: 'POST',
+    body: JSON.stringify({ path, name }),
+  });
+}
+
+/** @returns {Promise<Object[]>} */
 export function listPlugins() {
   return request('/plugins');
 }
 
+/** @returns {Promise<Object[]>} */
 export function getAiClients() {
   return request('/ai-clients');
 }
 
+/**
+ * @param {string} clientId
+ * @returns {Promise<Object[]>}
+ */
 export function getClientModels(clientId) {
   return request(`/ai-clients/${encodeURIComponent(clientId)}/models`);
 }
 
-// ── Standards ──────────────────────────────────────────────
-export async function listStandards() {
-  return request('/standards');
-}
-export async function getStandard(standardId) {
-  return request(`/standards/${encodeURIComponent(standardId)}`);
-}
-export async function createStandard(data) {
-  return request('/standards', { method: 'POST', body: JSON.stringify(data) });
-}
-export async function updateStandard(standardId, data) {
-  return request(`/standards/${encodeURIComponent(standardId)}`, { method: 'PUT', body: JSON.stringify(data) });
-}
-export async function deleteStandard(standardId) {
-  return request(`/standards/${encodeURIComponent(standardId)}`, { method: 'DELETE' });
-}
-export async function duplicateStandard(standardId, newId) {
-  return request(`/standards/${encodeURIComponent(standardId)}/duplicate`, { method: 'POST', body: JSON.stringify({ newId }) });
-}
-export async function listLibrary() {
-  return request('/standards/library');
-}
-export async function listCwes() {
-  return request('/standards/refs/cwe');
-}
-export async function importFromLibrary(file) {
-  return request('/standards/library/import', { method: 'POST', body: JSON.stringify({ file }) });
-}
-export async function importStandard(data, force = false) {
-  const res = await fetch(`${BASE}/standards/import`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data, force }),
-  });
-  const body = await res.json().catch(() => ({}));
-  if (res.status === 409) return { ...body, _conflict: true };
-  if (!res.ok) throw new Error(body.error || `Import failed: ${res.status}`);
-  return body;
-}
-export async function downloadStandard(standardId) {
-  const detail = await getStandard(standardId);
-  const { managed, type, origin, originHash, principleCount, requirementCount, ...portable } = detail;
-  const blob = new Blob([JSON.stringify(portable, null, 2)], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `${standardId}.quodeq`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-}
+// Standards and findings APIs are re-exported at the top of this file.

@@ -1,11 +1,12 @@
-import { useState, useEffect, useMemo } from 'react';
-import { getDimensionEval } from '../../../api/index.js';
+import { useState, useEffect, useMemo, useRef } from 'react';
+import { getDimensionEval, getRescore } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon, FileTextIcon } from '../../../components/CopyButton.jsx';
 import { gradeColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 
 const columnStyle = { display: 'flex', flexDirection: 'column', gap: 2 };
 
@@ -43,7 +44,7 @@ function computeComplianceByPrinciple(evalData) {
 
 function DimensionOverview({ data, stats, onNavigate }) {
   const { evalData, runId, dateLabel, allViolations } = data;
-  const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples } = stats;
+  const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples, principleGrades } = stats;
   return (
     <section className="acc-eval-panel acc-eval-panel--compact panel">
       <div className="acc-eval-top">
@@ -51,12 +52,22 @@ function DimensionOverview({ data, stats, onNavigate }) {
           <span className="explorer-dimension-title">{evalData.dimension}</span>
           {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
         </div>
-        {allViolations.length > 0 && (
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
           <CopyButton
-            label="Fix plan"
-            onClick={() => copyToClipboard(buildDimensionPlanFromViolations(evalData.dimension, allViolations))}
+            label="Report"
+            className="fix-plan-btn-header"
+            icon={<FileTextIcon />}
+            onClick={() => copyToClipboard(buildDimensionReport(evalData, principleGrades || [], allViolations, overallGrade, dateLabel, runId))}
           />
-        )}
+          {allViolations.length > 0 && (
+            <CopyButton
+              label="Full fix plan"
+              className="fix-plan-btn-header"
+              icon={<SparkleIcon />}
+              onClick={() => copyToClipboard(buildDimensionPlanFromViolations(evalData.dimension, allViolations))}
+            />
+          )}
+        </div>
       </div>
       <div className="compact-stats-row">
         <div className="compact-score-col">
@@ -180,12 +191,14 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
   );
 }
 
-function buildEvalPrincipalFn(evalData, complianceByPrinciple) {
+function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId) {
   return function buildEvalPrincipal(principleId) {
     const principleData = (evalData.principles || []).find((p) => p.name === principleId);
     const pg = (evalData.principleGrades || []).find((p) => p.principle === principleId);
     return {
       principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
+      dimension: evalData.dimension || '',
+      project: project || '', runId: runId || '',
       principleData, dimViolations: principleData?.violations || [],
       dimCompliance: complianceByPrinciple.get(principleId) || [],
     };
@@ -201,16 +214,57 @@ function useDerivedExplorerStats(evalData, allViolations) {
   return { topFiles, severityCounts, uniquePrinciples, totalCompliant, complianceByPrinciple };
 }
 
-function useExplorerData(project, dimension, runId) {
+function mergeRescoreIntoEval(prev, dimData) {
+  if (!prev || !dimData) return prev;
+  const rescPrinciples = dimData.principles || [];
+  const updatedGrades = (prev.principleGrades || []).map((pg) => {
+    if (pg.isOverall || pg.principle?.includes('Overall')) {
+      return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
+    }
+    const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
+    return match ? { ...pg, score: match.score, grade: match.grade } : pg;
+  });
+  return {
+    ...prev,
+    principleGrades: updatedGrades,
+    overallScore: dimData.overallScore ?? prev.overallScore,
+    overallGrade: dimData.overallGrade ?? prev.overallGrade,
+  };
+}
+
+async function fetchAndRescore(project, runId, dimension) {
+  const data = await getDimensionEval(project, runId, dimension);
+  try {
+    const rescored = await getRescore(project, runId);
+    const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+    return dimData ? mergeRescoreIntoEval(data, dimData) : data;
+  } catch {
+    return data; // rescore failure is non-fatal
+  }
+}
+
+function useExplorerData(project, dimension, runId, refreshSignal) {
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
   useEffect(() => {
     setLoading(true);
-    getDimensionEval(project, runId, dimension)
+    fetchAndRescore(project, runId, dimension)
       .then((data) => { setEvalData(data); setLoading(false); })
       .catch((err) => { setError(err.message); setLoading(false); });
   }, [project, dimension, runId]);
+
+  const initialRef = useRef(refreshSignal);
+  useEffect(() => {
+    if (refreshSignal === initialRef.current) return;
+    if (!evalData || !project || !runId) return;
+    getRescore(project, runId).then((rescored) => {
+      const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+      if (dimData) setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
+    }).catch(() => {});
+  }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
@@ -218,18 +272,18 @@ function useExplorerData(project, dimension, runId) {
   return { evalData, loading, error, overallGrade, principleGrades, allViolations, ...stats };
 }
 
-export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate }) {
-  const d = useExplorerData(project, dimension, runId);
+export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate, refreshSignal }) {
+  const d = useExplorerData(project, dimension, runId, refreshSignal);
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
-  const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple);
+  const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId);
 
   return (
     <>
       <DimensionOverview
         data={{ evalData: d.evalData, runId, dateLabel, allViolations: d.allViolations }}
-        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: d.topFiles, uniquePrinciples: d.uniquePrinciples }}
+        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: d.topFiles, uniquePrinciples: d.uniquePrinciples, principleGrades: d.principleGrades }}
         onNavigate={onNavigate}
       />
       <PrinciplesList evalData={d.evalData} principleGrades={d.principleGrades} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />

@@ -1,5 +1,5 @@
 import { parseFileRef } from '../../../utils/formatters.js';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
@@ -51,7 +51,7 @@ function ViolationDetail({ item }) {
   );
 }
 
-export function EvalViolationCard({ v, principle, buildViolationPlanText, index }) {
+export function EvalViolationCard({ v, principle, buildViolationPlanText, index, onDismiss }) {
   const { filename, ref, display } = useFileInfo(v.file, v.line, v.endLine);
   return (
     <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
@@ -59,7 +59,22 @@ export function EvalViolationCard({ v, principle, buildViolationPlanText, index 
         <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
         <span className="vrow-label">[{v.principle || principle}]</span>
         {filename && <FileCopyBtn display={display} copyText={ref} />}
-        <CopyButton label="Fix plan" onClick={() => copyToClipboard(buildViolationPlanText(v))} />
+        <CopyButton
+          label="Fix plan"
+          className="fix-plan-btn"
+          icon={<SparkleIcon />}
+          onClick={() => copyToClipboard(buildViolationPlanText(v))}
+        />
+        {onDismiss && (
+          <button
+            type="button"
+            className="dismiss-btn"
+            onClick={(e) => { e.stopPropagation(); onDismiss(v); }}
+            title="Dismiss this finding (exclude from scoring)"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>
+        )}
       </div>
       <ViolationDetail item={v} />
     </div>

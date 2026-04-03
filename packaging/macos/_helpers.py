@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 
 _HEALTH_TIMEOUT = 1.0
+_CMD_DISCOVERY_TIMEOUT_S = 5
 _HOMEBREW_ARM64 = "/opt/homebrew/bin"
 _HOMEBREW_X86 = "/usr/local/bin"
 
@@ -36,7 +37,7 @@ def source_user_path() -> None:
         cmd = ('source ~/.zprofile 2>/dev/null; source ~/.zshrc 2>/dev/null; '
                'source ~/.bash_profile 2>/dev/null; echo $PATH')
         shell = os.environ.get("SHELL", "/bin/zsh")
-        result = subprocess.run([shell, "-c", cmd], capture_output=True, text=True, timeout=5)
+        result = subprocess.run([shell, "-c", cmd], capture_output=True, text=True, timeout=_CMD_DISCOVERY_TIMEOUT_S)
         if result.returncode == 0 and result.stdout.strip():
             os.environ["PATH"] = result.stdout.strip()
             return
@@ -84,7 +85,7 @@ def _find_commands_uncached(env: dict[str, str] | None) -> dict[str, str | None]
     for name in ("python3", "node", "claude", "quodeq"):
         try:
             result = subprocess.run(
-                ["which", name], capture_output=True, text=True, timeout=5,
+                ["which", name], capture_output=True, text=True, timeout=_CMD_DISCOVERY_TIMEOUT_S,
                 env=env,
             )
             cmds[name] = result.stdout.strip() if result.returncode == 0 else None

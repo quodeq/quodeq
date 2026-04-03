@@ -10,7 +10,7 @@
 import { useState, useMemo } from 'react';
 import PrincipleAccordion from './PrincipleAccordion.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { splitScore, gradeColorClass, gradeLetter } from '../../../utils/formatters.js';
 import { buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
@@ -105,7 +105,9 @@ function DimViolationsList({ filteredViolations, activeFilterCount, totalCount, 
             : ` (${filteredViolations.length})`}
         </h4>
         <CopyButton
-          label="Fix plan"
+          label="Full fix plan"
+          className="fix-plan-btn-header"
+          icon={<SparkleIcon />}
           onClick={() => copyToClipboard(buildFixPlan())}
         />
       </div>

@@ -14,6 +14,7 @@ _SCHEMA_CACHE_SIZE = 32
 
 @lru_cache(maxsize=_SCHEMA_CACHE_SIZE)
 def _load_schema(name: str) -> dict:
+    """Load and return the JSON schema file identified by *name*."""
     path = _SCHEMAS_DIR / name
     try:
         return read_json(path)
@@ -23,6 +24,7 @@ def _load_schema(name: str) -> dict:
 
 @lru_cache(maxsize=_SCHEMA_CACHE_SIZE)
 def _get_validator(schema_file: str) -> jsonschema.Draft202012Validator:
+    """Return a cached JSON Schema validator for *schema_file*."""
     schema = _load_schema(schema_file)
     return jsonschema.Draft202012Validator(schema)
 
@@ -39,5 +41,6 @@ def validate_dimensions(data: dict) -> list[str]:
 
 
 def _validate(data: dict, schema_file: str) -> list[str]:
+    """Validate *data* against *schema_file* and return error messages."""
     validator = _get_validator(schema_file)
     return [e.message for e in validator.iter_errors(data)]

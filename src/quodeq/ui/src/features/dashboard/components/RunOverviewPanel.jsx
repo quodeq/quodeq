@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
@@ -153,7 +154,9 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
         <span className="acc-eval-date">{dashboard?.selectedRun?.dateLabel || formatRunId(selectedRunId)}</span>
         {(dashboard?.dimensions || []).some((d) => (d.violations?.length || 0) > 0) && (
           <CopyButton
-            label="Fix plan"
+            label="Full fix plan"
+            className="fix-plan-btn-header"
+            icon={<SparkleIcon />}
             onClick={() => {
               const allViolations = (dashboard.dimensions || []).flatMap(
                 (d) => (d.violations || []).map((v) => ({ ...v, dimension: d.dimension }))
@@ -205,19 +208,25 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
     return new Set(violations.map((v) => v.principle).filter(Boolean)).size;
   }, [dashboard]);
 
-  if (!dashboard) return <p className="empty-state">Loading run data...</p>;
+  const isLoading = !dashboard || !dashboard.dimensions;
 
   return (
-    <>
-      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }} />
-      <div className="dimensions-header">
-        <h3 className="dimensions-title">Dimensions Analyzed</h3>
-      </div>
-      <div className="dimensions-panel">
-        <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} />
-      </div>
-      <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />
-      <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
-    </>
+    <div className={`run-overview-fade ${isLoading ? 'run-overview-loading' : 'run-overview-ready'}`}>
+      {isLoading ? (
+        <div className="run-overview-spinner"><LoadingScreen /></div>
+      ) : (
+        <>
+          <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }} />
+          <div className="section-header">
+            <h3 className="section-title">Dimensions Analyzed</h3>
+          </div>
+          <div className="dimensions-panel">
+            <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} />
+          </div>
+          <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />
+          <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
+        </>
+      )}
+    </div>
   );
 }

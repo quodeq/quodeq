@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { browseDirectory } from '../../../api/index.js';
+import { browseDirectory, createDirectory } from '../../../api/index.js';
 
 function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigate }) {
   return (
@@ -34,7 +34,7 @@ function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigat
   );
 }
 
-function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate }) {
+function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate, onNewFolder }) {
   return (
     <div className="folder-browser-path">
       <button
@@ -45,6 +45,17 @@ function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate }) {
       >
         ↑
       </button>
+      {onNewFolder && (
+        <button
+          className="folder-nav-btn folder-new-btn"
+          disabled={loading}
+          onClick={onNewFolder}
+          aria-label="Create new folder"
+          title="New folder"
+        >
+          +
+        </button>
+      )}
       <input
         type="text"
         className="folder-path-input"
@@ -58,7 +69,7 @@ function FolderPathBar({ data, loading, pathInput, setPathInput, onNavigate }) {
   );
 }
 
-function FolderFooter({ selectedFolder, onClose, onConfirm }) {
+function FolderFooter({ selectedFolder, onClose, onConfirm, confirmText = 'Use This Folder' }) {
   return (
     <div className="folder-browser-footer">
       <div className={`selected-path ${selectedFolder ? 'visible' : ''}`}>
@@ -68,7 +79,7 @@ function FolderFooter({ selectedFolder, onClose, onConfirm }) {
       <div className="folder-browser-actions">
         <button className="btn-cancel" onClick={onClose}>Cancel</button>
         <button className="btn-confirm" onClick={onConfirm} disabled={!selectedFolder}>
-          Use This Folder
+          {confirmText}
         </button>
       </div>
     </div>
@@ -76,15 +87,12 @@ function FolderFooter({ selectedFolder, onClose, onConfirm }) {
 }
 
 async function navigateFolder(path, navigation) {
-  const { setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder } = navigation;
+  const { setLoading, setNavError, updateNavState } = navigation;
   setLoading(true);
   setNavError(null);
   try {
     const result = await browseDirectory(path || '');
-    setData(result);
-    setCurrentPath(result.current);
-    setPathInput(result.current);
-    setSelectedFolder(result.current);
+    updateNavState({ data: result, path: result.current, pathInput: result.current, selectedFolder: result.current });
   } catch (err) {
     setNavError(err.message || 'Failed to load folder');
   } finally {
@@ -92,18 +100,52 @@ async function navigateFolder(path, navigation) {
   }
 }
 
-function FolderBrowserDialog({ state, actions, navigation, selection }) {
+function NewFolderInput({ currentPath, navigate, onClose }) {
+  const [name, setName] = useState('');
+  const [error, setError] = useState(null);
+
+  async function handleCreate() {
+    if (!name.trim() || !currentPath) return;
+    setError(null);
+    try {
+      await createDirectory(currentPath, name.trim());
+      onClose();
+      navigate(currentPath);
+    } catch (err) {
+      setError(err.message || 'Failed to create folder');
+    }
+  }
+
+  return (
+    <div className="new-folder-row">
+      <input
+        type="text" className="new-folder-input" value={name}
+        onChange={(e) => setName(e.target.value)}
+        onKeyDown={(e) => { if (e.key === 'Enter') handleCreate(); if (e.key === 'Escape') onClose(); }}
+        placeholder="Folder name" autoFocus
+      />
+      <button className="folder-nav-btn" onClick={handleCreate} disabled={!name.trim()}>Create</button>
+      <button className="folder-nav-btn" onClick={onClose}>✕</button>
+      {error && <span className="inline-error">{error}</span>}
+    </div>
+  );
+}
+
+function FolderBrowserDialog({ state, actions, navigation, selection, title, confirmText }) {
   const { data, loading, pathInput, navError } = state;
   const { navigate, onClose, onConfirm } = actions;
   const { selectedFolder, setSelectedFolder } = selection;
   const { setPathInput } = navigation;
+  const [creatingFolder, setCreatingFolder] = useState(false);
+
   return (
     <div className="modal folder-browser-modal" role="dialog" aria-modal="true" aria-labelledby="folder-browser-title" onClick={(e) => e.stopPropagation()}>
       <div className="modal-header">
-        <h2 id="folder-browser-title">Select Repository Folder</h2>
+        <h2 id="folder-browser-title">{title}</h2>
         <button className="modal-close" onClick={onClose} aria-label="Close">&times;</button>
       </div>
-      <FolderPathBar data={data} loading={loading} pathInput={pathInput} setPathInput={setPathInput} onNavigate={navigate} />
+      <FolderPathBar data={data} loading={loading} pathInput={pathInput} setPathInput={setPathInput} onNavigate={navigate} onNewFolder={() => setCreatingFolder(true)} />
+      {creatingFolder && <NewFolderInput currentPath={data?.current} navigate={navigate} onClose={() => setCreatingFolder(false)} />}
       <div className="folder-browser-list">
         {loading ? (
           <p className="loading" role="status" aria-live="polite">Loading...</p>
@@ -111,12 +153,12 @@ function FolderBrowserDialog({ state, actions, navigation, selection }) {
           <FolderList data={data} navError={navError} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} />
         )}
       </div>
-      <FolderFooter selectedFolder={selectedFolder} onClose={onClose} onConfirm={onConfirm} />
+      <FolderFooter selectedFolder={selectedFolder} onClose={onClose} onConfirm={onConfirm} confirmText={confirmText} />
     </div>
   );
 }
 
-export default function FolderBrowser({ onSelect, onClose }) {
+export default function FolderBrowser({ onSelect, onClose, title = 'Select Repository Folder', confirmText = 'Use This Folder' }) {
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
@@ -124,7 +166,13 @@ export default function FolderBrowser({ onSelect, onClose }) {
   const [navError, setNavError] = useState(null);
   const [selectedFolder, setSelectedFolder] = useState(null);
 
-  const navigation = { setLoading, setNavError, setData, setCurrentPath, setPathInput, setSelectedFolder };
+  function updateNavState({ data: d, path: p, pathInput: pi, selectedFolder: sf }) {
+    if (d !== undefined) setData(d);
+    if (p !== undefined) setCurrentPath(p);
+    if (pi !== undefined) setPathInput(pi);
+    if (sf !== undefined) setSelectedFolder(sf);
+  }
+  const navigation = { setLoading, setNavError, updateNavState };
 
   function navigate(path) {
     navigateFolder(path, navigation);
@@ -139,6 +187,8 @@ export default function FolderBrowser({ onSelect, onClose }) {
         actions={{ navigate, onClose, onConfirm: () => { if (selectedFolder) onSelect(selectedFolder); } }}
         navigation={{ setPathInput }}
         selection={{ selectedFolder, setSelectedFolder }}
+        title={title}
+        confirmText={confirmText}
       />
     </div>
   );

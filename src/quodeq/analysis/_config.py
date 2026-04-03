@@ -1,0 +1,48 @@
+"""Analysis configuration dataclasses and type aliases."""
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Callable
+
+HeartbeatCallback = Callable[[int, dict], None]
+
+_DEFAULT_MAX_TURNS = 200
+_DEFAULT_MAX_DURATION = 1800  # 30 minutes
+_MCP_TOOL_REPORT_FINDING = "mcp__findings__report_finding"
+_MCP_TOOL_GET_NEXT_FILES = "mcp__findings__get_next_files"
+
+
+@dataclass(frozen=True)
+class AnalysisConfig:
+    """Configuration for an AI CLI analysis run."""
+    jsonl_file: Path | None = None
+    analysis_budget: str | None = None
+    heartbeat_interval: int = 10
+    heartbeat_callback: HeartbeatCallback | None = None
+    ai_cmd: str | None = None
+    ai_model: str | None = None
+    max_turns: int | None = _DEFAULT_MAX_TURNS
+    max_duration: int | None = _DEFAULT_MAX_DURATION
+    pool_budget: int = 600
+    compiled_dir: Path | None = None
+    dimension: str | None = None
+    queue_path: Path | None = None
+    agent_id: str = ""
+    max_files_per_agent: int = 30
+    work_dir: Path | None = None
+
+
+@dataclass(frozen=True)
+class _AgentParams:
+    """Optional grouping of per-agent MCP config parameters."""
+    queue_path: Path | None = None
+    agent_id: str = ""
+    work_dir: Path | None = None
+
+
+@dataclass(frozen=True)
+class _SpawnPaths:
+    """Paths for the AI CLI subprocess stdout/stderr capture files."""
+    stream_file: Path
+    stream_err: Path

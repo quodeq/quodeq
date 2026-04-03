@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react';
 
-function TreeNodeRow({ node, actions, titles, showExpand, expanded, setExpanded }) {
+function TreeNodeRow({ node, actions, titles, expand }) {
   const { label, isSelected } = node;
   const { onClick, onAdd, onRemove } = actions;
   const { addTitle, removeTitle } = titles || {};
+  const { showExpand, expanded, setExpanded } = expand || {};
 
   return (
     <div
@@ -53,14 +54,14 @@ function TreeNode({ node, actions, titles, children }) {
   useEffect(() => {
     if (isSelected && !expanded) setExpanded(true);
   }, [isSelected, expanded]);
-  const hasChildren = children && children.length > 0;
+  const hasChildren = Array.isArray(children) ? children.length > 0 : !!children;
   const showExpand = hasChildren && !alwaysExpanded;
 
   return (
     <div className={`tree-node tree-node--depth-${depth}`}>
       <TreeNodeRow
         node={node} actions={actions} titles={titles}
-        showExpand={showExpand} expanded={expanded} setExpanded={setExpanded}
+        expand={{ showExpand, expanded, setExpanded }}
       />
       {(alwaysExpanded || expanded) && hasChildren && (
         <div className="tree-node-children">
@@ -71,13 +72,16 @@ function TreeNode({ node, actions, titles, children }) {
   );
 }
 
-function RequirementNode({ req, ri, pi, selectedNode, actions }) {
+const MAX_LABEL_DISPLAY_LENGTH = 40;
+
+function RequirementNode({ req, position, selectedNode, actions, confirmFn = window.confirm }) {
+  const { ri, pi } = position;
   const { onSelectNode, onRemoveRequirement, editable } = actions;
   const isReqSelected = selectedNode?.type === 'requirement' && selectedNode.principleIndex === pi && selectedNode.reqIndex === ri;
   const hasContent = req.text || req.description || (req.refs && req.refs.length > 0);
   const handleRemoveReq = () => {
     if (hasContent) {
-      if (!window.confirm(`Delete requirement "${req.text ? (req.text.length > 40 ? req.text.slice(0, 40) + '...' : req.text) : 'Untitled'}"?`)) return;
+      if (!confirmFn(`Delete requirement "${req.text ? (req.text.length > MAX_LABEL_DISPLAY_LENGTH ? req.text.slice(0, MAX_LABEL_DISPLAY_LENGTH) + '...' : req.text) : 'Untitled'}"?`)) return;
     }
     onRemoveRequirement(pi, ri);
   };
@@ -91,13 +95,13 @@ function RequirementNode({ req, ri, pi, selectedNode, actions }) {
   );
 }
 
-function PrincipleNode({ principle, pi, selectedNode, actions }) {
+function PrincipleNode({ principle, pi, selectedNode, actions, confirmFn = window.confirm }) {
   const { onSelectNode, onAddRequirement, onRemovePrinciple, onRemoveRequirement, editable } = actions;
   const isPrincipleSelected = selectedNode?.type === 'principle' && selectedNode.index === pi;
   const reqCount = principle.requirements?.length || 0;
   const handleRemovePrinciple = () => {
     if (reqCount > 0) {
-      if (!window.confirm(`Delete "${principle.name || 'Untitled'}" and its ${reqCount} requirement${reqCount !== 1 ? 's' : ''}? This cannot be undone.`)) return;
+      if (!confirmFn(`Delete "${principle.name || 'Untitled'}" and its ${reqCount} requirement${reqCount !== 1 ? 's' : ''}? This cannot be undone.`)) return;
     }
     onRemovePrinciple(pi);
   };
@@ -109,14 +113,20 @@ function PrincipleNode({ principle, pi, selectedNode, actions }) {
       titles={{ addTitle: 'Add Requirement', removeTitle: 'Remove Principle' }}
     >
       {(principle.requirements || []).map((req, ri) => (
-        <RequirementNode key={ri} req={req} ri={ri} pi={pi} selectedNode={selectedNode} actions={actions} />
+        <RequirementNode key={ri} req={req} position={{ ri, pi }} selectedNode={selectedNode} actions={actions} confirmFn={confirmFn} />
       ))}
     </TreeNode>
   );
 }
 
-export default function StandardTree({ standard, selectedNode, onSelectNode, actions, editable }) {
-  const { onAddPrinciple, onRemovePrinciple, onAddRequirement, onRemoveRequirement } = actions || {};
+function PrinciplesList({ principles, selectedNode, actions, confirmFn }) {
+  return (principles || []).map((principle, pi) => (
+    <PrincipleNode key={pi} principle={principle} pi={pi} selectedNode={selectedNode} actions={actions} confirmFn={confirmFn} />
+  ));
+}
+
+export default function StandardTree({ standard, selectedNode, actions, confirmFn = window.confirm }) {
+  const { onAddPrinciple, onRemovePrinciple, onAddRequirement, onRemoveRequirement, onSelectNode, editable } = actions || {};
   if (!standard) return null;
 
   const treeActions = { onSelectNode, onAddRequirement, onRemovePrinciple, onRemoveRequirement, editable };
@@ -128,9 +138,7 @@ export default function StandardTree({ standard, selectedNode, onSelectNode, act
         actions={{ onClick: () => onSelectNode({ type: 'root' }), onAdd: editable ? onAddPrinciple : undefined }}
         titles={{ addTitle: 'Add Principle' }}
       >
-        {(standard.principles || []).map((principle, pi) => (
-          <PrincipleNode key={pi} principle={principle} pi={pi} selectedNode={selectedNode} actions={treeActions} />
-        ))}
+        <PrinciplesList principles={standard.principles} selectedNode={selectedNode} actions={treeActions} confirmFn={confirmFn} />
       </TreeNode>
     </div>
   );

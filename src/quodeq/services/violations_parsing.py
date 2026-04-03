@@ -1,18 +1,20 @@
-"""Low-level parsers for extracting violations from JSONL, evidence JSON, and stream files."""
+"""Shared helpers and evidence parsing for violation extraction.
+
+Sub-modules :mod:`._violations_jsonl` and :mod:`._violations_stream` handle
+JSONL and stream data sources respectively.  Public functions from those
+modules are re-exported here for backward compatibility.
+"""
 from __future__ import annotations
 
 import json
 import logging
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import Iterable
 
 from quodeq.core.types import Finding, ProgressInfo, ViolationResponse
-from quodeq.analysis.stream.event_text import TEXT_EXTRACTORS
-from quodeq.analysis.stream.counters import count_files_in_stream, extract_files_from_event
-from quodeq.core.evidence.parser import build_req_refs_lookup, resolve_llm_refs
+from quodeq.core.evidence.parser import resolve_llm_refs
 from quodeq.services.violation_context import FindingSpec, ViolationContext, build_finding_base, format_file_line
-from quodeq.shared.utils import open_text, read_json
+from quodeq.shared.utils import read_json
 
 # NOTE: logging in inner layer — tracked for middleware extraction
 _logger = logging.getLogger(__name__)
@@ -84,90 +86,9 @@ def _build_finding_entry(obj: dict, dimension: str, req_refs_lookup: dict[str, l
     return replace(entry, dimension=obj.get("d", dimension), violation_type=obj.get("vt"))
 
 
-def _parse_jsonl_findings(
-    lines: Iterable[str], dimension: str, req_refs_lookup: dict[str, list[dict]] | None = None,
-    req_to_principle: dict[str, str] | None = None,
-) -> tuple[list[Finding], list[Finding]]:
-    """Parse raw JSONL lines into deduplicated violation and compliance lists."""
-    violations: list[Finding] = []
-    compliance: list[Finding] = []
-    seen: set[tuple] = set()
-    for raw_line in lines:
-        raw = raw_line.strip()
-        if not raw:
-            continue
-        try:
-            obj = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-        principle = obj.get("p") or obj.get("req")
-        if not principle or obj.get("t") not in _FINDING_TYPES:
-            continue
-        obj["p"] = req_to_principle.get(principle, principle) if req_to_principle else principle
-        dedup_key = (principle, obj.get("t"), obj.get("file"), obj.get("line"))
-        if dedup_key in seen:
-            continue
-        seen.add(dedup_key)
-        entry = _build_finding_entry(obj, dimension, req_refs_lookup)
-        if obj["t"] == _TYPE_VIOLATION:
-            violations.append(entry)
-        else:
-            compliance.append(entry)
-    return violations, compliance
-
-
-def _load_req_to_principle(dimension: str, evaluators_dir: "Path | None" = None) -> dict[str, str]:
-    """Load req ID -> principle name mapping for custom evaluators.
-
-    Args:
-        dimension: The dimension ID to look up.
-        evaluators_dir: Directory containing evaluator JSON files.
-            Defaults to ``default_paths().evaluators_dir`` when not provided.
-    """
-    if evaluators_dir is None:
-        from quodeq.config.paths import default_paths
-        evaluators_dir = default_paths().evaluators_dir
-    if not evaluators_dir.is_dir():
-        return {}
-    path = evaluators_dir / f"{dimension}.json"
-    if not path.is_file():
-        return {}
-    try:
-        data = json.loads(path.read_text())
-        mapping: dict[str, str] = {}
-        for p in data.get("principles", []):
-            pname = p.get("name", "")
-            for req in p.get("requirements", []):
-                rid = req.get("id", "")
-                if rid and pname:
-                    mapping[rid] = pname
-        return mapping
-    except (OSError, ValueError):
-        return {}
-
-
-def parse_violations_from_jsonl(
-    jsonl_path: Path, stream_path: Path | None, ctx: ViolationContext,
-    compiled_dir: Path | None = None,
-) -> ViolationResponse | None:
-    """Parse live JSONL findings written by the MCP server."""
-    req_refs_lookup = build_req_refs_lookup(compiled_dir, ctx.dimension) if compiled_dir else None
-    req_to_principle = _load_req_to_principle(ctx.dimension)
-    try:
-        with open_text(jsonl_path) as _f:
-            violations, compliance = _parse_jsonl_findings(_f, ctx.dimension, req_refs_lookup, req_to_principle)
-    except OSError as exc:
-        _logger.warning("Failed to read findings file: %s", exc)
-        return None
-    files_read = len(count_files_in_stream(stream_path)) if stream_path and stream_path.exists() else 0
-    return _build_violation_response(
-        ctx, violations, compliance,
-        _ResponseOptions(
-            partial=True,
-            progress={"filesRead": files_read, "violations": len(violations), "compliance": len(compliance)},
-        ),
-    )
-
+# ---------------------------------------------------------------------------
+# Evidence parsing (stays in this module)
+# ---------------------------------------------------------------------------
 
 def _build_violation_from_principle(violation: dict, label: str) -> Finding:
     """Build a normalized violation from a principle's violation entry."""
@@ -203,88 +124,15 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
     return _build_violation_response(ctx, violations, [], _ResponseOptions(partial=True))
 
 
-def _try_parse_text_line(
-    stripped_line: str, dimension: str, seen: set[str],
-) -> tuple[str, Finding] | None:
-    """Parse a single JSON line from a text block, returning (type, entry) or None."""
-    if not stripped_line.startswith("{"):
-        return None
-    try:
-        obj = json.loads(stripped_line)
-    except json.JSONDecodeError:
-        return None
-    if not obj.get("p") or obj.get("t") not in _FINDING_TYPES:
-        return None
-    key = f"{obj['p']}:{obj.get('file', '')}:{obj.get('line', '')}:{obj['t']}"
-    if key in seen:
-        return None
-    seen.add(key)
-    entry = _build_finding_entry(obj, dimension)
-    if entry.snippet:
-        entry = replace(entry, snippet=str(entry.snippet).strip())
-    return obj["t"], entry
+# ---------------------------------------------------------------------------
+# Re-exports for backward compatibility
+# ---------------------------------------------------------------------------
 
+from quodeq.services._violations_jsonl import parse_violations_from_jsonl  # noqa: E402
+from quodeq.services._violations_stream import parse_violations_from_stream  # noqa: E402
 
-def _parse_entries_from_texts(
-    texts: list[str], dimension: str, seen: set[str]
-) -> tuple[list[Finding], list[Finding]]:
-    """Parse violation/compliance entries from a list of text blocks."""
-    violations: list[Finding] = []
-    compliance: list[Finding] = []
-    for text in texts:
-        for text_line in text.splitlines():
-            result = _try_parse_text_line(text_line.strip(), dimension, seen)
-            if result is None:
-                continue
-            finding_type, entry = result
-            if finding_type == _TYPE_VIOLATION:
-                violations.append(entry)
-            else:
-                compliance.append(entry)
-    return violations, compliance
-
-
-@dataclass
-class _StreamAccumulator:
-    """Mutable accumulator for stream-line parsing results."""
-    dimension: str
-    violations: list[Finding] = field(default_factory=list)
-    compliance: list[Finding] = field(default_factory=list)
-    seen: set[str] = field(default_factory=set)
-    files_read: set[str] = field(default_factory=set)
-
-
-def _parse_stream_line(stripped: str, acc: _StreamAccumulator) -> None:
-    """Parse one non-empty stream line, appending findings to *acc*."""
-    try:
-        event = json.loads(stripped)
-    except json.JSONDecodeError:
-        return
-    extractor = TEXT_EXTRACTORS.get(event.get("type"))
-    texts = extractor(event) if extractor else []
-    new_v, new_c = _parse_entries_from_texts(texts, acc.dimension, acc.seen)
-    acc.violations.extend(new_v)
-    acc.compliance.extend(new_c)
-    acc.files_read.update(extract_files_from_event(event))
-
-
-def parse_violations_from_stream(stream_path: Path, ctx: ViolationContext) -> ViolationResponse | None:
-    """Extract violations from a live-stream event log file."""
-    acc = _StreamAccumulator(dimension=ctx.dimension)
-    try:
-        with open_text(stream_path) as _stream:
-            for raw_line in _stream:
-                stripped = raw_line.strip()
-                if stripped:
-                    _parse_stream_line(stripped, acc)
-    except OSError as exc:
-        _logger.warning("Failed to read stream file: %s", exc)
-        return None
-
-    return _build_violation_response(
-        ctx, acc.violations, acc.compliance,
-        _ResponseOptions(
-            partial=True,
-            progress={"filesRead": len(acc.files_read), "violations": len(acc.violations), "compliance": len(acc.compliance)},
-        ),
-    )
+__all__ = [
+    "parse_violations_from_evidence",
+    "parse_violations_from_jsonl",
+    "parse_violations_from_stream",
+]

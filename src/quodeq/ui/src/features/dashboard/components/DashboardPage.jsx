@@ -1,11 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
 
 function DashboardContent({ runMode, data, focus, callbacks }) {
-  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex } = data;
+  const { dashboard, selectedRunId, accumulated, accumulatedDimensions, rescoreLookup, availableRuns, dailyRuns, overviewRunIndex, selectedProject } = data;
   const { dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData } = focus;
   const { onRunSelect, onDimensionCardClick, onAccumulatedDimensionClick, onFileClick } = callbacks;
   if (runMode) {
@@ -24,8 +24,8 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   if (focusedDimension) {
     return (
       <div className="dimensions-panel">
-        <div className="dimensions-header">
-          <h3 className="dimensions-title">{focusedDimension}</h3>
+        <div className="section-header">
+          <h3 className="section-title">{focusedDimension}</h3>
           <button type="button" className="btn-secondary" onClick={() => setFocusedDimension(null)}>
             Show all
           </button>
@@ -37,12 +37,14 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   return (
     <AccumulatedOverviewPanel
       data={{
-        accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
-        trend: dashboard?.trend || [], selectedRunId,
+        accumulated: accumulated ? { ...accumulated, dimensions: accumulatedDimensions } : accumulated,
+        accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex,
+        trend: dashboard?.trend || [], selectedRunId, selectedProject,
       }}
       callbacks={{
         onRunClick: onRunSelect, onDimensionClick: onAccumulatedDimensionClick,
       }}
+      rescoreLookup={rescoreLookup}
     />
   );
 }
@@ -53,57 +55,61 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
 // directly from App; the high prop count is intentional and not worth splitting.
 // ---------------------------------------------------------------------------
 
-function makeDashboardHandlers(onNavigate, dashboard) {
-  return {
+function useDashboardHandlers(onNavigate, dashboard) {
+  return useMemo(() => ({
     handleDimensionCardClick: (item, runId) => {
-      if (onNavigate) {
-        const dateLabel = dashboard?.selectedRun?.dateLabel || item.fromDateLabel;
-        onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel });
-      }
+      if (!onNavigate) return;
+      const dateLabel = dashboard?.selectedRun?.dateLabel || item.fromDateLabel;
+      onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel });
     },
     handleAccumulatedDimensionClick: (item) => {
       if (onNavigate) onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel });
     },
     handleFileClick: (fileObj) => { if (onNavigate) onNavigate('file', { file: fileObj }); },
-  };
+  }), [onNavigate, dashboard]);
 }
 
 export default function DashboardPage({ data = {}, callbacks = {}, runMode = false }) {
-  const {
-    selectedProject, selectedRun, projects = [],
-    dashboard, accumulated, loading, error,
-    availableRuns = [], dailyRuns, overviewRunIndex = 0,
-  } = data;
+  const { selectedProject, selectedRun, projects = [], dashboard, accumulated, rescoreLookup = {}, loading, error, availableRuns = [], dailyRuns, overviewRunIndex = 0 } = data;
   const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
-  const accumulatedDimensions = accumulated?.dimensions || [];
-  const focusedDimensionData = useMemo(() => {
-    if (!focusedDimension) return null;
-    return (dashboard?.dimensions || []).find((d) => d.dimension === focusedDimension) || null;
-  }, [focusedDimension, dashboard]);
-  const handlers = makeDashboardHandlers(onNavigate, dashboard);
+  // Clear focused dimension when the active run changes to avoid showing stale data
+  const prevRunRef = useRef(selectedRunId);
+  if (prevRunRef.current !== selectedRunId) {
+    prevRunRef.current = selectedRunId;
+    if (focusedDimension) setFocusedDimension(null);
+  }
+  // Merge rescored grades into accumulated dimensions so all cards reflect live scores
+  const accumulatedDimensions = useMemo(() => {
+    const dims = accumulated?.dimensions || [];
+    if (Object.keys(rescoreLookup).length === 0) return dims;
+    return dims.map((dim) => {
+      const match = rescoreLookup[(dim.dimension || '').toLowerCase()];
+      if (!match) return dim;
+      return { ...dim, overallScore: match.overallScore, overallGrade: match.overallGrade, totals: match.totals ?? dim.totals };
+    });
+  }, [accumulated, rescoreLookup]);
+  const focusedDimensionData = useMemo(() => focusedDimension ? (dashboard?.dimensions || []).find((d) => d.dimension === focusedDimension) || null : null, [focusedDimension, dashboard]);
+  const handlers = useDashboardHandlers(onNavigate, dashboard);
 
   if (!projects || projects.length === 0) {
     if (loading) return <LoadingScreen />;
     return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
   }
 
+  const isLoading = loading && !dashboard;
+
   return (
-    <div className="dashboard-page">
+    <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}`}>
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {loading && !dashboard && <LoadingScreen />}
+      {isLoading && <LoadingScreen />}
       {dashboard && (
         <DashboardContent
           runMode={runMode}
-          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, availableRuns, dailyRuns, overviewRunIndex }}
+          data={{ dashboard, selectedRunId, accumulated, accumulatedDimensions, rescoreLookup, availableRuns, dailyRuns, overviewRunIndex, selectedProject }}
           focus={{ dimension: focusedDimension, setDimension: setFocusedDimension, dimensionData: focusedDimensionData }}
-          callbacks={{
-            onRunSelect,
-            onDimensionCardClick: handlers.handleDimensionCardClick,
-            onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick,
-            onFileClick: handlers.handleFileClick,
-          }}
+          callbacks={{ onRunSelect, onDimensionCardClick: handlers.handleDimensionCardClick, onAccumulatedDimensionClick: handlers.handleAccumulatedDimensionClick, onFileClick: handlers.handleFileClick }}
         />
       )}
     </div>

@@ -83,7 +83,12 @@ def cleanup_stderr_log(path: str | None) -> None:
 
 
 def find_pids_on_port(port: int) -> list[int]:
-    """Return PIDs listening on *port* (macOS: uses lsof)."""
+    """Return PIDs listening on *port*.
+
+    macOS-only: relies on ``lsof`` which is available on macOS by default.
+    This function lives under ``packaging/macos/`` and is not intended for
+    cross-platform use.
+    """
     try:
         result = subprocess.run(
             ["lsof", f"-ti:{port}"], capture_output=True, text=True, timeout=5,

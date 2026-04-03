@@ -62,7 +62,7 @@ def _mock_run_analysis_factory(stream_content: str):
 # ---------------------------------------------------------------------------
 
 class TestRun:
-    @patch("quodeq.analysis.runner.run_analysis")
+    @patch("quodeq.analysis._dimension_steps.run_analysis")
     def test_end_to_end_with_mock(self, mock_analysis, tmp_path):
         dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"
@@ -91,7 +91,7 @@ class TestRun:
         assert len(pe.compliance) == 1
         assert pe.metrics["is_balanced"] is True
 
-    @patch("quodeq.analysis.runner.run_analysis")
+    @patch("quodeq.analysis._dimension_steps.run_analysis")
     def test_empty_project(self, mock_analysis, tmp_path):
         dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"
@@ -110,7 +110,7 @@ class TestRun:
         assert evidence.principles == {}
         assert evidence.coverage_pct == 0.0
 
-    @patch("quodeq.analysis.runner.run_analysis")
+    @patch("quodeq.analysis._dimension_steps.run_analysis")
     def test_invalid_stream_skipped(self, mock_analysis, tmp_path):
         dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"
@@ -130,7 +130,7 @@ class TestRun:
         evidence = run(config)
         assert evidence.principles == {}
 
-    @patch("quodeq.analysis.runner.run_analysis")
+    @patch("quodeq.analysis._dimension_steps.run_analysis")
     def test_zero_findings_raises_error(self, mock_analysis, tmp_path):
         """An evaluation with source files but 0 findings is broken, not successful."""
         dims_data = _make_universal_config(tmp_path)
@@ -155,7 +155,7 @@ class TestRun:
         with pytest.raises(EvaluationError, match="0 findings"):
             run(config)
 
-    @patch("quodeq.analysis.runner.run_analysis")
+    @patch("quodeq.analysis._dimension_steps.run_analysis")
     def test_stream_files_created(self, mock_analysis, tmp_path):
         dims_data = _make_universal_config(tmp_path)
         src = tmp_path / "src"

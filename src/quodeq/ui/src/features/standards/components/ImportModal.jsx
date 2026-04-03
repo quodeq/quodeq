@@ -83,14 +83,8 @@ function ConflictStep({ parsedData, conflict, warnings, onClose, onImportAsCopy,
   );
 }
 
-function useImportModal(onImported) {
-  const [step, setStep] = useState(STEP.PICK);
-  const [error, setError] = useState(null);
-  const [warnings, setWarnings] = useState([]);
-  const [conflict, setConflict] = useState(null);
-  const [parsedData, setParsedData] = useState(null);
-  const fileRef = useRef(null);
-
+function useImportActions(onImported, state) {
+  const { setStep, setError, setWarnings, setConflict, parsedData, setParsedData } = state;
   const doImport = async (data, force) => {
     setStep(STEP.IMPORTING);
     try {
@@ -122,32 +116,41 @@ function useImportModal(onImported) {
       return;
     }
     let data;
-    try {
-      const text = await file.text();
-      data = JSON.parse(text);
-    } catch {
-      setError('Invalid file: could not parse as JSON.');
-      setStep(STEP.ERROR);
-      return;
-    }
-    if (typeof data !== 'object' || Array.isArray(data)) {
-      setError('Invalid file: expected a JSON object.');
-      setStep(STEP.ERROR);
-      return;
-    }
+    try { const text = await file.text(); data = JSON.parse(text); }
+    catch { setError('Invalid file: could not parse as JSON.'); setStep(STEP.ERROR); return; }
+    if (typeof data !== 'object' || Array.isArray(data)) { setError('Invalid file: expected a JSON object.'); setStep(STEP.ERROR); return; }
     setParsedData(data);
     await doImport(data, false);
   };
 
   const handleForceImport = async () => { await doImport(parsedData, true); };
-  const handleImportAsCopy = async () => { const copied = { ...parsedData, id: `${parsedData.id}-imported` }; setParsedData(copied); await doImport(copied, false); };
+  const handleImportAsCopy = async () => {
+    const copied = { ...parsedData, id: `${parsedData.id}-imported` };
+    setParsedData(copied);
+    await doImport(copied, false);
+  };
   const handleProceedWithWarnings = async () => { await doImport(parsedData, true); };
+  return { doImport, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
+}
 
-  return { step, error, warnings, conflict, parsedData, fileRef, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
+function useImportModal(onImported) {
+  const [step, setStep] = useState(STEP.PICK);
+  const [error, setError] = useState(null);
+  const [warnings, setWarnings] = useState([]);
+  const [conflict, setConflict] = useState(null);
+  const [parsedData, setParsedData] = useState(null);
+  const fileRef = useRef(null);
+  const actions = useImportActions(onImported, { setStep, setError, setWarnings, setConflict, parsedData, setParsedData });
+
+  return { step, error, warnings, conflict, parsedData, fileRef, ...actions };
 }
 
 export default function ImportModal({ onClose, onImported }) {
-  const { step, error, warnings, conflict, parsedData, fileRef, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings } = useImportModal(onImported);
+  const {
+    step, error, warnings, conflict, parsedData,
+    fileRef, handleFile, handleForceImport,
+    handleImportAsCopy, handleProceedWithWarnings,
+  } = useImportModal(onImported);
 
   return (
     <div className="modal-overlay" onClick={onClose}>

@@ -2,9 +2,10 @@ import { memo } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
+import { ComplianceCard } from './EvalCards.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function buildViolationPlanText(v, principleName) {
@@ -35,6 +36,8 @@ function ViolationCard({ v, principleName, index }) {
         )}
         <CopyButton
           label="Fix plan"
+          className="fix-plan-btn"
+          icon={<SparkleIcon />}
           onClick={() => copyToClipboard(buildViolationPlanText(v, principleName))}
         />
       </div>
@@ -98,7 +101,9 @@ function ComplianceStatsRow({ principle, totalViolations, totalCompliance }) {
           )}
         </div>
         <CopyButton
-          label="Principle fix plan"
+          label="Full fix plan"
+          className="fix-plan-btn-header"
+          icon={<SparkleIcon />}
           onClick={() => copyToClipboard(buildPrinciplePlanText(principle))}
         />
       </div>
@@ -148,6 +153,19 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
       {SEVERITY_ORDER.map((sev) => (
         <ViolationGroup key={sev} sev={sev} violations={violationsBySeverity[sev]} principleName={principle.principle} />
       ))}
+      {totalCompliance > 0 && (
+        <div>
+          <div className="violation-group-header">
+            <span className="violation-group-title">Compliance</span>
+            <span className="violation-group-count">{totalCompliance}</span>
+          </div>
+          <div className="vlive-violations-group">
+            {principle.compliance.map((c, idx) => (
+              <ComplianceCard key={idx} c={c} principle={principle.principle} index={idx} />
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 });

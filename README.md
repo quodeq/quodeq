@@ -7,7 +7,7 @@
 
 <h2 align="center">The quality code compass</h2>
 <p align="center"><em>Your guide to drive any codebase to excellence.</em></p>
-<p align="center"><strong>v0.8.1</strong></p>
+<p align="center"><strong>v0.9.0</strong></p>
 
 <p align="center">
   Quodeq scans any codebase with AI and scores it across six quality dimensions —
@@ -102,6 +102,17 @@ Run `quodeq evaluate --help` and `quodeq dashboard --help` for all available opt
 5. **Report** — produces per-dimension reports with grades, violations, and compliance
 
 Results are stored in `~/.quodeq/evaluations/` and persist across sessions.
+
+## Standards
+
+By default, Quodeq evaluates six quality dimensions based on **ISO 25010**: Security, Reliability, Maintainability, Performance, Flexibility, and Usability.
+
+It also ships with additional built-in standards:
+
+- **Clean Architecture** — dependency rules, layer boundaries, separation of concerns
+- **Domain-Driven Design** — bounded contexts, aggregates, ubiquitous language
+
+You can **create your own standards** from the dashboard — define custom principles and requirements, then evaluate any codebase against them. Import and export standards to share with your team.
 
 ## Supported Languages
 
