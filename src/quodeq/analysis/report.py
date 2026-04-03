@@ -1,251 +1,30 @@
-"""Report builder — assembles scored evaluation data into JSON report dicts.
+"""Report builder -- public API re-exported from focused sub-modules.
 
-Pure report-building logic (``build_*`` functions) is separated from file I/O
-(``write_*`` / ``persist_*`` functions).  The I/O helpers act as infrastructure
-adapters and should not contain business logic.
+Sub-modules:
+  _report_constants  -- field-name constants
+  _report_scoring    -- score/grade conversion and lookup building
+  _report_findings   -- findings flattening and principle-row building
+  _report_assembly   -- report dict assembly
+  _report_io         -- disk persistence (I/O adapters)
 """
 from __future__ import annotations
 
-import json
-import re
-from pathlib import Path
+from quodeq.analysis._report_scoring import grade_from_score
+from quodeq.analysis._report_assembly import (
+    build_report_json,
+    build_full_report,
+    build_dashboard_report,
+)
+from quodeq.analysis._report_io import (
+    write_reports,
+    write_dimension_report,
+)
 
-from quodeq.core.types import ScoringResult, to_camel_dict
-from quodeq.core.evidence.model import Evidence
-from quodeq.core.scoring.internals import score_to_grade_label
-from quodeq.shared.validation import validate_path_segment
-
-_REPORT_SCHEMA_VERSION = 1
-
-_FIELD_FINAL_SCORE = "finalScore"
-_FIELD_FINAL_SCORE_SNAKE = "final_score"
-_FIELD_WEIGHTED_SCORE = "weightedScore"
-_FIELD_WEIGHTED_SCORE_SNAKE = "weighted_score"
-_FIELD_CONFIDENCE_INTERVAL = "confidenceInterval"
-_FIELD_CONFIDENCE_INTERVAL_SNAKE = "confidence_interval"
-
-
-def grade_from_score(score: str | None) -> str | None:
-    """Convert a numeric score string (e.g. '7/10') to a letter grade (Critical..Exemplary)."""
-    if not score:
-        return None
-
-    hit = re.match(r"(\d+(?:\.\d+)?)", str(score))
-    if not hit:
-        return None
-
-    return score_to_grade_label(float(hit.group(1)))
-
-
-def _build_score_lookup(per_principle_scores: dict) -> dict:
-    """Index per-principle scores by display_name for joining against evidence.
-
-    Values may be PrincipleScore dataclasses or plain dicts; we normalise to
-    dicts via ``to_camel_dict`` so downstream code can use uniform access.
-    """
-    lookup: dict = {}
-    for item in per_principle_scores.values():
-        raw = to_camel_dict(item) if not isinstance(item, dict) else item
-        key = raw.get("displayName") or raw.get("display_name", "")
-        if key:
-            lookup[key] = raw
-    return lookup
-
-
-_VIOLATION_FIELDS = ("file", "line", "end_line", "title", "reason", "snippet", "context", "scope", "severity", "req", "req_refs")
-_COMPLIANCE_FIELDS = ("file", "line", "end_line", "title", "reason", "snippet", "context", "scope", "req", "req_refs")
-_GRADE_INSUFFICIENT = "Insufficient"
-
-
-def _flatten_findings(items: list, label: str, fields: tuple[str, ...]) -> list[dict]:
-    """Flatten a list of finding dicts, tagging each with *label* and keeping only *fields*."""
-    result: list[dict] = []
-    for item in items:
-        entry: dict = {"principle": label}
-        entry.update({f: item.get(f) for f in fields if item.get(f) is not None})
-        result.append(entry)
-    return result
-
-
-def _build_principle_row(raw_key: str, pdata: dict, lookup: dict) -> dict:
-    """Build a single principle row dict from evidence and score lookup."""
-    label = pdata.get("display_name", raw_key)
-    matched = lookup.get(label, {})
-    grade = matched.get("grade")
-    raw_final = matched.get(_FIELD_FINAL_SCORE)
-    if raw_final is None:
-        raw_final = matched.get(_FIELD_FINAL_SCORE_SNAKE)
-    if grade == _GRADE_INSUFFICIENT:
-        formatted_score = None
-    else:
-        formatted_score = f"{round(raw_final, 1)}/10" if raw_final is not None else None
-    row: dict = {
-        "name": label,
-        "score": formatted_score,
-        "grade": grade or grade_from_score(formatted_score),
-    }
-    ci = matched.get(_FIELD_CONFIDENCE_INTERVAL) or matched.get(_FIELD_CONFIDENCE_INTERVAL_SNAKE)
-    gs = matched.get("gradeStability") or matched.get("grade_stability")
-    if ci is not None:
-        row["confidence_interval"] = ci
-    if gs is not None:
-        row["grade_stability"] = gs
-    raw_metrics = pdata.get("metrics")
-    if raw_metrics:
-        row["metrics"] = raw_metrics
-    return row
-
-
-def _build_principle_rows(
-    evidence: dict, lookup: dict
-) -> tuple[list, list, list, dict]:
-    """Build principle rows and flattened violation/compliance lists from evidence.
-
-    Returns (principle_rows, flat_violations, flat_compliance, sev_tally).
-    """
-    principle_rows: list = []
-    flat_violations: list = []
-    flat_compliance: list = []
-    sev_tally = {"critical": 0, "major": 0, "minor": 0}
-
-    for raw_key, pdata in evidence.get("principles", {}).items():
-        label = pdata.get("display_name", raw_key)
-        principle_rows.append(_build_principle_row(raw_key, pdata, lookup))
-
-        viols = _flatten_findings(pdata.get("violations", []), label, _VIOLATION_FIELDS)
-        flat_violations.extend(viols)
-        for v in viols:
-            bucket = v.get("severity", "minor")
-            if bucket in sev_tally:
-                sev_tally[bucket] += 1
-
-        flat_compliance.extend(_flatten_findings(pdata.get("compliance", []), label, _COMPLIANCE_FIELDS))
-
-    return principle_rows, flat_violations, flat_compliance, sev_tally
-
-
-def _extract_scores(scores: ScoringResult | dict | None) -> tuple[dict, dict]:
-    """Extract per-principle scores and aggregate from a ScoringResult or dict."""
-    if not scores:
-        return {}, {}
-    if isinstance(scores, dict):
-        return scores.get("principles", {}), scores.get("overall", {})
-    return scores.principles, to_camel_dict(scores.overall) if scores.overall else {}
-
-
-def _assemble_report_dict(
-    dimension: str, evidence: dict, top_score: str | None, top_grade: str | None,
-    principle_rows: list, flat_violations: list, flat_compliance: list, sev_tally: dict,
-) -> dict:
-    """Assemble the final report dict from pre-computed components."""
-    raw_meta = evidence.get("meta", {})
-    report: dict = {
-        "schema_version": _REPORT_SCHEMA_VERSION,
-        "dimension": dimension,
-        "project": evidence.get("repository", ""),
-        "runId": "",
-        "discipline": evidence.get("discipline", ""),
-        "date": evidence.get("date", ""),
-        "sourceFileCount": evidence.get("source_file_count"),
-        "filesRead": evidence.get("files_read", 0),
-        "coveragePct": evidence.get("coverage_pct", 0.0),
-        "meta": {
-            "analysis_prompt_version": raw_meta.get("analysis_prompt_version"),
-            "scoring_prompt_version": raw_meta.get("scoring_prompt_version"),
-            "mapping_file_hash": raw_meta.get("mapping_file_hash"),
-            "quodeq_version": raw_meta.get("quodeq_version"),
-        },
-        "overallScore": top_score,
-        "overallGrade": top_grade,
-        "principles": principle_rows,
-        "violations": flat_violations,
-        "compliance": flat_compliance,
-        "totals": {
-            "violationCount": len(flat_violations),
-            "complianceCount": len(flat_compliance),
-            "severity": sev_tally,
-        },
-    }
-    module = evidence.get("module")
-    if module:
-        report["module"] = module
-    return report
-
-
-def build_report_json(dimension: str, evidence: dict, scores: ScoringResult | dict | None) -> dict:
-    """Build a complete JSON report dict from evidence and scoring data for one dimension.
-
-    Args:
-        dimension: Quality dimension identifier (e.g. ``"maintainability"``).
-        evidence: Raw evidence dict produced by the analysis pipeline.
-        scores: Scoring result (DTO or plain dict) for the dimension, or *None*.
-
-    Parameter count is intentional: dimension identity, raw evidence, and
-    scoring result are each a distinct pipeline output with no shared container.
-    """
-    per_principle_scores, aggregate = _extract_scores(scores)
-    lookup = _build_score_lookup(per_principle_scores)
-    principle_rows, flat_violations, flat_compliance, sev_tally = _build_principle_rows(evidence, lookup)
-
-    # Support both snake_case (legacy dict) and camelCase (serialised DTO) keys
-    weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
-    if weighted is not None:
-        top_score = f"{round(weighted, 1)}/10"
-        top_grade = aggregate.get("grade") or grade_from_score(top_score)
-    else:
-        top_score = None
-        top_grade = None
-
-    report = _assemble_report_dict(
-        dimension, evidence, top_score, top_grade,
-        principle_rows, flat_violations, flat_compliance, sev_tally,
-    )
-    return report
-
-
-def build_full_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
-    """Build report with engine metadata fields."""
-    ev_dict = evidence.to_evidence_dict()
-    base = build_report_json(evidence.language, ev_dict, scores)
-    base["dismissed_count"] = evidence.dismissed_count
-    base["evidence_summary"] = evidence.summary()
-    return base
-
-
-def build_dashboard_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:
-    """Build web dashboard report format."""
-    ev_dict = evidence.to_evidence_dict()
-    return build_report_json(evidence.language, ev_dict, scores)
-
-
-# ---------------------------------------------------------------------------
-# I/O adapters — persist pre-built report dicts to disk
-# ---------------------------------------------------------------------------
-
-def _persist_json(data: dict, path: Path) -> None:
-    """Write a report dict as formatted JSON to *path* (I/O adapter)."""
-    path.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        path.write_text(json.dumps(data, indent=2))
-    except OSError as exc:
-        raise OSError(f"Failed to write report to {path}: {exc}") from exc
-
-
-def write_reports(evidence: Evidence, scores: ScoringResult | dict, output_dir: Path) -> None:
-    """Build and persist full + dashboard report files (I/O adapter)."""
-    full_report = build_full_report(evidence, scores)
-    dashboard_report = build_dashboard_report(evidence, scores)
-
-    dim = evidence.language
-    validate_path_segment(dim)
-    _persist_json(full_report, output_dir / f"{dim}_full.json")
-    _persist_json(dashboard_report, output_dir / f"{dim}.json")
-
-
-def write_dimension_report(evidence: Evidence, scores: ScoringResult | dict, dimension: str, output_dir: Path) -> None:
-    """Build and persist a per-dimension report file (I/O adapter)."""
-    validate_path_segment(dimension)
-
-    report = build_dashboard_report(evidence, scores)
-    report["dimension"] = dimension
-    _persist_json(report, output_dir / f"{dimension}.json")
+__all__ = [
+    "grade_from_score",
+    "build_report_json",
+    "build_full_report",
+    "build_dashboard_report",
+    "write_reports",
+    "write_dimension_report",
+]
