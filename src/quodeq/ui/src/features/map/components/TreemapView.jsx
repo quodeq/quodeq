@@ -25,27 +25,47 @@ function MapTooltipContent({ active, payload }) {
   );
 }
 
+const HEALTH_BAR_H = 5;
+
 function CustomTreemapContent(props) {
-  const { x, y, width, height, name, viewMode, severity, complianceRate, violations, compliance } = props;
+  const { x, y, width, height, name, severity, complianceRate, violations, compliance } = props;
   if (width < 4 || height < 4) return null;
 
   const sev = worstSeverity(severity || { critical: 0, major: 0, minor: 0 });
-  const fill = viewMode === 'violations' ? severityColor(sev) : complianceRateColor(complianceRate || 0);
+  const fill = severityColor(sev);
+  const healthFill = complianceRateColor(complianceRate || 0);
+  const total = violations + compliance;
+  const rate = total > 0 ? Math.round((compliance / total) * 100) : 0;
 
   const showLabel = width > 40 && height > 20;
   const showCount = width > 60 && height > 35;
+  const showHealthBar = width > 20 && height > 18;
+  const barY = y + height - HEALTH_BAR_H - 2;
 
   return (
     <g>
-      <rect x={x} y={y} width={width} height={height} rx={3} style={{ fill, stroke: 'var(--color-bg)', strokeWidth: 2, cursor: 'pointer', opacity: 0.85 }} />
+      <rect x={x} y={y} width={width} height={height} rx={3}
+        style={{ fill, stroke: 'var(--color-bg)', strokeWidth: 2, cursor: 'pointer', opacity: 0.85 }} />
+      {showHealthBar && (
+        <>
+          <rect x={x + 3} y={barY} width={width - 6} height={HEALTH_BAR_H} rx={2}
+            style={{ fill: 'rgba(0,0,0,0.3)' }} />
+          <rect x={x + 3} y={barY} width={Math.max(0, (width - 6) * (rate / 100))} height={HEALTH_BAR_H} rx={2}
+            style={{ fill: healthFill, opacity: 0.9 }} />
+        </>
+      )}
       {showLabel && (
-        <text x={x + width / 2} y={y + height / 2 - (showCount ? 6 : 0)} textAnchor="middle" dominantBaseline="central" style={{ fontSize: Math.min(12, width / 8), fill: '#fff', fontWeight: 600, pointerEvents: 'none' }}>
+        <text x={x + width / 2} y={y + (height - (showHealthBar ? HEALTH_BAR_H + 2 : 0)) / 2 - (showCount ? 6 : 0)}
+          textAnchor="middle" dominantBaseline="central"
+          style={{ fontSize: Math.min(12, width / 8), fill: '#fff', fontWeight: 600, pointerEvents: 'none' }}>
           {name.length > width / 7 ? name.slice(0, Math.floor(width / 7)) + '…' : name}
         </text>
       )}
       {showCount && (
-        <text x={x + width / 2} y={y + height / 2 + 10} textAnchor="middle" dominantBaseline="central" style={{ fontSize: 10, fill: 'rgba(255,255,255,0.8)', pointerEvents: 'none' }}>
-          {violations}v · {compliance}c
+        <text x={x + width / 2} y={y + (height - (showHealthBar ? HEALTH_BAR_H + 2 : 0)) / 2 + 10}
+          textAnchor="middle" dominantBaseline="central"
+          style={{ fontSize: 10, fill: 'rgba(255,255,255,0.8)', pointerEvents: 'none' }}>
+          {violations}v · {rate}%
         </text>
       )}
     </g>
@@ -86,7 +106,7 @@ export default function TreemapView({ node, viewMode, onDrillDown, containerHeig
         dataKey="size"
         stroke="var(--color-bg)"
         onClick={handleClick}
-        content={<CustomTreemapContent viewMode={viewMode} />}
+        content={<CustomTreemapContent />}
         isAnimationActive={false}
       >
         <Tooltip content={<MapTooltipContent />} />
