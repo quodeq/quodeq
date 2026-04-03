@@ -7,234 +7,36 @@ Two-phase approach:
 
 Confirmed findings are written to the evidence JSONL via MCP (same as
 main analysis), so they appear on the dashboard immediately.
+
+This module is the public entry point; implementation is split across:
+- _verify_io: evidence path resolution and JSONL parsing
+- _verify_filter: pre-filtering and fingerprint classification
+- _verify_output: writing findings and grouping by file
 """
 from __future__ import annotations
 
-import json
-from collections.abc import Callable
 from pathlib import Path
 from typing import Any
 
+from quodeq.analysis.subagents._verify_filter import (  # noqa: F401
+    _classify_findings,
+    _pre_filter_gone,
+    partition_findings_by_fingerprint,
+)
+from quodeq.analysis.subagents._verify_io import (  # noqa: F401
+    _find_previous_evidence,
+    _load_previous_findings,
+    _parse_finding_line,
+    _resolve_previous_evidence,
+    resolve_evidence_paths,
+)
+from quodeq.analysis.subagents._verify_output import (  # noqa: F401
+    _group_by_file,
+    _write_verify_manifest,
+    write_carry_forward_findings,
+)
 from quodeq.analysis.subagents._verify_pool import build_verify_prompt  # noqa: F401 — re-export
-from quodeq.data.fs.report_parser.runs import list_runs
-from quodeq.shared.logging import log_debug, log_info, log_success
-from quodeq.shared.utils import open_text
-
-
-def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_id: str, dim_id: str) -> Path | None:
-    """Find the JSONL evidence file from the most recent previous run."""
-    runs = list_runs(reports_root, project_uuid)
-    for run in runs:
-        if run.run_id == current_run_id:
-            continue
-        run_dir = reports_root / project_uuid / run.run_id
-        # Only use evidence from runs that completed (have a scored report)
-        if not (run_dir / "evaluation" / f"{dim_id}.json").is_file():
-            continue
-        prev_jsonl = run_dir / "evidence" / f"{dim_id}_evidence.jsonl"
-        if prev_jsonl.exists() and prev_jsonl.stat().st_size > 0:
-            return prev_jsonl
-    return None
-
-
-def _parse_finding_line(line: str) -> dict | None:
-    """Parse a single JSONL line into a finding dict, or None if invalid."""
-    line = line.strip()
-    if not line:
-        return None
-    try:
-        entry = json.loads(line)
-    except json.JSONDecodeError:
-        return None
-    if entry.get("p") and entry.get("t") in ("violation", "compliance"):
-        return entry
-    return None
-
-
-def _load_previous_findings(
-    jsonl_path: Path,
-    open_fn: Callable[[Path], Any] | None = None,
-) -> list[dict]:
-    """Load all findings from a JSONL file.
-
-    *open_fn* is an injectable file opener (defaults to ``open_text``).
-    """
-    if not jsonl_path.exists():
-        return []
-    _open = open_fn or open_text
-    try:
-        with _open(jsonl_path) as f:
-            return [e for line in f if (e := _parse_finding_line(line)) is not None]
-    except OSError as exc:
-        log_debug(f"Cannot read findings JSONL {jsonl_path}: {exc}")
-        return []
-
-
-def _pre_filter_gone(findings: list[dict], src: Path) -> tuple[list[dict], int]:
-    """Fast pre-filter: drop findings whose files no longer exist.
-
-    Returns (surviving_findings, gone_count).
-    """
-    # Batch existence checks: resolve unique paths once instead of per-finding.
-    unique_paths: dict[str, bool] = {}
-    for finding in findings:
-        rel_path = finding.get("file", "")
-        if rel_path and rel_path not in unique_paths:
-            unique_paths[rel_path] = (src / rel_path).exists()
-
-    surviving: list[dict] = []
-    gone = 0
-    for finding in findings:
-        rel_path = finding.get("file", "")
-        if not rel_path or not unique_paths.get(rel_path, False):
-            gone += 1
-        else:
-            surviving.append(finding)
-    return surviving, gone
-
-
-def _classify_findings(
-    findings: list[dict], prev_hashes: dict, src: Path,
-) -> tuple[list[dict], list[dict]]:
-    """Classify findings into carry-forward vs needs-verification by file hash."""
-    from quodeq.analysis.fingerprint import _hash_file
-    file_unchanged: dict[str, bool] = {}
-    carry_forward: list[dict] = []
-    needs_verification: list[dict] = []
-    for finding in findings:
-        rel_path = finding.get("file", "")
-        if not rel_path:
-            needs_verification.append(finding)
-            continue
-        if rel_path not in file_unchanged:
-            prev_hash = prev_hashes.get(rel_path)
-            if prev_hash is None:
-                file_unchanged[rel_path] = False
-            else:
-                file_unchanged[rel_path] = _hash_file(src / rel_path) == prev_hash
-        if file_unchanged[rel_path]:
-            carry_forward.append(finding)
-        else:
-            needs_verification.append(finding)
-    return carry_forward, needs_verification
-
-
-def partition_findings_by_fingerprint(
-    findings: list[dict],
-    prev_fingerprint: dict | None,
-    src: Path,
-    standards_dir: Path | None = None,
-    dimension: str | None = None,
-) -> tuple[list[dict], list[dict]]:
-    """Split findings into (carry_forward, needs_verification) based on file hashes.
-
-    Uses the previous fingerprint's per-file SHA-256 hashes to determine which
-    files have changed. Findings for unchanged files are carried forward (no AI
-    needed); findings for changed/deleted/new files need AI verification.
-
-    If standards changed since the previous run, all findings need verification
-    regardless of file hashes (findings were evaluated under different criteria).
-    """
-    from quodeq.analysis.fingerprint import _hash_standards
-
-    if not prev_fingerprint or not findings:
-        return [], list(findings)
-
-    # Standards guard: if standards changed, all findings need verification
-    if standards_dir and dimension:
-        current_std = _hash_standards(standards_dir, dimension)
-        prev_std = prev_fingerprint.get("standards_checksum")
-        if prev_std is not None and current_std != prev_std:
-            return [], list(findings)
-
-    return _classify_findings(findings, prev_fingerprint.get("file_hashes", {}), src)
-
-
-def write_carry_forward_findings(
-    findings: list[dict], evidence_dir: Path, dim_id: str,
-    write_fn: Callable[[Path, str], None] | None = None,
-) -> int:
-    """Append carry-forward findings to the evidence JSONL.
-
-    Writes from an in-memory list of finding dicts (as returned by
-    partition_findings_by_fingerprint). Unlike carry_forward_findings in
-    incremental.py which filters file-to-file, this writes pre-partitioned
-    results directly.
-
-    *write_fn* is an injectable writer ``(path, text) -> None``.  Defaults
-    to creating parent dirs and appending to file.
-
-    Returns the number of findings written.
-    """
-    if not findings:
-        return 0
-    output = evidence_dir / f"{dim_id}_evidence.jsonl"
-    text = "".join(json.dumps(finding) + "\n" for finding in findings)
-    if write_fn:
-        write_fn(output, text)
-    else:
-        output.parent.mkdir(parents=True, exist_ok=True)
-        with open(output, "a") as f:
-            f.write(text)
-    return len(findings)
-
-
-def _group_by_file(findings: list[dict]) -> dict[str, list[dict]]:
-    """Group findings by their source file path."""
-    groups: dict[str, list[dict]] = {}
-    for finding in findings:
-        file_path = finding.get("file", "")
-        if file_path:
-            groups.setdefault(file_path, []).append(finding)
-    return groups
-
-
-def _write_verify_manifest(
-    grouped: dict[str, list[dict]],
-    output_path: Path,
-) -> None:
-    """Write the verification manifest — a JSON file mapping files to findings.
-
-    Each verification subagent reads this to know which findings to re-check.
-    """
-    output_path.write_text(json.dumps(grouped, indent=2))
-
-
-def resolve_evidence_paths(evidence_dir: Path) -> tuple[str, str, Path] | None:
-    """Walk up from evidence_dir to find run_id, project_uuid, reports_base."""
-    edir = Path(evidence_dir)
-    while edir.name != "evidence" and edir != edir.parent:
-        edir = edir.parent
-    if edir.name != "evidence":
-        return None
-    run_dir = edir.parent
-    return run_dir.name, run_dir.parent.name, run_dir.parent.parent
-
-
-def _resolve_previous_evidence(
-    evidence_dir: Path,
-    dim_id: str,
-    cache: dict[tuple[str, str], tuple[list[dict], int, int]] | None,
-    cache_key: tuple[str, str],
-) -> tuple[Path | None, bool]:
-    """Resolve path to the previous evidence JSONL file.
-
-    Returns (prev_jsonl_path, already_cached).  When *already_cached* is True
-    the caller should use the cache hit instead.  A ``None`` path means no
-    previous evidence exists.
-    """
-    paths = resolve_evidence_paths(evidence_dir)
-    if paths is None:
-        if cache is not None:
-            cache[cache_key] = ([], 0, 0)
-        return None, False
-    current_run_id, project_uuid, reports_base = paths
-    prev_jsonl = _find_previous_evidence(reports_base, project_uuid, current_run_id, dim_id)
-    if prev_jsonl is None:
-        if cache is not None:
-            cache[cache_key] = ([], 0, 0)
-        return None, False
-    return prev_jsonl, False
+from quodeq.shared.logging import log_info
 
 
 def load_previous_findings_for_dimension(
