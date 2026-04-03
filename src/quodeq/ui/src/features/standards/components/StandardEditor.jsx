@@ -87,12 +87,12 @@ function EditorStatsRow({ standard }) {
 }
 
 function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
-  const { standard, selectedNode, setSelectedNode, actions, editable } = treeProps;
+  const { standard, selectedNode, actions, editable } = treeProps;
   const { updateField, isNew } = detailProps;
   return (
     <div className="standard-editor-body">
       <div className="standard-editor-tree-panel" style={{ width: treeWidth, minWidth: MIN_TREE_WIDTH, maxWidth: MAX_TREE_WIDTH }}>
-        <StandardTree standard={standard} selectedNode={selectedNode} onSelectNode={setSelectedNode} actions={actions} editable={editable} />
+        <StandardTree standard={standard} selectedNode={selectedNode} actions={actions} />
       </div>
       <div className="standard-editor-divider" onMouseDown={onDividerMouseDown} />
       <div className="standard-editor-detail-panel">
@@ -124,7 +124,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
     );
   }
 
-  const treeActions = { onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement };
+  const treeActions = { onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement, onSelectNode: setSelectedNode, editable };
 
   return (
     <div className="standard-editor">
@@ -135,7 +135,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
       />
       {error && <p className="inline-error" style={{ margin: '8px 16px' }}>{error}</p>}
       <EditorBody
-        treeProps={{ standard, selectedNode, setSelectedNode, actions: treeActions, editable }}
+        treeProps={{ standard, selectedNode, actions: treeActions, editable }}
         detailProps={{ updateField, isNew }}
         treeWidth={treeWidth}
         onDividerMouseDown={onDividerMouseDown}

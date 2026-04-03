@@ -10,7 +10,12 @@ from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_f
 
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
-    return Path(evaluations_dir) / project
+    base = Path(evaluations_dir).resolve()
+    resolved = (base / project).resolve()
+    if not resolved.is_relative_to(base):
+        from flask import abort
+        abort(400, description="Invalid project path")
+    return resolved
 
 
 def register_findings_routes(app: Flask) -> None:

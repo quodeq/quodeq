@@ -111,18 +111,18 @@ class FsEvaluationMixin:
     def _build_eval_env(repo: str, options: EvaluationOptions, env: dict[str, str] | None = None) -> dict[str, str]:
         """Build the subprocess environment for an evaluation run."""
         base = env if env is not None else os.environ
-        env = {**base, "PYTHONUNBUFFERED": "1"}
-        env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
+        built_env = {**base, "PYTHONUNBUFFERED": "1"}
+        built_env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
         ai_model = options.ai_model or get_ai_model()
         if ai_model:
-            env["AI_MODEL"] = ai_model
+            built_env["AI_MODEL"] = ai_model
         if options.subagent_model:
-            env["SUBAGENT_MODEL"] = options.subagent_model
+            built_env["SUBAGENT_MODEL"] = options.subagent_model
         if not options.verify_findings:
-            env["QUODEQ_NO_VERIFY"] = "1"
+            built_env["QUODEQ_NO_VERIFY"] = "1"
         if options.pool_budget != _DEFAULT_POOL_BUDGET:
-            env["QUODEQ_POOL_BUDGET"] = str(options.pool_budget)
-        return env
+            built_env["QUODEQ_POOL_BUDGET"] = str(options.pool_budget)
+        return built_env
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
         """Start an asynchronous evaluation subprocess for a repository."""
