@@ -47,7 +47,7 @@ def _mock_urlopen(monkeypatch):
     response.read.return_value = content
     response.__enter__ = lambda self: self
     response.__exit__ = MagicMock(return_value=False)
-    with patch("quodeq.config.standards_fetcher.urllib.request.urlopen", return_value=response) as mock:
+    with patch("quodeq.config._asvs_network.urllib.request.urlopen", return_value=response) as mock:
         yield mock, content
 
 
@@ -84,7 +84,7 @@ class TestFetchAsvsL1:
         response.read.return_value = content
         response.__enter__ = lambda self: self
         response.__exit__ = MagicMock(return_value=False)
-        with patch("quodeq.config.standards_fetcher.urllib.request.urlopen", return_value=response):
+        with patch("quodeq.config._asvs_network.urllib.request.urlopen", return_value=response):
             with pytest.raises(ValueError, match="No ASVS hash configured"):
                 fetch_asvs_l1(tmp_path)
 
@@ -97,5 +97,5 @@ class TestFetchAsvsL1:
         response.read.return_value = content
         response.__enter__ = lambda self: self
         response.__exit__ = MagicMock(return_value=False)
-        with patch("quodeq.config.standards_fetcher.urllib.request.urlopen", return_value=response):
+        with patch("quodeq.config._asvs_network.urllib.request.urlopen", return_value=response):
             fetch_asvs_l1(tmp_path, skip_integrity=True)  # should not raise
