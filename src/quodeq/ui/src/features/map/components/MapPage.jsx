@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { buildFileTree } from '../utils/fileTree.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import TreemapView from './TreemapView.jsx';
@@ -98,6 +98,30 @@ function buildBreadcrumbPath(path) {
   return parts.map((name, i) => ({ name, path: parts.slice(0, i + 1).join('/') }));
 }
 
+function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
+  const ref = useRef(null);
+  const [height, setHeight] = useState(400);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const h = Math.floor(entry.contentRect.height);
+      if (h > 0) setHeight(h);
+    });
+    observer.observe(ref.current);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div ref={ref} className="map-viz-container">
+      {vizStyle === 'treemap' && <TreemapView node={node} viewMode={viewMode} onDrillDown={onDrillDown} containerHeight={height} />}
+      {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+      {vizStyle === 'sunburst' && <SunburstView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+      {vizStyle === 'bubbles' && <BubblePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+    </div>
+  );
+}
+
 export default function MapPage({ data, callbacks }) {
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
   const [viewMode, setViewMode] = useState('violations');
@@ -177,12 +201,7 @@ export default function MapPage({ data, callbacks }) {
       </div>
       <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       <MapBreadcrumb path={breadcrumb} onNavigate={handleBreadcrumbNav} onBack={handleBack} />
-      <div className="map-viz-container">
-        {vizStyle === 'treemap' && <TreemapView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
-        {vizStyle === 'heatgrid' && <HeatGridView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
-        {vizStyle === 'sunburst' && <SunburstView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
-        {vizStyle === 'bubbles' && <BubblePackView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
-      </div>
+      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} />
     </div>
   );
 }

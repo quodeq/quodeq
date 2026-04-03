@@ -52,7 +52,7 @@ function CustomTreemapContent(props) {
   );
 }
 
-export default function TreemapView({ node, viewMode, onDrillDown }) {
+export default function TreemapView({ node, viewMode, onDrillDown, containerHeight }) {
   const treemapData = useMemo(() => {
     const toEntry = (n) => ({
       name: n.name,
@@ -80,7 +80,7 @@ export default function TreemapView({ node, viewMode, onDrillDown }) {
   };
 
   return (
-    <ResponsiveContainer width="100%" height="100%">
+    <ResponsiveContainer width="100%" height={containerHeight || 400}>
       <Treemap
         data={treemapData}
         dataKey="size"
