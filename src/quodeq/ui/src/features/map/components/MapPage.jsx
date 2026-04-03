@@ -118,9 +118,29 @@ function buildBreadcrumbPath(path) {
   return parts.map((name, i) => ({ name, path: parts.slice(0, i + 1).join('/') }));
 }
 
+const ZOOM_STEP = 0.2;
+const ZOOM_MIN = 0.4;
+const ZOOM_MAX = 3;
+
+function ZoomControls({ zoom, setZoom }) {
+  return (
+    <div className="map-zoom-controls">
+      <button type="button" className="map-zoom-btn" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))} title="Zoom in">+</button>
+      <button type="button" className="map-zoom-btn" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))} title="Zoom out">−</button>
+      <button type="button" className="map-zoom-btn map-zoom-reset" onClick={() => setZoom(1)} title="Reset zoom">⟳</button>
+      <span className="map-zoom-label">{Math.round(zoom * 100)}%</span>
+    </div>
+  );
+}
+
 function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
   const ref = useRef(null);
   const [height, setHeight] = useState(400);
+  const [zoom, setZoom] = useState(1);
+  const showZoom = vizStyle !== 'heatgrid';
+
+  // Reset zoom when switching viz style
+  useEffect(() => setZoom(1), [vizStyle]);
 
   useEffect(() => {
     if (!ref.current) return;
@@ -132,12 +152,24 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
     return () => observer.disconnect();
   }, []);
 
+  // Mouse wheel zoom for SVG views
+  const handleWheel = useCallback((e) => {
+    if (!showZoom) return;
+    if (e.ctrlKey || e.metaKey) {
+      e.preventDefault();
+      setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP))));
+    }
+  }, [showZoom]);
+
   return (
-    <div ref={ref} className="map-viz-container">
-      {vizStyle === 'treemap' && <TreemapView node={node} viewMode={viewMode} onDrillDown={onDrillDown} containerHeight={height} />}
-      {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'sunburst' && <SunburstView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'bubbles' && <BubblePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+    <div ref={ref} className="map-viz-container" onWheel={handleWheel}>
+      {showZoom && <ZoomControls zoom={zoom} setZoom={setZoom} />}
+      <div className="map-viz-inner" style={showZoom ? { transform: `scale(${zoom})`, transformOrigin: 'center top' } : undefined}>
+        {vizStyle === 'treemap' && <TreemapView node={node} viewMode={viewMode} onDrillDown={onDrillDown} containerHeight={Math.round(height / zoom)} />}
+        {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+        {vizStyle === 'sunburst' && <SunburstView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+        {vizStyle === 'bubbles' && <BubblePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+      </div>
     </div>
   );
 }
