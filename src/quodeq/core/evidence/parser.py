@@ -1,42 +1,20 @@
 """Evidence parser -- converts extracted JSONL lines into V2 Evidence model."""
 from __future__ import annotations
 
-import json
-import logging
-from collections.abc import Callable, Iterable
-from contextlib import AbstractContextManager
 from dataclasses import dataclass
-import os
 from pathlib import Path
 
+from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line, read_judgments
+from quodeq.core.evidence._refs import build_req_refs_lookup, resolve_llm_refs
 from quodeq.core.evidence._req_mapping import _GroupedJudgments, _group_judgments
 from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, compute_coverage_pct
-from quodeq.shared.utils import open_text
-from quodeq.engine._ref_utils import ref_label as _ref_label, load_compiled_refs
 
-_logger = logging.getLogger(__name__)
+# Re-export for backward compatibility (external code imports these from parser)
+__all__ = ["build_req_refs_lookup", "resolve_llm_refs", "EvidenceContext",
+           "parse_jsonl_to_evidence", "parse_jsonl_to_evidence_by_dimension"]
 
-_CWE_URL_TEMPLATE_DEFAULT = "https://cwe.mitre.org/data/definitions/{cwe_id}.html"
-
-
-def _cwe_url_template(env: dict[str, str] | None = None) -> str:
-    """Return the CWE URL template, reading from env lazily.
-
-    *env* overrides ``os.environ`` when provided (e.g. for testing).
-    When ``None``, falls back to ``os.environ``.
-    """
-    return (env if env is not None else os.environ).get(
-        "QUODEQ_CWE_URL_TEMPLATE",
-        _CWE_URL_TEMPLATE_DEFAULT,
-    )
-
-
-def build_req_refs_lookup(compiled_dir: Path, dimension: str) -> dict[str, list[dict]]:
-    """Return {req_id: [{label, url}, ...]} for all refs of each requirement.
-
-    Delegates to _ref_utils.load_compiled_refs for the heavy lifting.
-    """
-    return load_compiled_refs(str(compiled_dir), dimension)
+# Preserve private-name aliases used by tests
+_parse_jsonl_line = parse_jsonl_line
 
 
 @dataclass
@@ -50,238 +28,58 @@ class EvidenceContext:
     module: str = ""
 
 
-def resolve_llm_refs(
-    llm_refs: list[str] | None,
-    all_req_refs: list[dict] | None,
-    cwe_url_template: str | None = None,
-) -> list[dict] | None:
-    """Filter req_refs to only those the LLM selected, building URLs for unknown labels.
-
-    Only refs that carry a ``url`` are kept.  When the LLM did not select
-    any refs (``llm_refs`` is None/empty), returns ``None`` rather than
-    dumping all compiled refs — showing none is better than showing noise.
-
-    *cwe_url_template* may be overridden for offline or internal deployments.
-    """
-    if not llm_refs:
-        return None
-    if cwe_url_template is None:
-        cwe_url_template = _cwe_url_template()
-    by_label = {r["label"]: r for r in (all_req_refs or [])}
-    result = []
-    upper_labels = {k.upper(): r for k, r in by_label.items()}
-    for label in llm_refs:
-        if label in by_label:
-            result.append(by_label[label])
-        elif label.upper().startswith("CWE-"):
-            cwe_id = label.split("-", 1)[1]
-            result.append({"label": label.upper(), "url": cwe_url_template.format(cwe_id=cwe_id)})
-        else:
-            # Prefix match: "CISQ-ASCRM-CWE-396" matches known label "CISQ"
-            label_upper = label.upper()
-            matched = next((r for k, r in upper_labels.items() if label_upper.startswith(k)), None)
-            if matched:
-                result.append(matched)
-    # Only keep refs that have a URL -- drop bare labels without links
-    result = [r for r in result if r.get("url")]
-    return result if result else None
-
-
-def _parse_jsonl_line(line: str) -> tuple[Judgment, list[str] | None] | None:
-    """Parse a single JSONL evidence line into a Judgment and optional LLM ref selection."""
-    line = line.strip()
-    if not line:
-        return None
-    try:
-        obj = json.loads(line)
-    except json.JSONDecodeError as exc:
-        _logger.warning("Skipping malformed JSONL line: %s", exc)
-        return None
-
-    practice_id = obj.get("p") or obj.get("req")
-    verdict = obj.get("t")
-    if not practice_id or verdict not in ("violation", "compliance"):
-        return None
-
-    j = Judgment(
-        practice_id=practice_id,
-        verdict=verdict,
-        dimension=obj.get("d", ""),
-        file=obj.get("file", ""),
-        line=obj.get("line", 0),
-        end_line=obj.get("end_line", 0),
-        snippet=obj.get("snippet", ""),
-        severity=obj.get("severity", "medium"),
-        violation_type=obj.get("vt", ""),
-        reason=obj.get("reason", ""),
-        req=obj.get("req"),
-        title=obj.get("w", ""),
-        context=obj.get("context", ""),
-        scope=obj.get("scope", ""),
-    )
-    # Pre-resolved req_refs from MCP server enrichment take priority
-    pre_resolved = obj.get("req_refs")
-    if isinstance(pre_resolved, list) and pre_resolved:
-        j.req_refs = pre_resolved
-    return j, obj.get("refs")
-
-
-def _judgment_to_dict(j: Judgment) -> dict:
-    """Convert a Judgment to the dict format used in PrincipleEvidence lists."""
-    d: dict = {"file": j.file}
-    _optional = {"line": j.line, "end_line": j.end_line, "snippet": j.snippet, "severity": j.severity, "violation_type": j.violation_type, "context": j.context, "scope": j.scope}
-    d.update({k: v for k, v in _optional.items() if v})
-    if j.req:
-        d["req"] = j.req
-    if j.req_refs:
-        d["req_refs"] = j.req_refs
-    if j.title:
-        d["title"] = j.title
-    if j.reason:
-        d["reason"] = j.reason
-    return d
-
-
-def _enrich_judgment(
-    j: Judgment,
-    llm_refs: list[str] | None,
-    compiled_dir: Path | None,
-    req_refs_cache: dict[str, dict[str, list[dict]]],
-) -> None:
-    """Resolve and attach req_refs to a Judgment in-place."""
-    if j.req_refs:
-        return  # MCP server already enriched
-    all_req_refs = None
-    if compiled_dir and j.req and j.dimension:
-        if j.dimension not in req_refs_cache:
-            req_refs_cache[j.dimension] = build_req_refs_lookup(compiled_dir, j.dimension)
-        all_req_refs = req_refs_cache[j.dimension].get(j.req)
-    resolved = resolve_llm_refs(llm_refs, all_req_refs)
-    if resolved:
-        j.req_refs = resolved
-
-
-def _parse_judgments(
-    lines: Iterable[str], compiled_dir: Path | None,
-) -> list[Judgment]:
-    """Parse JSONL lines and return enriched Judgment objects.
-
-    Accepts any iterable of strings — the caller is responsible for file I/O.
-    """
-    judgments: list[Judgment] = []
-    req_refs_cache: dict[str, dict[str, list[dict]]] = {}
-    for line in lines:
-        result = _parse_jsonl_line(line)
-        if result is not None:
-            j, llm_refs = result
-            _enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
-            judgments.append(j)
-    return judgments
-
-
-def _read_judgments(
-    jsonl_file: Path, compiled_dir: Path | None,
-    open_fn: Callable[[Path], AbstractContextManager[Iterable[str]]] | None = None,
-) -> list[Judgment]:
-    """Read JSONL lines from a file and return enriched Judgment objects.
-
-    *open_fn* is an injectable file opener; defaults to ``open_text`` for
-    backward compatibility.  Pass a custom opener to decouple from the filesystem.
-    """
-    if not jsonl_file.exists():
-        return []
-    opener = open_fn or open_text
-    with opener(jsonl_file) as _jf:
-        return _parse_judgments(_jf, compiled_dir)
-
-
 def _build_principles(
     grouped: _GroupedJudgments, dimension_name: str,
 ) -> dict[str, PrincipleEvidence]:
     """Build scored PrincipleEvidence entries from grouped judgments."""
-    all_principle_keys = set(grouped.violations.keys()) | set(grouped.compliance.keys())
+    all_keys = set(grouped.violations.keys()) | set(grouped.compliance.keys())
     principles: dict[str, PrincipleEvidence] = {}
-    for sc in sorted(all_principle_keys):
+    for sc in sorted(all_keys):
         pe = PrincipleEvidence(
-            practice_id=sc,
-            display_name=sc,
-            dimension=dimension_name,
+            practice_id=sc, display_name=sc, dimension=dimension_name,
             severity=grouped.severity.get(sc, "medium"),
-            violations=[_judgment_to_dict(j) for j in grouped.violations.get(sc, [])],
-            compliance=[_judgment_to_dict(j) for j in grouped.compliance.get(sc, [])],
+            violations=[judgment_to_dict(j) for j in grouped.violations.get(sc, [])],
+            compliance=[judgment_to_dict(j) for j in grouped.compliance.get(sc, [])],
         )
         pe.compute_metrics()
         principles[sc] = pe
     return principles
 
 
-def parse_jsonl_to_evidence_by_dimension(
-    jsonl_file: Path,
-    context: EvidenceContext,
-    compiled_dir: Path | None = None,
-    evaluators_dir: Path | None = None,
-) -> dict[str, Evidence]:
-    """Parse a multi-dimension JSONL file into per-dimension Evidence objects.
+def _build_evidence(context: EvidenceContext, principles: dict[str, PrincipleEvidence]) -> Evidence:
+    """Create an Evidence object from context and principles."""
+    return Evidence(
+        repository=context.repository, language=context.language, date=context.date_str,
+        source_file_count=context.source_file_count, files_read=context.files_read,
+        coverage_pct=compute_coverage_pct(context.files_read, context.source_file_count),
+        principles=principles, dismissed_count=0, module=context.module,
+    )
 
-    Groups judgments by dimension (from the `d` field), then builds
-    separate Evidence objects for each dimension.
-    """
-    judgments = _read_judgments(jsonl_file, compiled_dir)
+
+def parse_jsonl_to_evidence_by_dimension(
+    jsonl_file: Path, context: EvidenceContext,
+    compiled_dir: Path | None = None, evaluators_dir: Path | None = None,
+) -> dict[str, Evidence]:
+    """Parse a multi-dimension JSONL file into per-dimension Evidence objects."""
+    judgments = read_judgments(jsonl_file, compiled_dir)
     if not judgments:
         return {}
-
-    # Group by dimension
     by_dim: dict[str, list[Judgment]] = {}
     for j in judgments:
-        dim = j.dimension or "unknown"
-        by_dim.setdefault(dim, []).append(j)
-
-    source_file_count = context.source_file_count
-    files_read = context.files_read
-    coverage_pct = compute_coverage_pct(files_read, source_file_count)
-
-    result: dict[str, Evidence] = {}
-    for dim, dim_judgments in by_dim.items():
-        grouped = _group_judgments(dim_judgments, dimension=dim, evaluators_dir=evaluators_dir)
-        principles = _build_principles(grouped, dim)
-        result[dim] = Evidence(
-            repository=context.repository,
-            language=context.language,
-            date=context.date_str,
-            source_file_count=source_file_count,
-            files_read=files_read,
-            coverage_pct=coverage_pct,
-            principles=principles,
-            dismissed_count=0,
-            module=context.module,
-        )
-    return result
+        by_dim.setdefault(j.dimension or "unknown", []).append(j)
+    return {
+        dim: _build_evidence(context, _build_principles(
+            _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir), dim))
+        for dim, dj in by_dim.items()
+    }
 
 
 def parse_jsonl_to_evidence(
-    jsonl_file: Path,
-    context: EvidenceContext,
-    compiled_dir: Path | None = None,
-    evaluators_dir: Path | None = None,
+    jsonl_file: Path, context: EvidenceContext,
+    compiled_dir: Path | None = None, evaluators_dir: Path | None = None,
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
-    judgments = _read_judgments(jsonl_file, compiled_dir)
-    dimension_name = judgments[0].dimension if judgments else ""
-    grouped = _group_judgments(judgments, dimension=dimension_name, evaluators_dir=evaluators_dir)
-    principles = _build_principles(grouped, dimension_name)
-
-    source_file_count = context.source_file_count
-    files_read = context.files_read
-    coverage_pct = compute_coverage_pct(files_read, source_file_count)
-
-    return Evidence(
-        repository=context.repository,
-        language=context.language,
-        date=context.date_str,
-        source_file_count=source_file_count,
-        files_read=files_read,
-        coverage_pct=coverage_pct,
-        principles=principles,
-        dismissed_count=0,
-        module=context.module,
-    )
+    judgments = read_judgments(jsonl_file, compiled_dir)
+    dim = judgments[0].dimension if judgments else ""
+    grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=evaluators_dir)
+    return _build_evidence(context, _build_principles(grouped, dim))
