@@ -49,10 +49,10 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, zoom = 1
   if (!node || !circles.length) return null;
 
   return (
-    <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
       <svg
         viewBox={`0 0 ${viewSize} ${viewSize}`}
-        style={{ width: viewSize, height: viewSize, maxWidth: 'none', overflow: 'hidden' }}
+        style={{ width: '100%', height: '100%', overflow: 'hidden' }}
         onClick={handleBgClick}
       >
         {/* Layer 1: circles */}
