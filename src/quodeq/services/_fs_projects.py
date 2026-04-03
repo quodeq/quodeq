@@ -9,12 +9,11 @@ from pathlib import Path
 from typing import Any
 
 from quodeq.core.types import ProjectEntry
-from quodeq.services._filesystem_helpers import (
+from quodeq.services._filesystem_helpers import _list_available_dimensions_for_discipline
+from quodeq.services._fs_metadata import _has_fingerprints, _infer_discipline
+from quodeq.services._fs_project_helpers import (
     _auto_detect_parents,
     _build_project_entry,
-    _has_fingerprints,
-    _infer_discipline,
-    _list_available_dimensions_for_discipline,
     _max_projects_listed,
 )
 from quodeq.services.ports import list_runs, safe_read_dir
