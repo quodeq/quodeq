@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
@@ -74,6 +74,12 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const { onNavigate, onRunSelect } = callbacks;
   const [focusedDimension, setFocusedDimension] = useState(null);
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
+  // Clear focused dimension when the active run changes to avoid showing stale data
+  const prevRunRef = useRef(selectedRunId);
+  if (prevRunRef.current !== selectedRunId) {
+    prevRunRef.current = selectedRunId;
+    if (focusedDimension) setFocusedDimension(null);
+  }
   // Merge rescored grades into accumulated dimensions so all cards reflect live scores
   const accumulatedDimensions = useMemo(() => {
     const dims = accumulated?.dimensions || [];
@@ -92,10 +98,12 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
     return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
   }
 
+  const isLoading = loading && !dashboard;
+
   return (
-    <div className="dashboard-page">
+    <div className={`dashboard-page dashboard-fade ${isLoading ? 'dashboard-loading' : 'dashboard-ready'}`}>
       {error && <p className="inline-error">Failed to load dashboard data. Please try again.</p>}
-      {loading && !dashboard && <LoadingScreen />}
+      {isLoading && <LoadingScreen />}
       {dashboard && (
         <DashboardContent
           runMode={runMode}

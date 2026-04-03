@@ -11,6 +11,7 @@ import { useProjectActions } from './useProjectActions.js';
 import { useVisibleRuns } from './useVisibleRuns.js';
 
 export const KNOWN_TABS = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
+export const PROJECT_TABS = KNOWN_TABS.slice(0, 3);
 
 function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
   const accDims = accumulated?.dimensions || [];
@@ -93,8 +94,8 @@ export function useAppState() {
     : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab
     : activePage.page === 'history-run' ? 'history'
     : 'overview';
-  const showProjectHeader = ['overview'].includes(activeTab) && projects.length > 0 && !!selectedProject;
-  const showRunNav = showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
+  const showProjectHeader = PROJECT_TABS.includes(activeTab) && projects.length > 0 && !!selectedProject;
+  const showRunNav = activeTab === 'overview' && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 
   return {
     serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,

@@ -1,3 +1,67 @@
+/* ── Tab fade transition ─────────────────────────────── */
+
+.tab-fade {
+  animation: tab-fadein 300ms ease;
+}
+
+@keyframes tab-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Dashboard fade transitions ──────────────────────── */
+
+.dashboard-fade {
+  transition: opacity 250ms ease;
+}
+
+.dashboard-loading {
+  opacity: 0.4;
+}
+
+.dashboard-ready {
+  animation: dashboard-fadein 400ms ease;
+}
+
+@keyframes dashboard-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Run overview transitions ─────────────────────────── */
+
+.run-overview-fade {
+  transition: opacity 250ms ease;
+}
+
+.run-overview-loading {
+  opacity: 0.4;
+}
+
+.run-overview-ready {
+  animation: run-overview-fadein 300ms ease;
+}
+
+.run-overview-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+}
+
+.run-overview-spinner .loading-screen {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  width: auto;
+  height: auto;
+}
+
+@keyframes run-overview-fadein {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* ── Stat cards ───────────────────────────────────────── */
 
 .acc-eval-panel {
