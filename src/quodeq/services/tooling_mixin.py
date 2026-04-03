@@ -104,26 +104,47 @@ class FsToolingMixin:
         return directories
 
     @staticmethod
-    def _build_browse_response(target: Path, directories: list[dict[str, Any]]) -> dict[str, Any]:
+    def _list_files(target: Path) -> list[dict[str, Any]]:
+        """List readable non-hidden source files in *target*."""
+        files: list[dict[str, Any]] = []
+        for entry in safe_read_dir(target):
+            if entry.name.startswith(".") or not entry.is_file():
+                continue
+            entry_path = target / entry.name
+            if not os.access(entry_path, os.R_OK):
+                continue
+            files.append({
+                "name": entry.name,
+                "path": str(entry_path),
+            })
+        files.sort(key=lambda item: item["name"])
+        return files
+
+    @staticmethod
+    def _build_browse_response(target: Path, directories: list[dict[str, Any]], files: list[dict[str, Any]] | None = None) -> dict[str, Any]:
         """Assemble a browse_repo response from a validated target and directory list."""
         truncated = len(directories) > _BROWSE_DIR_LIMIT
         if truncated:
             directories = directories[:_BROWSE_DIR_LIMIT]
         parent = target.parent if target.parent != target else None
-        return {
+        response: dict[str, Any] = {
             "current": str(target),
             "parent": str(parent) if parent else None,
             "directories": directories,
             "isGitRepo": (target / ".git").exists(),
             "truncated": truncated,
         }
+        if files is not None:
+            response["files"] = files
+        return response
 
-    def browse_repo(self, path: str | None) -> dict[str, Any]:
-        """List directories at the given path for repository browsing."""
+    def browse_repo(self, path: str | None, include_files: bool = False) -> dict[str, Any]:
+        """List directories (and optionally files) at the given path."""
         target, error = self._validate_browse_path(path)
         if error is not None:
             return error
-        return self._build_browse_response(target, self._list_directories(target))
+        files = self._list_files(target) if include_files else None
+        return self._build_browse_response(target, self._list_directories(target), files)
 
     # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
     # (comma-separated list of client IDs, e.g. "claude,codex").

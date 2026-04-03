@@ -125,6 +125,9 @@ export default function EvaluationForm({ onStart, disabled }) {
         <FolderBrowser
           onSelect={handleFolderSelect}
           onClose={() => setFolderBrowserOpen(false)}
+          title="Select Folder or File"
+          confirmText="Evaluate"
+          showFiles
         />
       )}
     </>
