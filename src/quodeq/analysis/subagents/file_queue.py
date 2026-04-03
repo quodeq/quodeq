@@ -1,82 +1,33 @@
 """Cross-process file queue for distributing work across subagents.
 
-Backed by a JSON file with atomic writes (write-to-temp + rename).
-Cross-process safe via file locking (fcntl on Unix, msvcrt on Windows; both imported lazily).
-Maintains a take log so no file is silently lost.
-
-**Scaling note:** ``FileQueue`` relies on OS-level file locking, which
-requires a shared filesystem.  For multi-machine deployments, implement
-the ``WorkQueue`` protocol with a networked backend (e.g. Redis, SQS)
-and inject it at the orchestration layer.
+See ``_queue_state`` for the atomic JSON persistence layer.
 """
 from __future__ import annotations
 
-import json
-import os
-import tempfile
 import time
-from contextlib import contextmanager
 from pathlib import Path
 
-from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
+from quodeq.analysis.subagents._queue_state import (
+    FileQueueError,  # noqa: F401 — re-export
+    _QUEUE_VERSION,
+    locked,
+    read_state,
+    write_state,
+)
 from quodeq.analysis.subagents.types import WorkQueue  # noqa: F401 — re-export
-
-_QUEUE_VERSION = 1
-
-
-class FileQueueError(RuntimeError):
-    """Raised on queue corruption or I/O failures."""
 
 
 class FileQueue:
-    """Distributes files across N subagent processes.
+    """Distributes files across N subagent processes via a locked JSON file.
 
-    **Scaling:** This is a single-node implementation using OS file locks.
-    For multi-machine deployments, implement the ``WorkQueue`` protocol
-    with a networked backend (Redis, SQS) and inject it at the
-    orchestration layer via dependency injection.
-
-    The queue state lives in a JSON file::
-
-        {
-            "version": 1,
-            "pending": ["file1.py", "file2.py", ...],
-            "taken": [
-                {"files": ["file3.py"], "agent": "agent-0", "ts": 1710000000.0},
-                ...
-            ]
-        }
-
-    Safety guarantees:
-
-    - **Atomic writes**: state is written to a temp file then renamed, so a
-      crash mid-write never corrupts the queue.
-    - **Exclusive locking**: a separate ``.lock`` file serialises all access
-      via ``fcntl.flock`` (Unix) or ``msvcrt.locking`` (Windows), both
-      imported lazily.  The OS releases the lock automatically if the holding
-      process dies.
-    - **Take log**: every ``take()`` is recorded with agent id and timestamp,
-      so files can be accounted for even after a crash.
+    Atomic writes, exclusive locking, and a take log ensure no file is lost.
+    For multi-machine deployments, implement ``WorkQueue`` with a networked backend.
     """
 
     def __init__(
         self, queue_path: Path, files: list[str] | None = None,
         max_files_per_agent: int = 0,
     ):
-        """Create or open a file queue.
-
-        Args:
-            queue_path: Path to the queue JSON file.
-            files: If provided, initialise the queue with this file list.
-                   If *None*, the queue must already exist on disk.
-            max_files_per_agent: When > 0, each agent (by agent_id) can take
-                at most this many files before ``take()`` returns empty.
-                The agent finishes, and the pool spawns a fresh one with
-                clean context. 0 means unlimited.
-
-        Raises:
-            FileQueueError: If *files* is None and the queue file doesn't exist.
-        """
         self._path = Path(queue_path)
         self._lock_path = self._path.with_suffix(".lock")
 
@@ -84,7 +35,7 @@ class FileQueue:
             state: dict = {"version": _QUEUE_VERSION, "pending": list(files), "taken": []}
             if max_files_per_agent > 0:
                 state["max_files_per_agent"] = max_files_per_agent
-            self._write_state(state)
+            write_state(state, self._path)
         elif not self._path.exists():
             raise FileQueueError(f"Queue file not found: {self._path}")
 
@@ -93,18 +44,12 @@ class FileQueue:
     # ------------------------------------------------------------------
 
     def take(self, count: int = 5, agent_id: str = "") -> list[str]:
-        """Atomically remove and return the next *count* files.
-
-        Returns an empty list when the queue is drained or the agent has
-        reached its ``max_files_per_agent`` limit.
-        """
+        """Atomically remove and return the next *count* files."""
         if count < 1:
             return []
-        with self._locked():
-            state = self._read_state()
+        with locked(self._lock_path):
+            state = read_state(self._path)
 
-            # Enforce per-agent file limit for context rotation.
-            # Use agent_totals dict for O(1) lookup instead of scanning taken log.
             max_per_agent = state.get("max_files_per_agent", 0)
             if max_per_agent > 0 and agent_id:
                 agent_totals = state.get("agent_totals", {})
@@ -120,35 +65,30 @@ class FileQueue:
                 return []
             state["pending"] = pending[count:]
             state["taken"].append({
-                "files": batch,
-                "agent": agent_id,
-                "ts": time.time(),
+                "files": batch, "agent": agent_id, "ts": time.time(),
             })
-            # Maintain running total for O(1) per-agent limit checks
             if agent_id:
                 totals = state.setdefault("agent_totals", {})
                 totals[agent_id] = totals.get(agent_id, 0) + len(batch)
-            self._write_state(state)
+            write_state(state, self._path)
         return batch
 
     def remaining(self) -> int:
         """Number of files still pending in the queue."""
-        with self._locked():
-            state = self._read_state()
-        return len(state["pending"])
+        with locked(self._lock_path):
+            return len(read_state(self._path)["pending"])
 
     def stats(self) -> tuple[int, int]:
         """Return (remaining, taken) counts in a single file read."""
-        with self._locked():
-            state = self._read_state()
+        with locked(self._lock_path):
+            state = read_state(self._path)
         taken = sum(len(e["files"]) for e in state["taken"])
         return len(state["pending"]), taken
 
     def taken_log(self) -> list[dict]:
         """Return the full take log for audit / crash recovery."""
-        with self._locked():
-            state = self._read_state()
-        return list(state["taken"])
+        with locked(self._lock_path):
+            return list(read_state(self._path)["taken"])
 
     def all_taken_files(self) -> list[str]:
         """Return flat list of every file that was taken, in order."""
@@ -156,60 +96,3 @@ class FileQueue:
         for entry in self.taken_log():
             result.extend(entry["files"])
         return result
-
-    # ------------------------------------------------------------------
-    # Internals
-    # ------------------------------------------------------------------
-
-    @contextmanager
-    def _locked(self):
-        """Exclusive file lock via a separate .lock file.
-
-        The lock file is never deleted — it's harmless and avoids races
-        where one process unlinks it while another is about to lock it.
-        """
-        fd = os.open(str(self._lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
-        try:
-            lock_file(fd)
-            yield
-        finally:
-            unlock_file(fd)
-            os.close(fd)
-
-    def _read_state(self) -> dict:
-        """Read and validate the queue JSON file."""
-        try:
-            raw = self._path.read_text()
-        except OSError as exc:
-            raise FileQueueError(f"Cannot read queue file: {exc}") from exc
-        try:
-            state = json.loads(raw)
-        except json.JSONDecodeError as exc:
-            raise FileQueueError(f"Queue file is corrupted: {exc}") from exc
-        version = state.get("version")
-        if version != _QUEUE_VERSION:
-            raise FileQueueError(f"Unsupported queue version: {version} (expected {_QUEUE_VERSION})")
-        if not isinstance(state.get("pending"), list):
-            raise FileQueueError("Queue file missing 'pending' list")
-        if not isinstance(state.get("taken"), list):
-            raise FileQueueError("Queue file missing 'taken' list")
-        return state
-
-    def _write_state(self, state: dict) -> None:
-        """Atomic write: temp file in the same directory, then rename."""
-        parent = self._path.parent
-        parent.mkdir(parents=True, exist_ok=True)
-        fd, tmp_path = tempfile.mkstemp(dir=str(parent), suffix=".tmp", prefix=".queue_")
-        try:
-            with os.fdopen(fd, "w") as f:
-                json.dump(state, f)
-                f.flush()
-                os.fsync(f.fileno())
-            os.rename(tmp_path, str(self._path))
-        except BaseException:
-            # Clean up temp file on any failure
-            try:
-                os.unlink(tmp_path)
-            except OSError:
-                pass
-            raise

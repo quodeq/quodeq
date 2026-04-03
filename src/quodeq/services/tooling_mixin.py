@@ -12,7 +12,7 @@ from pathlib import Path
 
 from typing import Any, Callable
 
-from quodeq.adapters.fs.report_parser import safe_read_dir
+from quodeq.data.fs.report_parser import safe_read_dir
 from quodeq.shared.config_loader import get_anthropic_api_url, get_anthropic_api_version
 from quodeq.shared.utils import get_anthropic_api_key, read_json
 

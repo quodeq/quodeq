@@ -106,7 +106,7 @@ class TestConsolidatedIntegration:
         """Consolidated mode splits findings by dimension correctly."""
         config, ctx = _make_consolidated_config(tmp_path)
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis", _consolidated_run_analysis):
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _consolidated_run_analysis):
             result = process_consolidated_dimensions(config, ["security", "maintainability"], ctx)
 
         assert "security" in result

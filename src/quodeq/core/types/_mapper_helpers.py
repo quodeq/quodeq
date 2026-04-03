@@ -45,3 +45,13 @@ def _str_list(raw: dict[str, object], key: str) -> list[str]:
     if not isinstance(v, list):
         return []
     return [x for x in v if isinstance(x, str)]
+
+
+def _require_str(raw: dict[str, object], field_name: str, context: str = "") -> str:
+    """Return raw[field_name] as str, or raise TypeError with a descriptive message."""
+    value = raw.get(field_name)
+    if not isinstance(value, str):
+        prefix = f"{context}." if context else ""
+        msg = f"{prefix}{field_name} must be str, got {type(value).__name__}"
+        raise TypeError(msg)
+    return value
