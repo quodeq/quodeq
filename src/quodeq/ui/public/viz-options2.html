@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualization Options — Round 2</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  :root {
+    --bg: #1c1a18; --surface: #242220; --border: #3e3a36;
+    --text: #f0ece6; --muted: #9a9490; --accent: #e8795a;
+    --critical: #e74c3c; --major: #e67e22; --minor: #f1c40f; --clean: #2ecc71;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 40px; }
+  h1 { font-size: 1.3rem; color: var(--muted); font-weight: 400; margin-bottom: 8px; }
+  .subtitle { font-size: 0.82rem; color: var(--muted); margin-bottom: 36px; opacity: 0.7; }
+  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .section { margin-bottom: 48px; }
+  .badge { font-size: 0.6rem; color: var(--accent); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: rgba(232,121,90,0.14); padding: 2px 8px; border-radius: 3px; margin-bottom: 10px; display: inline-block; }
+  .desc { font-size: 0.75rem; color: var(--muted); margin-top: 8px; line-height: 1.5; }
+  .viz { width: 100%; height: 420px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; position: relative; }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .tip { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 0.7rem; pointer-events: none; display: none; z-index: 99; box-shadow: 0 4px 12px rgba(0,0,0,0.3); }
+  .tip strong { color: var(--text); }
+  .tip div { color: var(--muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<h1>More Visualization Options</h1>
+<p class="subtitle">Interactive demos with mock codebase data. Hover for details.</p>
+
+<div class="section">
+  <span class="badge">1</span>
+  <h2>Icicle Chart — Horizontal Hierarchy</h2>
+  <div class="viz" id="icicle"></div>
+  <p class="desc">Each row = one folder depth. Width = violation count. Color = severity. Click to zoom into a subtree. Very readable for deep hierarchies. Like a horizontal treemap but with clear parent-child rows.</p>
+</div>
+
+<div class="section">
+  <span class="badge">2</span>
+  <h2>Scatter Plot — Violations vs Compliance</h2>
+  <div class="viz" id="scatter"></div>
+  <p class="desc">X = violations, Y = compliance. Dot size = total findings, color = worst severity. Instantly spot outliers: bottom-right = bad (many violations, little compliance). Top-left = good. Hover for file details.</p>
+</div>
+
+<div class="section">
+  <span class="badge">3</span>
+  <h2>Flame Chart — Vertical Stack</h2>
+  <div class="viz" id="flame"></div>
+  <p class="desc">Root at top, deepest files at bottom. Width = violation count. Familiar from CPU profilers. Click to zoom. Color = severity. Great for identifying deep hotspots.</p>
+</div>
+
+<div class="section">
+  <span class="badge">4</span>
+  <h2>Voronoi Diagram — Organic Regions</h2>
+  <div class="viz" id="voronoi"></div>
+  <p class="desc">Each polygon = one file. Area approximates violation count. Color = severity. Organic, map-like feel. Hover highlights region. Good for seeing relative size of problem areas.</p>
+</div>
+
+<div id="tip" class="tip"></div>
+
+<script>
+const data = {
+  name: "root", path: "", violations: 42, compliance: 180,
+  severity: { critical: 3, major: 12, minor: 27 },
+  children: [
+    { name: "src/auth", path: "src/auth", violations: 15, compliance: 45, severity: { critical: 2, major: 5, minor: 8 }, children: [
+      { name: "login.py", path: "src/auth/login.py", violations: 8, compliance: 20, severity: { critical: 2, major: 3, minor: 3 }, children: [] },
+      { name: "session.py", path: "src/auth/session.py", violations: 4, compliance: 15, severity: { critical: 0, major: 2, minor: 2 }, children: [] },
+      { name: "middleware.py", path: "src/auth/middleware.py", violations: 3, compliance: 10, severity: { critical: 0, major: 0, minor: 3 }, children: [] },
+    ]},
+    { name: "src/api", path: "src/api", violations: 12, compliance: 50, severity: { critical: 1, major: 4, minor: 7 }, children: [
+      { name: "routes.py", path: "src/api/routes.py", violations: 5, compliance: 20, severity: { critical: 1, major: 2, minor: 2 }, children: [] },
+      { name: "handlers.py", path: "src/api/handlers.py", violations: 4, compliance: 18, severity: { critical: 0, major: 1, minor: 3 }, children: [] },
+      { name: "validators.py", path: "src/api/validators.py", violations: 3, compliance: 12, severity: { critical: 0, major: 1, minor: 2 }, children: [] },
+    ]},
+    { name: "src/models", path: "src/models", violations: 8, compliance: 40, severity: { critical: 0, major: 2, minor: 6 }, children: [
+      { name: "user.py", path: "src/models/user.py", violations: 3, compliance: 15, severity: { critical: 0, major: 1, minor: 2 }, children: [] },
+      { name: "project.py", path: "src/models/project.py", violations: 2, compliance: 12, severity: { critical: 0, major: 1, minor: 1 }, children: [] },
+      { name: "settings.py", path: "src/models/settings.py", violations: 3, compliance: 13, severity: { critical: 0, major: 0, minor: 3 }, children: [] },
+    ]},
+    { name: "src/utils", path: "src/utils", violations: 5, compliance: 30, severity: { critical: 0, major: 1, minor: 4 }, children: [
+      { name: "helpers.py", path: "src/utils/helpers.py", violations: 3, compliance: 18, severity: { critical: 0, major: 1, minor: 2 }, children: [] },
+      { name: "crypto.py", path: "src/utils/crypto.py", violations: 2, compliance: 12, severity: { critical: 0, major: 0, minor: 2 }, children: [] },
+    ]},
+    { name: "tests", path: "tests", violations: 2, compliance: 15, severity: { critical: 0, major: 0, minor: 2 }, children: [
+      { name: "test_auth.py", path: "tests/test_auth.py", violations: 1, compliance: 8, severity: { critical: 0, major: 0, minor: 1 }, children: [] },
+      { name: "test_api.py", path: "tests/test_api.py", violations: 1, compliance: 7, severity: { critical: 0, major: 0, minor: 1 }, children: [] },
+    ]},
+  ]
+};
+
+function sev(s) {
+  if (s.critical > 0) return 'var(--critical)';
+  if (s.major > 0) return 'var(--major)';
+  if (s.minor > 0) return 'var(--minor)';
+  return 'var(--clean)';
+}
+
+const tip = document.getElementById('tip');
+function show(e, d) {
+  const t = d.violations + d.compliance;
+  const r = t > 0 ? Math.round(d.compliance / t * 100) : 0;
+  tip.innerHTML = `<strong>${d.name || d.path}</strong><div>Violations: ${d.violations} · Compliance: ${d.compliance}</div><div>Health: ${r}% · C:${d.severity.critical} M:${d.severity.major} m:${d.severity.minor}</div>`;
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top = (e.clientY - 10) + 'px';
+}
+function hide() { tip.style.display = 'none'; }
+
+// ═══════════════════════════════════════
+// 1. ICICLE CHART
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('icicle');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+
+  const root = d3.hierarchy(data).sum(d => d.children?.length ? 0 : Math.max(d.violations, 1)).sort((a, b) => b.value - a.value);
+  const part = d3.partition().size([w, h]).padding(1.5);
+  part(root);
+
+  const cell = svg.selectAll('g').data(root.descendants()).join('g').attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+  cell.append('rect')
+    .attr('width', d => Math.max(0, d.x1 - d.x0))
+    .attr('height', d => Math.max(0, d.y1 - d.y0))
+    .attr('fill', d => sev(d.data.severity))
+    .attr('opacity', 0.82)
+    .attr('rx', 2)
+    .attr('cursor', 'pointer')
+    .on('mouseover', (e, d) => { d3.select(e.target).attr('opacity', 1); show(e, d.data); })
+    .on('mousemove', (e, d) => show(e, d.data))
+    .on('mouseout', (e) => { d3.select(e.target).attr('opacity', 0.82); hide(); });
+
+  cell.append('text')
+    .attr('x', 4).attr('y', 14)
+    .text(d => { const w = d.x1 - d.x0; return w > 40 ? d.data.name : ''; })
+    .attr('font-size', 10).attr('fill', '#fff').attr('font-weight', 600).attr('pointer-events', 'none');
+
+  cell.append('text')
+    .attr('x', 4).attr('y', 26)
+    .text(d => { const w = d.x1 - d.x0; return w > 60 ? `${d.data.violations}v` : ''; })
+    .attr('font-size', 9).attr('fill', 'rgba(255,255,255,0.7)').attr('pointer-events', 'none');
+})();
+
+// ═══════════════════════════════════════
+// 2. SCATTER PLOT
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('scatter');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const m = { top: 30, right: 30, bottom: 40, left: 50 };
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+
+  // Flatten to leaf nodes
+  const leaves = [];
+  function flat(n) { if (!n.children?.length) leaves.push(n); else n.children.forEach(flat); }
+  flat(data);
+
+  const x = d3.scaleLinear().domain([0, d3.max(leaves, d => d.violations) + 1]).range([m.left, w - m.right]);
+  const y = d3.scaleLinear().domain([0, d3.max(leaves, d => d.compliance) + 2]).range([h - m.bottom, m.top]);
+  const r = d3.scaleSqrt().domain([0, d3.max(leaves, d => d.violations + d.compliance)]).range([4, 24]);
+
+  // Grid lines
+  svg.append('g').attr('transform', `translate(0,${h - m.bottom})`).call(d3.axisBottom(x).ticks(6))
+    .call(g => g.selectAll('text').attr('fill', '#9a9490').attr('font-size', 10))
+    .call(g => g.selectAll('line,path').attr('stroke', '#3e3a36'));
+  svg.append('g').attr('transform', `translate(${m.left},0)`).call(d3.axisLeft(y).ticks(5))
+    .call(g => g.selectAll('text').attr('fill', '#9a9490').attr('font-size', 10))
+    .call(g => g.selectAll('line,path').attr('stroke', '#3e3a36'));
+
+  // Labels
+  svg.append('text').attr('x', w / 2).attr('y', h - 6).attr('text-anchor', 'middle').attr('fill', '#9a9490').attr('font-size', 11).text('Violations →');
+  svg.append('text').attr('transform', `rotate(-90)`).attr('x', -h / 2).attr('y', 14).attr('text-anchor', 'middle').attr('fill', '#9a9490').attr('font-size', 11).text('Compliance →');
+
+  // Diagonal reference line (healthy = above)
+  svg.append('line').attr('x1', x(0)).attr('y1', y(0)).attr('x2', x(d3.max(leaves, d => d.violations))).attr('y2', y(d3.max(leaves, d => d.violations)))
+    .attr('stroke', '#3e3a36').attr('stroke-dasharray', '4,4').attr('stroke-width', 1);
+
+  // Dots
+  svg.selectAll('circle').data(leaves).join('circle')
+    .attr('cx', d => x(d.violations))
+    .attr('cy', d => y(d.compliance))
+    .attr('r', d => r(d.violations + d.compliance))
+    .attr('fill', d => sev(d.severity))
+    .attr('opacity', 0.8)
+    .attr('stroke', '#1c1a18').attr('stroke-width', 1.5)
+    .attr('cursor', 'pointer')
+    .on('mouseover', (e, d) => { d3.select(e.target).attr('opacity', 1).attr('r', r(d.violations + d.compliance) + 3); show(e, d); })
+    .on('mousemove', (e, d) => show(e, d))
+    .on('mouseout', (e, d) => { d3.select(e.target).attr('opacity', 0.8).attr('r', r(d.violations + d.compliance)); hide(); });
+
+  // Labels for big dots
+  svg.selectAll('text.label').data(leaves.filter(d => d.violations >= 4)).join('text')
+    .attr('x', d => x(d.violations)).attr('y', d => y(d.compliance) - r(d.violations + d.compliance) - 4)
+    .attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', '#9a9490').attr('pointer-events', 'none')
+    .text(d => d.name);
+})();
+
+// ═══════════════════════════════════════
+// 3. FLAME CHART
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('flame');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+
+  const root = d3.hierarchy(data).sum(d => d.children?.length ? 0 : Math.max(d.violations, 1)).sort((a, b) => b.value - a.value);
+  const part = d3.partition().size([w, h]).padding(1.5);
+  part(root);
+
+  // Flip: x stays, but swap y so root is at top
+  const cell = svg.selectAll('g').data(root.descendants()).join('g')
+    .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+  cell.append('rect')
+    .attr('width', d => Math.max(0, d.x1 - d.x0))
+    .attr('height', d => Math.max(0, d.y1 - d.y0))
+    .attr('fill', d => sev(d.data.severity))
+    .attr('opacity', d => 0.5 + d.depth * 0.12)
+    .attr('rx', 2)
+    .attr('cursor', 'pointer')
+    .on('mouseover', (e, d) => { d3.select(e.target).attr('opacity', 1); show(e, d.data); })
+    .on('mousemove', (e, d) => show(e, d.data))
+    .on('mouseout', (e, d) => { d3.select(e.target).attr('opacity', 0.5 + d.depth * 0.12); hide(); });
+
+  cell.append('text')
+    .attr('x', 4).attr('y', 14)
+    .text(d => { const bw = d.x1 - d.x0; return bw > 50 ? d.data.name : ''; })
+    .attr('font-size', 10).attr('fill', '#fff').attr('font-weight', d => d.depth === 0 ? 700 : 500).attr('pointer-events', 'none');
+
+  cell.append('text')
+    .attr('x', 4).attr('y', 26)
+    .text(d => { const bw = d.x1 - d.x0; const bh = d.y1 - d.y0; return bw > 70 && bh > 30 ? `${d.data.violations}v · ${Math.round(d.data.compliance/(d.data.violations+d.data.compliance)*100)}%` : ''; })
+    .attr('font-size', 9).attr('fill', 'rgba(255,255,255,0.7)').attr('pointer-events', 'none');
+})();
+
+// ═══════════════════════════════════════
+// 4. VORONOI DIAGRAM
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('voronoi');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+
+  // Flatten to leaves with random positions weighted by violations
+  const leaves = [];
+  function flat(n) { if (!n.children?.length) leaves.push(n); else n.children.forEach(flat); }
+  flat(data);
+
+  // Use force simulation to position based on violations (more violations = more central)
+  const sim = d3.forceSimulation(leaves)
+    .force('x', d3.forceX(w / 2).strength(0.05))
+    .force('y', d3.forceY(h / 2).strength(0.05))
+    .force('charge', d3.forceManyBody().strength(-30))
+    .force('collision', d3.forceCollide().radius(d => Math.sqrt(d.violations + 1) * 8))
+    .stop();
+
+  for (let i = 0; i < 200; i++) sim.tick();
+
+  // Clamp positions
+  leaves.forEach(d => { d.x = Math.max(20, Math.min(w - 20, d.x)); d.y = Math.max(20, Math.min(h - 20, d.y)); });
+
+  const delaunay = d3.Delaunay.from(leaves, d => d.x, d => d.y);
+  const voronoi = delaunay.voronoi([0, 0, w, h]);
+
+  svg.selectAll('path').data(leaves).join('path')
+    .attr('d', (d, i) => voronoi.renderCell(i))
+    .attr('fill', d => sev(d.severity))
+    .attr('stroke', 'var(--bg)').attr('stroke-width', 2)
+    .attr('opacity', 0.75)
+    .attr('cursor', 'pointer')
+    .on('mouseover', (e, d) => { d3.select(e.target).attr('opacity', 1).attr('stroke-width', 3).attr('stroke', '#fff'); show(e, d); })
+    .on('mousemove', (e, d) => show(e, d))
+    .on('mouseout', (e) => { d3.select(e.target).attr('opacity', 0.75).attr('stroke-width', 2).attr('stroke', 'var(--bg)'); hide(); });
+
+  svg.selectAll('text').data(leaves).join('text')
+    .attr('x', d => d.x).attr('y', d => d.y)
+    .attr('text-anchor', 'middle').attr('dominant-baseline', 'central')
+    .attr('font-size', d => Math.min(11, Math.sqrt(d.violations + 1) * 3))
+    .attr('fill', '#fff').attr('font-weight', 600).attr('pointer-events', 'none')
+    .text(d => d.name);
+
+  svg.selectAll('text.count').data(leaves.filter(d => d.violations >= 2)).join('text')
+    .attr('x', d => d.x).attr('y', d => d.y + 14)
+    .attr('text-anchor', 'middle')
+    .attr('font-size', 9).attr('fill', 'rgba(255,255,255,0.7)').attr('pointer-events', 'none')
+    .text(d => `${d.violations}v`);
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,403 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualization Options — Round 3 (Actionable)</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  :root {
+    --bg: #1c1a18; --surface: #242220; --surface2: #2e2b28; --border: #3e3a36;
+    --text: #f0ece6; --muted: #9a9490; --accent: #e8795a;
+    --critical: #e74c3c; --major: #e67e22; --minor: #f1c40f; --clean: #2ecc71;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); padding: 40px; }
+  h1 { font-size: 1.3rem; color: var(--muted); font-weight: 400; margin-bottom: 8px; }
+  .subtitle { font-size: 0.82rem; color: var(--muted); margin-bottom: 36px; opacity: 0.7; }
+  h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin-bottom: 16px; padding-bottom: 8px; border-bottom: 1px solid var(--border); }
+  .section { margin-bottom: 56px; }
+  .badge { font-size: 0.6rem; color: var(--accent); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; background: rgba(232,121,90,0.14); padding: 2px 8px; border-radius: 3px; margin-bottom: 10px; display: inline-block; }
+  .desc { font-size: 0.75rem; color: var(--muted); margin-top: 10px; line-height: 1.6; }
+  .best { color: var(--accent); font-weight: 600; }
+  .viz { width: 100%; height: 420px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); overflow: hidden; position: relative; }
+  .viz-tall { height: 500px; }
+  svg text { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+  .tip { position: fixed; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px 12px; font-size: 0.7rem; pointer-events: none; display: none; z-index: 99; box-shadow: 0 4px 12px rgba(0,0,0,0.3); max-width: 250px; }
+  .tip strong { color: var(--text); }
+  .tip div { color: var(--muted); margin-top: 2px; }
+</style>
+</head>
+<body>
+
+<h1>Actionable Visualizations — "Where Should I Fix First?"</h1>
+<p class="subtitle">Focused on surfacing hotspots and priorities from codebase quality data.</p>
+
+<!-- 1. Risk Matrix -->
+<div class="section">
+  <span class="badge">1</span>
+  <h2>Risk Matrix — Severity × Volume</h2>
+  <div class="viz" id="risk-matrix"></div>
+  <p class="desc"><span class="best">Best for: Quick triage.</span> X-axis = total violations, Y-axis = worst severity score. Top-right = urgent (many + severe). Bottom-left = low priority. Each bubble is a file/folder. Size = total findings. Instantly shows what to fix first.</p>
+</div>
+
+<!-- 2. Horizontal Bar Race -->
+<div class="section">
+  <span class="badge">2</span>
+  <h2>Stacked Bar Chart — Files Ranked by Severity</h2>
+  <div class="viz viz-tall" id="stacked-bars"></div>
+  <p class="desc"><span class="best">Best for: Top-N offenders list.</span> Files sorted by total violations. Each bar split into critical (red), major (orange), minor (yellow) segments. Health rate shown as a thin green bar on the right. Instantly see which files need the most work.</p>
+</div>
+
+<!-- 3. Dimension Radar -->
+<div class="section">
+  <span class="badge">3</span>
+  <h2>Radar / Spider Chart — Per-Dimension Health</h2>
+  <div class="viz" id="radar"></div>
+  <p class="desc"><span class="best">Best for: Dimension comparison.</span> Each axis = one quality dimension. Filled area shows health rate (0-100%). Multiple overlaid shapes compare folders. Immediately see which dimensions are weakest. Works great with the dimension filter.</p>
+</div>
+
+<!-- 4. Waffle Chart -->
+<div class="section">
+  <span class="badge">4</span>
+  <h2>Waffle Chart — Proportional Overview</h2>
+  <div class="viz" id="waffle"></div>
+  <p class="desc"><span class="best">Best for: At-a-glance proportion.</span> Each small square = one finding. Critical = red, major = orange, minor = yellow, compliance = green. Grouped by folder. Shows both the proportion of good vs bad AND the absolute volume. Very intuitive.</p>
+</div>
+
+<!-- 5. Dot Strip -->
+<div class="section">
+  <span class="badge">5</span>
+  <h2>Dot Strip — Every Violation Visible</h2>
+  <div class="viz viz-tall" id="dot-strip"></div>
+  <p class="desc"><span class="best">Best for: Granular view.</span> Each dot = one violation. Rows = files. Dots colored by severity, positioned by line number. See exactly where violations cluster within files. Hover for details. Like a minimap of your codebase issues.</p>
+</div>
+
+<!-- 6. Swimlane Timeline -->
+<div class="section">
+  <span class="badge">6</span>
+  <h2>Severity Breakdown — Nested Bars with Health Indicator</h2>
+  <div class="viz viz-tall" id="nested-bars"></div>
+  <p class="desc"><span class="best">Best for: Folder-level summary.</span> Folders as rows, each with an expandable bar showing severity breakdown. Right side shows health rate as a progress bar. Combines the heat grid's data density with visual clarity.</p>
+</div>
+
+<div id="tip" class="tip"></div>
+
+<script>
+// Richer mock data with line numbers and dimensions
+const folders = [
+  { name: "src/auth", files: [
+    { name: "login.py", violations: 8, compliance: 20, severity: { critical: 2, major: 3, minor: 3 }, lines: [12, 45, 67, 89, 102, 134, 167, 201] },
+    { name: "session.py", violations: 4, compliance: 15, severity: { critical: 0, major: 2, minor: 2 }, lines: [23, 78, 145, 189] },
+    { name: "middleware.py", violations: 3, compliance: 10, severity: { critical: 0, major: 0, minor: 3 }, lines: [34, 56, 98] },
+  ]},
+  { name: "src/api", files: [
+    { name: "routes.py", violations: 5, compliance: 20, severity: { critical: 1, major: 2, minor: 2 }, lines: [15, 67, 89, 123, 178] },
+    { name: "handlers.py", violations: 4, compliance: 18, severity: { critical: 0, major: 1, minor: 3 }, lines: [22, 89, 134, 167] },
+    { name: "validators.py", violations: 3, compliance: 12, severity: { critical: 0, major: 1, minor: 2 }, lines: [45, 112, 156] },
+  ]},
+  { name: "src/models", files: [
+    { name: "user.py", violations: 3, compliance: 15, severity: { critical: 0, major: 1, minor: 2 }, lines: [34, 89, 123] },
+    { name: "project.py", violations: 2, compliance: 12, severity: { critical: 0, major: 1, minor: 1 }, lines: [56, 178] },
+    { name: "settings.py", violations: 3, compliance: 13, severity: { critical: 0, major: 0, minor: 3 }, lines: [12, 45, 89] },
+  ]},
+  { name: "src/utils", files: [
+    { name: "helpers.py", violations: 3, compliance: 18, severity: { critical: 0, major: 1, minor: 2 }, lines: [23, 67, 134] },
+    { name: "crypto.py", violations: 2, compliance: 12, severity: { critical: 0, major: 0, minor: 2 }, lines: [45, 89] },
+  ]},
+];
+
+const allFiles = folders.flatMap(f => f.files.map(file => ({ ...file, folder: f.name, path: f.name + '/' + file.name })));
+
+function sev(s) {
+  if (s.critical > 0) return 'var(--critical)';
+  if (s.major > 0) return 'var(--major)';
+  if (s.minor > 0) return 'var(--minor)';
+  return 'var(--clean)';
+}
+function sevScore(s) { return s.critical * 100 + s.major * 10 + s.minor; }
+
+const tip = document.getElementById('tip');
+function show(e, html) {
+  tip.innerHTML = html;
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top = (e.clientY - 10) + 'px';
+}
+function hide() { tip.style.display = 'none'; }
+
+// ═══════════════════════════════════════
+// 1. RISK MATRIX
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('risk-matrix');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const m = { top: 40, right: 40, bottom: 50, left: 60 };
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+
+  const x = d3.scaleLinear().domain([0, d3.max(allFiles, d => d.violations) + 1]).range([m.left, w - m.right]);
+  const y = d3.scaleLinear().domain([0, 250]).range([h - m.bottom, m.top]);
+  const r = d3.scaleSqrt().domain([0, d3.max(allFiles, d => d.violations + d.compliance)]).range([6, 28]);
+
+  // Quadrant backgrounds
+  const midX = x(4), midY = y(100);
+  svg.append('rect').attr('x', midX).attr('y', m.top).attr('width', w - m.right - midX).attr('height', midY - m.top).attr('fill', 'rgba(231,76,60,0.06)');
+  svg.append('rect').attr('x', m.left).attr('y', m.top).attr('width', midX - m.left).attr('height', midY - m.top).attr('fill', 'rgba(241,196,15,0.04)');
+  svg.append('rect').attr('x', m.left).attr('y', midY).attr('width', midX - m.left).attr('height', h - m.bottom - midY).attr('fill', 'rgba(46,204,113,0.04)');
+
+  // Quadrant labels
+  svg.append('text').attr('x', (midX + w - m.right) / 2).attr('y', m.top + 16).attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', 'rgba(231,76,60,0.5)').text('⚠ URGENT — Fix first');
+  svg.append('text').attr('x', (m.left + midX) / 2).attr('y', h - m.bottom - 8).attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', 'rgba(46,204,113,0.5)').text('✓ Low priority');
+
+  // Axes
+  svg.append('g').attr('transform', `translate(0,${h - m.bottom})`).call(d3.axisBottom(x).ticks(8))
+    .call(g => { g.selectAll('text').attr('fill', '#9a9490'); g.selectAll('line,path').attr('stroke', '#3e3a36'); });
+  svg.append('g').attr('transform', `translate(${m.left},0)`).call(d3.axisLeft(y).ticks(5))
+    .call(g => { g.selectAll('text').attr('fill', '#9a9490'); g.selectAll('line,path').attr('stroke', '#3e3a36'); });
+  svg.append('text').attr('x', w / 2).attr('y', h - 6).attr('text-anchor', 'middle').attr('fill', '#9a9490').attr('font-size', 11).text('Violation Count →');
+  svg.append('text').attr('transform', 'rotate(-90)').attr('x', -h / 2).attr('y', 14).attr('text-anchor', 'middle').attr('fill', '#9a9490').attr('font-size', 11).text('Severity Score →');
+
+  svg.selectAll('circle').data(allFiles).join('circle')
+    .attr('cx', d => x(d.violations)).attr('cy', d => y(sevScore(d.severity)))
+    .attr('r', d => r(d.violations + d.compliance))
+    .attr('fill', d => sev(d.severity)).attr('opacity', 0.8).attr('stroke', 'var(--bg)').attr('stroke-width', 1.5).attr('cursor', 'pointer')
+    .on('mouseover', (e, d) => { d3.select(e.target).attr('opacity', 1).attr('r', r(d.violations + d.compliance) + 3); show(e, `<strong>${d.path}</strong><div>Violations: ${d.violations} · Severity: ${sevScore(d.severity)}</div><div>C:${d.severity.critical} M:${d.severity.major} m:${d.severity.minor}</div>`); })
+    .on('mousemove', (e, d) => show(e, `<strong>${d.path}</strong><div>Violations: ${d.violations} · Score: ${sevScore(d.severity)}</div>`))
+    .on('mouseout', (e, d) => { d3.select(e.target).attr('opacity', 0.8).attr('r', r(d.violations + d.compliance)); hide(); });
+
+  svg.selectAll('text.label').data(allFiles.filter(d => d.violations >= 4)).join('text')
+    .attr('x', d => x(d.violations) + r(d.violations + d.compliance) + 4).attr('y', d => y(sevScore(d.severity)) + 4)
+    .attr('font-size', 9).attr('fill', '#9a9490').attr('pointer-events', 'none').text(d => d.name);
+})();
+
+// ═══════════════════════════════════════
+// 2. STACKED BAR CHART
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('stacked-bars');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const m = { top: 20, right: 120, bottom: 20, left: 140 };
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+
+  const sorted = [...allFiles].sort((a, b) => b.violations - a.violations);
+  const barH = Math.min(32, (h - m.top - m.bottom) / sorted.length - 4);
+  const xMax = d3.max(sorted, d => d.violations);
+  const x = d3.scaleLinear().domain([0, xMax]).range([0, w - m.left - m.right - 80]);
+
+  sorted.forEach((d, i) => {
+    const yy = m.top + i * (barH + 4);
+    const total = d.violations + d.compliance;
+    const rate = total > 0 ? Math.round(d.compliance / total * 100) : 0;
+
+    // File name
+    svg.append('text').attr('x', m.left - 8).attr('y', yy + barH / 2 + 4).attr('text-anchor', 'end').attr('font-size', 10).attr('fill', '#9a9490').text(d.path);
+
+    // Stacked severity bars
+    let offset = 0;
+    [['critical', d.severity.critical, 'var(--critical)'], ['major', d.severity.major, 'var(--major)'], ['minor', d.severity.minor, 'var(--minor)']].forEach(([, count, color]) => {
+      if (count > 0) {
+        svg.append('rect').attr('x', m.left + x(offset)).attr('y', yy).attr('width', x(count)).attr('height', barH).attr('fill', color).attr('opacity', 0.85).attr('rx', 2)
+          .on('mouseover', (e) => { d3.select(e.target).attr('opacity', 1); show(e, `<strong>${d.path}</strong><div>C:${d.severity.critical} M:${d.severity.major} m:${d.severity.minor}</div><div>Health: ${rate}%</div>`); })
+          .on('mousemove', (e) => show(e, `<strong>${d.path}</strong><div>${d.violations} violations · ${rate}% health</div>`))
+          .on('mouseout', (e) => { d3.select(e.target).attr('opacity', 0.85); hide(); });
+        offset += count;
+      }
+    });
+
+    // Violation count
+    svg.append('text').attr('x', m.left + x(d.violations) + 6).attr('y', yy + barH / 2 + 4).attr('font-size', 10).attr('fill', '#9a9490').attr('font-weight', 600).text(d.violations);
+
+    // Health bar on right
+    const healthX = w - 100;
+    const healthW = 70;
+    svg.append('rect').attr('x', healthX).attr('y', yy + 2).attr('width', healthW).attr('height', barH - 4).attr('fill', 'var(--surface2)').attr('rx', 3);
+    svg.append('rect').attr('x', healthX).attr('y', yy + 2).attr('width', healthW * rate / 100).attr('height', barH - 4).attr('fill', rate > 70 ? 'var(--clean)' : rate > 40 ? 'var(--minor)' : 'var(--major)').attr('opacity', 0.7).attr('rx', 3);
+    svg.append('text').attr('x', healthX + healthW / 2).attr('y', yy + barH / 2 + 3).attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', 'var(--text)').attr('font-weight', 500).text(rate + '%');
+  });
+})();
+
+// ═══════════════════════════════════════
+// 3. RADAR CHART
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('radar');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+  const cx = w / 2, cy = h / 2, R = Math.min(cx, cy) - 50;
+
+  const dims = ['Security', 'Performance', 'Reliability', 'Maintainability', 'Usability'];
+  const n = dims.length;
+  const angle = (i) => (Math.PI * 2 * i / n) - Math.PI / 2;
+
+  // Grid rings
+  [0.25, 0.5, 0.75, 1].forEach(frac => {
+    const pts = dims.map((_, i) => `${cx + R * frac * Math.cos(angle(i))},${cy + R * frac * Math.sin(angle(i))}`).join(' ');
+    svg.append('polygon').attr('points', pts).attr('fill', 'none').attr('stroke', 'var(--border)').attr('stroke-width', 0.5);
+  });
+
+  // Axis lines + labels
+  dims.forEach((dim, i) => {
+    const ax = cx + R * Math.cos(angle(i)), ay = cy + R * Math.sin(angle(i));
+    svg.append('line').attr('x1', cx).attr('y1', cy).attr('x2', ax).attr('y2', ay).attr('stroke', 'var(--border)').attr('stroke-width', 0.5);
+    const lx = cx + (R + 18) * Math.cos(angle(i)), ly = cy + (R + 18) * Math.sin(angle(i));
+    svg.append('text').attr('x', lx).attr('y', ly + 4).attr('text-anchor', 'middle').attr('font-size', 10).attr('fill', '#9a9490').text(dim);
+  });
+
+  // Mock health rates per folder per dimension
+  const folderData = [
+    { name: 'src/auth', color: 'var(--critical)', rates: [0.55, 0.70, 0.60, 0.75, 0.80] },
+    { name: 'src/api', color: 'var(--major)', rates: [0.75, 0.65, 0.80, 0.70, 0.85] },
+    { name: 'src/models', color: 'var(--minor)', rates: [0.85, 0.80, 0.90, 0.60, 0.75] },
+    { name: 'src/utils', color: 'var(--clean)', rates: [0.90, 0.85, 0.88, 0.92, 0.80] },
+  ];
+
+  folderData.forEach((fd, fi) => {
+    const pts = fd.rates.map((r, i) => `${cx + R * r * Math.cos(angle(i))},${cy + R * r * Math.sin(angle(i))}`).join(' ');
+    svg.append('polygon').attr('points', pts).attr('fill', fd.color).attr('fill-opacity', 0.12).attr('stroke', fd.color).attr('stroke-width', 1.5).attr('stroke-opacity', 0.7);
+    fd.rates.forEach((r, i) => {
+      svg.append('circle').attr('cx', cx + R * r * Math.cos(angle(i))).attr('cy', cy + R * r * Math.sin(angle(i))).attr('r', 4).attr('fill', fd.color).attr('opacity', 0.9).attr('cursor', 'pointer')
+        .on('mouseover', (e) => show(e, `<strong>${fd.name}</strong><div>${dims[i]}: ${Math.round(r * 100)}% health</div>`))
+        .on('mouseout', hide);
+    });
+  });
+
+  // Legend
+  folderData.forEach((fd, i) => {
+    svg.append('rect').attr('x', 16).attr('y', 16 + i * 20).attr('width', 12).attr('height', 12).attr('fill', fd.color).attr('rx', 2).attr('opacity', 0.8);
+    svg.append('text').attr('x', 34).attr('y', 26 + i * 20).attr('font-size', 10).attr('fill', '#9a9490').text(fd.name);
+  });
+})();
+
+// ═══════════════════════════════════════
+// 4. WAFFLE CHART
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('waffle');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+  const cellSize = 8, gap = 2, cols = Math.floor((w - 40) / (cellSize + gap));
+  let row = 0, col = 0, labelY = 20;
+
+  folders.forEach((folder, fi) => {
+    // Folder label
+    if (col > 0) { row++; col = 0; }
+    svg.append('text').attr('x', 16).attr('y', 20 + row * (cellSize + gap) + cellSize / 2).attr('font-size', 10).attr('fill', '#9a9490').attr('font-weight', 600).text(folder.name);
+    row++; col = 0;
+
+    folder.files.forEach(file => {
+      // Violations
+      const sevList = [];
+      for (let i = 0; i < file.severity.critical; i++) sevList.push('var(--critical)');
+      for (let i = 0; i < file.severity.major; i++) sevList.push('var(--major)');
+      for (let i = 0; i < file.severity.minor; i++) sevList.push('var(--minor)');
+      // Compliance
+      for (let i = 0; i < Math.min(file.compliance, 30); i++) sevList.push('var(--clean)');
+
+      sevList.forEach(color => {
+        if (col >= cols) { col = 0; row++; }
+        svg.append('rect')
+          .attr('x', 16 + col * (cellSize + gap)).attr('y', 20 + row * (cellSize + gap))
+          .attr('width', cellSize).attr('height', cellSize).attr('fill', color).attr('rx', 1.5).attr('opacity', 0.8)
+          .on('mouseover', (e) => { d3.select(e.target).attr('opacity', 1); show(e, `<strong>${file.name}</strong><div>C:${file.severity.critical} M:${file.severity.major} m:${file.severity.minor} ✓:${file.compliance}</div>`); })
+          .on('mouseout', (e) => { d3.select(e.target).attr('opacity', 0.8); hide(); });
+        col++;
+      });
+    });
+    row += 2; col = 0;
+  });
+})();
+
+// ═══════════════════════════════════════
+// 5. DOT STRIP
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('dot-strip');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const m = { top: 20, right: 30, bottom: 20, left: 140 };
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+
+  const sorted = [...allFiles].sort((a, b) => b.violations - a.violations);
+  const rowH = Math.min(35, (h - m.top - m.bottom) / sorted.length);
+  const x = d3.scaleLinear().domain([0, 300]).range([m.left, w - m.right]);
+
+  sorted.forEach((file, i) => {
+    const yy = m.top + i * rowH;
+
+    // File name
+    svg.append('text').attr('x', m.left - 8).attr('y', yy + rowH / 2 + 4).attr('text-anchor', 'end').attr('font-size', 10).attr('fill', '#9a9490').text(file.name);
+
+    // Track line
+    svg.append('line').attr('x1', m.left).attr('y1', yy + rowH / 2).attr('x2', w - m.right).attr('y2', yy + rowH / 2).attr('stroke', 'var(--border)').attr('stroke-width', 0.5);
+
+    // Dots per violation at line positions
+    const sevColors = [];
+    for (let j = 0; j < file.severity.critical; j++) sevColors.push('var(--critical)');
+    for (let j = 0; j < file.severity.major; j++) sevColors.push('var(--major)');
+    for (let j = 0; j < file.severity.minor; j++) sevColors.push('var(--minor)');
+
+    file.lines.forEach((line, j) => {
+      const color = sevColors[j] || 'var(--minor)';
+      svg.append('circle').attr('cx', x(line)).attr('cy', yy + rowH / 2).attr('r', 5).attr('fill', color).attr('opacity', 0.85).attr('cursor', 'pointer')
+        .on('mouseover', (e) => { d3.select(e.target).attr('r', 7).attr('opacity', 1); show(e, `<strong>${file.path}:${line}</strong><div>Severity: ${j < file.severity.critical ? 'critical' : j < file.severity.critical + file.severity.major ? 'major' : 'minor'}</div>`); })
+        .on('mouseout', (e) => { d3.select(e.target).attr('r', 5).attr('opacity', 0.85); hide(); });
+    });
+  });
+
+  // X axis label
+  svg.append('text').attr('x', (m.left + w - m.right) / 2).attr('y', h - 4).attr('text-anchor', 'middle').attr('font-size', 10).attr('fill', '#9a9490').text('Line number →');
+})();
+
+// ═══════════════════════════════════════
+// 6. NESTED BARS WITH HEALTH
+// ═══════════════════════════════════════
+(function() {
+  const el = document.getElementById('nested-bars');
+  const { width: w, height: h } = el.getBoundingClientRect();
+  const m = { top: 20, right: 20, bottom: 20, left: 120 };
+  const svg = d3.select(el).append('svg').attr('width', w).attr('height', h);
+
+  // Aggregate folders
+  const folderStats = folders.map(f => {
+    const s = { critical: 0, major: 0, minor: 0 };
+    let comp = 0, viol = 0;
+    f.files.forEach(file => { s.critical += file.severity.critical; s.major += file.severity.major; s.minor += file.severity.minor; comp += file.compliance; viol += file.violations; });
+    return { name: f.name, severity: s, violations: viol, compliance: comp, rate: Math.round(comp / (comp + viol) * 100) };
+  }).sort((a, b) => b.violations - a.violations);
+
+  const barH = 40;
+  const groupH = barH + 30;
+  const xMax = d3.max(folderStats, d => d.violations);
+  const x = d3.scaleLinear().domain([0, xMax]).range([0, w - m.left - m.right - 20]);
+
+  folderStats.forEach((f, i) => {
+    const yy = m.top + i * groupH;
+
+    // Folder name
+    svg.append('text').attr('x', m.left - 8).attr('y', yy + 14).attr('text-anchor', 'end').attr('font-size', 11).attr('fill', 'var(--text)').attr('font-weight', 600).text(f.name);
+
+    // Severity stacked bar
+    let offset = 0;
+    [['critical', f.severity.critical, 'var(--critical)'], ['major', f.severity.major, 'var(--major)'], ['minor', f.severity.minor, 'var(--minor)']].forEach(([label, count, color]) => {
+      if (count > 0) {
+        const bw = x(count);
+        svg.append('rect').attr('x', m.left + x(offset)).attr('y', yy).attr('width', bw).attr('height', barH / 2).attr('fill', color).attr('opacity', 0.85).attr('rx', 2);
+        if (bw > 20) svg.append('text').attr('x', m.left + x(offset) + bw / 2).attr('y', yy + barH / 4 + 4).attr('text-anchor', 'middle').attr('font-size', 9).attr('fill', '#fff').attr('font-weight', 600).text(count);
+        offset += count;
+      }
+    });
+
+    // Total label
+    svg.append('text').attr('x', m.left + x(f.violations) + 6).attr('y', yy + barH / 4 + 4).attr('font-size', 10).attr('fill', '#9a9490').text(`${f.violations} violations`);
+
+    // Health progress bar below
+    const healthY = yy + barH / 2 + 4;
+    const healthW = x(xMax);
+    svg.append('rect').attr('x', m.left).attr('y', healthY).attr('width', healthW).attr('height', 10).attr('fill', 'var(--surface2)').attr('rx', 5);
+    svg.append('rect').attr('x', m.left).attr('y', healthY).attr('width', healthW * f.rate / 100).attr('height', 10)
+      .attr('fill', f.rate > 70 ? 'var(--clean)' : f.rate > 40 ? 'var(--minor)' : 'var(--major)').attr('opacity', 0.7).attr('rx', 5);
+    svg.append('text').attr('x', m.left + healthW * f.rate / 100 + 6).attr('y', healthY + 9).attr('font-size', 9).attr('fill', '#9a9490').text(`${f.rate}% health`);
+  });
+})();
+</script>
+</body>
+</html>
