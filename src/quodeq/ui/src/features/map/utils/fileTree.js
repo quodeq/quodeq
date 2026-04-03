@@ -53,6 +53,23 @@ function aggregateUp(node) {
   node.children.sort((a, b) => b.violations - a.violations);
 }
 
+function collapseSingleChildren(node) {
+  // Recursively collapse chains of single-child folders into one node
+  // e.g. java/ -> app/ -> src/ becomes java/app/src/
+  for (let i = 0; i < node.children.length; i++) {
+    let child = node.children[i];
+    while (!child.isFile && child.children.length === 1 && !child.children[0].isFile) {
+      const grandchild = child.children[0];
+      grandchild.name = child.name + '/' + grandchild.name;
+      child = grandchild;
+    }
+    node.children[i] = child;
+    if (child.children.length > 0) {
+      collapseSingleChildren(child);
+    }
+  }
+}
+
 export function buildFileTree(dimensions) {
   const root = createNode('/', '', false);
   for (const dim of dimensions) {
@@ -77,5 +94,6 @@ export function buildFileTree(dimensions) {
     }
   }
   aggregateUp(root);
+  collapseSingleChildren(root);
   return root;
 }

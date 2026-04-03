@@ -102,20 +102,48 @@ function MapBreadcrumb({ path, onNavigate, onBack }) {
 
 function findSubtree(root, path) {
   if (!path) return root;
-  const parts = path.split('/').filter(Boolean);
-  let node = root;
-  for (const part of parts) {
-    const child = node.children.find((c) => c.name === part);
-    if (!child) return root;
-    node = child;
+  // Walk the tree matching by node.path (handles collapsed names like "java/app/src")
+  function walk(node) {
+    if (node.path === path) return node;
+    for (const child of node.children) {
+      if (path === child.path || path.startsWith(child.path + '/')) {
+        const found = walk(child);
+        if (found) return found;
+      }
+    }
+    return null;
   }
-  return node;
+  return walk(root) || root;
 }
 
-function buildBreadcrumbPath(path) {
+function findParentPath(root, currentPath) {
+  // Find the parent node's path in the (possibly collapsed) tree
+  if (!currentPath) return '';
+  function walk(node) {
+    for (const child of node.children) {
+      if (child.path === currentPath) return node.path;
+      if (currentPath.startsWith(child.path + '/')) {
+        const found = walk(child);
+        if (found !== null) return found;
+      }
+    }
+    return null;
+  }
+  return walk(root) ?? '';
+}
+
+function buildBreadcrumbPath(root, path) {
   if (!path) return [];
-  const parts = path.split('/').filter(Boolean);
-  return parts.map((name, i) => ({ name, path: parts.slice(0, i + 1).join('/') }));
+  // Walk the collapsed tree to build breadcrumb from actual node names
+  const crumbs = [];
+  let node = root;
+  while (node && node.path !== path) {
+    const child = node.children.find((c) => path === c.path || path.startsWith(c.path + '/'));
+    if (!child) break;
+    crumbs.push({ name: child.name, path: child.path });
+    node = child;
+  }
+  return crumbs;
 }
 
 const ZOOM_STEP = 0.2;
@@ -223,15 +251,13 @@ export default function MapPage({ data, callbacks }) {
 
   const fullTree = useMemo(() => buildFileTree(filteredDimensions), [filteredDimensions]);
   const currentNode = useMemo(() => findSubtree(fullTree, currentPath), [fullTree, currentPath]);
-  const breadcrumb = useMemo(() => buildBreadcrumbPath(currentPath), [currentPath]);
+  const breadcrumb = useMemo(() => buildBreadcrumbPath(fullTree, currentPath), [fullTree, currentPath]);
 
   const handleDrillDown = (nodePath) => setCurrentPath(nodePath);
   const handleBreadcrumbNav = (path) => setCurrentPath(path);
   const handleBack = () => {
     if (!currentPath) return;
-    const parts = currentPath.split('/').filter(Boolean);
-    parts.pop();
-    setCurrentPath(parts.join('/'));
+    setCurrentPath(findParentPath(fullTree, currentPath));
   };
 
   if (allDimensions.length === 0) {
