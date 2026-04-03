@@ -137,3 +137,77 @@
   --map-minor: #f1c40f;
   --map-clean: #2ecc71;
 }
+
+/* ── Heat Grid ───────────────────────────────────────── */
+
+.heat-grid-wrap {
+  overflow-x: auto;
+}
+
+.heat-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 2px;
+  font-size: var(--text-xs);
+}
+
+.heat-grid th {
+  padding: 6px 8px;
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  text-align: center;
+  white-space: nowrap;
+  position: sticky;
+  top: 0;
+  background: var(--color-surface);
+}
+
+.heat-grid th:first-child {
+  text-align: left;
+  min-width: 160px;
+}
+
+.heat-grid td {
+  padding: 0;
+}
+
+.heat-grid-file {
+  padding: 6px 8px;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 240px;
+}
+
+.heat-grid-file.clickable {
+  cursor: pointer;
+}
+
+.heat-grid-file.clickable:hover {
+  color: var(--color-accent);
+}
+
+.heat-grid-cell {
+  width: 48px;
+  height: 32px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: var(--weight-medium);
+  color: rgba(255, 255, 255, 0.9);
+  cursor: pointer;
+  transition: opacity 150ms ease;
+}
+
+.heat-grid-cell:hover {
+  opacity: 0.8;
+}
+
+.heat-grid-cell.empty {
+  background: var(--color-surface-alt);
+  color: var(--color-text-muted);
+  cursor: default;
+}
