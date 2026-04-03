@@ -2265,6 +2265,15 @@
   font-weight: var(--weight-semibold);
 }
 
+.pill-btn--dismissed {
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+.pill-btn--dismissed.active {
+  background: color-mix(in srgb, var(--color-text-muted) 10%, transparent);
+  opacity: 1;
+}
+
 /* Severity-specific pill active colors */
 .severity-pill.critical.active {
   background: color-mix(in srgb, var(--color-sev-critical-text) 12%, transparent);

@@ -4,7 +4,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from quodeq.analysis.manifest import AnalysisTarget
+    from quodeq.analysis.manifest_models import AnalysisTarget
 
 _MAX_LANGUAGE_EXTENSIONS = 8
 

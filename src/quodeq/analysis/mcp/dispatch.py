@@ -1,161 +1,39 @@
-"""JSON-RPC dispatch handlers for the MCP findings server.
+"""JSON-RPC dispatch for the MCP findings server.
 
-Extracted from mcp_findings.py to keep module size under 300 lines.
-Defines the JSON-RPC constants, tool schemas, and the dispatch loop.
+Thin entry point that routes messages to handlers.
+Re-exports public API for backward compatibility.
 """
 from __future__ import annotations
 
-import json
-import sys
 from typing import TYPE_CHECKING
+
+from quodeq.analysis.mcp.jsonrpc_io import ok as _ok, send as _send, read_message
+from quodeq.analysis.mcp.handlers import (
+    handle_initialize,
+    handle_tools_list,
+    handle_tools_call,
+    handle_unknown_method,
+)
+
+# Re-export public names so ``from dispatch import X`` keeps working.
+from quodeq.analysis.mcp.schemas import (  # noqa: F401
+    GET_NEXT_FILES_DESC,
+    GET_NEXT_FILES_NAME,
+    GET_NEXT_FILES_SCHEMA,
+    REPORT_FINDING_DESC,
+    REPORT_FINDING_NAME,
+    REPORT_FINDING_SCHEMA,
+)
 
 if TYPE_CHECKING:
     from quodeq.analysis.subagents.file_queue import FileQueue
     from quodeq.analysis.mcp.findings_server import FindingsRouter
 
-_JSONRPC_VERSION = "2.0"
-_MCP_DEFAULT_PROTOCOL_VERSION = "2024-11-05"
-_SERVER_NAME = "quodeq-findings"
-_SERVER_VERSION = "1.0.0"
-_JSONRPC_METHOD_NOT_FOUND = -32601
-
-REPORT_FINDING_NAME = "report_finding"
-REPORT_FINDING_DESC = (
-    "Report a code quality finding (violation or compliance). "
-    "Call this for EVERY finding you discover, immediately after confirming it."
-)
-REPORT_FINDING_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "req": {"type": "string", "description": "Requirement ID from the standards checklist (e.g. 'M-MOD-1', 'S-CON-3'). Server auto-fills principle name and dimension from this."},
-        "t": {"type": "string", "enum": ["violation", "compliance"], "description": "Finding type"},
-        "file": {"type": "string", "description": "File path relative to repo root"},
-        "line": {"type": "integer", "description": "Line number"},
-        "end_line": {"type": "integer", "description": "Last line of the violation pattern (omit if single line)"},
-        "scope": {"type": "string", "enum": ["file", "class", "module"], "description": "Set when the finding affects an entire file/class/module rather than specific lines"},
-        "severity": {"type": "string", "enum": ["critical", "major", "minor"], "description": "Severity level"},
-        "w": {"type": "string", "description": "Short description of the finding"},
-        "reason": {"type": "string", "description": "Why this is a violation or compliance"},
-        "p": {"type": "string", "description": "Sub-characteristic name — auto-filled from req if omitted"},
-        "d": {"type": "string", "description": "Dimension — auto-filled from server config if omitted"},
-    },
-    "required": ["req", "t", "file", "line", "severity", "w", "reason"],
-}
-
-_DEFAULT_FILE_BATCH_SIZE = 5
-_MAX_LOG_LINE_PREVIEW = 200
-GET_NEXT_FILES_NAME = "get_next_files"
-GET_NEXT_FILES_DESC = (
-    "Get your next batch of files to analyse from the queue. "
-    "Call this to receive file paths, then Read each one and report findings. "
-    "When this returns an empty list, you are done."
-)
-GET_NEXT_FILES_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "count": {
-            "type": "integer",
-            "description": "Number of files to retrieve (default 5)",
-        },
-    },
-}
-
-
-def _send(msg: dict) -> None:
-    """Write one JSON-RPC message to stdout (newline-delimited)."""
-    sys.stdout.write(json.dumps(msg) + "\n")
-    sys.stdout.flush()
-
-
-def _ok(req_id: object, result: dict) -> dict:
-    return {"jsonrpc": _JSONRPC_VERSION, "id": req_id, "result": result}
-
-
-def read_message() -> dict | None:
-    """Read one JSON-RPC message from stdin (newline-delimited)."""
-    for raw in sys.stdin:
-        line = raw.strip()
-        if not line:
-            continue
-        try:
-            return json.loads(line)
-        except json.JSONDecodeError:
-            sys.stderr.write(f"Skipping malformed JSON: {line[:_MAX_LOG_LINE_PREVIEW]}\n")
-            continue
-    return None
-
-
-def _handle_initialize(request_id: object, msg: dict) -> dict:
-    """Handle the 'initialize' JSON-RPC method."""
-    client_version = msg.get("params", {}).get("protocolVersion", _MCP_DEFAULT_PROTOCOL_VERSION)
-    return _ok(request_id, {
-        "protocolVersion": client_version,
-        "capabilities": {"tools": {}},
-        "serverInfo": {"name": _SERVER_NAME, "version": _SERVER_VERSION},
-    })
-
-
-def _handle_tools_list(request_id: object, *, has_queue: bool = False) -> dict:
-    """Handle the 'tools/list' JSON-RPC method."""
-    tools = [{
-        "name": REPORT_FINDING_NAME,
-        "description": REPORT_FINDING_DESC,
-        "inputSchema": REPORT_FINDING_SCHEMA,
-    }]
-    if has_queue:
-        tools.append({
-            "name": GET_NEXT_FILES_NAME,
-            "description": GET_NEXT_FILES_DESC,
-            "inputSchema": GET_NEXT_FILES_SCHEMA,
-        })
-    return _ok(request_id, {"tools": tools})
-
-
-def _handle_tools_call(
-    request_id: object, params: dict,
-    router: FindingsRouter, queue: FileQueue | None = None,
-    agent_id: str = "",
-) -> dict:
-    """Handle the 'tools/call' JSON-RPC method."""
-    name = params.get("name")
-    args = params.get("arguments", {})
-
-    if name == REPORT_FINDING_NAME:
-        message, _is_dup = router.receive(args)
-        return _ok(request_id, {
-            "content": [{"type": "text", "text": message}],
-        })
-
-    if name == GET_NEXT_FILES_NAME:
-        if queue is None:
-            return _ok(request_id, {
-                "content": [{"type": "text", "text": "No file queue configured."}],
-                "isError": True,
-            })
-        count = args.get("count", _DEFAULT_FILE_BATCH_SIZE)
-        if not isinstance(count, int) or count < 1:
-            count = _DEFAULT_FILE_BATCH_SIZE
-        files = queue.take(count, agent_id=agent_id)
-        if not files:
-            return _ok(request_id, {
-                "content": [{"type": "text", "text": "DONE. Queue empty — no more files to analyse. Stop immediately and do not call any more tools."}],
-            })
-        file_list = "\n".join(files)
-        return _ok(request_id, {
-            "content": [{"type": "text", "text": f"{len(files)} files to analyse:\n{file_list}"}],
-        })
-
-    return _ok(request_id, {
-        "content": [{"type": "text", "text": f"Unknown tool: {name}"}],
-        "isError": True,
-    })
-
-
-def _handle_unknown_method(req_id: object, method: str) -> None:
-    """Send a JSON-RPC method-not-found error for unrecognised methods."""
-    if req_id is not None:
-        _send({"jsonrpc": _JSONRPC_VERSION, "id": req_id,
-               "error": {"code": _JSONRPC_METHOD_NOT_FOUND, "message": f"Method not found: {method}"}})
+__all__ = [
+    "REPORT_FINDING_NAME", "REPORT_FINDING_DESC", "REPORT_FINDING_SCHEMA",
+    "GET_NEXT_FILES_NAME", "GET_NEXT_FILES_DESC", "GET_NEXT_FILES_SCHEMA",
+    "dispatch", "read_message",
+]
 
 
 def dispatch(
@@ -169,12 +47,12 @@ def dispatch(
     if method in ("notifications/initialized", "notifications/cancelled"):
         return
     if method == "initialize":
-        _send(_handle_initialize(req_id, msg))
+        _send(handle_initialize(req_id, msg))
     elif method == "tools/list":
-        _send(_handle_tools_list(req_id, has_queue=queue is not None))
+        _send(handle_tools_list(req_id, has_queue=queue is not None))
     elif method == "tools/call":
-        _send(_handle_tools_call(req_id, msg.get("params", {}), router, queue, agent_id))
+        _send(handle_tools_call(req_id, msg.get("params", {}), router, queue, agent_id))
     elif method == "ping":
         _send(_ok(req_id, {}))
     else:
-        _handle_unknown_method(req_id, method)
+        handle_unknown_method(req_id, method)

@@ -1949,8 +1949,82 @@
 
 
 
-.vdetail-row-main .detail-copy-btn {
+.vdetail-row-main .detail-copy-btn,
+.vdetail-row-main .fix-plan-btn {
   margin-left: auto;
+}
+
+/* Fix plan button — outlined with left accent bar */
+.fix-plan-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px 3px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  border-left: 2px solid var(--color-accent);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+.fix-plan-btn:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* Header-level fix plan button (principle & dimension) */
+.fix-plan-btn-header {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px 5px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  border-left: 2px solid var(--color-accent);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: flex-start;
+  transition: all 150ms ease;
+}
+.fix-plan-btn-header:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+/* Dismiss button on violation cards — icon-only trash can */
+.dismiss-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 150ms ease;
+}
+.dismiss-btn:hover {
+  color: #f0883e;
+  border-color: #f0883e;
+  background: rgba(240, 136, 62, 0.08);
 }
 
 /* Dimension label inline in the row (file detail page) */
@@ -2086,4 +2160,131 @@
 .folder-new-btn {
   font-size: 1.1rem;
   font-weight: bold;
+}
+
+/* ── Dismissed findings section ─────────────────────── */
+.dismissed-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 24px;
+  padding: 10px 14px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background 150ms ease;
+  user-select: none;
+}
+.dismissed-bar:hover { background: var(--color-surface-alt); }
+.dismissed-bar-icon {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  transition: transform 200ms ease;
+  display: inline-block;
+  width: 12px;
+}
+.dismissed-bar-icon.open { transform: rotate(90deg); }
+.dismissed-bar-label { font-size: 0.82rem; color: var(--color-text-muted); }
+.dismissed-bar-count {
+  font-size: 0.68rem;
+  background: rgba(139, 148, 158, 0.15);
+  color: var(--color-text-muted);
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.dismissed-bar-note {
+  margin-left: auto;
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  opacity: 0.5;
+}
+.dismissed-list-inner { padding-top: 12px; }
+.dismissed-card {
+  border-left: 3px solid var(--color-text-muted);
+  margin-bottom: var(--space-3);
+}
+.dismissed-card-top {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0 10px 10px;
+}
+.dismissed-tag {
+  font-size: 0.58rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 7px;
+  border-radius: 3px;
+  background: rgba(139, 148, 158, 0.15);
+  color: var(--color-text-muted);
+}
+.dismissed-label {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-data);
+}
+.dismissed-file {
+  font-family: var(--font-data);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+.dismissed-card-top .restore-btn {
+  margin-left: auto;
+}
+.dismissed-detail {
+  padding: 12px 14px 12px 10px;
+  background: var(--color-surface);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.dismissed-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.dismissed-detail-section {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.dismissed-detail-label {
+  font-size: var(--text-xs);
+  font-weight: var(--weight-semibold);
+  color: var(--color-text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.dismissed-detail-title {
+  margin: 0;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  line-height: 1.4;
+}
+.dismissed-detail-text {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+.restore-btn {
+  font-size: 0.7rem;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-accent);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 150ms ease;
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.restore-btn:hover {
+  border-color: var(--color-accent);
+  background: rgba(88, 166, 255, 0.08);
 }

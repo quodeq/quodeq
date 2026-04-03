@@ -29,6 +29,15 @@ def _load_and_filter_previous(
     if config.options.incremental_file_filter is not None:
         filter_set = config.options.incremental_file_filter
         prev_findings = [f for f in prev_findings if f.get("file") in filter_set]
+    # Filter out dismissed findings
+    from quodeq.services.dismissed import dismissed_keys  # deferred to avoid import at module level
+    project_dir = evidence_dir.parent
+    dkeys = dismissed_keys(project_dir)
+    if dkeys:
+        prev_findings = [
+            f for f in prev_findings
+            if (f.get("p", ""), f.get("file", ""), f.get("line", 0)) not in dkeys
+        ]
     return prev_findings
 
 

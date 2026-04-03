@@ -1,18 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { getDashboard, getAccumulated } from '../../../api/index.js';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { getDashboard, getAccumulated, getRescore } from '../../../api/index.js';
+import { createDimension } from '../../../models/dimension.js';
 
 /**
  * Fetches and manages dashboard data for a given project and run.
- *
- * @param {{ selectedProject: string, selectedRun: string }} params
- * @returns {{
- *   dashboard: object|null,
- *   accumulated: object|null,
- *   loading: boolean,
- *   error: string|null,
- *   availableRuns: Array<{ runId: string, dateLabel: string }>,
- * }}
  */
+
 function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError) {
   if (!selectedProject) {
     setDashboard(null);
@@ -26,7 +19,21 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
 
   getDashboard(selectedProject, selectedRun)
     .then((payload) => {
-      if (active) setDashboard(payload);
+      if (!active) return;
+      setDashboard(payload);
+      // Rescore dashboard dimensions for the selected run
+      const runId = payload?.selectedRun?.runId || selectedRun;
+      getRescore(selectedProject, runId).then((rescored) => {
+        if (!active) return;
+        setDashboard((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            dimensions: (rescored.dimensions || []).map(createDimension),
+            summary: { ...prev.summary, ...rescored.summary },
+          };
+        });
+      }).catch((err) => console.warn('Rescore failed (non-fatal):', err));
     })
     .catch((err) => {
       console.warn('Dashboard load failed:', err);
@@ -60,6 +67,43 @@ function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, se
   return () => { active = false; };
 }
 
+/**
+ * Rescore all unique runs from accumulated dimensions and build a lookup
+ * of dimension name → rescored data. Stored as separate state so patching
+ * accumulated doesn't cause re-render loops.
+ */
+function rescoreAllRunsEffect(project, accumulated, setRescoreLookup) {
+  if (!project || !accumulated?.dimensions) return;
+  // Map each dimension to its authoritative run (the run the accumulated view selected)
+  const dimToRun = {};
+  for (const d of accumulated.dimensions) {
+    const key = (d.dimension || '').toLowerCase();
+    const rid = d.fromRunId || d.runId;
+    if (key && rid) dimToRun[key] = rid;
+  }
+  const runIds = [...new Set(Object.values(dimToRun))];
+  if (runIds.length === 0) return;
+
+  let active = true;
+  Promise.all(runIds.map((rid) => getRescore(project, rid).then((r) => ({ rid, data: r })).catch(() => null)))
+    .then((results) => {
+      if (!active) return;
+      const lookup = {};
+      for (const r of results) {
+        if (!r?.data) continue;
+        for (const d of (r.data.dimensions || [])) {
+          const key = (d.dimension || '').toLowerCase();
+          // Only use this dimension if it came from its authoritative run
+          if (dimToRun[key] === r.rid) {
+            lookup[key] = d;
+          }
+        }
+      }
+      setRescoreLookup(lookup);
+    });
+  return () => { active = false; };
+}
+
 function buildAvailableRuns(dashboard) {
   const trendRows = dashboard?.trend || [];
   if (trendRows.length === 0) return [];
@@ -75,6 +119,8 @@ export function useDashboard({ selectedProject, selectedRun }) {
   const [latestAccumulated, setLatestAccumulated] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [rescoreLookup, setRescoreLookup] = useState({});
 
   // Clear stale data immediately when project changes to prevent rendering old data for a new project
   const prevProjectRef = useRef(selectedProject);
@@ -83,13 +129,24 @@ export function useDashboard({ selectedProject, selectedRun }) {
     setDashboard(null);
     setAccumulated(null);
     setLatestAccumulated(null);
+    setRescoreLookup({});
     setError(null);
   }
 
-  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun]);
-  useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun]);
-  useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject]);
+  useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun, refreshKey]);
+  useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError), [selectedProject, selectedRun, refreshKey]);
+  useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError), [selectedProject, refreshKey]);
+  // Rescore all runs that contribute to accumulated — stored as lookup, not patched into accumulated
+  useEffect(() => rescoreAllRunsEffect(selectedProject, accumulated, setRescoreLookup), [selectedProject, accumulated]);
   const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
 
-  return { dashboard, accumulated, latestAccumulated, loading, error, availableRuns };
+  const refreshTimerRef = useRef(null);
+  const refreshDashboard = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => setRefreshKey((k) => k + 1), 300);
+  }, []);
+
+  useEffect(() => () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); }, []);
+
+  return { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, refreshDashboard };
 }

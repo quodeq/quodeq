@@ -41,7 +41,7 @@ class TestAdaptiveScalingIntegration:
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis",
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis",
                     _counting_run_analysis(call_log)):
             results = pool.run()
 
@@ -60,7 +60,7 @@ class TestAdaptiveScalingIntegration:
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis",
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis",
                     _counting_run_analysis(call_log)):
             results = pool.run()
 

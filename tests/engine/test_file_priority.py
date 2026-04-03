@@ -148,14 +148,14 @@ class TestComputePreviousViolations:
             {"p": "Integrity", "d": "security", "t": "violation", "file": "routes.py", "line": 10},
             {"p": "Integrity", "d": "security", "t": "compliance", "file": "utils.py", "line": 1},
         ]
-        with patch("quodeq.analysis.subagents.priority.load_previous_findings_for_dimension", return_value=findings):
+        with patch("quodeq.analysis.subagents.priority_scoring.load_previous_findings_for_dimension", return_value=findings):
             counts = compute_previous_violations(None, tmp_path, "security")
         assert counts.get("auth.py", 0) == 2
         assert counts.get("routes.py", 0) == 1
         assert counts.get("utils.py", 0) == 0
 
     def test_no_previous_run(self, tmp_path):
-        with patch("quodeq.analysis.subagents.priority.load_previous_findings_for_dimension", return_value=[]):
+        with patch("quodeq.analysis.subagents.priority_scoring.load_previous_findings_for_dimension", return_value=[]):
             counts = compute_previous_violations(None, tmp_path, "security")
         assert counts == {}
 
@@ -166,7 +166,7 @@ class TestComputePreviousViolations:
             elif dim == "maintainability":
                 return [{"t": "violation", "file": "big.py", "line": 1}]
             return []
-        with patch("quodeq.analysis.subagents.priority.load_previous_findings_for_dimension", side_effect=mock_load):
+        with patch("quodeq.analysis.subagents.priority_scoring.load_previous_findings_for_dimension", side_effect=mock_load):
             counts = compute_previous_violations(None, tmp_path, ["security", "maintainability"])
         assert counts.get("auth.py", 0) >= 1
         assert counts.get("big.py", 0) >= 1

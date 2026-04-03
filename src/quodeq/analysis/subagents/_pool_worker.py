@@ -1,0 +1,71 @@
+"""Worker logic: building agent configs and running single subagents."""
+from __future__ import annotations
+
+from pathlib import Path
+
+from quodeq.analysis.subagents._pool_models import (
+    SubagentResult,
+    _AGENT_ID_PREFIX,
+    _DEFAULT_MAX_DURATION_S,
+)
+from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analysis
+from quodeq.shared.logging import log_warning
+
+
+def build_agent_config(
+    idx: int,
+    base_config: AnalysisConfig,
+    dimension: str,
+    dimension_key: str,
+    evidence_dir: Path,
+    queue_path: Path,
+) -> tuple[AnalysisConfig, Path, Path]:
+    """Build per-agent AnalysisConfig, JSONL path, and stream path."""
+    agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
+    jsonl_file = evidence_dir / f"{dimension_key}_evidence.jsonl"
+    stream_file = evidence_dir / f"{dimension_key}_{agent_id}.stream"
+    bc = base_config
+    ac = AnalysisConfig(
+        jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
+        heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,
+        ai_cmd=bc.ai_cmd, ai_model=bc.ai_model, max_turns=bc.max_turns,
+        max_duration=bc.max_duration or _DEFAULT_MAX_DURATION_S,
+        compiled_dir=bc.compiled_dir, dimension=dimension,
+        queue_path=queue_path, agent_id=agent_id,
+        max_files_per_agent=bc.max_files_per_agent,
+    )
+    return ac, jsonl_file, stream_file
+
+
+def run_single_agent(
+    idx: int,
+    work_dir: Path,
+    prompt: str,
+    base_config: AnalysisConfig,
+    dimension: str,
+    dimension_key: str,
+    evidence_dir: Path,
+    queue_path: Path,
+) -> SubagentResult:
+    """Run a single subagent. Returns SubagentResult."""
+    agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
+    ac, jsonl_file, stream_file = build_agent_config(
+        idx, base_config, dimension, dimension_key, evidence_dir, queue_path,
+    )
+    try:
+        run_analysis(
+            work_dir=work_dir,
+            prompt=prompt,
+            stream_file=stream_file,
+            config=ac,
+        )
+        return SubagentResult(
+            agent_id=agent_id, jsonl_file=jsonl_file,
+            stream_file=stream_file, success=True,
+        )
+    except AnalysisError as exc:
+        log_warning(f"Subagent {agent_id} failed: {exc}")
+        return SubagentResult(
+            agent_id=agent_id, jsonl_file=jsonl_file,
+            stream_file=stream_file, success=False, error=str(exc),
+        )

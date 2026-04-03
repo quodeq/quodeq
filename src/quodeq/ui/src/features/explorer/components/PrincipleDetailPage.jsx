@@ -2,7 +2,7 @@ import { memo } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
@@ -35,6 +35,8 @@ function ViolationCard({ v, principleName, index }) {
         )}
         <CopyButton
           label="Fix plan"
+          className="fix-plan-btn"
+          icon={<SparkleIcon />}
           onClick={() => copyToClipboard(buildViolationPlanText(v, principleName))}
         />
       </div>
@@ -98,7 +100,9 @@ function ComplianceStatsRow({ principle, totalViolations, totalCompliance }) {
           )}
         </div>
         <CopyButton
-          label="Principle fix plan"
+          label="Full fix plan"
+          className="fix-plan-btn-header"
+          icon={<SparkleIcon />}
           onClick={() => copyToClipboard(buildPrinciplePlanText(principle))}
         />
       </div>

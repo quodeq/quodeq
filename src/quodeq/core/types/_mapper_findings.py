@@ -18,11 +18,7 @@ from ._mapper_helpers import (
 
 
 def parse_req_ref(raw: dict[str, object]) -> ReqRef:
-    """Parse a raw dict into a ReqRef (requirement reference) instance.
-
-    Args:
-        raw: Dictionary with ``"label"`` and ``"url"`` string keys.
-    """
+    """Parse a raw dict into a ReqRef (requirement reference) instance."""
     return ReqRef(
         label=_str(raw, "label"),
         url=_str(raw, "url"),
@@ -30,15 +26,7 @@ def parse_req_ref(raw: dict[str, object]) -> ReqRef:
 
 
 def parse_finding(raw: dict[str, object]) -> Finding:
-    """Parse a raw dict into a Finding instance with nested ReqRef list.
-
-    Args:
-        raw: Dictionary with camelCase keys matching the Finding fields
-            (e.g. ``"principle"``, ``"severity"``, ``"reqRefs"``).
-
-    Returns:
-        A fully populated :class:`Finding` dataclass.
-    """
+    """Parse a raw dict into a Finding instance with nested ReqRef list."""
     req_refs_raw = raw.get("reqRefs")
     req_refs: list[ReqRef] = []
     if isinstance(req_refs_raw, list):
@@ -61,15 +49,7 @@ def parse_finding(raw: dict[str, object]) -> Finding:
 
 
 def parse_severity_tally(raw: dict[str, object]) -> SeverityTally:
-    """Parse a raw dict into a SeverityTally (critical/major/minor/unknown counts).
-
-    Args:
-        raw: Dictionary with ``"critical"``, ``"major"``, ``"minor"``,
-            and ``"unknown"`` integer keys.
-
-    Returns:
-        A :class:`SeverityTally` with zero-defaulted counts.
-    """
+    """Parse a raw dict into a SeverityTally (critical/major/minor/unknown counts)."""
     return SeverityTally(
         critical=_int(raw, "critical"),
         major=_int(raw, "major"),
@@ -79,15 +59,7 @@ def parse_severity_tally(raw: dict[str, object]) -> SeverityTally:
 
 
 def parse_totals(raw: dict[str, object]) -> Totals:
-    """Parse a raw dict into a Totals instance with embedded SeverityTally.
-
-    Args:
-        raw: Dictionary with ``"violationCount"``, ``"complianceCount"``,
-            and an optional ``"severity"`` sub-dict.
-
-    Returns:
-        A :class:`Totals` with parsed severity breakdown.
-    """
+    """Parse a raw dict into a Totals instance with embedded SeverityTally."""
     sev_raw = raw.get("severity")
     severity = parse_severity_tally(sev_raw) if isinstance(sev_raw, dict) else SeverityTally()
     return Totals(

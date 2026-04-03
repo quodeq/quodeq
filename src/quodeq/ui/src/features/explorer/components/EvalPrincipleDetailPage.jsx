@@ -1,14 +1,15 @@
-import { memo, useState } from 'react';
+import { memo, useState, useCallback, useMemo } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import { getRescore } from '../../../api/index.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 
 const PAGE_SIZE = 20;
 
-function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText }) {
+function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
   return EVAL_SEVERITY_ORDER.map((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return null;
@@ -20,7 +21,7 @@ function ViolationListSection({ violationsBySeverity, principle, buildViolationP
         </div>
         <div className="vlive-violations-group">
           {vs.map((v, idx) => (
-            <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} />
+            <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
           ))}
         </div>
       </div>
@@ -109,7 +110,12 @@ function PrincipleHeader({ data, onCopyPlan }) {
           )}
         </div>
         {violations.length > 0 && (
-          <CopyButton label="Principle fix plan" onClick={onCopyPlan} />
+          <CopyButton
+            label="Full fix plan"
+            className="fix-plan-btn-header"
+            icon={<SparkleIcon />}
+            onClick={onCopyPlan}
+          />
         )}
       </div>
       <div className="file-detail-stats" style={{ marginTop: 6 }}>
@@ -147,20 +153,52 @@ function PrincipleContext({ principleData }) {
   );
 }
 
-const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal }) {
-  const { principleData, principle, score, grade } = evalPrincipal;
+const EvalPrincipleDetailPage = memo(function EvalPrincipleDetailPage({ evalPrincipal, onDismiss }) {
+  const { principleData, principle, score, grade, dimension, project, runId } = evalPrincipal;
   const [showAllCompliance, setShowAllCompliance] = useState(false);
+  const [dismissedSet, setDismissedSet] = useState(new Set());
+  const [liveScore, setLiveScore] = useState(null);
+  const [liveGrade, setLiveGrade] = useState(null);
   const { violations, compliance, violationsBySeverity, sevCounts } = computeEvalPrincipleData(evalPrincipal);
   const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
+
+  const handleDismiss = useCallback((v) => {
+    if (!onDismiss) return;
+    onDismiss(v);
+    setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
+    // Fire rescore to update principle score/grade
+    if (project && runId) {
+      getRescore(project, runId).then((rescored) => {
+        const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+        if (!dimData) return;
+        const pg = (dimData.principles || []).find((p) => p.principle === principle);
+        if (pg) { setLiveScore(pg.score); setLiveGrade(pg.grade); }
+      }).catch(() => {});
+    }
+  }, [onDismiss, project, runId, dimension, principle]);
+
+  // Filter dismissed violations and recompute derived stats
+  const { filteredBySeverity, filteredViolations, liveSevCounts } = useMemo(() => {
+    const bySev = {};
+    for (const sev of Object.keys(violationsBySeverity)) {
+      bySev[sev] = (violationsBySeverity[sev] || []).filter(
+        (v) => !dismissedSet.has(`${v.file}:${v.line}`)
+      );
+    }
+    const allFiltered = Object.values(bySev).flat();
+    const counts = { critical: 0, major: 0, minor: 0 };
+    allFiltered.forEach((v) => { const s = (v.severity || 'minor').toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
+    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
+  }, [violationsBySeverity, dismissedSet]);
 
   return (
     <>
       <PrincipleHeader
-        data={{ principle, score, grade, violations, compliance, sevCounts }}
+        data={{ principle, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts }}
         onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
       />
       <PrincipleContext principleData={principleData} />
-      <ViolationListSection violationsBySeverity={violationsBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} />
+      <ViolationListSection violationsBySeverity={filteredBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} onDismiss={handleDismiss} />
       <ComplianceListSection
         data={{ compliance, displayedCompliance, principle }}
         controls={{ hasMore: compliance.length > PAGE_SIZE, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
