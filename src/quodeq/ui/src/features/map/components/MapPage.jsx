@@ -2,11 +2,8 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { buildFileTree } from '../utils/fileTree.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import HeatGridView from './HeatGridView.jsx';
-import ZoomablePackView from './ZoomablePackView.jsx';
-import RadarView from './RadarView.jsx';
-import StackedBarView from './StackedBarView.jsx';
 import RiskMatrixView from './RiskMatrixView.jsx';
-import DotStripView from './DotStripView.jsx';
+import ZoomablePackView from './ZoomablePackView.jsx';
 
 const VIEW_MODES = [
   { id: 'violations', label: 'Violations' },
@@ -15,11 +12,8 @@ const VIEW_MODES = [
 
 const VIZ_STYLES = [
   { id: 'heatgrid', label: 'Heat Grid', enabled: true },
-  { id: 'radar', label: 'Radar', enabled: true },
-  { id: 'stackedbars', label: 'Stacked Bars', enabled: true },
   { id: 'riskmatrix', label: 'Risk Matrix', enabled: true },
   { id: 'zoompack', label: 'Circle Pack', enabled: true },
-  { id: 'dotstrip', label: 'Dot Strip', enabled: true },
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
@@ -154,11 +148,8 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
   return (
     <div className="map-viz-container">
       {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'radar' && <RadarView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'stackedbars' && <StackedBarView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
       {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'dotstrip' && <DotStripView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
     </div>
   );
 }
