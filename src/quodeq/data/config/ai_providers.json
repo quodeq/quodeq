@@ -1,12 +1,34 @@
 {
   "claude": {
+    "type": "cli",
+    "cmd": "claude",
+    "base_args": "--print --output-format stream-json --verbose",
     "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
     "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
     "env_remove": ["CLAUDECODE"]
   },
   "codex": {
+    "type": "cli",
+    "cmd": "codex",
+    "base_args": "--print --output-format stream-json --verbose",
     "mcp_permission_args": [],
     "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
     "env_remove": []
+  },
+  "ollama": {
+    "type": "api",
+    "model": "llama3.1",
+    "api_base": "http://localhost:11434/v1"
+  },
+  "openrouter": {
+    "type": "api",
+    "model": "anthropic/claude-sonnet-4",
+    "api_key_env": "OPENROUTER_API_KEY"
+  },
+  "custom": {
+    "type": "api",
+    "model": "${AI_MODEL}",
+    "api_base": "${AI_API_BASE}",
+    "api_key_env": "AI_API_KEY"
   }
 }
