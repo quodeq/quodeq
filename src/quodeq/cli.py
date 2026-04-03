@@ -228,12 +228,21 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     if src is None:
         return None
 
-    # Single-file evaluation: use parent dir as src, restrict to this file
+    # Single-file evaluation: find project root, compute relative path
     single_file: str | None = None
     if src.is_file():
-        single_file = src.name
-        src = src.parent
-        print(f"Single-file evaluation: {single_file}", file=sys.stderr)
+        file_path = src
+        # Walk up to find git root, or fall back to immediate parent
+        project_root = file_path.parent
+        candidate = file_path.parent
+        while candidate != candidate.parent:
+            if (candidate / ".git").exists():
+                project_root = candidate
+                break
+            candidate = candidate.parent
+        single_file = str(file_path.relative_to(project_root))
+        src = project_root
+        print(f"Single-file evaluation: {single_file} (project root: {src})", file=sys.stderr)
 
     paths = default_paths()
     if not paths.detection_file.exists() or not paths.dimensions_file.exists():

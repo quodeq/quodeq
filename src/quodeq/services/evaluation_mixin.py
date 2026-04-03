@@ -137,12 +137,21 @@ class FsEvaluationMixin:
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir)
         env = self._build_eval_env(repo, options)
-        # For single-file targets, run subprocess from the parent directory
         if is_repo_url(repo):
             cwd = str(Path.cwd())
         else:
             resolved = Path(repo).resolve()
-            cwd = str(resolved.parent) if resolved.is_file() else str(resolved)
+            # For files, walk up to find git root; for dirs, use as-is
+            if resolved.is_file():
+                candidate = resolved.parent
+                cwd = str(candidate)
+                while candidate != candidate.parent:
+                    if (candidate / ".git").exists():
+                        cwd = str(candidate)
+                        break
+                    candidate = candidate.parent
+            else:
+                cwd = str(resolved)
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:
