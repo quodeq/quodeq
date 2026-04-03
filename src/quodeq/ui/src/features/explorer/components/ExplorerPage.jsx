@@ -52,19 +52,21 @@ function DimensionOverview({ data, stats, onNavigate }) {
           <span className="explorer-dimension-title">{evalData.dimension}</span>
           {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
         </div>
-        {allViolations.length > 0 && (
+        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
           <CopyButton
-            label="Full fix plan"
+            label="Report"
             className="fix-plan-btn-header"
-            icon={<SparkleIcon />}
-            onClick={() => copyToClipboard(buildDimensionPlanFromViolations(evalData.dimension, allViolations))}
+            onClick={() => copyToClipboard(buildDimensionReport(evalData, principleGrades || [], allViolations, overallGrade, dateLabel, runId))}
           />
-        )}
-        <CopyButton
-          label="Report"
-          className="fix-plan-btn-header"
-          onClick={() => copyToClipboard(buildDimensionReport(evalData, principleGrades || [], allViolations, overallGrade, dateLabel, runId))}
-        />
+          {allViolations.length > 0 && (
+            <CopyButton
+              label="Full fix plan"
+              className="fix-plan-btn-header"
+              icon={<SparkleIcon />}
+              onClick={() => copyToClipboard(buildDimensionPlanFromViolations(evalData.dimension, allViolations))}
+            />
+          )}
+        </div>
       </div>
       <div className="compact-stats-row">
         <div className="compact-score-col">

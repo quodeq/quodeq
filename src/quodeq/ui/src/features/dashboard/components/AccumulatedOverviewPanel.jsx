@@ -67,12 +67,14 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
     <section className="acc-eval-panel panel">
       <div className="acc-eval-top">
         <span className="acc-eval-label">Accumulated Evaluation</span>
-        <CopyButton
-          label="Report"
-          className="fix-plan-btn-header"
-          onClick={() => copyToClipboard(buildOverviewReport(accumulated, accumulatedDimensions || [], projectName))}
-        />
-        {lastDate && <span className="acc-eval-date">Last evaluated {lastDate}</span>}
+        <div style={{ marginLeft: 'auto', display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
+          <CopyButton
+            label="Report"
+            className="fix-plan-btn-header"
+            onClick={() => copyToClipboard(buildOverviewReport(accumulated, accumulatedDimensions || [], projectName))}
+          />
+          {lastDate && <span className="acc-eval-date">Last evaluated {lastDate}</span>}
+        </div>
       </div>
       <div className="acc-eval-golden">
         <div className="acc-eval-circle-col">
