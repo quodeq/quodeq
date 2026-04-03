@@ -1393,6 +1393,18 @@
   border-color: color-mix(in srgb, var(--color-accent) 20%, transparent);
 }
 
+.folder-item.file-item {
+  opacity: 0.8;
+}
+
+.folder-item.file-item:hover {
+  opacity: 1;
+}
+
+.file-icon {
+  color: var(--color-text-muted);
+}
+
 .folder-icon {
   display: flex;
   align-items: center;

@@ -27,7 +27,8 @@ def _handle_browse(provider: ActionProvider) -> Response | tuple[Response, int]:
                 "FORBIDDEN",
             )
             return jsonify(body), status
-    payload = provider.browse_repo(path)
+    include_files = request.args.get("files", "").lower() in ("1", "true")
+    payload = provider.browse_repo(path, include_files=include_files)
     if "error" in payload:
         raw_error = payload["error"]
         is_not_dir = _BROWSE_NOT_A_DIR_KEYWORD in raw_error.lower()
