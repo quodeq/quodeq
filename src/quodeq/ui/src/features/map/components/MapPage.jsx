@@ -19,19 +19,39 @@ const VIZ_STYLES = [
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [open]);
+
   if (allDimensions.length <= 1) return null;
+
+  const activeCount = selectedDimensions.size === allDimensions.length ? allDimensions.length : selectedDimensions.size;
+  const label = activeCount === allDimensions.length ? 'All dimensions' : `${activeCount} of ${allDimensions.length}`;
+
   return (
-    <div className="map-pill-group map-dim-filter">
-      {allDimensions.map((dim) => (
-        <button
-          key={dim}
-          type="button"
-          className={`map-pill map-dim-pill${selectedDimensions.has(dim) ? ' active' : ''}`}
-          onClick={() => onToggle(dim)}
-        >
-          {dim}
-        </button>
-      ))}
+    <div className="map-filter-wrap" ref={ref}>
+      <button type="button" className="map-pill map-filter-btn" onClick={() => setOpen((v) => !v)}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
+        </svg>
+        {label}
+      </button>
+      {open && (
+        <div className="map-filter-dropdown">
+          {allDimensions.map((dim) => (
+            <label key={dim} className="map-filter-item">
+              <input type="checkbox" checked={selectedDimensions.has(dim)} onChange={() => onToggle(dim)} />
+              <span>{dim}</span>
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
