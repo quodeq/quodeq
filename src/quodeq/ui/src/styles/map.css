@@ -8,6 +8,17 @@
   overflow: hidden;
 }
 
+.map-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.map-header .map-controls {
+  margin-left: auto;
+}
+
 .map-total-count {
   font-size: 1rem;
   color: var(--color-text-muted);

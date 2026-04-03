@@ -213,13 +213,13 @@ export default function MapPage({ data, callbacks }) {
 
   return (
     <div className="map-page">
-      <div className="page-header">
+      <div className="map-header">
         <h2 className="page-title">Map</h2>
         <span className="map-total-count">
           <strong>{currentNode.violations}</strong> violation{currentNode.violations !== 1 ? 's' : ''} · <strong>{currentNode.compliance}</strong> compliance
         </span>
+        <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       </div>
-      <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       <MapBreadcrumb path={breadcrumb} onNavigate={handleBreadcrumbNav} onBack={handleBack} />
       <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} />
     </div>
