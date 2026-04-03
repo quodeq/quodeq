@@ -72,8 +72,8 @@ export default function SunburstView({ node, viewMode, onDrillDown }) {
   const rate = total > 0 ? ((node.compliance / total) * 100).toFixed(0) : '—';
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: 600, margin: '0 auto' }}>
-      <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', height: 'auto' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center' }}>
+      <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', maxWidth: 600, height: '100%' }}>
         {/* Center circle */}
         <circle cx={cx} cy={cy} r={unit * INNER_RADIUS} fill="var(--color-bg-elevated, #1e1e2e)" />
         <text x={cx} y={cy - 10} textAnchor="middle" dominantBaseline="central"

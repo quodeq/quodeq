@@ -171,8 +171,8 @@ export default function MapPage({ data, callbacks }) {
     <div className="map-page">
       <div className="page-header">
         <h2 className="page-title">Map</h2>
-        <span className="page-count">
-          {currentNode.violations} violation{currentNode.violations !== 1 ? 's' : ''} · {currentNode.compliance} compliance
+        <span className="map-total-count">
+          <strong>{currentNode.violations}</strong> violation{currentNode.violations !== 1 ? 's' : ''} · <strong>{currentNode.compliance}</strong> compliance
         </span>
       </div>
       <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />

@@ -80,7 +80,7 @@ export default function TreemapView({ node, viewMode, onDrillDown }) {
   };
 
   return (
-    <ResponsiveContainer width="100%" height={450}>
+    <ResponsiveContainer width="100%" height="100%">
       <Treemap
         data={treemapData}
         dataKey="size"

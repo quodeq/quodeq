@@ -4,6 +4,18 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  height: 100%;
+}
+
+.map-total-count {
+  font-size: 1rem;
+  color: var(--color-text-muted);
+}
+
+.map-total-count strong {
+  font-size: 1.15rem;
+  color: var(--color-text);
+  font-weight: 700;
 }
 
 /* ── Controls bar ────────────────────────────────────── */
@@ -110,7 +122,10 @@
 /* ── Visualization container ─────────────────────────── */
 
 .map-viz-container {
+  flex: 1;
   min-height: 400px;
+  height: calc(100vh - 280px);
+  overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-surface);

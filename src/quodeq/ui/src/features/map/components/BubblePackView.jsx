@@ -34,8 +34,8 @@ export default function BubblePackView({ node, viewMode, onDrillDown }) {
   if (!node) return null;
 
   return (
-    <div style={{ position: 'relative', width: '100%', maxWidth: 600, margin: '0 auto' }}>
-      <svg viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`} style={{ width: '100%', height: 'auto' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center' }}>
+      <svg viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`} style={{ width: '100%', maxWidth: 600, height: '100%' }}>
         {circles.map((c, i) => {
           const d = c.data;
           const isFolder = !d.isFile && d.children && d.children.length > 0;
