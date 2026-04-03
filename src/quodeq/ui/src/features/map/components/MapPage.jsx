@@ -12,10 +12,10 @@ const VIEW_MODES = [
 ];
 
 const VIZ_STYLES = [
-  { id: 'treemap', label: 'Treemap', enabled: true },
   { id: 'heatgrid', label: 'Heat Grid', enabled: true },
-  { id: 'sunburst', label: 'Sunburst', enabled: true },
   { id: 'bubbles', label: 'Bubbles', enabled: true },
+  { id: 'sunburst', label: 'Sunburst', enabled: true },
+  { id: 'treemap', label: 'Treemap', enabled: true },
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
@@ -205,7 +205,7 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
 export default function MapPage({ data, callbacks }) {
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
   const [viewMode, setViewMode] = useState('violations');
-  const [vizStyle, setVizStyle] = useState('treemap');
+  const [vizStyle, setVizStyle] = useState('heatgrid');
   const [currentPath, setCurrentPath] = useState('');
 
   // Get visible standards and available dimension names
