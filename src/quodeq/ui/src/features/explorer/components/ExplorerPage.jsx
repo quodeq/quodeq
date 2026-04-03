@@ -6,6 +6,7 @@ import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { gradeColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 
 const columnStyle = { display: 'flex', flexDirection: 'column', gap: 2 };
 
@@ -43,7 +44,7 @@ function computeComplianceByPrinciple(evalData) {
 
 function DimensionOverview({ data, stats, onNavigate }) {
   const { evalData, runId, dateLabel, allViolations } = data;
-  const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples } = stats;
+  const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples, principleGrades } = stats;
   return (
     <section className="acc-eval-panel acc-eval-panel--compact panel">
       <div className="acc-eval-top">
@@ -59,6 +60,11 @@ function DimensionOverview({ data, stats, onNavigate }) {
             onClick={() => copyToClipboard(buildDimensionPlanFromViolations(evalData.dimension, allViolations))}
           />
         )}
+        <CopyButton
+          label="Report"
+          className="fix-plan-btn-header"
+          onClick={() => copyToClipboard(buildDimensionReport(evalData, principleGrades || [], allViolations, overallGrade, dateLabel, runId))}
+        />
       </div>
       <div className="compact-stats-row">
         <div className="compact-score-col">
@@ -274,7 +280,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
     <>
       <DimensionOverview
         data={{ evalData: d.evalData, runId, dateLabel, allViolations: d.allViolations }}
-        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: d.topFiles, uniquePrinciples: d.uniquePrinciples }}
+        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: d.topFiles, uniquePrinciples: d.uniquePrinciples, principleGrades: d.principleGrades }}
         onNavigate={onNavigate}
       />
       <PrinciplesList evalData={d.evalData} principleGrades={d.principleGrades} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
