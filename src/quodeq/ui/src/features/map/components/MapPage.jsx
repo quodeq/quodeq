@@ -1,5 +1,6 @@
 import { useState, useMemo } from 'react';
 import { buildFileTree } from '../utils/fileTree.js';
+import TreemapView from './TreemapView.jsx';
 
 const VIEW_MODES = [
   { id: 'violations', label: 'Violations' },
@@ -105,7 +106,7 @@ export default function MapPage({ data, callbacks }) {
       <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} />
       <MapBreadcrumb path={breadcrumb} onNavigate={handleBreadcrumbNav} />
       <div className="map-viz-container">
-        {vizStyle === 'treemap' && <p className="empty-state">Treemap — next task</p>}
+        {vizStyle === 'treemap' && <TreemapView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
         {vizStyle === 'heatgrid' && <p className="empty-state">Heat Grid — next task</p>}
         {vizStyle === 'sunburst' && <p className="empty-state">Sunburst — coming soon</p>}
         {vizStyle === 'bubbles' && <p className="empty-state">Bubbles — coming soon</p>}
