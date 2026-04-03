@@ -16,6 +16,9 @@ PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
     "copilot": ("GITHUB_TOKEN", "copilot"),
     "codex": ("CODEX_API_KEY", "codex"),
+    "ollama": ("", "ollama"),
+    "openrouter": ("OPENROUTER_API_KEY", "openrouter"),
+    "custom": ("AI_API_KEY", "custom"),
 }
 
 
@@ -91,7 +94,8 @@ def _ensure_gitignore(paths: ConfigPaths) -> None:
 def configure_provider_noninteractive(provider: str, paths: ConfigPaths) -> int:
     """Write the chosen AI provider to the env file without interactive prompts."""
     if provider not in PROVIDERS:
-        log_error(f"Invalid provider: {provider}. Expected: claude, copilot, or codex.")
+        valid = ", ".join(sorted(PROVIDERS.keys()))
+        log_error(f"Invalid provider: {provider}. Expected one of: {valid}")
         return 1
     api_key_var, _ = PROVIDERS[provider]
     api_key_value = ""
