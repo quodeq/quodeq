@@ -55,46 +55,50 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, zoom = 1
         style={{ width: viewSize, height: viewSize, maxWidth: 'none', overflow: 'hidden' }}
         onClick={handleBgClick}
       >
+        {/* Layer 1: circles */}
         {circles.map((c, i) => {
           const d = c.data;
           const isFolder = !d.isFile && d.children?.length > 0;
           const isRoot = c.depth === 0;
           const t = transform(c);
-          // Only show labels at current level: direct children of the focused node
-          const showLabel = t.r > 10 && c.parent === focusNode;
           const isHovered = hover === i;
           return (
-            <g
+            <circle
               key={d.path || i}
+              cx={t.cx} cy={t.cy} r={t.r}
+              fill={isRoot ? 'var(--color-bg-elevated, #1e1e2e)' : nodeColor(d, viewMode)}
+              stroke={isFolder ? 'var(--color-border, #444)' : 'none'}
+              strokeWidth={isFolder ? 1.5 : 0}
+              fillOpacity={isFolder && !isRoot ? 0.2 : isHovered ? 1 : 0.82}
+              style={{ cursor: isFolder ? 'pointer' : 'default', transition: 'cx 0.5s ease, cy 0.5s ease, r 0.5s ease, fill-opacity 0.15s' }}
               onClick={(e) => handleClick(e, c)}
               onMouseEnter={() => setHover(i)}
               onMouseLeave={() => setHover(null)}
-              style={{ cursor: isFolder ? 'pointer' : 'default' }}
+            />
+          );
+        })}
+        {/* Layer 2: labels on top of all circles */}
+        {circles.map((c, i) => {
+          const d = c.data;
+          const isFolder = !d.isFile && d.children?.length > 0;
+          const t = transform(c);
+          if (!(t.r > 10 && c.parent === focusNode)) return null;
+          return (
+            <text
+              key={'lbl-' + (d.path || i)}
+              x={t.cx} y={t.cy - t.r - 4}
+              textAnchor="middle" dominantBaseline="auto"
+              style={{
+                fontSize: Math.min(11, Math.max(8, t.r / 4)),
+                fill: 'var(--color-text, #f0ece6)',
+                pointerEvents: 'none',
+                fontWeight: isFolder ? 600 : 400,
+                textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+                transition: 'x 0.5s ease, y 0.5s ease, font-size 0.5s ease',
+              }}
             >
-              <circle
-                cx={t.cx} cy={t.cy} r={t.r}
-                fill={isRoot ? 'var(--color-bg-elevated, #1e1e2e)' : nodeColor(d, viewMode)}
-                stroke={isFolder ? 'var(--color-border, #444)' : 'none'}
-                strokeWidth={isFolder ? 1.5 : 0}
-                fillOpacity={isFolder && !isRoot ? 0.2 : isHovered ? 1 : 0.82}
-                style={{ transition: 'cx 0.5s ease, cy 0.5s ease, r 0.5s ease, fill-opacity 0.15s' }}
-              />
-              {showLabel && (
-                <text
-                  x={t.cx} y={t.cy - t.r - 4}
-                  textAnchor="middle" dominantBaseline="auto"
-                  style={{
-                    fontSize: Math.min(11, Math.max(8, t.r / 4)),
-                    fill: 'var(--color-text-muted, #9a9490)',
-                    pointerEvents: 'none',
-                    fontWeight: isFolder ? 600 : 400,
-                    transition: 'x 0.5s ease, y 0.5s ease, font-size 0.5s ease',
-                  }}
-                >
-                  {d.name}
-                </text>
-              )}
-            </g>
+              {d.name}
+            </text>
           );
         })}
       </svg>
