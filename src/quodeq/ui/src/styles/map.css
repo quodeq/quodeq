@@ -4,22 +4,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  flex: 1;
-  min-height: 0;
-  overflow: hidden;
-}
-
-/* Ensure parent chain propagates height for map tab */
-.dashboard:has(.map-page) {
-  height: 100vh;
-  overflow: hidden;
-}
-
-.dashboard:has(.map-page) > .tab-fade {
-  flex: 1;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
 }
 
 .map-header {
@@ -198,70 +182,12 @@
 /* ── Visualization container ─────────────────────────── */
 
 .map-viz-container {
-  flex: 1;
-  min-height: 0;
+  min-height: 400px;
   overflow: auto;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-surface);
   padding: var(--space-4);
-  animation: tab-fadein 300ms ease;
-  position: relative;
-}
-
-.map-viz-inner {
-  width: 100%;
-  height: 100%;
-  transition: transform 150ms ease;
-}
-
-/* ── Zoom controls ──────────────────────────────────── */
-
-.map-zoom-controls {
-  position: absolute;
-  top: var(--space-3);
-  right: var(--space-3);
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  z-index: 10;
-  background: var(--color-surface-alt);
-  border: 1px solid var(--color-border);
-  border-radius: 6px;
-  padding: 2px;
-}
-
-.map-zoom-btn {
-  width: 28px;
-  height: 28px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--color-text-muted);
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 120ms ease;
-}
-
-.map-zoom-btn:hover {
-  background: var(--color-surface);
-  color: var(--color-text);
-}
-
-.map-zoom-reset {
-  font-size: 0.85rem;
-}
-
-.map-zoom-label {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  padding: 0 6px;
-  min-width: 36px;
-  text-align: center;
 }
 
 /* ── Tooltip ─────────────────────────────────────────── */

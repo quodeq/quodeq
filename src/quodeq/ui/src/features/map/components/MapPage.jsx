@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useState, useMemo, useRef, useEffect } from 'react';
 import { buildFileTree } from '../utils/fileTree.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import HeatGridView from './HeatGridView.jsx';
@@ -146,58 +146,13 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-const ZOOM_STEP = 0.2;
-const ZOOM_MIN = 0.4;
-const ZOOM_MAX = 3;
-
-function ZoomControls({ zoom, setZoom }) {
-  return (
-    <div className="map-zoom-controls">
-      <button type="button" className="map-zoom-btn" onClick={() => setZoom((z) => Math.min(ZOOM_MAX, z + ZOOM_STEP))} title="Zoom in">+</button>
-      <button type="button" className="map-zoom-btn" onClick={() => setZoom((z) => Math.max(ZOOM_MIN, z - ZOOM_STEP))} title="Zoom out">−</button>
-      <button type="button" className="map-zoom-btn map-zoom-reset" onClick={() => setZoom(1)} title="Reset zoom">⟳</button>
-      <span className="map-zoom-label">{Math.round(zoom * 100)}%</span>
-    </div>
-  );
-}
-
 function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
-  const ref = useRef(null);
-  const [height, setHeight] = useState(400);
-  const [zoom, setZoom] = useState(1);
-  const showZoom = vizStyle !== 'heatgrid';
-
-  // Reset zoom when switching viz style
-  useEffect(() => setZoom(1), [vizStyle]);
-
-  useEffect(() => {
-    if (!ref.current) return;
-    const observer = new ResizeObserver(([entry]) => {
-      const h = Math.floor(entry.contentRect.height);
-      if (h > 0) setHeight(h);
-    });
-    observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, []);
-
-  // Mouse wheel zoom for SVG views
-  const handleWheel = useCallback((e) => {
-    if (!showZoom) return;
-    if (e.ctrlKey || e.metaKey) {
-      e.preventDefault();
-      setZoom((z) => Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z + (e.deltaY < 0 ? ZOOM_STEP : -ZOOM_STEP))));
-    }
-  }, [showZoom]);
-
   return (
-    <div ref={ref} className="map-viz-container" onWheel={handleWheel}>
-      {showZoom && <ZoomControls zoom={zoom} setZoom={setZoom} />}
-      <div className="map-viz-inner">
-        {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-        {vizStyle === 'force' && <ForceGraphView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
-        {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
-        {vizStyle === 'radialtree' && <RadialTreeView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
-      </div>
+    <div className="map-viz-container">
+      {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+      {vizStyle === 'force' && <ForceGraphView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+      {vizStyle === 'radialtree' && <RadialTreeView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
     </div>
   );
 }
