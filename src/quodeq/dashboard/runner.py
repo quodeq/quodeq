@@ -1,74 +1,34 @@
-"""Dashboard runner — builds the UI, starts the action API, and serves the dashboard.
+"""Dashboard runner — entry point that resolves paths, launches the action API, and serves.
 
-Key functions and their contracts:
-- validate_paths: verifies required directories/files exist before serving.
-- _kill_stale_action_api: terminates a previously-recorded action API process via
-  PID file; waits up to _STALE_KILL_DEADLINE_S for the port to free.
-- _ensure_action_api: finds a free port, spawns the action API, and waits for it
-  to become healthy; returns (base_url, process) or (base_url, None) if already up.
-- _ensure_action_api_forced: like _ensure_action_api but uses an exact port; raises
-  RuntimeError if the port is occupied by a non-healthy process.
+Sub-modules:
+- _networking: host/port utilities
+- _process: PID tracking, stale-process cleanup
+- _server: API startup and serve-and-wait loop
 """
 from __future__ import annotations
 
-import logging
-import os
-import signal
-import socket
-import subprocess
-import sys
-import threading
-import time
-import webbrowser
-from pathlib import Path
-
-from quodeq.dashboard._api_health import ApiConfig, action_api_healthy, spawn_and_wait
+from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._build import maybe_build_ui
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
-from quodeq.shared.logging import log_debug, log_info, log_success, log_warning
-from quodeq.shared.paths import resolve_path
+from quodeq.dashboard._networking import _choose_ui_port, _is_port_open
+from quodeq.dashboard._process import _kill_stale_action_api
+from quodeq.dashboard._server import (
+    _ensure_action_api,
+    _ensure_action_api_forced,
+    _serve_and_wait,
+)
 from quodeq.shared.config_loader import get_default_host as _get_default_host
+from quodeq.shared.logging import log_info, log_warning
+from quodeq.shared.paths import resolve_path
 from quodeq.shared.prereqs import check_dashboard_prereqs
-from quodeq.shared.utils import IS_WIN32
 
-
-_DEFAULT_LOCAL_HOSTS = frozenset({"127.0.0.1", "localhost", "::1", "0.0.0.0"})
-
-
-def _local_hosts(
-    env: dict[str, str] | None = None,
-    defaults: frozenset[str] | None = None,
-) -> frozenset[str]:
-    extra = (env if env is not None else os.environ).get("QUODEQ_LOCAL_HOSTS", "")
-    base = set(defaults or _DEFAULT_LOCAL_HOSTS)
-    if extra:
-        base.update(h.strip() for h in extra.split(",") if h.strip())
-    return frozenset(base)
-
-_MAX_PORT_SCAN_TRIES = 20
-
-
-def _terminate_pid(pid: int) -> None:
-    """Send a termination signal to a process, platform-aware."""
-    os.kill(pid, signal.SIGTERM if not IS_WIN32 else signal.CTRL_BREAK_EVENT)
-
-
-def _get_pid_file(env: dict[str, str] | None = None) -> Path:
-    """Return a PID file path in a user-private runtime directory.
-
-    Override the default location via ``QUODEQ_RUN_DIR``.
-    """
-    env_run_dir = (env or os.environ).get("QUODEQ_RUN_DIR")
-    run_dir = Path(env_run_dir) if env_run_dir else Path.home() / ".quodeq" / "run"
-    run_dir.mkdir(parents=True, exist_ok=True)
-    return run_dir / "action_api.pid"
-
-
-_PORT_CHECK_TIMEOUT_S = 2
-_POLL_INTERVAL_S = 0.1
-_PROCESS_WAIT_TIMEOUT_S = 5
-_MAX_PORT = 65535
-_STALE_KILL_DEADLINE_S = 3
+__all__ = [
+    "BuildConfig",
+    "DashboardConfig",
+    "ServerConfig",
+    "run_dashboard",
+    "validate_paths",
+]
 
 
 def validate_paths(config: DashboardConfig) -> None:
@@ -85,94 +45,6 @@ def validate_paths(config: DashboardConfig) -> None:
         raise FileNotFoundError("Static dist missing index.html. Run without --no-build to build.")
 
 
-def _is_port_open(host: str, port: int) -> bool:
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-        sock.settimeout(_PORT_CHECK_TIMEOUT_S)
-        return sock.connect_ex((host, port)) == 0
-
-
-def _choose_ui_port(start: int, host: str | None = None) -> int:
-    host = host if host is not None else _get_default_host()
-    port = start
-    while _is_port_open(host, port):
-        port += 1
-        if port > _MAX_PORT:
-            raise RuntimeError("No free port available.")
-    return port
-
-
-def _kill_stale_action_api(host: str, port: int) -> None:
-    """Kill any lingering action API processes using PID file tracking."""
-    pid_file = _get_pid_file()
-    if pid_file.exists():
-        try:
-            pid = int(pid_file.read_text().strip())
-            _terminate_pid(pid)
-        except (ValueError, OSError) as exc:
-            log_debug(f"Could not kill stale action API (pid file): {exc}")
-        try:
-            pid_file.unlink(missing_ok=True)
-        except OSError as exc:
-            log_debug(f"Could not remove stale PID file: {exc}")
-    deadline = time.monotonic() + _STALE_KILL_DEADLINE_S
-    while _is_port_open(host, port) and time.monotonic() < deadline:
-        time.sleep(_POLL_INTERVAL_S)
-
-
-def _spawn_and_wait_local(port: int, base_url: str, api_config: ApiConfig | None = None) -> tuple[str, subprocess.Popen]:
-    """Spawn the action API on *port* and wait for it to become healthy."""
-    return spawn_and_wait(port, base_url, _get_pid_file(), _get_default_host(), api_config)
-
-
-def _allow_plaintext_http(override: bool | None = None, env: dict[str, str] | None = None) -> bool:
-    """Return True if plaintext HTTP to non-localhost is allowed."""
-    if override is not None:
-        return override
-    return (env or os.environ).get("QUODEQ_ALLOW_PLAINTEXT_HTTP") == "1"
-
-
-def _ensure_action_api(
-    host: str,
-    start_port: int,
-    max_tries: int = _MAX_PORT_SCAN_TRIES,
-    api_config: ApiConfig | None = None,
-) -> tuple[str, subprocess.Popen | None]:
-    cfg = api_config or ApiConfig()
-    if host not in _local_hosts():
-        if _allow_plaintext_http(cfg.allow_plaintext):
-            logging.getLogger(__name__).warning(
-                "API traffic to %s uses plaintext HTTP; use a TLS reverse proxy for remote hosts", host,
-            )
-        else:
-            raise RuntimeError(
-                f"Plaintext HTTP to non-localhost host {host!r} is not allowed. "
-                "Set QUODEQ_ALLOW_PLAINTEXT_HTTP=1 to explicitly opt in, "
-                "or use a TLS reverse proxy."
-            )
-    for port in range(start_port, start_port + max_tries):
-        base_url = f"http://{host}:{port}"
-        if _is_port_open(host, port):
-            if action_api_healthy(base_url):
-                return base_url, None
-            continue
-        return _spawn_and_wait_local(port, base_url, cfg)
-    raise RuntimeError("Unable to find a free port for Action API.")
-
-
-def _ensure_action_api_forced(
-    host: str,
-    port: int,
-    static_dist: Path | None = None,
-    evaluations_dir: str | None = None,
-) -> tuple[str, subprocess.Popen | None]:
-    base_url = f"http://{host}:{port}"
-    if _is_port_open(host, port):
-        if action_api_healthy(base_url):
-            return base_url, None
-        raise RuntimeError(f"Port {port} on {host} is in use and not a healthy Action API.")
-    return _spawn_and_wait_local(port, base_url, ApiConfig(static_dist=static_dist, evaluations_dir=evaluations_dir))
-
-
 def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     """Resolve paths, check prerequisites, build UI if needed, choose a free port."""
     reports_dir = resolve_path(str(config.reports_dir))
@@ -182,7 +54,6 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     if chosen_port != config.server.port:
         log_warning(f"Port {config.server.port} is in use. Using {chosen_port} instead.")
 
-    # --dev always builds from repo source; otherwise check for existing build.
     if config.build.dev:
         check_dashboard_prereqs()
         static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall, dev=True)
@@ -210,56 +81,12 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     )
 
 
-def _wait_for_process(proc: subprocess.Popen) -> None:
-    """Block until *proc* terminates, polling every 5 seconds."""
-    while proc.poll() is None:
-        try:
-            proc.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
-        except subprocess.TimeoutExpired:
-            pass
-
-
-def _serve_and_wait(action_api_url: str, action_api_process: subprocess.Popen | None, config: DashboardConfig) -> None:
-    """Open browser, register signal handlers, and block until exit."""
-    log_success(f"Dashboard running at {action_api_url}")
-
-    if config.build.open_browser:
-        webbrowser.open(action_api_url)
-
-    def _stop_children() -> None:
-        if action_api_process and action_api_process.poll() is None:
-            action_api_process.terminate()
-            try:
-                action_api_process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
-            except subprocess.TimeoutExpired:
-                action_api_process.kill()
-
-    def _handle_tstp(_signum, _frame) -> None:
-        _stop_children()
-        sys.exit(0)
-
-    if hasattr(signal, "SIGTSTP"):
-        signal.signal(signal.SIGTSTP, _handle_tstp)
-
-    try:
-        if action_api_process:
-            _wait_for_process(action_api_process)
-        elif IS_WIN32:
-            threading.Event().wait()
-        else:
-            signal.pause()
-    except KeyboardInterrupt:
-        pass
-    finally:
-        _stop_children()
-
-
 def _start_action_api(
     config: DashboardConfig,
     action_api_host: str,
     action_api_port: int,
     api_config: ApiConfig,
-) -> tuple[str, subprocess.Popen | None]:
+) -> tuple[str, "subprocess.Popen | None"]:
     """Resolve and start the action API, returning (url, process).
 
     Handles both forced-port and auto-scan modes, including killing stale
