@@ -6,6 +6,7 @@ import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { gradeColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
+import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 
 const columnStyle = { display: 'flex', flexDirection: 'column', gap: 2 };
 
@@ -43,7 +44,7 @@ function computeComplianceByPrinciple(evalData) {
 
 function DimensionOverview({ data, stats, onNavigate }) {
   const { evalData, runId, dateLabel, allViolations } = data;
-  const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples } = stats;
+  const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples, principleGrades } = stats;
   return (
     <section className="acc-eval-panel acc-eval-panel--compact panel">
       <div className="acc-eval-top">
@@ -51,14 +52,21 @@ function DimensionOverview({ data, stats, onNavigate }) {
           <span className="explorer-dimension-title">{evalData.dimension}</span>
           {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
         </div>
-        {allViolations.length > 0 && (
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
           <CopyButton
-            label="Full fix plan"
+            label="Report"
             className="fix-plan-btn-header"
-            icon={<SparkleIcon />}
-            onClick={() => copyToClipboard(buildDimensionPlanFromViolations(evalData.dimension, allViolations))}
+            onClick={() => copyToClipboard(buildDimensionReport(evalData, principleGrades || [], allViolations, overallGrade, dateLabel, runId))}
           />
-        )}
+          {allViolations.length > 0 && (
+            <CopyButton
+              label="Full fix plan"
+              className="fix-plan-btn-header"
+              icon={<SparkleIcon />}
+              onClick={() => copyToClipboard(buildDimensionPlanFromViolations(evalData.dimension, allViolations))}
+            />
+          )}
+        </div>
       </div>
       <div className="compact-stats-row">
         <div className="compact-score-col">
@@ -274,7 +282,7 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, onN
     <>
       <DimensionOverview
         data={{ evalData: d.evalData, runId, dateLabel, allViolations: d.allViolations }}
-        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: d.topFiles, uniquePrinciples: d.uniquePrinciples }}
+        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: d.topFiles, uniquePrinciples: d.uniquePrinciples, principleGrades: d.principleGrades }}
         onNavigate={onNavigate}
       />
       <PrinciplesList evalData={d.evalData} principleGrades={d.principleGrades} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />

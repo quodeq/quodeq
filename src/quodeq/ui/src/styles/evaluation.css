@@ -1996,7 +1996,6 @@
   cursor: pointer;
   white-space: nowrap;
   flex-shrink: 0;
-  align-self: flex-start;
   transition: all 150ms ease;
 }
 .fix-plan-btn-header:hover {
