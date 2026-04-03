@@ -85,14 +85,31 @@ export default function RiskMatrixView({ node, viewMode, onDrillDown }) {
                 <animate attributeName="r" values={`${r + 2};${r + 8};${r + 2}`} dur="2s" repeatCount="indefinite" />
                 <animate attributeName="opacity" values="0.3;0.1;0.3" dur="2s" repeatCount="indefinite" />
               </circle>}
-              <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.8}
-                stroke="rgba(255,255,255,0.2)" strokeWidth={1.5}
-                filter={tip?.name === child.name ? 'url(#glow)' : undefined}
-                style={{ cursor: canDrill ? 'pointer' : 'default', transition: 'r 0.2s ease, fill-opacity 0.2s ease' }}
-                onMouseEnter={(e) => setTip({ x: e.clientX, y: e.clientY, child })}
-                onMouseMove={(e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
-                onMouseLeave={() => setTip(null)}
-                onClick={() => canDrill && onDrillDown?.(child.path)} />
+              {canDrill ? (
+                /* Folder: rounded rectangle */
+                <>
+                  <rect x={cx - r} y={cy - r * 0.8} width={r * 2} height={r * 1.6} rx={4}
+                    fill={color} fillOpacity={0.8} stroke="rgba(255,255,255,0.25)" strokeWidth={1.5}
+                    filter={tip?.name === child.name ? 'url(#glow)' : undefined}
+                    style={{ cursor: 'pointer', transition: 'fill-opacity 0.2s ease' }}
+                    onMouseEnter={(e) => setTip({ x: e.clientX, y: e.clientY, child })}
+                    onMouseMove={(e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
+                    onMouseLeave={() => setTip(null)}
+                    onClick={() => onDrillDown?.(child.path)} />
+                  {/* Folder tab */}
+                  <rect x={cx - r} y={cy - r * 0.8 - 4} width={r * 0.7} height={5} rx={2}
+                    fill={color} fillOpacity={0.6} style={{ pointerEvents: 'none' }} />
+                </>
+              ) : (
+                /* File: circle */
+                <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.8}
+                  stroke="rgba(255,255,255,0.2)" strokeWidth={1.5}
+                  filter={tip?.name === child.name ? 'url(#glow)' : undefined}
+                  style={{ cursor: 'default', transition: 'fill-opacity 0.2s ease' }}
+                  onMouseEnter={(e) => setTip({ x: e.clientX, y: e.clientY, child })}
+                  onMouseMove={(e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
+                  onMouseLeave={() => setTip(null)} />
+              )}
               {r > 14 && (
                 <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="central"
                   fontSize={Math.min(10, r / 2)} fill="#fff" fontWeight="600" style={{ pointerEvents: 'none' }}>
