@@ -10,8 +10,8 @@ import { useEvaluationLifecycle } from './useEvaluationLifecycle.js';
 import { useProjectActions } from './useProjectActions.js';
 import { useVisibleRuns } from './useVisibleRuns.js';
 
-export const KNOWN_TABS = ['overview', 'violations', 'history', 'projects', 'evaluate', 'standards', 'settings'];
-export const PROJECT_TABS = KNOWN_TABS.slice(0, 3);
+export const KNOWN_TABS = ['overview', 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'settings'];
+export const PROJECT_TABS = KNOWN_TABS.slice(0, 4);
 
 function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
   const accDims = accumulated?.dimensions || [];
