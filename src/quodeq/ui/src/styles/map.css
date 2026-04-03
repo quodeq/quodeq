@@ -4,8 +4,22 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  height: calc(100vh - 90px);
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
+}
+
+/* Ensure parent chain propagates height for map tab */
+.dashboard:has(.map-page) {
+  height: 100vh;
+  overflow: hidden;
+}
+
+.dashboard:has(.map-page) > .tab-fade {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 .map-header {
