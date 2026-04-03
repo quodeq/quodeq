@@ -181,7 +181,7 @@ export default function MapPage({ data, callbacks }) {
   const setViewMode = (v) => { _savedViewMode = v; _setViewMode(v); };
   const [vizStyle, _setVizStyle] = useState(_savedVizStyle);
   const setVizStyle = (v) => { _savedVizStyle = v; _setVizStyle(v); };
-  const [showLabels, setShowLabels] = useState(true);
+  const [showLabels, setShowLabels] = useState(false);
   const [currentPath, _setCurrentPath] = useState(_savedMapPath);
   const setCurrentPath = (p) => { _savedMapPath = p; _setCurrentPath(p); };
 

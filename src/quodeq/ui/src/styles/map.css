@@ -358,8 +358,31 @@
 }
 
 .map-label-toggle input[type="checkbox"] {
-  accent-color: var(--color-accent);
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
+  border-radius: 3px;
+  background: transparent;
   cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.map-label-toggle input[type="checkbox"]:checked {
+  background: var(--color-accent);
+}
+
+.map-label-toggle input[type="checkbox"]:checked::after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 1px;
+  width: 5px;
+  height: 8px;
+  border: solid var(--color-surface);
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
 }
 
 .heat-grid-dim-row {
