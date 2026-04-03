@@ -155,6 +155,15 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
 }
 
 export default function MapPage({ data, callbacks }) {
+  // Lock parent to viewport height while map is active
+  useEffect(() => {
+    const dashboard = document.querySelector('.dashboard');
+    if (dashboard) {
+      dashboard.classList.add('dashboard--fullheight');
+      return () => dashboard.classList.remove('dashboard--fullheight');
+    }
+  }, []);
+
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
   const [viewMode, setViewMode] = useState('violations');
   const [vizStyle, setVizStyle] = useState('heatgrid');
