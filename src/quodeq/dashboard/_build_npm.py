@@ -8,6 +8,8 @@ from pathlib import Path
 
 from quodeq.shared.logging import log_info
 
+from quodeq.dashboard._build_hash import _SYNC_ITEMS
+
 _NPM_INSTALL_TIMEOUT_S = 300
 _NPM_BUILD_TIMEOUT_S = 600
 
@@ -38,10 +40,6 @@ def _get_ui_source_dir() -> Path:
     return Path(__file__).resolve().parent.parent / "ui"
 
 
-# Files and directories to sync from package source to build workdir
-_SYNC_ITEMS = ("src", "public", "package.json", "package-lock.json", ".npmrc", "vite.config.js", "index.html")
-
-
 def sync_source_to_workdir(source_dir: Path, workdir: Path) -> None:
     """Selectively copy source files to the build working directory.
 
@@ -61,24 +59,13 @@ def sync_source_to_workdir(source_dir: Path, workdir: Path) -> None:
             shutil.copy2(src_item, dst_item)
 
 
-def _needs_npm_install(workdir: Path) -> bool:
-    """Return True if npm install is needed (node_modules missing)."""
-    return not (workdir / "node_modules").is_dir()
-
-
-def _npm_cmd() -> str:
-    """Resolve the npm executable path."""
+def run_npm_build(workdir: Path, static_dir: Path) -> None:
+    """Run npm install (if needed) and npm run build."""
     npm = shutil.which("npm")
     if npm is None:
         raise FileNotFoundError("npm not found on PATH")
-    return npm
 
-
-def run_npm_build(workdir: Path, static_dir: Path) -> None:
-    """Run npm install (if needed) and npm run build."""
-    npm = _npm_cmd()
-
-    if _needs_npm_install(workdir):
+    if not (workdir / "node_modules").is_dir():
         log_info("Installing npm dependencies...")
         subprocess.run([npm, "install"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
     else:
