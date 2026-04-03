@@ -3,9 +3,9 @@ import { hierarchy, pack } from 'd3-hierarchy';
 import { nodeColor, nodeSize } from '../utils/mapColors.js';
 
 const MAX_DEPTH = 3;
-const VIEW_SIZE = 500;
+const BASE_SIZE = 500;
 
-export default function BubblePackView({ node, viewMode, onDrillDown }) {
+export default function BubblePackView({ node, viewMode, onDrillDown, zoom = 1 }) {
   const [hover, setHover] = useState(null);
 
   const circles = useMemo(() => {
@@ -20,11 +20,14 @@ export default function BubblePackView({ node, viewMode, onDrillDown }) {
 
     if (!root.value) return []; // nothing to pack
 
-    const layout = pack().size([VIEW_SIZE, VIEW_SIZE]).padding(4);
+    const viewSize = Math.round(BASE_SIZE * zoom);
+    const layout = pack().size([viewSize, viewSize]).padding(4);
     layout(root);
     return root.descendants()
       .filter((c) => c.depth <= MAX_DEPTH && c.r > 0 && !isNaN(c.r));
-  }, [node, viewMode]);
+  }, [node, viewMode, zoom]);
+
+  const viewSize = Math.round(BASE_SIZE * zoom);
 
   const handleClick = useCallback(
     (n) => { if (!n.isFile && n.children && n.children.length > 0) onDrillDown(n.path); },
@@ -34,8 +37,8 @@ export default function BubblePackView({ node, viewMode, onDrillDown }) {
   if (!node) return null;
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center' }}>
-      <svg viewBox={`0 0 ${VIEW_SIZE} ${VIEW_SIZE}`} style={{ width: '100%', maxWidth: 600, height: '100%' }}>
+    <div style={{ position: 'relative', width: '100%', display: 'flex', justifyContent: 'center' }}>
+      <svg viewBox={`0 0 ${viewSize} ${viewSize}`} style={{ width: viewSize, height: viewSize, maxWidth: 'none' }}>
         {circles.map((c, i) => {
           const d = c.data;
           const isFolder = !d.isFile && d.children && d.children.length > 0;

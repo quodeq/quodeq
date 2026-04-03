@@ -164,11 +164,11 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
   return (
     <div ref={ref} className="map-viz-container" onWheel={handleWheel}>
       {showZoom && <ZoomControls zoom={zoom} setZoom={setZoom} />}
-      <div className="map-viz-inner" style={showZoom ? { transform: `scale(${zoom})`, transformOrigin: 'center top' } : undefined}>
-        {vizStyle === 'treemap' && <TreemapView node={node} viewMode={viewMode} onDrillDown={onDrillDown} containerHeight={Math.round(height / zoom)} />}
+      <div className="map-viz-inner">
+        {vizStyle === 'treemap' && <TreemapView node={node} viewMode={viewMode} onDrillDown={onDrillDown} containerHeight={Math.round(height * zoom)} />}
         {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-        {vizStyle === 'sunburst' && <SunburstView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-        {vizStyle === 'bubbles' && <BubblePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+        {vizStyle === 'sunburst' && <SunburstView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
+        {vizStyle === 'bubbles' && <BubblePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
       </div>
     </div>
   );

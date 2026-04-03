@@ -50,7 +50,7 @@ function flatten(node, viewMode, depth, startAngle, endAngle) {
   return arcs;
 }
 
-export default function SunburstView({ node, viewMode, onDrillDown }) {
+export default function SunburstView({ node, viewMode, onDrillDown, zoom = 1 }) {
   const [hover, setHover] = useState(null);
 
   const arcs = useMemo(
@@ -65,7 +65,7 @@ export default function SunburstView({ node, viewMode, onDrillDown }) {
 
   if (!node) return null;
 
-  const size = 500;
+  const size = Math.round(500 * zoom);
   const cx = size / 2, cy = size / 2;
   const unit = size / 2;
   const total = node.violations + node.compliance;
@@ -73,7 +73,7 @@ export default function SunburstView({ node, viewMode, onDrillDown }) {
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%', display: 'flex', justifyContent: 'center' }}>
-      <svg viewBox={`0 0 ${size} ${size}`} style={{ width: '100%', maxWidth: 600, height: '100%' }}>
+      <svg viewBox={`0 0 ${size} ${size}`} style={{ width: size, height: size, maxWidth: 'none' }}>
         {/* Center circle */}
         <circle cx={cx} cy={cy} r={unit * INNER_RADIUS} fill="var(--color-bg-elevated, #1e1e2e)" />
         <text x={cx} y={cy - 10} textAnchor="middle" dominantBaseline="central"
