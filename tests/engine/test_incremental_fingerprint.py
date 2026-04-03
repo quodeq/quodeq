@@ -10,9 +10,9 @@ from quodeq.analysis._backfill import run_backfill_phase, BackfillContext
 
 
 class TestSaveDimensionFingerprintJsonlUnion:
-    @patch("quodeq.analysis._incremental._list_source_files")
-    @patch("quodeq.analysis._incremental.save_fingerprint")
-    @patch("quodeq.analysis._incremental.build_fingerprint")
+    @patch("quodeq.analysis._incremental_evidence._list_source_files")
+    @patch("quodeq.analysis._incremental_evidence.save_fingerprint")
+    @patch("quodeq.analysis._incremental_evidence.build_fingerprint")
     def test_includes_files_from_jsonl_not_in_queue(
         self, mock_build, mock_save, mock_list_files, tmp_path,
     ):
@@ -52,9 +52,9 @@ class TestSaveDimensionFingerprintJsonlUnion:
         assert "b.py" in analyzed
         assert "c.py" not in analyzed  # not in queue or JSONL
 
-    @patch("quodeq.analysis._incremental._list_source_files")
-    @patch("quodeq.analysis._incremental.save_fingerprint")
-    @patch("quodeq.analysis._incremental.build_fingerprint")
+    @patch("quodeq.analysis._incremental_evidence._list_source_files")
+    @patch("quodeq.analysis._incremental_evidence.save_fingerprint")
+    @patch("quodeq.analysis._incremental_evidence.build_fingerprint")
     def test_no_duplicates_in_union(
         self, mock_build, mock_save, mock_list_files, tmp_path,
     ):
