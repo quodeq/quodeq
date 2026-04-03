@@ -5,7 +5,7 @@
 | Layer | Purpose | Dependencies |
 |-------|---------|--------------|
 | `core/` | Domain logic: evidence models, scoring algorithms, standards definitions, type definitions | None (stdlib only) |
-| `engine/` | Infrastructure and execution: pipeline orchestration, markers, runner utilities | core/ |
+| `engine/` | Infrastructure and execution: pipeline orchestration, markers, runner utilities | core/, analysis/ |
 | `data/` | Data access: filesystem repositories, web API clients, report parsers | core/ |
 | `services/` | Business logic: dashboard, accumulated views, dismissals, standards CRUD | core/, data/ (via `services/ports.py`) |
 | `api/` | HTTP layer: Flask routes, security, rate limiting | core/, services/ |
@@ -18,7 +18,7 @@
 
 ```
 core/          -> stdlib, core/ only
-engine/        -> stdlib, core/
+engine/        -> stdlib, core/, analysis/
 data/          -> stdlib, core/
 services/      -> stdlib, core/, data/ (via services/ports.py)
 api/           -> stdlib, core/, services/

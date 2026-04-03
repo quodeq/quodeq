@@ -6,7 +6,7 @@ from pathlib import Path
 
 LAYER_RULES = {
     "core": {"core"},
-    "engine": {"core"},
+    "engine": {"core", "analysis"},
     "data": {"core"},
     "services": {"core", "data"},
     "api": {"core", "services"},
