@@ -92,7 +92,7 @@ class TestScoutThenScale:
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _fake_run_analysis):
             results = pool.run()
 
         assert len(results) == 1
@@ -109,7 +109,7 @@ class TestScoutThenScale:
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _fake_run_analysis):
             results = pool.run()
 
         assert len(results) > 1
@@ -126,7 +126,7 @@ class TestScoutThenScale:
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
-        with patch("quodeq.analysis.subagents.pool.run_analysis", _fake_run_analysis):
+        with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _fake_run_analysis):
             results = pool.run()
 
         # All 3 agents should have run (not just scout + scale-up)
