@@ -81,13 +81,13 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, zoom = 1
               />
               {showLabel && (
                 <text
-                  x={t.cx} y={t.cy}
-                  textAnchor="middle" dominantBaseline="central"
+                  x={t.cx} y={t.cy - t.r - 4}
+                  textAnchor="middle" dominantBaseline="auto"
                   style={{
-                    fontSize: Math.min(13, t.r / 3),
-                    fill: 'var(--color-text, #fff)',
+                    fontSize: Math.min(11, Math.max(8, t.r / 4)),
+                    fill: 'var(--color-text-muted, #9a9490)',
                     pointerEvents: 'none',
-                    fontWeight: isFolder ? 700 : 400,
+                    fontWeight: isFolder ? 600 : 400,
                     transition: 'x 0.5s ease, y 0.5s ease, font-size 0.5s ease',
                   }}
                 >
