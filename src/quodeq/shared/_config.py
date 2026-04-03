@@ -12,7 +12,7 @@ from quodeq.shared._io import read_json
 _DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
 
 # Derived constants (not URLs, safe to keep inline).
-ACTION_API_MODULE = "quodeq.action_api"
+ACTION_API_MODULE = "quodeq.api.app"
 
 
 @dataclass
