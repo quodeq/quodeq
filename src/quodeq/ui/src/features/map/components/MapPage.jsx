@@ -3,6 +3,8 @@ import { buildFileTree } from '../utils/fileTree.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import TreemapView from './TreemapView.jsx';
 import HeatGridView from './HeatGridView.jsx';
+import SunburstView from './SunburstView.jsx';
+import BubblePackView from './BubblePackView.jsx';
 
 const VIEW_MODES = [
   { id: 'violations', label: 'Violations' },
@@ -12,8 +14,8 @@ const VIEW_MODES = [
 const VIZ_STYLES = [
   { id: 'treemap', label: 'Treemap', enabled: true },
   { id: 'heatgrid', label: 'Heat Grid', enabled: true },
-  { id: 'sunburst', label: 'Sunburst', enabled: false },
-  { id: 'bubbles', label: 'Bubbles', enabled: false },
+  { id: 'sunburst', label: 'Sunburst', enabled: true },
+  { id: 'bubbles', label: 'Bubbles', enabled: true },
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
@@ -178,8 +180,8 @@ export default function MapPage({ data, callbacks }) {
       <div className="map-viz-container">
         {vizStyle === 'treemap' && <TreemapView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
         {vizStyle === 'heatgrid' && <HeatGridView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
-        {vizStyle === 'sunburst' && <p className="empty-state">Sunburst — coming soon</p>}
-        {vizStyle === 'bubbles' && <p className="empty-state">Bubbles — coming soon</p>}
+        {vizStyle === 'sunburst' && <SunburstView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
+        {vizStyle === 'bubbles' && <BubblePackView node={currentNode} viewMode={viewMode} onDrillDown={handleDrillDown} />}
       </div>
     </div>
   );
