@@ -52,7 +52,7 @@ function DimensionOverview({ data, stats, onNavigate }) {
           <span className="explorer-dimension-title">{evalData.dimension}</span>
           {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
           <CopyButton
             label="Report"
             className="fix-plan-btn-header"
