@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.10.0] — 2026-04-03
+
+### Features
+- **Map tab** — visual codebase health explorer with Heat Grid, Risk Matrix, and Circle Pack visualizations; drill-down navigation with breadcrumb; Violations/Health view toggle; dimension filter from visible standards
+- **Single-file evaluation** — evaluate individual files from the Local browser; auto-detects parent project by git root; per-dimension analysis for deeper coverage
+- **Finding dismissal** — dismiss false-positive violations with restore support; redesigned dismissed findings cards with full violation detail
+- **Report copy button** — copy markdown report to clipboard from overview and dimension detail pages
+- **Live rescore on dismiss** — accumulated scores update immediately when findings are dismissed
+- **Online re-evaluation** — re-evaluate remote projects and clone-to-local from the dashboard
+
+### Improvements
+- Smooth fade transitions on tab switches, loading states, and run navigation
+- Fix stale data flash when switching runs in history tab
+- Project header shown on Violations and History tabs
+- Backend clean architecture refactoring — all 8 phases
+
+### Fixes
+- Standard tree not showing principles after PrinciplesList extraction
+- Redesigned fix plan and dismiss buttons across UI
+
+### Code Quality
+- 150+ maintainability violations resolved (rounds 3–7)
+
 ## [0.9.0] — 2026-04-01
 
 ### Features
