@@ -9,7 +9,7 @@ import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
-import CopyButton from '../../../components/CopyButton.jsx';
+import CopyButton, { FileTextIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
 
@@ -71,6 +71,7 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
           <CopyButton
             label="Report"
             className="fix-plan-btn-header"
+            icon={<FileTextIcon />}
             onClick={() => copyToClipboard(buildOverviewReport(accumulated, accumulatedDimensions || [], projectName))}
           />
           {lastDate && <span className="acc-eval-date">Last evaluated {lastDate}</span>}
