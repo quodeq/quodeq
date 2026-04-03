@@ -115,8 +115,8 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
 function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, dimensionsWithViolations, selectedDayDimNames, rescoreLookup }) {
   return (
     <>
-      <div className="dimensions-header">
-        <h3 className="dimensions-title">Quality Dimensions</h3>
+      <div className="section-header">
+        <h3 className="section-title">Quality Dimensions</h3>
       </div>
       <div className="dimensions-panel">
         <DimensionCardsGrid sortedDimensions={sortedDimensions} onDimensionClick={onDimensionClick} selectedDayDimNames={selectedDayDimNames} rescoreLookup={rescoreLookup} />

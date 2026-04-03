@@ -196,6 +196,7 @@
 /* ── Visualization container ─────────────────────────── */
 
 .map-viz-container {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow: auto;
@@ -236,13 +237,13 @@
   color: var(--color-text);
 }
 
-/* ── Map color tokens ────────────────────────────────── */
+/* ── Map color tokens (aliased from theme severity tokens) */
 
 :root {
-  --map-critical: #e74c3c;
-  --map-major: #e67e22;
-  --map-minor: #f1c40f;
-  --map-clean: #2ecc71;
+  --map-critical: var(--color-sev-critical-text);
+  --map-major: var(--color-sev-major-text);
+  --map-minor: var(--color-sev-minor-text);
+  --map-clean: var(--color-compliance);
 }
 
 /* ── Heat Grid ───────────────────────────────────────── */
@@ -255,12 +256,14 @@
   width: 100%;
   border-collapse: separate;
   border-spacing: 2px;
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
+  color: var(--color-text);
 }
 
 .heat-grid th {
-  padding: 6px 8px;
-  font-weight: var(--weight-medium);
+  padding: 8px 8px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
   color: var(--color-text-muted);
   text-align: center;
   white-space: nowrap;
@@ -269,9 +272,17 @@
   background: var(--color-surface);
 }
 
-.heat-grid th:first-child {
+.heat-grid-th-sort {
+  cursor: pointer;
+  user-select: none;
+}
+
+.heat-grid-th-sort:hover {
+  color: var(--color-text);
+}
+
+.heat-grid-th-sort.left {
   text-align: left;
-  min-width: 160px;
 }
 
 .heat-grid td {
@@ -280,11 +291,9 @@
 
 .heat-grid-file {
   padding: 6px 8px;
+  font-size: var(--text-xs);
   color: var(--color-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 240px;
+  word-break: break-word;
 }
 
 .heat-grid-file.clickable {
@@ -299,19 +308,20 @@
   padding: 6px 8px;
   text-align: center;
   color: var(--color-text);
-  font-weight: var(--weight-medium);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-bold);
 }
 
 .heat-grid-cell {
-  min-width: 48px;
+  min-width: 56px;
   height: 32px;
-  border-radius: 3px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  font-weight: var(--weight-medium);
-  color: rgba(255, 255, 255, 0.9);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  border: 1px solid transparent;
   transition: opacity 150ms ease;
 }
 
@@ -322,9 +332,45 @@
 .heat-grid-cell.empty {
   background: var(--color-surface-alt);
   color: var(--color-text-muted);
+  border-color: transparent;
 }
 
 /* ── Dimension filter ────────────────────────────────── */
+
+.map-label-toggle {
+  position: absolute;
+  bottom: var(--space-2);
+  right: var(--space-2);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-sans);
+  font-size: 10px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: opacity 150ms ease;
+}
+
+.map-label-toggle:hover {
+  color: var(--color-text);
+}
+
+.map-label-toggle input[type="checkbox"] {
+  accent-color: var(--color-accent);
+  cursor: pointer;
+}
+
+.heat-grid-dim-row {
+  background: var(--color-surface-alt);
+}
+
+.heat-grid-dim-row td:first-child .heat-grid-file {
+  font-size: var(--text-sm);
+  font-weight: var(--weight-semibold);
+  text-transform: capitalize;
+}
 
 .map-dim-filter {
   flex-wrap: wrap;

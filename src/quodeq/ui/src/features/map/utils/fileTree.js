@@ -70,6 +70,31 @@ function collapseSingleChildren(node) {
   }
 }
 
+/** Convert a leaf tree node into a file object compatible with FileDetailPage */
+export function treeNodeToFileObj(node) {
+  const violations = node.items.filter((i) => i.type === 'violation');
+  const compliance = node.items.filter((i) => i.type === 'compliance');
+  const bySev = { critical: [], major: [], minor: [], unknown: [] };
+  for (const v of violations) {
+    const sev = v.severity || 'minor';
+    (bySev[sev] || bySev.unknown).push(v);
+  }
+  const dims = new Set(violations.map((v) => v.dimension).filter(Boolean));
+  return {
+    file: node.path,
+    total: violations.length,
+    critical: bySev.critical.length,
+    major: bySev.major.length,
+    minor: bySev.minor.length,
+    unknown: bySev.unknown.length,
+    dimensions: Array.from(dims).sort(),
+    dimensionsCount: dims.size,
+    principlesCount: new Set(violations.map((v) => v.principle).filter(Boolean)).size,
+    violationsBySeverity: bySev,
+    compliance,
+  };
+}
+
 export function buildFileTree(dimensions) {
   const root = createNode('/', '', false);
   for (const dim of dimensions) {

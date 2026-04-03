@@ -1,19 +1,22 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { buildFileTree } from '../utils/fileTree.js';
+import { buildFileTree, treeNodeToFileObj } from '../utils/fileTree.js';
+import { complianceRatio } from '../../../utils/formatters.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import HeatGridView from './HeatGridView.jsx';
 import RiskMatrixView from './RiskMatrixView.jsx';
 import ZoomablePackView from './ZoomablePackView.jsx';
 
+let _savedMapPath = '';
+let _savedVizStyle = 'zoompack';
+let _savedViewMode = 'health';
+
 const VIEW_MODES = [
-  { id: 'violations', label: 'Violations' },
   { id: 'health', label: 'Health' },
+  { id: 'violations', label: 'Violations' },
 ];
 
 const VIZ_STYLES = [
-  { id: 'heatgrid', label: 'Heat Grid', enabled: true },
-  { id: 'riskmatrix', label: 'Risk Matrix', enabled: true },
   { id: 'zoompack', label: 'Circle Pack', enabled: true },
+  { id: 'riskmatrix', label: 'Risk Matrix', enabled: true },
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
@@ -57,13 +60,15 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
 function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, allDimensions, selectedDimensions, onToggleDimension }) {
   return (
     <div className="map-controls">
-      <div className="map-pill-group">
-        {VIEW_MODES.map((m) => (
-          <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)}>
-            {m.label}
-          </button>
-        ))}
-      </div>
+      {vizStyle === 'zoompack' && (
+        <div className="map-pill-group">
+          {VIEW_MODES.map((m) => (
+            <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
       <div className="map-pill-group">
         {VIZ_STYLES.map((s) => (
           <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? 'Coming soon' : ''}>
@@ -144,12 +149,19 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
+function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack }) {
+  const hasLabels = vizStyle === 'riskmatrix' || vizStyle === 'zoompack';
   return (
     <div className="map-viz-container">
-      {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
+      <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} onBack={onBack} />
+      {hasLabels && (
+        <label className="map-label-toggle">
+          <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
+          Labels
+        </label>
+      )}
+      {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
+      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
     </div>
   );
 }
@@ -165,9 +177,13 @@ export default function MapPage({ data, callbacks }) {
   }, []);
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
-  const [viewMode, setViewMode] = useState('violations');
-  const [vizStyle, setVizStyle] = useState('heatgrid');
-  const [currentPath, setCurrentPath] = useState('');
+  const [viewMode, _setViewMode] = useState(_savedViewMode);
+  const setViewMode = (v) => { _savedViewMode = v; _setViewMode(v); };
+  const [vizStyle, _setVizStyle] = useState(_savedVizStyle);
+  const setVizStyle = (v) => { _savedVizStyle = v; _setVizStyle(v); };
+  const [showLabels, setShowLabels] = useState(true);
+  const [currentPath, _setCurrentPath] = useState(_savedMapPath);
+  const setCurrentPath = (p) => { _savedMapPath = p; _setCurrentPath(p); };
 
   // Get visible standards and available dimension names
   const visibleIds = useMemo(() => new Set(readVisibleStandardIds()), [allDimensions]);
@@ -215,6 +231,11 @@ export default function MapPage({ data, callbacks }) {
   const breadcrumb = useMemo(() => buildBreadcrumbPath(fullTree, currentPath), [fullTree, currentPath]);
 
   const handleDrillDown = (nodePath) => setCurrentPath(nodePath);
+  const handleFileClick = (treeNode) => {
+    if (callbacks?.onNavigate && treeNode.isFile) {
+      callbacks.onNavigate('file', { file: treeNodeToFileObj(treeNode), sourceTab: 'map' });
+    }
+  };
   const handleBreadcrumbNav = (path) => setCurrentPath(path);
   const handleBack = () => {
     if (!currentPath) return;
@@ -235,12 +256,11 @@ export default function MapPage({ data, callbacks }) {
       <div className="map-header">
         <h2 className="page-title">Map</h2>
         <span className="map-total-count">
-          <strong>{currentNode.violations}</strong> violation{currentNode.violations !== 1 ? 's' : ''} · <strong>{currentNode.compliance}</strong> compliance
+          <strong>{currentNode.violations}</strong> violation{currentNode.violations !== 1 ? 's' : ''} · <strong>{complianceRatio(currentNode.violations, currentNode.compliance)}</strong> ratio
         </span>
         <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       </div>
-      <MapBreadcrumb path={breadcrumb} onNavigate={handleBreadcrumbNav} onBack={handleBack} />
-      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} />
+      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} onFileClick={handleFileClick} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} />
     </div>
   );
 }

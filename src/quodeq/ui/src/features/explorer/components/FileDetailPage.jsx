@@ -5,6 +5,7 @@ import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
+import { ComplianceCard } from './EvalCards.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 
 const ANIM_DELAY_PER_ITEM_MS = 30;
@@ -62,7 +63,7 @@ function ViolationCard({ v, index }) {
   );
 }
 
-function FileSeverityStats({ file, totalViolations, dimensionsCount }) {
+function FileSeverityStats({ file, totalViolations, totalCompliance, dimensionsCount }) {
   return (
     <div className="file-detail-stats">
       {file.critical > 0 && (
@@ -78,6 +79,22 @@ function FileSeverityStats({ file, totalViolations, dimensionsCount }) {
       <span className="file-detail-stat">
         <strong>{totalViolations}</strong> violations
       </span>
+      {totalCompliance > 0 && (
+        <>
+          <span className="file-detail-stat-sep">·</span>
+          <span className="file-detail-stat">
+            <strong>{totalCompliance}</strong> compliance
+          </span>
+          {totalViolations > 0 && (
+            <>
+              <span className="file-detail-stat-sep">·</span>
+              <span className="file-detail-stat">
+                <strong>1:{Math.round(totalCompliance / totalViolations)}</strong> ratio
+              </span>
+            </>
+          )}
+        </>
+      )}
       <span className="file-detail-stat-sep">·</span>
       <span className="file-detail-stat">
         <strong>{dimensionsCount}</strong> {dimensionsCount === 1 ? 'dimension' : 'dimensions'}
@@ -85,6 +102,7 @@ function FileSeverityStats({ file, totalViolations, dimensionsCount }) {
     </div>
   );
 }
+
 
 function SeverityGroup({ sev, violations }) {
   if (violations.length === 0) return null;
@@ -105,6 +123,7 @@ function SeverityGroup({ sev, violations }) {
 
 const FileDetailPage = memo(function FileDetailPage({ file }) {
   const totalViolations = file.total || 0;
+  const totalCompliance = file.compliance?.length || 0;
   const dimensionsCount = file.dimensionsCount || 0;
 
   return (
@@ -112,7 +131,7 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
       <section className="panel file-detail-summary-panel">
         <h3 className="file-detail-title">{file.file}</h3>
         <div className="file-detail-stats-row">
-          <FileSeverityStats file={file} totalViolations={totalViolations} dimensionsCount={dimensionsCount} />
+          <FileSeverityStats file={file} totalViolations={totalViolations} totalCompliance={totalCompliance} dimensionsCount={dimensionsCount} />
           <CopyButton
             label="Full fix plan"
             className="fix-plan-btn-header"
@@ -125,6 +144,20 @@ const FileDetailPage = memo(function FileDetailPage({ file }) {
       {SEVERITY_ORDER.map((sev) => (
         <SeverityGroup key={sev} sev={sev} violations={file.violationsBySeverity?.[sev] || []} />
       ))}
+
+      {totalCompliance > 0 && (
+        <div>
+          <div className="violation-group-header">
+            <span className="violation-group-title">Compliance</span>
+            <span className="violation-group-count">{totalCompliance}</span>
+          </div>
+          <div className="vlive-violations-group">
+            {file.compliance.map((c, idx) => (
+              <ComplianceCard key={idx} c={c} principle={c.principle} index={idx} />
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 });

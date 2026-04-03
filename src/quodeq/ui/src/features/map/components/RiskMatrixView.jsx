@@ -1,10 +1,11 @@
 import { useMemo, useState, useEffect } from 'react';
-import { nodeColor } from '../utils/mapColors.js';
+import { nodeColor, nodeBorderColor } from '../utils/mapColors.js';
+import FileShape from './FileShape.jsx';
 
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
 const PW = W - PAD.l - PAD.r, PH = H - PAD.t - PAD.b;
 
-export default function RiskMatrixView({ node, viewMode, onDrillDown }) {
+export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLabels = true }) {
   const [tip, setTip] = useState(null);
   const [entered, setEntered] = useState(false);
 
@@ -13,37 +14,44 @@ export default function RiskMatrixView({ node, viewMode, onDrillDown }) {
   const items = useMemo(() => (node.children?.length > 0 ? node.children : [node]), [node]);
 
   const { points, maxX, maxY, maxB } = useMemo(() => {
-    const pts = items.map((c) => ({
-      child: c,
-      x: c.violations || 0,
-      y: (c.severity?.critical || 0) * 100 + (c.severity?.major || 0) * 10 + (c.severity?.minor || 0),
-      b: (c.violations || 0) + (c.compliance || 0),
-      color: nodeColor(c, viewMode),
-      hasCritical: (c.severity?.critical || 0) > 0,
-    }));
+    const pts = items.map((c) => {
+      const total = (c.violations || 0) + (c.compliance || 0);
+      // compliance ratio dampens position: 100% compliant → 0.7x, 0% → 1x
+      const dampen = total > 0 ? 1 - (c.compliance / total) * 0.45 : 1;
+      return {
+        child: c,
+        x: (c.violations || 0) * dampen,
+        y: ((c.severity?.critical || 0) * 100 + (c.severity?.major || 0) * 10 + (c.severity?.minor || 0)) * dampen,
+        b: total,
+        color: nodeColor(c, 'violations'),
+        border: nodeBorderColor(c, 'violations'),
+        hasCritical: (c.severity?.critical || 0) > 0,
+      };
+    });
     return {
       points: pts,
       maxX: Math.max(1, ...pts.map((p) => p.x)) * 1.15,
       maxY: Math.max(1, ...pts.map((p) => p.y)) * 1.15,
       maxB: Math.max(1, ...pts.map((p) => p.b)),
     };
-  }, [items, viewMode]);
+  }, [items]);
 
-  const px = (x) => PAD.l + (x / maxX) * PW;
-  const py = (y) => PAD.t + PH - (y / maxY) * PH;
-  const br = (b) => 8 + (b / maxB) * 20;
+  const log = (v, max) => max > 0 ? Math.log1p(v) / Math.log1p(max) : 0;
+  const px = (x) => PAD.l + log(x, maxX) * PW;
+  const py = (y) => PAD.t + PH - log(y, maxY) * PH;
+  const br = (b) => 3 + (b / maxB) * 8;
 
   return (
-    <div style={{ position: 'relative' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', display: 'block' }}>
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block' }}>
         <defs>
           <radialGradient id="riskDanger" cx="100%" cy="0%" r="100%">
-            <stop offset="0%" stopColor="#e74c3c" stopOpacity="0.12" />
-            <stop offset="100%" stopColor="#e74c3c" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-sev-critical-text)" stopOpacity="0.12" />
+            <stop offset="100%" stopColor="var(--color-sev-critical-text)" stopOpacity="0" />
           </radialGradient>
           <radialGradient id="riskSafe" cx="0%" cy="100%" r="100%">
-            <stop offset="0%" stopColor="#2ecc71" stopOpacity="0.10" />
-            <stop offset="100%" stopColor="#2ecc71" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--color-compliance)" stopOpacity="0.10" />
+            <stop offset="100%" stopColor="var(--color-compliance)" stopOpacity="0" />
           </radialGradient>
           <filter id="glow">
             <feGaussianBlur stdDeviation="3" result="blur" />
@@ -64,61 +72,93 @@ export default function RiskMatrixView({ node, viewMode, onDrillDown }) {
         ))}
 
         {/* Quadrant labels */}
-        <text x={PAD.l + PW - 8} y={PAD.t + 18} textAnchor="end" fontSize={10} fill="rgba(231,76,60,0.6)" fontWeight="600">Fix first</text>
-        <text x={PAD.l + 8} y={PAD.t + PH - 8} textAnchor="start" fontSize={10} fill="rgba(46,204,113,0.6)" fontWeight="600">Low priority</text>
+        <text x={PAD.l + PW - 8} y={PAD.t + 18} textAnchor="end" fontSize={10} fill="var(--color-sev-critical-text)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">Fix first</text>
+        <text x={PAD.l + 8} y={PAD.t + PH - 8} textAnchor="start" fontSize={10} fill="var(--color-compliance)" opacity={0.6} fontWeight="600" fontFamily="var(--font-sans)">Low priority</text>
 
         {/* Axes */}
         <line x1={PAD.l} y1={PAD.t + PH} x2={PAD.l + PW} y2={PAD.t + PH} stroke="var(--color-border)" strokeWidth={1} />
         <line x1={PAD.l} y1={PAD.t} x2={PAD.l} y2={PAD.t + PH} stroke="var(--color-border)" strokeWidth={1} />
-        <text x={PAD.l + PW / 2} y={H - 8} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)">Violations →</text>
-        <text x={14} y={PAD.t + PH / 2} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" transform={`rotate(-90, 14, ${PAD.t + PH / 2})`}>Severity →</text>
+        <text x={PAD.l + PW / 2} y={H - 8} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" fontFamily="var(--font-sans)">Violations</text>
+        <text x={14} y={PAD.t + PH / 2} textAnchor="middle" fontSize={11} fill="var(--color-text-muted)" fontFamily="var(--font-sans)" transform={`rotate(-90, 14, ${PAD.t + PH / 2})`}>Severity</text>
 
         {/* Bubbles with entrance animation */}
-        {points.map(({ child, x, y, b, color, hasCritical }, i) => {
+        {points.map(({ child, x, y, b, color, border, hasCritical }, i) => {
           const cx = px(x), cy = py(y), r = br(b);
           const canDrill = !child.isFile && child.children?.length > 0;
-          const delay = i * 60;
           return (
             <g key={child.path || child.name}
-              style={{ opacity: entered ? 1 : 0, transform: entered ? 'none' : `translate(${cx - W / 2}px, ${cy - H / 2}px) scale(0)`, transformOrigin: `${cx}px ${cy}px`, transition: `opacity 0.5s ease ${delay}ms, transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) ${delay}ms` }}>
+              style={{ opacity: entered ? 1 : 0, transition: 'opacity 0.2s ease' }}>
               {hasCritical && <circle cx={cx} cy={cy} r={r + 4} fill="none" stroke={color} strokeWidth={1} opacity={0.3}>
                 <animate attributeName="r" values={`${r + 2};${r + 8};${r + 2}`} dur="2s" repeatCount="indefinite" />
                 <animate attributeName="opacity" values="0.3;0.1;0.3" dur="2s" repeatCount="indefinite" />
               </circle>}
               {canDrill ? (
-                /* Folder: rounded rectangle */
-                <>
-                  <rect x={cx - r} y={cy - r * 0.8} width={r * 2} height={r * 1.6} rx={4}
-                    fill={color} fillOpacity={0.8} stroke="rgba(255,255,255,0.25)" strokeWidth={1.5}
-                    filter={tip?.name === child.name ? 'url(#glow)' : undefined}
-                    style={{ cursor: 'pointer', transition: 'fill-opacity 0.2s ease' }}
-                    onMouseEnter={(e) => setTip({ x: e.clientX, y: e.clientY, child })}
-                    onMouseMove={(e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
-                    onMouseLeave={() => setTip(null)}
-                    onClick={() => onDrillDown?.(child.path)} />
-                  {/* Folder tab */}
-                  <rect x={cx - r} y={cy - r * 0.8 - 4} width={r * 0.7} height={5} rx={2}
-                    fill={color} fillOpacity={0.6} style={{ pointerEvents: 'none' }} />
-                </>
-              ) : (
-                /* File: circle */
-                <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.8}
-                  stroke="rgba(255,255,255,0.2)" strokeWidth={1.5}
+                /* Folder: circle */
+                <circle cx={cx} cy={cy} r={r} fill={color} fillOpacity={0.85}
+                  stroke={border} strokeWidth={1}
                   filter={tip?.name === child.name ? 'url(#glow)' : undefined}
-                  style={{ cursor: 'default', transition: 'fill-opacity 0.2s ease' }}
+                  style={{ cursor: 'pointer', transition: 'fill-opacity 0.2s ease' }}
                   onMouseEnter={(e) => setTip({ x: e.clientX, y: e.clientY, child })}
                   onMouseMove={(e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null)}
-                  onMouseLeave={() => setTip(null)} />
-              )}
-              {r > 14 && (
-                <text x={cx} y={cy + 1} textAnchor="middle" dominantBaseline="central"
-                  fontSize={Math.min(10, r / 2)} fill="#fff" fontWeight="600" style={{ pointerEvents: 'none' }}>
-                  {child.name?.length > r / 3 ? child.name.slice(0, Math.floor(r / 3)) + '…' : child.name}
-                </text>
+                  onMouseLeave={() => setTip(null)}
+                  onClick={() => onDrillDown?.(child.path)} />
+              ) : (
+                /* File: document icon */
+                <FileShape cx={cx} cy={cy} r={r} color={color} borderColor={border}
+                  glow={tip?.name === child.name}
+                  handlers={{
+                    onMouseEnter: (e) => setTip({ x: e.clientX, y: e.clientY, child }),
+                    onMouseMove: (e) => setTip((t) => t ? { ...t, x: e.clientX, y: e.clientY } : null),
+                    onMouseLeave: () => setTip(null),
+                    onClick: () => onFileClick?.(child),
+                    style: { cursor: onFileClick ? 'pointer' : 'default' },
+                  }} />
               )}
             </g>
           );
         })}
+
+        {/* Layer 2: labels above all elements (with collision culling) */}
+        {showLabels && (() => {
+          const placed = [];
+          // Sort by bubble size desc so bigger/more important nodes keep their labels
+          const sorted = points
+            .map((p, i) => ({ ...p, i }))
+            .sort((a, b) => b.b - a.b);
+          return sorted.map(({ child, x, y, b, i }) => {
+            const cx = px(x), cy = py(y), r = br(b);
+            const canDrill = !child.isFile && child.children?.length > 0;
+            const labelY = canDrill ? cy - r - 4 : cy - r * 0.9 - 4;
+            const fs = Math.min(11, Math.max(8, r / 3));
+            const estW = child.name.length * fs * 0.55;
+            const estH = fs + 2;
+            const box = { x: cx - estW / 2, y: labelY - estH, w: estW, h: estH };
+            const overlaps = placed.some((p) =>
+              box.x < p.x + p.w && box.x + box.w > p.x &&
+              box.y < p.y + p.h && box.y + box.h > p.y
+            );
+            if (overlaps) return null;
+            placed.push(box);
+            return (
+              <text
+                key={'lbl-' + (child.path || child.name)}
+                x={cx} y={labelY}
+                textAnchor="middle" dominantBaseline="auto"
+                style={{
+                  fontSize: fs,
+                  fontFamily: 'var(--font-sans)',
+                  fill: 'var(--color-text)',
+                  pointerEvents: 'none',
+                  fontWeight: canDrill ? 'var(--weight-semibold)' : 'var(--weight-normal)',
+                  opacity: entered ? 1 : 0,
+                  transition: 'opacity 0.2s ease',
+                }}
+              >
+                {child.name}
+              </text>
+            );
+          });
+        })()}
       </svg>
 
       {tip && (() => {
@@ -126,7 +166,13 @@ export default function RiskMatrixView({ node, viewMode, onDrillDown }) {
         const total = c.violations + c.compliance;
         const rate = total > 0 ? Math.round(c.compliance / total * 100) : 0;
         return (
-          <div className="map-tooltip" style={{ position: 'fixed', left: tip.x + 12, top: tip.y - 12 }}>
+          <div className="map-tooltip" style={{
+            position: 'fixed',
+            left: tip.x > window.innerWidth * 0.65 ? undefined : tip.x + 12,
+            right: tip.x > window.innerWidth * 0.65 ? window.innerWidth - tip.x + 12 : undefined,
+            top: tip.y > window.innerHeight * 0.75 ? undefined : tip.y - 12,
+            bottom: tip.y > window.innerHeight * 0.75 ? window.innerHeight - tip.y + 12 : undefined,
+          }}>
             <div className="map-tooltip-title">{c.path || c.name}</div>
             <div className="map-tooltip-row"><span>Violations</span><span>{c.violations}</span></div>
             <div className="map-tooltip-row"><span>Compliance</span><span>{c.compliance}</span></div>

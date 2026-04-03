@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useRef } from 'react';
 import { getDimensionEval, getRescore } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
-import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
+import CopyButton, { SparkleIcon, FileTextIcon } from '../../../components/CopyButton.jsx';
 import { gradeColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
@@ -56,6 +56,7 @@ function DimensionOverview({ data, stats, onNavigate }) {
           <CopyButton
             label="Report"
             className="fix-plan-btn-header"
+            icon={<FileTextIcon />}
             onClick={() => copyToClipboard(buildDimensionReport(evalData, principleGrades || [], allViolations, overallGrade, dateLabel, runId))}
           />
           {allViolations.length > 0 && (

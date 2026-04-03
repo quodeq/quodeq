@@ -3,22 +3,22 @@ import assert from 'node:assert/strict';
 import { severityColor, complianceRateColor, healthColor, worstSeverity } from './mapColors.js';
 
 test('severityColor returns correct colors', () => {
-  assert.equal(severityColor('critical'), 'var(--map-critical)');
-  assert.equal(severityColor('major'), 'var(--map-major)');
-  assert.equal(severityColor('minor'), 'var(--map-minor)');
-  assert.equal(severityColor(null), 'var(--map-clean)');
+  assert.equal(severityColor('critical'), 'var(--color-sev-critical-text)');
+  assert.equal(severityColor('major'), 'var(--color-sev-major-text)');
+  assert.equal(severityColor('minor'), 'var(--color-sev-minor-text)');
+  assert.equal(severityColor(null), 'var(--color-compliance)');
 });
 
 test('complianceRateColor maps rate to gradient', () => {
-  assert.equal(complianceRateColor(1.0), 'var(--map-clean)');
-  assert.equal(complianceRateColor(0.75), 'var(--map-minor)');
-  assert.equal(complianceRateColor(0.5), 'var(--map-major)');
-  assert.equal(complianceRateColor(0.2), 'var(--map-critical)');
+  assert.equal(complianceRateColor(1.0), 'var(--color-compliance)');
+  assert.equal(complianceRateColor(0.75), 'var(--color-sev-minor-text)');
+  assert.equal(complianceRateColor(0.5), 'var(--color-sev-major-text)');
+  assert.equal(complianceRateColor(0.2), 'var(--color-sev-critical-text)');
 });
 
 test('healthColor maps ratio to gradient', () => {
-  assert.equal(healthColor(0.9), 'var(--map-clean)');
-  assert.equal(healthColor(0.2), 'var(--map-critical)');
+  assert.equal(healthColor(0.9), 'var(--color-compliance)');
+  assert.equal(healthColor(0.2), 'var(--color-sev-critical-text)');
 });
 
 test('worstSeverity returns highest severity from breakdown', () => {
