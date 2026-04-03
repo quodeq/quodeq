@@ -4,7 +4,15 @@ import { complianceRateColor } from '../utils/mapColors.js';
 export default function HeatGridView({ node, viewMode, onDrillDown }) {
   const rows = useMemo(() => {
     const items = node.children.length > 0 ? node.children : [node];
-    return items.filter((r) => r.violations > 0 || r.compliance > 0);
+    return items
+      .filter((r) => r.violations > 0 || r.compliance > 0)
+      .sort((a, b) => {
+        // 1 critical > many major, 1 major > many minor
+        const sevScore = (r) => r.severity.critical * 10000 + r.severity.major * 100 + r.severity.minor;
+        const diff = sevScore(b) - sevScore(a);
+        if (diff !== 0) return diff;
+        return (a.name || '').localeCompare(b.name || '');
+      });
   }, [node]);
 
   if (rows.length === 0) {

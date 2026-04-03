@@ -1,10 +1,10 @@
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { buildFileTree } from '../utils/fileTree.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import TreemapView from './TreemapView.jsx';
 import HeatGridView from './HeatGridView.jsx';
-import SunburstView from './SunburstView.jsx';
-import BubblePackView from './BubblePackView.jsx';
+import ForceGraphView from './ForceGraphView.jsx';
+import ZoomablePackView from './ZoomablePackView.jsx';
+import RadialTreeView from './RadialTreeView.jsx';
 
 const VIEW_MODES = [
   { id: 'violations', label: 'Violations' },
@@ -13,9 +13,9 @@ const VIEW_MODES = [
 
 const VIZ_STYLES = [
   { id: 'heatgrid', label: 'Heat Grid', enabled: true },
-  { id: 'bubbles', label: 'Bubbles', enabled: true },
-  { id: 'sunburst', label: 'Sunburst', enabled: true },
-  { id: 'treemap', label: 'Treemap', enabled: true },
+  { id: 'force', label: 'Force Graph', enabled: true },
+  { id: 'zoompack', label: 'Circle Pack', enabled: true },
+  { id: 'radialtree', label: 'Radial Tree', enabled: true },
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
@@ -193,10 +193,10 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
     <div ref={ref} className="map-viz-container" onWheel={handleWheel}>
       {showZoom && <ZoomControls zoom={zoom} setZoom={setZoom} />}
       <div className="map-viz-inner">
-        {vizStyle === 'treemap' && <TreemapView node={node} viewMode={viewMode} onDrillDown={onDrillDown} containerHeight={Math.round(height * zoom)} />}
         {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-        {vizStyle === 'sunburst' && <SunburstView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
-        {vizStyle === 'bubbles' && <BubblePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
+        {vizStyle === 'force' && <ForceGraphView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
+        {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
+        {vizStyle === 'radialtree' && <RadialTreeView node={node} viewMode={viewMode} onDrillDown={onDrillDown} zoom={zoom} />}
       </div>
     </div>
   );
