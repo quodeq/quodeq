@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.dashboard import runner
+from quodeq.dashboard import runner, _networking
 from quodeq.dashboard.runner import BuildConfig, DashboardConfig, ServerConfig, run_dashboard, validate_paths
 
 from tests.conftest import DummyProcess
@@ -74,7 +74,7 @@ def test_run_dashboard_creates_default_reports(tmp_path: Path, monkeypatch):
 
 
 def test_choose_ui_port_skips_taken(monkeypatch):
-    monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == _TEST_PORT)
+    monkeypatch.setattr(_networking, "_is_port_open", lambda host, port: port == _TEST_PORT)
     port = runner._choose_ui_port(_TEST_PORT)
     assert port == _TEST_PORT + 1
 
@@ -90,7 +90,7 @@ def test_run_dashboard_auto_picks_ui_port(monkeypatch, tmp_path):
         runner, "_ensure_action_api",
         lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT + 1}", DummyProcess()),
     )
-    monkeypatch.setattr(runner, "_is_port_open", lambda host, port: port == _TEST_PORT)
+    monkeypatch.setattr(_networking, "_is_port_open", lambda host, port: port == _TEST_PORT)
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
     monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
 
