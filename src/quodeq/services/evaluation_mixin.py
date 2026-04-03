@@ -130,14 +130,19 @@ class FsEvaluationMixin:
             if not is_valid_repo_url(repo):
                 raise ValueError(f"Invalid repository URL format: {repo}")
         else:
-            repo_path = Path(repo)
-            if not repo_path.resolve().is_dir():
+            resolved = Path(repo).resolve()
+            if not resolved.exists():
                 raise FileNotFoundError(f"Repository not found: {repo}")
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir)
         env = self._build_eval_env(repo, options)
-        cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
+        # For single-file targets, run subprocess from the parent directory
+        if is_repo_url(repo):
+            cwd = str(Path.cwd())
+        else:
+            resolved = Path(repo).resolve()
+            cwd = str(resolved.parent) if resolved.is_file() else str(resolved)
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:

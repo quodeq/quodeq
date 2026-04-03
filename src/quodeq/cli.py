@@ -180,6 +180,14 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
     print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
 
+    is_single_file = getattr(args, '_single_file', False)
+
+    # Single-file evaluation: force per-dimension analysis for deeper coverage
+    consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
+    if is_single_file:
+        consolidated = False
+        print("Single-file mode: per-dimension analysis for deeper coverage", file=sys.stderr)
+
     return RunConfig(
         src=inputs.src,
         language=inputs.language,
@@ -195,7 +203,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             max_subagents=args.n_subagents,
             subagent_model=_subagent_model(env=env),
             verify_findings=not _no_verify(args, env=env),
-            consolidated=not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE")),
+            consolidated=consolidated,
             pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
             incremental=args.incremental,
         ),
@@ -220,6 +228,13 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     if src is None:
         return None
 
+    # Single-file evaluation: use parent dir as src, restrict to this file
+    single_file: str | None = None
+    if src.is_file():
+        single_file = src.name
+        src = src.parent
+        print(f"Single-file evaluation: {single_file}", file=sys.stderr)
+
     paths = default_paths()
     if not paths.detection_file.exists() or not paths.dimensions_file.exists():
         print("Configuration not found: detection.json and dimensions.json are required.", file=sys.stderr)
@@ -237,6 +252,21 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
         return None
 
     manifest = _build_manifest(args, src, paths)
+
+    # For single-file: override manifest to contain only the target file
+    if single_file:
+        from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+        ext = os.path.splitext(single_file)[1]
+        target = AnalysisTarget(
+            name=single_file,
+            language=language,
+            source_files=[single_file],
+            total_files=1,
+            language_stats={ext: 1} if ext else {},
+        )
+        manifest = SourceManifest(targets=[target], total_files=1, language_stats={ext: 1} if ext else {})
+        args._single_file = True  # flag for _build_run_config
+
     return ResolvedInputs(src=src, language=language, manifest=manifest, dims_data=dims_data)
 
 
