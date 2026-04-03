@@ -9,17 +9,21 @@ export default function BubblePackView({ node, viewMode, onDrillDown }) {
   const [hover, setHover] = useState(null);
 
   const circles = useMemo(() => {
-    if (!node) return [];
-    // Build hierarchy — d3 adds .depth after construction, so use
-    // children() accessor on the hierarchy node (which HAS .depth)
+    if (!node || (!node.children?.length && !node.violations && !node.compliance)) return [];
     const root = hierarchy(node, (d) => d.children || [])
-      .sum((d) => (d.children && d.children.length > 0 ? 0 : nodeSize(d, viewMode)))
-      .sort((a, b) => b.value - a.value);
+      .sum((d) => {
+        // Leaves get their size; folders get 0 (d3 accumulates from leaves)
+        if (d.children && d.children.length > 0) return 0;
+        return Math.max(1, nodeSize(d, viewMode)); // ensure positive value
+      })
+      .sort((a, b) => (b.value || 0) - (a.value || 0));
 
-    // Prune deep nodes after layout so circles are sized correctly
+    if (!root.value) return []; // nothing to pack
+
     const layout = pack().size([VIEW_SIZE, VIEW_SIZE]).padding(4);
     layout(root);
-    return root.descendants().filter((c) => c.depth <= MAX_DEPTH);
+    return root.descendants()
+      .filter((c) => c.depth <= MAX_DEPTH && c.r > 0 && !isNaN(c.r));
   }, [node, viewMode]);
 
   const handleClick = useCallback(
