@@ -217,6 +217,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
+  margin-bottom: 28px;
 }
 
 .file-detail-stats-row {
@@ -462,7 +463,7 @@
   justify-content: space-between;
   gap: var(--space-4);
   flex-wrap: wrap;
-  margin-bottom: calc(-1 * var(--space-4));
+  margin-bottom: var(--space-2);
 }
 
 .eval-dimension-title {

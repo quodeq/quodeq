@@ -217,8 +217,8 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
       ) : (
         <>
           <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }} />
-          <div className="dimensions-header">
-            <h3 className="dimensions-title">Dimensions Analyzed</h3>
+          <div className="section-header">
+            <h3 className="section-title">Dimensions Analyzed</h3>
           </div>
           <div className="dimensions-panel">
             <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} />

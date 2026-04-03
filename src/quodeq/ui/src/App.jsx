@@ -11,6 +11,7 @@ import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx'
 import SettingsPage from './features/settings/components/SettingsPage.jsx';
 import StandardsPage from './features/standards/StandardsPage.jsx';
 import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
+import MapPage from './features/map/components/MapPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { dismissFinding } from './api/index.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -115,6 +116,10 @@ const ROUTE_RENDERERS = {
         }}
       />
     );
+  },
+  map: (params, props) => {
+    const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
+    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard }} callbacks={{ onNavigate: props.navigation.handleNavigate }} />;
   },
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   history: (params, props) => {

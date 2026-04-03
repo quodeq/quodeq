@@ -5,6 +5,7 @@ import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
 import ContextBlock from '../../../components/ContextBlock.jsx';
+import { ComplianceCard } from './EvalCards.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 
 function buildViolationPlanText(v, principleName) {
@@ -152,6 +153,19 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
       {SEVERITY_ORDER.map((sev) => (
         <ViolationGroup key={sev} sev={sev} violations={violationsBySeverity[sev]} principleName={principle.principle} />
       ))}
+      {totalCompliance > 0 && (
+        <div>
+          <div className="violation-group-header">
+            <span className="violation-group-title">Compliance</span>
+            <span className="violation-group-count">{totalCompliance}</span>
+          </div>
+          <div className="vlive-violations-group">
+            {principle.compliance.map((c, idx) => (
+              <ComplianceCard key={idx} c={c} principle={principle.principle} index={idx} />
+            ))}
+          </div>
+        </div>
+      )}
     </>
   );
 });

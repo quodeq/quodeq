@@ -24,8 +24,8 @@ function DashboardContent({ runMode, data, focus, callbacks }) {
   if (focusedDimension) {
     return (
       <div className="dimensions-panel">
-        <div className="dimensions-header">
-          <h3 className="dimensions-title">{focusedDimension}</h3>
+        <div className="section-header">
+          <h3 className="section-title">{focusedDimension}</h3>
           <button type="button" className="btn-secondary" onClick={() => setFocusedDimension(null)}>
             Show all
           </button>

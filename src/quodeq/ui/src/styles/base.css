@@ -807,13 +807,24 @@ textarea:focus {
   overflow-x: auto;
 }
 
+.offending-panel {
+  margin-bottom: 28px;
+}
+
+/* Panels followed by section headers or other panels get breathing room */
+.panel + .section-header,
+.panel + .eval-header,
+.panel + .panel {
+  margin-top: var(--space-5);
+}
+
 /* ── Page headers (top-level tab titles) ─────────────── */
 
 .page-header {
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
-  margin-bottom: var(--space-4);
+  margin-bottom: var(--space-3);
 }
 
 .page-title {
@@ -834,7 +845,7 @@ textarea:focus {
   display: flex;
   align-items: baseline;
   gap: var(--space-3);
-  margin-bottom: calc(-1 * var(--space-4));
+  margin-bottom: var(--space-3);
 }
 
 .section-title {
