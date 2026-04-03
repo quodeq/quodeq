@@ -5,8 +5,7 @@ from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
 
-from quodeq.data.fs.report_parser.runs import read_run_data
-from quodeq.services.ports import list_runs
+from quodeq.services.ports import list_runs, read_run_data
 from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
 
