@@ -1,0 +1,139 @@
+/* ── Map page ────────────────────────────────────────── */
+
+.map-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+/* ── Controls bar ────────────────────────────────────── */
+
+.map-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+}
+
+.map-pill-group {
+  display: flex;
+  gap: 2px;
+  background: var(--color-surface-alt);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.map-pill {
+  padding: 5px 12px;
+  border: none;
+  border-radius: 4px;
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all 150ms ease;
+  white-space: nowrap;
+}
+
+.map-pill:hover {
+  color: var(--color-text);
+}
+
+.map-pill.active {
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.map-pill.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ── Breadcrumb ──────────────────────────────────────── */
+
+.map-breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.map-breadcrumb-seg {
+  background: none;
+  border: none;
+  font-family: var(--font-sans);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.map-breadcrumb-seg:hover {
+  color: var(--color-accent);
+  background: var(--color-accent-soft);
+}
+
+.map-breadcrumb-sep {
+  color: var(--color-border);
+}
+
+.map-breadcrumb-current {
+  color: var(--color-text);
+  font-weight: var(--weight-medium);
+}
+
+/* ── Visualization container ─────────────────────────── */
+
+.map-viz-container {
+  min-height: 400px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-surface);
+  padding: var(--space-4);
+  animation: tab-fadein 300ms ease;
+}
+
+/* ── Tooltip ─────────────────────────────────────────── */
+
+.map-tooltip {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: var(--text-xs);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  z-index: 20;
+}
+
+.map-tooltip-title {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.map-tooltip-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--color-text-muted);
+}
+
+.map-tooltip-row span:last-child {
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+}
+
+/* ── Map color tokens ────────────────────────────────── */
+
+:root {
+  --map-critical: #e74c3c;
+  --map-major: #e67e22;
+  --map-minor: #f1c40f;
+  --map-clean: #2ecc71;
+}
