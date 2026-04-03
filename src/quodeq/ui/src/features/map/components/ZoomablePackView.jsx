@@ -60,10 +60,8 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, zoom = 1
           const isFolder = !d.isFile && d.children?.length > 0;
           const isRoot = c.depth === 0;
           const t = transform(c);
-          // Only show labels on direct children of focused node, or leaf nodes
-          const isFocusChild = c.parent === focusNode;
-          const isLeafVisible = !isFolder && t.r > 12;
-          const showLabel = t.r > 15 && (isFocusChild || isLeafVisible || isRoot);
+          // Only show labels at current level: direct children of the focused node
+          const showLabel = t.r > 10 && c.parent === focusNode;
           const isHovered = hover === i;
           return (
             <g
