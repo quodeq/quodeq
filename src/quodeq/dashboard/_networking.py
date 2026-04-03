@@ -33,9 +33,11 @@ def _is_port_open(host: str, port: int) -> bool:
 def _choose_ui_port(start: int, host: str | None = None) -> int:
     host = host if host is not None else _get_default_host()
     port = start
+    tries = 0
     while _is_port_open(host, port):
         port += 1
-        if port > _MAX_PORT:
+        tries += 1
+        if tries >= _MAX_PORT_SCAN_TRIES or port > _MAX_PORT:
             raise RuntimeError("No free port available.")
     return port
 

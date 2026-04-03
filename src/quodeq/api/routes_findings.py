@@ -1,6 +1,7 @@
 """API routes for dismissing and restoring individual findings."""
 from __future__ import annotations
 
+import importlib
 from pathlib import Path
 
 from flask import Flask, Response, jsonify, request
@@ -16,7 +17,7 @@ def register_findings_routes(app: Flask) -> None:
     """Register /api/findings/* routes."""
 
     def _eval_dir() -> str:
-        return app.config.get("EVALUATIONS_DIR") or __import__("quodeq.shared.utils", fromlist=["get_evaluations_dir"]).get_evaluations_dir()
+        return app.config.get("EVALUATIONS_DIR") or importlib.import_module("quodeq.shared.utils").get_evaluations_dir()
 
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response:

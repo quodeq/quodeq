@@ -12,7 +12,13 @@ logger = logging.getLogger(__name__)
 
 
 def register_read_routes(app: Flask, get_service, get_library_client) -> None:
-    """Register GET routes for the standards API."""
+    """Register GET routes for the standards API.
+
+    Args:
+        app: The Flask application instance.
+        get_service: Factory callable returning the standards service.
+        get_library_client: Factory callable returning the library client (or None).
+    """
 
     @app.get("/api/standards/refs/cwe")
     def list_cwes() -> Response:

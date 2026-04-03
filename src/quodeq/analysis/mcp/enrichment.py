@@ -10,6 +10,31 @@ from typing import Callable
 CONTEXT_LINES = 5
 
 
+def _enrich_line_level(
+    finding: dict, source_lines: list[str], line: int,
+) -> None:
+    """Fill snippet and context for a line-level finding."""
+    end_line = finding.get("end_line") or line
+    if end_line < line:
+        line, end_line = end_line, line
+    # Clamp to file boundaries (1-indexed)
+    line = max(1, min(line, len(source_lines)))
+    end_line = max(line, min(end_line, len(source_lines)))
+
+    # Build snippet (the offending lines)
+    snippet_lines = source_lines[line - 1:end_line]
+    finding["snippet"] = "\n".join(snippet_lines)
+
+    # Build context with >>> markers
+    ctx_start = max(0, line - 1 - CONTEXT_LINES)
+    ctx_end = min(len(source_lines), end_line + CONTEXT_LINES)
+    context_parts = []
+    for i in range(ctx_start, ctx_end):
+        prefix = ">>> " if line - 1 <= i < end_line else ""
+        context_parts.append(f"{prefix}{source_lines[i]}")
+    finding["context"] = "\n".join(context_parts)
+
+
 def enrich_code(
     finding: dict,
     work_dir: Path | None,
@@ -44,23 +69,4 @@ def enrich_code(
         finding["context"] = None
         return
 
-    # Normal line-level enrichment
-    end_line = finding.get("end_line") or line
-    if end_line < line:
-        line, end_line = end_line, line
-    # Clamp to file boundaries (1-indexed)
-    line = max(1, min(line, len(source_lines)))
-    end_line = max(line, min(end_line, len(source_lines)))
-
-    # Build snippet (the offending lines)
-    snippet_lines = source_lines[line - 1:end_line]
-    finding["snippet"] = "\n".join(snippet_lines)
-
-    # Build context with >>> markers
-    ctx_start = max(0, line - 1 - CONTEXT_LINES)
-    ctx_end = min(len(source_lines), end_line + CONTEXT_LINES)
-    context_parts = []
-    for i in range(ctx_start, ctx_end):
-        prefix = ">>> " if line - 1 <= i < end_line else ""
-        context_parts.append(f"{prefix}{source_lines[i]}")
-    finding["context"] = "\n".join(context_parts)
+    _enrich_line_level(finding, source_lines, line)

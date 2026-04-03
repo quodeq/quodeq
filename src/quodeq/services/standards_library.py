@@ -9,6 +9,9 @@ from typing import Any, Protocol
 # NOTE: logging in inner layer — tracked for middleware extraction
 logger = logging.getLogger(__name__)
 
+_HTTP_TIMEOUT_S = 30
+_HASH_PREFIX_LEN = 16
+
 class HttpClient(Protocol):
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any: ...
 
@@ -16,7 +19,7 @@ class UrllibJsonClient:
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
         import urllib.request
         req = urllib.request.Request(url, headers=headers or {})
-        with urllib.request.urlopen(req, timeout=30) as resp:
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
             return json.loads(resp.read())
 
 class StandardsLibraryClient:
@@ -48,7 +51,7 @@ class StandardsLibraryClient:
             raise ValueError(f"Invalid library file path: {file_path}")
         data = self.fetch_standard(file_path)
         self._validate_id(data.get("id", ""))
-        content_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:16]
+        content_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:_HASH_PREFIX_LEN]
         evaluators_dir.mkdir(parents=True, exist_ok=True)
         dest = evaluators_dir / f"{data['id']}.json"
         # Check for collision with existing standard

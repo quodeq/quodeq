@@ -71,13 +71,15 @@ function TreeNode({ node, actions, titles, children }) {
   );
 }
 
+const MAX_LABEL_DISPLAY_LENGTH = 40;
+
 function RequirementNode({ req, ri, pi, selectedNode, actions, confirmFn = window.confirm }) {
   const { onSelectNode, onRemoveRequirement, editable } = actions;
   const isReqSelected = selectedNode?.type === 'requirement' && selectedNode.principleIndex === pi && selectedNode.reqIndex === ri;
   const hasContent = req.text || req.description || (req.refs && req.refs.length > 0);
   const handleRemoveReq = () => {
     if (hasContent) {
-      if (!confirmFn(`Delete requirement "${req.text ? (req.text.length > 40 ? req.text.slice(0, 40) + '...' : req.text) : 'Untitled'}"?`)) return;
+      if (!confirmFn(`Delete requirement "${req.text ? (req.text.length > MAX_LABEL_DISPLAY_LENGTH ? req.text.slice(0, MAX_LABEL_DISPLAY_LENGTH) + '...' : req.text) : 'Untitled'}"?`)) return;
     }
     onRemoveRequirement(pi, ri);
   };

@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 
 from quodeq.analysis.manifest_render import render_target_prompt_context
 
+_MAX_EXTENSION_DISPLAY = 8
+
 
 @dataclass
 class AnalysisTarget:
@@ -120,7 +122,7 @@ class SourceManifest:
             if self.language_stats:
                 breakdown = ", ".join(
                     f"{ext}: {count}" for ext, count in
-                    sorted(self.language_stats.items(), key=lambda x: -x[1])[:8]
+                    sorted(self.language_stats.items(), key=lambda x: -x[1])[:_MAX_EXTENSION_DISPLAY]
                 )
                 lines.append(f"**Extension breakdown:** {breakdown}")
             return "\n".join(lines)
@@ -138,7 +140,7 @@ class SourceManifest:
         if self.language_stats:
             breakdown = ", ".join(
                 f"{ext}: {count}" for ext, count in
-                sorted(self.language_stats.items(), key=lambda x: -x[1])[:8]
+                sorted(self.language_stats.items(), key=lambda x: -x[1])[:_MAX_EXTENSION_DISPLAY]
             )
             lines.append(f"**Extension breakdown:** {breakdown}")
         return "\n".join(lines)

@@ -23,7 +23,14 @@ def register_all_routes(
     app: Flask, provider: ActionProvider,
     eval_store: RateLimitStore, static_dist: str | None,
 ) -> None:
-    """Register all API route groups on the app."""
+    """Register all API route groups on the app.
+
+    Args:
+        app: The Flask application instance.
+        provider: Action provider for evaluation and project operations.
+        eval_store: Rate-limit store for evaluation requests.
+        static_dist: Optional path to the static assets directory.
+    """
     register_project_list_routes(app, provider)
     register_project_data_routes(app, provider)
     register_evaluation_list_routes(app, provider, eval_store)

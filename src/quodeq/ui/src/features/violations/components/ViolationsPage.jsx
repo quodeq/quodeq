@@ -159,6 +159,10 @@ function FileSubTab({ dimensions, onFileClick }) {
   );
 }
 
+function dismissedLabel(d) {
+  return d.principle || d.dimension || d.req || '?';
+}
+
 function DismissedSubTab({ dismissed, onRestore, onRestoreAll }) {
   if (dismissed.length === 0) {
     return <p className="empty-state">No dismissed findings.</p>;
@@ -180,7 +184,7 @@ function DismissedSubTab({ dismissed, onRestore, onRestoreAll }) {
             <div className="dismissed-card-top">
               <span className="dismissed-tag">dismissed</span>
               {d.severity && <span className={`severity-tag ${d.severity}`}>{d.severity}</span>}
-              <span className="dismissed-label">[{d.principle || d.dimension || d.req || '?'}]</span>
+              <span className="dismissed-label">[{dismissedLabel(d)}]</span>
               <span className="dismissed-file">{d.file}:{d.line}</span>
               <button type="button" className="restore-btn" onClick={() => onRestore(d)}>Restore</button>
             </div>

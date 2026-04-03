@@ -6,6 +6,8 @@ import { createDimension } from '../../../models/dimension.js';
  * Fetches and manages dashboard data for a given project and run.
  */
 
+const REFRESH_DEBOUNCE_MS = 300;
+
 function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError) {
   if (!selectedProject) {
     setDashboard(null);
@@ -143,7 +145,7 @@ export function useDashboard({ selectedProject, selectedRun }) {
   const refreshTimerRef = useRef(null);
   const refreshDashboard = useCallback(() => {
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
-    refreshTimerRef.current = setTimeout(() => setRefreshKey((k) => k + 1), 300);
+    refreshTimerRef.current = setTimeout(() => setRefreshKey((k) => k + 1), REFRESH_DEBOUNCE_MS);
   }, []);
 
   useEffect(() => () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); }, []);

@@ -19,9 +19,11 @@ __all__ = [
 ]
 
 
-def compute_base_score(filepath: str, category: str | None = None) -> int:
+def compute_base_score(
+    filepath: str, category: str | None = None, config: dict | None = None,
+) -> int:
     """Layer 1: base score from path patterns, entry points, and category."""
-    config = load_priority_config()
+    config = config or load_priority_config()
     score = config["default_path_score"]
 
     filepath_lower = filepath.lower().replace("\\", "/")
@@ -50,9 +52,10 @@ def compute_dimension_boost(
     filepath: str,
     dimension: str | list[str],
     file_size: int = 0,
+    config: dict | None = None,
 ) -> int:
     """Layer 2: dimension-specific keyword boost or file-size boost."""
-    config = load_priority_config()
+    config = config or load_priority_config()
     dims = dimension if isinstance(dimension, list) else [dimension]
     filepath_lower = filepath.lower().replace("\\", "/")
 

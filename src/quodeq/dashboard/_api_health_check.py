@@ -14,6 +14,9 @@ _HEALTH_POLL_INTERVAL_S = 0.2
 _DEFAULT_WAIT_TIMEOUT_S = 10
 _MAX_HEALTH_POLL_ATTEMPTS = 200
 _MAX_JITTER_DELAY_S = 2.0
+_LOG_CADENCE = 10
+_JITTER_RATIO = 0.2
+_BACKOFF_MULTIPLIER = 1.5
 
 
 def action_api_healthy(base_url: str) -> bool:
@@ -40,10 +43,10 @@ def wait_for_action_api(base_url: str, timeout_s: float = _DEFAULT_WAIT_TIMEOUT_
         if action_api_healthy(base_url):
             return None
         attempts += 1
-        if attempts % 10 == 0:
+        if attempts % _LOG_CADENCE == 0:
             elapsed = round(time.monotonic() - start, 1)
             log_info(f"Still waiting for Action API ({elapsed:.0f}s elapsed)...")
-        jitter = random.uniform(0, delay * 0.2)
+        jitter = random.uniform(0, delay * _JITTER_RATIO)
         time.sleep(delay + jitter)
-        delay = min(delay * 1.5, max_delay)
+        delay = min(delay * _BACKOFF_MULTIPLIER, max_delay)
     raise TimeoutError(f"Action API did not become ready within {timeout_s} seconds.")
