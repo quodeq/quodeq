@@ -124,15 +124,21 @@ export function useDashboard({ selectedProject, selectedRun }) {
   const [refreshKey, setRefreshKey] = useState(0);
   const [rescoreLookup, setRescoreLookup] = useState({});
 
-  // Clear stale data immediately when project changes to prevent rendering old data for a new project
+  // Clear stale data immediately when project or run changes to prevent rendering old data
   const prevProjectRef = useRef(selectedProject);
+  const prevRunRef = useRef(selectedRun);
   if (prevProjectRef.current !== selectedProject) {
     prevProjectRef.current = selectedProject;
+    prevRunRef.current = selectedRun;
     setDashboard(null);
     setAccumulated(null);
     setLatestAccumulated(null);
     setRescoreLookup({});
     setError(null);
+  } else if (prevRunRef.current !== selectedRun) {
+    prevRunRef.current = selectedRun;
+    // Clear run-specific data but preserve trend so history page doesn't flash empty
+    setDashboard((prev) => prev ? { trend: prev.trend } : null);
   }
 
   useEffect(() => fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError), [selectedProject, selectedRun, refreshKey]);

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import LoadingScreen from '../../../components/LoadingScreen.jsx';
 import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
@@ -207,19 +208,25 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
     return new Set(violations.map((v) => v.principle).filter(Boolean)).size;
   }, [dashboard]);
 
-  if (!dashboard) return <p className="empty-state">Loading run data...</p>;
+  const isLoading = !dashboard || !dashboard.dimensions;
 
   return (
-    <>
-      <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }} />
-      <div className="dimensions-header">
-        <h3 className="dimensions-title">Dimensions Analyzed</h3>
-      </div>
-      <div className="dimensions-panel">
-        <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} />
-      </div>
-      <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />
-      <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
-    </>
+    <div className={`run-overview-fade ${isLoading ? 'run-overview-loading' : 'run-overview-ready'}`}>
+      {isLoading ? (
+        <div className="run-overview-spinner"><LoadingScreen /></div>
+      ) : (
+        <>
+          <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }} />
+          <div className="dimensions-header">
+            <h3 className="dimensions-title">Dimensions Analyzed</h3>
+          </div>
+          <div className="dimensions-panel">
+            <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} />
+          </div>
+          <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />
+          <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
+        </>
+      )}
+    </div>
   );
 }

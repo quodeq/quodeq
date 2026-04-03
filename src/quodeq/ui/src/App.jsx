@@ -236,7 +236,7 @@ export default function App() {
         />
       ) : null}
       breadcrumb={navStack.length > 1 ? <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} /> : null}
-      content={<MainContent activePage={activePage} props={contentProps} />}
+      content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
     />
   );
 }
