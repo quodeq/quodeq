@@ -85,6 +85,19 @@ function buildDismissPayload(v, fallbackDimension) {
   };
 }
 
+function renderEvalPrincipleDetail(params, props) {
+  return (
+    <EvalPrincipleDetailPage
+      evalPrincipal={params.evalPrincipal}
+      onDismiss={(v) => {
+        dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.evalPrincipal?.dimension))
+          .then(() => props.refreshDashboard?.())
+          .catch((e) => console.error('[Dismiss] failed:', e));
+      }}
+    />
+  );
+}
+
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
   violations: (params, props) => {
@@ -134,16 +147,8 @@ const ROUTE_RENDERERS = {
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
   file: (params) => <FileDetailPage file={params.file} />,
   principle: (params) => <PrincipleDetailPage principle={params.principle} />,
-  evalprinciple: (params, props) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} onDismiss={(v) => {
-    dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.evalPrincipal?.dimension))
-      .then(() => props.refreshDashboard?.())
-      .catch((e) => console.error('[Dismiss] failed:', e));
-  }} />,
-  'eval-principle-detail': (params, props) => <EvalPrincipleDetailPage evalPrincipal={params.evalPrincipal} onDismiss={(v) => {
-    dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.evalPrincipal?.dimension))
-      .then(() => props.refreshDashboard?.())
-      .catch((e) => console.error('[Dismiss] failed:', e));
-  }} />,
+  evalprinciple: renderEvalPrincipleDetail,
+  'eval-principle-detail': renderEvalPrincipleDetail,
   settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} persistAnalysisPower={props.evaluation.persistAnalysisPower} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
   standards: () => <StandardsPage />,

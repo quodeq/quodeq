@@ -7,6 +7,8 @@ from pathlib import Path
 
 from quodeq.analysis.fingerprint import _hash_file, _hash_standards
 
+_GIT_DIFF_TIMEOUT_S = 10
+
 
 @dataclass
 class ChangeDetectionResult:
@@ -21,7 +23,7 @@ def _detect_via_git(src: Path, prev_commit: str) -> set[str] | None:
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", f"{prev_commit}..HEAD"],
-            cwd=str(src), capture_output=True, text=True, timeout=10,
+            cwd=str(src), capture_output=True, text=True, timeout=_GIT_DIFF_TIMEOUT_S,
         )
         if result.returncode == 0:
             return {f.strip() for f in result.stdout.splitlines() if f.strip()}

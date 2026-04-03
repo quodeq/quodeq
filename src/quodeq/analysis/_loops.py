@@ -16,7 +16,7 @@ def check_zero_findings(
     result: dict[str, Evidence], source_file_count: int, skipped_count: int = 0,
 ) -> None:
     """Raise EvaluationError if all dimensions produced zero findings."""
-    from quodeq.analysis.runner import EvaluationError
+    from quodeq.analysis._pipeline import EvaluationError
 
     if not result or source_file_count <= 0:
         return
@@ -35,14 +35,22 @@ def check_zero_findings(
 
 def run_incremental_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
-    *, process_fn: Callable[..., Evidence | None] | None = None,
+    *, process_fn: Callable[..., Evidence | None],
+    log_result_fn: Callable[..., None],
 ) -> dict[str, Evidence]:
-    """Run incremental per-dimension analysis."""
+    """Run incremental per-dimension analysis.
+
+    Args:
+        config: Run configuration for this evaluation.
+        dimensions: Dimension identifiers to analyze.
+        ctx: Shared analysis context (total count, etc.).
+        process_fn: Callback to process a single dimension (signature:
+            ``(config, dimension, idx, ctx) -> Evidence | None``).
+        log_result_fn: Callback to log a completed dimension result.
+    """
     from quodeq.analysis._incremental import run_dimension_incremental
-    from quodeq.analysis.runner import _process_single_dimension, _log_dimension_result
     from quodeq.engine._runner_markers import emit_marker
 
-    _process = process_fn or _process_single_dimension
     result: dict[str, Evidence] = {}
     for idx, dimension in enumerate(dimensions, 1):
         emit_marker("analyzing", dimension=dimension)
@@ -54,9 +62,9 @@ def run_incremental_loop(
             fallback_options = copy(config.options)
             fallback_options.incremental_file_filter = None
             fallback_config = replace(config, options=fallback_options)
-            ev = _process(fallback_config, dimension, idx, ctx)
+            ev = process_fn(fallback_config, dimension, idx, ctx)
         if ev:
-            _log_dimension_result(ev, dimension, idx, ctx.total)
+            log_result_fn(ev, dimension, idx, ctx.total)
             result[dimension] = ev
     check_zero_findings(result, config.source_file_count)
     return result
@@ -64,17 +72,22 @@ def run_incremental_loop(
 
 def run_per_dimension_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
-    *, process_fn: Callable[..., Evidence | None] | None = None,
+    *, process_fn: Callable[..., Evidence | None],
 ) -> dict[str, Evidence]:
-    """Per-dimension loop (fallback or single-dimension)."""
-    from quodeq.analysis.runner import _process_single_dimension
+    """Per-dimension loop (fallback or single-dimension).
 
-    _process = process_fn or _process_single_dimension
+    Args:
+        config: Run configuration for this evaluation.
+        dimensions: Dimension identifiers to analyze.
+        ctx: Shared analysis context (total count, etc.).
+        process_fn: Callback to process a single dimension (signature:
+            ``(config, dimension, idx, ctx) -> Evidence | None``).
+    """
     result: dict[str, Evidence] = {}
     skipped_count = 0
     for idx, dimension in enumerate(dimensions, 1):
         try:
-            ev = _process(config, dimension, idx, ctx)
+            ev = process_fn(config, dimension, idx, ctx)
         except (OSError, ValueError, json.JSONDecodeError, RuntimeError) as exc:
             log_warning(f"[{idx}/{ctx.total}] {dimension} \u2014 failed: {exc}")
             skipped_count += 1

@@ -25,14 +25,4 @@ __all__ = [
     "HttpClientConfig",
     "HttpResponse",
     "check_response_status",
-    # Semi-private helpers re-exported for backward compatibility
-    "_allow_private_urls",
-    "_circuit_breaker_reset_s",
-    "_circuit_breaker_threshold",
-    "_http_timeout_s",
-    "_max_retries",
-    "_retry_base_delay_s",
-    "_retry_jitter_s",
-    "_safe_float",
-    "_safe_int",
 ]

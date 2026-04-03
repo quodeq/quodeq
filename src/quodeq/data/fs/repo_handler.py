@@ -9,9 +9,6 @@ from quodeq.data.fs.repo_validation import (
 )
 
 __all__ = [
-    "_PRIVATE_HOST_RE",
-    "_REPO_URL_RE",
-    "_resolves_to_private",
     "cleanup_cloned_repo",
     "is_valid_repo_url",
     "prepare_repository",

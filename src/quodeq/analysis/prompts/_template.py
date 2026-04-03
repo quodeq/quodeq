@@ -8,6 +8,7 @@ from pathlib import Path
 from quodeq.config.paths import default_paths
 
 _TEMPLATE_HASH_CACHE_SIZE = 128
+_HASH_PREFIX_LEN = 12
 
 
 def load_template(
@@ -41,4 +42,4 @@ def load_template(
 @lru_cache(maxsize=_TEMPLATE_HASH_CACHE_SIZE)
 def template_hash(template: str) -> str:
     """Return a short hash of the template string, computed once per unique template."""
-    return hashlib.sha256(template.encode()).hexdigest()[:12]
+    return hashlib.sha256(template.encode()).hexdigest()[:_HASH_PREFIX_LEN]

@@ -3,8 +3,10 @@ from __future__ import annotations
 
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 from math import ceil
 from pathlib import Path
+from typing import Callable
 
 from quodeq.analysis.subagents._pool_models import (
     ScaleUpState,
@@ -14,6 +16,15 @@ from quodeq.analysis.subagents._pool_models import (
 )
 from quodeq.analysis.subagents.file_queue import FileQueue, WorkQueue
 from quodeq.shared.logging import log_warning
+
+
+@dataclass
+class EvidencePaths:
+    """Grouped paths for evidence collection."""
+
+    shared_jsonl_path: Path
+    evidence_dir: Path
+    dimension_key: str
 
 
 def get_queue(queue: WorkQueue | None, queue_path: Path) -> WorkQueue:
@@ -54,9 +65,7 @@ def collect_done(
     futures: dict[Future[SubagentResult], int],
     finished: dict[str, bool],
     results: list[SubagentResult],
-    shared_jsonl_path: Path,
-    evidence_dir: Path,
-    dimension_key: str,
+    paths: EvidencePaths,
 ) -> set[Future[SubagentResult]]:
     """Collect completed futures, updating results and finished map."""
     done_futures = {f for f in futures if f.done()}
@@ -69,8 +78,8 @@ def collect_done(
             log_warning(f"  {agent_id} raised {type(exc).__name__}: {exc}")
             result = SubagentResult(
                 agent_id=agent_id,
-                jsonl_file=shared_jsonl_path,
-                stream_file=evidence_dir / f"{dimension_key}_{agent_id}.stream",
+                jsonl_file=paths.shared_jsonl_path,
+                stream_file=paths.evidence_dir / f"{paths.dimension_key}_{agent_id}.stream",
                 success=False,
                 error=str(exc),
             )
@@ -84,7 +93,7 @@ def maybe_scale_up(
     done: set, state: ScaleUpState, n_agents: int,
     max_files_per_agent: int | None,
     queue: WorkQueue | None, queue_path: Path,
-    submit_fn: callable,
+    submit_fn: Callable[[], None],
 ) -> bool:
     """Check if scout phase is complete and scale up if needed. Returns updated scout_done."""
     if state.scout_done:

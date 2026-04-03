@@ -56,6 +56,16 @@ def _score_principle(violations: list[Finding], compliance: list[Finding]) -> tu
     return final, grade
 
 
+def _group_by_principle(
+    findings: list[Finding],
+) -> dict[str, list[Finding]]:
+    """Group a list of findings by their principle name."""
+    groups: dict[str, list[Finding]] = {}
+    for f in findings:
+        groups.setdefault(f.principle or "unknown", []).append(f)
+    return groups
+
+
 def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> DimensionResult:
     """Rescore a single dimension after filtering dismissed findings."""
     # Filter violations -- dismissed key is (req, file, line)
@@ -65,12 +75,8 @@ def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> Dimension
     ]
 
     # Group violations and compliance by principle
-    principles_violations: dict[str, list[Finding]] = {}
-    principles_compliance: dict[str, list[Finding]] = {}
-    for v in filtered_violations:
-        principles_violations.setdefault(v.principle or "unknown", []).append(v)
-    for c in dim.compliance:
-        principles_compliance.setdefault(c.principle or "unknown", []).append(c)
+    principles_violations = _group_by_principle(filtered_violations)
+    principles_compliance = _group_by_principle(dim.compliance)
 
     # Score each principle
     all_principle_names = set(principles_violations) | set(principles_compliance)

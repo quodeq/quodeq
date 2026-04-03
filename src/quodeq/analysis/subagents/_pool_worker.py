@@ -1,6 +1,7 @@
 """Worker logic: building agent configs and running single subagents."""
 from __future__ import annotations
 
+from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.analysis.subagents._pool_models import (
@@ -12,26 +13,33 @@ from quodeq.analysis.subprocess import AnalysisConfig, AnalysisError, run_analys
 from quodeq.shared.logging import log_warning
 
 
+@dataclass
+class WorkerContext:
+    """Grouped dimension and path context for a pool worker."""
+
+    dimension: str
+    dimension_key: str
+    evidence_dir: Path
+    queue_path: Path
+
+
 def build_agent_config(
     idx: int,
     base_config: AnalysisConfig,
-    dimension: str,
-    dimension_key: str,
-    evidence_dir: Path,
-    queue_path: Path,
+    wctx: WorkerContext,
 ) -> tuple[AnalysisConfig, Path, Path]:
     """Build per-agent AnalysisConfig, JSONL path, and stream path."""
     agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
-    jsonl_file = evidence_dir / f"{dimension_key}_evidence.jsonl"
-    stream_file = evidence_dir / f"{dimension_key}_{agent_id}.stream"
+    jsonl_file = wctx.evidence_dir / f"{wctx.dimension_key}_evidence.jsonl"
+    stream_file = wctx.evidence_dir / f"{wctx.dimension_key}_{agent_id}.stream"
     bc = base_config
     ac = AnalysisConfig(
         jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
         heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,
         ai_cmd=bc.ai_cmd, ai_model=bc.ai_model, max_turns=bc.max_turns,
         max_duration=bc.max_duration or _DEFAULT_MAX_DURATION_S,
-        compiled_dir=bc.compiled_dir, dimension=dimension,
-        queue_path=queue_path, agent_id=agent_id,
+        compiled_dir=bc.compiled_dir, dimension=wctx.dimension,
+        queue_path=wctx.queue_path, agent_id=agent_id,
         max_files_per_agent=bc.max_files_per_agent,
     )
     return ac, jsonl_file, stream_file
@@ -42,16 +50,11 @@ def run_single_agent(
     work_dir: Path,
     prompt: str,
     base_config: AnalysisConfig,
-    dimension: str,
-    dimension_key: str,
-    evidence_dir: Path,
-    queue_path: Path,
+    wctx: WorkerContext,
 ) -> SubagentResult:
     """Run a single subagent. Returns SubagentResult."""
     agent_id = f"{_AGENT_ID_PREFIX}-{idx}"
-    ac, jsonl_file, stream_file = build_agent_config(
-        idx, base_config, dimension, dimension_key, evidence_dir, queue_path,
-    )
+    ac, jsonl_file, stream_file = build_agent_config(idx, base_config, wctx)
     try:
         run_analysis(
             work_dir=work_dir,

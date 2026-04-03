@@ -8,21 +8,39 @@ const LS_THEME = 'cc-theme';
 const LS_THEME_MODE = 'cc-theme-mode';
 const LS_THEME_FAMILY = 'cc-theme-family';
 
+const THEME_MODES = { SYSTEM: 'system', LIGHT: 'light', DARK: 'dark' };
+const THEME_FAMILIES = { DARUMA: 'daruma', FLYNN: 'flynn', GALADRIEL: 'galadriel', IFRIT: 'ifrit', DECKARD: 'deckard' };
+
+const LEGACY_THEME_MAP = {
+  system: [THEME_MODES.SYSTEM, THEME_FAMILIES.DARUMA],
+  light: [THEME_MODES.LIGHT, THEME_FAMILIES.DARUMA],
+  dark: [THEME_MODES.DARK, THEME_FAMILIES.DARUMA],
+  ember: [THEME_MODES.DARK, THEME_FAMILIES.IFRIT],
+  forest: [THEME_MODES.LIGHT, THEME_FAMILIES.GALADRIEL],
+  midnight: [THEME_MODES.DARK, THEME_FAMILIES.FLYNN],
+  slate: [THEME_MODES.LIGHT, THEME_FAMILIES.DARUMA],
+  horizon: [THEME_MODES.LIGHT, THEME_FAMILIES.FLYNN],
+};
+
+const LEGACY_FAMILY_MAP = {
+  default: THEME_FAMILIES.DARUMA,
+  midnight: THEME_FAMILIES.FLYNN,
+  forest: THEME_FAMILIES.GALADRIEL,
+  ember: THEME_FAMILIES.IFRIT,
+  cyber: THEME_FAMILIES.DECKARD,
+};
+
 function applyInitialTheme() {
   const oldTheme = localStorage.getItem(LS_THEME);
   if (oldTheme !== null) {
-    const map = { system: ['system','daruma'], light: ['light','daruma'], dark: ['dark','daruma'],
-      ember: ['dark','ifrit'], forest: ['light','galadriel'], midnight: ['dark','flynn'],
-      slate: ['light','daruma'], horizon: ['light','flynn'] };
-    const [m, f] = map[oldTheme] || ['system','daruma'];
+    const [m, f] = LEGACY_THEME_MAP[oldTheme] || [THEME_MODES.SYSTEM, THEME_FAMILIES.DARUMA];
     localStorage.setItem(LS_THEME_MODE, m);
     localStorage.setItem(LS_THEME_FAMILY, f);
     localStorage.removeItem(LS_THEME);
   }
   const oldFamily = localStorage.getItem(LS_THEME_FAMILY);
-  const familyMap = { 'default': 'daruma', 'midnight': 'flynn', 'forest': 'galadriel', 'ember': 'ifrit', 'cyber': 'deckard' };
-  if (oldFamily && familyMap[oldFamily]) {
-    localStorage.setItem(LS_THEME_FAMILY, familyMap[oldFamily]);
+  if (oldFamily && LEGACY_FAMILY_MAP[oldFamily]) {
+    localStorage.setItem(LS_THEME_FAMILY, LEGACY_FAMILY_MAP[oldFamily]);
   }
   const mode = localStorage.getItem(LS_THEME_MODE) || 'system';
   const family = localStorage.getItem(LS_THEME_FAMILY) || 'daruma';

@@ -64,12 +64,23 @@ def _finalize_incremental(
     return ev
 
 
+def _can_carry_forward(
+    prev_fp: dict | None, prev_evidence_dir: Path | None, classification: object,
+) -> bool:
+    """Return True when previous findings exist and can be reused."""
+    return bool(
+        prev_fp and prev_evidence_dir
+        and not classification.full_reanalysis
+        and classification.unchanged
+    )
+
+
 def _maybe_carry_forward(
     prev_fp: dict | None, prev_evidence_dir: Path | None,
     classification: object, dimension: str, evidence_dir: Path,
 ) -> None:
     """Carry forward findings for unchanged files if conditions are met."""
-    if not (prev_fp and prev_evidence_dir and not classification.full_reanalysis and classification.unchanged):
+    if not _can_carry_forward(prev_fp, prev_evidence_dir, classification):
         return
     prev_jsonl = prev_evidence_dir / f"{dimension}_evidence.jsonl"
     output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"

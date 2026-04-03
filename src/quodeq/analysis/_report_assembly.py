@@ -1,6 +1,8 @@
 """Report assembly -- builds complete JSON report dicts from evidence and scores."""
 from __future__ import annotations
 
+from dataclasses import dataclass
+
 from quodeq.core.types import ScoringResult
 from quodeq.core.evidence.model import Evidence
 
@@ -17,40 +19,51 @@ from quodeq.analysis._report_scoring import (
 from quodeq.analysis._report_findings import build_principle_rows
 
 
-def _assemble_report_dict(
-    dimension: str, evidence: dict, top_score: str | None, top_grade: str | None,
-    principle_rows: list, flat_violations: list, flat_compliance: list, sev_tally: dict,
-) -> dict:
+@dataclass
+class _ReportData:
+    """Grouped components for assembling a report dict."""
+
+    dimension: str
+    evidence: dict
+    top_score: str | None
+    top_grade: str | None
+    principle_rows: list
+    flat_violations: list
+    flat_compliance: list
+    sev_tally: dict
+
+
+def _assemble_report_dict(data: _ReportData) -> dict:
     """Assemble the final report dict from pre-computed components."""
-    raw_meta = evidence.get("meta", {})
+    raw_meta = data.evidence.get("meta", {})
     report: dict = {
         "schema_version": _REPORT_SCHEMA_VERSION,
-        "dimension": dimension,
-        "project": evidence.get("repository", ""),
+        "dimension": data.dimension,
+        "project": data.evidence.get("repository", ""),
         "runId": "",
-        "discipline": evidence.get("discipline", ""),
-        "date": evidence.get("date", ""),
-        "sourceFileCount": evidence.get("source_file_count"),
-        "filesRead": evidence.get("files_read", 0),
-        "coveragePct": evidence.get("coverage_pct", 0.0),
+        "discipline": data.evidence.get("discipline", ""),
+        "date": data.evidence.get("date", ""),
+        "sourceFileCount": data.evidence.get("source_file_count"),
+        "filesRead": data.evidence.get("files_read", 0),
+        "coveragePct": data.evidence.get("coverage_pct", 0.0),
         "meta": {
             "analysis_prompt_version": raw_meta.get("analysis_prompt_version"),
             "scoring_prompt_version": raw_meta.get("scoring_prompt_version"),
             "mapping_file_hash": raw_meta.get("mapping_file_hash"),
             "quodeq_version": raw_meta.get("quodeq_version"),
         },
-        "overallScore": top_score,
-        "overallGrade": top_grade,
-        "principles": principle_rows,
-        "violations": flat_violations,
-        "compliance": flat_compliance,
+        "overallScore": data.top_score,
+        "overallGrade": data.top_grade,
+        "principles": data.principle_rows,
+        "violations": data.flat_violations,
+        "compliance": data.flat_compliance,
         "totals": {
-            "violationCount": len(flat_violations),
-            "complianceCount": len(flat_compliance),
-            "severity": sev_tally,
+            "violationCount": len(data.flat_violations),
+            "complianceCount": len(data.flat_compliance),
+            "severity": data.sev_tally,
         },
     }
-    module = evidence.get("module")
+    module = data.evidence.get("module")
     if module:
         report["module"] = module
     return report
@@ -74,10 +87,12 @@ def build_report_json(
         top_score = None
         top_grade = None
 
-    return _assemble_report_dict(
-        dimension, evidence, top_score, top_grade,
-        principle_rows, flat_violations, flat_compliance, sev_tally,
-    )
+    return _assemble_report_dict(_ReportData(
+        dimension=dimension, evidence=evidence, top_score=top_score,
+        top_grade=top_grade, principle_rows=principle_rows,
+        flat_violations=flat_violations, flat_compliance=flat_compliance,
+        sev_tally=sev_tally,
+    ))
 
 
 def build_full_report(evidence: Evidence, scores: ScoringResult | dict) -> dict:

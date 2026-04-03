@@ -205,65 +205,57 @@ function useDerivedExplorerStats(evalData, allViolations) {
   return { topFiles, severityCounts, uniquePrinciples, totalCompliant, complianceByPrinciple };
 }
 
+function mergeRescoreIntoEval(prev, dimData) {
+  if (!prev || !dimData) return prev;
+  const rescPrinciples = dimData.principles || [];
+  const updatedGrades = (prev.principleGrades || []).map((pg) => {
+    if (pg.isOverall || pg.principle?.includes('Overall')) {
+      return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
+    }
+    const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
+    return match ? { ...pg, score: match.score, grade: match.grade } : pg;
+  });
+  return {
+    ...prev,
+    principleGrades: updatedGrades,
+    overallScore: dimData.overallScore ?? prev.overallScore,
+    overallGrade: dimData.overallGrade ?? prev.overallGrade,
+  };
+}
+
+async function fetchAndRescore(project, runId, dimension) {
+  const data = await getDimensionEval(project, runId, dimension);
+  try {
+    const rescored = await getRescore(project, runId);
+    const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+    return dimData ? mergeRescoreIntoEval(data, dimData) : data;
+  } catch {
+    return data; // rescore failure is non-fatal
+  }
+}
+
 function useExplorerData(project, dimension, runId, refreshSignal) {
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  // Fetch eval data when params change
+
   useEffect(() => {
     setLoading(true);
-    getDimensionEval(project, runId, dimension)
-      .then((data) => {
-        setEvalData(data);
-        setLoading(false);
-        return getRescore(project, runId).then((rescored) => {
-          const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
-          if (!dimData) return;
-          setEvalData((prev) => {
-            if (!prev) return prev;
-            // Merge rescored principle grades and overall score
-            const rescPrinciples = dimData.principles || [];
-            const updatedGrades = (prev.principleGrades || []).map((pg) => {
-              // Update the overall row with dimension-level rescored values
-              if (pg.isOverall || pg.principle?.includes('Overall')) {
-                return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
-              }
-              const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
-              return match ? { ...pg, score: match.score, grade: match.grade } : pg;
-            });
-            return {
-              ...prev,
-              principleGrades: updatedGrades,
-              overallScore: dimData.overallScore ?? prev.overallScore,
-              overallGrade: dimData.overallGrade ?? prev.overallGrade,
-            };
-          });
-        }).catch(() => { /* rescore failure is non-fatal */ });
-      })
+    fetchAndRescore(project, runId, dimension)
+      .then((data) => { setEvalData(data); setLoading(false); })
       .catch((err) => { setError(err.message); setLoading(false); });
   }, [project, dimension, runId]);
-  // Re-run rescore when refreshSignal changes (e.g. after a dismiss on another page)
+
   const initialRef = useRef(refreshSignal);
   useEffect(() => {
-    if (refreshSignal === initialRef.current) return; // skip initial mount
+    if (refreshSignal === initialRef.current) return;
     if (!evalData || !project || !runId) return;
     getRescore(project, runId).then((rescored) => {
       const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
-      if (!dimData) return;
-      setEvalData((prev) => {
-        if (!prev) return prev;
-        const rescPrinciples = dimData.principles || [];
-        const updatedGrades = (prev.principleGrades || []).map((pg) => {
-          if (pg.isOverall || pg.principle?.includes('Overall')) {
-            return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
-          }
-          const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
-          return match ? { ...pg, score: match.score, grade: match.grade } : pg;
-        });
-        return { ...prev, principleGrades: updatedGrades, overallScore: dimData.overallScore, overallGrade: dimData.overallGrade };
-      });
+      if (dimData) setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
     }).catch(() => {});
   }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
   const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
   const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);

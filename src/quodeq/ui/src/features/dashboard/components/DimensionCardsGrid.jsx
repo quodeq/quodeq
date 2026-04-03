@@ -50,7 +50,7 @@ function AccDimensionCard({ item, onDimensionClick, evaluatedToday = true, resco
   );
 }
 
-export default function DimensionCardsGrid({ sortedDimensions, referenceRun, onDimensionClick, selectedDayDimNames, rescoreLookup }) {
+export default function DimensionCardsGrid({ sortedDimensions, onDimensionClick, selectedDayDimNames, rescoreLookup }) {
   const dimNameSet = selectedDayDimNames instanceof Set ? selectedDayDimNames : new Set();
   const sorted = useMemo(() => [...sortedDimensions].sort((a, b) => {
     if (dimNameSet.size === 0) return a.dimension.localeCompare(b.dimension);

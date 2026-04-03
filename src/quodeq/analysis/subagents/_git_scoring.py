@@ -5,6 +5,9 @@ import subprocess
 from datetime import datetime, timedelta
 from pathlib import Path
 
+_GIT_LOG_TIMEOUT_S = 10
+_GIT_HASH_LENGTH = 40
+
 
 def _run_git_log(src: Path, months: int = 3) -> str | None:
     """Run git log and return raw output, or None if git unavailable."""
@@ -20,7 +23,7 @@ def _run_git_log(src: Path, months: int = 3) -> str | None:
     try:
         result = subprocess.run(
             ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
-            cwd=str(src), capture_output=True, text=True, timeout=10,
+            cwd=str(src), capture_output=True, text=True, timeout=_GIT_LOG_TIMEOUT_S,
         )
         return result.stdout if result.returncode == 0 else None
     except (OSError, subprocess.TimeoutExpired):
@@ -44,7 +47,7 @@ def compute_git_scores(files: list[str], src: Path, config: dict | None = None) 
         if not line:
             continue
         # 40-char hex = commit hash, skip
-        if len(line) == 40 and all(c in "0123456789abcdef" for c in line):
+        if len(line) == _GIT_HASH_LENGTH and all(c in "0123456789abcdef" for c in line):
             continue
         # Date lines: "YYYY-MM-DD HH:MM:SS +ZZZZ"
         if len(line) >= 10 and line[4:5] == "-" and line[7:8] == "-" and " " in line:

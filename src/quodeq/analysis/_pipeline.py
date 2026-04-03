@@ -36,7 +36,11 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
 
     if config.options.incremental:
         emit_marker("setup", dimensions=dimensions)
-        return run_incremental_loop(config, dimensions, ctx)
+        return run_incremental_loop(
+            config, dimensions, ctx,
+            process_fn=_process_single_dimension,
+            log_result_fn=_log_dimension_result,
+        )
 
     emit_marker("setup", dimensions=dimensions)
 
@@ -56,7 +60,10 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
         except (OSError, KeyError, ValueError, RuntimeError) as exc:
             log_warning(f"Consolidated mode failed: {exc}, falling back to per-dimension")
 
-    return run_per_dimension_loop(config, dimensions, ctx)
+    return run_per_dimension_loop(
+        config, dimensions, ctx,
+        process_fn=_process_single_dimension,
+    )
 
 
 def run(config: RunConfig) -> Evidence:
