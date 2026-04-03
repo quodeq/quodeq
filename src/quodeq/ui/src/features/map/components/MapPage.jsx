@@ -2,9 +2,7 @@ import { useState, useMemo, useRef, useEffect } from 'react';
 import { buildFileTree } from '../utils/fileTree.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import HeatGridView from './HeatGridView.jsx';
-import ForceGraphView from './ForceGraphView.jsx';
 import ZoomablePackView from './ZoomablePackView.jsx';
-import RadialTreeView from './RadialTreeView.jsx';
 
 const VIEW_MODES = [
   { id: 'violations', label: 'Violations' },
@@ -13,9 +11,7 @@ const VIEW_MODES = [
 
 const VIZ_STYLES = [
   { id: 'heatgrid', label: 'Heat Grid', enabled: true },
-  { id: 'force', label: 'Force Graph', enabled: true },
   { id: 'zoompack', label: 'Circle Pack', enabled: true },
-  { id: 'radialtree', label: 'Radial Tree', enabled: true },
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
@@ -150,9 +146,7 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown }) {
   return (
     <div className="map-viz-container">
       {vizStyle === 'heatgrid' && <HeatGridView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'force' && <ForceGraphView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
       {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
-      {vizStyle === 'radialtree' && <RadialTreeView node={node} viewMode={viewMode} onDrillDown={onDrillDown} />}
     </div>
   );
 }
