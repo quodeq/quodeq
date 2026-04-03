@@ -10,6 +10,8 @@ from quodeq.core.types import to_camel_dict
 
 logger = logging.getLogger(__name__)
 
+_cwe_cache: list | None = None
+
 
 def register_read_routes(app: Flask, get_service, get_library_client) -> None:
     """Register GET routes for the standards API.
@@ -22,9 +24,10 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
 
     @app.get("/api/standards/refs/cwe")
     def list_cwes() -> Response:
-        if not hasattr(app, "_cwe_list"):
-            app._cwe_list = get_service(app).load_cwe_list()
-        return jsonify(app._cwe_list)
+        global _cwe_cache
+        if _cwe_cache is None:
+            _cwe_cache = get_service(app).load_cwe_list()
+        return jsonify(_cwe_cache)
 
     @app.get("/api/standards")
     def list_standards() -> Response:

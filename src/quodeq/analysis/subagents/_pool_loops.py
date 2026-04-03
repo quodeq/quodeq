@@ -15,6 +15,7 @@ from quodeq.analysis.subagents._pool_models import (
 )
 from quodeq.analysis.subagents._pool_scaling import (
     EvidencePaths,
+    ScaleUpContext,
     collect_done,
     maybe_scale_up,
     should_respawn,
@@ -51,9 +52,10 @@ def scout_loop(ctx: LoopContext) -> None:
     ctx.submit_fn()
     while ctx.futures:
         done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
+        scale_ctx = ScaleUpContext(ctx.queue, ctx.queue_path, ctx.submit_fn)
         state.scout_done = maybe_scale_up(
             done, state, ctx.n_agents, ctx.max_files_per_agent,
-            ctx.queue, ctx.queue_path, ctx.submit_fn,
+            scale_ctx,
         )
         if not done:
             time.sleep(_FUTURE_POLL_INTERVAL_S)

@@ -19,6 +19,15 @@ from quodeq.shared.logging import log_warning
 
 
 @dataclass
+class ScaleUpContext:
+    """Grouped parameters for scale-up decisions."""
+
+    queue: WorkQueue | None
+    queue_path: Path
+    submit_fn: Callable[[], None]
+
+
+@dataclass
 class EvidencePaths:
     """Grouped paths for evidence collection."""
 
@@ -92,8 +101,7 @@ def collect_done(
 def maybe_scale_up(
     done: set, state: ScaleUpState, n_agents: int,
     max_files_per_agent: int | None,
-    queue: WorkQueue | None, queue_path: Path,
-    submit_fn: Callable[[], None],
+    ctx: ScaleUpContext,
 ) -> bool:
     """Check if scout phase is complete and scale up if needed. Returns updated scout_done."""
     if state.scout_done:
@@ -103,7 +111,7 @@ def maybe_scale_up(
     scout_timed_out = elapsed >= state.scout_timeout and n_agents > 1
     if not (scout_completed or scout_timed_out):
         return False
-    remaining = should_respawn(queue, queue_path, state.pool_start, state.max_duration)
+    remaining = should_respawn(ctx.queue, ctx.queue_path, state.pool_start, state.max_duration)
     for _ in range(compute_scale_up(remaining, n_agents, max_files_per_agent)):
-        submit_fn()
+        ctx.submit_fn()
     return True
