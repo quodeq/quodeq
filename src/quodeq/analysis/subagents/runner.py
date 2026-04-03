@@ -1,33 +1,29 @@
 """Subagent processing path -- runs a dimension via N parallel subagents."""
 from __future__ import annotations
 
-import os
 from dataclasses import dataclass
-from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.analysis._types import RunConfig
-from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.core.evidence.model import Evidence
-from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.file_queue import FileQueue
-from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
-from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
-from quodeq.analysis.subagents.priority import PriorityContext, prioritize_files
-from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
-from quodeq.shared.logging import log_info, log_success, log_warning
+from quodeq.shared.logging import log_info, log_warning
 
-_MAX_FILES_PER_AGENT = 30
-_MAX_FILES_PER_AGENT_CAP = 50
-
-
-def _compute_files_per_agent(total_files: int) -> int:
-    """Compute adaptive max files per agent. Capped to avoid turn limits."""
-    return min(total_files, _MAX_FILES_PER_AGENT_CAP) if total_files > 0 else 0
-
-
-# Re-export verification helpers (extracted to _verification.py for file-length limits)
-from quodeq.analysis.subagents._verification import (  # noqa: E402,F401
+# Re-exports from split modules -- keep the public API stable
+from quodeq.analysis.subagents._source_files import _list_source_files  # noqa: F401
+from quodeq.analysis.subagents._prompts import _build_subagent_prompt  # noqa: F401
+from quodeq.analysis.subagents._pool_launcher import (  # noqa: F401
+    LaunchPoolParams,
+    _compute_files_per_agent,
+    _default_subagent_model,
+    _launch_pool,
+    _collect_all_evidence,
+)
+from quodeq.analysis.subagents._evidence_collector import (  # noqa: F401
+    _CollectionContext,
+    _collect_evidence,
+)
+from quodeq.analysis.subagents._verification import (  # noqa: F401
     _dispatch_verification_pool,
     _load_and_filter_previous,
     _run_verification_pool,
@@ -39,169 +35,8 @@ from quodeq.analysis.subagents._verification import (  # noqa: E402,F401
 class DimensionCallbacks:
     """Grouped callbacks for single-agent dimension processing fallback."""
     build_prompt: Callable[..., str]
-    run_analysis: Callable[..., tuple[Path, Path]]
+    run_analysis: Callable[..., tuple[Any, Any]]
     parse_evidence: Callable[..., Evidence | None]
-
-
-def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
-    """Return the subagent model override, or None to use the client's default."""
-    return (env or os.environ).get("QUODEQ_SUBAGENT_MODEL") or None
-
-
-def _list_source_files(config: RunConfig, dim_id: str, *, ignore_file_filter: bool = False) -> tuple[list[str], set[str]]:
-    """List source files for the subagent queue from the target or manifest.
-
-    Returns (files, extensions) or ([], set()) if none found.
-    Files are returned in priority order (most important first).
-    """
-    # Prefer target-scoped files when available
-    if config.target is not None and config.target.source_files:
-        files = config.target.source_files
-        extensions = set(config.target.language_stats.keys()) if config.target.language_stats else set()
-    elif config.manifest is not None and config.manifest.source_files:
-        files = config.manifest.source_files
-        extensions = set(config.manifest.language_stats.keys()) if config.manifest.language_stats else set()
-    else:
-        return [], set()
-
-    # Prioritize files: most important first
-    category = None
-    if config.target and config.target.category:
-        category = config.target.category
-    elif config.manifest:
-        category = config.manifest.category
-
-    evidence_dir = config.work_dir or config.src
-    files = prioritize_files(
-        files, config.src, dim_id,
-        context=PriorityContext(
-            category=category,
-            language=config.language,
-            evidence_dir=evidence_dir,
-            config=config,
-        ),
-    )
-
-    # Incremental mode: filter to only changed + dependent files
-    if not ignore_file_filter and config.options.incremental_file_filter is not None:
-        filter_set = config.options.incremental_file_filter
-        files = [f for f in files if f in filter_set]
-
-    return files, extensions
-
-
-def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
-    """Build the prompt for subagent analysis using the cached subagent.md template."""
-    return build_analysis_prompt(
-        ctx.subagent_template,
-        PromptContext(
-            language=config.language,
-            repo_name=str(config.src),
-            date_str=ctx.date_str,
-            dimension=dim_id,
-            source_file_count=config.source_file_count,
-            dimensions_data=ctx.dimensions_data,
-            standards_dir=config.standards_dir,
-            evaluators_dir=config.evaluators_dir,
-            manifest=config.manifest,
-            target=config.target,
-            work_dir=config.work_dir or config.src,
-        ),
-    )
-
-
-@dataclass
-class _CollectionContext:
-    """Grouped parameters for collecting evidence after a subagent pool run."""
-    results: list[Any]
-    ctx: Any
-    files: list[str] | None = None
-    save_fingerprint_fn: Any = None
-
-
-@dataclass
-class LaunchPoolParams:
-    """Grouped parameters for launching a subagent pool."""
-    evidence_dir: Path
-    queue_path: Path
-    prompt: str
-    max_files_per_agent: int = _MAX_FILES_PER_AGENT
-
-
-def _launch_pool(config: RunConfig, dim_id: str, params: LaunchPoolParams) -> tuple[Any, list[Any]]:
-    """Create and run a SubagentPool, returning its results."""
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model()
-    base_ac = AnalysisConfig(
-        analysis_budget=config.options.analysis_budget,
-        compiled_dir=compiled_dir,
-        max_turns=config.options.max_turns,
-        max_duration=config.options.max_duration,
-        ai_model=subagent_model,
-        max_files_per_agent=params.max_files_per_agent,
-        pool_budget=config.options.pool_budget if config.options.pool_budget is not None else _DEFAULT_POOL_BUDGET,
-    )
-    pool = SubagentPool(
-        paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path),
-        options=PoolOptions(
-            n_agents=config.options.max_subagents,
-            prompt=params.prompt,
-            dimension=dim_id,
-        ),
-        config=base_ac,
-    )
-    return pool, pool.run()
-
-
-def _collect_all_evidence(results: list[Any], cleanup_stream_fn: Any) -> int:
-    """Sum files-read counts across all subagent result stream files, cleaning up each."""
-    total = 0
-    for r in results:
-        if r.stream_file.exists():
-            total += count_files_from_stream(r.stream_file)
-            cleanup_stream_fn(r.stream_file)
-    return total
-
-
-def _collect_evidence(
-    config: RunConfig, dim_id: str, evidence_dir: Path,
-    collection: _CollectionContext,
-) -> Evidence:
-    """Deduplicate JSONL, count files read, save fingerprint, and parse into Evidence.
-
-    *collection.save_fingerprint_fn* is an injectable ``(fingerprint, dir) -> None``
-    for persistence; defaults to ``analysis.fingerprint.save_fingerprint``.
-    """
-    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint as _default_save
-    from quodeq.engine._runner_markers import cleanup_stream
-
-    _save = collection.save_fingerprint_fn or _default_save
-
-    merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"
-    SubagentPool.deduplicate_jsonl(merged_jsonl)
-
-    total_files_read = _collect_all_evidence(collection.results, cleanup_stream)
-
-    # Save fingerprint so next run can carry forward unchanged-file findings
-    if collection.files:
-        fp = build_fingerprint(config.src, collection.files, dim_id, config.standards_dir)
-        _save(fp, evidence_dir)
-
-    compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    ev = parse_jsonl_to_evidence(
-        merged_jsonl,
-        EvidenceContext(
-            language=config.language,
-            repository=str(config.src),
-            date_str=collection.ctx.date_str,
-            source_file_count=config.source_file_count,
-            files_read=total_files_read,
-            module=config.target.name if config.target else "",
-        ),
-        compiled_dir=compiled_dir,
-        evaluators_dir=config.evaluators_dir,
-    )
-    return ev
 
 
 def process_consolidated_dimensions(
