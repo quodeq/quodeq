@@ -130,14 +130,28 @@ class FsEvaluationMixin:
             if not is_valid_repo_url(repo):
                 raise ValueError(f"Invalid repository URL format: {repo}")
         else:
-            repo_path = Path(repo)
-            if not repo_path.resolve().is_dir():
+            resolved = Path(repo).resolve()
+            if not resolved.exists():
                 raise FileNotFoundError(f"Repository not found: {repo}")
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir)
         env = self._build_eval_env(repo, options)
-        cwd = str(Path.cwd()) if is_repo_url(repo) else str(Path(repo).resolve())
+        if is_repo_url(repo):
+            cwd = str(Path.cwd())
+        else:
+            resolved = Path(repo).resolve()
+            # For files, walk up to find git root; for dirs, use as-is
+            if resolved.is_file():
+                candidate = resolved.parent
+                cwd = str(candidate)
+                while candidate != candidate.parent:
+                    if (candidate / ".git").exists():
+                        cwd = str(candidate)
+                        break
+                    candidate = candidate.parent
+            else:
+                cwd = str(resolved)
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
     def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:

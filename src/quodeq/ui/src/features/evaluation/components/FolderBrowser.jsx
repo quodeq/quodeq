@@ -1,15 +1,29 @@
 import { useEffect, useState } from 'react';
 import { browseDirectory, createDirectory } from '../../../api/index.js';
 
-function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigate }) {
+function FileIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  );
+}
+
+function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigate, showFiles }) {
+  const files = showFiles ? (data?.files || []) : [];
   return (
     <>
       {navError && <p className="inline-error" role="alert">{navError}</p>}
-      {!navError && data?.directories?.length === 0 && (
-        <p className="empty-folder">No subfolders in this directory</p>
+      {!navError && data?.directories?.length === 0 && files.length === 0 && (
+        <p className="empty-folder">No items in this directory</p>
       )}
-      {data?.directories?.length > 0 && (
-        <div className="folder-browser-hint">Click to select · Double-click to open</div>
+      {!navError && (data?.directories?.length > 0 || files.length > 0) && (
+        <div className="folder-browser-hint">
+          {data?.directories?.length > 0 && 'Click to select · Double-click to open'}
+          {data?.directories?.length > 0 && files.length > 0 && ' · '}
+          {files.length > 0 && 'Click file to select'}
+        </div>
       )}
       {(data?.directories || []).map((dir) => (
         <div
@@ -28,6 +42,22 @@ function FolderList({ data, navError, selectedFolder, setSelectedFolder, navigat
           <span className="folder-icon">{dir.isGitRepo ? '\uD83D\uDCE6' : '\uD83D\uDCC1'}</span>
           <span className="folder-name">{dir.name}</span>
           {dir.isGitRepo && <span className="git-indicator">repo</span>}
+        </div>
+      ))}
+      {files.map((file) => (
+        <div
+          key={file.path}
+          className={`folder-item file-item ${selectedFolder === file.path ? 'selected' : ''}`}
+          role="button"
+          tabIndex={0}
+          aria-pressed={selectedFolder === file.path}
+          onClick={() => setSelectedFolder(file.path)}
+          onKeyDown={(e) => {
+            if (e.key === ' ') { e.preventDefault(); setSelectedFolder(file.path); }
+          }}
+        >
+          <span className="folder-icon file-icon"><FileIcon /></span>
+          <span className="folder-name">{file.name}</span>
         </div>
       ))}
     </>
@@ -86,12 +116,12 @@ function FolderFooter({ selectedFolder, onClose, onConfirm, confirmText = 'Use T
   );
 }
 
-async function navigateFolder(path, navigation) {
+async function navigateFolder(path, navigation, showFiles) {
   const { setLoading, setNavError, updateNavState } = navigation;
   setLoading(true);
   setNavError(null);
   try {
-    const result = await browseDirectory(path || '');
+    const result = await browseDirectory(path || '', { files: showFiles });
     updateNavState({ data: result, path: result.current, pathInput: result.current, selectedFolder: result.current });
   } catch (err) {
     setNavError(err.message || 'Failed to load folder');
@@ -131,7 +161,7 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
   );
 }
 
-function FolderBrowserDialog({ state, actions, navigation, selection, title, confirmText }) {
+function FolderBrowserDialog({ state, actions, navigation, selection, title, confirmText, showFiles }) {
   const { data, loading, pathInput, navError } = state;
   const { navigate, onClose, onConfirm } = actions;
   const { selectedFolder, setSelectedFolder } = selection;
@@ -150,7 +180,7 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
         {loading ? (
           <p className="loading" role="status" aria-live="polite">Loading...</p>
         ) : (
-          <FolderList data={data} navError={navError} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} />
+          <FolderList data={data} navError={navError} selectedFolder={selectedFolder} setSelectedFolder={setSelectedFolder} navigate={navigate} showFiles={showFiles} />
         )}
       </div>
       <FolderFooter selectedFolder={selectedFolder} onClose={onClose} onConfirm={onConfirm} confirmText={confirmText} />
@@ -158,7 +188,7 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
   );
 }
 
-export default function FolderBrowser({ onSelect, onClose, title = 'Select Repository Folder', confirmText = 'Use This Folder' }) {
+export default function FolderBrowser({ onSelect, onClose, title = 'Select Repository Folder', confirmText = 'Use This Folder', showFiles = false }) {
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
@@ -175,7 +205,7 @@ export default function FolderBrowser({ onSelect, onClose, title = 'Select Repos
   const navigation = { setLoading, setNavError, updateNavState };
 
   function navigate(path) {
-    navigateFolder(path, navigation);
+    navigateFolder(path, navigation, showFiles);
   }
 
   useEffect(() => { navigate(''); }, []);
@@ -189,6 +219,7 @@ export default function FolderBrowser({ onSelect, onClose, title = 'Select Repos
         selection={{ selectedFolder, setSelectedFolder }}
         title={title}
         confirmText={confirmText}
+        showFiles={showFiles}
       />
     </div>
   );

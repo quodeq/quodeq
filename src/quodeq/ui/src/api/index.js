@@ -138,10 +138,14 @@ export async function getDimensionEval(projectId, runId, dimension) {
 
 /**
  * @param {string} [dirPath='']
- * @returns {Promise<{ current: string, parent: string|null, directories: Object[] }>}
+ * @param {{ files?: boolean }} [options]
+ * @returns {Promise<{ current: string, parent: string|null, directories: Object[], files?: Object[] }>}
  */
-export function browseDirectory(dirPath = '') {
-  const q = dirPath ? `?path=${encodeURIComponent(dirPath)}` : '';
+export function browseDirectory(dirPath = '', options = {}) {
+  const params = new URLSearchParams();
+  if (dirPath) params.set('path', dirPath);
+  if (options.files) params.set('files', '1');
+  const q = params.toString() ? `?${params}` : '';
   return request(`/browse${q}`);
 }
 
