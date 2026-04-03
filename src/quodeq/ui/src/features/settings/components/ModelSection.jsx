@@ -11,43 +11,57 @@ export { AI_MODEL_STORAGE_KEY, AI_CMD_STORAGE_KEY };
 
 function ClientSelector({ aiCmd, availableClients }) {
   const { value, onApply } = aiCmd;
-  return (
-    <>
-      <div className={`settings-row${!value ? ' settings-row--last' : ''}`}>
+  if (availableClients === null) {
+    return (
+      <div className="settings-row settings-row--last">
         <div className="settings-row-label">
           <span className="settings-label">Client</span>
-          <span className="settings-description">CLI tool used to run the analysis</span>
+          <span className="settings-description">Detecting...</span>
         </div>
-        {availableClients === null ? (
-          <span className="settings-description">Detecting…</span>
-        ) : availableClients.filter((c) => c.id === 'claude').length > 0 ? (
-          <div className="theme-toggle">
-            {availableClients.filter((c) => c.id === 'claude').map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                className={`theme-toggle-btn${value === id ? ' active' : ''}`}
-                onClick={() => onApply(id)}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        ) : null}
       </div>
-      {availableClients !== null && !availableClients.some((c) => c.id === 'claude') && (
+    );
+  }
+
+  const cliClients = availableClients.filter((c) => c.type === 'cli' || !c.type);
+  const apiClients = availableClients.filter((c) => c.type === 'api');
+
+  return (
+    <>
+      <div className={`settings-row${!value && apiClients.length === 0 ? ' settings-row--last' : ''}`}>
+        <div className="settings-row-label">
+          <span className="settings-label">Client</span>
+          <span className="settings-description">CLI tool or API provider for analysis</span>
+        </div>
+        <div className="theme-toggle">
+          {cliClients.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              className={`theme-toggle-btn${value === id ? ' active' : ''}`}
+              onClick={() => onApply(id)}
+            >
+              {label}
+            </button>
+          ))}
+          {apiClients.map(({ id, label }) => (
+            <button
+              key={id}
+              type="button"
+              className={`theme-toggle-btn${value === id ? ' active' : ''}`}
+              onClick={() => onApply(id)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {cliClients.length === 0 && apiClients.length === 0 && (
         <div className="settings-row settings-row--last settings-install-guide">
           <div className="settings-row-label">
-            <span className="settings-label">Claude not detected</span>
+            <span className="settings-label">No providers detected</span>
             <span className="settings-description">
-              Install Claude Code and restart Quodeq.
+              Install a CLI tool or configure an API provider.
             </span>
-          </div>
-          <div className="settings-install-options">
-            <div className="settings-install-item">
-              <span className="settings-install-name">Claude</span>
-              <code className="settings-install-cmd">npm i -g @anthropic-ai/claude-code</code>
-            </div>
           </div>
         </div>
       )}
