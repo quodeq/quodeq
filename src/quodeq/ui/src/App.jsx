@@ -121,7 +121,7 @@ const ROUTE_RENDERERS = {
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const isDirectNav = props.navigation.navStackLength === 1;
-    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard }} callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }} isDirectNav={isDirectNav} />;
+    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard }} callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }} isDirectNav={isDirectNav} tabKey={params._tabKey || 0} />;
   },
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   history: (params, props) => {

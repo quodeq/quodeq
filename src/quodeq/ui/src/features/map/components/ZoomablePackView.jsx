@@ -8,9 +8,19 @@ let _savedFocusPath = null;
 
 export function resetSavedFocus() { _savedFocusPath = null; }
 
-export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileClick, showLabels = true, zoom = 1 }) {
+export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileClick, showLabels = true, zoom = 1, resetKey = 0 }) {
   const [focus, _setFocus] = useState(null);
   const setFocus = (n) => { _savedFocusPath = n?.data?.path || null; _setFocus(n); };
+
+  // Zoom out to root with transition when resetKey changes
+  const prevResetKey = useRef(resetKey);
+  useEffect(() => {
+    if (resetKey !== prevResetKey.current) {
+      prevResetKey.current = resetKey;
+      _savedFocusPath = null;
+      _setFocus(null);
+    }
+  }, [resetKey]);
   const [hover, setHover] = useState(null);
   const skipTransition = useRef(!!_savedFocusPath);
 

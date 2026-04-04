@@ -149,7 +149,7 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack }) {
+function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey }) {
   const hasLabels = vizStyle === 'riskmatrix' || vizStyle === 'zoompack';
   return (
     <div className="map-viz-container">
@@ -161,7 +161,7 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, s
         </label>
       )}
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
-      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
+      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} />}
     </div>
   );
 }
@@ -171,9 +171,13 @@ function resetMapSavedState() {
   resetSavedFocus();
 }
 
-export default function MapPage({ data, callbacks, isDirectNav }) {
-  // Reset position state on direct tab click; keep viz style and view mode
-  if (isDirectNav) resetMapSavedState();
+export default function MapPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
+  // Reset position state on first mount from direct tab click; keep viz style and view mode
+  const initialResetDone = useRef(false);
+  if (isDirectNav && !initialResetDone.current) {
+    resetMapSavedState();
+    initialResetDone.current = true;
+  }
 
   // Lock parent to viewport height while map is active
   useEffect(() => {
@@ -197,6 +201,17 @@ export default function MapPage({ data, callbacks, isDirectNav }) {
   const [showLabels, setShowLabels] = useState(false);
   const [currentPath, _setCurrentPath] = useState(_savedMapPath);
   const setCurrentPath = (p) => { _savedMapPath = p; _setCurrentPath(p); };
+
+  // Animate back to root when tab is re-clicked while already on map
+  const prevTabKey = useRef(tabKey);
+  useEffect(() => {
+    if (tabKey !== prevTabKey.current) {
+      prevTabKey.current = tabKey;
+      setCurrentPath('');
+      resetSavedFocus();
+      callbacks?.onRefresh?.();
+    }
+  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get visible standards and available dimension names
   const visibleIds = useMemo(() => new Set(readVisibleStandardIds()), [allDimensions]);
@@ -273,7 +288,7 @@ export default function MapPage({ data, callbacks, isDirectNav }) {
         </span>
         <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       </div>
-      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} onFileClick={handleFileClick} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} />
+      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} onFileClick={handleFileClick} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} />
     </div>
   );
 }
