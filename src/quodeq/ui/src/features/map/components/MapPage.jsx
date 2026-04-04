@@ -166,18 +166,18 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, s
   );
 }
 
+let _lastTabKey = null;
+
 function resetMapSavedState() {
   _savedMapPath = '';
   resetSavedFocus();
 }
 
 export default function MapPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
-  // Reset position state on first mount from direct tab click; keep viz style and view mode
-  const initialResetDone = useRef(false);
-  if (isDirectNav && !initialResetDone.current) {
-    resetMapSavedState();
-    initialResetDone.current = true;
-  }
+  // Reset only on fresh tab click (tabKey changed), not on back from detail
+  const isFreshTabClick = _lastTabKey !== null && tabKey !== _lastTabKey;
+  _lastTabKey = tabKey;
+  if (isFreshTabClick) resetMapSavedState();
 
   // Lock parent to viewport height while map is active
   useEffect(() => {
@@ -188,10 +188,10 @@ export default function MapPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
     }
   }, []);
 
-  // Refresh data when navigating directly to the tab
+  // Refresh data on fresh tab click
   useEffect(() => {
-    if (isDirectNav) callbacks?.onRefresh?.();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isFreshTabClick) callbacks?.onRefresh?.();
+  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
   const [viewMode, _setViewMode] = useState(_savedViewMode);

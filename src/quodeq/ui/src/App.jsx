@@ -115,6 +115,7 @@ const ROUTE_RENDERERS = {
           onRefresh: props.refreshDashboard,
         }}
         isDirectNav={props.navigation.navStackLength === 1}
+        tabKey={params._tabKey || 0}
       />
     );
   },
