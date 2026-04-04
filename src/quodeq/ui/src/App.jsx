@@ -114,12 +114,15 @@ const ROUTE_RENDERERS = {
           onPrincipleClick: (principleObj) => nav('principle', { principle: principleObj, sourceTab: 'violations' }),
           onRefresh: props.refreshDashboard,
         }}
+        isDirectNav={props.navigation.navStackLength === 1}
+        tabKey={params._tabKey || 0}
       />
     );
   },
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
-    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard }} callbacks={{ onNavigate: props.navigation.handleNavigate }} />;
+    const isDirectNav = props.navigation.navStackLength === 1;
+    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard }} callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }} isDirectNav={isDirectNav} tabKey={params._tabKey || 0} />;
   },
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   history: (params, props) => {
@@ -213,7 +216,7 @@ export default function App() {
     navigation: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
       handleNavigate: state.handleNavigate, handleRunSelect: state.handleRunSelect,
-      handleProjectChange: state.handleProjectChange, navTab,
+      handleProjectChange: state.handleProjectChange, navTab, navStackLength: navStack.length,
       handleDeleteProject: state.handleDeleteProject, handleExportProject: state.handleExportProject, handleRelocateProject: state.handleRelocateProject,
       historySelectedRun: state.historySelectedRun, setHistorySelectedRun: state.setHistorySelectedRun,
       currentOverviewRun: state.currentOverviewRun, handleRunPrev: state.handleRunPrev, handleRunNext: state.handleRunNext, handleRunLatest: state.handleRunLatest,

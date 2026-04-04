@@ -70,7 +70,7 @@ function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange, onPer
           <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
         </div>
       </div>
-      <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} onPersist={onPersistPower} />
+      <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} onPersist={onPersistPower} labelPosition="left" />
     </header>
   );
 }

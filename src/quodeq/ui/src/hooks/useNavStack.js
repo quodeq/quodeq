@@ -48,7 +48,8 @@ function createNavActions(setNavStack, navStackRef) {
     setNavStack((prev) => {
       const stepsBack = prev.length - 1;
       if (stepsBack > 0) window.history.go(-stepsBack);
-      return [{ page }];
+      const prevKey = prev.length === 1 && prev[0].page === page ? (prev[0]._tabKey || 0) : 0;
+      return [{ page, _tabKey: prevKey + 1 }];
     });
   }
 

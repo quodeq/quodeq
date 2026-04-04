@@ -3,7 +3,7 @@ import { buildFileTree, treeNodeToFileObj } from '../utils/fileTree.js';
 import { complianceRatio } from '../../../utils/formatters.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import RiskMatrixView from './RiskMatrixView.jsx';
-import ZoomablePackView from './ZoomablePackView.jsx';
+import ZoomablePackView, { resetSavedFocus } from './ZoomablePackView.jsx';
 
 let _savedMapPath = '';
 let _savedVizStyle = 'zoompack';
@@ -60,6 +60,7 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
 function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, allDimensions, selectedDimensions, onToggleDimension }) {
   return (
     <div className="map-controls">
+      <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
       {vizStyle === 'zoompack' && (
         <div className="map-pill-group">
           {VIEW_MODES.map((m) => (
@@ -76,7 +77,6 @@ function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, allDimensio
           </button>
         ))}
       </div>
-      <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
     </div>
   );
 }
@@ -149,7 +149,7 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack }) {
+function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey }) {
   const hasLabels = vizStyle === 'riskmatrix' || vizStyle === 'zoompack';
   return (
     <div className="map-viz-container">
@@ -161,12 +161,24 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, s
         </label>
       )}
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
-      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
+      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} />}
     </div>
   );
 }
 
-export default function MapPage({ data, callbacks }) {
+let _lastTabKey = null;
+
+function resetMapSavedState() {
+  _savedMapPath = '';
+  resetSavedFocus();
+}
+
+export default function MapPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
+  // Reset only on fresh tab click (tabKey changed), not on back from detail
+  const isFreshTabClick = _lastTabKey !== null && tabKey !== _lastTabKey;
+  _lastTabKey = tabKey;
+  if (isFreshTabClick) resetMapSavedState();
+
   // Lock parent to viewport height while map is active
   useEffect(() => {
     const dashboard = document.querySelector('.dashboard');
@@ -176,6 +188,11 @@ export default function MapPage({ data, callbacks }) {
     }
   }, []);
 
+  // Refresh data on fresh tab click
+  useEffect(() => {
+    if (isFreshTabClick) callbacks?.onRefresh?.();
+  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
   const [viewMode, _setViewMode] = useState(_savedViewMode);
   const setViewMode = (v) => { _savedViewMode = v; _setViewMode(v); };
@@ -184,6 +201,17 @@ export default function MapPage({ data, callbacks }) {
   const [showLabels, setShowLabels] = useState(false);
   const [currentPath, _setCurrentPath] = useState(_savedMapPath);
   const setCurrentPath = (p) => { _savedMapPath = p; _setCurrentPath(p); };
+
+  // Animate back to root when tab is re-clicked while already on map
+  const prevTabKey = useRef(tabKey);
+  useEffect(() => {
+    if (tabKey !== prevTabKey.current) {
+      prevTabKey.current = tabKey;
+      setCurrentPath('');
+      resetSavedFocus();
+      callbacks?.onRefresh?.();
+    }
+  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get visible standards and available dimension names
   const visibleIds = useMemo(() => new Set(readVisibleStandardIds()), [allDimensions]);
@@ -260,7 +288,7 @@ export default function MapPage({ data, callbacks }) {
         </span>
         <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       </div>
-      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} onFileClick={handleFileClick} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} />
+      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} onFileClick={handleFileClick} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} />
     </div>
   );
 }
