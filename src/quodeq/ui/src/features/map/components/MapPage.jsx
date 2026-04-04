@@ -3,7 +3,7 @@ import { buildFileTree, treeNodeToFileObj } from '../utils/fileTree.js';
 import { complianceRatio } from '../../../utils/formatters.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import RiskMatrixView from './RiskMatrixView.jsx';
-import ZoomablePackView from './ZoomablePackView.jsx';
+import ZoomablePackView, { resetSavedFocus } from './ZoomablePackView.jsx';
 
 let _savedMapPath = '';
 let _savedVizStyle = 'zoompack';
@@ -60,6 +60,7 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
 function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, allDimensions, selectedDimensions, onToggleDimension }) {
   return (
     <div className="map-controls">
+      <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
       {vizStyle === 'zoompack' && (
         <div className="map-pill-group">
           {VIEW_MODES.map((m) => (
@@ -76,7 +77,6 @@ function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, allDimensio
           </button>
         ))}
       </div>
-      <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
     </div>
   );
 }
@@ -166,7 +166,15 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, s
   );
 }
 
-export default function MapPage({ data, callbacks }) {
+function resetMapSavedState() {
+  _savedMapPath = '';
+  resetSavedFocus();
+}
+
+export default function MapPage({ data, callbacks, isDirectNav }) {
+  // Reset position state on direct tab click; keep viz style and view mode
+  if (isDirectNav) resetMapSavedState();
+
   // Lock parent to viewport height while map is active
   useEffect(() => {
     const dashboard = document.querySelector('.dashboard');
@@ -175,6 +183,11 @@ export default function MapPage({ data, callbacks }) {
       return () => dashboard.classList.remove('dashboard--fullheight');
     }
   }, []);
+
+  // Refresh data when navigating directly to the tab
+  useEffect(() => {
+    if (isDirectNav) callbacks?.onRefresh?.();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
   const [viewMode, _setViewMode] = useState(_savedViewMode);

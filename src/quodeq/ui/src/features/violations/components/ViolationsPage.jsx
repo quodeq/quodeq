@@ -146,9 +146,17 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh }
   };
 }
 
-export default function ViolationsPage({ data, callbacks }) {
+export default function ViolationsPage({ data, callbacks, isDirectNav }) {
+  // Reset file path on direct tab click; keep selected sub-tab
+  if (isDirectNav) _savedFilePath = '';
+
   const { accumulatedDimensions, selectedProject } = data;
   const { onDimensionClick, onFileClick, onPrincipleClick, onRefresh } = callbacks;
+
+  // Refresh data when navigating directly to the tab
+  useEffect(() => {
+    if (isDirectNav) onRefresh?.();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
     activeSubTab, setActiveSubTab, dismissed,

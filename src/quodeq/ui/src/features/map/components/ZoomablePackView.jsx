@@ -6,6 +6,8 @@ import FileShape from './FileShape.jsx';
 const BASE_SIZE = 600;
 let _savedFocusPath = null;
 
+export function resetSavedFocus() { _savedFocusPath = null; }
+
 export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileClick, showLabels = true, zoom = 1 }) {
   const [focus, _setFocus] = useState(null);
   const setFocus = (n) => { _savedFocusPath = n?.data?.path || null; _setFocus(n); };
@@ -28,12 +30,14 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
     if (_savedFocusPath && circles.length > 0 && !focus) {
       const match = circles.find((c) => c.data.path === _savedFocusPath);
       if (match) _setFocus(match);
+      // Keep skipTransition true until the restored focus is rendered
+      return;
     }
-    // Allow transitions after first paint
+    // Allow transitions after focus has been restored and painted
     if (skipTransition.current) {
       requestAnimationFrame(() => { skipTransition.current = false; });
     }
-  }, [circles]);
+  }, [circles, focus]);
 
   const focusNode = focus || root;
   const viewSize = Math.round(BASE_SIZE * zoom);
