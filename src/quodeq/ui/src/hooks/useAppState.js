@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { useDashboard } from '../features/dashboard/hooks/useDashboard.js';
 import { buildDailyRuns } from '../utils/dailyGrouping.js';
 import { useServerHealth } from './useServerHealth.js';
@@ -90,6 +90,18 @@ export function useAppState() {
   const visibleDailyRuns = useVisibleRuns(rawDailyRuns, dashboard, activePage.page, setSelectedRun);
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect } = useRunNavigator({ selectedRun, availableRuns: visibleDailyRuns, onRunChange: handleRunChange, onNavigate: handleNavigate });
   const evalLifecycle = useEvaluationLifecycle({ settings, navigation: { navTab, navReset }, projects: { loadProjects, setProjects, selectProjectAndRun } });
+
+  // Refresh all dashboard data (including latestAccumulated) when an evaluation finishes
+  const evalRefreshedRef = useRef(null);
+  useEffect(() => {
+    const job = evalLifecycle.job;
+    const finished = job && job.status !== 'running' && job.outputRunId;
+    if (finished && evalRefreshedRef.current !== job.outputRunId) {
+      evalRefreshedRef.current = job.outputRunId;
+      refreshDashboard();
+    }
+  }, [evalLifecycle.job, refreshDashboard]);
+
   const activeTab = KNOWN_TABS.includes(activePage.page) ? activePage.page
     : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab
     : activePage.page === 'history-run' ? 'history'
