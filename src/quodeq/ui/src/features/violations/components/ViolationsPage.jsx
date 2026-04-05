@@ -156,9 +156,9 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   const { accumulatedDimensions, selectedProject } = data;
   const { onDimensionClick, onFileClick, onPrincipleClick, onRefresh } = callbacks;
 
-  // Refresh data on fresh tab click
+  // Refresh data on mount (ensures fresh data after returning from detail pages) and on tab re-click
   useEffect(() => {
-    if (isFreshTabClick) onRefresh?.();
+    onRefresh?.();
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {

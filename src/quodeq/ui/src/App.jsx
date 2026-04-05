@@ -4,7 +4,6 @@ import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
 import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
-import EvalPrincipleDetailPage from './features/explorer/components/EvalPrincipleDetailPage.jsx';
 import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
 import HistoryPage from './features/history/components/HistoryPage.jsx';
 import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
@@ -17,7 +16,7 @@ import { dismissFinding } from './api/index.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
-import { useAppState, formatDayLabel, KNOWN_TABS } from './hooks/useAppState.js';
+import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 
 
 /**
@@ -87,16 +86,41 @@ function buildDismissPayload(v, fallbackDimension) {
 }
 
 function renderEvalPrincipleDetail(params, props) {
+  const { selectedProject, selectedRun } = props.navigation;
+  const evalPrincipal = {
+    ...params.evalPrincipal,
+    project: params.evalPrincipal?.project || selectedProject || '',
+    runId: params.evalPrincipal?.runId || selectedRun || '',
+  };
   return (
-    <EvalPrincipleDetailPage
-      evalPrincipal={params.evalPrincipal}
+    <PrincipleDetailPage
+      evalPrincipal={evalPrincipal}
       onDismiss={(v) => {
-        dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.evalPrincipal?.dimension))
+        dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
           .then(() => props.refreshDashboard?.())
           .catch((e) => console.error('[Dismiss] failed:', e));
       }}
     />
   );
+}
+
+function buildEvalPrincipal(principleObj, principleGrade) {
+  const violations = principleObj.violations || [];
+  const compliance = principleObj.compliance || [];
+  return {
+    principle: principleObj.principle,
+    score: principleGrade?.score || null,
+    grade: principleGrade?.grade || null,
+    dimension: principleObj.dimension || '',
+    principleData: {
+      name: principleObj.principle,
+      grade: principleGrade?.grade || null,
+      violations,
+      compliance,
+    },
+    dimViolations: violations,
+    dimCompliance: compliance,
+  };
 }
 
 const ROUTE_RENDERERS = {
@@ -111,7 +135,14 @@ const ROUTE_RENDERERS = {
         callbacks={{
           onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, sourceTab: 'violations' }),
           onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
-          onPrincipleClick: (principleObj) => nav('principle', { principle: principleObj, sourceTab: 'violations' }),
+          onPrincipleClick: (principleObj) => {
+            const dim = dims.find(d => d.dimension === principleObj.dimension);
+            const pg = (dim?.principles || []).find(p => (p.name || p.principle) === principleObj.principle);
+            nav('evalprinciple', {
+              evalPrincipal: buildEvalPrincipal(principleObj, pg),
+              sourceTab: 'violations',
+            });
+          },
           onRefresh: props.refreshDashboard,
         }}
         isDirectNav={props.navigation.navStackLength === 1}
@@ -122,7 +153,7 @@ const ROUTE_RENDERERS = {
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const isDirectNav = props.navigation.navStackLength === 1;
-    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard }} callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }} isDirectNav={isDirectNav} tabKey={params._tabKey || 0} />;
+    return <MapPage data={{ accumulated: acc, dashboard: props.dashboardData.dashboard, projectName: props.dashboardData.selectedDisplayName }} callbacks={{ onNavigate: props.navigation.handleNavigate, onRefresh: props.refreshDashboard }} isDirectNav={isDirectNav} tabKey={params._tabKey || 0} />;
   },
   run: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
   history: (params, props) => {
@@ -154,7 +185,6 @@ const ROUTE_RENDERERS = {
   explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
   file: (params) => <FileDetailPage file={params.file} />,
-  principle: (params) => <PrincipleDetailPage principle={params.principle} />,
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
   settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} persistAnalysisPower={props.evaluation.persistAnalysisPower} />,
@@ -212,6 +242,7 @@ export default function App() {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
       dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, rescoreLookup: state.rescoreLookup, loading: state.loading, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
+      selectedDisplayName: state.selectedDisplayName,
     },
     navigation: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,

@@ -30,7 +30,7 @@ import { createViolations } from './violation.js';
 export function createPrinciple(raw) {
   if (!raw || typeof raw !== 'object') return raw;
   return {
-    name:            raw.name ?? '',
+    name:            raw.name || raw.principle || '',
     grade:           raw.grade ?? null,
     score:           raw.score ?? null,
     violations:      createViolations(raw.violations),

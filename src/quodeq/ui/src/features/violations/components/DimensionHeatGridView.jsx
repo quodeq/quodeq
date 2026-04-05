@@ -93,6 +93,7 @@ function buildRows(dimensions, sortCol, sortDir) {
           raw: dim,
           principleObj: {
             principle: name,
+            dimension: dim.dimension,
             total: data.violations,
             critical: data.severity.critical,
             major: data.severity.major,

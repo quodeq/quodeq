@@ -4,6 +4,7 @@ import { complianceRatio } from '../../../utils/formatters.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import RiskMatrixView from './RiskMatrixView.jsx';
 import ZoomablePackView, { resetSavedFocus } from './ZoomablePackView.jsx';
+import GalaxyView from './GalaxyView.jsx';
 
 let _savedMapPath = '';
 let _savedVizStyle = 'zoompack';
@@ -16,6 +17,7 @@ const VIEW_MODES = [
 
 const VIZ_STYLES = [
   { id: 'zoompack', label: 'Circle Pack', enabled: true },
+  { id: 'galaxy', label: 'Galaxy', enabled: true },
   { id: 'riskmatrix', label: 'Risk Matrix', enabled: true },
 ];
 
@@ -149,12 +151,11 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey }) {
-  const hasLabels = vizStyle === 'riskmatrix' || vizStyle === 'zoompack';
+function MapVizContainer({ vizStyle, viewMode, node, dimensions, onDrillDown, onFileClick, onNavigate, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey, projectName }) {
   return (
     <div className="map-viz-container">
-      <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} onBack={onBack} />
-      {hasLabels && (
+      {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} onBack={onBack} />}
+      {vizStyle !== 'galaxy' && (
         <label className="map-label-toggle">
           <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
           Labels
@@ -162,6 +163,7 @@ function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, s
       )}
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
       {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} />}
+      {vizStyle === 'galaxy' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} />}
     </div>
   );
 }
@@ -188,9 +190,9 @@ export default function MapPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
     }
   }, []);
 
-  // Refresh data on fresh tab click
+  // Refresh data on mount (ensures fresh data after returning from detail pages) and on tab re-click
   useEffect(() => {
-    if (isFreshTabClick) callbacks?.onRefresh?.();
+    callbacks?.onRefresh?.();
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
@@ -198,7 +200,7 @@ export default function MapPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
   const setViewMode = (v) => { _savedViewMode = v; _setViewMode(v); };
   const [vizStyle, _setVizStyle] = useState(_savedVizStyle);
   const setVizStyle = (v) => { _savedVizStyle = v; _setVizStyle(v); };
-  const [showLabels, setShowLabels] = useState(false);
+  const [showLabels, setShowLabels] = useState(true);
   const [currentPath, _setCurrentPath] = useState(_savedMapPath);
   const setCurrentPath = (p) => { _savedMapPath = p; _setCurrentPath(p); };
 
@@ -254,6 +256,7 @@ export default function MapPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
     [visibleDimensions, effectiveSelected]
   );
 
+
   const fullTree = useMemo(() => buildFileTree(filteredDimensions), [filteredDimensions]);
   const currentNode = useMemo(() => findSubtree(fullTree, currentPath), [fullTree, currentPath]);
   const breadcrumb = useMemo(() => buildBreadcrumbPath(fullTree, currentPath), [fullTree, currentPath]);
@@ -288,7 +291,7 @@ export default function MapPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
         </span>
         <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       </div>
-      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} onFileClick={handleFileClick} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} />
+      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} dimensions={filteredDimensions} onDrillDown={handleDrillDown} onFileClick={handleFileClick} onNavigate={callbacks?.onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} projectName={data?.projectName} />
     </div>
   );
 }
