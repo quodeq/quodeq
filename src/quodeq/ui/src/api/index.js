@@ -9,7 +9,7 @@
  */
 
 import { createDashboard } from '../models/dashboard.js';
-import { createDimensionEval } from '../models/dimension.js';
+import { createDimension, createDimensionEval } from '../models/dimension.js';
 import { createJob } from '../models/job.js';
 import { createProject } from '../models/project.js';
 import { request, BASE } from './request.js';
@@ -90,7 +90,11 @@ export async function getDashboard(projectId, run = 'latest') {
 /** @returns {Promise<Object>} */
 export async function getAccumulated(projectId, asOfRun = null) {
   const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  return request(`/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
+  if (data && Array.isArray(data.dimensions)) {
+    data.dimensions = data.dimensions.map(createDimension);
+  }
+  return data;
 }
 
 // ── Evaluations / Jobs ──────────────────────────────────────────────────
