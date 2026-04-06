@@ -95,6 +95,7 @@ function renderEvalPrincipleDetail(params, props) {
   return (
     <PrincipleDetailPage
       evalPrincipal={evalPrincipal}
+      severityFilter={params.severity || null}
       onDismiss={(v) => {
         dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
           .then(() => props.refreshDashboard?.())
@@ -129,20 +130,33 @@ const ROUTE_RENDERERS = {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const dims = acc?.dimensions || [];
     const nav = props.navigation.handleNavigate;
+
+    function navigateToPrinciple(principleObj, severity) {
+      const dim = dims.find(d => d.dimension === principleObj.dimension);
+      const pg = (dim?.principles || []).find(p => (p.name || p.principle) === principleObj.principle);
+      nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
+    }
+
+    function navigateToDimension(row, severity) {
+      const dim = row.raw || dims.find(d => d.dimension === row.dimension);
+      if (!dim) return;
+      nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, severity, sourceTab: 'violations' });
+    }
+
     return (
       <ViolationsPage
         data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
         callbacks={{
           onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, sourceTab: 'violations' }),
           onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
-          onPrincipleClick: (principleObj) => {
-            const dim = dims.find(d => d.dimension === principleObj.dimension);
-            const pg = (dim?.principles || []).find(p => (p.name || p.principle) === principleObj.principle);
-            nav('evalprinciple', {
-              evalPrincipal: buildEvalPrincipal(principleObj, pg),
-              sourceTab: 'violations',
-            });
+          onCellClick: ({ row, severity }) => {
+            if (row.type === 'principle' && row.principleObj) {
+              navigateToPrinciple(row.principleObj, severity);
+            } else {
+              navigateToDimension(row, severity);
+            }
           },
+          onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
           onRefresh: props.refreshDashboard,
         }}
         isDirectNav={props.navigation.navStackLength === 1}
@@ -182,7 +196,7 @@ const ROUTE_RENDERERS = {
     );
   },
   'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
-  explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
+  explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} severityFilter={params.severity} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} />,
   file: (params) => <FileDetailPage file={params.file} />,
   evalprinciple: renderEvalPrincipleDetail,

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { severityCellStyle, complianceRateCellStyle } from '../../map/utils/mapColors.js';
+import HeatGridCells from '../../../components/HeatGridCells.jsx';
 
 const COLUMNS = [
   { id: 'name', label: 'Dimension / Principle', align: 'left' },
@@ -121,7 +121,7 @@ function buildRows(dimensions, sortCol, sortDir) {
   return rows;
 }
 
-export default function DimensionHeatGridView({ dimensions, onDimensionClick, onPrincipleClick }) {
+export default function DimensionHeatGridView({ dimensions, onDimensionClick, onPrincipleClick, onCellClick }) {
   const [sortCol, setSortCol] = useState('violations');
   const [sortDir, setSortDir] = useState('desc');
 
@@ -154,10 +154,7 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
         </thead>
         <tbody>
           {rows.map((row, i) => {
-            const total = row.violations + row.compliance;
-            const rate = total > 0 ? Math.round(row.complianceRate * 100) + '%' : '—';
             const isDim = row.type === 'dimension';
-
             return (
               <tr key={`${row.type}-${row.name}-${i}`} className={isDim ? 'heat-grid-dim-row' : undefined}>
                 <td>
@@ -172,11 +169,7 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
                     {row.name}
                   </div>
                 </td>
-                <td><div className={`heat-grid-cell${row.severity.critical > 0 ? '' : ' empty'}`} style={row.severity.critical > 0 ? severityCellStyle('critical') : undefined}>{row.severity.critical || '—'}</div></td>
-                <td><div className={`heat-grid-cell${row.severity.major > 0 ? '' : ' empty'}`} style={row.severity.major > 0 ? severityCellStyle('major') : undefined}>{row.severity.major || '—'}</div></td>
-                <td><div className={`heat-grid-cell${row.severity.minor > 0 ? '' : ' empty'}`} style={row.severity.minor > 0 ? severityCellStyle('minor') : undefined}>{row.severity.minor || '—'}</div></td>
-                <td><div className="heat-grid-num">{row.violations}</div></td>
-                <td><div className={`heat-grid-cell${total > 0 ? ' health' : ' empty'}`} style={total > 0 ? complianceRateCellStyle(row.complianceRate) : undefined}>{rate}</div></td>
+                <HeatGridCells row={row} onCellClick={onCellClick} />
               </tr>
             );
           })}

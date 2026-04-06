@@ -329,6 +329,17 @@
   opacity: 0.8;
 }
 
+.heat-grid-cell.clickable,
+.heat-grid-num.clickable {
+  cursor: pointer;
+}
+
+.heat-grid-cell.clickable:hover,
+.heat-grid-num.clickable:hover {
+  opacity: 0.7;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
 .heat-grid-cell.empty {
   background: var(--color-surface-alt);
   color: var(--color-text-muted);

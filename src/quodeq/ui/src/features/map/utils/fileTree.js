@@ -70,10 +70,15 @@ function collapseSingleChildren(node) {
   }
 }
 
-/** Convert a leaf tree node into a file object compatible with FileDetailPage */
-export function treeNodeToFileObj(node) {
-  const violations = node.items.filter((i) => i.type === 'violation');
-  const compliance = node.items.filter((i) => i.type === 'compliance');
+/** Convert a tree node into a file object, optionally filtered by severity.
+ *  severity: null = all violations, 'critical'|'major'|'minor' = filtered, 'all' = violations + compliance */
+export function treeNodeToFileObj(node, { severity } = {}) {
+  let violations = node.items.filter((i) => i.type === 'violation');
+  let compliance = node.items.filter((i) => i.type === 'compliance');
+  if (severity && severity !== 'all') {
+    violations = violations.filter((v) => (v.severity || 'minor') === severity);
+    compliance = []; // severity filter shows only violations
+  }
   const bySev = { critical: [], major: [], minor: [], unknown: [] };
   for (const v of violations) {
     const sev = v.severity || 'minor';

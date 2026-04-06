@@ -78,10 +78,15 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
     if (treeNode.isFile) onFileClick?.(treeNodeToFileObj(treeNode));
   }, [onFileClick]);
 
+  const handleCellClick = useCallback(({ row, severity }) => {
+    // Navigate to file/folder detail filtered by severity
+    onFileClick?.(treeNodeToFileObj(row, { severity: severity || undefined }));
+  }, [onFileClick]);
+
   return (
     <>
       <FileBreadcrumb path={breadcrumb} onNavigate={setCurrentPath} onBack={() => setCurrentPath(findParentPath(fullTree, currentPath))} />
-      <HeatGridView node={currentNode} onDrillDown={setCurrentPath} onFileClick={handleFileClick} />
+      <HeatGridView node={currentNode} onDrillDown={setCurrentPath} onFileClick={handleFileClick} onCellClick={handleCellClick} />
     </>
   );
 }
@@ -221,7 +226,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
         <FileSubTab dimensions={visibleDimensions} onFileClick={onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />
       )}
       {activeSubTab === 'dimension' && (
-        <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} />
+        <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} onCellClick={callbacks.onCellClick} />
       )}
       {activeSubTab === 'dismissed' && (
         dismissed.length > 0

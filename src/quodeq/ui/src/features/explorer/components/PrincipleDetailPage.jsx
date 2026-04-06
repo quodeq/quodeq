@@ -6,6 +6,7 @@ import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { getRescore } from '../../../api/index.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
+import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 
 const PAGE_SIZE = 20;
 
@@ -153,12 +154,13 @@ function PrincipleContext({ principleData }) {
   );
 }
 
-const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, onDismiss }) {
+const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
   const { principleData, principle, score, grade, dimension, project, runId } = evalPrincipal;
   const [showAllCompliance, setShowAllCompliance] = useState(false);
   const [dismissedSet, setDismissedSet] = useState(new Set());
   const [liveScore, setLiveScore] = useState(null);
   const [liveGrade, setLiveGrade] = useState(null);
+  const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
   const { violations, compliance, violationsBySeverity, sevCounts } = computeEvalPrincipleData(evalPrincipal);
   const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
 
@@ -191,6 +193,16 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, o
     return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
   }, [violationsBySeverity, dismissedSet]);
 
+  // Apply active severity filter
+  const displayedBySeverity = useMemo(() => {
+    if (!activeSevFilter || activeSevFilter === 'all') return filteredBySeverity;
+    const filtered = {};
+    for (const sev of Object.keys(filteredBySeverity)) {
+      filtered[sev] = sev === activeSevFilter ? filteredBySeverity[sev] : [];
+    }
+    return filtered;
+  }, [filteredBySeverity, activeSevFilter]);
+
   return (
     <>
       <PrincipleHeader
@@ -198,7 +210,10 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, o
         onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
       />
       <PrincipleContext principleData={principleData} />
-      <ViolationListSection violationsBySeverity={filteredBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} onDismiss={handleDismiss} />
+      {filteredViolations.length > 0 && (
+        <SeverityFilterPills counts={liveSevCounts} activeFilter={activeSevFilter} onFilterChange={setActiveSevFilter} />
+      )}
+      <ViolationListSection violationsBySeverity={displayedBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} onDismiss={handleDismiss} />
       <ComplianceListSection
         data={{ compliance, displayedCompliance, principle }}
         controls={{ hasMore: compliance.length > PAGE_SIZE, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
