@@ -1,5 +1,5 @@
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
-import { complianceRateColor } from '../utils/mapColors.js';
+import { seedHash, seededRng } from './galaxyCore.js';
 
 const TAU = Math.PI * 2;
 
@@ -142,6 +142,10 @@ const CONSTELLATION_LABELS = {
 };
 
 function buildScene(dimensions, W, H, standardTypes) {
+  // Seeded RNG from dimension names for deterministic layout
+  const dimFingerprint = dimensions.map(d => d.dimension || '').sort().join('|');
+  const rng = seededRng(seedHash('galaxy:' + dimFingerprint));
+
   // Group dimensions by standard type
   const dimGroups = {};
   dimensions.forEach(dim => {
@@ -159,22 +163,30 @@ function buildScene(dimensions, W, H, standardTypes) {
   const constellations = [];
   let globalIdx = 0;
 
-  const spread = Math.min(W, H) * 0.35;
-  // Scale cluster spread based on star count — more stars need more space
-  const baseClusterSpread = Math.min(W, H) * 0.16;
+  const spread = Math.min(W, H) * 0.5;
+  const baseClusterSpread = Math.min(W, H) * 0.3;
 
   if (useConstellations) {
-    // Organic layout positions — hand-tuned for 1-4 groups, avoids overlap
-    const layouts = {
-      1: [[0, 0]],
-      2: [[-0.55, -0.1], [0.55, 0.15]],
-      3: [[-0.6, -0.35], [0.55, -0.15], [-0.05, 0.55]],
-      4: [[-0.6, -0.4], [0.55, -0.3], [-0.45, 0.5], [0.6, 0.5]],
-    };
+    // Seeded cluster positions — unique per group composition
     const n = groupKeys.length;
-    const positions = layouts[Math.min(n, 4)] || layouts[4];
+    let clusterPositions;
+    if (n === 1) {
+      clusterPositions = [[0, 0]];
+    } else {
+      const clusterRng = seededRng(seedHash('clusters:' + groupKeys.join(':')));
+      clusterPositions = groupKeys.map(() => {
+        const angle = clusterRng() * TAU;
+        const dist = 0.3 + clusterRng() * 0.5;
+        return [Math.cos(angle) * dist, Math.sin(angle) * dist];
+      });
+      let cx = 0, cy = 0;
+      clusterPositions.forEach(p => { cx += p[0]; cy += p[1]; });
+      cx /= n; cy /= n;
+      clusterPositions.forEach(p => { p[0] -= cx; p[1] -= cy; });
+    }
+
     groupKeys.forEach((type, gi) => {
-      const [px, py] = positions[gi % positions.length];
+      const [px, py] = clusterPositions[gi];
       const clusterCx = px * spread * 1.8;
       const clusterCy = py * spread * 1.8;
       const groupDims = dimGroups[type];
@@ -183,16 +195,21 @@ function buildScene(dimensions, W, H, standardTypes) {
       const startIdx = globalIdx;
       const lines = [];
 
-      // Place stars with minimum spacing — use golden angle for even distribution
-      const goldenAngle = TAU * (1 - 1 / 1.618);
+      // Seeded organic layout — scattered but balanced, no center star
+      const clRng = seededRng(seedHash('cl:' + type));
+      const phaseOffset = clRng() * TAU;
+      // Place all stars scattered around the cluster, with seeded variation
       groupDims.forEach((dim, i) => {
         const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
         const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
         const score = dim.overallScore ? parseFloat(dim.overallScore) : 5;
         const radius = 3 + Math.sqrt(totalV + totalC) * 0.4;
-        // Golden angle spiral for even spacing
-        const a = i * goldenAngle;
-        const dist = clusterSpread * (0.4 + (i / Math.max(1, groupDims.length - 1)) * 0.6);
+        const n = groupDims.length;
+        // Fully seeded random angle — organic scatter
+        const a = phaseOffset + clRng() * TAU;
+        // Distance: varied per star, seeded — closer and further stars mixed
+        const distVar = 0.3 + clRng() * 0.45; // 0.3 to 0.75
+        const dist = n === 1 ? 0 : Math.max(clusterSpread * distVar, 40);
         stars.push({
           name: dim.dimension || 'Unknown',
           score, radius,
@@ -203,22 +220,64 @@ function buildScene(dimensions, W, H, standardTypes) {
           _clusterCy: clusterCy,
           _ox: Math.cos(a) * dist,
           _oy: Math.sin(a) * dist,
-          pp: Math.random() * TAU,
+          pp: rng() * TAU,
           x: 0, y: 0,
           principleCount: 0,
           _raw: dim,
         });
-        // Connect to previous star in cluster
-        if (i > 0) lines.push({ a: startIdx + i - 1, b: startIdx + i });
         globalIdx++;
       });
-      // Close the shape for 3+ stars
-      if (groupDims.length >= 3) lines.push({ a: startIdx + groupDims.length - 1, b: startIdx });
+      // MST constellation lines — connects all stars, organic shape
+      const clusterStars = stars.slice(startIdx);
+      if (clusterStars.length >= 2) {
+        const connected = new Set([0]);
+        while (connected.size < clusterStars.length) {
+          let bestA = -1, bestB = -1, bestD = Infinity;
+          for (const ai of connected) {
+            for (let bi = 0; bi < clusterStars.length; bi++) {
+              if (connected.has(bi)) continue;
+              const dx = clusterStars[ai]._ox - clusterStars[bi]._ox;
+              const dy = clusterStars[ai]._oy - clusterStars[bi]._oy;
+              const d = dx * dx + dy * dy;
+              if (d < bestD) { bestD = d; bestA = ai; bestB = bi; }
+            }
+          }
+          if (bestB >= 0) { lines.push({ a: startIdx + bestA, b: startIdx + bestB }); connected.add(bestB); }
+          else break;
+        }
+      }
+
+      // Repulsion pass — enforce minimum distance between stars in cluster
+      const clStars = stars.slice(startIdx);
+      const minGap = 60;
+      for (let iter = 0; iter < 6; iter++) {
+        for (let a2 = 0; a2 < clStars.length; a2++) {
+          for (let b2 = a2 + 1; b2 < clStars.length; b2++) {
+            const sa = clStars[a2], sb = clStars[b2];
+            const dx = sb._ox - sa._ox, dy = sb._oy - sa._oy;
+            const d = Math.sqrt(dx * dx + dy * dy) || 0.1;
+            const minD = sa.radius + sb.radius + minGap;
+            if (d < minD) {
+              const push = (minD - d) / 2;
+              const nx = dx / d, ny = dy / d;
+              sa._ox -= nx * push; sa._oy -= ny * push;
+              sb._ox += nx * push; sb._oy += ny * push;
+            }
+          }
+        }
+      }
+      // Re-center after repulsion
+      if (clStars.length > 0) {
+        let rcx = 0, rcy = 0;
+        clStars.forEach(s => { rcx += s._ox; rcy += s._oy; });
+        rcx /= clStars.length; rcy /= clStars.length;
+        clStars.forEach(s => { s._ox -= rcx; s._oy -= rcy; });
+      }
 
       constellations.push({ type, label: CONSTELLATION_LABELS[type] || type, cx: clusterCx, cy: clusterCy, spread: clusterSpread, lines });
     });
   } else {
-    // Single group — original circular layout
+    // Single group — seeded circular layout
     dimensions.forEach((dim, i) => {
       const totalV = dim.totals?.violationCount || dim.violations?.length || 0;
       const totalC = dim.totals?.complianceCount || dim.compliance?.length || 0;
@@ -230,9 +289,9 @@ function buildScene(dimensions, W, H, standardTypes) {
         violations: totalV, compliance: totalC,
         col: scoreRGB(score),
         ba: (i / dimensions.length) * TAU - Math.PI / 2,
-        j: (Math.random() - 0.5) * 40,
+        j: (rng() - 0.5) * 40,
         _clusterCx: 0, _clusterCy: 0, _ox: 0, _oy: 0,
-        pp: Math.random() * TAU,
+        pp: rng() * TAU,
         x: 0, y: 0,
         principleCount: 0,
         _raw: dim,
@@ -252,6 +311,7 @@ function buildScene(dimensions, W, H, standardTypes) {
       violations: g.violations,
       compliance: g.compliance,
     }));
+    const pRng = seededRng(seedHash('prin:' + (dim.dimension || di)));
     principles[di] = prinList.map((p, pi) => {
       const pv = p.violations.length;
       const pc = p.compliance.length;
@@ -266,8 +326,8 @@ function buildScene(dimensions, W, H, standardTypes) {
         violations: pv, compliance: pc,
         radius, col: scoreRGB(pScore),
         ba: (pi / (prinList.length || 1)) * TAU - Math.PI / 2,
-        od: 25 + (pi / (prinList.length || 1)) * 35 + Math.random() * 5,
-        pp: Math.random() * TAU,
+        od: 25 + (pi / (prinList.length || 1)) * 35 + pRng() * 5,
+        pp: pRng() * TAU,
         ...sev,
         x: 0, y: 0,
         particles: mkParticles(sev.critical, sev.major, sev.minor, radius),
@@ -276,11 +336,11 @@ function buildScene(dimensions, W, H, standardTypes) {
         dimParticle: {
           col: scoreRGB(pScore),
           or: 12 + Math.sqrt(pv + pc) * 1.5,
-          os: (0.02 + Math.random() * 0.05) * (Math.random() > 0.5 ? 1 : -1),
-          op: Math.random() * TAU,
+          os: (0.02 + pRng() * 0.05) * (pRng() > 0.5 ? 1 : -1),
+          op: pRng() * TAU,
           sz: 0.8 + Math.sqrt(pv + pc) * 0.15,
-          ec: 0.9 + Math.random() * 0.1,
-          tp: Math.random() * TAU,
+          ec: 0.9 + pRng() * 0.1,
+          tp: pRng() * TAU,
         },
       };
     });
@@ -302,14 +362,31 @@ function buildScene(dimensions, W, H, standardTypes) {
     }
   }
 
+  const bgRng = seededRng(seedHash('bg:' + dimFingerprint));
   const bg = Array.from({ length: 120 }, () => ({
-    x: Math.random(), y: Math.random(),
-    sz: Math.random() * 1.2,
-    tw: Math.random() * TAU,
-    sp: 0.3 + Math.random() * 0.7,
+    x: bgRng(), y: bgRng(),
+    sz: bgRng() * 1.2,
+    tw: bgRng() * TAU,
+    sp: 0.3 + bgRng() * 0.7,
   }));
 
-  return { stars, principles, connections, constellations, bg };
+  // Compute max extent for fitZoom — include constellation circle + label space
+  let _maxExtentX = 0, _maxExtentY = 0;
+  stars.forEach(s => {
+    const ex = Math.abs(s._clusterCx + s._ox) + s.radius * 2;
+    const ey = Math.abs(s._clusterCy + s._oy) + s.radius * 2;
+    if (ex > _maxExtentX) _maxExtentX = ex;
+    if (ey > _maxExtentY) _maxExtentY = ey;
+  });
+  constellations.forEach(con => {
+    const ex = Math.abs(con.cx) + con.spread + 40;
+    const ey = Math.abs(con.cy) + con.spread + 50; // extra for label above
+    if (ex > _maxExtentX) _maxExtentX = ex;
+    if (ey > _maxExtentY) _maxExtentY = ey;
+  });
+  const _maxExtent = Math.max(_maxExtentX, _maxExtentY);
+
+  return { stars, principles, connections, constellations, bg, _maxExtent };
 }
 
 const LEGEND_ITEMS = [
@@ -436,7 +513,6 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
     animRef.current = { t: 0, sx: cam.x, sy: cam.y, sz: cam.z, out: zoomingOut };
   }, []);
 
-
   // Reset on resetKey change (tab re-click)
   const prevResetKey = useRef(resetKey);
   useEffect(() => {
@@ -457,17 +533,33 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
     return { x: (wx - cam.x) * cam.z + size.w / 2, y: (wy - cam.y) * cam.z + size.h / 2 };
   }, [size.w, size.h]);
 
+  // Compute fitZoom from scene extent
+  const getFitZoom = useCallback(() => {
+    const ext = scene?._maxExtent;
+    if (!ext || ext <= 0) return 1;
+    const halfView = Math.min(size.w, size.h) / 2 - 20;
+    return Math.min(halfView / ext, 4);
+  }, [scene, size.w, size.h]);
+
   // Get camera target for current depth
   const getTarget = useCallback(() => {
     const nav = navRef.current;
+    const fz = getFitZoom();
     if (nav.depth === 0) {
-      if (nav.clusterCx != null) return { x: size.w / 2 + nav.clusterCx, y: size.h / 2 + nav.clusterCy, z: 2.5 };
-      return { x: size.w / 2, y: size.h / 2, z: 1 };
+      if (nav.clusterCx != null) {
+        // Fit zoom to cluster spread + padding
+        const con = scene?.constellations?.find(c => c.cx === nav.clusterCx && c.cy === nav.clusterCy);
+        const clusterExtent = con ? con.spread + 15 : 80;
+        const halfView = Math.min(size.w, size.h) / 2 - 30;
+        const clusterFz = halfView / clusterExtent;
+        return { x: size.w / 2 + nav.clusterCx, y: size.h / 2 + nav.clusterCy, z: clusterFz };
+      }
+      return { x: size.w / 2, y: size.h / 2, z: fz };
     }
     if (nav.depth === 1 && nav.dim !== null) { const s = scene.stars[nav.dim]; return { x: s.x, y: s.y, z: 5 }; }
     if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) { const p = scene.principles[nav.dim][nav.prin]; return { x: p.x, y: p.y, z: 50 }; }
     return camRef.current;
-  }, [scene, size.w, size.h]);
+  }, [scene, size.w, size.h, getFitZoom]);
 
   // Drawing helpers
   const drawGlow = useCallback((ctx, sx, sy, sr, col, alpha) => {
@@ -508,13 +600,18 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
     const ctx = canvas.getContext('2d');
     let running = true;
 
+    // Reset camera on scene change so it starts at correct fitZoom
+    if (camRef.current?._sceneId !== scene) {
+      camRef.current = null;
+      frameCount.current = 0;
+    }
+
     function frame() {
       if (!running) return;
       const t = timeRef.current += 0.016;
       const nav = navRef.current;
       const W = size.w, H = size.h;
-      // Initialize camera at canvas center on first frame
-      if (!camRef.current) camRef.current = { x: W / 2, y: H / 2, z: 1 };
+      if (!camRef.current) camRef.current = { x: W / 2, y: H / 2, z: getFitZoom(), _sceneId: scene };
       const cam = camRef.current;
       const SP = Math.min(W, H) * 0.22;
 
@@ -593,30 +690,35 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
         (scene.constellations || []).forEach(con => {
           const isFocused = nav.clusterCx == null || (con.cx === nav.clusterCx && con.cy === nav.clusterCy);
           const conClusterDim = isFocused ? 1 : Math.max(0.08, 1 - (cam.z - 1) / 2);
-          // Dashed constellation lines between stars
+          // Dashed circle around cluster
+          const csc = w2s(W / 2 + con.cx, H / 2 + con.cy);
+          const circleR = (con.spread + 10) * cam.z;
+          ctx.beginPath(); ctx.arc(csc.x, csc.y, circleR, 0, TAU);
+          ctx.strokeStyle = `rgba(${mr},${mg},${mb},${0.15 * conAlpha * conClusterDim})`;
+          ctx.lineWidth = 1;
+          ctx.setLineDash([8, 14]); ctx.stroke(); ctx.setLineDash([]);
+
+          // Constellation lines between stars
           con.lines.forEach(l => {
             const sa = w2s(scene.stars[l.a].x, scene.stars[l.a].y);
             const sb = w2s(scene.stars[l.b].x, scene.stars[l.b].y);
-            const cmx = (sa.x + sb.x) / 2 + (sa.y - sb.y) * 0.1;
-            const cmy = (sa.y + sb.y) / 2 + (sb.x - sa.x) * 0.1;
-            ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.quadraticCurveTo(cmx, cmy, sb.x, sb.y);
+            ctx.beginPath(); ctx.moveTo(sa.x, sa.y); ctx.lineTo(sb.x, sb.y);
             ctx.strokeStyle = `rgba(${mr},${mg},${mb},${0.4 * conAlpha * conClusterDim})`;
             ctx.lineWidth = 0.8;
             ctx.setLineDash([3, 5]); ctx.stroke(); ctx.setLineDash([]);
           });
-          // Constellation label
+          // Constellation label — above the dashed circle
           if (showLabels && con.label) {
-            const lsc = w2s(W / 2 + con.cx, H / 2 + con.cy - con.spread - 20);
+            const lx = csc.x;
+            const ly = csc.y - circleR - 10;
             ctx.font = '600 14px -apple-system,BlinkMacSystemFont,sans-serif';
             ctx.textAlign = 'center';
             ctx.fillStyle = `rgba(${mr},${mg},${mb},${0.55 * conAlpha * conClusterDim})`;
-            ctx.fillText(con.label, lsc.x, lsc.y);
-            // Store screen position for click detection
-            con._lx = lsc.x; con._ly = lsc.y;
+            ctx.fillText(con.label, lx, ly);
+            con._lx = lx; con._ly = ly;
           }
         });
       }
-
 
       // Dimension stars + principle particles orbiting them
       const mx = mouseRef.current.x, my = mouseRef.current.y;
@@ -658,7 +760,7 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
         if (showLabels && labelAlpha > 0.01) {
           const fs = Math.min(cam.z, 1.5);
           ctx.font = `600 ${Math.max(11, 14 * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
-          ctx.textAlign = 'center'; ctx.fillStyle = rgba(s.col, 0.9 * labelAlpha);
+          ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, 0.6 * labelAlpha);
           ctx.fillText(s.name, sc.x, sc.y - sr - 24 * fs);
           ctx.font = `${Math.max(9, 12 * fs)}px -apple-system,BlinkMacSystemFont,sans-serif`;
           ctx.fillStyle = rgba(tc.textMuted, 0.8 * labelAlpha);
@@ -700,7 +802,7 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
           if (showLabels && prinLabelAlpha > 0.01) {
             const la = pAlpha * prinLabelAlpha;
             ctx.font = `600 14px -apple-system,BlinkMacSystemFont,sans-serif`;
-            ctx.textAlign = 'center'; ctx.fillStyle = rgba(p.col, la);
+            ctx.textAlign = 'center'; ctx.fillStyle = rgba(tc.text, 0.6 * la);
             ctx.fillText(p.name, sc.x, sc.y - sr - 10);
             ctx.font = `12px -apple-system,BlinkMacSystemFont,sans-serif`;
             ctx.fillStyle = rgba(tc.textMuted, 0.7 * la);
@@ -831,10 +933,27 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
     const h = hoveredRef.current;
     if (!h || animRef.current) { el.style.display = 'none'; return; }
     const d = h.data;
-    const row = (label, value) => `<div style="display:flex;justify-content:space-between;gap:12px;color:var(--color-text-muted)"><span>${label}</span><span style="color:var(--color-text);font-weight:500">${value}</span></div>`;
+    const row = (label, value, color) => `<div style="display:flex;justify-content:space-between;gap:12px;color:${color || 'var(--color-text-muted)'}"><span>${label}</span><span style="color:${color || 'var(--color-text)'};font-weight:500">${value}</span></div>`;
     const rows = [row('Score', d.score.toFixed(1))];
     if (h.type === 'dim') rows.push(row('Principles', d.principleCount));
-    rows.push(row('Violations', d.violations), row('Compliance', d.compliance));
+    rows.push(row('Violations', d.violations));
+    if (d.violations > 0) {
+      // For dimensions: compute severity from raw violations; for principles: use stored counts
+      let sc = d.critical, sm = d.major, sn = d.minor;
+      if (sc == null && d._raw?.violations) {
+        sc = sm = sn = 0;
+        (d._raw.violations || []).forEach(v => {
+          const s = v.severity || 'minor';
+          if (s === 'critical') sc++;
+          else if (s === 'major') sm++;
+          else sn++;
+        });
+      }
+      if (sc > 0) rows.push(row('Critical', sc, 'var(--color-sev-critical-text)'));
+      if (sm > 0) rows.push(row('Major', sm, 'var(--color-sev-major-text)'));
+      if (sn > 0) rows.push(row('Minor', sn, 'var(--color-sev-minor-text)'));
+    }
+    rows.push(row('Compliance', d.compliance));
     el.innerHTML = `<div style="font-weight:600;color:${rgb(d.col)};margin-bottom:4px">${d.name}</div>
       ${rows.join('')}
       <div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">Click to explore</div>`;
@@ -872,14 +991,27 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
       const totalV = clusterStars.reduce((s, d) => s + d.violations, 0);
       const totalC = clusterStars.reduce((s, d) => s + d.compliance, 0);
       const avgScore = clusterStars.length > 0 ? clusterStars.reduce((s, d) => s + d.score, 0) / clusterStars.length : 0;
+      const sevCounts = { critical: 0, major: 0, minor: 0 };
+      clusterStars.forEach(s => {
+        (s._raw?.violations || []).forEach(v => {
+          const sev = v.severity || 'minor';
+          if (sevCounts[sev] != null) sevCounts[sev]++;
+        });
+      });
+      const lines = [
+        { label: 'Score', value: avgScore.toFixed(1) },
+        { label: 'Dimensions', value: clusterStars.length },
+        { label: 'Violations', value: totalV },
+      ];
+      if (totalV > 0) {
+        if (sevCounts.critical > 0) lines.push({ label: 'Critical', value: sevCounts.critical, color: 'var(--color-sev-critical-text)' });
+        if (sevCounts.major > 0) lines.push({ label: 'Major', value: sevCounts.major, color: 'var(--color-sev-major-text)' });
+        if (sevCounts.minor > 0) lines.push({ label: 'Minor', value: sevCounts.minor, color: 'var(--color-sev-minor-text)' });
+      }
+      lines.push({ label: 'Compliance', value: totalC });
       return {
         title: clusterCon?.label || (projectName ? `${projectName} System` : 'Project System'),
-        lines: [
-          { label: 'Score', value: avgScore.toFixed(1) },
-          { label: 'Dimensions', value: clusterStars.length },
-          { label: 'Violations', value: totalV },
-          { label: 'Compliance', value: totalC },
-        ],
+        lines,
         hint: 'Click a dimension to explore',
         detailAction: null,
       };
@@ -888,14 +1020,25 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
       const dim = scene.stars[nav.dim];
       const prins = scene.principles[nav.dim] || [];
       const rawDim = dim._raw;
+      const dimSev = { critical: 0, major: 0, minor: 0 };
+      (rawDim?.violations || []).forEach(v => {
+        const sev = v.severity || 'minor';
+        if (dimSev[sev] != null) dimSev[sev]++;
+      });
+      const dimLines = [
+        { label: 'Score', value: dim.score.toFixed(1) },
+        { label: 'Principles', value: prins.length },
+        { label: 'Violations', value: dim.violations },
+      ];
+      if (dim.violations > 0) {
+        if (dimSev.critical > 0) dimLines.push({ label: 'Critical', value: dimSev.critical, color: 'var(--color-sev-critical-text)' });
+        if (dimSev.major > 0) dimLines.push({ label: 'Major', value: dimSev.major, color: 'var(--color-sev-major-text)' });
+        if (dimSev.minor > 0) dimLines.push({ label: 'Minor', value: dimSev.minor, color: 'var(--color-sev-minor-text)' });
+      }
+      dimLines.push({ label: 'Compliance', value: dim.compliance });
       return {
         title: dim.name,
-        lines: [
-          { label: 'Score', value: dim.score.toFixed(1) },
-          { label: 'Principles', value: prins.length },
-          { label: 'Violations', value: dim.violations },
-          { label: 'Compliance', value: dim.compliance },
-        ],
+        lines: dimLines,
         hint: 'Click a principle to explore',
         detailAction: () => {
           const d = scene.stars[navRef.current.dim]?._raw;
@@ -906,13 +1049,19 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
     }
     if (nav.depth === 2 && nav.dim !== null && nav.prin !== null) {
       const prin = scene.principles[nav.dim][nav.prin];
+      const prinLines = [
+        { label: 'Score', value: prin.score.toFixed(1) },
+        { label: 'Violations', value: prin.violations },
+      ];
+      if (prin.violations > 0) {
+        if (prin.critical > 0) prinLines.push({ label: 'Critical', value: prin.critical, color: 'var(--color-sev-critical-text)' });
+        if (prin.major > 0) prinLines.push({ label: 'Major', value: prin.major, color: 'var(--color-sev-major-text)' });
+        if (prin.minor > 0) prinLines.push({ label: 'Minor', value: prin.minor, color: 'var(--color-sev-minor-text)' });
+      }
+      prinLines.push({ label: 'Compliance', value: prin.compliance });
       return {
         title: prin.name,
-        lines: [
-          { label: 'Score', value: prin.score.toFixed(1) },
-          { label: 'Violations', value: prin.violations },
-          { label: 'Compliance', value: prin.compliance },
-        ],
+        lines: prinLines,
         hint: null,
         // Read live data at click time, not at memo time
         detailAction: () => {
@@ -1002,9 +1151,9 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
         <div style={{ position: 'absolute', top: 12, right: 16, background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '12px 18px', fontSize: 12, zIndex: 2, backdropFilter: 'blur(8px)', minWidth: 160 }}>
           <div style={{ fontWeight: 600, color: 'var(--color-text)', marginBottom: 8, fontSize: 13 }}>{levelInfo.title}</div>
           {levelInfo.lines.map((l, i) => (
-            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, margin: '3px 0', color: 'var(--color-text-muted)' }}>
+            <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: 16, margin: '3px 0', color: l.color || 'var(--color-text-muted)' }}>
               <span>{l.label}</span>
-              <span style={{ color: 'var(--color-text)', fontWeight: 500 }}>{l.value}</span>
+              <span style={{ color: l.color || 'var(--color-text)', fontWeight: 500 }}>{l.value}</span>
             </div>
           ))}
           {levelInfo.hint && (
@@ -1024,5 +1173,3 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
     </div>
   );
 }
-
-export { scoreRGB, sevRGB, rgb, rgba, gradeToScore };

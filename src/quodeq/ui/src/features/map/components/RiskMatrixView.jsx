@@ -177,9 +177,9 @@ export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLab
             <div className="map-tooltip-row"><span>Violations</span><span>{c.violations}</span></div>
             <div className="map-tooltip-row"><span>Compliance</span><span>{c.compliance}</span></div>
             <div className="map-tooltip-row"><span>Health</span><span>{rate}%</span></div>
-            {c.severity?.critical > 0 && <div className="map-tooltip-row"><span>Critical</span><span>{c.severity.critical}</span></div>}
-            {c.severity?.major > 0 && <div className="map-tooltip-row"><span>Major</span><span>{c.severity.major}</span></div>}
-            {c.severity?.minor > 0 && <div className="map-tooltip-row"><span>Minor</span><span>{c.severity.minor}</span></div>}
+            {c.severity?.critical > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}><span>Critical</span><span>{c.severity.critical}</span></div>}
+            {c.severity?.major > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}><span>Major</span><span>{c.severity.major}</span></div>}
+            {c.severity?.minor > 0 && <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}><span>Minor</span><span>{c.severity.minor}</span></div>}
           </div>
         );
       })()}

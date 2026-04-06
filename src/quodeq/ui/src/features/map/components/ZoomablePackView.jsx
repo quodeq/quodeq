@@ -152,31 +152,50 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
                 transition: skipTransition.current ? 'none' : 'x 0.5s ease, y 0.5s ease, font-size 0.5s ease',
               }}
             >
-              {d.name}
+              {d.name.includes('/') ? d.name.split('/')[0] : d.name}
             </text>
           );
         })}
       </svg>
 
-      {hover !== null && circles[hover] && circles[hover].depth > 0 && (
-        <div className="map-tooltip" style={{ position: 'absolute', top: 8, right: 8, pointerEvents: 'none' }}>
-          <div className="map-tooltip-title">{circles[hover].data.path || circles[hover].data.name}</div>
-          <div className="map-tooltip-row">
-            <span>Violations</span><span>{circles[hover].data.violations}</span>
+      {hover !== null && circles[hover] && circles[hover].depth > 0 && (() => {
+        const hd = circles[hover].data;
+        const sev = hd.severity || {};
+        return (
+          <div className="map-tooltip" style={{ position: 'absolute', top: 8, right: 8, pointerEvents: 'none' }}>
+            <div className="map-tooltip-title">{hd.path || hd.name}</div>
+            <div className="map-tooltip-row">
+              <span>Violations</span><span>{hd.violations}</span>
+            </div>
+            {hd.violations > 0 && sev.critical > 0 && (
+              <div className="map-tooltip-row" style={{ color: 'var(--color-sev-critical-text)' }}>
+                <span>Critical</span><span>{sev.critical}</span>
+              </div>
+            )}
+            {hd.violations > 0 && sev.major > 0 && (
+              <div className="map-tooltip-row" style={{ color: 'var(--color-sev-major-text)' }}>
+                <span>Major</span><span>{sev.major}</span>
+              </div>
+            )}
+            {hd.violations > 0 && sev.minor > 0 && (
+              <div className="map-tooltip-row" style={{ color: 'var(--color-sev-minor-text)' }}>
+                <span>Minor</span><span>{sev.minor}</span>
+              </div>
+            )}
+            <div className="map-tooltip-row">
+              <span>Compliance</span><span>{hd.compliance}</span>
+            </div>
+            <div className="map-tooltip-row">
+              <span>Rate</span>
+              <span>
+                {(hd.violations + hd.compliance) > 0
+                  ? ((hd.compliance / (hd.violations + hd.compliance)) * 100).toFixed(0) + '%'
+                  : '—'}
+              </span>
+            </div>
           </div>
-          <div className="map-tooltip-row">
-            <span>Compliance</span><span>{circles[hover].data.compliance}</span>
-          </div>
-          <div className="map-tooltip-row">
-            <span>Rate</span>
-            <span>
-              {(circles[hover].data.violations + circles[hover].data.compliance) > 0
-                ? ((circles[hover].data.compliance / (circles[hover].data.violations + circles[hover].data.compliance)) * 100).toFixed(0) + '%'
-                : '—'}
-            </span>
-          </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
