@@ -2,7 +2,11 @@ import { useState, useRef } from 'react';
 import { importStandard } from '../../../api/index.js';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
-const STEP = { PICK: 'pick', IMPORTING: 'importing', ERROR: 'error', WARNINGS: 'warnings', CONFLICT: 'conflict' };
+const STEP = { PICK: 'pick', REVIEWING: 'reviewing', ERROR: 'error', WARNINGS: 'warnings', CONFLICT: 'conflict' };
+
+function buildImportedCopyId(id) {
+  return `${id}-imported`;
+}
 
 function PickStep({ fileRef, onFile, onClose }) {
   return (
@@ -56,7 +60,8 @@ function WarningsStep({ warnings, onClose, onProceed }) {
   );
 }
 
-function ConflictStep({ parsedData, conflict, warnings, onClose, onImportAsCopy, onOverwrite }) {
+function ConflictStep({ parsedData, conflict, warnings, actions }) {
+  const { onClose, onImportAsCopy, onOverwrite } = actions;
   return (
     <>
       <h3 className="modal-title">ID Already Exists</h3>
@@ -85,8 +90,8 @@ function ConflictStep({ parsedData, conflict, warnings, onClose, onImportAsCopy,
 
 function useImportActions(onImported, state) {
   const { setStep, setError, setWarnings, setConflict, parsedData, setParsedData } = state;
-  const doImport = async (data, force) => {
-    setStep(STEP.IMPORTING);
+  const importEvaluator = async (data, force) => {
+    setStep(STEP.REVIEWING);
     try {
       const result = await importStandard(data, force);
       if (result._conflict) {
@@ -120,17 +125,17 @@ function useImportActions(onImported, state) {
     catch { setError('Invalid file: could not parse as JSON.'); setStep(STEP.ERROR); return; }
     if (typeof data !== 'object' || Array.isArray(data)) { setError('Invalid file: expected a JSON object.'); setStep(STEP.ERROR); return; }
     setParsedData(data);
-    await doImport(data, false);
+    await importEvaluator(data, false);
   };
 
-  const handleForceImport = async () => { await doImport(parsedData, true); };
+  const handleForceImport = async () => { await importEvaluator(parsedData, true); };
   const handleImportAsCopy = async () => {
-    const copied = { ...parsedData, id: `${parsedData.id}-imported` };
+    const copied = { ...parsedData, id: buildImportedCopyId(parsedData.id) };
     setParsedData(copied);
-    await doImport(copied, false);
+    await importEvaluator(copied, false);
   };
-  const handleProceedWithWarnings = async () => { await doImport(parsedData, true); };
-  return { doImport, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
+  const handleProceedWithWarnings = async () => { await importEvaluator(parsedData, true); };
+  return { importEvaluator, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
 }
 
 function useImportModal(onImported) {
@@ -156,10 +161,10 @@ export default function ImportModal({ onClose, onImported }) {
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
         {step === STEP.PICK && <PickStep fileRef={fileRef} onFile={handleFile} onClose={onClose} />}
-        {step === STEP.IMPORTING && <ImportingStep />}
+        {step === STEP.REVIEWING && <ImportingStep />}
         {step === STEP.ERROR && <ErrorStep error={error} onClose={onClose} />}
         {step === STEP.WARNINGS && <WarningsStep warnings={warnings} onClose={onClose} onProceed={handleProceedWithWarnings} />}
-        {step === STEP.CONFLICT && <ConflictStep parsedData={parsedData} conflict={conflict} warnings={warnings} onClose={onClose} onImportAsCopy={handleImportAsCopy} onOverwrite={handleForceImport} />}
+        {step === STEP.CONFLICT && <ConflictStep parsedData={parsedData} conflict={conflict} warnings={warnings} actions={{ onClose, onImportAsCopy: handleImportAsCopy, onOverwrite: handleForceImport }} />}
       </div>
     </div>
   );
