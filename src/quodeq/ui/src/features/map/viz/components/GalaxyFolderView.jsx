@@ -3,7 +3,7 @@ import {
   TAU, getThemeColors, scoreRGB, sevRGB, rgb, rgba,
   drawGlow, drawParticles,
   seedHash, seededRng, LEGEND_ITEMS,
-} from './galaxyCore.js';
+} from '../core/galaxyCore.js';
 
 /* ── Position consistency engine ── */
 
