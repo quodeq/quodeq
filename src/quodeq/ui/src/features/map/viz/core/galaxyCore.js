@@ -142,6 +142,13 @@ export function seededRng(seed) {
   };
 }
 
+/* ── Grade helpers ── */
+
+// Returns 0-10 scale to match scoreRGB thresholds
+export function gradeToScore(grade) {
+  return { A: 9.5, B: 8, C: 6.5, D: 4.5, F: 2 }[grade] || 5;
+}
+
 /* ── Constants ── */
 
 export const LEGEND_ITEMS = [

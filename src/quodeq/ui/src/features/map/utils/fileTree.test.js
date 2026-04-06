@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildFileTree } from './fileTree.js';
+import { buildFileTree } from '../viz/core/fileTree.js';
 
 test('buildFileTree returns root node with empty dimensions', () => {
   const tree = buildFileTree([]);

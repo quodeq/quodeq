@@ -1,6 +1,6 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { hierarchy, pack } from 'd3-hierarchy';
-import { nodeColor, nodeBorderColor, nodeSize } from '../utils/mapColors.js';
+import { nodeColor, nodeBorderColor, nodeSize } from '../core/mapColors.js';
 import FileShape from './FileShape.jsx';
 
 const BASE_SIZE = 600;

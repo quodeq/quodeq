@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
 import { complianceRatio } from '../../../utils/formatters.js';
-import { buildFileTree, treeNodeToFileObj } from '../../map/utils/fileTree.js';
-import HeatGridView from '../../map/components/HeatGridView.jsx';
+import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/index.js';
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
 

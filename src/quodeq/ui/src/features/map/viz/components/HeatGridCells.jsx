@@ -1,4 +1,4 @@
-import { severityCellStyle, complianceRateCellStyle } from '../features/map/viz/core/mapColors.js';
+import { severityCellStyle, complianceRateCellStyle } from '../core/mapColors.js';
 
 const SEVERITY_LEVELS = ['critical', 'major', 'minor'];
 

@@ -1,11 +1,12 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { buildFileTree, treeNodeToFileObj } from '../utils/fileTree.js';
+import {
+  buildFileTree, treeNodeToFileObj,
+  RiskMatrixView, ZoomablePackView, resetSavedFocus,
+  GalaxyView, GalaxyFolderView,
+} from '../viz/index.js';
 import { complianceRatio } from '../../../utils/formatters.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import RiskMatrixView from './RiskMatrixView.jsx';
-import ZoomablePackView, { resetSavedFocus } from './ZoomablePackView.jsx';
-import GalaxyView from './GalaxyView.jsx';
-import GalaxyFolderView from './GalaxyFolderView.jsx';
+import { listStandards } from '../../../api/standards.js';
 
 let _savedMapPath = '';
 let _savedVizStyle = 'zoompack';
@@ -167,7 +168,7 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-function MapVizContainer({ vizStyle, viewMode, galaxyMode, setGalaxyMode, node, dimensions, onDrillDown, onFileClick, onNavigate, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey, projectName }) {
+function MapVizContainer({ vizStyle, viewMode, galaxyMode, setGalaxyMode, node, dimensions, onDrillDown, onFileClick, onNavigate, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey, projectName, standardTypes }) {
   return (
     <div className="map-viz-container">
       {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} onBack={onBack} />}
@@ -179,7 +180,7 @@ function MapVizContainer({ vizStyle, viewMode, galaxyMode, setGalaxyMode, node, 
       )}
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
       {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
       {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={node} onFileClick={onFileClick} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} />}
     </div>
   );
@@ -211,6 +212,16 @@ export default function MapPage({ data, callbacks, tabKey = 0 }) {
   useEffect(() => {
     callbacks?.onRefresh?.();
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch standard types for galaxy constellation grouping
+  const [standardTypes, setStandardTypes] = useState({});
+  useEffect(() => {
+    listStandards().then(stds => {
+      const map = {};
+      stds.forEach(s => { map[(s.id || '').toLowerCase()] = s.type || 'custom'; });
+      setStandardTypes(map);
+    }).catch(() => {});
+  }, []);
 
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
   const [viewMode, _setViewMode] = useState(_savedViewMode);
@@ -308,7 +319,7 @@ export default function MapPage({ data, callbacks, tabKey = 0 }) {
         </span>
         <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       </div>
-      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} node={currentNode} dimensions={filteredDimensions} onDrillDown={handleDrillDown} onFileClick={handleFileClick} onNavigate={callbacks?.onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} projectName={data?.projectName} />
+      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} node={currentNode} dimensions={filteredDimensions} onDrillDown={handleDrillDown} onFileClick={handleFileClick} onNavigate={callbacks?.onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} projectName={data?.projectName} standardTypes={standardTypes} />
     </div>
   );
 }

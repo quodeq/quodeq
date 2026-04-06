@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { nodeColor, nodeBorderColor } from '../utils/mapColors.js';
+import { nodeColor, nodeBorderColor } from '../core/mapColors.js';
 import FileShape from './FileShape.jsx';
 
 const W = 600, H = 420, PAD = { l: 55, r: 25, t: 35, b: 55 };
