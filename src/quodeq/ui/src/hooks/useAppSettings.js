@@ -10,7 +10,7 @@ const AI_MODEL_KEY = 'cc-ai-model';
 const VERIFY_FINDINGS_KEY = 'cc-verify-findings';
 
 const VALID_MODES = ['system', 'light', 'dark'];
-const VALID_FAMILIES = ['daruma', 'flynn', 'neo', 'galadriel', 'ifrit', 'deckard'];
+const VALID_FAMILIES = ['daruma', 'neo', 'galadriel', 'ifrit', 'deckard'];
 
 const MIGRATION_MAP = {
   system:   { mode: 'system', family: 'daruma' },
@@ -18,9 +18,9 @@ const MIGRATION_MAP = {
   dark:     { mode: 'dark',   family: 'daruma' },
   ember:    { mode: 'dark',   family: 'ifrit' },
   forest:   { mode: 'light',  family: 'galadriel' },
-  midnight: { mode: 'dark',   family: 'flynn' },
+  midnight: { mode: 'dark',   family: 'daruma' },
   slate:    { mode: 'light',  family: 'daruma' },
-  horizon:  { mode: 'light',  family: 'flynn' },
+  horizon:  { mode: 'light',  family: 'daruma' },
 };
 
 function migrateOldTheme() {
@@ -29,7 +29,7 @@ function migrateOldTheme() {
     if (old === null) {
       // Migrate old family names to character names
       const currentFamily = localStorage.getItem(FAMILY_KEY);
-      const familyRenames = { 'default': 'daruma', 'midnight': 'flynn', 'forest': 'galadriel', 'ember': 'ifrit', 'cyber': 'deckard' };
+      const familyRenames = { 'default': 'daruma', 'midnight': 'daruma', 'flynn': 'daruma', 'forest': 'galadriel', 'ember': 'ifrit', 'cyber': 'deckard' };
       if (currentFamily && familyRenames[currentFamily]) {
         localStorage.setItem(FAMILY_KEY, familyRenames[currentFamily]);
       }
