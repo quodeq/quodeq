@@ -916,7 +916,7 @@ export default function GalaxyFolderView({ node, onFileClick, onNavigate, showLa
       if (sev.minor) rows.push(row('Minor', sev.minor, 'var(--color-sev-minor-text)'));
     }
     const nameCol = rgb(d.col);
-    const name = d.isFolder ? d.name + '/' : d.name;
+    const name = d.name;
     const ff = focusedFolderRef.current;
     const isFocused = h.type === 'folder' && ff && ff.starIdx === h.starIdx;
     const action = h.type === 'file' ? 'zoom in' : isFocused ? 'enter folder' : 'focus';
