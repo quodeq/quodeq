@@ -1,171 +1,223 @@
-import { memo } from 'react';
+import { memo, useState, useCallback, useMemo } from 'react';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
-import { SEVERITY_ORDER, parseFileRef } from '../../../utils/formatters.js';
+import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
-import FileCopyBtn from '../../../components/FileCopyBtn.jsx';
-import ContextBlock from '../../../components/ContextBlock.jsx';
-import { ComplianceCard } from './EvalCards.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import { getRescore } from '../../../api/index.js';
+import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
+import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 
-function buildViolationPlanText(v, principleName) {
-  return buildSingleViolationPlanText(v, principleName || 'Violation');
+const PAGE_SIZE = 20;
+
+function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
+  return EVAL_SEVERITY_ORDER.map((sev) => {
+    const vs = violationsBySeverity[sev];
+    if (!vs || vs.length === 0) return null;
+    return (
+      <div key={sev}>
+        <div className="violation-group-header">
+          <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
+          <span className="violation-group-count">{vs.length}</span>
+        </div>
+        <div className="vlive-violations-group">
+          {vs.map((v, idx) => (
+            <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
+          ))}
+        </div>
+      </div>
+    );
+  });
 }
 
-const ANIM_DELAY_PER_ITEM_MS = 30;
-const ANIM_MAX_DELAY_MS = 300;
-
-function filterHttpRefs(reqRefs) {
-  return (reqRefs || []).filter(r => r.url && /^https?:\/\//.test(r.url));
-}
-
-function ViolationCard({ v, principleName, index }) {
-  const { filePath, line } = parseFileRef(v.file, v.line);
-  const filename = filePath ? filePath.split('/').pop() : null;
-  const range = (v.endLine && v.endLine !== line) ? `${line}-${v.endLine}` : line;
-  const ref = line != null ? `${filePath}:${range}` : filePath;
-  const display = line != null ? `${filename}:${range}` : filename;
-  const linkedRefs = filterHttpRefs(v.reqRefs);
+function ComplianceListSection({ data, controls }) {
+  const { compliance, displayedCompliance, principle } = data;
+  const { hasMore, showAll, setShowAll } = controls;
+  if (compliance.length === 0) return null;
   return (
-    <div className={`vdetail-row vdetail-row--${v.severity}`} style={{ animationDelay: `${Math.min(index * ANIM_DELAY_PER_ITEM_MS, ANIM_MAX_DELAY_MS)}ms` }}>
-      <div className="vdetail-row-main">
-        <span className={`severity-tag ${v.severity}`}>{v.severity}</span>
-        <span className="vrow-label">[{principleName}]</span>
-        {filename && (
-          <FileCopyBtn display={display} copyText={ref} />
-        )}
-        <CopyButton
-          label="Fix plan"
-          className="fix-plan-btn"
-          icon={<SparkleIcon />}
-          onClick={() => copyToClipboard(buildViolationPlanText(v, principleName))}
-        />
+    <div>
+      <div className="violation-group-header">
+        <span className="violation-group-title">Compliance</span>
+        <span className="violation-group-count">{compliance.length}</span>
       </div>
-      <div className="vlive-detail">
-        {(v.title || v.reason) && (
-          <div className="vlive-detail-section">
-            <div className="vlive-detail-section-header">
-              {v.title && <span className="vlive-detail-section-label">Reason</span>}
-              {linkedRefs.length > 0 &&
-                <span className="cwe-link-group">{linkedRefs.map((ref, i) => (
-                  <a key={i} className="cwe-link" href={ref.url} target="_blank" rel="noopener noreferrer">{ref.label}</a>
-                ))}</span>
-              }
-            </div>
-            {v.title && <p className="vlive-detail-title">{v.title}</p>}
-            {v.reason && <>
-              <span className="vlive-detail-section-label">Detail</span>
-              <p className="vlive-detail-reason">{v.reason}</p>
-            </>}
-          </div>
-        )}
-        <ContextBlock snippet={v.snippet} line={v.line} endLine={v.endLine} />
+      <div className="vlive-violations-group">
+        {displayedCompliance.map((c, idx) => (
+          <ComplianceCard key={idx} c={c} principle={principle} index={idx} />
+        ))}
       </div>
+      {hasMore && (
+        <button
+          className="offending-show-more"
+          onClick={() => setShowAll((v) => !v)}
+        >
+          {showAll ? 'Show less' : `Show all ${compliance.length} compliance items`}
+        </button>
+      )}
     </div>
   );
 }
 
-function ComplianceStatsRow({ principle, totalViolations, totalCompliance }) {
+function buildViolationPlanText(v, principle) {
+  return buildSingleViolationPlanText(v, principle, { reqRefs: v.reqRefs, reqFallback: v.req || undefined });
+}
+
+function SeverityTags({ sevCounts }) {
+  return (
+    <>
+      {sevCounts.critical > 0 && <span className="file-detail-stat severity-tag critical">{sevCounts.critical} critical</span>}
+      {sevCounts.major > 0 && <span className="file-detail-stat severity-tag major">{sevCounts.major} major</span>}
+      {sevCounts.minor > 0 && <span className="file-detail-stat severity-tag minor">{sevCounts.minor} minor</span>}
+      {(sevCounts.critical > 0 || sevCounts.major > 0 || sevCounts.minor > 0) && <span className="file-detail-stat-sep">·</span>}
+    </>
+  );
+}
+
+function ComplianceStats({ compliance, violations }) {
+  if (compliance.length === 0) return null;
+  return (
+    <>
+      <span className="file-detail-stat-sep">·</span>
+      <span className="file-detail-stat"><strong>{compliance.length}</strong> compliance</span>
+      {violations.length > 0 && (
+        <>
+          <span className="file-detail-stat-sep">·</span>
+          <span className="file-detail-stat"><strong>1:{Math.round(compliance.length / violations.length)}</strong> ratio</span>
+        </>
+      )}
+    </>
+  );
+}
+
+function PrincipleHeader({ data, onCopyPlan }) {
+  const { principle, score, grade, violations, compliance, sevCounts } = data;
   return (
     <section className="panel file-detail-summary-panel">
       <div className="file-detail-stats-row">
         <div className="file-detail-stats">
-          {principle.critical > 0 && (
-            <span className="file-detail-stat severity-tag critical">{principle.critical} critical</span>
-          )}
-          {principle.major > 0 && (
-            <span className="file-detail-stat severity-tag major">{principle.major} major</span>
-          )}
-          {principle.minor > 0 && (
-            <span className="file-detail-stat severity-tag minor">{principle.minor} minor</span>
-          )}
-          {(principle.critical > 0 || principle.major > 0 || principle.minor > 0) && <span className="file-detail-stat-sep">·</span>}
-          <span className="file-detail-stat">
-            <strong>{totalViolations}</strong> violations
-          </span>
-          {totalCompliance > 0 && (
+          <h3 className="file-detail-title" style={{ margin: 0 }}>{principle}</h3>
+          {grade === 'Insufficient' ? (
+            <span className="exec-summary-insufficient">Not enough evidence</span>
+          ) : (
             <>
-              <span className="file-detail-stat-sep">·</span>
-              <span className="file-detail-stat">
-                <strong>{totalCompliance}</strong> compliance
-              </span>
-              {totalViolations > 0 && (
+              {score && (
                 <>
                   <span className="file-detail-stat-sep">·</span>
-                  <span className="file-detail-stat">
-                    <strong>1:{Math.round(totalCompliance / totalViolations)}</strong> ratio
-                  </span>
+                  <span className="file-detail-stat" style={{ fontSize: '1.1rem' }}><strong>{score.replace('/10', '')}</strong></span>
                 </>
               )}
+              <span className="file-detail-stat-sep">·</span>
+              <span className={`chip small ${gradeColorClass(grade)}`}>{grade || '—'}</span>
             </>
           )}
         </div>
-        <CopyButton
-          label="Full fix plan"
-          className="fix-plan-btn-header"
-          icon={<SparkleIcon />}
-          onClick={() => copyToClipboard(buildPrinciplePlanText(principle))}
-        />
+        {violations.length > 0 && (
+          <CopyButton
+            label="Full fix plan"
+            className="fix-plan-btn-header"
+            icon={<SparkleIcon />}
+            onClick={onCopyPlan}
+          />
+        )}
+      </div>
+      <div className="file-detail-stats" style={{ marginTop: 6 }}>
+        <SeverityTags sevCounts={sevCounts} />
+        <span className="file-detail-stat"><strong>{violations.length}</strong> violations</span>
+        <ComplianceStats compliance={compliance} violations={violations} />
       </div>
     </section>
   );
 }
 
-function ViolationGroup({ sev, violations, principleName }) {
-  if (!violations || violations.length === 0) return null;
+function computeEvalPrincipleData(evalPrincipal) {
+  const { principleData, dimViolations = [], dimCompliance = [] } = evalPrincipal;
+  const violations = (principleData?.violations?.length > 0) ? principleData.violations : dimViolations;
+  const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet);
+  const violationsBySeverity = EVAL_SEVERITY_ORDER.reduce((acc, sev) => {
+    acc[sev] = violations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
+    return acc;
+  }, {});
+  const sevCounts = { critical: 0, major: 0, minor: 0 };
+  violations.forEach(v => { const s = (v.severity || 'minor').toLowerCase(); if (sevCounts[s] !== undefined) sevCounts[s]++; });
+  return { violations, compliance, violationsBySeverity, sevCounts };
+}
+
+function PrincipleContext({ principleData }) {
   return (
-    <div>
-      <div className="violation-group-header">
-        <span className="violation-group-title">{sev.charAt(0).toUpperCase() + sev.slice(1)}</span>
-        <span className="violation-group-count">{violations.length}</span>
-      </div>
-      <div className="vlive-violations-group">
-        {violations.map((v, idx) => (
-          <ViolationCard key={idx} v={v} principleName={principleName} index={idx} />
-        ))}
-      </div>
-    </div>
+    <>
+      {principleData?.findings && (
+        <p className="violation-context-desc" style={{ padding: '0 4px', marginBottom: '4px' }}>{principleData.findings}</p>
+      )}
+      {principleData?.justification && (
+        <p className="violation-context-desc muted" style={{ padding: '0 4px', marginBottom: '12px' }}>{principleData.justification}</p>
+      )}
+    </>
   );
 }
 
-function groupViolationsBySeverity(violations) {
-  const result = {};
-  for (const sev of SEVERITY_ORDER) result[sev] = [];
-  for (const v of (violations || [])) {
-    const sev = (v.severity || 'minor').toLowerCase();
-    if (result[sev]) result[sev].push(v);
-    else result['minor'].push(v);
-  }
-  return result;
-}
+const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
+  const { principleData, principle, score, grade, dimension, project, runId } = evalPrincipal;
+  const [showAllCompliance, setShowAllCompliance] = useState(false);
+  const [dismissedSet, setDismissedSet] = useState(new Set());
+  const [liveScore, setLiveScore] = useState(null);
+  const [liveGrade, setLiveGrade] = useState(null);
+  const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
+  const { violations, compliance, violationsBySeverity, sevCounts } = computeEvalPrincipleData(evalPrincipal);
+  const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
 
-const PrincipleDetailPage = memo(function PrincipleDetailPage({ principle }) {
-  const totalViolations = principle.total || 0;
-  const totalCompliance = principle.compliance?.length || 0;
-  const violationsBySeverity = groupViolationsBySeverity(principle.violations);
+  const handleDismiss = useCallback((v) => {
+    if (!onDismiss) return;
+    onDismiss(v);
+    setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
+    // Fire rescore to update principle score/grade
+    if (project && runId) {
+      getRescore(project, runId).then((rescored) => {
+        const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+        if (!dimData) return;
+        const pg = (dimData.principles || []).find((p) => p.principle === principle);
+        if (pg) { setLiveScore(pg.score); setLiveGrade(pg.grade); }
+      }).catch(() => {});
+    }
+  }, [onDismiss, project, runId, dimension, principle]);
+
+  // Filter dismissed violations and recompute derived stats
+  const { filteredBySeverity, filteredViolations, liveSevCounts } = useMemo(() => {
+    const bySev = {};
+    for (const sev of Object.keys(violationsBySeverity)) {
+      bySev[sev] = (violationsBySeverity[sev] || []).filter(
+        (v) => !dismissedSet.has(`${v.file}:${v.line}`)
+      );
+    }
+    const allFiltered = Object.values(bySev).flat();
+    const counts = { critical: 0, major: 0, minor: 0 };
+    allFiltered.forEach((v) => { const s = (v.severity || 'minor').toLowerCase(); if (counts[s] !== undefined) counts[s]++; });
+    return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
+  }, [violationsBySeverity, dismissedSet]);
+
+  // Apply active severity filter
+  const displayedBySeverity = useMemo(() => {
+    if (!activeSevFilter || activeSevFilter === 'all') return filteredBySeverity;
+    const filtered = {};
+    for (const sev of Object.keys(filteredBySeverity)) {
+      filtered[sev] = sev === activeSevFilter ? filteredBySeverity[sev] : [];
+    }
+    return filtered;
+  }, [filteredBySeverity, activeSevFilter]);
 
   return (
     <>
-      <div className="section-header">
-        <h3 className="section-title file-detail-title">{principle.principle}</h3>
-      </div>
-      <ComplianceStatsRow principle={principle} totalViolations={totalViolations} totalCompliance={totalCompliance} />
-      {SEVERITY_ORDER.map((sev) => (
-        <ViolationGroup key={sev} sev={sev} violations={violationsBySeverity[sev]} principleName={principle.principle} />
-      ))}
-      {totalCompliance > 0 && (
-        <div>
-          <div className="violation-group-header">
-            <span className="violation-group-title">Compliance</span>
-            <span className="violation-group-count">{totalCompliance}</span>
-          </div>
-          <div className="vlive-violations-group">
-            {principle.compliance.map((c, idx) => (
-              <ComplianceCard key={idx} c={c} principle={principle.principle} index={idx} />
-            ))}
-          </div>
-        </div>
+      <PrincipleHeader
+        data={{ principle, score: liveScore ?? score, grade: liveGrade ?? grade, violations: filteredViolations, compliance, sevCounts: liveSevCounts }}
+        onCopyPlan={() => copyToClipboard(buildPrinciplePlanText(principle, violations, violationsBySeverity, principleData))}
+      />
+      <PrincipleContext principleData={principleData} />
+      {filteredViolations.length > 0 && (
+        <SeverityFilterPills counts={liveSevCounts} activeFilter={activeSevFilter} onFilterChange={setActiveSevFilter} />
       )}
+      <ViolationListSection violationsBySeverity={displayedBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} onDismiss={handleDismiss} />
+      <ComplianceListSection
+        data={{ compliance, displayedCompliance, principle }}
+        controls={{ hasMore: compliance.length > PAGE_SIZE, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
+      />
     </>
   );
 });

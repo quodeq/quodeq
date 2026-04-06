@@ -1,13 +1,17 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
-import { buildFileTree, treeNodeToFileObj } from '../utils/fileTree.js';
+import {
+  buildFileTree, treeNodeToFileObj,
+  RiskMatrixView, ZoomablePackView, resetSavedFocus,
+  GalaxyView, GalaxyFolderView,
+} from '../viz/index.js';
 import { complianceRatio } from '../../../utils/formatters.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import RiskMatrixView from './RiskMatrixView.jsx';
-import ZoomablePackView from './ZoomablePackView.jsx';
+import { listStandards } from '../../../api/standards.js';
 
 let _savedMapPath = '';
 let _savedVizStyle = 'zoompack';
 let _savedViewMode = 'health';
+let _savedGalaxyMode = 'filesystem';
 
 const VIEW_MODES = [
   { id: 'health', label: 'Health' },
@@ -16,7 +20,13 @@ const VIEW_MODES = [
 
 const VIZ_STYLES = [
   { id: 'zoompack', label: 'Circle Pack', enabled: true },
+  { id: 'galaxy', label: 'Galaxy', enabled: true },
   { id: 'riskmatrix', label: 'Risk Matrix', enabled: true },
+];
+
+const GALAXY_MODES = [
+  { id: 'filesystem', label: 'File System' },
+  { id: 'standards', label: 'Standards' },
 ];
 
 function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
@@ -57,13 +67,23 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
   );
 }
 
-function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, allDimensions, selectedDimensions, onToggleDimension }) {
+function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, galaxyMode, setGalaxyMode, allDimensions, selectedDimensions, onToggleDimension }) {
   return (
     <div className="map-controls">
+      <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
       {vizStyle === 'zoompack' && (
         <div className="map-pill-group">
           {VIEW_MODES.map((m) => (
             <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)}>
+              {m.label}
+            </button>
+          ))}
+        </div>
+      )}
+      {vizStyle === 'galaxy' && (
+        <div className="map-pill-group">
+          {GALAXY_MODES.map((m) => (
+            <button key={m.id} type="button" className={`map-pill${galaxyMode === m.id ? ' active' : ''}`} onClick={() => setGalaxyMode(m.id)}>
               {m.label}
             </button>
           ))}
@@ -76,7 +96,6 @@ function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, allDimensio
           </button>
         ))}
       </div>
-      <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
     </div>
   );
 }
@@ -149,24 +168,37 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-function MapVizContainer({ vizStyle, viewMode, node, onDrillDown, onFileClick, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack }) {
-  const hasLabels = vizStyle === 'riskmatrix' || vizStyle === 'zoompack';
+function MapVizContainer({ vizStyle, viewMode, galaxyMode, setGalaxyMode, node, dimensions, onDrillDown, onFileClick, onNavigate, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey, projectName, standardTypes }) {
   return (
     <div className="map-viz-container">
-      <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} onBack={onBack} />
-      {hasLabels && (
+      {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} onBack={onBack} />}
+      {vizStyle !== 'galaxy' && (
         <label className="map-label-toggle">
           <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
           Labels
         </label>
       )}
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
-      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
+      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={node} onFileClick={onFileClick} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} />}
     </div>
   );
 }
 
-export default function MapPage({ data, callbacks }) {
+let _lastTabKey = null;
+
+function resetMapSavedState() {
+  _savedMapPath = '';
+  resetSavedFocus();
+}
+
+export default function MapPage({ data, callbacks, tabKey = 0 }) {
+  // Reset only on fresh tab click (tabKey changed), not on back from detail
+  const isFreshTabClick = _lastTabKey !== null && tabKey !== _lastTabKey;
+  _lastTabKey = tabKey;
+  if (isFreshTabClick) resetMapSavedState();
+
   // Lock parent to viewport height while map is active
   useEffect(() => {
     const dashboard = document.querySelector('.dashboard');
@@ -176,14 +208,42 @@ export default function MapPage({ data, callbacks }) {
     }
   }, []);
 
+  // Refresh data on mount (ensures fresh data after returning from detail pages) and on tab re-click
+  useEffect(() => {
+    callbacks?.onRefresh?.();
+  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Fetch standard types for galaxy constellation grouping
+  const [standardTypes, setStandardTypes] = useState({});
+  useEffect(() => {
+    listStandards().then(stds => {
+      const map = {};
+      stds.forEach(s => { map[(s.id || '').toLowerCase()] = s.type || 'custom'; });
+      setStandardTypes(map);
+    }).catch(() => {});
+  }, []);
+
   const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
   const [viewMode, _setViewMode] = useState(_savedViewMode);
   const setViewMode = (v) => { _savedViewMode = v; _setViewMode(v); };
   const [vizStyle, _setVizStyle] = useState(_savedVizStyle);
   const setVizStyle = (v) => { _savedVizStyle = v; _setVizStyle(v); };
+  const [galaxyMode, _setGalaxyMode] = useState(_savedGalaxyMode);
+  const setGalaxyMode = (v) => { _savedGalaxyMode = v; _setGalaxyMode(v); };
   const [showLabels, setShowLabels] = useState(false);
   const [currentPath, _setCurrentPath] = useState(_savedMapPath);
   const setCurrentPath = (p) => { _savedMapPath = p; _setCurrentPath(p); };
+
+  // Animate back to root when tab is re-clicked while already on map
+  const prevTabKey = useRef(tabKey);
+  useEffect(() => {
+    if (tabKey !== prevTabKey.current) {
+      prevTabKey.current = tabKey;
+      setCurrentPath('');
+      resetSavedFocus();
+      callbacks?.onRefresh?.();
+    }
+  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Get visible standards and available dimension names
   const visibleIds = useMemo(() => new Set(readVisibleStandardIds()), [allDimensions]);
@@ -232,9 +292,8 @@ export default function MapPage({ data, callbacks }) {
 
   const handleDrillDown = (nodePath) => setCurrentPath(nodePath);
   const handleFileClick = (treeNode) => {
-    if (callbacks?.onNavigate && treeNode.isFile) {
-      callbacks.onNavigate('file', { file: treeNodeToFileObj(treeNode), sourceTab: 'map' });
-    }
+    if (!callbacks?.onNavigate) return;
+    callbacks.onNavigate('file', { file: treeNodeToFileObj(treeNode), sourceTab: 'map' });
   };
   const handleBreadcrumbNav = (path) => setCurrentPath(path);
   const handleBack = () => {
@@ -258,9 +317,9 @@ export default function MapPage({ data, callbacks }) {
         <span className="map-total-count">
           <strong>{currentNode.violations}</strong> violation{currentNode.violations !== 1 ? 's' : ''} · <strong>{complianceRatio(currentNode.violations, currentNode.compliance)}</strong> ratio
         </span>
-        <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
+        <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       </div>
-      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} node={currentNode} onDrillDown={handleDrillDown} onFileClick={handleFileClick} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} />
+      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} node={currentNode} dimensions={filteredDimensions} onDrillDown={handleDrillDown} onFileClick={handleFileClick} onNavigate={callbacks?.onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} projectName={data?.projectName} standardTypes={standardTypes} />
     </div>
   );
 }

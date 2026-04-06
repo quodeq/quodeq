@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { severityCellStyle, complianceRateCellStyle } from '../utils/mapColors.js';
+import HeatGridCells from './HeatGridCells.jsx';
 
 const COLUMNS = [
   { id: 'name', label: 'File / Folder', align: 'left' },
@@ -27,7 +27,7 @@ function sortRows(items, sortCol, sortDir) {
   });
 }
 
-export default function HeatGridView({ node, onDrillDown, onFileClick }) {
+export default function HeatGridView({ node, onDrillDown, onFileClick, onCellClick }) {
   const [sortCol, setSortCol] = useState('violations');
   const [sortDir, setSortDir] = useState('desc');
 
@@ -65,9 +65,6 @@ export default function HeatGridView({ node, onDrillDown, onFileClick }) {
         <tbody>
           {rows.map((row) => {
             const canDrill = !row.isFile && row.children?.length > 0;
-            const total = row.violations + row.compliance;
-            const rate = total > 0 ? Math.round(row.complianceRate * 100) + '%' : '—';
-
             return (
               <tr key={row.path}>
                 <td>
@@ -82,11 +79,7 @@ export default function HeatGridView({ node, onDrillDown, onFileClick }) {
                     {row.isFile ? '' : '\uD83D\uDCC1 '}{row.name}
                   </div>
                 </td>
-                <td><div className={`heat-grid-cell${row.severity.critical > 0 ? '' : ' empty'}`} style={row.severity.critical > 0 ? severityCellStyle('critical') : undefined}>{row.severity.critical || '—'}</div></td>
-                <td><div className={`heat-grid-cell${row.severity.major > 0 ? '' : ' empty'}`} style={row.severity.major > 0 ? severityCellStyle('major') : undefined}>{row.severity.major || '—'}</div></td>
-                <td><div className={`heat-grid-cell${row.severity.minor > 0 ? '' : ' empty'}`} style={row.severity.minor > 0 ? severityCellStyle('minor') : undefined}>{row.severity.minor || '—'}</div></td>
-                <td><div className="heat-grid-num">{row.violations}</div></td>
-                <td><div className={`heat-grid-cell${total > 0 ? ' health' : ' empty'}`} style={total > 0 ? complianceRateCellStyle(row.complianceRate) : undefined}>{rate}</div></td>
+                <HeatGridCells row={row} onCellClick={onCellClick} />
               </tr>
             );
           })}

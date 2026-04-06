@@ -2,8 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
 import { complianceRatio } from '../../../utils/formatters.js';
-import { buildFileTree, treeNodeToFileObj } from '../../map/utils/fileTree.js';
-import HeatGridView from '../../map/components/HeatGridView.jsx';
+import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/index.js';
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
 
@@ -78,10 +77,15 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
     if (treeNode.isFile) onFileClick?.(treeNodeToFileObj(treeNode));
   }, [onFileClick]);
 
+  const handleCellClick = useCallback(({ row, severity }) => {
+    // Navigate to file/folder detail filtered by severity
+    onFileClick?.(treeNodeToFileObj(row, { severity: severity || undefined }));
+  }, [onFileClick]);
+
   return (
     <>
       <FileBreadcrumb path={breadcrumb} onNavigate={setCurrentPath} onBack={() => setCurrentPath(findParentPath(fullTree, currentPath))} />
-      <HeatGridView node={currentNode} onDrillDown={setCurrentPath} onFileClick={handleFileClick} />
+      <HeatGridView node={currentNode} onDrillDown={setCurrentPath} onFileClick={handleFileClick} onCellClick={handleCellClick} />
     </>
   );
 }
@@ -146,9 +150,20 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh }
   };
 }
 
-export default function ViolationsPage({ data, callbacks }) {
+let _lastViolationsTabKey = null;
+
+export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
+  const isFreshTabClick = _lastViolationsTabKey !== null && tabKey !== _lastViolationsTabKey;
+  _lastViolationsTabKey = tabKey;
+  if (isFreshTabClick) _savedFilePath = '';
+
   const { accumulatedDimensions, selectedProject } = data;
   const { onDimensionClick, onFileClick, onPrincipleClick, onRefresh } = callbacks;
+
+  // Refresh data on mount (ensures fresh data after returning from detail pages) and on tab re-click
+  useEffect(() => {
+    onRefresh?.();
+  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const {
     activeSubTab, setActiveSubTab, dismissed,
@@ -210,7 +225,7 @@ export default function ViolationsPage({ data, callbacks }) {
         <FileSubTab dimensions={visibleDimensions} onFileClick={onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />
       )}
       {activeSubTab === 'dimension' && (
-        <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} />
+        <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} onCellClick={callbacks.onCellClick} />
       )}
       {activeSubTab === 'dismissed' && (
         dismissed.length > 0
