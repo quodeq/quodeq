@@ -24,7 +24,6 @@ const MODE_OPTIONS = [
 
 const FAMILY_OPTIONS = [
   { value: 'daruma',    label: 'Daruma' },
-  { value: 'flynn',     label: 'Flynn' },
   { value: 'neo',       label: 'Neo' },
   { value: 'ifrit',     label: 'Ifrit' },
   { value: 'deckard',   label: 'Deckard' },
