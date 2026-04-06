@@ -52,15 +52,19 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
   const focusNode = focus || root;
   const viewSize = Math.round(BASE_SIZE * zoom);
 
-  const transform = useCallback((c) => {
-    if (!focusNode) return { cx: c.x, cy: c.y, r: c.r };
+  // Pre-compute all transforms once per focus change
+  const transformed = useMemo(() => {
+    if (!focusNode) return circles.map(c => ({ cx: c.x, cy: c.y, r: c.r }));
     const k = viewSize / (focusNode.r * 2);
-    return {
-      cx: (c.x - focusNode.x) * k + viewSize / 2,
-      cy: (c.y - focusNode.y) * k + viewSize / 2,
+    const hv = viewSize / 2;
+    return circles.map(c => ({
+      cx: (c.x - focusNode.x) * k + hv,
+      cy: (c.y - focusNode.y) * k + hv,
       r: c.r * k,
-    };
-  }, [focusNode, viewSize]);
+    }));
+  }, [circles, focusNode, viewSize]);
+
+  const transform = useCallback((c, i) => transformed[i] || { cx: c.x, cy: c.y, r: c.r }, [transformed]);
 
   const handleClick = useCallback((e, c) => {
     e.stopPropagation();
@@ -93,7 +97,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
           const isFolder = !d.isFile && d.children?.length > 0;
           const isRoot = c.depth === 0;
           if (!isFolder && !isRoot) return null;
-          const t = transform(c);
+          const t = transform(c, i);
           const isHovered = hover === i;
           return (
             <circle
@@ -115,7 +119,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
           const d = c.data;
           const isFolder = !d.isFile && d.children?.length > 0;
           if (isFolder || c.depth === 0) return null;
-          const t = transform(c);
+          const t = transform(c, i);
           return (
             <FileShape
               key={d.path || i}
@@ -136,7 +140,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
         {showLabels && circles.map((c, i) => {
           const d = c.data;
           const isFolder = !d.isFile && d.children?.length > 0;
-          const t = transform(c);
+          const t = transform(c, i);
           if (!(t.r > 10 && c.parent === focusNode)) return null;
           return (
             <text
