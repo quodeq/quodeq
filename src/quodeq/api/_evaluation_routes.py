@@ -66,12 +66,22 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
     """Register single-evaluation status and cancel routes."""
     from quodeq.api.routes import _reports_dir
 
+    _scored_jobs: set[str] = set()
+
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
         job = provider.get_evaluation_status(job_id)
         if not job:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
+        # Score any completed dimensions from failed/cancelled jobs (once)
+        if job.get("status") in ("failed", "cancelled") and job_id not in _scored_jobs:
+            _scored_jobs.add(job_id)
+            try:
+                from quodeq.services.evaluation_mixin import _score_completed_evidence
+                _score_completed_evidence(_reports_dir(), job)
+            except Exception:
+                pass
         return jsonify(to_camel_dict(job))
 
     @app.delete("/api/evaluations/<job_id>")

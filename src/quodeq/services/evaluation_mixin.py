@@ -176,6 +176,14 @@ class FsEvaluationMixin:
             _score_completed_evidence(reports_dir, job)
         return ok
 
+    def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
+        """Score any completed dimensions from a failed evaluation."""
+        job = self._jobs.get_job(job_id)
+        if not job or job.get("status") not in ("failed", "cancelled"):
+            return False
+        _score_completed_evidence(reports_dir, job)
+        return True
+
     def list_evaluations(self) -> list[JobSnapshot]:
         """Return all evaluation jobs (running, done, failed, cancelled)."""
         return self._jobs.list_jobs()
@@ -209,6 +217,10 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
             continue  # already scored
         if jsonl_path.stat().st_size == 0:
             continue  # no findings
+        # Only score dimensions that passed verification (analysis queue exists)
+        queue_file = evidence_dir / f"{dim_id}_queue.json"
+        if not queue_file.exists():
+            continue  # verification not completed for this dimension
 
         try:
             from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
