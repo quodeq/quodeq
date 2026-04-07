@@ -1630,3 +1630,106 @@ textarea:focus {
   from { opacity: 0; }
   to { opacity: 1; }
 }
+
+/* ── Provider Tabs ───────────────────────────────────────────────────── */
+
+.provider-tab-bar {
+  display: flex;
+  gap: 8px;
+}
+
+.provider-tab {
+  padding: 10px 14px;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  font-family: var(--font-sans);
+  color: var(--color-text-muted);
+  background: var(--color-surface);
+  border: 2px solid var(--color-border);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+}
+
+.provider-tab--active {
+  border-color: var(--color-accent);
+  background: var(--color-accent-soft);
+  color: var(--color-accent);
+  font-weight: var(--weight-semibold);
+}
+
+.provider-tab:hover:not(.provider-tab--active) {
+  border-color: var(--color-text-muted);
+}
+
+.provider-tab-content {
+  padding: 0;
+}
+
+.server-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  display: inline-block;
+}
+
+.server-dot--online { background: #4ade80; }
+.server-dot--offline { background: #f87171; }
+.server-dot--unknown { background: var(--color-text-muted); }
+
+.server-status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  margin: var(--space-4);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+}
+
+.server-status--online {
+  background: color-mix(in srgb, #4ade80 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, #4ade80 30%, var(--color-border));
+  color: #4ade80;
+}
+
+.server-status--offline {
+  background: color-mix(in srgb, #f87171 10%, var(--color-surface));
+  border: 1px solid color-mix(in srgb, #f87171 30%, var(--color-border));
+  color: #f87171;
+}
+
+.server-address {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.settings-error {
+  color: #f87171;
+}
+
+.settings-action-btn {
+  padding: var(--space-2) var(--space-4);
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.settings-action-btn:hover:not(:disabled) {
+  background: var(--color-border);
+}
+
+.settings-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
