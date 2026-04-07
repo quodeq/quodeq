@@ -8,7 +8,7 @@ from quodeq.analysis.prompts.builder import PromptContext, build_analysis_prompt
 
 
 def _build_subagent_prompt(config: RunConfig, dim_id: str, ctx: Any) -> str:
-    """Build the prompt for subagent analysis using the cached subagent.md template."""
+    """Build the prompt for subagent analysis using the cached cli_subagent_prompt.md template."""
     return build_analysis_prompt(
         ctx.subagent_template,
         PromptContext(

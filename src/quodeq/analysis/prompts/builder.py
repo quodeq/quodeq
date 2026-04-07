@@ -19,6 +19,16 @@ from quodeq.config.prompt_templates import render_template
 
 _logger = logging.getLogger(__name__)
 
+_TPL_EVALUATION_RULES = "EVALUATION_RULES"
+
+
+def _load_evaluation_rules() -> str:
+    """Load shared evaluation rules from evaluation_rules.md."""
+    try:
+        return load_template(template_name="evaluation_rules.md")
+    except (OSError, FileNotFoundError):
+        return ""
+
 # Re-export public API so existing ``from ...builder import X`` keeps working
 PromptContext = ctx.PromptContext
 __all__ = [
@@ -69,6 +79,7 @@ def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
         "DIMENSIONS": dimensions_text,
         ctx.TPL_PROMPT_HASH: prompt_hash,
         ctx.TPL_SOURCE_MANIFEST: manifest_context,
+        _TPL_EVALUATION_RULES: _load_evaluation_rules(),
     }
     if context.extra_vars:
         values.update(context.extra_vars)
@@ -82,7 +93,7 @@ def build_consolidated_prompt(
 ) -> str:
     """Build a multi-dimension analysis prompt with all standards inline."""
     if template is None:
-        template = load_template(template_name="consolidated.md")
+        template = load_template(template_name="cli_consolidated_prompt.md")
 
     standards_text = render_all_standards(
         context.standards_dir, dimensions, evaluators_dir=context.evaluators_dir,
@@ -100,6 +111,7 @@ def build_consolidated_prompt(
         ctx.TPL_ANALYSIS_GUIDANCE: manifest_context,
         ctx.TPL_PROMPT_HASH: prompt_hash,
         ctx.TPL_SOURCE_MANIFEST: manifest_context,
+        _TPL_EVALUATION_RULES: _load_evaluation_rules(),
     }
     if context.extra_vars:
         values.update(context.extra_vars)

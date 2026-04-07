@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from quodeq.analysis._api_prompt import assemble_api_prompt
+from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
 
 
 @pytest.fixture()
