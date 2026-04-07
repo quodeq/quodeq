@@ -167,10 +167,62 @@ class FsEvaluationMixin:
         """Return the current status of an evaluation job."""
         return self._jobs.get_job(job_id)
 
-    def cancel_evaluation(self, job_id: str) -> bool:
-        """Cancel a running evaluation job."""
-        return self._jobs.cancel_job(job_id)
+    def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
+        """Cancel a running evaluation job and score any completed dimensions."""
+        # Get job info before cancellation
+        job = self._jobs.get_job(job_id)
+        ok = self._jobs.cancel_job(job_id)
+        if ok and reports_dir and job:
+            _score_completed_evidence(reports_dir, job)
+        return ok
 
     def list_evaluations(self) -> list[JobSnapshot]:
         """Return all evaluation jobs (running, done, failed, cancelled)."""
         return self._jobs.list_jobs()
+
+
+def _score_completed_evidence(reports_dir: str, job: dict) -> None:
+    """Score any dimensions that have evidence but no evaluation report.
+
+    Called after cancellation so completed dimensions are preserved in the
+    dashboard even when the overall run was cancelled.
+    """
+    project = job.get("outputProject")
+    run_id = job.get("outputRunId")
+    if not project or not run_id:
+        return
+
+    import logging
+    _log = logging.getLogger(__name__)
+
+    evidence_dir = Path(reports_dir) / project / run_id / "evidence"
+    evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
+    if not evidence_dir.is_dir():
+        return
+
+    evaluation_dir.mkdir(parents=True, exist_ok=True)
+
+    for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):
+        dim_id = jsonl_path.name.replace("_evidence.jsonl", "")
+        eval_file = evaluation_dir / f"{dim_id}.json"
+        if eval_file.exists():
+            continue  # already scored
+        if jsonl_path.stat().st_size == 0:
+            continue  # no findings
+
+        try:
+            from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
+            from quodeq.core.scoring.engine import score_evidence
+            from quodeq.analysis.report import write_dimension_report
+
+            evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
+                dimension=dim_id, src="", language="", source_file_count=0,
+                compiled_dir=None, files_read=0,
+            ))
+            if evidence is None:
+                continue
+            scores = score_evidence(evidence, mode="numerical")
+            write_dimension_report(evidence, scores, dim_id, evaluation_dir)
+            _log.info("Scored cancelled dimension '%s' for run %s", dim_id, run_id[:8])
+        except Exception as exc:
+            _log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)

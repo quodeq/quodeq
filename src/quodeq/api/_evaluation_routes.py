@@ -64,6 +64,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
 
 def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
     """Register single-evaluation status and cancel routes."""
+    from quodeq.api.routes import _reports_dir
 
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
@@ -76,7 +77,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
     @app.delete("/api/evaluations/<job_id>")
     def cancel_evaluation(job_id: str) -> Response | tuple[Response, int]:
         _logger.info("cancel_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
-        ok = provider.cancel_evaluation(job_id)
+        ok = provider.cancel_evaluation(job_id, reports_dir=_reports_dir())
         if not ok:
             body, status = error_response("Job not found or not running", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

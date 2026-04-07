@@ -85,7 +85,7 @@ class EvaluationActions(Protocol):
         """Return current status of an evaluation job."""
         ...
 
-    def cancel_evaluation(self, job_id: str) -> bool:
+    def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
         """Cancel a running evaluation job. Return True on success."""
         ...
 
