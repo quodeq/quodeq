@@ -118,10 +118,13 @@ class FsEvaluationMixin:
         built_env = {**base, "PYTHONUNBUFFERED": "1"}
         built_env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
         ai_model = options.ai_model or get_ai_model()
+        subagent_model = options.subagent_model or ai_model
+        # Ensure both env vars are set consistently — prevents model swapping
+        # between verification (reads AI_MODEL) and analysis (reads SUBAGENT_MODEL)
         if ai_model:
             built_env["AI_MODEL"] = ai_model
-        if options.subagent_model:
-            built_env["SUBAGENT_MODEL"] = options.subagent_model
+        if subagent_model:
+            built_env["SUBAGENT_MODEL"] = subagent_model
         if not options.verify_findings:
             built_env["QUODEQ_NO_VERIFY"] = "1"
         if options.pool_budget != _DEFAULT_POOL_BUDGET:
