@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } from '../../../api/index.js';
-import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY } from '../../../constants.js';
+import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY, PER_DIMENSION_STORAGE_KEY } from '../../../constants.js';
 
 const DIMENSION_POLL_INITIAL_MS = 2000;
 const DIMENSION_POLL_MAX_MS = 8000;
@@ -114,6 +114,7 @@ function preparePayload(payload, storage = localStorage) {
   if (maxSubagents !== DEFAULT_MAX_SUBAGENTS) payload.maxSubagents = maxSubagents;
   const poolBudget = parseInt(storage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10);
   if (poolBudget !== DEFAULT_POOL_BUDGET) payload.poolBudget = poolBudget;
+  if (storage.getItem(PER_DIMENSION_STORAGE_KEY) === 'true') payload.perDimension = true;
 }
 
 function parseDimensions(payload) {

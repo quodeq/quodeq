@@ -53,6 +53,7 @@ def _run_dimension_analysis(
 
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     ac_kwargs: dict[str, Any] = dict(
+        ai_model=config.options.ai_model,
         jsonl_file=jsonl_file,
         analysis_budget=config.options.analysis_budget,
         heartbeat_callback=heartbeat,

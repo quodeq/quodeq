@@ -4,11 +4,11 @@ import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import SettingsAside from './SettingsAside.jsx';
 import AboutSection from './AboutSection.jsx';
 import ModelSection from './ModelSection.jsx';
-import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY, AI_CMD_STORAGE_KEY } from '../../../constants.js';
+import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY, AI_CMD_STORAGE_KEY, PER_DIMENSION_STORAGE_KEY } from '../../../constants.js';
 
 const MIN_SUBAGENTS = 1;
 const MAX_SUBAGENTS = 10;
-const MIN_POOL_BUDGET_MINS = 1;
+const MIN_POOL_BUDGET_MINS = 0;
 const MAX_POOL_BUDGET_MINS = 60;
 const DEFAULT_POOL_BUDGET_MINS = 10;
 
@@ -95,12 +95,16 @@ function persistSubagents(value, setter) {
 }
 
 function clampPoolBudget(value) {
-  return Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parseInt(value, 10) || DEFAULT_POOL_BUDGET_MINS));
+  const parsed = parseInt(value, 10);
+  if (isNaN(parsed)) return DEFAULT_POOL_BUDGET_MINS;
+  if (parsed === 0) return 0; // 0 = unlimited
+  return Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parsed));
 }
 
 function persistPoolBudget(value, setter) {
   const v = clampPoolBudget(value);
   setter(v);
+  // 0 minutes → 0 seconds (unlimited); pool interprets 0 as no limit
   persistSetting(POOL_BUDGET_STORAGE_KEY, v * 60);
 }
 
@@ -120,7 +124,8 @@ function SubagentsRow({ subagents }) {
         min={MIN_SUBAGENTS}
         max={MAX_SUBAGENTS}
         value={max}
-        onChange={(e) => persistSubagents(e.target.value, setMax)}
+        onChange={(e) => setMax(e.target.value)}
+        onBlur={(e) => persistSubagents(e.target.value, setMax)}
       />
     </div>
   );
@@ -128,27 +133,71 @@ function SubagentsRow({ subagents }) {
 
 function PoolBudgetRow({ subagents }) {
   const { poolBudgetMinutes, setPoolBudgetMinutes } = subagents;
+  const unlimited = poolBudgetMinutes === 0;
+
   return (
     <div className="settings-row settings-row--last">
       <div className="settings-row-label">
         <span className="settings-label">Analysis time limit</span>
         <span className="settings-description">
-          Maximum time allowed for the analysis pool to run (1–60 minutes). Evaluations exceeding this limit will stop early.
+          Maximum time allowed for the analysis pool to run. Evaluations exceeding this limit will stop early.
         </span>
       </div>
-      <input
-        type="number"
-        className="settings-model-input"
-        min={MIN_POOL_BUDGET_MINS}
-        max={MAX_POOL_BUDGET_MINS}
-        value={poolBudgetMinutes}
-        onChange={(e) => persistPoolBudget(e.target.value, setPoolBudgetMinutes)}
-      />
+      <div className="settings-budget-control">
+        <div className="theme-toggle">
+          <button
+            type="button"
+            className={`theme-toggle-btn${!unlimited ? ' active' : ''}`}
+            onClick={() => persistPoolBudget(poolBudgetMinutes || DEFAULT_POOL_BUDGET_MINS, setPoolBudgetMinutes)}
+          >Limited</button>
+          <button
+            type="button"
+            className={`theme-toggle-btn${unlimited ? ' active' : ''}`}
+            onClick={() => { setPoolBudgetMinutes(0); persistSetting(POOL_BUDGET_STORAGE_KEY, 0); }}
+          >Unlimited</button>
+        </div>
+        <input
+          type="number"
+          className="settings-model-input"
+          min={1}
+          max={MAX_POOL_BUDGET_MINS}
+          value={unlimited ? '' : poolBudgetMinutes}
+          placeholder={unlimited ? '∞' : 'min'}
+          disabled={unlimited}
+          onChange={(e) => persistPoolBudget(e.target.value, setPoolBudgetMinutes)}
+        />
+      </div>
     </div>
   );
 }
 
-function AnalysisSection({ analysis, subagents }) {
+function PerDimensionRow({ perDimension, onApply, providerType }) {
+  if (providerType === 'api') return null;
+  return (
+    <div className="settings-row">
+      <div className="settings-row-label">
+        <span className="settings-label">Per-dimension analysis</span>
+        <span className="settings-description">
+          Analyze each quality dimension separately instead of all at once. Deeper coverage per dimension but uses more tokens.
+        </span>
+      </div>
+      <div className="theme-toggle">
+        <button
+          type="button"
+          className={`theme-toggle-btn${perDimension ? ' active' : ''}`}
+          onClick={() => onApply(true)}
+        >Per-dimension</button>
+        <button
+          type="button"
+          className={`theme-toggle-btn${!perDimension ? ' active' : ''}`}
+          onClick={() => onApply(false)}
+        >Consolidated</button>
+      </div>
+    </div>
+  );
+}
+
+function AnalysisSection({ analysis, subagents, perDimension }) {
   const { power, onChange, onPersist } = analysis;
   return (
     <>
@@ -163,6 +212,7 @@ function AnalysisSection({ analysis, subagents }) {
       </div>
       <SubagentsRow subagents={subagents} />
       <PoolBudgetRow subagents={subagents} />
+      <PerDimensionRow {...perDimension} />
     </>
   );
 }
@@ -248,7 +298,19 @@ function useSettingsState(aiCmd, onApplyAiCmd) {
       .catch(() => setAvailableClients([]));
   }, [aiCmd, stableApplyAiCmd]);
 
-  return { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase };
+  const [perDimension, setPerDimension] = useState(() => localStorage.getItem(PER_DIMENSION_STORAGE_KEY) !== 'false');
+
+  function applyPerDimension(value) {
+    setPerDimension(value);
+    persistSetting(PER_DIMENSION_STORAGE_KEY, String(value));
+  }
+
+  // Determine provider type for current aiCmd
+  const providerType = availableClients
+    ? (availableClients.find((c) => c.id === aiCmd)?.type || 'cli')
+    : 'cli';
+
+  return { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase, perDimension, applyPerDimension, providerType };
 }
 
 export default function SettingsPage({ theme, models, analysis, verification }) {
@@ -256,7 +318,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
   const { aiCmd, onApplyAiCmd } = models;
   const { power: analysisPower, onPowerChange: onAnalysisPowerChange, onPersist: onPersistPower } = analysis;
   const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
-  const { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase } = useSettingsState(aiCmd, onApplyAiCmd);
+  const { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase, perDimension, applyPerDimension, providerType } = useSettingsState(aiCmd, onApplyAiCmd);
 
   return (
     <div className="settings-page">
@@ -281,6 +343,7 @@ export default function SettingsPage({ theme, models, analysis, verification }) 
             <AnalysisSection
               analysis={{ power: analysisPower, onChange: onAnalysisPowerChange, onPersist: onPersistPower }}
               subagents={{ max: maxSubagents, setMax: setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes }}
+              perDimension={{ perDimension, onApply: applyPerDimension, providerType }}
             />
             <VerificationSection verifyFindings={verifyFindings} onApplyVerifyFindings={onApplyVerifyFindings} />
           </section>

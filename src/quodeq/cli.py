@@ -21,7 +21,7 @@ from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, 
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import cleanup_cloned_repo, prepare_repository
-from quodeq.shared.utils import is_repo_url, project_name_from_repo, write_text
+from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
@@ -188,6 +188,10 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
         consolidated = False
         print("Single-file mode: per-dimension analysis for deeper coverage", file=sys.stderr)
 
+    ai_model = get_ai_model(env=env)
+    subagent_model_val = _subagent_model(env=env)
+    effective_ai_model = ai_model or subagent_model_val
+
     return RunConfig(
         src=inputs.src,
         language=inputs.language,
@@ -197,11 +201,12 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
         dimensions_data=inputs.dims_data,
         evaluators_dir=default_paths().evaluators_dir,
         options=AnalysisOptions(
+            ai_model=effective_ai_model,
             dimensions=dimensions_filter,
             max_turns=args.max_turns if args.max_turns is not None else _env_int(_ENV_MAX_TURNS, None, env=env),
             max_duration=args.max_duration if args.max_duration is not None else _env_int(_ENV_MAX_DURATION, None, env=env),
             max_subagents=args.n_subagents,
-            subagent_model=_subagent_model(env=env),
+            subagent_model=subagent_model_val,
             verify_findings=not _no_verify(args, env=env),
             consolidated=consolidated,
             pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),

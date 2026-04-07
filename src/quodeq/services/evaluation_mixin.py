@@ -122,6 +122,8 @@ class FsEvaluationMixin:
             built_env["QUODEQ_NO_VERIFY"] = "1"
         if options.pool_budget != _DEFAULT_POOL_BUDGET:
             built_env["QUODEQ_POOL_BUDGET"] = str(options.pool_budget)
+        if options.per_dimension:
+            built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
         return built_env
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:

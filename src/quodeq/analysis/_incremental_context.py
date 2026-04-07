@@ -72,7 +72,7 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
         dimensions_data=dims_data,
         date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         template=load_template(config.options.template_path),
-        subagent_template=load_template(template_name="subagent.md"),
+        subagent_template=load_template(template_name="cli_subagent_prompt.md"),
         total=len(dimensions),
     )
     return dimensions, ctx

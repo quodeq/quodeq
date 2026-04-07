@@ -1,12 +1,15 @@
 """Prompt assembly for the direct API runner.
 
-Bundles source files, standards, and evaluation instructions into a single
-prompt that requests structured JSON output matching the JSONL evidence schema.
+Loads api_prompt.md template and fills in source files, standards,
+and evaluation rules.
 """
 from __future__ import annotations
 
 import logging
 from pathlib import Path
+
+from quodeq.analysis.prompts._template import load_template
+from quodeq.config.prompt_templates import render_template
 
 _log = logging.getLogger(__name__)
 
@@ -26,36 +29,6 @@ Each finding must be a JSON object with these fields:
     "scope": string - "file", "class", or "module"
 """
 
-_SYSTEM_TEMPLATE = """\
-You are a code quality evaluator. Analyze the provided source code against \
-the given standards for the "{dimension}" dimension.
-
-Repository: {repo_name}
-
-## Standards
-
-{standards_text}
-
-## Output Format
-
-Return a JSON object with a single key "findings" containing an array of finding objects.
-
-{schema}
-
-Example:
-{{"findings": [{{"req": "M-MOD-1", "t": "violation", "file": "src/app.py", "line": 10, \
-"severity": "major", "w": "Multiple responsibilities", "reason": "Module handles both IO and logic"}}]}}
-
-If no findings, return: {{"findings": []}}
-
-## Source Files
-
-{files_block}
-
-Analyze these files for the "{dimension}" dimension only. \
-Report violations and notable compliance. Be precise with line numbers.
-"""
-
 
 def _read_file_safe(path: Path) -> str | None:
     """Read a file, returning None on failure."""
@@ -66,14 +39,16 @@ def _read_file_safe(path: Path) -> str | None:
         return None
 
 
-def _build_files_block(source_files: list[Path]) -> str:
+def _build_files_block(source_files: list[Path], repo_root: Path | None = None) -> str:
     """Build the source files block for the prompt."""
     parts: list[str] = []
     for path in source_files:
         content = _read_file_safe(path)
         if content is None:
             continue
-        parts.append(f"### {path.name}\n```\n{content}\n```")
+        display_path = str(path.relative_to(repo_root)) if repo_root else path.name
+        numbered = "\n".join(f"{i+1:4d} | {line}" for i, line in enumerate(content.splitlines()))
+        parts.append(f"### {display_path}\n```\n{numbered}\n```")
     return "\n\n".join(parts)
 
 
@@ -83,13 +58,17 @@ def assemble_api_prompt(
     standards_text: str,
     dimension: str,
     repo_name: str,
+    repo_root: Path | None = None,
 ) -> str:
     """Assemble a complete evaluation prompt for the API runner."""
-    files_block = _build_files_block(source_files)
-    return _SYSTEM_TEMPLATE.format(
-        dimension=dimension,
-        repo_name=repo_name,
-        standards_text=standards_text,
-        schema=_FINDING_SCHEMA,
-        files_block=files_block,
-    )
+    template = load_template(template_name="api_prompt.md")
+    rules = load_template(template_name="evaluation_rules.md")
+    files_block = _build_files_block(source_files, repo_root=repo_root)
+    return render_template(template, {
+        "DIMENSION": dimension,
+        "REPO_NAME": repo_name,
+        "STANDARDS_TEXT": standards_text,
+        "EVALUATION_RULES": rules,
+        "FINDING_SCHEMA": _FINDING_SCHEMA,
+        "FILES_BLOCK": files_block,
+    })

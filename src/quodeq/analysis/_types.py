@@ -26,6 +26,7 @@ class AnalysisOptions:
     max_duration: int | None = None
     max_subagents: int = 1
     subagent_model: str | None = None
+    ai_model: str | None = None
     verify_findings: bool = True
     consolidated: bool = True
     pool_budget: int | None = None

@@ -92,7 +92,7 @@ class SubagentPool:
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, returning a SubagentResult per agent."""
-        max_dur = self._base_config.pool_budget or _DEFAULT_POOL_BUDGET
+        max_dur = self._base_config.pool_budget if self._base_config.pool_budget is not None else _DEFAULT_POOL_BUDGET
         if self._scout_first:
             log_info(f"Launching scout agent for {self._dimension_key} (max {self._n} agents)")
         else:

@@ -21,8 +21,13 @@ def _compute_files_per_agent(total_files: int) -> int:
 
 
 def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
-    """Return the subagent model override, or None to use the client's default."""
-    return (env or os.environ).get("QUODEQ_SUBAGENT_MODEL") or None
+    """Return the subagent model override, or None to use the client's default.
+
+    Checks SUBAGENT_MODEL first (set by dashboard/service layer),
+    then QUODEQ_SUBAGENT_MODEL (direct env var override).
+    """
+    _env = env or os.environ
+    return _env.get("SUBAGENT_MODEL") or _env.get("QUODEQ_SUBAGENT_MODEL") or None
 
 
 @dataclass
@@ -39,7 +44,7 @@ def _launch_pool(
 ) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model()
+    subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -49,10 +54,12 @@ def _launch_pool(
         max_files_per_agent=params.max_files_per_agent,
         pool_budget=config.options.pool_budget if config.options.pool_budget is not None else _DEFAULT_POOL_BUDGET,
     )
+    n_agents = config.options.max_subagents
+
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path),
         options=PoolOptions(
-            n_agents=config.options.max_subagents,
+            n_agents=n_agents,
             prompt=params.prompt,
             dimension=dim_id,
         ),

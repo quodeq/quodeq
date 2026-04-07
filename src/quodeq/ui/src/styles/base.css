@@ -1312,6 +1312,17 @@ textarea:focus {
   margin: 0;
 }
 
+.settings-budget-control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.settings-budget-control .settings-model-input:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
 .settings-row-label {
   display: flex;
   flex-direction: column;

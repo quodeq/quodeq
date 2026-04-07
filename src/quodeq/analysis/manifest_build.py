@@ -76,7 +76,7 @@ def _walk_and_group(
     ext_counts_by_lang: dict[str, Counter] = {}
     all_extensions = set(ext_map.keys())
     for dirpath, dirnames, filenames in os.walk(src):
-        dirnames[:] = [d for d in dirnames if d not in skip_dirs]
+        dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
         for fname in filenames:
             suffix = os.path.splitext(fname)[1]
             if suffix in all_extensions:

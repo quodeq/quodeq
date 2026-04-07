@@ -25,6 +25,7 @@ class EvaluationOptions:
     max_subagents: int = _DEFAULT_MAX_SUBAGENTS
     pool_budget: int = _DEFAULT_POOL_BUDGET
     incremental: bool = False
+    per_dimension: bool = False
 
 
 class ProjectActions(Protocol):

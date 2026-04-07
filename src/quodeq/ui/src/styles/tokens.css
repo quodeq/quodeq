@@ -453,6 +453,7 @@
    ──────────────────────────────────────────────────────── */
 
 html[data-theme="dark"]:root {
+  --color-bg:           var(--primitive-flynn-950);
   --color-surface:      var(--primitive-flynn-900);
   --color-surface-alt:  var(--primitive-flynn-800);
   --color-border:       var(--primitive-flynn-700);

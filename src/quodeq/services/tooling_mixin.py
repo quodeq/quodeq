@@ -58,13 +58,19 @@ _DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "copilot"})
 def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
     """Return the set of allowed AI client IDs (lazy, reads env on each call).
 
-    *env* overrides ``os.environ`` when provided, making the function
-    testable without environment mutation.
+    Includes both hardcoded CLI tools and API providers from the provider
+    config.  *env* overrides ``os.environ`` when provided, making the
+    function testable without environment mutation.
     """
     environ = env if env is not None else os.environ
     if "QUODEQ_AI_CLIENTS" in environ:
         return frozenset(environ["QUODEQ_AI_CLIENTS"].split(","))
-    return _DEFAULT_CLIENT_IDS
+    # Include API providers from config alongside default CLI tools
+    api_ids = frozenset(
+        pid for pid, cfg in get_provider_configs().items()
+        if cfg.get("type") == "api"
+    )
+    return _DEFAULT_CLIENT_IDS | api_ids
 
 
 class FsToolingMixin:
