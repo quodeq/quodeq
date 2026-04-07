@@ -43,14 +43,15 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
   function handleStartEvaluation(payload) {
     const activeProvider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
     const get = (key) => localStorage.getItem(providerKey(activeProvider, key));
-    // Ollama uses a single analysis model; CLI providers use tier-based selection
+    // Ollama uses a single analysis model; CLI providers use tier-based selection.
+    // Falls back to the orchestrator model if no analysis-specific model is set.
     const analysisModel = get('model-analysis');
     let subagentModel;
     if (analysisModel) {
       subagentModel = analysisModel;
     } else {
       const tierNames = ['fast', 'balanced', 'thorough'];
-      subagentModel = get(`model-${tierNames[analysisPower - 1]}`) || undefined;
+      subagentModel = get(`model-${tierNames[analysisPower - 1]}`) || get('model') || undefined;
     }
     startEvaluation({ ...payload, subagentModel });
   }
