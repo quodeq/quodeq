@@ -79,6 +79,9 @@ def run_verification_pool(
     prompt = build_verify_prompt(manifest_path, dim_id)
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     fast = _fast_model()
+    # For non-Claude providers, use the configured model instead of 'haiku'
+    if config.options.ai_model and fast == _DEFAULT_FAST_MODEL:
+        fast = config.options.ai_model
 
     ac = AnalysisConfig(
         compiled_dir=compiled_dir,
