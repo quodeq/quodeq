@@ -228,8 +228,8 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
             from quodeq.analysis.report import write_dimension_report
 
             evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
-                dimension=dim_id, src="", language="", source_file_count=0,
-                compiled_dir=None, files_read=0,
+                language="", repository="", date_str="",
+                source_file_count=0, files_read=0,
             ))
             if evidence is None:
                 continue
