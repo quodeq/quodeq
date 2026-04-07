@@ -125,10 +125,10 @@ function preparePayload(payload, storage = localStorage) {
   payload.aiModel = model;
 
   const subagents = parseInt(get('subagents') || '1', 10);
-  if (subagents !== 1) payload.maxSubagents = subagents;
+  payload.maxSubagents = subagents;
 
   const poolBudget = parseInt(get('pool-budget') || '0', 10);
-  if (poolBudget !== 0) payload.poolBudget = poolBudget;
+  payload.poolBudget = poolBudget;
 
   if (get('per-dimension') === 'true') payload.perDimension = true;
   if (get('verify') === 'false') payload.verifyFindings = false;
