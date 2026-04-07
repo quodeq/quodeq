@@ -54,6 +54,21 @@ export default function OllamaTab({ state, update }) {
       </div>
       <div className="settings-row">
         <div className="settings-row-label">
+          <span className="settings-label">Context window</span>
+          <span className="settings-description">Smaller context = faster inference, less VRAM. 0 = model default.</span>
+        </div>
+        <select className="settings-model-input" value={state['context-size']} onChange={(e) => update('context-size', e.target.value)}>
+          <option value="0">Default</option>
+          <option value="8192">8K</option>
+          <option value="16384">16K</option>
+          <option value="32768">32K</option>
+          <option value="65536">64K</option>
+          <option value="131072">128K</option>
+          <option value="262144">256K</option>
+        </select>
+      </div>
+      <div className="settings-row">
+        <div className="settings-row-label">
           <span className="settings-label">Max parallel agents</span>
           <span className="settings-description">Auto-detected from VRAM. Test for accuracy.</span>
         </div>

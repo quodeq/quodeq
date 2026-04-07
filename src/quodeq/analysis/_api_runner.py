@@ -65,6 +65,7 @@ class ApiRunnerConfig:
     api_key: str = ""
     temperature: float = 0.1
     max_tokens: int | None = None
+    context_size: int = 0
 
 
 def _salvage_partial_findings(raw_json: str) -> list[dict]:
@@ -92,6 +93,10 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         mode=instructor.Mode.JSON,
     )
 
+    extra_body: dict = {"reasoning_effort": "none"}
+    if config.context_size > 0:
+        extra_body["num_ctx"] = config.context_size
+
     create_kwargs: dict = dict(
         model=config.model,
         response_model=_Findings,
@@ -101,7 +106,7 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
         ],
         temperature=config.temperature,
         max_retries=_MAX_RETRIES,
-        extra_body={"reasoning_effort": "none"},
+        extra_body=extra_body,
     )
     if config.max_tokens is not None:
         create_kwargs["max_tokens"] = config.max_tokens

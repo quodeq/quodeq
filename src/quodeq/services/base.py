@@ -28,6 +28,7 @@ class EvaluationOptions:
     per_dimension: bool = False
     branch: str | None = None
     scope_path: str | None = None
+    context_size: int = 0
 
 
 class ProjectActions(Protocol):

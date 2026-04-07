@@ -62,6 +62,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         pool_budget=pool_budget,
         incremental=bool(payload.get("incremental", False)),
         per_dimension=bool(payload.get("perDimension", False)),
+        context_size=int(payload.get("contextSize", 0)),
         branch=payload.get("branch") or None,
         scope_path=payload.get("scopePath") or None,
     )

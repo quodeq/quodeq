@@ -131,6 +131,8 @@ class FsEvaluationMixin:
             built_env["QUODEQ_POOL_BUDGET"] = str(options.pool_budget)
         if options.per_dimension:
             built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
+        if options.context_size > 0:
+            built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
         return built_env
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
