@@ -20,6 +20,8 @@ class RunInfo:
     run_id: str
     date_iso: str | None
     date_label: str
+    branch: str | None = None
+    scope_path: str | None = None
 
 
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:

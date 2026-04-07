@@ -30,3 +30,6 @@ class ProjectEntry:
     latest_grade: str | None = None
     latest_score: float | None = None
     language_stats: dict[str, int] = field(default_factory=dict)
+    scan_date: str | None = None
+    total_files: int | None = None
+    analyzed_files: int | None = None

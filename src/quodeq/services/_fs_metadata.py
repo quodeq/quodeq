@@ -9,6 +9,21 @@ from typing import Any
 from quodeq.services.ports import RunInfo, read_run_data, safe_read_dir, summarize_dimensions
 
 
+def _read_scan_summary(reports_root: Path, entry_name: str) -> dict[str, Any]:
+    """Read scan.json and return coverage fields, or empty dict if not available."""
+    scan_path = reports_root / entry_name / "scan.json"
+    if not scan_path.exists():
+        return {}
+    try:
+        data = json.loads(scan_path.read_text())
+        return {
+            "scanDate": data.get("scanned_at"),
+            "totalFiles": data.get("total_files"),
+        }
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
 def _check_path_exists(path: str | None, location: str | None) -> bool | None:
     """Return whether a local path exists, or None if not applicable."""
     if location == "local" and path:

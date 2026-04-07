@@ -56,6 +56,42 @@ def _subagent_model(env: dict[str, str] | None = None) -> str | None:
     return (env or os.environ).get("SUBAGENT_MODEL") or None
 
 
+import tempfile as _tempfile
+
+
+def _create_worktree(repo_dir: Path, branch: str) -> Path | None:
+    """Create a temporary git worktree for the given branch.
+
+    Returns the worktree path, or None on failure.
+    """
+    worktree_dir = Path(_tempfile.mkdtemp(prefix=f"quodeq-wt-{branch.replace('/', '-')}-"))
+    try:
+        subprocess.run(
+            ["git", "-C", str(repo_dir), "worktree", "add", str(worktree_dir), branch],
+            capture_output=True, text=True, check=True, timeout=30,
+        )
+        return worktree_dir
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+        print(f"Failed to create worktree for branch '{branch}': {exc}", file=sys.stderr)
+        # Clean up the empty temp dir
+        try:
+            worktree_dir.rmdir()
+        except OSError:
+            pass
+        return None
+
+
+def _cleanup_worktree(repo_dir: Path, worktree_dir: Path) -> None:
+    """Remove a temporary git worktree."""
+    try:
+        subprocess.run(
+            ["git", "-C", str(repo_dir), "worktree", "remove", str(worktree_dir), "--force"],
+            capture_output=True, text=True, timeout=30,
+        )
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, OSError) as exc:
+        _logger.debug("Failed to clean up worktree %s: %s", worktree_dir, exc)
+
+
 def _resolve_repo(args: argparse.Namespace) -> Path | None:
     """Resolve the repo argument to a local path (cloning if needed)."""
     repo_path = args.repo
@@ -76,6 +112,17 @@ def _resolve_repo(args: argparse.Namespace) -> Path | None:
     if not src.exists():
         print(f"Repository path does not exist: {src}. Verify the path is correct and accessible.", file=sys.stderr)
         return None
+
+    # --branch: create a worktree for the requested branch
+    branch = getattr(args, "branch", None)
+    if branch and not is_remote and src.is_dir():
+        worktree = _create_worktree(src, branch)
+        if worktree is None:
+            return None
+        args._worktree_origin = src  # original repo dir, for cleanup
+        args._worktree_dir = worktree
+        src = worktree
+
     return src
 
 
@@ -233,6 +280,19 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     if src is None:
         return None
 
+    # --scope: narrow analysis to a subdirectory
+    scope = getattr(args, "scope", None)
+    if scope and src.is_dir():
+        scoped = (src / scope).resolve()
+        if not scoped.is_dir():
+            print(f"Scope directory does not exist: {scoped}", file=sys.stderr)
+            return None
+        if not str(scoped).startswith(str(src)):
+            print(f"Scope must be within the repository: {scope}", file=sys.stderr)
+            return None
+        src = scoped
+        print(f"Scoped evaluation: {scope} (repo root: {src.parent})", file=sys.stderr)
+
     # Single-file evaluation: find project root, compute relative path
     single_file: str | None = None
     if src.is_file():
@@ -298,6 +358,10 @@ def _run_pipeline_with_cleanup(
     finally:
         if is_repo_url(args.repo):
             cleanup_cloned_repo(str(inputs.src))
+        worktree_dir = getattr(args, "_worktree_dir", None)
+        worktree_origin = getattr(args, "_worktree_origin", None)
+        if worktree_dir and worktree_origin:
+            _cleanup_worktree(worktree_origin, worktree_dir)
 
 
 def run_evaluate(args: argparse.Namespace) -> int:

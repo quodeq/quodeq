@@ -722,6 +722,11 @@ textarea:focus {
   color: var(--color-text-muted);
 }
 
+.content-header-sep {
+  color: var(--color-text-subtle);
+  margin: 0 var(--space-1);
+}
+
 .content-meta-text {
   font-size: 0.75rem;
   color: var(--color-text-muted);

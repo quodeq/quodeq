@@ -26,6 +26,8 @@ class EvaluationOptions:
     pool_budget: int = _DEFAULT_POOL_BUDGET
     incremental: bool = False
     per_dimension: bool = False
+    branch: str | None = None
+    scope_path: str | None = None
 
 
 class ProjectActions(Protocol):

@@ -94,7 +94,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
             <div className="panel-header">
               <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
             </div>
-            <EvaluationForm onStart={onStartEvaluation} disabled={false} />
+            <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={selectedProject} />
           </div>
         )}
 

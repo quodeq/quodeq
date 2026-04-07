@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from typing import Any
 
@@ -12,9 +13,32 @@ from quodeq.services.dashboard import build_dashboard
 from quodeq.services.violations import aggregate_violations, resolve_dimension_eval
 
 
+def _enrich_with_coverage(reports_dir: str, project: str, payload: dict[str, Any]) -> dict[str, Any]:
+    """Add coverage fields from scan.json if available."""
+    scan_path = Path(reports_dir) / project / "scan.json"
+    if not scan_path.exists():
+        return payload
+    try:
+        scan = json.loads(scan_path.read_text())
+        total = scan.get("total_files", 0)
+        payload["totalFiles"] = total
+        # Compute analyzed_files from the files_count already tracked in run data.
+        # The existing _read_accumulated_summary returns files_count from manifests.
+        # Use it as the analyzed count (it counts unique source files seen across runs).
+        files_count = payload.get("filesCount") or payload.get("files_count")
+        if files_count and total:
+            payload["analyzedFiles"] = min(files_count, total)
+        else:
+            payload["analyzedFiles"] = None
+    except (json.JSONDecodeError, OSError):
+        pass
+    return payload
+
+
 def get_dashboard(reports_dir: str, project: str, run: str) -> dict[str, Any]:
     """Return the dashboard payload for a specific project run."""
-    return build_dashboard(reports_dir, project, run)
+    payload = build_dashboard(reports_dir, project, run)
+    return _enrich_with_coverage(reports_dir, project, payload)
 
 
 def get_accumulated(reports_dir: str, project: str, as_of: str | None) -> dict[str, Any] | None:

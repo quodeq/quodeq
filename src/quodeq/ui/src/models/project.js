@@ -17,6 +17,9 @@
  * @property {number}       runsCount
  * @property {number|null}  filesCount
  * @property {Object|null}  languageStats - e.g. { py: 302, js: 84 }
+ * @property {string|null}  scanDate
+ * @property {number|null}  totalFiles
+ * @property {number|null}  analyzedFiles
  */
 
 /**
@@ -44,5 +47,8 @@ export function createProject(raw) {
     filesCount:   raw.filesCount ?? null,
     hasFingerprints: raw.hasFingerprints ?? false,
     languageStats: raw.languageStats ?? null,
+    scanDate:      raw.scanDate ?? null,
+    totalFiles:    raw.totalFiles ?? null,
+    analyzedFiles: raw.analyzedFiles ?? null,
   };
 }
