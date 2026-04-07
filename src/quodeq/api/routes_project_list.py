@@ -1,6 +1,7 @@
 """Project listing, mutation, and export routes."""
 from __future__ import annotations
 
+import json
 import logging
 from http import HTTPStatus
 from pathlib import Path
@@ -112,3 +113,49 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.post("/api/projects/<project>/clone-local")
     def clone_project_local(project: str) -> Response | tuple[Response, int]:
         return _handle_clone_project_local(provider)
+
+    @app.get("/api/projects/<project>/scan")
+    def project_scan(project: str) -> Response | tuple[Response, int]:
+        """Return scan data for a project. Triggers scan if needed for local projects."""
+        from quodeq.shared.validation import validate_path_segment
+        validate_path_segment(project)
+
+        project_dir = Path(reports_dir()) / project
+        if not project_dir.is_dir():
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+
+        scan_path = project_dir / "scan.json"
+        if scan_path.exists():
+            try:
+                data = json.loads(scan_path.read_text())
+                return jsonify(data)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        # Check if local — read repository_info.json
+        info_path = project_dir / "repository_info.json"
+        if not info_path.exists():
+            body, status = error_response("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+
+        try:
+            info = json.loads(info_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            body, status = error_response("Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
+            return jsonify(body), status
+
+        if info.get("location") != "local" or not info.get("path"):
+            body, status = error_response("Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
+            return jsonify(body), status
+
+        project_path = Path(info["path"])
+        if not project_path.is_dir():
+            body, status = error_response("Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
+            return jsonify(body), status
+
+        from quodeq.services._fs_scan import scan_project
+        result = scan_project(project_path, output_dir=project_dir)
+
+        import dataclasses
+        return jsonify(dataclasses.asdict(result))
