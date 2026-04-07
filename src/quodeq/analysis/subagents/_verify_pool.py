@@ -73,18 +73,29 @@ def run_verification_pool(
     Uses the fast model (haiku by default) with a smaller pool.
     Confirmed findings are written to JSONL via MCP -> appear on dashboard.
     """
-    queue_path = evidence_dir / f"{dim_id}_verify_queue.json"
-    FileQueue(queue_path, files_to_verify, max_files_per_agent=_VERIFY_MAX_FILES_PER_AGENT)
-
     prompt = build_verify_prompt(manifest_path, dim_id)
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     fast = _fast_model()
-    # For non-CLI providers (e.g. Ollama), use the same model and agent count
-    # as analysis — no cost benefit to a cheaper model, and swapping wastes VRAM.
+    # For non-CLI providers (e.g. Ollama), treat verification the same as
+    # analysis — no caps on agents or files-per-agent, no model swapping.
     is_local = False
     if config.options.ai_model and fast == _DEFAULT_FAST_MODEL:
         fast = config.options.ai_model
         is_local = True
+
+    if is_local:
+        n_agents = min(config.options.max_subagents, len(files_to_verify))
+        files_per_agent = (len(files_to_verify) + n_agents - 1) // n_agents if n_agents else 0
+    else:
+        files_per_agent = _VERIFY_MAX_FILES_PER_AGENT
+        n_agents = min(
+            _VERIFY_N_AGENTS,
+            config.options.max_subagents,
+            (len(files_to_verify) + files_per_agent - 1) // files_per_agent,
+        )
+
+    queue_path = evidence_dir / f"{dim_id}_verify_queue.json"
+    FileQueue(queue_path, files_to_verify, max_files_per_agent=files_per_agent)
 
     ac = AnalysisConfig(
         compiled_dir=compiled_dir,
@@ -93,17 +104,6 @@ def run_verification_pool(
         ai_model=fast,
         dimension=dim_id,
     )
-
-    if is_local:
-        # Local providers: use all configured agents, distribute files evenly
-        n_agents = min(config.options.max_subagents, len(files_to_verify))
-    else:
-        # CLI providers: cap at _VERIFY_N_AGENTS, batch by _VERIFY_MAX_FILES_PER_AGENT
-        n_agents = min(
-            _VERIFY_N_AGENTS,
-            config.options.max_subagents,
-            (len(files_to_verify) + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
-        )
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
         options=PoolOptions(
