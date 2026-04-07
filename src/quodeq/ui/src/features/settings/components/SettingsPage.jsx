@@ -1,20 +1,9 @@
-import { useState, useEffect, useCallback } from 'react';
-import { getHealth, getAiClients } from '../../../api/index.js';
-import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
+import { useState, useEffect } from 'react';
+import { getHealth, getProviderConfigs } from '../../../api/index.js';
 import SettingsAside from './SettingsAside.jsx';
 import AboutSection from './AboutSection.jsx';
-import ModelSection from './ModelSection.jsx';
-import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY, AI_CMD_STORAGE_KEY, PER_DIMENSION_STORAGE_KEY } from '../../../constants.js';
-
-const MIN_SUBAGENTS = 1;
-const MAX_SUBAGENTS = 10;
-const MIN_POOL_BUDGET_MINS = 0;
-const MAX_POOL_BUDGET_MINS = 60;
-const DEFAULT_POOL_BUDGET_MINS = 10;
-
-function persistSetting(key, value) {
-  localStorage.setItem(key, String(value));
-}
+import ProviderTabs from './ProviderTabs.jsx';
+import ServerSection from './ServerSection.jsx';
 
 const MODE_OPTIONS = [
   { value: 'system',   label: 'System' },
@@ -84,164 +73,6 @@ function ThemeSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
   );
 }
 
-function clampSubagents(value) {
-  return Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(value, 10) || DEFAULT_MAX_SUBAGENTS));
-}
-
-function persistSubagents(value, setter) {
-  const v = clampSubagents(value);
-  setter(v);
-  persistSetting(SUBAGENTS_STORAGE_KEY, v);
-}
-
-function clampPoolBudget(value) {
-  const parsed = parseInt(value, 10);
-  if (isNaN(parsed)) return DEFAULT_POOL_BUDGET_MINS;
-  if (parsed === 0) return 0; // 0 = unlimited
-  return Math.max(MIN_POOL_BUDGET_MINS, Math.min(MAX_POOL_BUDGET_MINS, parsed));
-}
-
-function persistPoolBudget(value, setter) {
-  const v = clampPoolBudget(value);
-  setter(v);
-  // 0 minutes → 0 seconds (unlimited); pool interprets 0 as no limit
-  persistSetting(POOL_BUDGET_STORAGE_KEY, v * 60);
-}
-
-function SubagentsRow({ subagents }) {
-  const { max, setMax } = subagents;
-  return (
-    <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">Max parallel agents</span>
-        <span className="settings-description">
-          Maximum number of subagents to run in parallel during evaluation (1–10). Higher values speed up analysis but use more resources.
-        </span>
-      </div>
-      <input
-        type="number"
-        className="settings-model-input"
-        min={MIN_SUBAGENTS}
-        max={MAX_SUBAGENTS}
-        value={max}
-        onChange={(e) => setMax(e.target.value)}
-        onBlur={(e) => persistSubagents(e.target.value, setMax)}
-      />
-    </div>
-  );
-}
-
-function PoolBudgetRow({ subagents }) {
-  const { poolBudgetMinutes, setPoolBudgetMinutes } = subagents;
-  const unlimited = poolBudgetMinutes === 0;
-
-  return (
-    <div className="settings-row settings-row--last">
-      <div className="settings-row-label">
-        <span className="settings-label">Analysis time limit</span>
-        <span className="settings-description">
-          Maximum time allowed for the analysis pool to run. Evaluations exceeding this limit will stop early.
-        </span>
-      </div>
-      <div className="settings-budget-control">
-        <div className="theme-toggle">
-          <button
-            type="button"
-            className={`theme-toggle-btn${!unlimited ? ' active' : ''}`}
-            onClick={() => persistPoolBudget(poolBudgetMinutes || DEFAULT_POOL_BUDGET_MINS, setPoolBudgetMinutes)}
-          >Limited</button>
-          <button
-            type="button"
-            className={`theme-toggle-btn${unlimited ? ' active' : ''}`}
-            onClick={() => { setPoolBudgetMinutes(0); persistSetting(POOL_BUDGET_STORAGE_KEY, 0); }}
-          >Unlimited</button>
-        </div>
-        <input
-          type="number"
-          className="settings-model-input"
-          min={1}
-          max={MAX_POOL_BUDGET_MINS}
-          value={unlimited ? '' : poolBudgetMinutes}
-          placeholder={unlimited ? '∞' : 'min'}
-          disabled={unlimited}
-          onChange={(e) => persistPoolBudget(e.target.value, setPoolBudgetMinutes)}
-        />
-      </div>
-    </div>
-  );
-}
-
-function PerDimensionRow({ perDimension, onApply, providerType }) {
-  if (providerType === 'api') return null;
-  return (
-    <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">Per-dimension analysis</span>
-        <span className="settings-description">
-          Analyze each quality dimension separately instead of all at once. Deeper coverage per dimension but uses more tokens.
-        </span>
-      </div>
-      <div className="theme-toggle">
-        <button
-          type="button"
-          className={`theme-toggle-btn${perDimension ? ' active' : ''}`}
-          onClick={() => onApply(true)}
-        >Per-dimension</button>
-        <button
-          type="button"
-          className={`theme-toggle-btn${!perDimension ? ' active' : ''}`}
-          onClick={() => onApply(false)}
-        >Consolidated</button>
-      </div>
-    </div>
-  );
-}
-
-function AnalysisSection({ analysis, subagents, perDimension }) {
-  const { power, onChange, onPersist } = analysis;
-  return (
-    <>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Analysis power</span>
-          <span className="settings-description">
-            Controls the AI model used for analysis. Higher power gives more thorough results but takes longer.
-          </span>
-        </div>
-        <PowerSelector value={power} onChange={onChange} onPersist={onPersist} />
-      </div>
-      <SubagentsRow subagents={subagents} />
-      <PoolBudgetRow subagents={subagents} />
-      <PerDimensionRow {...perDimension} />
-    </>
-  );
-}
-
-function VerificationSection({ verifyFindings, onApplyVerifyFindings }) {
-  return (
-    <div className="settings-row">
-      <div className="settings-row-label">
-        <span className="settings-label">Verify findings</span>
-        <span className="settings-description">
-          After analysis, verify findings from the previous evaluation against the current code. Confirms which violations persist, detects fixes, and hunts for missing compliance evidence. Improves grade consistency across runs.
-        </span>
-      </div>
-      <div className="theme-toggle">
-        <button
-          type="button"
-          className={`theme-toggle-btn${verifyFindings ? ' active' : ''}`}
-          onClick={() => onApplyVerifyFindings(true)}
-        >On</button>
-        <button
-          type="button"
-          className={`theme-toggle-btn${!verifyFindings ? ' active' : ''}`}
-          onClick={() => onApplyVerifyFindings(false)}
-        >Off</button>
-      </div>
-    </div>
-  );
-}
-
 function SettingsHeader() {
   return (
     <div className="settings-header">
@@ -266,89 +97,27 @@ function SettingsHeader() {
   );
 }
 
-function useSettingsState(aiCmd, onApplyAiCmd) {
-  const [maxSubagents, setMaxSubagents] = useState(() => parseInt(localStorage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10));
-  const [poolBudgetMinutes, setPoolBudgetMinutes] = useState(() => Math.round(parseInt(localStorage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10) / 60));
-  const [availableClients, setAvailableClients] = useState(null);
+export default function SettingsPage({ theme }) {
+  const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
-
-  // Stable reference so it can be included in the effect dep array without re-running
-  const stableApplyAiCmd = useCallback(onApplyAiCmd, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const [providerConfigs, setProviderConfigs] = useState({});
 
   useEffect(() => {
     setSettingsPhrase(_SETTINGS_PHRASES[Math.floor(Math.random() * _SETTINGS_PHRASES.length)]);
     getHealth().then((d) => setAppVersion(d.version || null)).catch((err) => console.warn('Failed to fetch app version:', err));
+    getProviderConfigs().then(setProviderConfigs).catch(() => setProviderConfigs({}));
   }, []);
-
-  useEffect(() => {
-    if (availableClients !== null) return;
-    getAiClients()
-      .then((data) => {
-        const clients = data.clients || [];
-        setAvailableClients(clients);
-        if (aiCmd && !clients.some((c) => c.id === aiCmd)) {
-          stableApplyAiCmd('');
-          localStorage.removeItem(AI_CMD_STORAGE_KEY);
-        }
-        if (!aiCmd && clients.length > 0) {
-          stableApplyAiCmd(clients[0].id);
-        }
-      })
-      .catch(() => setAvailableClients([]));
-  }, [aiCmd, stableApplyAiCmd]);
-
-  const [perDimension, setPerDimension] = useState(() => localStorage.getItem(PER_DIMENSION_STORAGE_KEY) !== 'false');
-
-  function applyPerDimension(value) {
-    setPerDimension(value);
-    persistSetting(PER_DIMENSION_STORAGE_KEY, String(value));
-  }
-
-  // Determine provider type for current aiCmd
-  const providerType = availableClients
-    ? (availableClients.find((c) => c.id === aiCmd)?.type || 'cli')
-    : 'cli';
-
-  return { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase, perDimension, applyPerDimension, providerType };
-}
-
-export default function SettingsPage({ theme, models, analysis, verification }) {
-  const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
-  const { aiCmd, onApplyAiCmd } = models;
-  const { power: analysisPower, onPowerChange: onAnalysisPowerChange, onPersist: onPersistPower } = analysis;
-  const { enabled: verifyFindings, onApply: onApplyVerifyFindings } = verification;
-  const { maxSubagents, setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes, availableClients, appVersion, settingsPhrase, perDimension, applyPerDimension, providerType } = useSettingsState(aiCmd, onApplyAiCmd);
 
   return (
     <div className="settings-page">
       <SettingsHeader />
       <div className="settings-body settings-body--full">
         <div className="settings-grid">
-          <section className="panel settings-section">
-            <div className="panel-header">
-              <h2 className="settings-section-title">Analysis</h2>
-              <p className="settings-section-description">Configure the AI client used when running evaluations</p>
-            </div>
-            <ModelSection
-              aiCmd={{ value: aiCmd, onApply: onApplyAiCmd }}
-              models={{
-                aiModel: models.aiModel, onAiModelChange: models.onAiModelChange,
-                fast: models.fast, onFastChange: models.onFastChange,
-                balanced: models.balanced, onBalancedChange: models.onBalancedChange,
-                thorough: models.thorough, onThoroughChange: models.onThoroughChange,
-              }}
-              availableClients={availableClients}
-            />
-            <AnalysisSection
-              analysis={{ power: analysisPower, onChange: onAnalysisPowerChange, onPersist: onPersistPower }}
-              subagents={{ max: maxSubagents, setMax: setMaxSubagents, poolBudgetMinutes, setPoolBudgetMinutes }}
-              perDimension={{ perDimension, onApply: applyPerDimension, providerType }}
-            />
-            <VerificationSection verifyFindings={verifyFindings} onApplyVerifyFindings={onApplyVerifyFindings} />
-          </section>
+          <ProviderTabs providerConfigs={providerConfigs} />
 
           <div className="settings-grid-col">
+            <ServerSection />
             <ThemeSection themeMode={themeMode} themeFamily={themeFamily} onApplyMode={onApplyMode} onApplyFamily={onApplyFamily} />
             <AboutSection appVersion={appVersion} settingsPhrase={settingsPhrase} />
           </div>

@@ -1,13 +1,9 @@
 import { useState, useEffect } from 'react';
-import { MODEL_STORAGE_PREFIX } from '../features/evaluation/components/powerLevels.js';
 import { resolveDataTheme } from '../utils/themeResolver.js';
 
 const MODE_KEY = 'cc-theme-mode';
 const FAMILY_KEY = 'cc-theme-family';
 const OLD_THEME_KEY = 'cc-theme';
-const AI_CMD_KEY = 'cc-ai-cmd';
-const AI_MODEL_KEY = 'cc-ai-model';
-const VERIFY_FINDINGS_KEY = 'cc-verify-findings';
 
 const VALID_MODES = ['system', 'light', 'dark'];
 const VALID_FAMILIES = ['daruma', 'neo', 'galadriel', 'ifrit', 'deckard'];
@@ -64,14 +60,6 @@ export function useAppSettings() {
 
   const [themeMode, setThemeMode] = useState(safeGet(MODE_KEY, 'system'));
   const [themeFamily, setThemeFamily] = useState(safeGet(FAMILY_KEY, 'daruma'));
-  const [aiCmd, setAiCmd] = useState(safeGet(AI_CMD_KEY));
-  const [aiModel, setAiModel] = useState(safeGet(AI_MODEL_KEY));
-  const [modelFast, setModelFast] = useState(safeGet(`${MODEL_STORAGE_PREFIX}1`));
-  const [modelBalanced, setModelBalanced] = useState(safeGet(`${MODEL_STORAGE_PREFIX}2`));
-  const [modelThorough, setModelThorough] = useState(safeGet(`${MODEL_STORAGE_PREFIX}3`));
-  const [verifyFindings, setVerifyFindings] = useState(() => {
-    try { const v = localStorage.getItem(VERIFY_FINDINGS_KEY); return v === null ? true : v === 'true'; } catch { return true; }
-  });
 
   // Listen for OS color scheme changes when in system mode
   useEffect(() => {
@@ -101,28 +89,8 @@ export function useAppSettings() {
     applyDataTheme(resolveDataTheme(themeMode, value, prefersDark));
   }
 
-  function applyAiCmd(value) {
-    setAiCmd(value);
-    if (value) {
-      localStorage.setItem(AI_CMD_KEY, value);
-    } else {
-      localStorage.removeItem(AI_CMD_KEY);
-    }
-  }
-
-  function applyVerifyFindings(value) {
-    setVerifyFindings(value);
-    localStorage.setItem(VERIFY_FINDINGS_KEY, value ? 'true' : 'false');
-  }
-
   return {
     themeMode, applyMode,
     themeFamily, applyFamily,
-    aiCmd, applyAiCmd,
-    aiModel, setAiModel,
-    modelFast, setModelFast,
-    modelBalanced, setModelBalanced,
-    modelThorough, setModelThorough,
-    verifyFindings, applyVerifyFindings,
   };
 }

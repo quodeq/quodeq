@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } from '../../../api/index.js';
-import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY, PER_DIMENSION_STORAGE_KEY } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 const DIMENSION_POLL_INITIAL_MS = 2000;
 const DIMENSION_POLL_MAX_MS = 8000;
@@ -110,11 +110,23 @@ function createJobPoller(refs, setters, startDimensionPolling) {
 }
 
 function preparePayload(payload, storage = localStorage) {
-  const maxSubagents = parseInt(storage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10);
-  if (maxSubagents !== DEFAULT_MAX_SUBAGENTS) payload.maxSubagents = maxSubagents;
-  const poolBudget = parseInt(storage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10);
-  if (poolBudget !== DEFAULT_POOL_BUDGET) payload.poolBudget = poolBudget;
-  if (storage.getItem(PER_DIMENSION_STORAGE_KEY) === 'true') payload.perDimension = true;
+  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  if (!activeProvider) return;
+
+  const get = (key) => storage.getItem(providerKey(activeProvider, key));
+
+  payload.aiCmd = activeProvider;
+  const model = get('model');
+  if (model) payload.aiModel = model;
+
+  const subagents = parseInt(get('subagents') || '1', 10);
+  if (subagents !== 1) payload.maxSubagents = subagents;
+
+  const poolBudget = parseInt(get('pool-budget') || '0', 10);
+  if (poolBudget !== 0) payload.poolBudget = poolBudget;
+
+  if (get('per-dimension') === 'true') payload.perDimension = true;
+  if (get('verify') === 'false') payload.verifyFindings = false;
 }
 
 function parseDimensions(payload) {

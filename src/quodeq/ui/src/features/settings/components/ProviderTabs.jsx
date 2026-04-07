@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAiClients, getOllamaStatus } from '../../../api/index.js';
+import { getAiClients } from '../../../api/index.js';
 import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
 import { classify_provider } from './providerUtils.js';
@@ -26,8 +26,6 @@ function TabContent({ provider, providerConfig }) {
 export default function ProviderTabs({ providerConfigs }) {
   const [clients, setClients] = useState([]);
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem(ACTIVE_PROVIDER_KEY) || '');
-  const [statuses, setStatuses] = useState({});
-
   useEffect(() => {
     getAiClients().then((data) => {
       const raw = data.clients || [];
@@ -64,15 +62,6 @@ export default function ProviderTabs({ providerConfigs }) {
       }
     }).catch(() => setClients([]));
   }, []);
-
-  useEffect(() => {
-    const ollama = clients.find((c) => c.id === 'ollama');
-    if (ollama) {
-      getOllamaStatus()
-        .then((s) => setStatuses((prev) => ({ ...prev, ollama: s.running })))
-        .catch(() => setStatuses((prev) => ({ ...prev, ollama: false })));
-    }
-  }, [clients]);
 
   const selectTab = (id) => {
     setActiveTab(id);

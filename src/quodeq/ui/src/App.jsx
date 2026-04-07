@@ -25,13 +25,13 @@ import { useAppState, formatDayLabel } from './hooks/useAppState.js';
  */
 function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
   const { connected, setConnected } = serverHealth;
-  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, persistAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
+  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, persistAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, isLocalApi } = evaluation;
   return (
     <>
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower, onPersistPower: persistAnalysisPower }}
+        context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower, onPersistPower: persistAnalysisPower, isLocalApi }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
       />
     </>
@@ -39,22 +39,13 @@ function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
 }
 
 /**
- * @param {{ settings: Object, analysisPower: string, setAnalysisPower: Function, persistAnalysisPower: Function }} props
+ * @param {{ settings: Object }} props
  * @returns {JSX.Element}
  */
-function SettingsCase({ settings, analysisPower, setAnalysisPower, persistAnalysisPower }) {
+function SettingsCase({ settings }) {
   return (
     <SettingsPage
       theme={{ mode: settings.themeMode, family: settings.themeFamily, onApplyMode: settings.applyMode, onApplyFamily: settings.applyFamily }}
-      models={{
-        aiCmd: settings.aiCmd, onApplyAiCmd: settings.applyAiCmd,
-        aiModel: settings.aiModel, onAiModelChange: settings.setAiModel,
-        fast: settings.modelFast, onFastChange: settings.setModelFast,
-        balanced: settings.modelBalanced, onBalancedChange: settings.setModelBalanced,
-        thorough: settings.modelThorough, onThoroughChange: settings.setModelThorough,
-      }}
-      analysis={{ power: analysisPower, onPowerChange: setAnalysisPower, onPersist: persistAnalysisPower }}
-      verification={{ enabled: settings.verifyFindings, onApply: settings.applyVerifyFindings }}
     />
   );
 }
@@ -201,7 +192,7 @@ const ROUTE_RENDERERS = {
   file: (params) => <FileDetailPage file={params.file} />,
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
-  settings: (params, props) => <SettingsCase settings={props.settings} analysisPower={props.evaluation.analysisPower} setAnalysisPower={props.evaluation.setAnalysisPower} persistAnalysisPower={props.evaluation.persistAnalysisPower} />,
+  settings: (params, props) => <SettingsCase settings={props.settings} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
   standards: () => <StandardsPage />,
 };

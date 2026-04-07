@@ -1,15 +1,24 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { getOllamaStatus } from '../../../api/index.js';
+
+const POLL_MS = 30000;
 
 export default function ServerStatus() {
   const [status, setStatus] = useState(null);
+  const timerRef = useRef(null);
 
   useEffect(() => {
-    getOllamaStatus().then(setStatus).catch(() => setStatus({ running: false, error: 'Could not reach server' }));
-    const interval = setInterval(() => {
-      getOllamaStatus().then(setStatus).catch(() => setStatus({ running: false, error: 'Connection lost' }));
-    }, 15000);
-    return () => clearInterval(interval);
+    function tick() {
+      getOllamaStatus()
+        .then(setStatus)
+        .catch(() => setStatus({ running: false, error: 'Could not reach server' }));
+    }
+    tick();
+    timerRef.current = setTimeout(function schedule() {
+      tick();
+      timerRef.current = setTimeout(schedule, POLL_MS);
+    }, POLL_MS);
+    return () => clearTimeout(timerRef.current);
   }, []);
 
   if (!status) return null;
