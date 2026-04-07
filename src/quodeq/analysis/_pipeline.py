@@ -44,10 +44,16 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
 
     emit_marker("setup", dimensions=dimensions)
 
-    # Consolidated mode: evaluate all dimensions in one pass
+    # Consolidated mode: evaluate all dimensions in one pass.
+    # Disabled for API providers — per-dimension gives better coverage
+    # since local models struggle with 8 dimensions in one prompt.
+    from quodeq.analysis.subprocess import _get_provider_type
+    from quodeq.shared.utils import get_ai_cmd
+    _provider_type = _get_provider_type(get_ai_cmd())
     if (config.options.consolidated
             and len(dimensions) > 1
-            and config.options.max_subagents > 1):
+            and config.options.max_subagents > 1
+            and _provider_type != "api"):
         from quodeq.analysis.subagents.runner import process_consolidated_dimensions
         try:
             result = process_consolidated_dimensions(config, dimensions, ctx)
