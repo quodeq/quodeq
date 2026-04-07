@@ -1,6 +1,8 @@
 """Pipeline coordination — dimension orchestration, merging, and public API."""
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis._dimension_ops import (
     _build_dimension_prompt,
@@ -26,7 +28,10 @@ def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContex
     return _load_ctx(config)
 
 
-def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
+def _run_dimensions(
+    config: RunConfig,
+    on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
+) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
     from quodeq.analysis._incremental import (
         run_incremental_loop, run_per_dimension_loop,
@@ -40,6 +45,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
             config, dimensions, ctx,
             process_fn=_process_single_dimension,
             log_result_fn=_log_dimension_result,
+            on_dimension_done=on_dimension_done,
         )
 
     emit_marker("setup", dimensions=dimensions)
@@ -69,6 +75,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     return run_per_dimension_loop(
         config, dimensions, ctx,
         process_fn=_process_single_dimension,
+        on_dimension_done=on_dimension_done,
     )
 
 
@@ -82,6 +89,9 @@ def run(config: RunConfig) -> Evidence:
     )
 
 
-def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
+def run_per_dimension(
+    config: RunConfig,
+    on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
+) -> dict[str, Evidence]:
     """Like run(), but returns a dict of {dimension_id: Evidence} without merging."""
-    return _run_dimensions(config)
+    return _run_dimensions(config, on_dimension_done=on_dimension_done)
