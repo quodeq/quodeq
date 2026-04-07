@@ -94,12 +94,16 @@ def run_verification_pool(
         dimension=dim_id,
     )
 
-    max_verify_agents = config.options.max_subagents if is_local else _VERIFY_N_AGENTS
-    n_agents = min(
-        max_verify_agents,
-        config.options.max_subagents,
-        (len(files_to_verify) + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
-    )
+    if is_local:
+        # Local providers: use all configured agents, distribute files evenly
+        n_agents = min(config.options.max_subagents, len(files_to_verify))
+    else:
+        # CLI providers: cap at _VERIFY_N_AGENTS, batch by _VERIFY_MAX_FILES_PER_AGENT
+        n_agents = min(
+            _VERIFY_N_AGENTS,
+            config.options.max_subagents,
+            (len(files_to_verify) + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
+        )
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
         options=PoolOptions(
