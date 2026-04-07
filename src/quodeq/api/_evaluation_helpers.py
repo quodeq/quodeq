@@ -46,8 +46,8 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
     max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
-    pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
-    pool_budget = max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, int(pool_budget_raw)))
+    pool_budget_raw = int(payload.get("poolBudget", _DEFAULT_POOL_BUDGET))
+    pool_budget = 0 if pool_budget_raw == 0 else max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, pool_budget_raw))
     return EvaluationOptions(
         discipline=payload.get("discipline"),
         dimensions=payload.get("dimensions") or "",
@@ -59,6 +59,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         max_subagents=max_subagents,
         pool_budget=pool_budget,
         incremental=bool(payload.get("incremental", False)),
+        per_dimension=bool(payload.get("perDimension", False)),
     )
 
 

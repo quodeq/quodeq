@@ -73,4 +73,11 @@ def detect_changed_files(
     new_files = file_set - prev_files
     changed |= new_files
 
+    # Files that were fingerprinted but never analyzed (e.g. pool timed out)
+    # must be treated as changed so they get picked up on the next run.
+    prev_analyzed = set(prev_fingerprint.get("analyzed_files", []))
+    if prev_analyzed:
+        not_analyzed = (file_set & prev_files) - prev_analyzed - changed
+        changed |= not_analyzed
+
     return ChangeDetectionResult(changed=changed)

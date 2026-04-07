@@ -47,9 +47,10 @@ def _build_consolidated_config(
 
 def _collect_consolidated_results(
     config: "RunConfig", dimensions: list[str], ctx: Any,
-    results: list[Any], paths: _ConsolidatedPaths,
+    results: list[Any], paths: _ConsolidatedPaths, files: list[str],
 ) -> dict[str, Evidence]:
     """Deduplicate and parse consolidated results into per-dimension Evidence."""
+    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
     from quodeq.analysis.stream.counters import count_files_in_stream
     from quodeq.engine._runner_markers import cleanup_stream
 
@@ -61,6 +62,20 @@ def _collect_consolidated_results(
         if r.stream_file.exists():
             total_files_read += len(count_files_in_stream(r.stream_file))
             cleanup_stream(r.stream_file)
+
+    # Determine which files were actually analyzed (from queue + evidence)
+    analyzed: set[str] = set()
+    queue_path = paths.evidence_dir / "consolidated_queue.json"
+    if queue_path.exists():
+        try:
+            analyzed |= set(FileQueue(queue_path).all_taken_files())
+        except (OSError, ValueError, KeyError):
+            pass
+
+    # Save per-dimension fingerprints so incremental works after consolidated runs
+    for dim in dimensions:
+        fp = build_fingerprint(config.src, files, dim, config.standards_dir, analyzed_files=analyzed or None)
+        save_fingerprint(fp, paths.evidence_dir)
 
     ev_ctx = EvidenceContext(
         language=config.language,
@@ -133,4 +148,4 @@ def process_consolidated_dimensions(
     results = pool.run()
 
     # 4. Collect and return per-dimension evidence
-    return _collect_consolidated_results(config, dimensions, ctx, results, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir))
+    return _collect_consolidated_results(config, dimensions, ctx, results, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir), files)
