@@ -79,9 +79,12 @@ def run_verification_pool(
     prompt = build_verify_prompt(manifest_path, dim_id)
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     fast = _fast_model()
-    # For non-Claude providers, use the configured model instead of 'haiku'
+    # For non-CLI providers (e.g. Ollama), use the same model and agent count
+    # as analysis — no cost benefit to a cheaper model, and swapping wastes VRAM.
+    is_local = False
     if config.options.ai_model and fast == _DEFAULT_FAST_MODEL:
         fast = config.options.ai_model
+        is_local = True
 
     ac = AnalysisConfig(
         compiled_dir=compiled_dir,
@@ -91,8 +94,9 @@ def run_verification_pool(
         dimension=dim_id,
     )
 
+    max_verify_agents = config.options.max_subagents if is_local else _VERIFY_N_AGENTS
     n_agents = min(
-        _VERIFY_N_AGENTS,
+        max_verify_agents,
         config.options.max_subagents,
         (len(files_to_verify) + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
     )
