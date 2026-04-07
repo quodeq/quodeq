@@ -27,7 +27,7 @@ dependencies = [
 
 [project.optional-dependencies]
 api = [
-    "openai>=1.0.0",
+    "instructor>=1.15.0",
 ]
 
 [project.urls]

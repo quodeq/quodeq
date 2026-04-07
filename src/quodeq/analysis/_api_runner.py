@@ -1,23 +1,60 @@
-"""OpenAI SDK-based API runner for direct LLM evaluation.
+"""API runner for direct LLM evaluation.
 
-Calls any OpenAI-compatible API (Ollama, OpenRouter, LM Studio, etc.)
+Calls LLM APIs directly via Instructor (Pydantic-based structured output)
 and writes findings as JSONL evidence -- the same format the CLI runner
 produces via MCP.
+
+Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
 from __future__ import annotations
 
 import json
 import logging
 from dataclasses import dataclass
+from enum import Enum as _Enum
 from pathlib import Path
 
-try:
-    import openai
-except ImportError:
-    openai = None  # type: ignore[assignment]
+import instructor
+import openai
+from pydantic import BaseModel, Field
 
 _log = logging.getLogger(__name__)
 
+_MAX_RETRIES = 2
+
+
+# ---------------------------------------------------------------------------
+# Pydantic schema for structured LLM output
+# ---------------------------------------------------------------------------
+
+class _FindingType(str, _Enum):
+    violation = "violation"
+    compliance = "compliance"
+
+
+class _Severity(str, _Enum):
+    critical = "critical"
+    major = "major"
+    minor = "minor"
+
+
+class _Finding(BaseModel):
+    req: str = Field(description="Requirement ID (e.g. P-TIM-1, S-CON-3)")
+    t: _FindingType = Field(description="violation or compliance")
+    file: str = Field(description="File path relative to repo root")
+    line: int = Field(default=0, description="Line number")
+    severity: _Severity = Field(default=_Severity.minor)
+    w: str = Field(description="Short title of the finding")
+    reason: str = Field(default="", description="Why this is a violation or compliance")
+
+
+class _Findings(BaseModel):
+    findings: list[_Finding]
+
+
+# ---------------------------------------------------------------------------
+# Config and API call
+# ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
 class ApiRunnerConfig:
@@ -30,66 +67,138 @@ class ApiRunnerConfig:
     max_tokens: int | None = None
 
 
-def _parse_findings(raw: str) -> list[dict]:
-    """Parse the LLM response into a list of finding dicts.
+def _salvage_partial_findings(raw_json: str) -> list[dict]:
+    """Try to extract valid findings from malformed JSON.
 
-    Raises ValueError if the response is not valid JSON with a 'findings' key.
+    Local models sometimes drop a brace in long arrays, producing invalid
+    JSON. We try to parse each object individually.
     """
-    try:
-        data = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"Could not parse LLM response as JSON: {exc}") from exc
+    import re
+    objects = re.findall(r'\{[^{}]*\}', raw_json)
+    findings = []
+    for obj_str in objects:
+        try:
+            f = _Finding.model_validate_json(obj_str)
+            findings.append(f.model_dump())
+        except Exception:
+            continue
+    return findings
 
-    if isinstance(data, dict) and "findings" in data:
-        findings = data["findings"]
-        if isinstance(findings, list):
-            return findings
 
-    raise ValueError(
-        "LLM response missing 'findings' array. "
-        f"Got keys: {list(data.keys()) if isinstance(data, dict) else type(data).__name__}"
+def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
+    """Call LLM via Instructor — returns validated finding dicts."""
+    client = instructor.from_openai(
+        openai.OpenAI(base_url=config.api_base, api_key=config.api_key or "ollama"),
+        mode=instructor.Mode.JSON,
     )
 
+    create_kwargs: dict = dict(
+        model=config.model,
+        response_model=_Findings,
+        messages=[
+            {"role": "system", "content": "You are a code quality evaluator."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=config.temperature,
+        max_retries=_MAX_RETRIES,
+        extra_body={"reasoning_effort": "none"},
+    )
+    if config.max_tokens is not None:
+        create_kwargs["max_tokens"] = config.max_tokens
+
+    _log.debug("Calling %s model=%s via Instructor", config.api_base, config.model)
+    try:
+        result = client.chat.completions.create(**create_kwargs)
+        _log.debug("Instructor returned %d findings", len(result.findings))
+        return [f.model_dump() for f in result.findings]
+    except Exception as exc:
+        # Try to salvage valid findings from the malformed response
+        raw = str(exc)
+        salvaged = _salvage_partial_findings(raw)
+        if salvaged:
+            _log.warning("Instructor validation failed — salvaged %d findings from malformed response", len(salvaged))
+            return salvaged
+        _log.warning("Instructor validation failed — no findings salvaged: %s", str(exc)[:200])
+        return []
+
+
+# ---------------------------------------------------------------------------
+# Enrichment and path resolution
+# ---------------------------------------------------------------------------
+
+def _enrich_findings(
+    findings: list[dict],
+    compiled_dir: Path | None,
+    dimension: str | None,
+    work_dir: Path | None,
+) -> list[dict]:
+    """Enrich findings through FindingsRouter (same as MCP path)."""
+    if not compiled_dir:
+        return findings
+    try:
+        from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
+        from quodeq.engine._ref_utils import load_compiled_refs
+        from quodeq.core.standards.refs import load_compiled_requirements
+
+        compiled_refs = load_compiled_refs(compiled_dir, dimension) or {}
+        compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
+        ctx = CompiledContext(
+            compiled_refs=compiled_refs,
+            compiled_reqs=compiled_reqs,
+            dimension=dimension,
+            work_dir=work_dir,
+        )
+
+        import io
+        buf = io.StringIO()
+        router = FindingsRouter(buf, context=ctx)
+        for f in findings:
+            router.receive(f)
+        buf.seek(0)
+        return [json.loads(line) for line in buf if line.strip()]
+    except Exception as exc:
+        _log.warning("Could not enrich findings: %s — writing raw", exc)
+        return findings
+
+
+def _resolve_file_paths(findings: list[dict], source_paths: list[str]) -> list[dict]:
+    """Resolve short filenames to full relative paths."""
+    name_to_path: dict[str, str] = {}
+    for p in source_paths:
+        name = Path(p).name
+        name_to_path[name] = p
+
+    for f in findings:
+        file_val = f.get("file", "")
+        if file_val and "/" not in file_val and file_val in name_to_path:
+            f["file"] = name_to_path[file_val]
+    return findings
+
+
+# ---------------------------------------------------------------------------
+# Public entry point
+# ---------------------------------------------------------------------------
 
 def run_api_analysis(
     *,
     prompt: str,
     jsonl_file: Path,
     config: ApiRunnerConfig,
+    compiled_dir: Path | None = None,
+    dimension: str | None = None,
+    work_dir: Path | None = None,
+    source_file_paths: list[str] | None = None,
 ) -> None:
-    """Call an OpenAI-compatible API and write findings to JSONL.
+    """Call an LLM API and write findings to JSONL."""
+    findings = _call_api(prompt, config)
 
-    Raises ImportError if the openai package is not installed.
-    Raises ValueError if the LLM response cannot be parsed.
-    """
-    if openai is None:
-        raise ImportError(
-            "The 'openai' package is required for API mode. "
-            "Install it with: pip install 'quodeq[api]'"
-        )
+    if source_file_paths:
+        findings = _resolve_file_paths(findings, source_file_paths)
 
-    client = openai.OpenAI(
-        base_url=config.api_base,
-        api_key=config.api_key,
-    )
+    findings = _enrich_findings(findings, compiled_dir, dimension, work_dir)
 
-    create_kwargs: dict = dict(
-        model=config.model,
-        messages=[{"role": "user", "content": prompt}],
-        response_format={"type": "json_object"},
-        temperature=config.temperature,
-    )
-    if config.max_tokens is not None:
-        create_kwargs["max_tokens"] = config.max_tokens
+    _log.debug("Received %d findings from API", len(findings))
 
-    _log.info("Calling %s model=%s", config.api_base, config.model)
-    response = client.chat.completions.create(**create_kwargs)
-
-    raw_content = response.choices[0].message.content
-    findings = _parse_findings(raw_content)
-
-    _log.info("Received %d findings from API", len(findings))
-
-    with open(jsonl_file, "w") as fh:
+    with open(jsonl_file, "a") as fh:
         for finding in findings:
             fh.write(json.dumps(finding) + "\n")
