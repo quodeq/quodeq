@@ -84,18 +84,18 @@ def run_verification_pool(
         is_local = True
 
     if is_local:
-        n_agents = min(config.options.max_subagents, len(files_to_verify))
-        files_per_agent = (len(files_to_verify) + n_agents - 1) // n_agents if n_agents else 0
+        # Local: use all configured agents, no file-count-based cap
+        n_agents = config.options.max_subagents
     else:
-        files_per_agent = _VERIFY_MAX_FILES_PER_AGENT
+        # Cloud/CLI: cap agents based on file count and max pool size
         n_agents = min(
             _VERIFY_N_AGENTS,
             config.options.max_subagents,
-            (len(files_to_verify) + files_per_agent - 1) // files_per_agent,
+            (len(files_to_verify) + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
         )
 
     queue_path = evidence_dir / f"{dim_id}_verify_queue.json"
-    FileQueue(queue_path, files_to_verify, max_files_per_agent=files_per_agent)
+    FileQueue(queue_path, files_to_verify, max_files_per_agent=_VERIFY_MAX_FILES_PER_AGENT)
 
     ac = AnalysisConfig(
         compiled_dir=compiled_dir,
