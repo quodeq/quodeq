@@ -93,6 +93,7 @@ def run_verification_pool(
 
     n_agents = min(
         _VERIFY_N_AGENTS,
+        config.options.max_subagents,
         (len(files_to_verify) + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
     )
     pool = SubagentPool(
