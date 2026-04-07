@@ -76,6 +76,10 @@ def _build_evaluate_cmd(
         cmd += ["--n-subagents", str(options.max_subagents)]
     if options.incremental:
         cmd += ["--incremental"]
+    if options.branch:
+        cmd += ["--branch", options.branch]
+    if options.scope_path:
+        cmd += ["--scope", options.scope_path]
     return cmd
 
 
