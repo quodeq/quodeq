@@ -536,6 +536,10 @@ textarea:focus {
   margin: var(--space-2) 0;
 }
 
+.inline-error--spaced {
+  margin-bottom: var(--space-4, 16px);
+}
+
 .job-error-banner {
   background: color-mix(in srgb, var(--color-danger) 10%, transparent);
   border: 1px solid color-mix(in srgb, var(--color-danger) 30%, transparent);

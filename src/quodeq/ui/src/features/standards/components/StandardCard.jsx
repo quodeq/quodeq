@@ -159,12 +159,21 @@ function StandardCardBody({ standard, isVisible, onToggleVisibility, principleCo
   );
 }
 
-export default function StandardCard({ standard, onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility }) {
+function useCardModals() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showDuplicateModal, setShowDuplicateModal] = useState(false);
+  return { showDeleteModal, setShowDeleteModal, showDuplicateModal, setShowDuplicateModal };
+}
+
+function isDeletableStandard(type) {
+  return type !== STANDARD_TYPES.BUILTIN && type !== STANDARD_TYPES.QUODEQ;
+}
+
+export default function StandardCard({ standard, onEdit, onDelete, onDuplicate, isVisible, onToggleVisibility }) {
+  const { showDeleteModal, setShowDeleteModal, showDuplicateModal, setShowDuplicateModal } = useCardModals();
   const principleCount = standard.principleCount ?? standard.principles?.length ?? 0;
   const requirementCount = standard.requirementCount ?? (standard.principles || []).reduce((sum, p) => sum + (p.requirements?.length ?? 0), 0);
-  const isDeletable = standard.type !== STANDARD_TYPES.BUILTIN && standard.type !== STANDARD_TYPES.QUODEQ;
+  const isDeletable = isDeletableStandard(standard.type);
   const visClass = isVisible ? 'standard-card--visible' : 'standard-card--hidden';
 
   return (

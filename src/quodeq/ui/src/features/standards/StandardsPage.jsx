@@ -3,12 +3,10 @@ import { useStandards } from './hooks/useStandards.js';
 import { useVisibleStandards } from './hooks/useVisibleStandards.js';
 import StandardsList from './components/StandardsList.jsx';
 import StandardEditor from './components/StandardEditor.jsx';
-import LibraryBrowser from './components/LibraryBrowser.jsx';
 import ImportModal from './components/ImportModal.jsx';
 
 function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisible) {
   const [view, setView] = useState({ mode: 'list' });
-  const [showLibrary, setShowLibrary] = useState(false);
   const [showImport, setShowImport] = useState(false);
 
   const handleEdit = (standardId) => setView({ mode: 'edit', standardId });
@@ -18,7 +16,7 @@ function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisibl
   const handleDeleteWithCleanup = async (id) => { removeVisible(id); await handleDelete(id); };
 
   return {
-    view, showLibrary, setShowLibrary,
+    view,
     showImport, setShowImport,
     handleEdit, handleNewStandard, handleEditorBack,
     handleSaved, handleDeleteWithCleanup,
@@ -28,7 +26,7 @@ function useStandardsPageActions(refresh, handleDelete, addVisible, removeVisibl
 function StandardsListView({ grouped, loading, error, actions }) {
   return (
     <>
-      {error && <p className="inline-error" style={{ marginBottom: 16 }}>{error}</p>}
+      {error && <p className="inline-error inline-error--spaced">{error}</p>}
       {loading ? (
         <div className="standards-loading">Loading standards...</div>
       ) : (
@@ -43,8 +41,6 @@ export default function StandardsPage() {
   const { isVisible, toggle, add: addVisible, remove: removeVisible } = useVisibleStandards();
   const {
     view,
-    showLibrary,
-    setShowLibrary,
     showImport,
     setShowImport,
     handleEdit,
@@ -71,7 +67,6 @@ export default function StandardsPage() {
         </div>
       </div>
       <StandardsListView grouped={grouped} loading={loading} error={error} actions={{ onEdit: handleEdit, onDelete: handleDeleteWithCleanup, onDuplicate: handleDuplicate, isVisible, onToggleVisibility: toggle }} />
-      {showLibrary && <LibraryBrowser onClose={() => setShowLibrary(false)} onImported={() => { setShowLibrary(false); refresh(); }} />}
       {showImport && <ImportModal onClose={() => setShowImport(false)} onImported={() => { setShowImport(false); refresh(); }} />}
     </div>
   );

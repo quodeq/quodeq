@@ -102,18 +102,7 @@ function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
   );
 }
 
-export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
-  const {
-    standard, loading, error, dirty, editable,
-    selectedNode, setSelectedNode,
-    updateField, addPrinciple, removePrinciple, addRequirement, removeRequirement,
-    save,
-  } = useStandardDetail(standardId, isNew);
-
-  const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
-
-  const handleSave = async () => { await save(); if (onSaved) onSaved(standard?.id); };
-
+function EditorLoadingOrError({ loading, error, standard, onBack }) {
   if (loading) return <div className="standard-editor-loading">Loading standard...</div>;
   if (error && !standard) {
     return (
@@ -123,8 +112,28 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
       </div>
     );
   }
+  return null;
+}
 
-  const treeActions = { onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement, onSelectNode: setSelectedNode, editable };
+function buildTreeActions({ addPrinciple, removePrinciple, addRequirement, removeRequirement, setSelectedNode, editable }) {
+  return { onAddPrinciple: addPrinciple, onRemovePrinciple: removePrinciple, onAddRequirement: addRequirement, onRemoveRequirement: removeRequirement, onSelectNode: setSelectedNode, editable };
+}
+
+export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
+  const {
+    standard, loading, error, dirty, editable,
+    selectedNode, setSelectedNode,
+    updateField, addPrinciple, removePrinciple, addRequirement, removeRequirement,
+    save,
+  } = useStandardDetail(standardId, isNew);
+
+  const { width: treeWidth, onMouseDown: onDividerMouseDown } = useResizable(DEFAULT_TREE_WIDTH);
+  const handleSave = async () => { await save(); if (onSaved) onSaved(standard?.id); };
+
+  const earlyReturn = EditorLoadingOrError({ loading, error, standard, onBack });
+  if (earlyReturn) return earlyReturn;
+
+  const treeActions = buildTreeActions({ addPrinciple, removePrinciple, addRequirement, removeRequirement, setSelectedNode, editable });
 
   return (
     <div className="standard-editor">
