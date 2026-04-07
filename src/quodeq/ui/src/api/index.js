@@ -183,4 +183,37 @@ export function getClientModels(clientId) {
   return request(`/ai-clients/${encodeURIComponent(clientId)}/models`);
 }
 
+// ── LLM Bridge ─────────────────────────────────────────────────────────
+
+export function getOllamaStatus() {
+  return request('/ollama/status');
+}
+
+export async function getOllamaModels() {
+  const data = await request('/ollama/models');
+  return data?.models ?? [];
+}
+
+export function testOllamaConcurrency(model) {
+  return request('/ollama/test-concurrency', {
+    method: 'POST',
+    body: JSON.stringify({ model }),
+  });
+}
+
+export function testProviderConnection({ apiBase, model, apiKey }) {
+  return request('/provider/test', {
+    method: 'POST',
+    body: JSON.stringify({ api_base: apiBase, model, api_key: apiKey }),
+  });
+}
+
+export function getKnownModels() {
+  return request('/known-models');
+}
+
+export function getProviderConfigs() {
+  return request('/provider-configs');
+}
+
 // Standards and findings APIs are re-exported at the top of this file.
