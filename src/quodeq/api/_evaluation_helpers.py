@@ -48,13 +48,15 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
     pool_budget_raw = int(payload.get("poolBudget", _DEFAULT_POOL_BUDGET))
     pool_budget = 0 if pool_budget_raw == 0 else max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, pool_budget_raw))
+    ai_model = payload.get("aiModel") or None
+    subagent_model = payload.get("subagentModel") or ai_model  # default to orchestrator
     return EvaluationOptions(
         discipline=payload.get("discipline"),
         dimensions=payload.get("dimensions") or "",
         numerical=bool(payload.get("numerical")),
         ai_cmd=payload.get("aiCmd") or None,
-        ai_model=payload.get("aiModel") or None,
-        subagent_model=payload.get("subagentModel") or None,
+        ai_model=ai_model,
+        subagent_model=subagent_model,
         verify_findings=bool(payload.get("verifyFindings", True)),
         max_subagents=max_subagents,
         pool_budget=pool_budget,

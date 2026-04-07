@@ -98,7 +98,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
           </div>
         )}
 
-        {jobError && <div className="job-error-banner">Evaluation failed. Please check your inputs and try again.</div>}
+        {jobError && <div className="job-error-banner">{jobError}</div>}
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
 
         {!job && <EvaluateHelpSection />}
