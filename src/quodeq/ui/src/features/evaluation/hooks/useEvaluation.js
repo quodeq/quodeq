@@ -109,15 +109,20 @@ function createJobPoller(refs, setters, startDimensionPolling) {
   };
 }
 
+/**
+ * Build the evaluation payload from provider settings.
+ * Throws if the orchestrator model is not configured.
+ */
 function preparePayload(payload, storage = localStorage) {
   const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  if (!activeProvider) return;
+  if (!activeProvider) throw new Error('No AI provider selected. Go to Settings to configure one.');
 
   const get = (key) => storage.getItem(providerKey(activeProvider, key));
 
   payload.aiCmd = activeProvider;
   const model = get('model');
-  if (model) payload.aiModel = model;
+  if (!model) throw new Error('No orchestrator model selected. Go to Settings and select a model for the active provider.');
+  payload.aiModel = model;
 
   const subagents = parseInt(get('subagents') || '1', 10);
   if (subagents !== 1) payload.maxSubagents = subagents;
@@ -177,8 +182,8 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
     refs.liveViolationsRef.current = {};
     refs.partialDimensionsRef.current = new Set();
     setLiveViolations({});
-    preparePayload(payload);
     try {
+      preparePayload(payload);
       const created = await startEvaluation(payload);
       setJob({ ...created, repo: payload.repo });
       startPolling(created.jobId);

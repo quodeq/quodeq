@@ -41,6 +41,16 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         ai_cmd_error = _validate_ai_cmd(ai_cmd)
         if ai_cmd_error is not None:
             return ai_cmd_error
+        # Require an explicit model for API-type providers (e.g. Ollama)
+        if ai_cmd:
+            from quodeq.analysis._provider_cache import get_provider_configs
+            ptype = get_provider_configs().get(ai_cmd, {}).get("type")
+            if ptype == "api" and not payload.get("aiModel"):
+                body, status = error_response(
+                    "No model selected. Go to Settings and select an orchestrator model.",
+                    HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
+                )
+                return jsonify(body), status
         repo = payload.get("repo")
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:

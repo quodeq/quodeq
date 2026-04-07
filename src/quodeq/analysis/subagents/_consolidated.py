@@ -31,7 +31,7 @@ def _build_consolidated_config(
     # Deferred import: breaks circular dependency between _consolidated and runner.
     from quodeq.analysis.subagents.runner import _default_subagent_model
 
-    subagent_model = config.options.subagent_model or _default_subagent_model()
+    subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
     pool_budget_val = config.options.pool_budget
     return AnalysisConfig(
         analysis_budget=config.options.analysis_budget,

@@ -2,7 +2,7 @@
   "ollama": {
     "type": "api",
     "order": 0,
-    "model": "llama3.1",
+    "model": "gemma4:26b",
     "api_base": "http://localhost:11434/v1"
   },
   "claude": {
