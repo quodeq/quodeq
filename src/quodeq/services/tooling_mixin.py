@@ -192,6 +192,9 @@ class FsToolingMixin:
                         "type": "api",
                     })
 
+        # Sort by 'order' field from ai_providers.json
+        clients.sort(key=lambda c: provider_configs.get(c["id"], {}).get("order", 50))
+
         return {"clients": clients}
 
     def _get_cli_models(self, client_id: str, env: dict[str, str] | None = None) -> dict[str, list[str]]:

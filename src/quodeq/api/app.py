@@ -63,9 +63,20 @@ def create_app(
 
     @app.get("/api/health")
     def health() -> Response:
-        """Return a simple health-check response."""
+        """Return a simple health-check response with server info."""
         from quodeq import __version__
-        return jsonify({"ok": True, "version": __version__})
+        from quodeq.shared.utils import get_action_api_host, get_action_api_port
+        host = get_action_api_host()
+        port = get_action_api_port()
+        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
+        return jsonify({
+            "ok": True,
+            "version": __version__,
+            "host": host,
+            "port": port,
+            "address": f"{display_host}:{port}",
+            "pid": os.getpid(),
+        })
 
     register_all_routes(app, provider, eval_store, static_dist)
     return app
