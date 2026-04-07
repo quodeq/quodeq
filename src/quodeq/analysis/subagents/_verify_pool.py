@@ -103,6 +103,7 @@ def run_verification_pool(
         max_duration=_VERIFY_MAX_DURATION,
         ai_model=fast,
         dimension=dim_id,
+        pool_budget=config.options.pool_budget,
     )
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=evidence_dir, queue_path=queue_path),
