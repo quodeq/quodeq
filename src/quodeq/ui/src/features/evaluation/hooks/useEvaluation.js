@@ -124,7 +124,8 @@ function preparePayload(payload, storage = localStorage) {
   if (!model) throw new Error('No orchestrator model selected. Go to Settings and select a model for the active provider.');
   payload.aiModel = model;
 
-  const subagents = parseInt(get('subagents') || '1', 10);
+  const defaultSubagents = ['ollama'].includes(activeProvider) ? '1' : '5';
+  const subagents = parseInt(get('subagents') || defaultSubagents, 10);
   payload.maxSubagents = subagents;
 
   const poolBudget = parseInt(get('pool-budget') || '0', 10);

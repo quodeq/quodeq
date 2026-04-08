@@ -14,7 +14,12 @@ import logging
 import os
 from pathlib import Path
 
-from quodeq.analysis._command import _build_ai_cmd, _build_analysis_env
+from quodeq.analysis._command import (
+    _build_ai_cmd,
+    _build_analysis_env,
+    _register_cli_mcp,
+    _unregister_cli_mcp,
+)
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPaths
 from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
 from quodeq.analysis._provider_cache import get_provider_configs
@@ -49,9 +54,22 @@ def _get_provider_type(ai_cmd: str) -> str:
 def _run_cli_analysis(
     work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
 ) -> None:
-    """Run analysis via CLI subprocess (existing behavior)."""
+    """Run analysis via CLI subprocess."""
+    ai_cmd = cfg.ai_cmd or get_ai_cmd()
+    configs = get_provider_configs()
+    provider_cfg = configs.get(ai_cmd, {})
+    mcp_style = provider_cfg.get("mcp_style", "config-file")
+
+    # For cli-register providers (e.g. Codex), register MCP server before the run.
+    # Registration is shared across all parallel agents — the first agent registers,
+    # and we never unregister during the run (cleanup happens at pool level).
+    cli_mcp_registered = False
+    if mcp_style == "cli-register" and cfg.jsonl_file is not None:
+        name = _register_cli_mcp(ai_cmd, cfg, work_dir)
+        cli_mcp_registered = name is not None
+
     args, mcp_config_path = _build_ai_cmd(prompt, cfg, work_dir=work_dir)
-    env = _build_analysis_env(cfg.ai_cmd or get_ai_cmd())
+    env = _build_analysis_env(ai_cmd)
     stream_err = Path(str(stream_file) + ".err")
 
     try:
@@ -61,6 +79,8 @@ def _run_cli_analysis(
     finally:
         if mcp_config_path is not None:
             mcp_config_path.unlink(missing_ok=True)
+        # Don't unregister cli MCP here — other parallel agents may still need it.
+        # Cleanup happens via _register_cli_mcp's idempotent remove-then-add on next run.
 
     if not timed_out:
         _check_process_result(process, stream_err)

@@ -14,8 +14,8 @@ _OWNER_RW_PERMS = 0o600
 
 PROVIDERS = {
     "claude": ("ANTHROPIC_API_KEY", "claude"),
-    "copilot": ("GITHUB_TOKEN", "copilot"),
     "codex": ("CODEX_API_KEY", "codex"),
+    "gemini": ("GEMINI_API_KEY", "gemini"),
     "ollama": ("", "ollama"),
     "openrouter": ("OPENROUTER_API_KEY", "openrouter"),
     "custom": ("AI_API_KEY", "custom"),

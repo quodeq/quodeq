@@ -25,13 +25,13 @@ import { useAppState, formatDayLabel } from './hooks/useAppState.js';
  */
 function EvaluateCase({ serverHealth, evaluation, selectedProject }) {
   const { connected, setConnected } = serverHealth;
-  const { job, jobError, liveViolations, analysisPower, setAnalysisPower, persistAnalysisPower, handleStartEvaluation, handleEvalDismiss, cancelEvaluation, isLocalApi } = evaluation;
+  const { job, jobError, liveViolations, handleStartEvaluation, handleEvalDismiss, cancelEvaluation } = evaluation;
   return (
     <>
       {!connected && <ServerDisconnectedOverlay onReconnect={() => setConnected(true)} />}
       <EvaluateScreen
         evaluation={{ job, jobError, liveViolations }}
-        context={{ selectedProject, analysisPower, onAnalysisPowerChange: setAnalysisPower, onPersistPower: persistAnalysisPower, isLocalApi }}
+        context={{ selectedProject }}
         actions={{ onStart: handleStartEvaluation, onDismiss: handleEvalDismiss, onCancel: cancelEvaluation }}
       />
     </>

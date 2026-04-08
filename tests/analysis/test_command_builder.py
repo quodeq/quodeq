@@ -35,7 +35,7 @@ _CODEX_CFG = {
         "cmd_subcommand": "exec",
         "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
         "prompt_style": "positional",
-        "supports_mcp": False,
+        "mcp_style": "cli-register",
         "supports_tools": False,
         "supports_budget": False,
         "supports_turns": False,
