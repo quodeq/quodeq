@@ -1738,3 +1738,62 @@ textarea:focus {
   cursor: not-allowed;
 }
 
+/* Server console */
+.server-console-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-3) var(--space-4);
+  margin: 0 var(--space-4);
+  cursor: pointer;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  border-top: 1px solid var(--color-border);
+  user-select: none;
+}
+
+.server-console-toggle:hover {
+  color: var(--color-text);
+}
+
+.server-console-toggle .console-chevron {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.server-console-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-console-bg);
+  border-top: 1px solid color-mix(in srgb, var(--color-console-text) 12%, var(--color-console-bg));
+}
+
+.server-console-actions button {
+  background: none;
+  border: 1px solid color-mix(in srgb, var(--color-console-text) 25%, var(--color-console-bg));
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  padding: 2px 10px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.server-console-actions button:hover {
+  color: var(--color-text);
+  border-color: var(--color-text-muted);
+}
+
+.server-console-wrap {
+  margin: 0 var(--space-4) var(--space-4);
+}
+
+.server-console-wrap .console-output {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  max-height: 240px;
+}
+
