@@ -52,7 +52,7 @@ def _fetch_anthropic_models(api_key: str) -> list[str] | None:
         return None
 
 
-_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "copilot"})
+_DEFAULT_CLIENT_IDS = frozenset({"claude", "codex", "gemini"})
 
 
 def get_allowed_client_ids(env: dict[str, str] | None = None) -> frozenset[str]:
@@ -158,7 +158,7 @@ class FsToolingMixin:
     _CLI_CANDIDATES = [
         {"id": "claude", "label": "Claude"},
         {"id": "codex", "label": "Codex"},
-        {"id": "copilot", "label": "Copilot"},
+        {"id": "gemini", "label": "Gemini"},
     ]
 
     def get_ai_clients(self, env: dict[str, str] | None = None) -> dict[str, list[dict[str, str]]]:

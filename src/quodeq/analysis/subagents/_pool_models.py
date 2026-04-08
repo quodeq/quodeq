@@ -36,6 +36,7 @@ class PoolOptions:
     prompt: str
     dimension: str | list[str]
     scout_first: bool = True
+    phase: str = "ANALYSIS"
 
 
 @dataclass

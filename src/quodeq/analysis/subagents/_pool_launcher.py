@@ -56,12 +56,19 @@ def _launch_pool(
     )
     n_agents = config.options.max_subagents
 
+    # Skip scout mode for providers without per-token billing (e.g. Codex with
+    # ChatGPT subscription).  Launch all agents immediately for faster results.
+    from quodeq.shared.utils import get_ai_cmd
+    ai_cmd = get_ai_cmd()
+    use_scout = ai_cmd not in ("codex", "gemini")
+
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path),
         options=PoolOptions(
             n_agents=n_agents,
             prompt=params.prompt,
             dimension=dim_id,
+            scout_first=use_scout,
         ),
         config=base_ac,
     )

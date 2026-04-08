@@ -7,7 +7,7 @@ import OllamaTab from './OllamaTab.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
 
-const CLI_DEFAULTS = { 'subagents': '5' };
+const CLI_DEFAULTS = { 'subagents': '5', 'pool-budget': '600' };
 
 function TabContent({ provider, providerConfig }) {
   const classification = classify_provider(provider.id, provider.type, providerConfig);

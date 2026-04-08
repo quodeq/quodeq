@@ -1,7 +1,6 @@
 import EvaluationForm from './EvaluationForm.jsx';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
-import PowerSelector from './PowerSelector.jsx';
 
 const INITIAL_ANIM_DELAY = '0s';
 const CHIP_DELAY_1 = '0.55s';
@@ -40,7 +39,7 @@ function EvaluateHelpSection() {
   );
 }
 
-function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange, onPersistPower, showPowerSelector }) {
+function EvaluateHeader({ isRunning }) {
   return (
     <header className="evaluate-header">
       <div className="evaluate-header-content">
@@ -70,19 +69,18 @@ function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange, onPer
           <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
         </div>
       </div>
-      {showPowerSelector && <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} onPersist={onPersistPower} labelPosition="left" />}
     </header>
   );
 }
 
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
-  const { selectedProject, analysisPower, onAnalysisPowerChange, onPersistPower, isLocalApi } = context;
+  const { selectedProject } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader isRunning={job?.status === 'running'} analysisPower={analysisPower} onAnalysisPowerChange={onAnalysisPowerChange} onPersistPower={onPersistPower} showPowerSelector={!isLocalApi} />
+      <EvaluateHeader isRunning={job?.status === 'running'} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (

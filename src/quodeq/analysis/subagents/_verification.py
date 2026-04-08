@@ -51,9 +51,9 @@ def _dispatch_verification_pool(
     manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
     _write_verify_manifest(grouped, manifest_path)
     files_to_verify = list(grouped.keys())
-    log_info(f"  [{dim_id}] Launching fast verification pool for {len(needs_verify)} findings across {len(files_to_verify)} files")
+    log_info(f"  [{dim_id}] [VERIFICATION] Launching pool for {len(needs_verify)} findings across {len(files_to_verify)} files")
     verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
-    log_success(f"  [{dim_id}] Verification pool complete")
+    log_success(f"  [{dim_id}] [VERIFICATION] Pool complete")
     return verify_results
 
 

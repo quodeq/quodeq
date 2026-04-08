@@ -112,6 +112,7 @@ def run_verification_pool(
             prompt=prompt,
             dimension=dim_id,
             scout_first=False,
+            phase="VERIFICATION",
         ),
         config=ac,
     )

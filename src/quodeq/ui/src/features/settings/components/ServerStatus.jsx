@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { getOllamaStatus } from '../../../api/index.js';
 
-const POLL_MS = 30000;
+const POLL_MS = 5000;
 
 export default function ServerStatus() {
   const [status, setStatus] = useState(null);

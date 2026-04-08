@@ -5,16 +5,11 @@
     {"id": "claude-opus-4-6-20260407", "label": "Opus 4.6", "tier": "thorough"}
   ],
   "codex": [
-    {"id": "gpt-4o-mini", "label": "GPT-4o Mini", "tier": "fast"},
-    {"id": "gpt-4o", "label": "GPT-4o", "tier": "balanced"},
-    {"id": "o3", "label": "o3", "tier": "thorough"}
+    {"id": "gpt-5.4-mini", "label": "GPT-5.4 Mini", "tier": "fast"},
+    {"id": "gpt-5.3-codex", "label": "GPT-5.3 Codex", "tier": "balanced"},
+    {"id": "gpt-5.4", "label": "GPT-5.4", "tier": "thorough"}
   ],
-  "copilot": [
-    {"id": "gpt-4o-mini", "label": "GPT-4o Mini", "tier": "fast"},
-    {"id": "gpt-4o", "label": "GPT-4o", "tier": "balanced"},
-    {"id": "o3", "label": "o3", "tier": "thorough"}
-  ],
-  "gemini-cli": [
+  "gemini": [
     {"id": "gemini-2.5-flash", "label": "Gemini 2.5 Flash", "tier": "fast"},
     {"id": "gemini-2.5-pro", "label": "Gemini 2.5 Pro", "tier": "thorough"}
   ]
