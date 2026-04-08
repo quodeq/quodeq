@@ -49,9 +49,12 @@ def spawn_action_api(
     if cfg.static_dist:
         env[_ENV_STATIC_DIST] = str(cfg.static_dist)
     env[_ENV_EVALUATIONS_DIR] = cfg.evaluations_dir or get_evaluations_dir()
+    verbose = env.get("QUODEQ_VERBOSE") == "1"
     proc = subprocess.Popen(
         [sys.executable, "-m", ACTION_API_MODULE],
         env=env,
+        stdout=None if verbose else subprocess.DEVNULL,
+        stderr=None if verbose else subprocess.DEVNULL,
         **_popen_platform_kwargs(),
     )
     try:

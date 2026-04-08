@@ -6,6 +6,7 @@ import signal
 import subprocess
 import sys
 import threading
+import typing
 import webbrowser
 from pathlib import Path
 
@@ -75,11 +76,8 @@ def _serve_and_wait(
     action_api_process: subprocess.Popen | None,
     config: DashboardConfig,
 ) -> None:
-    """Open browser, register signal handlers, and block until exit."""
+    """Open window or browser, register signal handlers, and block until exit."""
     log_success(f"Dashboard running at {action_api_url}")
-
-    if config.build.open_browser:
-        webbrowser.open(action_api_url)
 
     def _stop_children() -> None:
         if action_api_process and action_api_process.poll() is None:
@@ -96,6 +94,64 @@ def _serve_and_wait(
     if hasattr(signal, "SIGTSTP"):
         signal.signal(signal.SIGTSTP, _handle_tstp)
 
+    if config.build.use_native and config.build.open_browser:
+        _serve_native(action_api_url, action_api_process, _stop_children)
+    elif config.build.open_browser:
+        webbrowser.open(action_api_url)
+        _serve_blocking(action_api_process, _stop_children)
+    else:
+        _serve_blocking(action_api_process, _stop_children)
+
+
+def _serve_native(
+    action_api_url: str,
+    action_api_process: subprocess.Popen | None,
+    stop_children: typing.Callable,
+) -> None:
+    """Open a PyWebView native window with single-instance support."""
+    try:
+        import webview  # noqa: F401
+    except ImportError:
+        raise RuntimeError(
+            "pywebview is not installed. "
+            "Install it with 'pip install quodeq[desktop]' or use --browser."
+        )
+
+    from quodeq.dashboard._instance import InstanceController
+
+    instance = InstanceController()
+
+    if not instance.try_acquire():
+        try:
+            instance.send_reload(action_api_url)
+        except (ConnectionRefusedError, OSError):
+            logging.getLogger(__name__).warning("Could not reach existing instance — opening new window")
+            instance.shutdown()
+            instance = InstanceController()
+            if not instance.try_acquire():
+                stop_children()
+                return
+        else:
+            stop_children()
+            return
+
+    # Pass Flask PID so the webview process can kill it on window close.
+    api_pid = str(action_api_process.pid) if action_api_process else ""
+
+    subprocess.Popen(
+        [sys.executable, "-m", "quodeq.dashboard._webview_window",
+         action_api_url, str(instance._sock_path), api_pid],
+        start_new_session=True,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+
+
+def _serve_blocking(
+    action_api_process: subprocess.Popen | None,
+    stop_children: typing.Callable,
+) -> None:
+    """Block until process exits or keyboard interrupt (browser mode)."""
     try:
         if action_api_process:
             _wait_for_process(action_api_process)
@@ -106,4 +162,4 @@ def _serve_and_wait(
     except KeyboardInterrupt:
         pass
     finally:
-        _stop_children()
+        stop_children()
