@@ -75,11 +75,15 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
         # Score any completed dimensions from failed/cancelled jobs (once)
-        if job.get("status") in ("failed", "cancelled") and job_id not in _scored_jobs:
+        job_status = getattr(job, "status", None)
+        if job_status in ("failed", "cancelled") and job_id not in _scored_jobs:
             _scored_jobs.add(job_id)
             try:
                 from quodeq.services.evaluation_mixin import _score_completed_evidence
-                _score_completed_evidence(_reports_dir(), job)
+                _score_completed_evidence(_reports_dir(), {
+                    "outputProject": job.output_project,
+                    "outputRunId": job.output_run_id,
+                })
             except Exception:
                 pass
         return jsonify(to_camel_dict(job))

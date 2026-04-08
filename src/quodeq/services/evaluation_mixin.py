@@ -175,7 +175,10 @@ class FsEvaluationMixin:
         job = self._jobs.get_job(job_id)
         ok = self._jobs.cancel_job(job_id)
         if ok and reports_dir and job:
-            _score_completed_evidence(reports_dir, job)
+            _score_completed_evidence(reports_dir, {
+                "outputProject": job.output_project,
+                "outputRunId": job.output_run_id,
+            })
         return ok
 
     def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
