@@ -39,19 +39,14 @@ def _process_single_dimension(
         emit_marker("analyzing", dimension=dimension)
         log_info(f"→ [{idx}/{ctx.total}] Analyzing {dimension}")
 
-    if config.options.max_subagents > 1:
-        ev = process_dimension_with_subagents(
-            config, dimension, idx, ctx,
-            callbacks=DimensionCallbacks(
-                build_prompt=_build_dimension_prompt,
-                run_analysis=_run_dimension_analysis,
-                parse_evidence=_parse_dimension_evidence,
-            ),
-        )
-    else:
-        prompt = _build_dimension_prompt(config, dimension, ctx)
-        stream_file, jsonl_file = _run_dimension_analysis(config, dimension, prompt, idx, ctx)
-        ev = _parse_dimension_evidence(config, dimension, stream_file, jsonl_file, ctx)
+    ev = process_dimension_with_subagents(
+        config, dimension, idx, ctx,
+        callbacks=DimensionCallbacks(
+            build_prompt=_build_dimension_prompt,
+            run_analysis=_run_dimension_analysis,
+            parse_evidence=_parse_dimension_evidence,
+        ),
+    )
 
     if ev is None:
         log_warning(f"[{idx}/{ctx.total}] {dimension} — no valid evidence, skipping")
