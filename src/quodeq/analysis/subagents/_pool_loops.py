@@ -44,7 +44,7 @@ class LoopContext:
 
 def scout_loop(ctx: LoopContext) -> None:
     """Run scout-then-scale loop: launch one agent, scale up when it finishes."""
-    scout_timeout = min(_SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * 0.5)
+    scout_timeout = _SCOUT_TIMEOUT_S if ctx.max_duration <= 0 else min(_SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * 0.5)
     state = ScaleUpState(
         pool_start=ctx.pool_start, max_duration=ctx.max_duration, scout_timeout=scout_timeout,
     )

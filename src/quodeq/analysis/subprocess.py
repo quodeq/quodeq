@@ -217,7 +217,7 @@ def _run_api_analysis_bridge(
     if cfg.queue_path and cfg.queue_path.exists():
         from quodeq.analysis.subagents.file_queue import FileQueue
         queue = FileQueue(cfg.queue_path)
-        taken = queue.take(count=min(cfg.max_files_per_agent or 10, 5), agent_id=cfg.agent_id)
+        taken = queue.take(count=min(cfg.max_files_per_agent or 10, 3), agent_id=cfg.agent_id)
         source_files = [
             work_dir / f for f in taken
             if (work_dir / f).exists() and (work_dir / f).stat().st_size < _MAX_API_FILE_SIZE

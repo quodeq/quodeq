@@ -132,9 +132,6 @@ function preparePayload(payload, storage = localStorage) {
 
   if (get('per-dimension') === 'true') payload.perDimension = true;
   if (get('verify') === 'false') payload.verifyFindings = false;
-
-  const contextSize = parseInt(get('context-size') || '0', 10);
-  if (contextSize > 0) payload.contextSize = contextSize;
 }
 
 function parseDimensions(payload) {
