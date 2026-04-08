@@ -40,7 +40,7 @@ Issues = "https://github.com/quodeq/quodeq/issues"
 
 [dependency-groups]
 dev = [
-    "pytest==9.0.2",
+    "pytest==9.0.3",
     "pytest-cov==7.1.0",
     "openai>=1.0.0",
 ]
