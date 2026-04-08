@@ -3,10 +3,9 @@ import { getOllamaModels, testOllamaConcurrency } from '../../../api/index.js';
 import ServerStatus from './ServerStatus.jsx';
 import ProviderSettings from './ProviderSettings.jsx';
 
-function ModelSelector({ label, value, models, onChange }) {
+function ModelSelector({ value, models, onChange }) {
   return (
     <div className="settings-model-field">
-      {label && <label className="settings-model-label">{label}</label>}
       <select className="settings-model-input" value={value} onChange={(e) => onChange(e.target.value)}>
         <option value="">Click to select</option>
         {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
@@ -40,32 +39,10 @@ export default function OllamaTab({ state, update }) {
       <ServerStatus />
       <div className="settings-row">
         <div className="settings-row-label">
-          <span className="settings-label">Orchestrator model</span>
-          <span className="settings-description">Main model used for orchestration and planning</span>
+          <span className="settings-label">Model</span>
+          <span className="settings-description">Model used for all evaluation phases</span>
         </div>
         <ModelSelector value={state.model} models={models} onChange={(v) => update('model', v)} />
-      </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Analysis model</span>
-          <span className="settings-description">Model used by subagents during evaluation. Defaults to orchestrator if not set.</span>
-        </div>
-        <ModelSelector value={state['model-analysis']} models={models} onChange={(v) => update('model-analysis', v)} />
-      </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Context window</span>
-          <span className="settings-description">Smaller context = faster inference, less VRAM. 0 = model default.</span>
-        </div>
-        <select className="settings-model-input" value={state['context-size']} onChange={(e) => update('context-size', e.target.value)}>
-          <option value="0">Default</option>
-          <option value="8192">8K</option>
-          <option value="16384">16K</option>
-          <option value="32768">32K</option>
-          <option value="65536">64K</option>
-          <option value="131072">128K</option>
-          <option value="262144">256K</option>
-        </select>
       </div>
       <div className="settings-row">
         <div className="settings-row-label">

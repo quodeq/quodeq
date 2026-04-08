@@ -1,7 +1,7 @@
 import { useState, useCallback } from 'react';
 import { providerKey } from '../../../constants.js';
 
-const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'pool-budget', 'per-dimension', 'verify', 'context-size'];
+const SETTINGS = ['model', 'model-analysis', 'model-fast', 'model-balanced', 'model-thorough', 'subagents', 'pool-budget', 'per-dimension', 'verify'];
 const DEFAULTS = {
   'model': '',
   'model-analysis': '',
@@ -12,7 +12,6 @@ const DEFAULTS = {
   'pool-budget': '0',
   'per-dimension': 'true',
   'verify': 'true',
-  'context-size': '0',
 };
 
 function loadProviderState(providerId, overrides) {
