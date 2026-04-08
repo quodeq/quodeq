@@ -7,15 +7,18 @@ Sub-modules:
 """
 from __future__ import annotations
 
+import logging
+import os
+
 from quodeq.dashboard._api_health import ApiConfig
 from quodeq.dashboard._build import maybe_build_ui
 from quodeq.dashboard._config import BuildConfig, DashboardConfig, ServerConfig
 from quodeq.dashboard._networking import _choose_ui_port, _is_port_open
 from quodeq.dashboard._process import _kill_stale_action_api
+from quodeq.dashboard import _server as _server_mod
 from quodeq.dashboard._server import (
     _ensure_action_api,
     _ensure_action_api_forced,
-    _serve_and_wait,
 )
 from quodeq.shared.config_loader import get_default_host as _get_default_host
 from quodeq.shared.logging import log_info, log_warning
@@ -111,6 +114,9 @@ def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) ->
     config = _resolve_paths_and_build(config)
     validate_paths(config)
 
+    if config.build.verbose:
+        os.environ["QUODEQ_VERBOSE"] = "1"
+
     log_info("Starting dashboard...")
     log_info(f"Reports: {config.reports_dir}")
     log_info(f"Static:  {config.static_dist}")
@@ -121,5 +127,5 @@ def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) ->
     api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
     action_api_url, action_api_process = _start_action_api(config, action_api_host, action_api_port, api_config)
 
-    _serve_and_wait(action_api_url, action_api_process, config)
+    _server_mod._serve_and_wait(action_api_url, action_api_process, config)
     return 0

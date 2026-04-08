@@ -8,6 +8,7 @@ import sys
 
 from flask import Flask, Response, jsonify
 
+from quodeq.api._log_buffer import LogBuffer
 from quodeq.api._rate_limit import (
     InMemoryRateLimitStore,
     RateLimitStore,
@@ -61,6 +62,19 @@ def create_app(
 
     configure_security(app, store, api_key)
 
+    log_buffer = LogBuffer()
+    app.extensions["log_buffer"] = log_buffer
+
+    # Capture request logs in the ring buffer for the UI console.
+    # Terminal output is suppressed unless QUODEQ_VERBOSE=1 (set by --verbose).
+    verbose = os.environ.get("QUODEQ_VERBOSE") == "1"
+    for name in ("werkzeug", "quodeq.api"):
+        lgr = logging.getLogger(name)
+        lgr.handlers = [log_buffer.handler]
+        if verbose:
+            lgr.handlers.append(logging.StreamHandler())
+        lgr.propagate = False
+
     @app.get("/api/health")
     def health() -> Response:
         """Return a simple health-check response with server info."""
@@ -78,7 +92,7 @@ def create_app(
             "pid": os.getpid(),
         })
 
-    register_all_routes(app, provider, eval_store, static_dist)
+    register_all_routes(app, provider, eval_store, static_dist, log_buffer)
     return app
 
 

@@ -1,4 +1,6 @@
+import os
 from pathlib import Path
+import logging
 
 import pytest
 
@@ -115,3 +117,105 @@ def test_validate_paths_missing_reports_custom_message(tmp_path: Path):
     assert "Reports directory not found" in message
     assert "mkdir -p" in message
     assert "omit --evaluations" in message
+
+
+def test_build_config_native_defaults():
+    cfg = BuildConfig(open_browser=True, no_build=True, reinstall=False)
+    assert cfg.use_native is True
+    assert cfg.verbose is False
+
+
+def test_build_config_browser_mode():
+    cfg = BuildConfig(open_browser=True, no_build=True, reinstall=False, use_native=False)
+    assert cfg.use_native is False
+
+
+def test_run_dashboard_native_window(tmp_path: Path, monkeypatch):
+    """When use_native=True, _serve_and_wait uses webview instead of webbrowser."""
+    (tmp_path / "reports").mkdir()
+    static_dist = tmp_path / "ui/web/dist"
+    static_dist.mkdir(parents=True)
+    (static_dist / "index.html").write_text("ok")
+
+    webview_calls = []
+
+    monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        runner, "_ensure_action_api",
+        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
+    )
+    monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
+    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+
+    from quodeq.dashboard import _server
+
+    def fake_serve(url, proc, config):
+        webview_calls.append(config.build.use_native)
+
+    monkeypatch.setattr(_server, "_serve_and_wait", fake_serve)
+
+    config = _make_config(
+        tmp_path,
+        static_dist=static_dist,
+        build=BuildConfig(open_browser=True, no_build=True, reinstall=False, use_native=True),
+    )
+    run_dashboard(config)
+    assert webview_calls == [True]
+
+
+def test_run_dashboard_browser_fallback(tmp_path: Path, monkeypatch):
+    """When use_native=False, _serve_and_wait opens browser."""
+    (tmp_path / "reports").mkdir()
+    static_dist = tmp_path / "ui/web/dist"
+    static_dist.mkdir(parents=True)
+    (static_dist / "index.html").write_text("ok")
+
+    from quodeq.dashboard import _server
+    browser_calls = []
+
+    monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        runner, "_ensure_action_api",
+        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
+    )
+    monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
+    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+
+    def fake_serve(url, proc, config):
+        browser_calls.append(config.build.use_native)
+
+    monkeypatch.setattr(_server, "_serve_and_wait", fake_serve)
+
+    config = _make_config(
+        tmp_path,
+        static_dist=static_dist,
+        build=BuildConfig(open_browser=True, no_build=True, reinstall=False, use_native=False),
+    )
+    run_dashboard(config)
+    assert browser_calls == [False]
+
+
+def test_run_dashboard_verbose_sets_env(tmp_path: Path, monkeypatch):
+    """When verbose=True, QUODEQ_VERBOSE env var is set."""
+    (tmp_path / "reports").mkdir()
+    static_dist = tmp_path / "ui/web/dist"
+    static_dist.mkdir(parents=True)
+    (static_dist / "index.html").write_text("ok")
+
+    monkeypatch.setattr(runner, "_kill_stale_action_api", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        runner, "_ensure_action_api",
+        lambda *_args, **_kwargs: (f"http://127.0.0.1:{_TEST_PORT}", DummyProcess()),
+    )
+    monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
+    monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
+    monkeypatch.delenv("QUODEQ_VERBOSE", raising=False)
+
+    config = _make_config(
+        tmp_path,
+        static_dist=static_dist,
+        build=BuildConfig(open_browser=False, no_build=True, reinstall=False, verbose=True),
+    )
+    run_dashboard(config)
+
+    assert os.environ.get("QUODEQ_VERBOSE") == "1"

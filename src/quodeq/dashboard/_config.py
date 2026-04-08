@@ -21,6 +21,8 @@ class BuildConfig:
     no_build: bool
     reinstall: bool
     dev: bool = False
+    use_native: bool = True
+    verbose: bool = False
 
 
 @dataclass(frozen=True)
