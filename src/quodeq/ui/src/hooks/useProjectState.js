@@ -39,6 +39,7 @@ function resolveInitialProject(list, currentProject, onChangeProject, onNoProjec
  */
 export function useProjectState({ onNoProjects }) {
   const [projects, setProjects] = useState([]);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
   const [selectedProject, setSelectedProject] = useState(readStoredProject);
   const [selectedRun, setSelectedRun] = useState(DEFAULT_RUN);
 
@@ -47,9 +48,10 @@ export function useProjectState({ onNoProjects }) {
       .then((data) => {
         const list = Array.isArray(data) ? data : (data?.projects || []);
         setProjects(list);
+        setProjectsLoaded(true);
         return list;
       })
-      .catch((err) => { console.warn('Failed to load projects:', err); return []; });
+      .catch((err) => { console.warn('Failed to load projects:', err); setProjectsLoaded(true); return []; });
   }, []);
 
   useEffect(() => {
@@ -70,6 +72,7 @@ export function useProjectState({ onNoProjects }) {
 
   return {
     projects,
+    projectsLoaded,
     setProjects,
     selectedProject,
     selectedRun,

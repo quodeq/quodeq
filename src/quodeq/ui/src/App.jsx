@@ -208,7 +208,7 @@ function MainContent({ activePage, props }) {
   if (!noProjectTabs.includes(page)) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
-      if (props.dashboardData?.loading) return <LoadingScreen />;
+      if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
       return <section className="empty-state"><h2>No analyzed projects yet</h2><p>Run an evaluation to get started.</p></section>;
     }
   }
