@@ -79,7 +79,7 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
 export function useAppState() {
   const nav = useAppNavigation();
   const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
-  const { projects, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
+  const { projects, projectsLoaded, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
   const settings = useAppSettings();
   const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
   const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, refreshDashboard } = useDashboard({ selectedProject, selectedRun: effectiveRun });
@@ -111,7 +111,7 @@ export function useAppState() {
 
   return {
     serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,
-    projects, selectedProject, selectedRun, handleProjectChange, handleNavigate,
+    projects, projectsLoaded, selectedProject, selectedRun, handleProjectChange, handleNavigate,
     handleDeleteProject, handleExportProject, handleRelocateProject,
     dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, dailyRuns: visibleDailyRuns, overviewRunIndex,
     currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest, handleRunView, handleRunSelect,
