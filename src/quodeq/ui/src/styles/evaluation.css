@@ -825,7 +825,7 @@
 .evaluate-form-large {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .evaluate-form-large .form-group label {
@@ -1060,7 +1060,6 @@
   flex-wrap: wrap;
   gap: 8px;
   padding: 12px;
-  margin-bottom: 12px;
   background: var(--color-surface-alt);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
@@ -1107,7 +1106,6 @@
 
 /* Improve submit button */
 .evaluate-submit-btn {
-  margin-top: 4px;
   padding: 12px 24px;
   font-size: 0.9rem;
   font-weight: 600;
