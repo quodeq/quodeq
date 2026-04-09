@@ -174,30 +174,43 @@ function CloneSection({ info, cloning, cloneDest, cloneError, setCloneBrowserOpe
 }
 
 function ActionButtons({ info, project, disabled, canStart, cloning, handleIncremental, handleStart }) {
+  const hasFingerprints = info.hasFingerprints;
   return (
     <div style={buttonRowStyle}>
-      {info.hasFingerprints && (
+      {hasFingerprints ? (
+        <>
+          <button
+            type="button"
+            className="evaluate-submit-btn"
+            style={{ flex: 3 }}
+            disabled={!canStart}
+            onClick={handleIncremental}
+            title="Only analyze files changed since last evaluation"
+          >
+            {disabled ? 'Running...' : 'Re-scan changes'}
+          </button>
+          <button
+            type="button"
+            className="evaluate-submit-btn evaluate-submit-btn--secondary"
+            style={{ flex: 1 }}
+            disabled={!canStart}
+            onClick={handleStart}
+            title="Fresh re-evaluation of all selected dimensions"
+          >
+            Full
+          </button>
+        </>
+      ) : (
         <button
           type="button"
           className="evaluate-submit-btn"
           style={flexButtonStyle}
           disabled={!canStart}
-          onClick={handleIncremental}
-          title="Only analyze files changed since last evaluation"
+          onClick={handleStart}
         >
-          Re-scan changes
+          {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
         </button>
       )}
-      <button
-        type="button"
-        className="evaluate-submit-btn"
-        style={flexButtonStyle}
-        disabled={!canStart}
-        onClick={handleStart}
-        title="Fresh re-evaluation of all selected dimensions"
-      >
-        {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
-      </button>
     </div>
   );
 }
