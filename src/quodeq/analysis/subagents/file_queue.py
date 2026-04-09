@@ -10,6 +10,7 @@ from pathlib import Path
 from quodeq.analysis.subagents._queue_state import (
     FileQueueError,  # noqa: F401 — re-export
     _QUEUE_VERSION,
+    cleanup_stale_lock,
     locked,
     read_state,
     write_state,
@@ -30,6 +31,7 @@ class FileQueue:
     ):
         self._path = Path(queue_path)
         self._lock_path = self._path.with_suffix(".lock")
+        cleanup_stale_lock(self._lock_path)
 
         if files is not None:
             state: dict = {"version": _QUEUE_VERSION, "pending": list(files), "taken": []}

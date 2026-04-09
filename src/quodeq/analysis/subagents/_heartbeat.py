@@ -30,11 +30,6 @@ class HeartbeatContext:
     dimension_key: str
     jsonl_path: Path
     lock: threading.Lock
-    # Optional fingerprint params — when set, fingerprint is updated each tick
-    src: Path | None = None
-    all_files: list[str] | None = None
-    evidence_dir: Path | None = None
-    standards_dir: Path | None = None
 
 
 @dataclass
@@ -75,26 +70,19 @@ def _read_findings_from_file(jsonl_path: Path) -> FindingCounts:
 
 
 def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> FindingCounts:
-    """Count total, violation, and compliance lines in a JSONL file under a lock."""
-    if not jsonl_path.exists():
-        return FindingCounts()
+    """Count total, violation, and compliance lines in a JSONL file under a lock.
+
+    The existence check and read are both inside the lock to avoid a TOCTOU
+    race with concurrent MCP writers that may create the file between the
+    check and the open.
+    """
     try:
         with lock:
+            if not jsonl_path.exists():
+                return FindingCounts()
             return _read_findings_from_file(jsonl_path)
     except OSError:
         return FindingCounts()
-
-
-def _update_fingerprint(ctx: HeartbeatContext) -> None:
-    """Save an incremental fingerprint with all source file hashes."""
-    if not ctx.src or not ctx.all_files or not ctx.evidence_dir:
-        return
-    try:
-        from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
-        fp = build_fingerprint(ctx.src, ctx.all_files, ctx.dimension_key, ctx.standards_dir)
-        save_fingerprint(fp, ctx.evidence_dir)
-    except (OSError, ValueError):
-        pass
 
 
 def heartbeat_loop(
@@ -123,6 +111,5 @@ def heartbeat_loop(
                 violations=counts.violations,
                 compliances=counts.compliances,
             ))
-            _update_fingerprint(ctx)
         except (OSError, ValueError, RuntimeError) as exc:
             log_warning(f"Heartbeat error: {exc}")

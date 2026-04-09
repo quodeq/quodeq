@@ -159,8 +159,15 @@ def _resolve_language(args: argparse.Namespace, src: Path, paths) -> str | None:
         return None
 
 
-def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManifest | None":
-    """Build a source manifest for the repository."""
+def _build_manifest(
+    args: argparse.Namespace, src: Path, paths,
+    scope_path: str | None = None,
+) -> "SourceManifest | None":
+    """Build a source manifest for the repository.
+
+    When *scope_path* is given the file walk is restricted to the scoped
+    subdirectory, avoiding a full-repo scan for large repositories.
+    """
     if args.no_prescan:
         return None
 
@@ -173,7 +180,7 @@ def _build_manifest(args: argparse.Namespace, src: Path, paths) -> "SourceManife
 
     detection = read_json(detection_file)
     disciplines_conf = paths.disciplines_conf if paths.disciplines_conf.exists() else None
-    manifest = build_manifest(src, detection, disciplines_conf)
+    manifest = build_manifest(src, detection, disciplines_conf, scope_path=scope_path)
     if manifest.targets:
         langs = ", ".join(
             f"{t.language} ({t.total_files})"
@@ -329,9 +336,12 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
         print(f"Invalid dimensions config: {exc}", file=sys.stderr)
         return None
 
-    manifest = _build_manifest(args, src, paths)
+    manifest = _build_manifest(args, src, paths, scope_path=scope_path)
 
-    # Scope filter: narrow manifest to files under scope_path
+    # Scope filter (fallback): ensure manifest only contains files under
+    # scope_path.  With scope-aware scanning the manifest should already be
+    # scoped, but this guard handles edge cases (e.g. disciplines.conf
+    # pulling files from outside the scope directory).
     if scope_path and manifest and manifest.targets:
         from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
         prefix = scope_path.rstrip("/") + "/"
@@ -385,6 +395,12 @@ def _run_pipeline_with_cleanup(
     """Set up directories, build config, run the pipeline, and clean up cloned repos."""
     _reports_root, evidence_dir, evaluation_dir = paths
     print(f"Report path: {evaluation_dir}", file=sys.stderr)
+    # Emit structured marker so the job manager can extract project/run IDs
+    # without fragile regex parsing of the human-readable log line above.
+    from quodeq.engine._runner_markers import emit_marker
+    run_id = evaluation_dir.parent.name
+    project_uuid = evaluation_dir.parent.parent.name
+    emit_marker("report_path", project=project_uuid, runId=run_id)
     _save_manifest(inputs.manifest, evidence_dir)
 
     config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)

@@ -16,7 +16,7 @@ def check_zero_findings(
     result: dict[str, Evidence], source_file_count: int, skipped_count: int = 0,
 ) -> None:
     """Raise EvaluationError if all dimensions produced zero findings."""
-    from quodeq.analysis._pipeline import EvaluationError
+    from quodeq.analysis.errors import EvaluationError
 
     if not result or source_file_count <= 0:
         return
