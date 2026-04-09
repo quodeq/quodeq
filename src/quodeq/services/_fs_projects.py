@@ -103,13 +103,31 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
 
 
 def delete_project(reports_dir: str, project: str) -> bool:
-    """Remove a project directory and all its report data."""
+    """Remove a project directory and all its report data.
+
+    If the project is a parent, cascade-deletes all children.
+    """
     reports_root = Path(reports_dir).resolve()
     project_path = (reports_root / project).resolve()
     if not project_path.is_relative_to(reports_root):
         return False
     if not project_path.exists() or not project_path.is_dir():
         return False
+
+    # Cascade: find and delete children first
+    for entry in reports_root.iterdir():
+        if not entry.is_dir() or entry.name == project:
+            continue
+        info_path = entry / "repository_info.json"
+        if not info_path.exists():
+            continue
+        try:
+            info = json.loads(info_path.read_text())
+            if info.get("parent") == project:
+                shutil.rmtree(entry, ignore_errors=True)
+        except (json.JSONDecodeError, OSError):
+            continue
+
     try:
         shutil.rmtree(project_path)
     except OSError:
