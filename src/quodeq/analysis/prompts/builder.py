@@ -29,6 +29,40 @@ def _load_evaluation_rules() -> str:
     except (OSError, FileNotFoundError):
         return ""
 
+
+def render_previous_findings_section(findings: list[dict]) -> str:
+    """Render a prompt section listing previous findings grouped by file."""
+    if not findings:
+        return ""
+
+    grouped: dict[str, list[dict]] = {}
+    for f in findings:
+        key = f.get("file", "(unknown file)")
+        grouped.setdefault(key, []).append(f)
+
+    lines = [
+        "",
+        "## Previous findings for files in this batch",
+        "",
+        "The following findings were reported in a prior evaluation. For each file",
+        "you analyze, confirm whether these findings still apply to the current code.",
+        "Report confirmed findings alongside any new ones you discover.",
+        "Dismiss findings that no longer apply by not reporting them.",
+        "",
+    ]
+    for filepath, file_findings in sorted(grouped.items()):
+        lines.append(f"### {filepath}")
+        for f in file_findings:
+            ftype = f.get("t", "finding")
+            req = f.get("req", "")
+            line_num = f.get("line", "?")
+            reason = f.get("reason", "")
+            lines.append(f"- [{ftype}] {req} line {line_num}: {reason}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 # Re-export public API so existing ``from ...builder import X`` keeps working
 PromptContext = ctx.PromptContext
 __all__ = [
@@ -38,6 +72,7 @@ __all__ = [
     "load_template",
     "render_compiled_standards",
     "render_dimensions",
+    "render_previous_findings_section",
     "_load_dimension_data",
 ]
 
@@ -83,7 +118,11 @@ def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
     }
     if context.extra_vars:
         values.update(context.extra_vars)
-    return render_template(template, values)
+    result = render_template(template, values)
+    prev_section = render_previous_findings_section(context.previous_findings)
+    if prev_section:
+        result += prev_section
+    return result
 
 
 def build_consolidated_prompt(
