@@ -129,6 +129,17 @@ class JobManager:
             _kill_tree(process.pid)
         return True
 
+    def shutdown(self) -> None:
+        """Kill all running job subprocesses. Called on server shutdown."""
+        with self._lock:
+            for job_id, process in list(self._processes.items()):
+                try:
+                    from quodeq.analysis._process import _kill_tree
+                    _kill_tree(process.pid)
+                except (ProcessLookupError, OSError):
+                    pass
+            self._processes.clear()
+
     def get_job(self, job_id: str) -> JobSnapshot | None:
         """Return the current state of a job, or None if not found."""
         with self._lock:

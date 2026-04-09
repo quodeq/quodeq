@@ -43,6 +43,7 @@ def create_app(
     if test_config is not None:
         app.config.update(test_config)
     provider = provider or _default_provider()
+    app.config["_provider"] = provider
     store = rate_limit_store or create_rate_limit_store()
     eval_store = InMemoryRateLimitStore(
         window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
@@ -105,7 +106,16 @@ def main(env: dict[str, str] | None = None) -> None:
     # consider a secrets manager or platform keychain instead.
     app = create_app(static_dist=get_static_dist(), api_key=_env.get("QUODEQ_API_KEY"))
 
+    # Kill running evaluation subprocesses on shutdown
+    import atexit
+    def _cleanup_jobs():
+        provider = app.config.get("_provider")
+        if provider and hasattr(provider, "_jobs"):
+            provider._jobs.shutdown()
+    atexit.register(_cleanup_jobs)
+
     def _handle_shutdown(signum: int, frame: object) -> None:
+        _cleanup_jobs()
         raise SystemExit(0)
 
     if hasattr(signal, "SIGTERM"):

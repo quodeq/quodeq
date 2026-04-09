@@ -135,11 +135,78 @@ class _WindowApi:
         self._instance = instance
 
     def close(self) -> None:
+        job = self._get_running_evaluation() if self._window else None
+        if job:
+            try:
+                choice = self._window.evaluate_js(self._build_close_dialog_js(job))
+                if choice == 'back':
+                    return
+                if choice == 'keep':
+                    os._exit(0)
+            except Exception:
+                pass
         if self._api_pid:
             _kill_api(self._api_pid)
         if self._instance:
             self._instance.shutdown()
         os._exit(0)
+
+    def _get_running_evaluation(self) -> dict | None:
+        """Return the first running evaluation job, or None."""
+        try:
+            import urllib.request
+            import json as _json
+            url = self._window.get_current_url().split("#")[0].rstrip("/")
+            base = url.rsplit("/", 1)[0] if "/" in url.lstrip("http") else url
+            req = urllib.request.Request(f"{base}/api/evaluations")
+            with urllib.request.urlopen(req, timeout=2) as resp:
+                jobs = _json.loads(resp.read())
+                for j in (jobs if isinstance(jobs, list) else []):
+                    if j.get("status") == "running":
+                        return j
+        except Exception:
+            pass
+        return None
+
+    @staticmethod
+    def _build_close_dialog_js(job: dict) -> str:
+        """Build JS for the close confirmation dialog with job info."""
+        phase = job.get("phase", "analyzing")
+        dim = job.get("currentDimension", "")
+        repo = job.get("repo", "")
+        # Build info line
+        info_parts = []
+        if repo:
+            name = repo.rsplit("/", 1)[-1] if "/" in repo else repo
+            info_parts.append(f"Project: <b>{name}</b>")
+        if dim:
+            info_parts.append(f"Dimension: <b>{dim}</b>")
+        if phase:
+            info_parts.append(f"Phase: <b>{phase}</b>")
+        info_html = "<br>".join(info_parts) if info_parts else "Running..."
+
+        return """
+            (function() {
+                var d = document.createElement('div');
+                d.id = '_qd_close_dialog';
+                d.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center';
+                d.innerHTML = '<div style="background:var(--color-surface,#1c2128);border:1px solid var(--color-border,#333);border-radius:12px;padding:24px 28px;max-width:420px;color:var(--color-text,#e6edf3);font-family:inherit">'
+                    + '<h3 style="margin:0 0 12px;font-size:1rem">Evaluation in progress</h3>'
+                    + '<div style="margin:0 0 16px;padding:10px 14px;background:var(--color-surface-alt,#161b22);border-radius:6px;font-size:0.82rem;line-height:1.6;color:var(--color-text-muted,#8b949e)">""" + info_html + """</div>'
+                    + '<div style="display:flex;flex-direction:column;gap:8px">'
+                    + '<button id="_qd_close_keep" style="padding:10px 16px;border:1px solid var(--color-border,#333);border-radius:6px;background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:0.85rem">Close window (evaluation continues in background)</button>'
+                    + '<button id="_qd_close_cancel" style="padding:10px 16px;border:1px solid #da3633;border-radius:6px;background:transparent;color:#f85149;cursor:pointer;font-size:0.85rem">Cancel evaluation and close</button>'
+                    + '<button id="_qd_close_back" style="padding:10px 16px;border:none;border-radius:6px;background:transparent;color:var(--color-text-muted,#8b949e);cursor:pointer;font-size:0.85rem">Go back</button>'
+                    + '</div></div>';
+                document.body.appendChild(d);
+                return new Promise(function(resolve) {
+                    document.getElementById('_qd_close_keep').onclick = function() { d.remove(); resolve('keep'); };
+                    document.getElementById('_qd_close_cancel').onclick = function() { d.remove(); resolve('cancel'); };
+                    document.getElementById('_qd_close_back').onclick = function() { d.remove(); resolve('back'); };
+                    d.onclick = function(e) { if (e.target === d) { d.remove(); resolve('back'); } };
+                });
+            })()
+        """
 
     def minimize(self) -> None:
         if self._window:
