@@ -18,8 +18,7 @@ from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.logging import log_warning
 
 
-class EvaluationError(RuntimeError):
-    """Raised when an evaluation completes but produces no usable findings."""
+from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 
 
 def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
