@@ -30,3 +30,4 @@ class ProjectIdentity:
     repo_path: str
     discipline: str | None = None
     location: str = "local"
+    scope_path: str | None = None
