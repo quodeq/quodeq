@@ -75,7 +75,7 @@ function EvaluateHeader({ isRunning }) {
 
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
-  const { selectedProject } = context;
+  const { selectedProject, projectInfo } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
 
   return (
@@ -84,7 +84,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} onStart={onStartEvaluation} disabled={false} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={onStartEvaluation} disabled={false} />
         )}
 
         {!job && (
@@ -92,7 +92,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
             <div className="panel-header">
               <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
             </div>
-            <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={selectedProject} />
+            <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={projectInfo} />
           </div>
         )}
 

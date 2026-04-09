@@ -216,4 +216,8 @@ export function getProviderConfigs() {
   return request('/provider-configs');
 }
 
+export function scanPath(dirPath) {
+  return request('/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: dirPath }) });
+}
+
 // Standards and findings APIs are re-exported at the top of this file.

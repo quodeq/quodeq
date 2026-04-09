@@ -68,10 +68,23 @@ def scout_loop(ctx: LoopContext) -> None:
 
 def immediate_loop(ctx: LoopContext) -> None:
     """Launch all agents immediately, respawning as they complete."""
+    from quodeq.shared.logging import log_warning as _log_warn
+
     ev_paths = EvidencePaths(ctx.shared_jsonl_path, ctx.evidence_dir, ctx.dimension_key)
     for _ in range(ctx.n_agents):
         ctx.submit_fn()
     while ctx.futures:
+        # Check pool budget — cancel all running agents if exceeded
+        if ctx.max_duration > 0:
+            elapsed = time.monotonic() - ctx.pool_start
+            if elapsed >= ctx.max_duration:
+                _log_warn(
+                    f"  Pool budget ({ctx.max_duration:.0f}s) exceeded "
+                    f"-- cancelling {len(ctx.futures)} remaining agents"
+                )
+                for future in list(ctx.futures):
+                    future.cancel()
+                break
         done = collect_done(ctx.futures, ctx.finished, ctx.results, ev_paths)
         if not done:
             time.sleep(_FUTURE_POLL_INTERVAL_S)

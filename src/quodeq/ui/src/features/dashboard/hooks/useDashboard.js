@@ -195,7 +195,7 @@ export function useDashboard({ selectedProject, selectedRun }) {
   // Dashboard (dimensions/summary): loads per run
   useEffect(() => { setLoading(true); return fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError); }, [selectedProject, selectedRun, refreshKey]);
   useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError, true), [selectedProject, selectedRun, refreshKey]);
-  useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError, true), [selectedProject, refreshKey]);
+  useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError, true), [selectedProject, selectedRun, refreshKey]);
   useEffect(() => rescoreAllRunsEffect(selectedProject, accumulated, setRescoreLookup), [selectedProject, accumulated]);
   const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
 

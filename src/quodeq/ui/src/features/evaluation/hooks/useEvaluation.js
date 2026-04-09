@@ -128,7 +128,8 @@ function preparePayload(payload, storage = localStorage) {
   const subagents = parseInt(get('subagents') || defaultSubagents, 10);
   payload.maxSubagents = subagents;
 
-  const poolBudget = parseInt(get('pool-budget') || '0', 10);
+  const defaultBudget = ['ollama'].includes(activeProvider) ? '0' : '600';
+  const poolBudget = parseInt(get('pool-budget') || defaultBudget, 10);
   payload.poolBudget = poolBudget;
 
   if (get('per-dimension') === 'true') payload.perDimension = true;

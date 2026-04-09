@@ -17,12 +17,19 @@ class _IncrementalProgressReader:
         self._jsonl_offset = 0
         self._seen_files: set[str] = set()
         self._jsonl_count = 0
+        self._violations = 0
+        self._compliances = 0
 
     def read_progress(self) -> dict:
         """Return incremental progress since the last call."""
         self._read_stream()
         self._read_jsonl()
-        return {"files_read": len(self._seen_files), "evidence": self._jsonl_count}
+        return {
+            "files_read": len(self._seen_files),
+            "evidence": self._jsonl_count,
+            "violations": self._violations,
+            "compliances": self._compliances,
+        }
 
     def _read_stream(self) -> None:
         try:
@@ -41,13 +48,23 @@ class _IncrementalProgressReader:
         if self._jsonl_file is None or not self._jsonl_file.exists():
             return
         try:
+            import json as _json
             with open(self._jsonl_file, "rb") as jf:
                 jf.seek(self._jsonl_offset)
                 new_bytes = jf.read()
                 self._jsonl_offset += len(new_bytes)
-            self._jsonl_count += sum(
-                1 for line in new_bytes.decode("utf-8", errors="replace").splitlines()
-                if line.strip()
-            )
+            for line in new_bytes.decode("utf-8", errors="replace").splitlines():
+                stripped = line.strip()
+                if not stripped:
+                    continue
+                self._jsonl_count += 1
+                try:
+                    t = _json.loads(stripped).get("t", "")
+                except (ValueError, AttributeError):
+                    t = ""
+                if t == "violation":
+                    self._violations += 1
+                elif t == "compliance":
+                    self._compliances += 1
         except OSError as exc:
             log_debug(f"Failed to read JSONL {self._jsonl_file}: {exc}")

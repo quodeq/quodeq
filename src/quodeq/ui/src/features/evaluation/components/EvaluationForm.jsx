@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import DimensionSelector from './DimensionSelector.jsx';
@@ -56,6 +56,9 @@ function useEvaluationForm(onStart) {
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
 
+  // Reset scope when repo changes
+  useEffect(() => { setScopePath(null); setBranch(null); }, [repo]);
+
   const toggleDim = (id) => setSelectedDims((prev) => {
     const next = new Set(prev);
     if (next.has(id)) next.delete(id); else next.add(id);
@@ -106,8 +109,8 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
     branch, setBranch, scopePath, setScopePath,
   } = useEvaluationForm(onStart);
 
-  const isLocal = selectedProject?.location === 'local';
-  const { scanData } = useScanData(isLocal ? selectedProject?.id : null);
+  const isLocalRepo = !!repo && !repo.startsWith('http') && !repo.startsWith('git@') && !repo.includes('github.com');
+  const { scanData } = useScanData(null, isLocalRepo ? repo : null);
 
   const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
 
@@ -121,12 +124,11 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
           onBrowse={() => setFolderBrowserOpen(true)}
         />
 
-        {isLocal && scanData && (
+        {isLocalRepo && (
           <BranchScopeSelector
-            branches={scanData.branches}
-            currentBranch={branch}
-            projectPath={selectedProject?.path}
-            onBranchChange={setBranch}
+            branches={scanData?.branches}
+            currentBranch={scanData?.currentBranch || branch}
+            projectPath={repo}
             onScopeChange={setScopePath}
             scopePath={scopePath}
           />
