@@ -240,7 +240,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
           />
         )}
 
-        <div className={cloning ? 're-eval-disabled-section' : ''}>
+        <div className={`re-eval-actions-group${cloning ? ' re-eval-disabled-section' : ''}`}>
           <DimensionSelectionSection allDimensions={allDimensions} selectedDims={selectedDims} cloning={cloning} toggleDim={toggleDim} selectAll={selectAll} clearAll={clearAll} />
           <ActionButtons info={info} project={project} disabled={disabled} canStart={canStart} cloning={cloning} handleIncremental={handleIncremental} handleStart={handleStart} />
         </div>

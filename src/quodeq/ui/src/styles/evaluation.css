@@ -1011,6 +1011,17 @@
   margin: var(--space-1) 0;
 }
 
+.re-eval-actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.re-eval-disabled-section {
+  opacity: 0.5;
+  pointer-events: none;
+}
+
 /* Dimension label row: label left, actions right */
 .dimension-label-row {
   display: flex;
