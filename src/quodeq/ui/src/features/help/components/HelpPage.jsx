@@ -51,7 +51,7 @@ function Providers() {
 
       <h3>Local Providers (Ollama)</h3>
       <div className="help-callout help-callout-tip">
-        <strong>Recommended model:</strong> <code>gemma4:26b</code> offers excellent quality-to-cost ratio for local analysis. It runs well on machines with 32GB+ RAM.
+        <strong>Recommended model:</strong> <code>gemma4:26b</code> offers excellent quality-to-cost ratio for local analysis. Even limiting context to 32k tokens, we observed strong results.
       </div>
       <p>To use Ollama:</p>
       <ol>
