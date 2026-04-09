@@ -40,6 +40,7 @@ function Philosophy() {
         <li><strong>Collect</strong> — findings stream in real-time as structured JSONL via tool calls</li>
         <li><strong>Score</strong> — maps findings to ISO 25010 principles with CWE classifications</li>
         <li><strong>Report</strong> — produces per-dimension reports with grades, violations, and compliance evidence</li>
+        <li><strong>Fix Plan</strong> — for each violation, you can copy a structured fix plan with file path, line number, code context, and remediation guidance — ready to paste into your AI agent or IDE to fix the issue directly</li>
       </ol>
 
       <h3>Both sides of the story</h3>
