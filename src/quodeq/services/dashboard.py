@@ -225,7 +225,13 @@ def build_dashboard(
     reports_root = Path(reports_dir)
     runs = list_runs(reports_root, project)
     if not runs:
-        raise FileNotFoundError(f"No runs found for project: {project}")
+        return {
+            "project": project,
+            "selectedRun": None,
+            "dimensions": [],
+            "summary": {},
+            "trend": [],
+        }
 
     selected_run, selected_index = _resolve_selected_run(runs, run)
     selected_dims = read_run_data(reports_root, project, selected_run.run_id)
