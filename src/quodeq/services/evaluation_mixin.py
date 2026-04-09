@@ -94,7 +94,7 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str, scope
     location = _LOCATION_ONLINE if is_repo_url(repo) else _LOCATION_LOCAL
     reports_path = Path(reports_dir)
 
-    child_uuid = resolve_project_uuid(
+    project_uuid = resolve_project_uuid(
         reports_path,
         ProjectIdentity(project_name, repo_resolved, discipline, location, scope_path=scope_path),
     )
@@ -104,15 +104,20 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str, scope
         from quodeq.services._fs_scan import scan_project
         repo_path = Path(repo_resolved)
         if repo_path.is_dir():
-            # Always scan the parent (full repo)
+            project_dir = reports_path / project_uuid
+            scan_project(repo_path, output_dir=project_dir)
+            # For scoped projects, also scan the parent using the parent UUID from repo info
             if scope_path:
-                parent_identity = ProjectIdentity(project_name, repo_resolved, discipline, location)
-                parent_uuid = resolve_project_uuid(reports_path, parent_identity)
-                parent_dir = reports_path / parent_uuid
-                scan_project(repo_path, output_dir=parent_dir)
-            # Scan child (or standalone project)
-            child_dir = reports_path / child_uuid
-            scan_project(repo_path, output_dir=child_dir)
+                import json
+                info_path = project_dir / "repository_info.json"
+                try:
+                    parent_uuid = json.loads(info_path.read_text()).get("parent")
+                    if parent_uuid:
+                        parent_dir = reports_path / parent_uuid
+                        if not (parent_dir / "scan.json").exists():
+                            scan_project(repo_path, output_dir=parent_dir)
+                except (json.JSONDecodeError, OSError):
+                    pass
 
 
 class FsEvaluationMixin:

@@ -21,21 +21,41 @@ from quodeq.services.ports import list_runs, safe_read_dir
 _MAX_PROJECT_BUILD_WORKERS = 8
 
 
-def _has_children(reports_root: Path, project_id: str) -> bool:
-    """Check if any project in reports_root has this project as parent."""
+def find_children(reports_root: Path, parent_id: str) -> list[str]:
+    """Return UUIDs of child projects whose parent matches *parent_id*."""
+    children: list[str] = []
     for entry in reports_root.iterdir():
-        if not entry.is_dir() or entry.name == project_id:
+        if not entry.is_dir() or entry.name == parent_id:
             continue
         info_path = entry / "repository_info.json"
         if not info_path.exists():
             continue
         try:
             info = json.loads(info_path.read_text())
-            if info.get("parent") == project_id:
-                return True
+            if info.get("parent") == parent_id:
+                children.append(entry.name)
         except (json.JSONDecodeError, OSError):
             continue
-    return False
+    return children
+
+
+def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[set[str], set[str]]:
+    """Single pass: return (parent_ids, subproject_ids) from repo info files."""
+    parent_ids: set[str] = set()
+    subproject_ids: set[str] = set()
+    for name in dir_names:
+        info_path = reports_root / name / "repository_info.json"
+        if not info_path.exists():
+            continue
+        try:
+            info = json.loads(info_path.read_text())
+            parent = info.get("parent")
+            if parent:
+                parent_ids.add(parent)
+                subproject_ids.add(name)
+        except (json.JSONDecodeError, OSError):
+            continue
+    return parent_ids, subproject_ids
 
 
 def build_project_list(reports_root: Path) -> list[ProjectEntry]:
@@ -49,19 +69,11 @@ def build_project_list(reports_root: Path) -> list[ProjectEntry]:
         if len(dir_names) >= max_listed:
             break
 
-    def _is_subproject(name: str) -> bool:
-        info_path = reports_root / name / "repository_info.json"
-        if not info_path.exists():
-            return False
-        try:
-            return bool(json.loads(info_path.read_text()).get("parent"))
-        except (json.JSONDecodeError, OSError):
-            return False
+    parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
 
     def _build_one(name: str) -> ProjectEntry | None:
         runs = list_runs(reports_root, name)
-        # Include if: has runs, or is a parent with children, or is a sub-project
-        if not runs and not _has_children(reports_root, name) and not _is_subproject(name):
+        if not runs and name not in parent_ids and name not in subproject_ids:
             return None
         return _build_project_entry(reports_root, name, runs)
 
@@ -125,18 +137,8 @@ def delete_project(reports_dir: str, project: str) -> bool:
         return False
 
     # Cascade: find and delete children first
-    for entry in reports_root.iterdir():
-        if not entry.is_dir() or entry.name == project:
-            continue
-        info_path = entry / "repository_info.json"
-        if not info_path.exists():
-            continue
-        try:
-            info = json.loads(info_path.read_text())
-            if info.get("parent") == project:
-                shutil.rmtree(entry, ignore_errors=True)
-        except (json.JSONDecodeError, OSError):
-            continue
+    for child_id in find_children(reports_root, project):
+        shutil.rmtree(reports_root / child_id, ignore_errors=True)
 
     try:
         shutil.rmtree(project_path)

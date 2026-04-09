@@ -106,9 +106,11 @@ function JobHeader({ job, onDismiss, onCancel }) {
   );
 }
 
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+
 function JobProviderBadge() {
-  const provider = localStorage.getItem('cc-active-provider') || '';
-  const model = localStorage.getItem(`cc-${provider}-model`) || '';
+  const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const model = localStorage.getItem(providerKey(provider, 'model')) || '';
   if (!provider) return null;
   return (
     <div className="job-meta-item">

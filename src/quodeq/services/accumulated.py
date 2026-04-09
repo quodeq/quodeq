@@ -79,24 +79,7 @@ def _compute_result(
     return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
 
 
-def _find_children(reports_root: Path, parent_id: str) -> list[str]:
-    """Return UUIDs of child projects whose parent matches *parent_id*."""
-    import json as _json
-
-    children: list[str] = []
-    for entry in reports_root.iterdir():
-        if not entry.is_dir() or entry.name == parent_id:
-            continue
-        info_path = entry / "repository_info.json"
-        if not info_path.exists():
-            continue
-        try:
-            info = _json.loads(info_path.read_text())
-            if info.get("parent") == parent_id:
-                children.append(entry.name)
-        except (_json.JSONDecodeError, OSError):
-            continue
-    return children
+from quodeq.services._fs_projects import find_children as _find_children  # noqa: E402
 
 
 def _compute_parent_accumulated(

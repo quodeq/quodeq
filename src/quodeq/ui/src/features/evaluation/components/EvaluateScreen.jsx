@@ -39,9 +39,11 @@ function EvaluateHelpSection() {
   );
 }
 
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+
 function ActiveProviderBadge() {
-  const provider = localStorage.getItem('cc-active-provider') || '';
-  const model = localStorage.getItem(`cc-${provider}-model`) || '';
+  const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const model = localStorage.getItem(providerKey(provider, 'model')) || '';
   if (!provider) return null;
   return (
     <div className="eval-provider-badge">

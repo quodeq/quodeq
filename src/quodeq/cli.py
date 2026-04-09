@@ -133,7 +133,7 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
 
     project_name = project_name_from_repo(args.repo)
     location = "online" if is_repo_url(args.repo) else "local"
-    scope = getattr(args, "scope", None) or None
+    scope = getattr(args, "scope", None)
     project_uuid = resolve_project_uuid(reports_root, ProjectIdentity(project_name, str(src), None, location, scope_path=scope))
 
     run_id = str(uuid.uuid4())
