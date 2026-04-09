@@ -21,6 +21,23 @@ from quodeq.services.ports import list_runs, safe_read_dir
 _MAX_PROJECT_BUILD_WORKERS = 8
 
 
+def _has_children(reports_root: Path, project_id: str) -> bool:
+    """Check if any project in reports_root has this project as parent."""
+    for entry in reports_root.iterdir():
+        if not entry.is_dir() or entry.name == project_id:
+            continue
+        info_path = entry / "repository_info.json"
+        if not info_path.exists():
+            continue
+        try:
+            info = json.loads(info_path.read_text())
+            if info.get("parent") == project_id:
+                return True
+        except (json.JSONDecodeError, OSError):
+            continue
+    return False
+
+
 def build_project_list(reports_root: Path) -> list[ProjectEntry]:
     """Collect eligible project dirs and build entries in parallel."""
     max_listed = _max_projects_listed()
@@ -34,7 +51,7 @@ def build_project_list(reports_root: Path) -> list[ProjectEntry]:
 
     def _build_one(name: str) -> ProjectEntry | None:
         runs = list_runs(reports_root, name)
-        if not runs:
+        if not runs and not _has_children(reports_root, name):
             return None
         return _build_project_entry(reports_root, name, runs)
 
