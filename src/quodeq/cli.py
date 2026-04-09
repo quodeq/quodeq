@@ -357,9 +357,9 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
             manifest = SourceManifest(targets=scoped_targets, total_files=total, language_stats=all_stats)
             print(f"Scope filter: {total} files under '{scope_path}'", file=sys.stderr)
         else:
-            # No recognized source files under scope — create empty manifest
-            manifest = SourceManifest(targets=[], total_files=0, language_stats={})
             print(f"No source files found under scope '{scope_path}'", file=sys.stderr)
+            print("The scoped folder contains no recognized source code files.", file=sys.stderr)
+            return None
 
     # For single-file: override manifest to contain only the target file
     if single_file:
