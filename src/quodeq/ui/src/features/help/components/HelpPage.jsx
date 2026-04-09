@@ -1,6 +1,7 @@
 import { useState } from 'react';
 
 const SECTIONS = [
+  { id: 'philosophy', label: 'Philosophy' },
   { id: 'getting-started', label: 'Getting Started' },
   { id: 'providers', label: 'AI Providers' },
   { id: 'evaluations', label: 'Running Evaluations' },
@@ -19,6 +20,52 @@ function SectionNav({ active, onSelect }) {
         <button key={s.id} className={`help-section-btn${active === s.id ? ' active' : ''}`} onClick={() => onSelect(s.id)}>{s.label}</button>
       ))}
     </nav>
+  );
+}
+
+function Philosophy() {
+  return (
+    <section className="help-section">
+      <h2>The Quodeq Philosophy</h2>
+      <p>Quodeq is a quality compass for your codebase — not a linter, not a static analyzer, but an AI-powered evaluator that reads and understands your code the way a senior engineer would.</p>
+
+      <h3>Why Quodeq exists</h3>
+      <p>Traditional code quality tools count syntax violations. They can tell you a function is too long, but not whether your architecture has a dependency leak. They can flag a missing null check, but not whether your error handling strategy is coherent across the project.</p>
+      <p>Quodeq takes a different approach: it sends an AI agent into your codebase with read-only tools to explore, understand context, and evaluate quality against structured standards. The agent reads actual code, follows imports, understands patterns — then reports what it finds with specific file locations and evidence.</p>
+
+      <h3>How evaluation works</h3>
+      <ol>
+        <li><strong>Detect</strong> — identifies the languages, frameworks, and structure of your codebase</li>
+        <li><strong>Analyze</strong> — spawns AI agents with read-only tools (Bash, Grep, Read, Glob) to systematically explore the code</li>
+        <li><strong>Collect</strong> — findings stream in real-time as structured JSONL via tool calls</li>
+        <li><strong>Score</strong> — maps findings to ISO 25010 principles with CWE classifications</li>
+        <li><strong>Report</strong> — produces per-dimension reports with grades, violations, and compliance evidence</li>
+      </ol>
+
+      <h3>Both sides of the story</h3>
+      <p>Quodeq reports <strong>violations AND compliance</strong>. The scoring uses the ratio between them — a project with many violations but also strong compliance patterns is scored more fairly than one with the same violations and no evidence of good practices. This means the AI actively looks for files that follow standards correctly, not just files that break them.</p>
+
+      <h3>The Q&#xB2; Scoring Formula</h3>
+      <p>Each principle is scored 0-10 using four independent constraints:</p>
+      <ol>
+        <li><strong>Violation Base</strong> — a hyperbolic curve where the first violations hurt most: <code>10 / (1 + K * weighted_violations)</code>. This prevents 50 minor issues from tanking a score the same way 5 critical ones would.</li>
+        <li><strong>Compliance Lift</strong> — evidence of good practices fills the gap between the base and 10. More compliance always helps, never hurts.</li>
+        <li><strong>Violation Ceiling</strong> — a log&#x2082;-based cap prevents compliance from overriding significant violations. You can't reach Exemplary with critical issues, no matter how much compliance you have.</li>
+        <li><strong>Severity Grade Floor</strong> — grade labels match reality. Only actual critical violations can produce a "Critical" grade. 50 minor violations with zero compliance still score Adequate, not Critical.</li>
+      </ol>
+      <pre className="help-code">{'final = max(floor, min(ceiling, base + (10 - base) * lift))'}</pre>
+
+      <h3>Fair by design</h3>
+      <div className="help-callout help-callout-info">
+        The scoring model was designed to address specific fairness issues: linear accumulation is unfair (39 minor issues shouldn't score the same as 39 critical flaws), compliance should be additive (not just a discount), grade names should be semantically honest, and reaching the top should require genuinely clean code.
+      </div>
+
+      <h3>Any language, any stack</h3>
+      <p>Quodeq can evaluate <strong>any codebase in any programming language</strong>. The AI analysis engine reads and understands code regardless of the tech stack — Python, TypeScript, Go, Rust, Java, Swift, or anything else. The standards are language-agnostic by design.</p>
+
+      <h3>Your standards, your rules</h3>
+      <p>While Quodeq ships with ISO 25010 dimensions, Clean Architecture, and DDD standards, you can create your own. Define what quality means for your project — whether that's React component best practices, API design guidelines, or your team's internal coding standards — and Quodeq will evaluate against them.</p>
+    </section>
   );
 }
 
@@ -345,6 +392,7 @@ Scope:      packages/frontend`}</pre>
 }
 
 const SECTION_COMPONENTS = {
+  'philosophy': Philosophy,
   'getting-started': GettingStarted,
   'providers': Providers,
   'evaluations': Evaluations,
@@ -357,8 +405,8 @@ const SECTION_COMPONENTS = {
 };
 
 export default function HelpPage() {
-  const [activeSection, setActiveSection] = useState('getting-started');
-  const Section = SECTION_COMPONENTS[activeSection] || GettingStarted;
+  const [activeSection, setActiveSection] = useState('philosophy');
+  const Section = SECTION_COMPONENTS[activeSection] || Philosophy;
 
   return (
     <div className="help-page">
