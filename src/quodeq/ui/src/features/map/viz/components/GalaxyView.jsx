@@ -904,7 +904,7 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
         detailAction: () => {
           const d = scene.stars[navRef.current.dim]?._raw;
           if (!d) return;
-          onNavigate?.('explorer', { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, sourceTab: 'map' });
+          onNavigate?.('explorer', { dimension: d.dimension, runId: d.fromRunId, dateLabel: d.fromDateLabel, fromProject: d.fromProject, sourceTab: 'map' });
         },
       };
     }

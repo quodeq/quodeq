@@ -107,18 +107,28 @@ def _compute_parent_accumulated(
 ) -> dict[str, Any] | None:
     """Merge latest findings from all children and score as one project."""
     all_dims: list[DimensionResult] = []
+    # Track which child each dimension came from
+    dim_source: dict[str, str] = {}  # dimension_name -> child_project_id
     for child in children:
         child_runs = list_runs(reports_root, child)
         if not child_runs:
             continue
         result = _compute_result(reports_root, child, child_runs, cache_config)
+        for d in result.all_dimensions:
+            dim_source[d.dimension] = child
         all_dims.extend(result.all_dimensions)
     if not all_dims:
         return None
     severity = _aggregate_severity_counts(all_dims)
     avg, _ = _compute_accumulated_scores(all_dims, {})
     merged_result = _AccumulatedResult(all_dims, all_dims, severity, avg, None)
-    return _build_accumulated_response(parent_id, merged_result)
+    response = _build_accumulated_response(parent_id, merged_result)
+    # Tag each dimension with its source child project for navigation
+    for dim_dict in response.get("dimensions", []):
+        dim_name = dim_dict.get("dimension", "")
+        if dim_name in dim_source:
+            dim_dict["fromProject"] = dim_source[dim_name]
+    return response
 
 
 def compute_accumulated(
