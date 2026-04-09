@@ -166,7 +166,49 @@ def _kill_api(pid: int) -> None:
         pass
 
 
+def _icon_path(ext: str) -> str | None:
+    """Resolve the quodeq icon path for the given extension (.icns or .ico)."""
+    p = Path(__file__).resolve().parent.parent.parent.parent / "packaging"
+    if ext == ".icns":
+        p = p / "macos" / "icon.icns"
+    elif ext == ".ico":
+        p = p / "windows" / "icon.ico"
+    else:
+        return None
+    return str(p) if p.exists() else None
+
+
+def _set_app_icon() -> None:
+    """Set the application icon (dock on macOS, taskbar on Windows)."""
+    if sys.platform == "darwin":
+        try:
+            from AppKit import NSApplication, NSImage  # type: ignore[import-untyped]
+            path = _icon_path(".icns")
+            if path:
+                icon = NSImage.alloc().initWithContentsOfFile_(path)
+                if icon:
+                    NSApplication.sharedApplication().setApplicationIconImage_(icon)
+        except ImportError:
+            pass
+    elif sys.platform == "win32":
+        try:
+            import ctypes
+            path = _icon_path(".ico")
+            if path:
+                ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("quodeq.dashboard")
+                # Load icon and set for the process
+                icon_flags = 0x00000010 | 0x00000001  # LR_LOADFROMFILE | LR_DEFAULTSIZE
+                hicon = ctypes.windll.user32.LoadImageW(0, path, 1, 0, 0, icon_flags)
+                if hicon:
+                    ctypes.windll.user32.SendMessageW(
+                        ctypes.windll.kernel32.GetConsoleWindow(), 0x0080, 0, hicon,
+                    )
+        except (AttributeError, OSError):
+            pass
+
+
 def main() -> None:
+    _set_app_icon()
     url = sys.argv[1]
     sock_path = Path(sys.argv[2])
     api_pid = int(sys.argv[3]) if len(sys.argv) > 3 and sys.argv[3] else 0
