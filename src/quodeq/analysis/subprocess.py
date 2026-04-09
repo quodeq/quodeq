@@ -55,7 +55,11 @@ def _run_cli_analysis(
     work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
 ) -> None:
     """Run analysis via CLI subprocess."""
+    import shutil as _shutil
     ai_cmd = cfg.ai_cmd or get_ai_cmd()
+    # Validate that the CLI command exists on PATH before spawning a subprocess.
+    if not _shutil.which(ai_cmd):
+        raise AnalysisError(f"AI command not found on PATH: {ai_cmd!r}")
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
     mcp_style = provider_cfg.get("mcp_style", "config-file")

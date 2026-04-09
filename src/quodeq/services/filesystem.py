@@ -68,6 +68,10 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         return _fs_projects.delete_project(reports_dir, project)
 
     def clone_to_local(self, reports_dir: str, project: str, destination: str) -> dict[str, Any] | None:
+        # Validate destination: must be absolute and free of traversal components.
+        dest = Path(destination)
+        if not dest.is_absolute() or ".." in dest.parts:
+            return None
         return _fs_clone.clone_to_local(
             reports_dir, project, destination, get_project_info_fn=self.get_project_info,
         )

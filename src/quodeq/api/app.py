@@ -84,14 +84,16 @@ def create_app(
         host = get_action_api_host()
         port = get_action_api_port()
         display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
-        return jsonify({
+        payload: dict[str, object] = {
             "ok": True,
             "version": __version__,
             "host": host,
             "port": port,
             "address": f"{display_host}:{port}",
-            "pid": os.getpid(),
-        })
+        }
+        if verbose:
+            payload["pid"] = os.getpid()
+        return jsonify(payload)
 
     register_all_routes(app, provider, eval_store, static_dist, log_buffer)
     return app

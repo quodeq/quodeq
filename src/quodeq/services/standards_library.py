@@ -26,6 +26,8 @@ class UrllibJsonClient:
 
 class StandardsLibraryClient:
     def __init__(self, base_url: str, http_client: HttpClient, token: str | None = None) -> None:
+        if not base_url.startswith("https://"):
+            raise ValueError(f"Only https:// base URLs are allowed, got: {base_url!r}")
         self._base_url = base_url.rstrip("/")
         self._http = http_client
         self._token = token

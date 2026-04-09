@@ -1,6 +1,7 @@
 """CRUD and import operations for custom standards."""
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,7 +24,7 @@ class JsonIO:
 
 
 def _validate_id(standard_id: str) -> None:
-    if not standard_id or "/" in standard_id or "\\" in standard_id or ".." in standard_id:
+    if not standard_id or "/" in standard_id or "\\" in standard_id or ".." in standard_id or os.sep in standard_id:
         raise ValueError(f"Invalid standard ID: {standard_id}")
 
 
