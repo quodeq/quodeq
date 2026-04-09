@@ -25,6 +25,30 @@
   font-size: 1rem;
 }
 
+.eval-provider-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.eval-provider-name {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  text-transform: capitalize;
+}
+
+.eval-provider-model {
+  font-family: monospace;
+  font-size: 0.72rem;
+}
+
 .evaluate-content {
   display: grid;
   gap: 24px;
