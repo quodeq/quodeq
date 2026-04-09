@@ -79,6 +79,48 @@ def _compute_result(
     return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
 
 
+def _find_children(reports_root: Path, parent_id: str) -> list[str]:
+    """Return UUIDs of child projects whose parent matches *parent_id*."""
+    import json as _json
+
+    children: list[str] = []
+    for entry in reports_root.iterdir():
+        if not entry.is_dir() or entry.name == parent_id:
+            continue
+        info_path = entry / "repository_info.json"
+        if not info_path.exists():
+            continue
+        try:
+            info = _json.loads(info_path.read_text())
+            if info.get("parent") == parent_id:
+                children.append(entry.name)
+        except (_json.JSONDecodeError, OSError):
+            continue
+    return children
+
+
+def _compute_parent_accumulated(
+    reports_root: Path,
+    children: list[str],
+    parent_id: str,
+    cache_config: AccumulatedCacheConfig | None,
+) -> dict[str, Any] | None:
+    """Merge latest findings from all children and score as one project."""
+    all_dims: list[DimensionResult] = []
+    for child in children:
+        child_runs = list_runs(reports_root, child)
+        if not child_runs:
+            continue
+        result = _compute_result(reports_root, child, child_runs, cache_config)
+        all_dims.extend(result.all_dimensions)
+    if not all_dims:
+        return None
+    severity = _aggregate_severity_counts(all_dims)
+    avg, _ = _compute_accumulated_scores(all_dims, {})
+    merged_result = _AccumulatedResult(all_dims, all_dims, severity, avg, None)
+    return _build_accumulated_response(parent_id, merged_result)
+
+
 def compute_accumulated(
     reports_dir: str, project: str, as_of: str | None,
     *, cache_config: AccumulatedCacheConfig | None = None,
@@ -92,5 +134,8 @@ def compute_accumulated(
         idx = next((i for i, r in enumerate(all_run_infos) if r.run_id == as_of), None)
         all_run_infos = all_run_infos[idx:] if idx is not None else []
     if not all_run_infos:
+        children = _find_children(reports_root, project)
+        if children:
+            return _compute_parent_accumulated(reports_root, children, project, cache_config)
         return None
     return _build_accumulated_response(project, _compute_result(reports_root, project, all_run_infos, cache_config))
