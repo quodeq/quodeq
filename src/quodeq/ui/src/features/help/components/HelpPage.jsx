@@ -27,45 +27,45 @@ function Philosophy() {
   return (
     <section className="help-section">
       <h2>The Quodeq Philosophy</h2>
-      <p>Quodeq is a quality compass for your codebase — not a linter, not a static analyzer, but an AI-powered evaluator that reads and understands your code the way a senior engineer would.</p>
+      <p>Quodeq is a quality compass for your codebase. Not a linter, not a static analyzer. An AI-powered evaluator that reads and understands your code the way a senior engineer would.</p>
 
       <h3>Why Quodeq exists</h3>
       <p>Traditional code quality tools count syntax violations. They can tell you a function is too long, but not whether your architecture has a dependency leak. They can flag a missing null check, but not whether your error handling strategy is coherent across the project.</p>
-      <p>Quodeq takes a different approach: it sends an AI agent into your codebase with read-only tools to explore, understand context, and evaluate quality against structured standards. The agent reads actual code, follows imports, understands patterns — then reports what it finds with specific file locations and evidence.</p>
+      <p>Quodeq takes a different approach. It sends an AI agent into your codebase with read-only tools to explore, understand context, and evaluate quality against structured standards. The agent reads actual code, follows imports, understands patterns, and reports what it finds with specific file locations and evidence.</p>
 
       <h3>How evaluation works</h3>
       <ol>
-        <li><strong>Detect</strong> — identifies the languages, frameworks, and structure of your codebase</li>
-        <li><strong>Analyze</strong> — spawns AI agents with read-only tools (Bash, Grep, Read, Glob) to systematically explore the code</li>
-        <li><strong>Collect</strong> — findings stream in real-time as structured JSONL via tool calls</li>
-        <li><strong>Score</strong> — maps findings to ISO 25010 principles with CWE classifications</li>
-        <li><strong>Report</strong> — produces per-dimension reports with grades, violations, and compliance evidence</li>
-        <li><strong>Fix Plan</strong> — for each violation, you can copy a structured fix plan with file path, line number, code context, and remediation guidance — ready to paste into your AI agent or IDE to fix the issue directly</li>
+        <li><strong>Detect</strong> identifies the languages, frameworks, and structure of your codebase</li>
+        <li><strong>Analyze</strong> spawns AI agents with read-only tools (Bash, Grep, Read, Glob) to systematically explore the code</li>
+        <li><strong>Collect</strong> streams findings in real-time as structured JSONL via tool calls</li>
+        <li><strong>Score</strong> maps findings to ISO 25010 principles with CWE classifications</li>
+        <li><strong>Report</strong> produces per-dimension reports with grades, violations, and compliance evidence</li>
+        <li><strong>Fix Plan</strong> for each violation, you can copy a structured fix plan with file path, line number, code context, and remediation guidance, ready to paste into your AI agent or IDE</li>
       </ol>
 
       <h3>Both sides of the story</h3>
-      <p>Quodeq reports <strong>violations AND compliance</strong>. The scoring uses the ratio between them — a project with many violations but also strong compliance patterns is scored more fairly than one with the same violations and no evidence of good practices. This means the AI actively looks for files that follow standards correctly, not just files that break them.</p>
+      <p>Quodeq reports <strong>violations AND compliance</strong>. The scoring uses the ratio between them. A project with many violations but also strong compliance patterns is scored more fairly than one with the same violations and no evidence of good practices. The AI actively looks for files that follow standards correctly, not just files that break them.</p>
 
       <h3>The Q&#xB2; Scoring Formula</h3>
       <p>Each principle is scored 0-10 using four independent constraints:</p>
       <ol>
-        <li><strong>Violation Base</strong> — a hyperbolic curve where the first violations hurt most: <code>10 / (1 + K * weighted_violations)</code>. This prevents 50 minor issues from tanking a score the same way 5 critical ones would.</li>
-        <li><strong>Compliance Lift</strong> — evidence of good practices fills the gap between the base and 10. More compliance always helps, never hurts.</li>
-        <li><strong>Violation Ceiling</strong> — a log&#x2082;-based cap prevents compliance from overriding significant violations. You can't reach Exemplary with critical issues, no matter how much compliance you have.</li>
-        <li><strong>Severity Grade Floor</strong> — grade labels match reality. Only actual critical violations can produce a "Critical" grade. 50 minor violations with zero compliance still score Adequate, not Critical.</li>
+        <li><strong>Violation Base</strong> is a hyperbolic curve where the first violations hurt most: <code>10 / (1 + K * weighted_violations)</code>. This prevents 50 minor issues from tanking a score the same way 5 critical ones would.</li>
+        <li><strong>Compliance Lift</strong> fills the gap between the base and 10 with evidence of good practices. More compliance always helps, never hurts.</li>
+        <li><strong>Violation Ceiling</strong> is a log&#x2082;-based cap that prevents compliance from overriding significant violations. You cannot reach Exemplary with critical issues, no matter how much compliance you have.</li>
+        <li><strong>Severity Grade Floor</strong> ensures grade labels match reality. Only actual critical violations can produce a "Critical" grade. 50 minor violations with zero compliance still score Adequate, not Critical.</li>
       </ol>
       <pre className="help-code">{'final = max(floor, min(ceiling, base + (10 - base) * lift))'}</pre>
 
       <h3>Fair by design</h3>
       <div className="help-callout help-callout-info">
-        The scoring model was designed to address specific fairness issues: linear accumulation is unfair (39 minor issues shouldn't score the same as 39 critical flaws), compliance should be additive (not just a discount), grade names should be semantically honest, and reaching the top should require genuinely clean code.
+        The scoring model addresses specific fairness issues: linear accumulation is unfair (39 minor issues should not score the same as 39 critical flaws), compliance should be additive (not just a discount), grade names should be semantically honest, and reaching the top should require genuinely clean code.
       </div>
 
       <h3>Any language, any stack</h3>
-      <p>Quodeq can evaluate <strong>any codebase in any programming language</strong>. The AI analysis engine reads and understands code regardless of the tech stack — Python, TypeScript, Go, Rust, Java, Swift, or anything else. The standards are language-agnostic by design.</p>
+      <p>Quodeq can evaluate <strong>any codebase in any programming language</strong>. The AI analysis engine reads and understands code regardless of the tech stack. Python, TypeScript, Go, Rust, Java, Swift, or anything else. The standards are language-agnostic by design.</p>
 
       <h3>Your standards, your rules</h3>
-      <p>While Quodeq ships with ISO 25010 dimensions, Clean Architecture, and DDD standards, you can create your own. Define what quality means for your project — whether that's React component best practices, API design guidelines, or your team's internal coding standards — and Quodeq will evaluate against them.</p>
+      <p>While Quodeq ships with ISO 25010 dimensions, Clean Architecture, and DDD standards, you can create your own. Define what quality means for your project, whether that is React component best practices, API design guidelines, or your team's internal coding standards, and Quodeq will evaluate against them.</p>
     </section>
   );
 }
@@ -108,16 +108,16 @@ function Providers() {
         <li>In Settings, select the <strong>Ollama</strong> provider tab</li>
         <li>Choose your model and configure the number of subagents</li>
       </ol>
-      <p>Local models are <strong>free and private</strong> — your code never leaves your machine. The trade-off is slower analysis and potentially lower accuracy compared to cloud models.</p>
+      <p>Local models are <strong>free and private</strong>. Your code never leaves your machine. The trade-off is slower analysis and potentially lower accuracy compared to cloud models.</p>
 
       <h3>Cloud Providers</h3>
       <div className="help-callout help-callout-warning">
-        <strong>Watch your token usage.</strong> Cloud providers charge per token. A full evaluation of a medium codebase can use significant tokens. Monitor your usage in your provider's dashboard.
+        <strong>Watch your token usage.</strong> Cloud providers charge per token. A full evaluation of a medium codebase can consume significant tokens. Monitor your usage in your provider's dashboard.
       </div>
       <p>Recommended cloud models:</p>
       <ul>
-        <li><strong>Claude Sonnet</strong> (Anthropic) — best balance of speed, quality, and cost</li>
-        <li><strong>GPT-5.3-codex</strong> (OpenAI) — strong alternative, good for diverse codebases</li>
+        <li><strong>Claude Sonnet</strong> (Anthropic) best balance of speed, quality, and cost</li>
+        <li><strong>GPT-5.3-codex</strong> (OpenAI) strong alternative, good for diverse codebases</li>
       </ul>
       <p>To configure a cloud provider:</p>
       <ol>
@@ -149,30 +149,30 @@ function Evaluations() {
 
       <h3>Input types</h3>
       <ul>
-        <li><strong>Local path:</strong> <code>/path/to/your/project</code></li>
-        <li><strong>GitHub URL:</strong> <code>https://github.com/org/repo</code></li>
-        <li><strong>SSH path:</strong> <code>git@github.com:org/repo.git</code></li>
+        <li><strong>Local path</strong> <code>/path/to/your/project</code></li>
+        <li><strong>GitHub URL</strong> <code>https://github.com/org/repo</code></li>
+        <li><strong>SSH path</strong> <code>git@github.com:org/repo.git</code></li>
       </ul>
 
       <h3>Evaluation options</h3>
       <ul>
-        <li><strong>Dimensions:</strong> Choose which quality dimensions to evaluate (default: all six)</li>
-        <li><strong>Branch:</strong> Select a specific branch to analyze</li>
-        <li><strong>Scope:</strong> Narrow analysis to a subdirectory within the repository</li>
-        <li><strong>Subagents:</strong> Number of parallel AI agents (more = faster, more tokens)</li>
+        <li><strong>Dimensions</strong> choose which quality dimensions to evaluate (default: all six)</li>
+        <li><strong>Branch</strong> select a specific branch to analyze</li>
+        <li><strong>Scope</strong> narrow analysis to a subdirectory within the repository</li>
+        <li><strong>Subagents</strong> number of parallel AI agents (more agents means faster analysis but more tokens)</li>
       </ul>
 
       <h3>Scan types</h3>
       <div className="help-callout help-callout-info">
-        <strong>Incremental scan:</strong> Only re-evaluates files that changed since the last run. Much faster for iterative development. Enable the <em>Incremental</em> toggle before starting.
+        <strong>Incremental scan</strong> only re-evaluates files that changed since the last run. Much faster for iterative development. Enable the <em>Incremental</em> toggle before starting.
       </div>
       <ul>
-        <li><strong>Full scan:</strong> Evaluates the entire codebase from scratch. Use for first-time analysis or after major refactors.</li>
-        <li><strong>Incremental scan:</strong> Detects changed files via git diff and only re-evaluates those. Previous findings for unchanged files are carried forward. Significantly faster and cheaper.</li>
+        <li><strong>Full scan</strong> evaluates the entire codebase from scratch. Use for first-time analysis or after major refactors.</li>
+        <li><strong>Incremental scan</strong> detects changed files via git diff and only re-evaluates those. Previous findings for unchanged files are carried forward. Significantly faster and cheaper.</li>
       </ul>
 
       <h3>Re-evaluate</h3>
-      <p>From the <strong>Evaluate</strong> tab, you can re-run an evaluation on an existing project. The new results will appear as a new run in the history, allowing you to track quality over time.</p>
+      <p>From the <strong>Evaluate</strong> tab, you can re-run an evaluation on an existing project. The new results appear as a new run in the history, allowing you to track quality over time.</p>
     </section>
   );
 }
@@ -188,7 +188,7 @@ function Dimensions() {
   return (
     <section className="help-section">
       <h2>Quality Dimensions (ISO 25010)</h2>
-      <p>Quodeq evaluates code across six dimensions derived from the ISO/IEC 25010 software quality standard:</p>
+      <p>Quodeq evaluates code across six dimensions derived from the ISO/IEC 25010 software quality standard.</p>
 
       <table className="help-table">
         <thead>
@@ -222,15 +222,15 @@ function Dimensions() {
       </div>
 
       <h3>Showing and hiding dimensions</h3>
-      <p>You can control which dimensions are included in evaluations and displayed in the Overview using the {ICON_EYE_ON} <strong>visibility toggle</strong> on each standard card in the Standards tab:</p>
+      <p>Control which dimensions are included in evaluations and displayed in the Overview using the {ICON_EYE_ON} <strong>visibility toggle</strong> on each standard card in the Standards tab:</p>
       <ul>
-        <li>{ICON_EYE_ON} <strong>Eye open</strong> — dimension is active and will be included in evaluations and the Overview</li>
-        <li><strong>Eye closed</strong> — dimension is hidden from evaluations and the Overview</li>
+        <li>{ICON_EYE_ON} <strong>Eye open</strong> the dimension is active and will be included in evaluations and the Overview</li>
+        <li><strong>Eye closed</strong> the dimension is hidden from evaluations and the Overview</li>
       </ul>
       <p>This lets you customize which quality aspects matter for your project without deleting any standards.</p>
 
       <h3>Creating custom dimensions</h3>
-      <p>You can create your own evaluation standards in the <strong>Standards</strong> tab. Each standard defines principles and requirements that the AI evaluates against. See the <strong>Custom Standards</strong> section for the full schema and instructions on how to create them — including how to use an AI agent to generate standards for you.</p>
+      <p>You can create your own evaluation standards in the <strong>Standards</strong> tab. Each standard defines principles and requirements that the AI evaluates against. See the <strong>Custom Standards</strong> section for the full schema and instructions, including how to use an AI agent to generate standards for you.</p>
     </section>
   );
 }
@@ -259,7 +259,7 @@ function Violations() {
         <li><strong>Click a dimension</strong> to see all findings for that quality area</li>
         <li><strong>Click a file</strong> to see all violations in that specific file with code context</li>
         <li><strong>Click a principle</strong> to see all violations for that evaluation rule</li>
-        <li><strong>Severity cells</strong> in the grid are clickable — they filter by both dimension and severity</li>
+        <li><strong>Severity cells</strong> in the grid are clickable and filter by both dimension and severity</li>
       </ul>
 
       <h3>Dismissing findings</h3>
@@ -275,16 +275,16 @@ function CodeMap() {
       <p>The <strong>Map</strong> tab provides a visual representation of your codebase structure and quality.</p>
 
       <h3>Treemap view</h3>
-      <p>Files are displayed as rectangles sized by their line count. Color indicates the severity density — red areas have more critical violations, green areas are clean.</p>
+      <p>Files are displayed as rectangles sized by their line count. Color indicates severity density: red areas have more critical violations, green areas are clean.</p>
       <p>This makes it easy to spot:</p>
       <ul>
-        <li><strong>Large red blocks:</strong> Big files with many issues — high-impact refactoring targets</li>
-        <li><strong>Clusters of red:</strong> Entire modules that need attention</li>
-        <li><strong>Green areas:</strong> Well-maintained parts of the codebase</li>
+        <li><strong>Large red blocks</strong> big files with many issues, high-impact refactoring targets</li>
+        <li><strong>Clusters of red</strong> entire modules that need attention</li>
+        <li><strong>Green areas</strong> well-maintained parts of the codebase</li>
       </ul>
 
       <h3>Risk matrix</h3>
-      <p>The risk matrix plots files by complexity (size) vs. issue density, helping you prioritize which files to fix first. Files in the top-right quadrant are both complex and problematic — tackle those first.</p>
+      <p>The risk matrix plots files by complexity (size) vs. issue density, helping you prioritize which files to fix first. Files in the top-right quadrant are both complex and problematic. Tackle those first.</p>
 
       <p>Click any file in the map to see its detailed violations and code context.</p>
     </section>
@@ -305,7 +305,7 @@ function Standards() {
         <li>Click <strong>New Standard</strong> in the Standards tab</li>
         <li>Define principles (evaluation categories) and requirements (specific checks)</li>
         <li>Assign severity levels to each requirement (<code>critical</code>, <code>major</code>, or <code>minor</code>)</li>
-        <li>Save — your standard will be used in the next evaluation</li>
+        <li>Save and your standard will be used in the next evaluation</li>
       </ol>
 
       <h3>Importing from library</h3>
@@ -334,10 +334,10 @@ function Standards() {
 }`}</pre>
       <p>Key fields:</p>
       <ul>
-        <li><strong>id</strong> — unique identifier, used as filename (<code>my-standard.json</code>)</li>
-        <li><strong>dimension</strong> — the quality dimension this standard belongs to</li>
-        <li><strong>principles</strong> — categories of evaluation (e.g., "Error Handling", "Input Validation")</li>
-        <li><strong>requirements</strong> — specific checks within each principle, each with an ID and severity</li>
+        <li><strong>id</strong> unique identifier, used as filename (<code>my-standard.json</code>)</li>
+        <li><strong>dimension</strong> the quality dimension this standard belongs to</li>
+        <li><strong>principles</strong> categories of evaluation (e.g., "Error Handling", "Input Validation")</li>
+        <li><strong>requirements</strong> specific checks within each principle, each with an ID and severity</li>
       </ul>
 
       <h3>Using AI to generate standards</h3>
@@ -370,15 +370,15 @@ function Settings() {
 
       <h3>Provider configuration</h3>
       <ul>
-        <li><strong>CLI Provider:</strong> Uses an installed AI CLI (Claude Code, Codex). Configure the power level and model.</li>
-        <li><strong>Ollama:</strong> Uses a locally running Ollama instance. Select model and configure parallelism.</li>
+        <li><strong>CLI Provider</strong> uses an installed AI CLI (Claude Code, Codex). Configure the power level and model.</li>
+        <li><strong>Ollama</strong> uses a locally running Ollama instance. Select a model and configure parallelism.</li>
       </ul>
 
       <h3>Model selection</h3>
       <p>Each power level maps to a model tier. You can override the default model for each level in Settings. Custom model names are stored locally.</p>
 
       <h3>Server info</h3>
-      <p>The Settings tab shows the current server status including port, PID, and version. Use this to verify the dashboard is connected to the correct backend.</p>
+      <p>The Settings tab shows the current server status including port and version. Use this to verify the dashboard is connected to the correct backend.</p>
 
       <h3>Theme</h3>
       <p>Choose between light and dark mode, and select a theme family for the dashboard appearance.</p>
