@@ -11,6 +11,7 @@ import SettingsPage from './features/settings/components/SettingsPage.jsx';
 import StandardsPage from './features/standards/StandardsPage.jsx';
 import ViolationsPage from './features/violations/components/ViolationsPage.jsx';
 import MapPage from './features/map/components/MapPage.jsx';
+import HelpPage from './features/help/components/HelpPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
 import { dismissFinding } from './api/index.js';
 import LoadingScreen from './components/LoadingScreen.jsx';
@@ -196,6 +197,7 @@ const ROUTE_RENDERERS = {
   settings: (params, props) => <SettingsCase settings={props.settings} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
   standards: () => <StandardsPage />,
+  help: () => <HelpPage />,
 };
 
 /**
@@ -204,7 +206,7 @@ const ROUTE_RENDERERS = {
  */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  const noProjectTabs = ['evaluate', 'standards', 'settings'];
+  const noProjectTabs = ['evaluate', 'standards', 'settings', 'help'];
   if (!noProjectTabs.includes(page)) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
