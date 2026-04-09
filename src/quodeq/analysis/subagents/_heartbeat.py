@@ -30,11 +30,6 @@ class HeartbeatContext:
     dimension_key: str
     jsonl_path: Path
     lock: threading.Lock
-    # Optional fingerprint params — when set, fingerprint is updated each tick
-    src: Path | None = None
-    all_files: list[str] | None = None
-    evidence_dir: Path | None = None
-    standards_dir: Path | None = None
 
 
 @dataclass
@@ -90,18 +85,6 @@ def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> FindingCoun
         return FindingCounts()
 
 
-def _update_fingerprint(ctx: HeartbeatContext) -> None:
-    """Save an incremental fingerprint with all source file hashes."""
-    if not ctx.src or not ctx.all_files or not ctx.evidence_dir:
-        return
-    try:
-        from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
-        fp = build_fingerprint(ctx.src, ctx.all_files, ctx.dimension_key, ctx.standards_dir)
-        save_fingerprint(fp, ctx.evidence_dir)
-    except (OSError, ValueError):
-        pass
-
-
 def heartbeat_loop(
     stop: threading.Event, finished: dict[str, bool],
     ctx: HeartbeatContext,
@@ -128,6 +111,5 @@ def heartbeat_loop(
                 violations=counts.violations,
                 compliances=counts.compliances,
             ))
-            _update_fingerprint(ctx)
         except (OSError, ValueError, RuntimeError) as exc:
             log_warning(f"Heartbeat error: {exc}")
