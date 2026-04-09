@@ -94,8 +94,8 @@ app = BUNDLE(
     icon=str(icon_icns) if icon_icns.exists() else None,
     bundle_identifier="com.quodeq.app",
     info_plist={
-        "CFBundleShortVersionString": os.environ.get("QUODEQ_VERSION", "0.10.0"),
-        "CFBundleVersion": os.environ.get("QUODEQ_VERSION", "0.10.0"),
+        "CFBundleShortVersionString": os.environ.get("QUODEQ_VERSION", "1.0.0b1"),
+        "CFBundleVersion": os.environ.get("QUODEQ_VERSION", "1.0.0b1"),
         "CFBundleDisplayName": "Quodeq",
         "CFBundleName": "Quodeq",
         "NSHighResolutionCapable": True,
