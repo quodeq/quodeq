@@ -19,16 +19,16 @@ function useReEvalInfo(project, initialInfo) {
 
   useEffect(() => {
     if (!project) return;
-    // Use pre-loaded info if available, otherwise fetch
-    if (initialInfo) { setInfo(initialInfo); return; }
-    setInfo(null);
+    // Always fetch full info (listing doesn't include hasFingerprints)
     getProjectInfo(project)
       .then(setInfo)
       .catch(() => {
-        setInfo(null);
-        setError('Could not load project info. The project may have been removed.');
+        if (!initialInfo) {
+          setInfo(null);
+          setError('Could not load project info. The project may have been removed.');
+        }
       });
-  }, [project, initialInfo]);
+  }, [project]);
 
   async function handleUrlRestore() {
     const url = urlInput.trim();
