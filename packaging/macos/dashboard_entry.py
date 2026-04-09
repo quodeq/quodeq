@@ -17,6 +17,9 @@ def _setup_frozen_env() -> None:
 def main() -> int:
     if getattr(sys, "frozen", False):
         _setup_frozen_env()
+        # Load user's shell PATH so CLI tools (claude, node, etc.) are found
+        from quodeq.dashboard._frozen import source_user_path
+        source_user_path()
 
     # Internal subprocess dispatch — checked before heavy imports.
     if len(sys.argv) > 1:
