@@ -22,6 +22,7 @@ class ProjectEntry:
     discipline: str | None = None
     path: str | None = None
     location: str | None = None
+    scope_path: str | None = None
     runs_count: int = 0
     latest_run_id: str | None = None
     latest_date: str | None = None

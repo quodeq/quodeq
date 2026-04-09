@@ -45,6 +45,7 @@ export function createProject(raw) {
     latestScore:  raw.latestScore ?? null,
     runsCount:    raw.runsCount ?? 0,
     filesCount:   raw.filesCount ?? null,
+    scopePath:    raw.scopePath ?? null,
     hasFingerprints: raw.hasFingerprints ?? false,
     languageStats: raw.languageStats ?? null,
     scanDate:      raw.scanDate ?? null,

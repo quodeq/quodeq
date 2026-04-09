@@ -83,12 +83,12 @@ def _build_evaluate_cmd(
     return cmd
 
 
-def _register_project(repo: str, discipline: str | None, reports_dir: str) -> None:
+def _register_project(repo: str, discipline: str | None, reports_dir: str, scope_path: str | None = None) -> None:
     """Resolve and register the project UUID before evaluation starts."""
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = project_name_from_repo(repo)
     location = _LOCATION_ONLINE if is_repo_url(repo) else _LOCATION_LOCAL
-    resolve_project_uuid(Path(reports_dir), ProjectIdentity(project_name, repo_resolved, discipline, location))
+    resolve_project_uuid(Path(reports_dir), ProjectIdentity(project_name, repo_resolved, discipline, location, scope_path=scope_path))
 
 
 class FsEvaluationMixin:
@@ -146,7 +146,7 @@ class FsEvaluationMixin:
                 raise FileNotFoundError(f"Repository not found: {repo}")
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
-        _register_project(repo, options.discipline, reports_dir)
+        _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
         env = self._build_eval_env(repo, options)
         if is_repo_url(repo):
             cwd = str(Path.cwd())
