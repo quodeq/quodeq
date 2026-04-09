@@ -62,7 +62,7 @@ pythonpath = ["src"]
 source = ["quodeq"]
 
 [tool.coverage.report]
-fail_under = 73
+fail_under = 80
 
 [build-system]
 requires = ["uv_build>=0.10.6,<0.12.0"]
