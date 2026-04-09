@@ -10,7 +10,7 @@ $BuildDir = "$RepoRoot\dist\dashboard-build"
 $DistDir = "$RepoRoot\dist"
 
 # Extract version
-$Version = python3 -c "import re; print(re.search(r'version = \`"(.+?)\`"', open('$RepoRoot\pyproject.toml').read()).group(1))"
+$Version = python -c "import re; print(re.search(r'version = \`"(.+?)\`"', open('$RepoRoot\pyproject.toml').read()).group(1))"
 Write-Host "Building Quodeq v$Version..."
 
 # Clean build dir
