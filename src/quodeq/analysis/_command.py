@@ -89,6 +89,11 @@ def _build_ai_cmd(
                 if config.queue_path:
                     allowed += f",{_MCP_TOOL_GET_NEXT_FILES}"
                 args.extend(["--allowedTools", allowed])
+            # bypassPermissions is intentional: the CLI analysis tool runs in a
+            # sandboxed, non-interactive subprocess where MCP tool calls (e.g.
+            # report_finding) must succeed without user confirmation prompts.
+            # The subprocess has no access to credentials or network beyond
+            # what the parent process explicitly provides via env filtering.
             args.extend(
                 provider_cfg.get("mcp_permission_args", ["--permission-mode", "bypassPermissions"])
             )

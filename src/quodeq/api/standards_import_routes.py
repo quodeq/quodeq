@@ -24,6 +24,8 @@ def register_import_routes(app: Flask, get_service, get_library_client) -> None:
         file_path = payload.get("file")
         if not file_path:
             return error_response("file is required", 400, "bad_request")
+        if ".." in file_path or file_path.startswith("/"):
+            return error_response("Invalid file path", 400, "bad_request")
         try:
             library.import_standard(file_path, Path(app.config["STANDARDS_EVALUATORS_DIR"]))
         except ValueError as exc:

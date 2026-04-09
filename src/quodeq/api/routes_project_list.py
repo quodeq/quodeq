@@ -38,6 +38,9 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     if not new_path:
         body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status
+    if ".." in new_path or not Path(new_path).is_absolute():
+        body, status = error_response("Invalid path", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return jsonify(body), status
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
     if not ok:

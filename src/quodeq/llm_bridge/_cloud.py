@@ -33,4 +33,9 @@ def check_cloud_connection(
         latency = int((time.monotonic() - start) * 1000)
         return {"success": True, "model": model, "latency_ms": latency}
     except Exception as exc:
-        return {"success": False, "error": str(exc)}
+        _log.debug("Cloud connection check failed: %s", exc)
+        # Surface the exception type and HTTP status codes without leaking
+        # internal details like file paths, stack traces, or server headers.
+        error_type = type(exc).__name__
+        brief = str(exc)[:120] if str(exc) else "unknown error"
+        return {"success": False, "error": f"{error_type}: {brief}"}

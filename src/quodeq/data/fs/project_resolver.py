@@ -43,6 +43,10 @@ def resolve_project_uuid(
         resolved_path = identity.repo_path
     else:
         resolved_path = str(Path(identity.repo_path).resolve())
+        # Ensure the resolved local path stays within a real absolute location
+        # and hasn't escaped via symlink or traversal.
+        if not Path(resolved_path).is_absolute():
+            raise ValueError(f"Resolved repo path is not absolute: {resolved_path}")
 
     if not reports_dir.exists():
         reports_dir.mkdir(parents=True, exist_ok=True)

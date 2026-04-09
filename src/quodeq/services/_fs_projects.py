@@ -108,6 +108,9 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         resolved_path = new_path
         location = "online"
     else:
+        # Reject path-traversal attempts in the raw input before resolving.
+        if ".." in Path(new_path).parts:
+            return False
         resolved = Path(new_path).resolve()
         if not resolved.is_absolute() or not resolved.is_dir():
             return False

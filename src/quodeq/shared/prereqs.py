@@ -21,7 +21,13 @@ _VERSION_CMD_TIMEOUT_S = 30
 
 
 def _run_version_cmd(cmd: list[str]) -> str:
-    """Run a command and return its stdout, or raise FileNotFoundError."""
+    """Run a command and return its stdout, or raise FileNotFoundError.
+
+    ``shell=True`` is required on Windows so that ``where`` and other
+    shell built-ins resolve correctly.  The *cmd* list is always
+    hard-coded by callers in this module (never user-influenced),
+    so the shell injection risk does not apply.
+    """
     result = subprocess.run(
         cmd, capture_output=True, text=True, check=True, shell=_IS_WIN32,
         timeout=_VERSION_CMD_TIMEOUT_S,

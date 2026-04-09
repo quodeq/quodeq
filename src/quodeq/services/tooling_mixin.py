@@ -200,6 +200,8 @@ class FsToolingMixin:
     def _get_cli_models(self, client_id: str, env: dict[str, str] | None = None) -> dict[str, list[str]]:
         if client_id not in get_allowed_client_ids(env=env):
             return {"models": []}
+        if not client_id.isalnum():
+            return {"models": []}
         if not shutil.which(client_id):
             return {"models": []}
         try:

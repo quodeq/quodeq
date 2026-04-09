@@ -29,6 +29,8 @@ def _get_pid_file(env: dict[str, str] | None = None) -> Path:
     Override the default location via ``QUODEQ_RUN_DIR``.
     """
     env_run_dir = (env or os.environ).get("QUODEQ_RUN_DIR")
+    if env_run_dir and not Path(env_run_dir).is_absolute():
+        raise ValueError(f"QUODEQ_RUN_DIR must be an absolute path, got: {env_run_dir!r}")
     run_dir = Path(env_run_dir) if env_run_dir else Path.home() / ".quodeq" / "run"
     run_dir.mkdir(parents=True, exist_ok=True)
     return run_dir / "action_api.pid"

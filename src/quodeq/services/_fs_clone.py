@@ -17,7 +17,7 @@ def run_git_clone(url: str, clone_dest: Path) -> bool:
     env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
     try:
         _subprocess.run(
-            ["git", "clone", "--progress", url, str(clone_dest)],
+            ["git", "clone", "--progress", "--", url, str(clone_dest)],
             check=True,
             env=env,
             timeout=_GIT_CLONE_TIMEOUT_S,

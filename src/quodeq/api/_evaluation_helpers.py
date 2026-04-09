@@ -18,6 +18,7 @@ _MIN_SUBAGENTS = 1
 _MAX_SUBAGENTS = 10
 _MIN_POOL_BUDGET = 60
 _MAX_POOL_BUDGET = 3600
+_MAX_CONTEXT_SIZE = 2_000_000
 
 
 def _sanitize_url(url: str) -> str:
@@ -62,7 +63,7 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
         pool_budget=pool_budget,
         incremental=bool(payload.get("incremental", False)),
         per_dimension=bool(payload.get("perDimension", False)),
-        context_size=int(payload.get("contextSize", 0)),
+        context_size=max(0, min(_MAX_CONTEXT_SIZE, int(payload.get("contextSize", 0)))),
         branch=payload.get("branch") or None,
         scope_path=payload.get("scopePath") or None,
     )

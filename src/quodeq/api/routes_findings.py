@@ -10,6 +10,8 @@ from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_f
 
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
+    from quodeq.shared.validation import validate_path_segment
+    validate_path_segment(project)
     base = Path(evaluations_dir).resolve()
     resolved = (base / project).resolve()
     if not resolved.is_relative_to(base):
