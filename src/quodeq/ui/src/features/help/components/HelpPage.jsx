@@ -129,6 +129,13 @@ function Evaluations() {
   );
 }
 
+const ICON_EYE_ON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" style={{ verticalAlign: 'middle', marginBottom: 2 }}>
+    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+    <circle cx="12" cy="12" r="3" />
+  </svg>
+);
+
 function Dimensions() {
   return (
     <section className="help-section">
@@ -150,6 +157,29 @@ function Dimensions() {
       </table>
 
       <p>Each dimension is scored 0-10 and receives a letter grade (A-F). The overall score is a weighted average across all dimensions.</p>
+
+      <h3>Quodeq Dimensions</h3>
+      <p>In addition to the six ISO dimensions, Quodeq includes two extra dimensions focused on software architecture:</p>
+      <table className="help-table">
+        <thead>
+          <tr><th>Dimension</th><th>Focus</th></tr>
+        </thead>
+        <tbody>
+          <tr><td><strong>Clean Architecture</strong></td><td>Layer separation, dependency rules, import direction, boundary enforcement</td></tr>
+          <tr><td><strong>DDD Design</strong></td><td>Domain modeling, bounded contexts, aggregates, value objects, ubiquitous language</td></tr>
+        </tbody>
+      </table>
+      <div className="help-callout help-callout-info">
+        These dimensions come <strong>disabled by default</strong>. To enable them, go to the <strong>Standards</strong> tab and click the {ICON_EYE_ON} eye icon on the dimension card. Enabled dimensions will appear in the Evaluation and Overview tabs.
+      </div>
+
+      <h3>Showing and hiding dimensions</h3>
+      <p>You can control which dimensions are included in evaluations and displayed in the Overview using the {ICON_EYE_ON} <strong>visibility toggle</strong> on each standard card in the Standards tab:</p>
+      <ul>
+        <li>{ICON_EYE_ON} <strong>Eye open</strong> — dimension is active and will be included in evaluations and the Overview</li>
+        <li><strong>Eye closed</strong> — dimension is hidden from evaluations and the Overview</li>
+      </ul>
+      <p>This lets you customize which quality aspects matter for your project without deleting any standards.</p>
 
       <h3>Creating custom dimensions</h3>
       <p>You can create your own evaluation standards in the <strong>Standards</strong> tab. Each standard defines principles and requirements that the AI evaluates against.</p>
