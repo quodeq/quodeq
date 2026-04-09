@@ -108,10 +108,15 @@ def process_dimension_with_subagents(
     )
     pool, results = _launch_pool(config, dim_id, params)
 
-    # 6. Mini-verify for changed files not in analysis queue
+    # 6. Save fingerprint eagerly so it survives cancel/timeout
+    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
+    fp = build_fingerprint(config.src, files, dim_id, config.standards_dir)
+    save_fingerprint(fp, evidence_dir)
+
+    # 7. Mini-verify for changed files not in analysis queue
     if mini_verify_findings:
         verify_results = _dispatch_mini_verify(config, dim_id, evidence_dir, mini_verify_findings)
         results = results + verify_results
 
-    # 7. Collect evidence
+    # 8. Collect evidence (also saves fingerprint, but we saved it eagerly above)
     return _collect_evidence(config, dim_id, evidence_dir, _CollectionContext(results=results, ctx=ctx, files=files))
