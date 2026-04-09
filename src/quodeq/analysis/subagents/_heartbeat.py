@@ -75,11 +75,16 @@ def _read_findings_from_file(jsonl_path: Path) -> FindingCounts:
 
 
 def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> FindingCounts:
-    """Count total, violation, and compliance lines in a JSONL file under a lock."""
-    if not jsonl_path.exists():
-        return FindingCounts()
+    """Count total, violation, and compliance lines in a JSONL file under a lock.
+
+    The existence check and read are both inside the lock to avoid a TOCTOU
+    race with concurrent MCP writers that may create the file between the
+    check and the open.
+    """
     try:
         with lock:
+            if not jsonl_path.exists():
+                return FindingCounts()
             return _read_findings_from_file(jsonl_path)
     except OSError:
         return FindingCounts()
