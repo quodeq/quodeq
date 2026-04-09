@@ -13,7 +13,7 @@ from quodeq.shared.utils import open_text
 
 def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_id: str, dim_id: str) -> Path | None:
     """Find the JSONL evidence file from the most recent previous run."""
-    runs = list_runs(reports_root, project_uuid)
+    runs = list_runs(reports_root, project_uuid, limit=20)
     for run in runs:
         if run.run_id == current_run_id:
             continue
@@ -53,8 +53,13 @@ def _load_previous_findings(
         return []
     _open = open_fn or open_text
     try:
+        findings: list[dict] = []
         with _open(jsonl_path) as f:
-            return [e for line in f if (e := _parse_finding_line(line)) is not None]
+            for line in f:
+                entry = _parse_finding_line(line)
+                if entry is not None:
+                    findings.append(entry)
+        return findings
     except OSError as exc:
         log_debug(f"Cannot read findings JSONL {jsonl_path}: {exc}")
         return []

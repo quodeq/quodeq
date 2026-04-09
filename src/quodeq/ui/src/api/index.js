@@ -100,8 +100,9 @@ export async function getAccumulated(projectId, asOfRun = null) {
 // ── Evaluations / Jobs ──────────────────────────────────────────────────
 
 /** @returns {Promise<import('../models/job.js').Job[]>} */
-export async function listEvaluations() {
-  const data = await request('/evaluations');
+export async function listEvaluations({ limit } = {}) {
+  const params = limit ? `?limit=${limit}` : '';
+  const data = await request(`/evaluations${params}`);
   return (data || []).map(createJob);
 }
 

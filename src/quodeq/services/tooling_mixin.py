@@ -146,12 +146,37 @@ class FsToolingMixin:
         return response
 
     def browse_repo(self, path: str | None, include_files: bool = False) -> dict[str, Any]:
-        """List directories (and optionally files) at the given path."""
+        """List directories (and optionally files) at the given path.
+
+        Single-pass traversal: iterates directory entries once to collect both
+        directories and files, avoiding redundant filesystem scans.
+        """
         target, error = self._validate_browse_path(path)
         if error is not None:
             return error
-        files = self._list_files(target) if include_files else None
-        return self._build_browse_response(target, self._list_directories(target), files)
+        directories: list[dict[str, Any]] = []
+        files: list[dict[str, Any]] | None = [] if include_files else None
+        for entry in safe_read_dir(target):
+            if entry.name.startswith("."):
+                continue
+            entry_path = target / entry.name
+            if not os.access(entry_path, os.R_OK):
+                continue
+            if entry.is_dir():
+                directories.append({
+                    "name": entry.name,
+                    "path": str(entry_path),
+                    "isGitRepo": (entry_path / ".git").exists(),
+                })
+            elif include_files and entry.is_file():
+                files.append({
+                    "name": entry.name,
+                    "path": str(entry_path),
+                })
+        directories.sort(key=lambda item: item["name"])
+        if files is not None:
+            files.sort(key=lambda item: item["name"])
+        return self._build_browse_response(target, directories, files)
 
     # Default AI CLI candidates. Override via the QUODEQ_AI_CLIENTS env var
     # (comma-separated list of client IDs, e.g. "claude,codex").

@@ -218,9 +218,13 @@ class FsEvaluationMixin:
         _score_completed_evidence(reports_dir, job)
         return True
 
-    def list_evaluations(self) -> list[JobSnapshot]:
-        """Return all evaluation jobs (running, done, failed, cancelled)."""
-        return self._jobs.list_jobs()
+    def list_evaluations(self, *, limit: int = 0) -> list[JobSnapshot]:
+        """Return evaluation jobs (running, done, failed, cancelled).
+
+        When *limit* > 0 only the most recent *limit* jobs are returned.
+        """
+        jobs = self._jobs.list_jobs()
+        return jobs[:limit] if limit > 0 else jobs
 
 
 def _score_completed_evidence(reports_dir: str, job: dict) -> None:

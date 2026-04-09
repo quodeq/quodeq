@@ -69,6 +69,28 @@ def _read_findings_from_file(jsonl_path: Path) -> FindingCounts:
     return counts
 
 
+def _count_jsonl_findings_incremental(
+    jsonl_path: Path, lock: threading.Lock,
+    cumulative: FindingCounts, offset: int,
+) -> tuple[FindingCounts, int]:
+    """Incrementally count findings from *offset*, updating *cumulative* in place."""
+    try:
+        with lock:
+            if not jsonl_path.exists():
+                return cumulative, offset
+            with open(jsonl_path, "rb") as f:
+                f.seek(offset)
+                new_bytes = f.read()
+                new_offset = offset + len(new_bytes)
+            for line in new_bytes.decode("utf-8", errors="replace").splitlines():
+                stripped = line.strip()
+                if stripped:
+                    _classify_jsonl_line(stripped, cumulative)
+            return cumulative, new_offset
+    except OSError:
+        return cumulative, offset
+
+
 def _count_jsonl_findings(jsonl_path: Path, lock: threading.Lock) -> FindingCounts:
     """Count total, violation, and compliance lines in a JSONL file under a lock.
 
@@ -89,13 +111,21 @@ def heartbeat_loop(
     stop: threading.Event, finished: dict[str, bool],
     ctx: HeartbeatContext,
 ) -> None:
-    """Emit periodic progress lines for the subagent pool."""
+    """Emit periodic progress lines for the subagent pool.
+
+    Tracks JSONL file offset across ticks to avoid re-reading the entire file
+    on every heartbeat cycle.
+    """
     start = time.monotonic()
+    cumulative = FindingCounts()
+    jsonl_offset = 0
     while not stop.wait(_HEARTBEAT_INTERVAL):
         try:
             elapsed = int(time.monotonic() - start)
             mins, secs = divmod(elapsed, _SECONDS_PER_MINUTE)
-            counts = _count_jsonl_findings(ctx.jsonl_path, ctx.lock)
+            counts, jsonl_offset = _count_jsonl_findings_incremental(
+                ctx.jsonl_path, ctx.lock, cumulative, jsonl_offset,
+            )
             remaining, taken = FileQueue(ctx.queue_path).stats()
             total_agents = len(finished)
             active = sum(1 for v in finished.values() if not v)

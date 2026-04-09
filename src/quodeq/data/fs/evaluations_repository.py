@@ -18,15 +18,18 @@ class FilesystemEvaluationsRepository:
     def __init__(self, root: Path) -> None:
         self._root = root
 
-    def list_reports(self) -> list[str]:
+    def list_reports(self, *, limit: int = 0) -> list[str]:
         """Return sorted IDs of all available evaluation reports.
+
+        When *limit* > 0 only the first *limit* entries are returned.
 
         Example::
 
             repo = FilesystemEvaluationsRepository(Path("/data"))
             ids = repo.list_reports()  # ["report-001", "report-002"]
         """
-        return list_json_dir(self._root / "evaluations", "Evaluations directory not found")
+        ids = list_json_dir(self._root / "evaluations", "Evaluations directory not found")
+        return ids[:limit] if limit > 0 else ids
 
     def get_report(self, report_id: str) -> dict:
         """Load and return a single evaluation report by ID.

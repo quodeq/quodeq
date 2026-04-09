@@ -63,8 +63,9 @@ def _run_dimensions(
         try:
             result = process_consolidated_dimensions(config, dimensions, ctx)
             if result:
+                dim_index = {d: i + 1 for i, d in enumerate(dimensions)}
                 for dim, ev in result.items():
-                    idx = dimensions.index(dim) + 1 if dim in dimensions else 0
+                    idx = dim_index.get(dim, 0)
                     _log_dimension_result(ev, dim, idx, len(dimensions))
                 return result
             log_warning("Consolidated mode produced no results, falling back to per-dimension")

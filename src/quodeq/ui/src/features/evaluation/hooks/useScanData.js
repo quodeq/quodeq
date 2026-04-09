@@ -18,12 +18,12 @@ export function useScanData(projectId, localPath) {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
 
     const fetchPromise = projectId
-      ? fetch(`/api/projects/${encodeURIComponent(projectId)}/scan`).then((res) => {
+      ? fetch(`/api/projects/${encodeURIComponent(projectId)}/scan`, { signal: controller.signal }).then((res) => {
           if (!res.ok) throw new Error(`Scan failed: ${res.status}`);
           return res.json();
         })
@@ -31,19 +31,19 @@ export function useScanData(projectId, localPath) {
 
     fetchPromise
       .then((data) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setScanData(data);
           setLoading(false);
         }
       })
       .catch((err) => {
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setError(err.message);
           setLoading(false);
         }
       });
 
-    return () => { cancelled = true; };
+    return () => { controller.abort(); };
   }, [projectId, localPath]);
 
   return { scanData, loading, error };

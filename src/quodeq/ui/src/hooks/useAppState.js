@@ -17,11 +17,19 @@ function computeDerivedState(accumulated, dashboard, selectedProject, projects) 
   const accDims = accumulated?.dimensions || [];
   let headerMeta = null;
   if (accDims.length > 0) {
-    const discipline = accDims.find((d) => d.discipline)?.discipline ?? null;
-    const repository = accDims.find((d) => d.repository)?.repository ?? null;
+    let discipline = null, repository = null;
+    for (const d of accDims) {
+      if (!discipline && d.discipline) discipline = d.discipline;
+      if (!repository && d.repository) repository = d.repository;
+      if (discipline && repository) break;
+    }
     const runDims = dashboard?.dimensions || [];
-    const totalFiles = runDims.find((d) => d.sourceFileCount)?.sourceFileCount ?? null;
-    const project = projects.find((p) => p.id === selectedProject);
+    let totalFiles = null;
+    for (const d of runDims) {
+      if (d.sourceFileCount) { totalFiles = d.sourceFileCount; break; }
+    }
+    const projectMap = new Map(projects.map((p) => [p.id, p]));
+    const project = projectMap.get(selectedProject);
     const languageStats = project?.languageStats ?? null;
     headerMeta = { discipline, repository, totalFiles, languageStats };
   }
@@ -30,9 +38,10 @@ function computeDerivedState(accumulated, dashboard, selectedProject, projects) 
   let selectedProjectParent = null;
   let selectedProjectParentId = null;
   if (selectedProject && projects.length) {
-    const data = projects.find((p) => (p.id || p.name || p) === selectedProject);
+    const projectById = new Map(projects.map((p) => [(p.id || p.name || p), p]));
+    const data = projectById.get(selectedProject);
     const parentRef = data?.parent || null;
-    const parentData = parentRef ? projects.find((p) => (p.id || p.name || p) === parentRef) : null;
+    const parentData = parentRef ? projectById.get(parentRef) : null;
     selectedDisplayName = data?.displayName || data?.name || selectedProject;
     selectedProjectParent = parentData?.displayName || parentData?.name || parentRef;
     selectedProjectParentId = parentData ? (parentData.id || parentData.name || parentRef) : null;

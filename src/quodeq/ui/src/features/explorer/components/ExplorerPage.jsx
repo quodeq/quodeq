@@ -193,9 +193,11 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
 }
 
 function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId) {
+  const principlesByName = new Map((evalData.principles || []).map((p) => [p.name, p]));
+  const gradesByPrinciple = new Map((evalData.principleGrades || []).map((p) => [p.principle, p]));
   return function buildEvalPrincipal(principleId) {
-    const principleData = (evalData.principles || []).find((p) => p.name === principleId);
-    const pg = (evalData.principleGrades || []).find((p) => p.principle === principleId);
+    const principleData = principlesByName.get(principleId);
+    const pg = gradesByPrinciple.get(principleId);
     return {
       principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
       dimension: evalData.dimension || '',
@@ -234,14 +236,15 @@ function mergeRescoreIntoEval(prev, dimData) {
 }
 
 async function fetchAndRescore(project, runId, dimension) {
-  const data = await getDimensionEval(project, runId, dimension);
-  try {
-    const rescored = await getRescore(project, runId);
+  const [data, rescored] = await Promise.all([
+    getDimensionEval(project, runId, dimension),
+    getRescore(project, runId).catch(() => null),
+  ]);
+  if (rescored) {
     const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
     return dimData ? mergeRescoreIntoEval(data, dimData) : data;
-  } catch {
-    return data; // rescore failure is non-fatal
   }
+  return data;
 }
 
 function useExplorerData(project, dimension, runId, refreshSignal) {

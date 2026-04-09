@@ -132,12 +132,14 @@ function computeEvalPrincipleData(evalPrincipal) {
   const { principleData, dimViolations = [], dimCompliance = [] } = evalPrincipal;
   const violations = (principleData?.violations?.length > 0) ? principleData.violations : dimViolations;
   const compliance = dimCompliance.filter((c) => c.file || c.reason || c.snippet);
-  const violationsBySeverity = EVAL_SEVERITY_ORDER.reduce((acc, sev) => {
-    acc[sev] = violations.filter((v) => (v.severity || 'minor').toLowerCase() === sev);
-    return acc;
-  }, {});
+  const violationsBySeverity = {};
   const sevCounts = { critical: 0, major: 0, minor: 0 };
-  violations.forEach(v => { const s = (v.severity || 'minor').toLowerCase(); if (sevCounts[s] !== undefined) sevCounts[s]++; });
+  for (const sev of EVAL_SEVERITY_ORDER) violationsBySeverity[sev] = [];
+  for (const v of violations) {
+    const sev = (v.severity || 'minor').toLowerCase();
+    if (violationsBySeverity[sev]) violationsBySeverity[sev].push(v);
+    if (sevCounts[sev] !== undefined) sevCounts[sev]++;
+  }
   return { violations, compliance, violationsBySeverity, sevCounts };
 }
 
@@ -171,9 +173,11 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
     // Fire rescore to update principle score/grade
     if (project && runId) {
       getRescore(project, runId).then((rescored) => {
-        const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
+        const dimMap = new Map((rescored.dimensions || []).map((d) => [d.dimension, d]));
+        const dimData = dimMap.get(dimension);
         if (!dimData) return;
-        const pg = (dimData.principles || []).find((p) => p.principle === principle);
+        const pgMap = new Map((dimData.principles || []).map((p) => [p.principle, p]));
+        const pg = pgMap.get(principle);
         if (pg) { setLiveScore(pg.score); setLiveGrade(pg.grade); }
       }).catch(() => {});
     }

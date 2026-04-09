@@ -115,9 +115,10 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     Prioritizes code files over markup/styles and caps total size to
     fit within local model context limits.
     """
-    all_files: list[Path] = []
-    for ext in _CODE_EXTS | _MARKUP_EXTS:
-        all_files.extend(work_dir.rglob(f"*{ext}"))
+    _ALL_EXTS = _CODE_EXTS | _MARKUP_EXTS
+    all_files: list[Path] = [
+        f for f in work_dir.rglob("*") if f.is_file() and f.suffix in _ALL_EXTS
+    ]
     # Filter out non-source dirs, dotdirs, empty files, and oversized files
     filtered = [
         f for f in all_files

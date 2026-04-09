@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { listCwes } from '../../../api/index.js';
 
 const EDITABLE_REF_TYPES = ['cwe', 'book', 'url', 'other'];
@@ -75,11 +75,11 @@ function CweBrowserModal({ onSelect, onClose }) {
   useEffect(() => { listCwes().then(setCwes).catch(() => setCwes([])); }, []);
   useEffect(() => { if (searchRef.current) searchRef.current.focus(); }, []);
 
-  const filtered = cwes.filter((c) => {
+  const filtered = useMemo(() => cwes.filter((c) => {
     if (filterAbstraction && c.abstraction !== filterAbstraction) return false;
     if (!query) return true;
     return String(c.id).includes(query) || c.name.toLowerCase().includes(query.toLowerCase());
-  });
+  }), [cwes, query, filterAbstraction]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>

@@ -114,6 +114,18 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
     };
   }, [focusNode, root, onFileClick]);
 
+  // Pre-categorize circles into folders vs files to avoid triple classification per render
+  const { folderIndices, fileIndices } = useMemo(() => {
+    const fi = [], fli = [];
+    circles.forEach((c, i) => {
+      const d = c.data;
+      const isFolder = !d.isFile && d.children?.length > 0;
+      if (isFolder || c.depth === 0) fi.push(i);
+      else fli.push(i);
+    });
+    return { folderIndices: fi, fileIndices: fli };
+  }, [circles]);
+
   if (!node || !circles.length) return null;
 
   return (
@@ -124,11 +136,10 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
         onClick={handleBgClick}
       >
         {/* Layer 1: folders (circles) */}
-        {circles.map((c, i) => {
+        {folderIndices.map((i) => {
+          const c = circles[i];
           const d = c.data;
-          const isFolder = !d.isFile && d.children?.length > 0;
           const isRoot = c.depth === 0;
-          if (!isFolder && !isRoot) return null;
           const t = transform(c, i);
           const isHovered = hover === i;
           return (
@@ -147,10 +158,9 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
           );
         })}
         {/* Layer 2: files (document icons) */}
-        {circles.map((c, i) => {
+        {fileIndices.map((i) => {
+          const c = circles[i];
           const d = c.data;
-          const isFolder = !d.isFile && d.children?.length > 0;
-          if (isFolder || c.depth === 0) return null;
           const t = transform(c, i);
           return (
             <FileShape

@@ -9,10 +9,11 @@ import DismissedSubTab from './DismissedSubTab.jsx';
 
 function findSubtree(root, path) {
   if (!path) return root;
-  function walk(node) {
+  function walk(node, depth = 0) {
+    if (depth > 64) return null;
     if (node.path === path) return node;
     for (const child of node.children) {
-      const found = walk(child);
+      const found = walk(child, depth + 1);
       if (found) return found;
     }
     return null;

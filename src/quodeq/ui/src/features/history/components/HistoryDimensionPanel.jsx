@@ -11,8 +11,11 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 
+const _cssVarCache = {};
 const cssVar = (name, fallback) => {
+  if (name in _cssVarCache) return _cssVarCache[name] || fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  _cssVarCache[name] = val;
   return val || fallback;
 };
 

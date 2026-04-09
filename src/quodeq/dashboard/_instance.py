@@ -105,10 +105,9 @@ class InstanceController:
         if self._port_file.exists():
             try:
                 port = int(self._port_file.read_text().strip())
-                probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                probe.settimeout(_SOCK_TIMEOUT)
-                probe.connect(("127.0.0.1", port))
-                probe.close()
+                with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
+                    probe.settimeout(_SOCK_TIMEOUT)
+                    probe.connect(("127.0.0.1", port))
                 self._tcp_port = port
                 return False
             except (ConnectionRefusedError, OSError, ValueError):
@@ -150,13 +149,15 @@ class InstanceController:
         if _IS_WIN32:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(_SOCK_TIMEOUT)
-            sock.connect(("127.0.0.1", self._tcp_port))
+            with sock:
+                sock.connect(("127.0.0.1", self._tcp_port))
+                sock.sendall(f"{_RELOAD_PREFIX}{url}".encode("utf-8"))
         else:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
             sock.settimeout(_SOCK_TIMEOUT)
-            self._connect_to_sock(sock)
-        sock.sendall(f"{_RELOAD_PREFIX}{url}".encode("utf-8"))
-        sock.close()
+            with sock:
+                self._connect_to_sock(sock)
+                sock.sendall(f"{_RELOAD_PREFIX}{url}".encode("utf-8"))
 
     def shutdown(self) -> None:
         """Stop listening and clean up."""

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
@@ -76,10 +76,12 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
   // Clear focused dimension when the active run changes to avoid showing stale data
   const prevRunRef = useRef(selectedRunId);
-  if (prevRunRef.current !== selectedRunId) {
-    prevRunRef.current = selectedRunId;
-    if (focusedDimension) setFocusedDimension(null);
-  }
+  useEffect(() => {
+    if (prevRunRef.current !== selectedRunId) {
+      prevRunRef.current = selectedRunId;
+      setFocusedDimension(null);
+    }
+  }, [selectedRunId]);
   // Merge rescored grades into accumulated dimensions so all cards reflect live scores
   const accumulatedDimensions = useMemo(() => {
     const dims = accumulated?.dimensions || [];

@@ -165,8 +165,10 @@ function buildFolderScene(node, W, H) {
   }
 
   // Repulsion pass — push overlapping stars apart
+  // Adaptively reduce iterations for large sets to keep O(n^2) bounded
   const minGap = 10 + Math.min(n, 20) * 1.5; // scales: 2 items=13px, 10=25px, 20+=40px
-  for (let iter = 0; iter < 8; iter++) {
+  const repulsionIters = rootStars.length > 50 ? 3 : rootStars.length > 20 ? 5 : 8;
+  for (let iter = 0; iter < repulsionIters; iter++) {
     for (let i = 0; i < rootStars.length; i++) {
       for (let j = i + 1; j < rootStars.length; j++) {
         const a = rootStars[i], b = rootStars[j];

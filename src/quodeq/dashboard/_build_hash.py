@@ -26,7 +26,9 @@ def compute_source_hash(source_dir: Path) -> str:
         rel = f.relative_to(source_dir)
         try:
             h.update(str(rel).encode())
-            h.update(f.read_bytes())
+            with open(f, "rb") as fh:
+                while chunk := fh.read(1 << 16):
+                    h.update(chunk)
         except OSError as exc:
             log_debug(f"Skipping {f.name} in source hash: {exc}")
             continue

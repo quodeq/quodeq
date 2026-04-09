@@ -26,10 +26,17 @@ def _get_git_commit(src: Path) -> str | None:
         return None
 
 
+_HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
+
+
 def _hash_file(path: Path) -> str | None:
-    """SHA-256 hash of a file's content."""
+    """SHA-256 hash of a file's content, streamed in chunks to limit memory."""
     try:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while chunk := f.read(_HASH_CHUNK_SIZE):
+                h.update(chunk)
+        return h.hexdigest()
     except OSError:
         return None
 
