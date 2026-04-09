@@ -28,23 +28,47 @@ function deduplicateDimensions(plugins, standards) {
   return seen;
 }
 
+// Module-level cache: loaded once, reused across mounts
+let _cachedDimensions = null;
+let _cachePromise = null;
+
+function _loadDimensions() {
+  if (_cachePromise) return _cachePromise;
+  _cachePromise = Promise.all([
+    listPlugins().catch(() => []),
+    listStandards().catch(() => []),
+  ]).then(([plugins, standards]) => {
+    const seen = deduplicateDimensions(plugins, standards);
+    const visibleSet = new Set(readVisibleStandardIds());
+    _cachedDimensions = [...seen.values()].filter((d) => visibleSet.has(d.id));
+    return _cachedDimensions;
+  }).catch((err) => {
+    console.warn('Failed to load dimensions:', err);
+    _cachePromise = null; // allow retry on next mount
+    return [];
+  });
+  return _cachePromise;
+}
+
+export function invalidateDimensionCache() {
+  _cachedDimensions = null;
+  _cachePromise = null;
+}
+
 export function usePluginDimensions() {
-  const [allDimensions, setAllDimensions] = useState([]);
+  const [allDimensions, setAllDimensions] = useState(_cachedDimensions || []);
   const [dimLoadError, setDimLoadError] = useState(null);
 
   useEffect(() => {
-    Promise.all([
-      listPlugins().catch(() => []),
-      listStandards().catch(() => []),
-    ]).then(([plugins, standards]) => {
-      const seen = deduplicateDimensions(plugins, standards);
-      const visibleSet = new Set(readVisibleStandardIds());
-      setAllDimensions([...seen.values()].filter((d) => visibleSet.has(d.id)));
+    if (_cachedDimensions) {
+      setAllDimensions(_cachedDimensions);
+      return;
+    }
+    _loadDimensions().then((dims) => {
+      setAllDimensions(dims);
       setDimLoadError(null);
-    }).catch((err) => {
-      console.warn('Failed to load dimensions:', err);
-      setAllDimensions([]);
-      setDimLoadError('Failed to load dimensions. Using defaults.');
+    }).catch(() => {
+      setDimLoadError('Failed to load dimensions.');
     });
   }, []);
 
