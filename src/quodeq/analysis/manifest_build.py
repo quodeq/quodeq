@@ -69,13 +69,25 @@ def _build_targets_from_disciplines(
 
 def _walk_and_group(
     src: Path, ext_map: dict[str, str], skip_dirs: set[str],
+    scope_path: str | None = None,
 ) -> tuple[dict[str, list[str]], Counter[str], dict[str, Counter]]:
-    """Walk *src* once, grouping files by language."""
+    """Walk *src* (or a scoped subdirectory) once, grouping files by language.
+
+    When *scope_path* is given (relative to *src*), only files under that
+    subdirectory are included.  Relative paths in the result are still
+    expressed relative to *src* so callers see the same format regardless.
+    """
+    walk_root = src
+    if scope_path:
+        candidate = src / scope_path
+        if candidate.is_dir():
+            walk_root = candidate
+
     files_by_lang: dict[str, list[str]] = {}
     ext_counts: Counter[str] = Counter()
     ext_counts_by_lang: dict[str, Counter] = {}
     all_extensions = set(ext_map.keys())
-    for dirpath, dirnames, filenames in os.walk(src):
+    for dirpath, dirnames, filenames in os.walk(walk_root):
         dirnames[:] = [d for d in dirnames if d not in skip_dirs and not d.startswith(".")]
         for fname in filenames:
             suffix = os.path.splitext(fname)[1]
@@ -92,16 +104,21 @@ def build_manifest(
     src: Path,
     detection: dict,
     disciplines_conf: Path | None = None,
+    scope_path: str | None = None,
 ) -> SourceManifest:
     """Walk a repository once and build a complete source manifest.
 
     *detection* is the parsed content of detection.json.
     *disciplines_conf* is the optional path to disciplines.conf for
     category and framework detection.
+    *scope_path*, when provided, limits the file scan to the given
+    subdirectory (relative to *src*) instead of the full repo.
     """
     ext_map: dict[str, str] = detection.get("extensions", {})
     skip_dirs = set(detection.get("skip_dirs", []))
-    files_by_lang, ext_counts, ext_counts_by_lang = _walk_and_group(src, ext_map, skip_dirs)
+    files_by_lang, ext_counts, ext_counts_by_lang = _walk_and_group(
+        src, ext_map, skip_dirs, scope_path=scope_path,
+    )
     all_source_files_count = sum(len(f) for f in files_by_lang.values())
 
     targets: list[AnalysisTarget] = []

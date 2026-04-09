@@ -38,6 +38,7 @@ class SubagentPool:
         queue: WorkQueue | None = None,
     ):
         self._n = max(1, options.n_agents)
+        self._paths = paths
         self._work_dir, self._prompt = paths.work_dir, options.prompt
         self._evidence_dir, self._queue_path = paths.evidence_dir, paths.queue_path
         self._queue = queue

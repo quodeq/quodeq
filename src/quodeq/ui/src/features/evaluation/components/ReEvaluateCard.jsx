@@ -19,16 +19,16 @@ function useReEvalInfo(project, initialInfo) {
 
   useEffect(() => {
     if (!project) return;
-    // Use pre-loaded info if available, otherwise fetch
-    if (initialInfo) { setInfo(initialInfo); return; }
-    setInfo(null);
+    // Always fetch full info (listing doesn't include hasFingerprints)
     getProjectInfo(project)
       .then(setInfo)
       .catch(() => {
-        setInfo(null);
-        setError('Could not load project info. The project may have been removed.');
+        if (!initialInfo) {
+          setInfo(null);
+          setError('Could not load project info. The project may have been removed.');
+        }
       });
-  }, [project, initialInfo]);
+  }, [project]);
 
   async function handleUrlRestore() {
     const url = urlInput.trim();
@@ -176,27 +176,25 @@ function CloneSection({ info, cloning, cloneDest, cloneError, setCloneBrowserOpe
 function ActionButtons({ info, project, disabled, canStart, cloning, handleIncremental, handleStart }) {
   return (
     <div style={buttonRowStyle}>
-      {info.hasFingerprints && (
-        <button
-          type="button"
-          className="evaluate-submit-btn"
-          style={flexButtonStyle}
-          disabled={!canStart}
-          onClick={handleIncremental}
-          title="Only analyze files changed since last evaluation"
-        >
-          Re-scan changes
-        </button>
-      )}
       <button
         type="button"
         className="evaluate-submit-btn"
-        style={flexButtonStyle}
+        style={{ flex: 3 }}
+        disabled={!canStart}
+        onClick={handleIncremental}
+        title="Only analyze files changed since last evaluation"
+      >
+        {disabled ? 'Running...' : 'Scan changes'}
+      </button>
+      <button
+        type="button"
+        className="evaluate-submit-btn evaluate-submit-btn--secondary"
+        style={{ flex: 1 }}
         disabled={!canStart}
         onClick={handleStart}
         title="Fresh re-evaluation of all selected dimensions"
       >
-        {disabled ? 'Running Evaluation...' : `Re-evaluate ${info.name || project}`}
+        Full scan
       </button>
     </div>
   );

@@ -4,10 +4,15 @@ Contains the core routing class and its supporting data types / protocols.
 """
 from __future__ import annotations
 
+import io
 import json
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Protocol, TextIO, runtime_checkable
+
+if sys.platform != "win32":
+    import fcntl
 
 from quodeq.analysis.mcp.enrichment import enrich_code
 from quodeq.analysis.mcp.ref_scoring import select_best_refs
@@ -42,6 +47,28 @@ class DeduplicationStore(Protocol):
 
     def __contains__(self, key: tuple) -> bool: ...
     def add(self, key: tuple) -> None: ...
+
+
+def _locked_write(fh: TextIO, line: str) -> None:
+    """Write a line to *fh*, holding an exclusive POSIX lock when possible.
+
+    The lock protects against concurrent writes from sibling MCP server
+    processes that share the same JSONL output file.  Falls back to a plain
+    write when the file handle doesn't support ``fileno()`` (e.g. StringIO
+    in tests) or on Windows.
+    """
+    use_lock = sys.platform != "win32"
+    if use_lock:
+        try:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+        except (OSError, io.UnsupportedOperation):
+            use_lock = False
+    try:
+        fh.write(line)
+        fh.flush()
+    finally:
+        if use_lock:
+            fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def _default_read_file(path: Path) -> str:
@@ -108,7 +135,7 @@ class FindingsRouter:
         self._enrich(args, finding)
         enrich_code(finding, self._work_dir, self._read_file)
 
-        self._fh.write(json.dumps(finding) + "\n")
-        self._fh.flush()
+        line = json.dumps(finding) + "\n"
+        _locked_write(self._fh, line)
         self.counter += 1
         return f"Finding #{self.counter} recorded.", False

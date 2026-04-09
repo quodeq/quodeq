@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 
 from quodeq.analysis._config import AnalysisConfig, _SpawnPaths
+from quodeq.analysis.errors import ProviderError
 from quodeq.analysis.stream.progress_reader import _IncrementalProgressReader
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
@@ -15,7 +16,7 @@ from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
 _TERMINATE_TIMEOUT_S = 10
 
 
-class AnalysisError(RuntimeError):
+class AnalysisError(ProviderError):
     """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""
 
 
