@@ -73,6 +73,9 @@ cp "$SCRIPT_DIR/icon.icns" "$APP/Contents/Resources/icon.icns"
 
 echo "  Created $APP"
 
+# Strip quarantine attribute so users don't need xattr -cr
+xattr -cr "$APP"
+
 # Step 2: Create DMG
 echo "==> Creating DMG..."
 DMG_PATH="$DMG_DIR/QuodeqBar-${VERSION}-macOS.dmg"

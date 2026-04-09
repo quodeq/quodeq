@@ -76,10 +76,7 @@ Click any dimension, file, or principle to explore the details.
 
 A native menu bar companion app to manage the dashboard — start/stop the server, see evaluation status at a glance, and open the dashboard in one click.
 
-> **Early preview:** You can try it now by downloading the DMG from [Releases](https://github.com/quodeq/quodeq/releases/latest). Since it's not yet signed, allow it with:
-> ```bash
-> xattr -cr /Applications/QuodeqBar.app
-> ```
+> **Early preview:** You can try it now by downloading the DMG from [Releases](https://github.com/quodeq/quodeq/releases/latest). Since it's not yet signed, on first launch right-click the app → **Open**, then click **Open** in the dialog.
 
 ### CLI usage
 

@@ -18,6 +18,7 @@ from quodeq.dashboard._networking import (
     _is_port_open,
     _local_hosts,
 )
+from quodeq.dashboard._frozen import subprocess_cmd
 from quodeq.dashboard._process import (
     _PROCESS_WAIT_TIMEOUT_S,
     _spawn_and_wait_local,
@@ -139,8 +140,7 @@ def _serve_native(
     api_pid = str(action_api_process.pid) if action_api_process else ""
 
     subprocess.Popen(
-        [sys.executable, "-m", "quodeq.dashboard._webview_window",
-         action_api_url, str(instance._sock_path), api_pid],
+        subprocess_cmd("webview", [action_api_url, str(instance._sock_path), api_pid]),
         start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,

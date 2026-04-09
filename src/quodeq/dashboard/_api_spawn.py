@@ -8,9 +8,10 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.shared.logging import log_warning
-from quodeq.shared.utils import ACTION_API_MODULE, IS_WIN32 as _IS_WIN32, get_evaluations_dir
+from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_evaluations_dir
 
 from quodeq.dashboard._api_health_check import wait_for_action_api
+from quodeq.dashboard._frozen import subprocess_cmd
 
 _ENV_ACTION_API_PORT = "QUODEQ_ACTION_API_PORT"
 _ENV_ACTION_API_HOST = "QUODEQ_ACTION_API_HOST"
@@ -51,7 +52,7 @@ def spawn_action_api(
     env[_ENV_EVALUATIONS_DIR] = cfg.evaluations_dir or get_evaluations_dir()
     verbose = env.get("QUODEQ_VERBOSE") == "1"
     proc = subprocess.Popen(
-        [sys.executable, "-m", ACTION_API_MODULE],
+        subprocess_cmd("api"),
         env=env,
         stdout=None if verbose else subprocess.DEVNULL,
         stderr=None if verbose else subprocess.DEVNULL,
