@@ -13,6 +13,8 @@ from pathlib import Path
 from quodeq.data.fs._index_cache import clear_index_cache
 from quodeq.data.fs._index_io import _load_index, _save_index
 from quodeq.data.fs._models import ProjectIdentity, ProjectRepository
+import json
+
 from quodeq.data.fs._resolution import _create_project, _find_existing_project
 
 # Re-exports for backward compatibility
@@ -22,6 +24,23 @@ __all__ = [
     "clear_index_cache",
     "resolve_project_uuid",
 ]
+
+
+def _has_scoped_children(reports_dir: Path, parent_id: str) -> bool:
+    """Return True if any project under reports_dir has parent == parent_id."""
+    for entry in reports_dir.iterdir():
+        if not entry.is_dir() or entry.name == parent_id:
+            continue
+        info_path = entry / "repository_info.json"
+        if not info_path.exists():
+            continue
+        try:
+            info = json.loads(info_path.read_text())
+            if info.get("parent") == parent_id:
+                return True
+        except (json.JSONDecodeError, OSError):
+            continue
+    return False
 
 
 def resolve_project_uuid(
@@ -71,11 +90,24 @@ def resolve_project_uuid(
             reports_dir, child_identity, load_fn, save_fn, parent_uuid=parent_uuid,
         )
 
-    # --- unscoped resolution (original behaviour) ---
+    # --- unscoped resolution ---
     resolved = ProjectIdentity(
         identity.project_name, resolved_path, identity.discipline, identity.location,
     )
     existing = _find_existing_project(reports_dir, resolved, load_fn, save_fn)
     if existing:
+        # If this parent already has scoped children, redirect the unscoped
+        # evaluation to a "." child so the parent stays a pure aggregator.
+        if _has_scoped_children(reports_dir, existing):
+            dot_identity = ProjectIdentity(
+                f"{identity.project_name}/.", resolved_path,
+                identity.discipline, identity.location, scope_path=".",
+            )
+            dot_existing = _find_existing_project(reports_dir, dot_identity, load_fn, save_fn)
+            if dot_existing:
+                return dot_existing
+            return _create_project(
+                reports_dir, dot_identity, load_fn, save_fn, parent_uuid=existing,
+            )
         return existing
     return _create_project(reports_dir, resolved, load_fn, save_fn)

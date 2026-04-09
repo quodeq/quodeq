@@ -132,4 +132,46 @@ def test_unscoped_resolution_unchanged(tmp_path: Path) -> None:
     info = _read_info(reports, uuid1)
     assert "scopePath" not in info
     assert "parent" not in info
+
+
+def test_unscoped_redirects_to_dot_child_when_children_exist(tmp_path: Path) -> None:
+    """Unscoped evaluation on a parent with children creates a '.' child."""
+    clear_index_cache()
+    reports = tmp_path / "reports"
+    repo_path = str(tmp_path / "repo")
+
+    # Create a scoped child first (which also creates the parent)
+    scoped = ProjectIdentity("myrepo", repo_path, scope_path="src/api")
+    child_uuid = resolve_project_uuid(reports, scoped)
+    child_info = _read_info(reports, child_uuid)
+    parent_uuid = child_info["parent"]
+
+    # Now resolve unscoped — should redirect to "." child
+    clear_index_cache()
+    unscoped = ProjectIdentity("myrepo", repo_path)
+    dot_uuid = resolve_project_uuid(reports, unscoped)
+
+    assert dot_uuid != parent_uuid  # not the parent
+    assert dot_uuid != child_uuid   # not the scoped child
+    dot_info = _read_info(reports, dot_uuid)
+    assert dot_info["scopePath"] == "."
+    assert dot_info["parent"] == parent_uuid
+
+
+def test_unscoped_no_redirect_without_children(tmp_path: Path) -> None:
+    """Unscoped evaluation on a project without children returns the project itself."""
+    clear_index_cache()
+    reports = tmp_path / "reports"
+    repo_path = str(tmp_path / "repo")
+
+    # Create unscoped project (no children)
+    identity = ProjectIdentity("myrepo", repo_path)
+    uuid1 = resolve_project_uuid(reports, identity)
+
+    # Resolve again — should return same UUID (no redirect)
+    clear_index_cache()
+    uuid2 = resolve_project_uuid(reports, identity)
+    assert uuid1 == uuid2
+    info = _read_info(reports, uuid1)
+    assert "scopePath" not in info
     assert info["name"] == "myrepo"
