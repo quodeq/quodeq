@@ -235,11 +235,14 @@ def _kill_api(pid: int) -> None:
 
 def _icon_path(ext: str) -> str | None:
     """Resolve the quodeq icon path for the given extension (.icns or .ico)."""
-    p = Path(__file__).resolve().parent.parent.parent.parent / "packaging"
+    if getattr(sys, "frozen", False):
+        base = Path(sys._MEIPASS) / "packaging"  # type: ignore[attr-defined]
+    else:
+        base = Path(__file__).resolve().parent.parent.parent.parent / "packaging"
     if ext == ".icns":
-        p = p / "macos" / "icon.icns"
+        p = base / "macos" / "icon.icns"
     elif ext == ".ico":
-        p = p / "windows" / "icon.ico"
+        p = base / "windows" / "icon.ico"
     else:
         return None
     return str(p) if p.exists() else None
