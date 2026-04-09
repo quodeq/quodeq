@@ -71,7 +71,9 @@ def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir
 
 def save_fingerprint(fingerprint: dict, evidence_dir: Path) -> Path:
     """Save fingerprint to the evidence directory."""
+    from quodeq.shared.validation import validate_path_segment
     dim = fingerprint["dimension"]
+    validate_path_segment(dim)
     path = evidence_dir / f"{dim}_fingerprint.json"
     path.write_text(json.dumps(fingerprint, indent=2))
     return path

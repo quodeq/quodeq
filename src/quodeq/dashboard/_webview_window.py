@@ -171,13 +171,14 @@ class _WindowApi:
     @staticmethod
     def _build_close_dialog_js(job: dict) -> str:
         """Build JS for the close confirmation dialog with job info."""
-        phase = job.get("phase", "analyzing")
-        dim = job.get("currentDimension", "")
-        repo = job.get("repo", "")
+        import html as _html
+        phase = _html.escape(job.get("phase", "analyzing"))
+        dim = _html.escape(job.get("currentDimension", ""))
+        repo = _html.escape(job.get("repo", ""))
         # Build info line
         info_parts = []
         if repo:
-            name = repo.rsplit("/", 1)[-1] if "/" in repo else repo
+            name = _html.escape(repo.rsplit("/", 1)[-1] if "/" in repo else repo)
             info_parts.append(f"Project: <b>{name}</b>")
         if dim:
             info_parts.append(f"Dimension: <b>{dim}</b>")

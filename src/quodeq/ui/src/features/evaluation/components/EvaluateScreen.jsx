@@ -115,7 +115,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
           </div>
         )}
 
-        {jobError && <div className="job-error-banner">{jobError}</div>}
+        {jobError && <div className="job-error-banner">{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
 
         {!job && <EvaluateHelpSection />}

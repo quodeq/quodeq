@@ -22,7 +22,8 @@ def register_crud_routes(app: Flask, get_service) -> None:
         try:
             detail = svc.create_standard(payload)
         except ValueError as exc:
-            return error_response(str(exc), 400, "bad_request")
+            logger.debug("standards.create validation error: %s", exc)
+            return error_response("Invalid standard data", 400, "bad_request")
         return jsonify(to_camel_dict(detail)), 201
 
     @app.put("/api/standards/<standard_id>")
@@ -61,5 +62,6 @@ def register_crud_routes(app: Flask, get_service) -> None:
         try:
             detail = svc.duplicate_standard(standard_id, new_id)
         except (FileNotFoundError, ValueError) as exc:
-            return error_response(str(exc), 400, "bad_request")
+            logger.debug("standards.duplicate error: %s", exc)
+            return error_response("Could not duplicate standard", 400, "bad_request")
         return jsonify(to_camel_dict(detail)), 201

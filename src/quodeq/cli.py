@@ -297,7 +297,7 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
         if not scoped.exists():
             print(f"Scope path does not exist: {scoped}", file=sys.stderr)
             return None
-        if not str(scoped).startswith(str(src)):
+        if not scoped.is_relative_to(src):
             print(f"Scope must be within the repository: {scope}", file=sys.stderr)
             return None
         scope_path = scope

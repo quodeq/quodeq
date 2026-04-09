@@ -1,6 +1,7 @@
 """Discovery routes: AI clients, plugins, and filesystem browsing."""
 from __future__ import annotations
 
+import logging
 from http import HTTPStatus
 from pathlib import Path
 
@@ -8,6 +9,8 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.core.types import to_camel_dict
+
+_logger = logging.getLogger(__name__)
 from quodeq.services.base import ActionProvider
 
 # Error keyword returned by browse_repo when the path exists but is not a directory.
@@ -69,7 +72,8 @@ def _handle_browse_mkdir() -> Response | tuple[Response, int]:
         body, status = error_response("Folder already exists", HTTPStatus.CONFLICT, "CONFLICT")
         return jsonify(body), status
     except OSError as exc:
-        body, status = error_response(f"Could not create folder: {exc}", HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR")
+        _logger.warning("Could not create folder %s: %s", name, exc)
+        body, status = error_response("Could not create folder", HTTPStatus.INTERNAL_SERVER_ERROR, "SERVER_ERROR")
         return jsonify(body), status
     return jsonify({"created": True, "path": str(target)})
 

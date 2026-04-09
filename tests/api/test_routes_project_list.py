@@ -250,6 +250,11 @@ class TestScanPath:
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "NOT_DIR"
 
+    def test_system_dir_blocked(self, client):
+        resp = client.post("/api/scan", json={"path": "/etc"})
+        assert resp.status_code == 403
+        assert resp.get_json()["code"] == "FORBIDDEN"
+
     def test_scan_success(self, client, tmp_path):
         target = tmp_path / "code"
         target.mkdir()

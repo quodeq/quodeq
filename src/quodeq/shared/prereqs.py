@@ -27,6 +27,8 @@ def _run_version_cmd(cmd: list[str]) -> str:
     shell built-ins resolve correctly.  The *cmd* list is always
     hard-coded by callers in this module (never user-influenced),
     so the shell injection risk does not apply.
+
+    SECURITY: Do not pass user-controlled strings into *cmd*.
     """
     result = subprocess.run(
         cmd, capture_output=True, text=True, check=True, shell=_IS_WIN32,
