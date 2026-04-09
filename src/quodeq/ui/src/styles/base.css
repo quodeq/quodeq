@@ -31,10 +31,11 @@ body {
 /* ── App shell ────────────────────────────────────────── */
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
   display: grid;
   grid-template-columns: var(--sidebar-width) 1fr;
   transition: grid-template-columns 200ms ease;
+  overflow: hidden;
 }
 
 /* Expand sidebar on hover */
@@ -670,6 +671,7 @@ textarea:focus {
   gap: var(--space-6);
   min-width: 0;
   overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* ── Content header ───────────────────────────────────── */
