@@ -229,32 +229,7 @@ function Dimensions() {
       <p>This lets you customize which quality aspects matter for your project without deleting any standards.</p>
 
       <h3>Creating custom dimensions</h3>
-      <p>You can create your own evaluation standards in the <strong>Standards</strong> tab. Each standard defines principles and requirements that the AI evaluates against.</p>
-      <div className="help-callout help-callout-tip">
-        <strong>Tip:</strong> You can ask an AI agent to create custom dimensions for you based on the schema below.
-      </div>
-
-      <h3>Standard schema</h3>
-      <pre className="help-code">{`{
-  "id": "my-standard",
-  "name": "My Custom Standard",
-  "dimension": "security",
-  "version": "1.0",
-  "principles": [
-    {
-      "name": "Principle Name",
-      "description": "What this principle evaluates",
-      "requirements": [
-        {
-          "id": "MY-REQ-1",
-          "text": "The specific requirement to check",
-          "severity": "major"
-        }
-      ]
-    }
-  ]
-}`}</pre>
-      <p>To create a standard with an AI agent, provide the schema above and describe your evaluation criteria. The agent can generate a complete standard JSON that you can import in the Standards tab.</p>
+      <p>You can create your own evaluation standards in the <strong>Standards</strong> tab. Each standard defines principles and requirements that the AI evaluates against. See the <strong>Custom Standards</strong> section for the full schema and instructions on how to create them — including how to use an AI agent to generate standards for you.</p>
     </section>
   );
 }
@@ -319,29 +294,69 @@ function Standards() {
   return (
     <section className="help-section">
       <h2>Custom Standards</h2>
-      <p>The <strong>Standards</strong> tab lets you create, edit, and manage evaluation standards.</p>
+      <p>The <strong>Standards</strong> tab lets you create, edit, and manage evaluation standards. Define what quality means for your project.</p>
 
       <h3>Built-in standards</h3>
-      <p>Quodeq ships with standards based on ISO 25010 for each of the six dimensions. These provide comprehensive coverage out of the box.</p>
+      <p>Quodeq ships with standards based on ISO 25010 for each of the six dimensions, plus Clean Architecture and DDD Design. These provide comprehensive coverage out of the box.</p>
 
       <h3>Creating your own</h3>
       <ol>
         <li>Click <strong>New Standard</strong> in the Standards tab</li>
         <li>Define principles (evaluation categories) and requirements (specific checks)</li>
-        <li>Assign severity levels to each requirement</li>
+        <li>Assign severity levels to each requirement (<code>critical</code>, <code>major</code>, or <code>minor</code>)</li>
         <li>Save — your standard will be used in the next evaluation</li>
       </ol>
 
       <h3>Importing from library</h3>
       <p>You can import pre-built standards from the Quodeq library. Click <strong>Import</strong> and browse available standards.</p>
 
+      <h3>Standard schema</h3>
+      <p>Every standard follows this JSON structure:</p>
+      <pre className="help-code">{`{
+  "id": "my-standard",
+  "name": "My Custom Standard",
+  "dimension": "security",
+  "version": "1.0",
+  "principles": [
+    {
+      "name": "Principle Name",
+      "description": "What this principle evaluates",
+      "requirements": [
+        {
+          "id": "MY-REQ-1",
+          "text": "The specific requirement to check",
+          "severity": "major"
+        }
+      ]
+    }
+  ]
+}`}</pre>
+      <p>Key fields:</p>
+      <ul>
+        <li><strong>id</strong> — unique identifier, used as filename (<code>my-standard.json</code>)</li>
+        <li><strong>dimension</strong> — the quality dimension this standard belongs to</li>
+        <li><strong>principles</strong> — categories of evaluation (e.g., "Error Handling", "Input Validation")</li>
+        <li><strong>requirements</strong> — specific checks within each principle, each with an ID and severity</li>
+      </ul>
+
       <h3>Using AI to generate standards</h3>
-      <p>Provide an AI agent with the JSON schema (shown in the Dimensions section) and describe what you want to evaluate. For example:</p>
-      <pre className="help-code">{`"Create a Quodeq evaluation standard for
-React component best practices. Include
-principles for accessibility, performance,
-state management, and error boundaries.
-Use the following JSON schema: { ... }"`}</pre>
+      <div className="help-callout help-callout-tip">
+        <strong>Tip:</strong> You can ask an AI agent (Claude, ChatGPT, etc.) to create custom standards for you. Provide the schema above and describe what you want to evaluate.
+      </div>
+      <p>Example prompt:</p>
+      <pre className="help-code">{`Create a Quodeq evaluation standard for React
+component best practices. Include principles for
+accessibility, performance, state management,
+and error boundaries.
+
+Use this JSON schema:
+{
+  "id": "react-best-practices",
+  "name": "React Best Practices",
+  "dimension": "react",
+  ...
+}`}</pre>
+      <p>The agent will generate a complete standard JSON that you can paste into the Standards editor or save as a <code>.json</code> file and import.</p>
     </section>
   );
 }
