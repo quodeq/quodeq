@@ -187,7 +187,7 @@ function ActionButtons({ info, project, disabled, canStart, cloning, handleIncre
             onClick={handleIncremental}
             title="Only analyze files changed since last evaluation"
           >
-            {disabled ? 'Running...' : 'Re-scan changes'}
+            {disabled ? 'Running...' : 'Scan changes'}
           </button>
           <button
             type="button"
@@ -197,7 +197,7 @@ function ActionButtons({ info, project, disabled, canStart, cloning, handleIncre
             onClick={handleStart}
             title="Fresh re-evaluation of all selected dimensions"
           >
-            Full
+            Full scan
           </button>
         </>
       ) : (
