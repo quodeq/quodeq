@@ -46,3 +46,29 @@ def test_render_previous_findings_no_file_key():
     findings = [{"p": "X", "t": "violation", "reason": "no file"}]
     result = render_previous_findings_section(findings)
     assert "### (unknown file)" in result
+
+
+def test_build_subagent_prompt_passes_inline_findings():
+    from unittest.mock import MagicMock
+
+    from quodeq.analysis.subagents._prompts import _build_subagent_prompt
+
+    findings = [{"file": "a.py", "p": "S", "t": "violation", "line": 1, "reason": "test"}]
+    ctx = MagicMock()
+    ctx.subagent_template = "{{DIMENSION}} analysis"
+    ctx.date_str = "2026-01-01"
+    ctx.dimensions_data = {}
+
+    config = MagicMock()
+    config.language = "python"
+    config.src = "/test"
+    config.source_file_count = 10
+    config.standards_dir = None
+    config.evaluators_dir = None
+    config.manifest = None
+    config.target = None
+    config.work_dir = None
+
+    result = _build_subagent_prompt(config, "security", ctx, inline_findings=findings)
+    assert "Previous findings" in result
+    assert "a.py" in result
