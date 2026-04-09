@@ -51,12 +51,12 @@ function Providers() {
 
       <h3>Local Providers (Ollama)</h3>
       <div className="help-callout help-callout-tip">
-        <strong>Recommended model:</strong> <code>gemma3:27b</code> offers excellent quality-to-cost ratio for local analysis. It runs well on machines with 32GB+ RAM.
+        <strong>Recommended model:</strong> <code>gemma4:26b</code> offers excellent quality-to-cost ratio for local analysis. It runs well on machines with 32GB+ RAM.
       </div>
       <p>To use Ollama:</p>
       <ol>
         <li>Install Ollama from <code>ollama.com</code></li>
-        <li>Pull a model: <code>ollama pull gemma3:27b</code></li>
+        <li>Pull a model: <code>ollama pull gemma4:26b</code></li>
         <li>In Settings, select the <strong>Ollama</strong> provider tab</li>
         <li>Choose your model and configure the number of subagents</li>
       </ol>
@@ -69,7 +69,7 @@ function Providers() {
       <p>Recommended cloud models:</p>
       <ul>
         <li><strong>Claude Sonnet</strong> (Anthropic) — best balance of speed, quality, and cost</li>
-        <li><strong>GPT-4.1</strong> (OpenAI) — strong alternative, good for diverse codebases</li>
+        <li><strong>GPT-5.3-codex</strong> (OpenAI) — strong alternative, good for diverse codebases</li>
       </ul>
       <p>To configure a cloud provider:</p>
       <ol>
