@@ -38,6 +38,7 @@ class SubagentPool:
         queue: WorkQueue | None = None,
     ):
         self._n = max(1, options.n_agents)
+        self._paths = paths
         self._work_dir, self._prompt = paths.work_dir, options.prompt
         self._evidence_dir, self._queue_path = paths.evidence_dir, paths.queue_path
         self._queue = queue
@@ -79,11 +80,15 @@ class SubagentPool:
         self._futures[executor.submit(self._run_single, self._next_idx)] = self._next_idx
         self._next_idx += 1
 
-    def _start_heartbeat(self) -> tuple[threading.Event, threading.Thread]:
+    def _start_heartbeat(self, src: Path | None = None,
+                          all_files: list[str] | None = None,
+                          standards_dir: Path | None = None) -> tuple[threading.Event, threading.Thread]:
         stop = threading.Event()
         ctx = HeartbeatContext(
             queue_path=self._queue_path, dimension_key=self._dimension_key,
             jsonl_path=self._shared_jsonl_path(), lock=self._jsonl_lock,
+            src=src, all_files=all_files, evidence_dir=self._evidence_dir,
+            standards_dir=standards_dir,
         )
         hb = threading.Thread(
             target=heartbeat_loop, args=(stop, self._finished, ctx), daemon=True,
@@ -102,7 +107,10 @@ class SubagentPool:
         self._finished.clear()
         self._futures.clear()
         self._next_idx = 0
-        stop, hb = self._start_heartbeat()
+        stop, hb = self._start_heartbeat(
+            src=self._paths.src, all_files=self._paths.all_files,
+            standards_dir=self._paths.standards_dir,
+        )
         try:
             with ThreadPoolExecutor(max_workers=self._n) as pool:
                 ctx = LoopContext(

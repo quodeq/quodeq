@@ -27,6 +27,9 @@ class PoolPaths:
     work_dir: Path
     evidence_dir: Path
     queue_path: Path
+    src: Path | None = None
+    all_files: list[str] | None = None
+    standards_dir: Path | None = None
 
 
 @dataclass

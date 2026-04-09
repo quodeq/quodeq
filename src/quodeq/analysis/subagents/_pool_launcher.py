@@ -37,6 +37,7 @@ class LaunchPoolParams:
     queue_path: Path
     prompt: str
     max_files_per_agent: int = _MAX_FILES_PER_AGENT
+    all_files: list[str] | None = None
 
 
 def _launch_pool(
@@ -63,7 +64,8 @@ def _launch_pool(
     use_scout = ai_cmd not in ("codex", "gemini")
 
     pool = SubagentPool(
-        paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path),
+        paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,
+                        src=config.src, all_files=params.all_files, standards_dir=config.standards_dir),
         options=PoolOptions(
             n_agents=n_agents,
             prompt=params.prompt,

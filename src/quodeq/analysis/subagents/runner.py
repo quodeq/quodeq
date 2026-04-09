@@ -105,6 +105,7 @@ def process_dimension_with_subagents(
     params = LaunchPoolParams(
         evidence_dir=evidence_dir, queue_path=queue_path,
         prompt=prompt, max_files_per_agent=files_per_agent,
+        all_files=files,
     )
     pool, results = _launch_pool(config, dim_id, params)
 
