@@ -57,6 +57,7 @@
   background: var(--color-surface-alt);
   border-radius: 6px;
   padding: 2px;
+  margin-bottom: 12px;
 }
 
 .map-pill {
