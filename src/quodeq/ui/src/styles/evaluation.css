@@ -867,28 +867,18 @@
   align-items: flex-end;
 }
 
-.scope-toggle-row {
-  display: inline-flex;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-}
-
-.scope-toggle-btn {
-  padding: 3px 10px;
+.scope-compact-btn {
+  padding: 2px 8px;
   background: var(--color-surface-alt);
-  border: none;
+  border: 1px solid var(--color-border);
   color: var(--color-text-muted);
-  font-size: 0.75rem;
+  font-size: 0.7rem;
+  border-radius: var(--radius-sm);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
 }
 
-.scope-toggle-btn:not(:last-child) {
-  border-right: 1px solid var(--color-border);
-}
-
-.scope-toggle-btn.active {
+.scope-compact-btn:hover {
   background: var(--color-accent);
   color: var(--color-on-accent, #fff);
 }
@@ -897,8 +887,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  margin-top: var(--space-2);
-  font-size: 0.8rem;
+  font-size: 0.75rem;
   align-self: flex-end;
   white-space: nowrap;
 }

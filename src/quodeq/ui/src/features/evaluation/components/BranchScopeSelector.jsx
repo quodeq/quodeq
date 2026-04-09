@@ -2,9 +2,9 @@ import { useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
 
 /**
- * Scope toggle for local project evaluations.
- * Default: "Entire project". Toggle to "Custom scope" to pick a subfolder.
- * Branch is display-only (detected from scan data).
+ * Scope selector for local project evaluations.
+ * Default: entire project (no scope set). Click "Scope" to pick a subfolder.
+ * Clear the selection to return to entire project.
  */
 export default function BranchScopeSelector({
   branches,
@@ -14,28 +14,10 @@ export default function BranchScopeSelector({
   scopePath,
 }) {
   const [scopeBrowserOpen, setScopeBrowserOpen] = useState(false);
-  const customScope = !!scopePath;
 
   return (
     <div className="scope-toggle-group">
-      <div className="scope-toggle-row">
-        <button
-          type="button"
-          className={`scope-toggle-btn${!customScope ? ' active' : ''}`}
-          onClick={() => { onScopeChange(null); }}
-        >
-          Entire project
-        </button>
-        <button
-          type="button"
-          className={`scope-toggle-btn${customScope ? ' active' : ''}`}
-          onClick={() => setScopeBrowserOpen(true)}
-        >
-          Custom scope
-        </button>
-      </div>
-
-      {customScope && (
+      {scopePath ? (
         <div className="scope-display">
           <code className="scope-path">{scopePath}</code>
           <button
@@ -56,6 +38,14 @@ export default function BranchScopeSelector({
             </svg>
           </button>
         </div>
+      ) : (
+        <button
+          type="button"
+          className="scope-compact-btn"
+          onClick={() => setScopeBrowserOpen(true)}
+        >
+          Scope
+        </button>
       )}
 
       {currentBranch && (
