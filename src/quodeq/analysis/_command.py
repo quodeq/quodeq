@@ -130,8 +130,13 @@ def _mcp_server_name(config: AnalysisConfig) -> str:
 def _build_mcp_server_args(
     config: AnalysisConfig,
     work_dir: Path | None = None,
+    skip_agent_id: bool = False,
 ) -> list[str]:
-    """Build the MCP findings server command-line args."""
+    """Build the MCP findings server command-line args.
+
+    *skip_agent_id*: set True for cli-register MCP where all agents share
+    one server — the per-agent file cap doesn't apply.
+    """
     mcp_script = str(Path(__file__).resolve().parent / "mcp" / "findings_server.py")
     mcp_args = [sys.executable, mcp_script, str(config.jsonl_file.resolve())]
     if config.compiled_dir and config.dimension:
@@ -141,7 +146,7 @@ def _build_mcp_server_args(
         ])
     if config.queue_path:
         mcp_args.extend(["--queue", str(config.queue_path.resolve())])
-    if config.agent_id:
+    if config.agent_id and not skip_agent_id:
         mcp_args.extend(["--agent-id", config.agent_id])
     wd = config.work_dir or work_dir
     if wd:
@@ -162,7 +167,9 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
         if key in _cli_mcp_registered:
             return name
         _unregister_cli_mcp(cmd, name)
-        mcp_args = _build_mcp_server_args(config, work_dir)
+        # Skip agent-id: all agents share one MCP server, so per-agent
+        # file caps don't apply — the queue distributes freely.
+        mcp_args = _build_mcp_server_args(config, work_dir, skip_agent_id=True)
         provider_cfg = _get_provider_configs().get(cmd, {})
         # Codex/Copilot use "-- cmd args", Gemini uses "cmd args" (no separator)
         use_separator = provider_cfg.get("mcp_add_separator", True)

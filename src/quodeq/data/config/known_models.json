@@ -1,8 +1,8 @@
 {
   "claude": [
-    {"id": "claude-haiku-4-5-20251001", "label": "Haiku 4.5", "tier": "fast"},
-    {"id": "claude-sonnet-4-6-20260407", "label": "Sonnet 4.6", "tier": "balanced"},
-    {"id": "claude-opus-4-6-20260407", "label": "Opus 4.6", "tier": "thorough"}
+    {"id": "claude-haiku-4-5", "label": "Haiku 4.5", "tier": "fast"},
+    {"id": "claude-sonnet-4-6", "label": "Sonnet 4.6", "tier": "balanced"},
+    {"id": "claude-opus-4-6", "label": "Opus 4.6", "tier": "thorough"}
   ],
   "codex": [
     {"id": "gpt-5.4-mini", "label": "GPT-5.4 Mini", "tier": "fast"},

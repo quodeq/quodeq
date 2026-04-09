@@ -280,18 +280,21 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
     if src is None:
         return None
 
-    # --scope: narrow analysis to a subdirectory
+    # --scope: narrow analysis to a subdirectory or single file
+    # Language detection runs on the full repo; scope only filters analyzed files.
     scope = getattr(args, "scope", None)
+    scope_path = None
     if scope and src.is_dir():
         scoped = (src / scope).resolve()
-        if not scoped.is_dir():
-            print(f"Scope directory does not exist: {scoped}", file=sys.stderr)
+        if not scoped.exists():
+            print(f"Scope path does not exist: {scoped}", file=sys.stderr)
             return None
         if not str(scoped).startswith(str(src)):
             print(f"Scope must be within the repository: {scope}", file=sys.stderr)
             return None
-        src = scoped
-        print(f"Scoped evaluation: {scope} (repo root: {src.parent})", file=sys.stderr)
+        scope_path = scope
+        kind = "file" if scoped.is_file() else "folder"
+        print(f"Scoped evaluation: {scope} ({kind}, repo root: {src})", file=sys.stderr)
 
     # Single-file evaluation: find project root, compute relative path
     single_file: str | None = None
@@ -326,6 +329,35 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
         return None
 
     manifest = _build_manifest(args, src, paths)
+
+    # Scope filter: narrow manifest to files under scope_path
+    if scope_path and manifest and manifest.targets:
+        from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+        prefix = scope_path.rstrip("/") + "/"
+        scoped_targets = []
+        total = 0
+        all_stats: dict[str, int] = {}
+        for t in manifest.targets:
+            scoped_files = [f for f in t.source_files if f.startswith(prefix) or f == scope_path]
+            if scoped_files:
+                stats = {}
+                for f in scoped_files:
+                    ext = os.path.splitext(f)[1]
+                    if ext:
+                        stats[ext] = stats.get(ext, 0) + 1
+                scoped_targets.append(AnalysisTarget(
+                    name=t.name, language=t.language,
+                    source_files=scoped_files, total_files=len(scoped_files),
+                    language_stats=stats, category=t.category,
+                ))
+                total += len(scoped_files)
+                for k, v in stats.items():
+                    all_stats[k] = all_stats.get(k, 0) + v
+        if scoped_targets:
+            manifest = SourceManifest(targets=scoped_targets, total_files=total, language_stats=all_stats)
+            print(f"Scope filter: {total} files under '{scope_path}'", file=sys.stderr)
+        else:
+            print(f"No source files found under scope '{scope_path}'", file=sys.stderr)
 
     # For single-file: override manifest to contain only the target file
     if single_file:

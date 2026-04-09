@@ -1,7 +1,10 @@
 """Subprocess spawning, heartbeat monitoring, and error handling."""
 from __future__ import annotations
 
+import os
+import signal
 import subprocess
+import sys
 from pathlib import Path
 
 from quodeq.analysis._config import AnalysisConfig, _SpawnPaths
@@ -16,13 +19,35 @@ class AnalysisError(RuntimeError):
     """Raised when the AI CLI subprocess fails (non-zero exit, auth error, etc.)."""
 
 
+def _kill_tree(pid: int, sig: int = signal.SIGTERM) -> None:
+    """Kill a process and all its children, cross-platform."""
+    if sys.platform == "win32":
+        # taskkill /T kills the entire process tree
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(pid)],
+            capture_output=True, timeout=10,
+        )
+    else:
+        try:
+            os.killpg(os.getpgid(pid), sig)
+        except (ProcessLookupError, OSError):
+            try:
+                os.kill(pid, sig)
+            except (ProcessLookupError, OSError):
+                pass
+
+
 def _terminate_process(process: subprocess.Popen) -> None:
-    """Send SIGTERM and escalate to SIGKILL if the process doesn't exit."""
-    process.terminate()
+    """Kill the process and its entire process tree to prevent orphans."""
+    _kill_tree(process.pid, signal.SIGTERM)
     try:
         process.wait(timeout=_TERMINATE_TIMEOUT_S)
     except subprocess.TimeoutExpired:
-        process.kill()
+        _kill_tree(process.pid, getattr(signal, "SIGKILL", signal.SIGTERM))
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            process.kill()
 
 
 def _run_with_heartbeat(
@@ -77,9 +102,12 @@ def _spawn_and_monitor(
 ) -> tuple[subprocess.Popen, bool]:
     """Spawn the AI CLI process, monitor with heartbeat, return (process, timed_out)."""
     with open(paths.stream_file, "w") as out, open(paths.stream_err, "w") as err:
+        # start_new_session creates a new process group so we can kill the
+        # entire tree (including child processes) when the agent is cancelled.
         process = subprocess.Popen(
             args, cwd=str(work_dir), env=env,
             stdout=out, stderr=err, stdin=subprocess.DEVNULL,
+            start_new_session=True,
         )
         timed_out = _run_with_heartbeat(process, cfg, paths.stream_file)
     return process, timed_out

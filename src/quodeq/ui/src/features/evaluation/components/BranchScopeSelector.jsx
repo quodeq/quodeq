@@ -2,50 +2,49 @@ import { useState } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
 
 /**
- * Branch dropdown + Scope button for local project evaluations.
- * Only rendered when scan data with branches is available.
+ * Scope toggle for local project evaluations.
+ * Default: "Entire project". Toggle to "Custom scope" to pick a subfolder.
+ * Branch is display-only (detected from scan data).
  */
 export default function BranchScopeSelector({
   branches,
   currentBranch,
   projectPath,
-  onBranchChange,
   onScopeChange,
   scopePath,
 }) {
   const [scopeBrowserOpen, setScopeBrowserOpen] = useState(false);
-
-  if (!branches || branches.length === 0) return null;
+  const customScope = !!scopePath;
 
   return (
-    <div className="form-group">
-      <label htmlFor="eval-branch">Branch</label>
-      <div className="branch-scope-row">
-        <select
-          id="eval-branch"
-          className="branch-select"
-          value={currentBranch || ''}
-          onChange={(e) => onBranchChange(e.target.value || null)}
-        >
-          {branches.map((b) => (
-            <option key={b} value={b}>{b}</option>
-          ))}
-        </select>
+    <div className="scope-toggle-group">
+      <div className="scope-toggle-row">
         <button
           type="button"
-          className="browse-btn"
-          onClick={() => setScopeBrowserOpen(true)}
-          title="Narrow evaluation to a subfolder"
+          className={`scope-toggle-btn${!customScope ? ' active' : ''}`}
+          onClick={() => { onScopeChange(null); }}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-          </svg>
-          Scope
+          Entire project
+        </button>
+        <button
+          type="button"
+          className={`scope-toggle-btn${customScope ? ' active' : ''}`}
+          onClick={() => setScopeBrowserOpen(true)}
+        >
+          Custom scope
         </button>
       </div>
-      {scopePath ? (
+
+      {customScope && (
         <div className="scope-display">
-          <span className="scope-path">{scopePath}</span>
+          <code className="scope-path">{scopePath}</code>
+          <button
+            type="button"
+            className="scope-change-btn"
+            onClick={() => setScopeBrowserOpen(true)}
+          >
+            Change
+          </button>
           <button
             type="button"
             className="input-clear-btn"
@@ -57,20 +56,26 @@ export default function BranchScopeSelector({
             </svg>
           </button>
         </div>
-      ) : (
-        <span className="form-hint">Entire project · Click Scope to narrow to a subfolder</span>
+      )}
+
+      {currentBranch && (
+        <div className="scope-branch-display">
+          <span className="scope-branch-label">Branch</span>
+          <code className="scope-branch-value">{currentBranch}</code>
+        </div>
       )}
 
       {scopeBrowserOpen && (
         <FolderBrowser
           onSelect={(path) => {
             const rel = projectPath ? path.replace(projectPath, '').replace(/^\//, '') : path;
-            onScopeChange(rel);
+            onScopeChange(rel || null);
             setScopeBrowserOpen(false);
           }}
           onClose={() => setScopeBrowserOpen(false)}
-          title="Select Subfolder"
-          confirmText="Use This Folder"
+          title="Select scope"
+          confirmText="Select"
+          showFiles={true}
           rootPath={projectPath}
         />
       )}

@@ -90,6 +90,7 @@ class JobManager:
                 text=True,
                 cwd=cwd,
                 env=env,
+                start_new_session=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:
             _logger.error("Failed to start job subprocess: %s", exc)
@@ -122,7 +123,8 @@ class JobManager:
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
-            process.terminate()
+            from quodeq.analysis._process import _kill_tree
+            _kill_tree(process.pid)
         return True
 
     def get_job(self, job_id: str) -> JobSnapshot | None:

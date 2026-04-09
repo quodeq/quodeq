@@ -1,18 +1,17 @@
 import { useState, useEffect } from 'react';
 import { getProjectInfo, relocateProject, cloneToLocal } from '../../../api/index.js';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
+import { useScanData } from '../hooks/useScanData.js';
+import BranchScopeSelector from './BranchScopeSelector.jsx';
 import DimensionSelector from './DimensionSelector.jsx';
 import FolderBrowser from './FolderBrowser.jsx';
 
 
-const BUTTON_GAP = '8px';
-const BUTTON_PADDING = '8px 16px';
-const BUTTON_FONT_SIZE = '0.85rem';
-const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_GAP, alignItems: 'center' };
-const flexButtonStyle = { flex: 1, marginTop: 0 };
+const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' };
+const flexButtonStyle = { flex: 1 };
 
-function useReEvalInfo(project) {
-  const [info, setInfo] = useState(null);
+function useReEvalInfo(project, initialInfo) {
+  const [info, setInfo] = useState(initialInfo || null);
   const [error, setError] = useState(null);
   const [urlInput, setUrlInput] = useState('');
   const [urlError, setUrlError] = useState(null);
@@ -20,6 +19,8 @@ function useReEvalInfo(project) {
 
   useEffect(() => {
     if (!project) return;
+    // Use pre-loaded info if available, otherwise fetch
+    if (initialInfo) { setInfo(initialInfo); return; }
     setInfo(null);
     getProjectInfo(project)
       .then(setInfo)
@@ -27,7 +28,7 @@ function useReEvalInfo(project) {
         setInfo(null);
         setError('Could not load project info. The project may have been removed.');
       });
-  }, [project]);
+  }, [project, initialInfo]);
 
   async function handleUrlRestore() {
     const url = urlInput.trim();
@@ -49,14 +50,22 @@ function useReEvalInfo(project) {
   return { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
-function useReEvaluateCard(project, onStart) {
-  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project);
+function useReEvaluateCard(project, onStart, projectInfo) {
+  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo);
   const { allDimensions } = usePluginDimensions();
   const [selectedDims, setSelectedDims] = useState(new Set());
+  const [branch, setBranch] = useState(null);
+  const [scopePath, setScopePath] = useState(null);
+
+  // Reset scope when project changes
+  useEffect(() => { setScopePath(null); setBranch(null); }, [project]);
   const [cloneBrowserOpen, setCloneBrowserOpen] = useState(false);
   const [cloning, setCloning] = useState(false);
   const [cloneDest, setCloneDest] = useState('');
   const [cloneError, setCloneError] = useState(null);
+
+  const isLocal = info?.location === 'local';
+  const { scanData } = useScanData(isLocal ? project : null);
 
   const toggleDim = (id) => {
     setSelectedDims((prev) => {
@@ -71,6 +80,8 @@ function useReEvaluateCard(project, onStart) {
   const buildPayload = (extra) => {
     const payload = { repo: info.path, ...extra };
     if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
+    if (branch) payload.branch = branch;
+    if (scopePath) payload.scopePath = scopePath;
     return payload;
   };
   const handleStart = () => onStart(buildPayload());
@@ -96,6 +107,7 @@ function useReEvaluateCard(project, onStart) {
     toggleDim, selectAll, clearAll, handleStart, handleIncremental,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
+    isLocal, scanData, branch, setBranch, scopePath, setScopePath,
   };
 }
 
@@ -103,7 +115,7 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
   return (
     <div className="re-eval-stale-warning">
       <p>This project was evaluated from a remote repo but the original URL was not saved. Enter the URL to restore reevaluation.</p>
-      <div style={{ display: 'flex', gap: BUTTON_GAP, alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
         <input
           type="text"
           value={urlInput}
@@ -116,7 +128,6 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
         <button
           type="button"
           className="evaluate-submit-btn"
-          style={{ padding: BUTTON_PADDING, fontSize: BUTTON_FONT_SIZE }}
           disabled={!urlInput.trim() || urlSaving}
           onClick={handleUrlRestore}
         >
@@ -191,7 +202,7 @@ function ActionButtons({ info, project, disabled, canStart, cloning, handleIncre
   );
 }
 
-function ReEvaluateCardView({ info, project, disabled, dimensions, actions }) {
+function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scope }) {
   const { all: allDimensions, selected: selectedDims } = dimensions;
   const {
     toggleDim, selectAll, clearAll, handleStart, handleIncremental,
@@ -219,7 +230,17 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions }) {
 
         <CloneSection info={info} cloning={cloning} cloneDest={cloneDest} cloneError={cloneError} setCloneBrowserOpen={setCloneBrowserOpen} />
 
-        <div className={cloning ? 're-eval-disabled-section' : ''}>
+        {scope.isLocal && (
+          <BranchScopeSelector
+            branches={scope.scanData?.branches}
+            currentBranch={scope.scanData?.currentBranch || scope.branch}
+            projectPath={info.path}
+            onScopeChange={scope.setScopePath}
+            scopePath={scope.scopePath}
+          />
+        )}
+
+        <div className={`re-eval-actions-group${cloning ? ' re-eval-disabled-section' : ''}`}>
           <DimensionSelectionSection allDimensions={allDimensions} selectedDims={selectedDims} cloning={cloning} toggleDim={toggleDim} selectAll={selectAll} clearAll={clearAll} />
           <ActionButtons info={info} project={project} disabled={disabled} canStart={canStart} cloning={cloning} handleIncremental={handleIncremental} handleStart={handleStart} />
         </div>
@@ -237,15 +258,21 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions }) {
   );
 }
 
-export default function ReEvaluateCard({ project, onStart, disabled }) {
+export default function ReEvaluateCard({ project, projectInfo, onStart, disabled }) {
   const {
     info, error, allDimensions, selectedDims,
     toggleDim, selectAll, clearAll, handleStart, handleIncremental,
     urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
-  } = useReEvaluateCard(project, onStart);
+    isLocal, scanData, branch, setBranch, scopePath, setScopePath,
+  } = useReEvaluateCard(project, onStart, projectInfo);
 
-  if (error || !info) return null;
+  if (error) return null;
+  if (!info) return (
+    <div className="panel evaluate-panel">
+      <div className="panel-header"><h3>Loading project...</h3></div>
+    </div>
+  );
 
   return (
     <ReEvaluateCardView
@@ -258,6 +285,7 @@ export default function ReEvaluateCard({ project, onStart, disabled }) {
         urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore,
         cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
       }}
+      scope={{ isLocal, scanData, branch, setBranch, scopePath, setScopePath }}
     />
   );
 }

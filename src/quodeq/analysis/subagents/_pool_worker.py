@@ -33,11 +33,15 @@ def build_agent_config(
     jsonl_file = wctx.evidence_dir / f"{wctx.dimension_key}_evidence.jsonl"
     stream_file = wctx.evidence_dir / f"{wctx.dimension_key}_{agent_id}.stream"
     bc = base_config
+    # Cap per-agent duration to pool budget so agents can't outlive the pool
+    agent_dur = bc.max_duration or _DEFAULT_MAX_DURATION_S
+    if bc.pool_budget and bc.pool_budget > 0:
+        agent_dur = min(agent_dur, bc.pool_budget)
     ac = AnalysisConfig(
         jsonl_file=jsonl_file, analysis_budget=bc.analysis_budget,
         heartbeat_interval=bc.heartbeat_interval, heartbeat_callback=bc.heartbeat_callback,
         ai_cmd=bc.ai_cmd, ai_model=bc.ai_model, max_turns=bc.max_turns,
-        max_duration=bc.max_duration or _DEFAULT_MAX_DURATION_S,
+        max_duration=agent_dur,
         compiled_dir=bc.compiled_dir, dimension=wctx.dimension,
         queue_path=wctx.queue_path, agent_id=agent_id,
         max_files_per_agent=bc.max_files_per_agent,

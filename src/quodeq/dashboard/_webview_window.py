@@ -21,7 +21,7 @@ _CONTROLS_MAC = """\
     display: flex;
     gap: 6px;
     z-index: 99999;
-    padding: 6px 11px;
+    padding: 12px 11px;
     pointer-events: auto;
   }
   .qd-traffic::after {
@@ -49,7 +49,7 @@ _CONTROLS_MAC = """\
   body:has(.sidebar:hover) .qd-dot--minimize { background: #febc2e; }
   .qd-traffic:hover .qd-dot--maximize,
   body:has(.sidebar:hover) .qd-dot--maximize { background: #28c840; }
-  .sidebar { padding-top: 18px !important; }
+  .sidebar { padding-top: 26px !important; }
   body:has(.qd-traffic:hover) .app-shell {
     grid-template-columns: var(--sidebar-expanded-width) 1fr;
   }

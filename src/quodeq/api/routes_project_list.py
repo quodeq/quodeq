@@ -159,3 +159,22 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
         import dataclasses
         return jsonify(dataclasses.asdict(result))
+
+    @app.post("/api/scan")
+    def scan_path() -> Response | tuple[Response, int]:
+        """Scan a local path directly (no project required)."""
+        data = request.get_json(silent=True) or {}
+        target = data.get("path", "").strip()
+        if not target:
+            body, status = error_response("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
+            return jsonify(body), status
+
+        target_path = Path(target).resolve()
+        if not target_path.is_dir():
+            body, status = error_response("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
+            return jsonify(body), status
+
+        from quodeq.services._fs_scan import scan_project
+        import dataclasses
+        result = scan_project(target_path)
+        return jsonify(dataclasses.asdict(result))

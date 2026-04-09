@@ -1,16 +1,19 @@
 import { useState, useEffect } from 'react';
+import { scanPath } from '../../../api/index.js';
 
 /**
- * Fetch scan data (branches, modules) for a project.
+ * Fetch scan data for a project ID or a raw local path.
+ * Pass projectId for existing projects, or localPath for new evaluations.
  * Returns { scanData, loading, error }.
  */
-export function useScanData(projectId) {
+export function useScanData(projectId, localPath) {
   const [scanData, setScanData] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    if (!projectId) {
+    const target = projectId || localPath;
+    if (!target) {
       setScanData(null);
       return;
     }
@@ -19,11 +22,14 @@ export function useScanData(projectId) {
     setLoading(true);
     setError(null);
 
-    fetch(`/api/projects/${encodeURIComponent(projectId)}/scan`)
-      .then((res) => {
-        if (!res.ok) throw new Error(`Scan failed: ${res.status}`);
-        return res.json();
-      })
+    const fetchPromise = projectId
+      ? fetch(`/api/projects/${encodeURIComponent(projectId)}/scan`).then((res) => {
+          if (!res.ok) throw new Error(`Scan failed: ${res.status}`);
+          return res.json();
+        })
+      : scanPath(localPath);
+
+    fetchPromise
       .then((data) => {
         if (!cancelled) {
           setScanData(data);
@@ -38,7 +44,7 @@ export function useScanData(projectId) {
       });
 
     return () => { cancelled = true; };
-  }, [projectId]);
+  }, [projectId, localPath]);
 
   return { scanData, loading, error };
 }
