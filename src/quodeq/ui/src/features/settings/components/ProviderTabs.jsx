@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { getAiClients } from '../../../api/index.js';
 import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
-import { classify_provider } from './providerUtils.js';
+import { classifyProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
@@ -10,7 +10,7 @@ import CloudProviderTab from './CloudProviderTab.jsx';
 const CLI_DEFAULTS = { 'subagents': '5', 'pool-budget': '600' };
 
 function TabContent({ provider, providerConfig }) {
-  const classification = classify_provider(provider.id, provider.type, providerConfig);
+  const classification = classifyProvider(provider.id, provider.type, providerConfig);
   const defaults = classification === 'cli' ? CLI_DEFAULTS : undefined;
   const { state, update } = useProviderSettings(provider.id, defaults);
 

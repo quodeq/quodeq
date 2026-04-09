@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 import sys
 from pathlib import Path
@@ -15,6 +16,8 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_n
 
 if TYPE_CHECKING:
     from quodeq.services.jobs import JobManager
+
+_logger = logging.getLogger(__name__)
 
 _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
@@ -238,8 +241,7 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
     if not project or not run_id:
         return
 
-    import logging
-    _log = logging.getLogger(__name__)
+    _log = _logger
 
     evidence_dir = Path(reports_dir) / project / run_id / "evidence"
     evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"

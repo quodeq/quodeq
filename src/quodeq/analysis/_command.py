@@ -5,6 +5,7 @@ import logging
 import os
 import subprocess
 import sys
+import threading
 from pathlib import Path
 
 from quodeq.analysis._config import (
@@ -119,7 +120,7 @@ def _build_ai_cmd(
 
 
 _MCP_SERVER_PREFIX = "quodeq-findings"
-_cli_mcp_lock = __import__("threading").Lock()
+_cli_mcp_lock = threading.Lock()
 _cli_mcp_registered: set[str] = set()  # tracks (cmd, name) pairs
 
 

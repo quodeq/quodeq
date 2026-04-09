@@ -213,7 +213,7 @@ export default function FolderBrowser({ onSelect, onClose, title = 'Select Repos
     navigateFolder(path, navigation, showFiles);
   }
 
-  useEffect(() => { navigate(rootPath || ''); }, []);
+  useEffect(() => { navigate(rootPath || ''); }, [rootPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="modal-overlay" onClick={onClose}>

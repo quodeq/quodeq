@@ -159,7 +159,7 @@ class _WindowApi:
             url = self._window.get_current_url().split("#")[0].rstrip("/")
             base = url.rsplit("/", 1)[0] if "/" in url.lstrip("http") else url
             req = urllib.request.Request(f"{base}/api/evaluations")
-            with urllib.request.urlopen(req, timeout=2) as resp:
+            with urllib.request.urlopen(req, timeout=0.5) as resp:
                 jobs = _json.loads(resp.read())
                 for j in (jobs if isinstance(jobs, list) else []):
                     if j.get("status") == "running":

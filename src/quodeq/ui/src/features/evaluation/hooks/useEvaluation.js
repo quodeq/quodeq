@@ -180,7 +180,7 @@ function useResumeRunning(setJob, startPolling, pollRef, dimPollRef) {
       stopTimer(pollRef);
       stopTimer(dimPollRef);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only: resume any running eval
 }
 
 function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling) {

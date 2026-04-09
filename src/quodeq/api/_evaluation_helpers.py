@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from http import HTTPStatus
 
 from flask import Response, jsonify, request
@@ -10,7 +11,7 @@ from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
 
-_CREDENTIALS_RE = __import__("re").compile(r"(https?://)([^@]+)@")
+_CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
 _logger = logging.getLogger(__name__)
 
 # Bounds for user-supplied evaluation parameters

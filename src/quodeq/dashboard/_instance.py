@@ -10,8 +10,10 @@ from pathlib import Path
 from typing import Callable
 
 _logger = logging.getLogger(__name__)
-_SOCK_TIMEOUT = 1.0
+_SOCK_TIMEOUT = 0.5
 _RELOAD_PREFIX = "reload:"
+_MAX_UNIX_SOCK_PATH_LEN = 100
+_RECV_BUFFER_SIZE = 4096
 _IS_WIN32 = sys.platform == "win32"
 _WIN_PORT_FILE = "dashboard.port"
 
@@ -50,29 +52,25 @@ class InstanceController:
 
     # ── Unix socket helpers (macOS/Linux) ──
 
-    def _connect_to_sock(self, sock: socket.socket) -> None:
+    def _sock_op(self, sock: socket.socket, op_name: str) -> None:
+        """Connect or bind a unix socket, using chdir for long paths."""
+        op = getattr(sock, op_name)
         path_str = str(self._sock_path)
-        if len(path_str) <= 100:
-            sock.connect(path_str)
+        if len(path_str) <= _MAX_UNIX_SOCK_PATH_LEN:
+            op(path_str)
             return
         orig_cwd = os.getcwd()
         try:
             os.chdir(str(self._sock_path.parent))
-            sock.connect(self._sock_path.name)
+            op(self._sock_path.name)
         finally:
             os.chdir(orig_cwd)
 
+    def _connect_to_sock(self, sock: socket.socket) -> None:
+        self._sock_op(sock, "connect")
+
     def _bind_server_sock(self) -> None:
-        path_str = str(self._sock_path)
-        if len(path_str) <= 100:
-            self._server_sock.bind(path_str)
-            return
-        orig_cwd = os.getcwd()
-        try:
-            os.chdir(str(self._sock_path.parent))
-            self._server_sock.bind(self._sock_path.name)
-        finally:
-            os.chdir(orig_cwd)
+        self._sock_op(self._server_sock, "bind")
 
     # ── Public API ──
 
@@ -128,7 +126,7 @@ class InstanceController:
             while not self._shutdown_event.is_set():
                 try:
                     conn, _ = self._server_sock.accept()
-                    data = conn.recv(4096).decode("utf-8", errors="replace")
+                    data = conn.recv(_RECV_BUFFER_SIZE).decode("utf-8", errors="replace")
                     conn.close()
                     if data.startswith(_RELOAD_PREFIX):
                         url = data[len(_RELOAD_PREFIX):]
@@ -168,7 +166,7 @@ class InstanceController:
             except OSError:
                 pass
         if self._listen_thread:
-            self._listen_thread.join(timeout=2.0)
+            self._listen_thread.join(timeout=0.5)
         if _IS_WIN32:
             self._port_file.unlink(missing_ok=True)
         else:

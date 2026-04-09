@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import subprocess
@@ -104,7 +105,6 @@ def _list_modules(project_dir: Path) -> list[str]:
 
 def _write_scan_json(scan: ScanData, output_dir: Path) -> None:
     """Persist scan data as JSON."""
-    import dataclasses
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = dataclasses.asdict(scan)
     (output_dir / "scan.json").write_text(json.dumps(payload, indent=2))
