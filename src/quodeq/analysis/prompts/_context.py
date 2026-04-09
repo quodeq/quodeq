@@ -45,6 +45,7 @@ class PromptContext:
     target: "AnalysisTarget | None" = None
     extra_vars: dict[str, str] = field(default_factory=dict)
     work_dir: Path | None = None
+    previous_findings: list[dict] = field(default_factory=list)
 
 
 def render_manifest_context(context: PromptContext) -> str:

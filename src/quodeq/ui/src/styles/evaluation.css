@@ -115,6 +115,10 @@
   cursor: not-allowed;
 }
 
+.evaluate-submit-btn--secondary {
+  font-size: 0.85rem;
+}
+
 .job-error {
   margin-top: 16px;
   padding: 12px 16px;
