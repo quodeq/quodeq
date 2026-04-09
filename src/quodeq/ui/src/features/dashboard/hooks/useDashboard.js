@@ -100,13 +100,24 @@ function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, se
       let patched = data;
       if (rescore && data?.dimensions?.length > 0) {
         try {
-          const runIds = [...new Set(data.dimensions.map(d => d.fromRunId || d.runId).filter(Boolean))];
-          const byRun = await fetchRescores(selectedProject, runIds);
-          if (!active) return;
+          // Group runs by source project — parent dimensions may reference child projects
+          const runsByProject = {};
+          for (const d of data.dimensions) {
+            const proj = d.fromProject || selectedProject;
+            const rid = d.fromRunId || d.runId;
+            if (rid) {
+              if (!runsByProject[proj]) runsByProject[proj] = new Set();
+              runsByProject[proj].add(rid);
+            }
+          }
           const lookup = {};
-          for (const [, r] of Object.entries(byRun)) {
-            for (const d of (r.dimensions || []).map(createDimension)) {
-              lookup[dimKey(d)] = d;
+          for (const [proj, rids] of Object.entries(runsByProject)) {
+            const byRun = await fetchRescores(proj, [...rids]);
+            if (!active) return;
+            for (const [, r] of Object.entries(byRun)) {
+              for (const d of (r.dimensions || []).map(createDimension)) {
+                lookup[dimKey(d)] = d;
+              }
             }
           }
           patched = {

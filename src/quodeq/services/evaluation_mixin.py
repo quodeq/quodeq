@@ -83,12 +83,41 @@ def _build_evaluate_cmd(
     return cmd
 
 
-def _register_project(repo: str, discipline: str | None, reports_dir: str) -> None:
-    """Resolve and register the project UUID before evaluation starts."""
+def _register_project(repo: str, discipline: str | None, reports_dir: str, scope_path: str | None = None) -> None:
+    """Resolve/register project and run a scan for local projects.
+
+    For scoped evaluations, registers parent first, scans it, then registers
+    the child so both exist with scan data before the evaluation starts.
+    """
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = project_name_from_repo(repo)
     location = _LOCATION_ONLINE if is_repo_url(repo) else _LOCATION_LOCAL
-    resolve_project_uuid(Path(reports_dir), ProjectIdentity(project_name, repo_resolved, discipline, location))
+    reports_path = Path(reports_dir)
+
+    project_uuid = resolve_project_uuid(
+        reports_path,
+        ProjectIdentity(project_name, repo_resolved, discipline, location, scope_path=scope_path),
+    )
+
+    # Scan local projects so file lists are available immediately
+    if location == _LOCATION_LOCAL:
+        from quodeq.services._fs_scan import scan_project
+        repo_path = Path(repo_resolved)
+        if repo_path.is_dir():
+            project_dir = reports_path / project_uuid
+            scan_project(repo_path, output_dir=project_dir)
+            # For scoped projects, also scan the parent using the parent UUID from repo info
+            if scope_path:
+                import json
+                info_path = project_dir / "repository_info.json"
+                try:
+                    parent_uuid = json.loads(info_path.read_text()).get("parent")
+                    if parent_uuid:
+                        parent_dir = reports_path / parent_uuid
+                        if not (parent_dir / "scan.json").exists():
+                            scan_project(repo_path, output_dir=parent_dir)
+                except (json.JSONDecodeError, OSError):
+                    pass
 
 
 class FsEvaluationMixin:
@@ -146,7 +175,7 @@ class FsEvaluationMixin:
                 raise FileNotFoundError(f"Repository not found: {repo}")
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
-        _register_project(repo, options.discipline, reports_dir)
+        _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
         env = self._build_eval_env(repo, options)
         if is_repo_url(repo):
             cwd = str(Path.cwd())

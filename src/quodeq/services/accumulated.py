@@ -79,6 +79,46 @@ def _compute_result(
     return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
 
 
+from quodeq.services._fs_projects import find_children as _find_children  # noqa: E402
+
+
+def _compute_parent_accumulated(
+    reports_root: Path,
+    children: list[str],
+    parent_id: str,
+    cache_config: AccumulatedCacheConfig | None,
+    extra_dims: list[DimensionResult] | None = None,
+) -> dict[str, Any] | None:
+    """Merge latest findings from all children (and optional own dims) and score.
+
+    *extra_dims* are dimensions from the parent's own runs, included when the
+    parent has both its own evaluation runs and scoped children.
+    """
+    all_dims: list[DimensionResult] = list(extra_dims) if extra_dims else []
+    # Track which child each dimension came from
+    dim_source: dict[str, str] = {}  # dimension_name -> child_project_id
+    for child in children:
+        child_runs = list_runs(reports_root, child)
+        if not child_runs:
+            continue
+        result = _compute_result(reports_root, child, child_runs, cache_config)
+        for d in result.all_dimensions:
+            dim_source[d.dimension] = child
+        all_dims.extend(result.all_dimensions)
+    if not all_dims:
+        return None
+    severity = _aggregate_severity_counts(all_dims)
+    avg, _ = _compute_accumulated_scores(all_dims, {})
+    merged_result = _AccumulatedResult(all_dims, all_dims, severity, avg, None)
+    response = _build_accumulated_response(parent_id, merged_result)
+    # Tag each dimension with its source child project for navigation
+    for dim_dict in response.get("dimensions", []):
+        dim_name = dim_dict.get("dimension", "")
+        if dim_name in dim_source:
+            dim_dict["fromProject"] = dim_source[dim_name]
+    return response
+
+
 def compute_accumulated(
     reports_dir: str, project: str, as_of: str | None,
     *, cache_config: AccumulatedCacheConfig | None = None,
@@ -91,6 +131,23 @@ def compute_accumulated(
     if as_of:
         idx = next((i for i, r in enumerate(all_run_infos) if r.run_id == as_of), None)
         all_run_infos = all_run_infos[idx:] if idx is not None else []
-    if not all_run_infos:
+    children = _find_children(reports_root, project)
+
+    # No runs and no children — nothing to show
+    if not all_run_infos and not children:
         return None
-    return _build_accumulated_response(project, _compute_result(reports_root, project, all_run_infos, cache_config))
+
+    # Pure parent (no own runs) — aggregate children only
+    if not all_run_infos and children:
+        return _compute_parent_accumulated(reports_root, children, project, cache_config)
+
+    # Has own runs — check if also has children to merge
+    own_result = _compute_result(reports_root, project, all_run_infos, cache_config)
+    if not children:
+        return _build_accumulated_response(project, own_result)
+
+    # Has both own runs AND children — merge everything
+    return _compute_parent_accumulated(
+        reports_root, children, project, cache_config,
+        extra_dims=own_result.all_dimensions,
+    )

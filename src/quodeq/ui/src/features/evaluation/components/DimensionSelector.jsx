@@ -1,9 +1,9 @@
 const TYPE_CONFIG = {
-  quodeq:    { label: 'Quodeq',    className: 'dimension-chip-type--quodeq' },
-  custom:    { label: 'Custom',    className: 'dimension-chip-type--custom' },
-  community: { label: 'Community', className: 'dimension-chip-type--community' },
+  quodeq:    { label: 'Quodeq',    className: 'dimension-chip-type--quodeq',    order: 1 },
+  custom:    { label: 'Custom',    className: 'dimension-chip-type--custom',    order: 3 },
+  community: { label: 'Community', className: 'dimension-chip-type--community', order: 2 },
 };
-const DEFAULT_TYPE_CONFIG = { label: 'ISO', className: 'dimension-chip-type--builtin' };
+const DEFAULT_TYPE_CONFIG = { label: 'ISO', className: 'dimension-chip-type--builtin', order: 0 };
 
 function typeInfo(dim) { return TYPE_CONFIG[dim.standardType] || DEFAULT_TYPE_CONFIG; }
 
@@ -24,7 +24,12 @@ function DimensionChip({ dim, isSelected, onToggle }) {
 }
 
 export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll }) {
-  const sorted = [...allDimensions].sort((a, b) => (a.label || a.id).localeCompare(b.label || b.id));
+  const sorted = [...allDimensions].sort((a, b) => {
+    const oa = (TYPE_CONFIG[a.standardType] || DEFAULT_TYPE_CONFIG).order;
+    const ob = (TYPE_CONFIG[b.standardType] || DEFAULT_TYPE_CONFIG).order;
+    if (oa !== ob) return oa - ob;
+    return (a.label || a.id).localeCompare(b.label || b.id);
+  });
 
   return (
     <div className="form-group">

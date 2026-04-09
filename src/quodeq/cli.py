@@ -133,7 +133,8 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
 
     project_name = project_name_from_repo(args.repo)
     location = "online" if is_repo_url(args.repo) else "local"
-    project_uuid = resolve_project_uuid(reports_root, ProjectIdentity(project_name, str(src), None, location))
+    scope = getattr(args, "scope", None)
+    project_uuid = resolve_project_uuid(reports_root, ProjectIdentity(project_name, str(src), None, location, scope_path=scope))
 
     run_id = str(uuid.uuid4())
     evidence_dir = reports_root / project_uuid / run_id / "evidence"
@@ -358,6 +359,8 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
             print(f"Scope filter: {total} files under '{scope_path}'", file=sys.stderr)
         else:
             print(f"No source files found under scope '{scope_path}'", file=sys.stderr)
+            print("The scoped folder contains no recognized source code files.", file=sys.stderr)
+            return None
 
     # For single-file: override manifest to contain only the target file
     if single_file:

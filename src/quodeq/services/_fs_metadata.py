@@ -40,6 +40,7 @@ def _extract_project_metadata(info: dict[str, Any], entry_name: str) -> dict[str
         "discipline": info.get("discipline") or None,
         "path": info.get("path") or None,
         "location": info.get("location") or None,
+        "scopePath": info.get("scopePath") or None,
     }
 
 

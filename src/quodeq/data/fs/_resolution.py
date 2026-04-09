@@ -12,8 +12,11 @@ from quodeq.data.fs._models import ProjectIdentity
 
 
 def _index_key(identity: ProjectIdentity) -> str:
-    """Return a stable string key for the (name, path) pair."""
-    return f"{identity.project_name}\x00{identity.repo_path}"
+    """Return a stable string key for the (name, path[, scope]) tuple."""
+    base = f"{identity.project_name}\x00{identity.repo_path}"
+    if identity.scope_path:
+        return f"{base}\x00{identity.scope_path}"
+    return base
 
 
 def _find_existing_project(
@@ -58,6 +61,8 @@ def _create_project(
     identity: ProjectIdentity,
     load_fn: Callable[[Path], dict[str, str]],
     save_fn: Callable[[Path, dict[str, str]], None],
+    *,
+    parent_uuid: str | None = None,
 ) -> str:
     """Create a new UUID project directory, write repository_info.json, and index it."""
     if identity.location == "online" and not identity.repo_path.startswith(("https://", "git@")):
@@ -69,13 +74,17 @@ def _create_project(
     project_uuid = str(uuid.uuid4())
     project_dir = reports_dir / project_uuid
     project_dir.mkdir(parents=True, exist_ok=True)
-    info = {
+    info: dict[str, object] = {
         "uuid": project_uuid,
         "name": identity.project_name,
         "discipline": identity.discipline,
         "location": identity.location,
         "path": identity.repo_path,
     }
+    if identity.scope_path:
+        info["scopePath"] = identity.scope_path
+    if parent_uuid:
+        info["parent"] = parent_uuid
     try:
         (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
     except OSError as exc:

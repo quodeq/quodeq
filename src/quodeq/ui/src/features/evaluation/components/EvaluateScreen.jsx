@@ -39,6 +39,20 @@ function EvaluateHelpSection() {
   );
 }
 
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+
+function ActiveProviderBadge() {
+  const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const model = localStorage.getItem(providerKey(provider, 'model')) || '';
+  if (!provider) return null;
+  return (
+    <div className="eval-provider-badge">
+      <span className="eval-provider-name">{provider}</span>
+      {model && <span className="eval-provider-model">{model}</span>}
+    </div>
+  );
+}
+
 function EvaluateHeader({ isRunning }) {
   return (
     <header className="evaluate-header">
@@ -69,6 +83,7 @@ function EvaluateHeader({ isRunning }) {
           <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
         </div>
       </div>
+      <ActiveProviderBadge />
     </header>
   );
 }

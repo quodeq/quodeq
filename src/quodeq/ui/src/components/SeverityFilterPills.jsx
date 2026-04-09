@@ -8,7 +8,7 @@ const SEVERITY_LABELS = { critical: 'Critical', major: 'Major', minor: 'Minor' }
 export default function SeverityFilterPills({ counts, activeFilter, onFilterChange }) {
   const isAllActive = !activeFilter || activeFilter === 'all';
   return (
-    <div className="map-pill-group" style={{ margin: '8px 0 4px', justifyContent: 'flex-start' }}>
+    <div className="map-pill-group" style={{ justifyContent: 'flex-start' }}>
       <button type="button" className={`map-pill${isAllActive ? ' active' : ''}`} onClick={() => onFilterChange(null)}>
         All
       </button>

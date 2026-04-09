@@ -34,20 +34,60 @@ def resolve_project_uuid(
     When *repository* is provided, it is used for loading/saving the index
     instead of the default filesystem helpers, making the storage layer
     injectable for testing or alternative backends.
+
+    When *identity.scope_path* is set, a parent project (full repo) is
+    resolved/created first, then a child project scoped to the subfolder
+    is resolved/created with a ``parent`` back-link.
     """
     if identity.location == "online":
         resolved_path = identity.repo_path
     else:
         resolved_path = str(Path(identity.repo_path).resolve())
-    resolved = ProjectIdentity(
-        identity.project_name, resolved_path, identity.discipline, identity.location,
-    )
+
     if not reports_dir.exists():
         reports_dir.mkdir(parents=True, exist_ok=True)
 
     load_fn = repository.load_index if repository is not None else _load_index
     save_fn = repository.save_index if repository is not None else _save_index
+
+    # --- scoped resolution: ensure parent exists, then resolve child ---
+    if identity.scope_path:
+        parent_identity = ProjectIdentity(
+            identity.project_name, resolved_path, identity.discipline, identity.location,
+        )
+        parent_uuid = _find_existing_project(reports_dir, parent_identity, load_fn, save_fn)
+        if not parent_uuid:
+            parent_uuid = _create_project(reports_dir, parent_identity, load_fn, save_fn)
+
+        child_name = f"{identity.project_name}/{identity.scope_path}"
+        child_identity = ProjectIdentity(
+            child_name, resolved_path, identity.discipline, identity.location,
+            scope_path=identity.scope_path,
+        )
+        existing = _find_existing_project(reports_dir, child_identity, load_fn, save_fn)
+        if existing:
+            return existing
+        return _create_project(
+            reports_dir, child_identity, load_fn, save_fn, parent_uuid=parent_uuid,
+        )
+
+    # --- unscoped resolution ---
+    resolved = ProjectIdentity(
+        identity.project_name, resolved_path, identity.discipline, identity.location,
+    )
     existing = _find_existing_project(reports_dir, resolved, load_fn, save_fn)
     if existing:
+        from quodeq.services._fs_projects import find_children
+        if find_children(reports_dir, existing):
+            dot_identity = ProjectIdentity(
+                f"{identity.project_name}/.", resolved_path,
+                identity.discipline, identity.location, scope_path=".",
+            )
+            dot_existing = _find_existing_project(reports_dir, dot_identity, load_fn, save_fn)
+            if dot_existing:
+                return dot_existing
+            return _create_project(
+                reports_dir, dot_identity, load_fn, save_fn, parent_uuid=existing,
+            )
         return existing
     return _create_project(reports_dir, resolved, load_fn, save_fn)

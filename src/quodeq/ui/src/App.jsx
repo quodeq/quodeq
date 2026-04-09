@@ -132,14 +132,14 @@ const ROUTE_RENDERERS = {
     function navigateToDimension(row, severity) {
       const dim = row.raw || dims.find(d => d.dimension === row.dimension);
       if (!dim) return;
-      nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, severity, sourceTab: 'violations' });
+      nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, severity, sourceTab: 'violations' });
     }
 
     return (
       <ViolationsPage
         data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
         callbacks={{
-          onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, sourceTab: 'violations' }),
+          onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
           onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
           onCellClick: ({ row, severity }) => {
             if (row.type === 'principle' && row.principleObj) {
@@ -180,7 +180,7 @@ const ROUTE_RENDERERS = {
         }}
         callbacks={{
           onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
-          onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel }),
+          onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
           onNavigate: props.navigation.handleNavigate,
           onRunChange: props.navigation.setHistorySelectedRun,
         }}
@@ -188,7 +188,7 @@ const ROUTE_RENDERERS = {
     );
   },
   'history-run': (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate }} runMode={true} />,
-  explorer: (params, props) => <ExplorerPage project={props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} severityFilter={params.severity} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
+  explorer: (params, props) => <ExplorerPage project={params.fromProject || props.navigation.selectedProject} dimension={params.dimension} runId={params.runId} dateLabel={params.dateLabel} severityFilter={params.severity} onNavigate={props.navigation.handleNavigate} refreshSignal={props.dashboardData.dashboard} />,
   evaluate: (params, props) => <EvaluateCase serverHealth={props.serverHealth} evaluation={props.evaluation} selectedProject={props.navigation.selectedProject} projects={props.navigation.projects} />,
   file: (params) => <FileDetailPage file={params.file} />,
   evalprinciple: renderEvalPrincipleDetail,
