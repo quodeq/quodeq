@@ -49,9 +49,19 @@ def build_project_list(reports_root: Path) -> list[ProjectEntry]:
         if len(dir_names) >= max_listed:
             break
 
+    def _is_subproject(name: str) -> bool:
+        info_path = reports_root / name / "repository_info.json"
+        if not info_path.exists():
+            return False
+        try:
+            return bool(json.loads(info_path.read_text()).get("parent"))
+        except (json.JSONDecodeError, OSError):
+            return False
+
     def _build_one(name: str) -> ProjectEntry | None:
         runs = list_runs(reports_root, name)
-        if not runs and not _has_children(reports_root, name):
+        # Include if: has runs, or is a parent with children, or is a sub-project
+        if not runs and not _has_children(reports_root, name) and not _is_subproject(name):
             return None
         return _build_project_entry(reports_root, name, runs)
 
