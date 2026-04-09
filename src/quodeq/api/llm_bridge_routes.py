@@ -29,8 +29,10 @@ def register_llm_bridge_routes(app: Flask) -> None:
     def ollama_test_concurrency() -> Response:
         data = request.get_json() or {}
         model = data.get("model", "")
-        if not model:
+        if not model or not isinstance(model, str):
             return jsonify({"error": "model is required"}), 400
+        if "\\" in model or ".." in model or "\0" in model:
+            return jsonify({"error": "Invalid model name"}), 400
         result = run_concurrency_test(model)
         return jsonify(result)
 

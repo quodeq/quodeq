@@ -75,7 +75,7 @@ def register_static_routes(app: Flask, static_dist: str | None) -> None:
         """Serve a static file or fall back to the SPA index."""
         resolved = (dist / path).resolve()
         if not resolved.is_relative_to(dist):
-            return None
+            return jsonify({"error": "Forbidden", "code": "FORBIDDEN"}), HTTPStatus.FORBIDDEN
         if resolved.is_file():
             return send_from_directory(str(dist), path)
         if path.startswith('api/'):
