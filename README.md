@@ -22,7 +22,7 @@
 
 ---
 
-> **Why now?** Anthropic's Claude Mythos Preview just identified thousands of zero-day vulnerabilities across every major OS and browser, with a 72% exploit success rate. The model found a 17-year-old RCE flaw in FreeBSD's NFS server without any human guidance. AI can now find and exploit vulnerabilities faster than most teams can patch them. If your codebase has security debt, maintainability issues, or reliability gaps, the window to fix them before AI-powered attacks scale is closing. Quodeq helps you prepare your software -- find vulnerabilities, enforce standards, and harden your code before these models reach the wild.
+> **Why now?** AI models can now autonomously find and exploit zero-day vulnerabilities across operating systems, browsers, and web applications. Thousands of previously unknown flaws have been uncovered in weeks, not years. The code you ship today will be read by models that can spot what humans miss. If your codebase carries security debt, reliability gaps, or maintenance shortcuts, the window to fix them is shrinking fast. Quodeq helps you prepare your software -- find what's wrong, enforce quality standards, and harden your code before the next generation of models is used against it.
 
 ---
 
@@ -35,7 +35,7 @@ quodeq dashboard       # Launch the dashboard
 
 That's it. The dashboard lets you point to any project and run evaluations from the UI.
 
-> Also available via `pip install quodeq`.
+> Also available via `pip install quodeq`, or download the [macOS DMG](https://github.com/quodeq/quodeq/releases/latest) / [Windows installer](https://github.com/quodeq/quodeq/releases/latest) from Releases.
 
 ### Requirements
 
@@ -142,7 +142,7 @@ Quodeq can evaluate **any codebase in any language**. The AI analysis engine rea
 
 ---
 
-## The Q-squared Scoring Formula
+## The Q&#178; Scoring Formula
 
 Quodeq scores each principle on a 0-10 scale using four independent constraints:
 
