@@ -62,11 +62,11 @@ ollama pull gemma4:26b
 
 Install any of these CLI tools and Quodeq will auto-detect them:
 
-| Provider | Install | Docs |
-|---|---|---|
-| Claude Code | [Installation guide](https://code.claude.com/docs/en/quickstart) | [docs](https://code.claude.com/docs) |
-| Codex CLI | `npm i -g @openai/codex` | [docs](https://developers.openai.com/codex/quickstart) |
-| Gemini CLI | `npm i -g @google/gemini-cli` | [docs](https://geminicli.com/docs/get-started/installation/) |
+| Provider | Getting started |
+|---|---|
+| Claude Code | [Installation guide](https://code.claude.com/docs/en/quickstart) |
+| Codex CLI | [Installation guide](https://developers.openai.com/codex/quickstart) |
+| Gemini CLI | [Installation guide](https://geminicli.com/docs/get-started/installation/) |
 
 After installing a provider, go to **Settings** in the dashboard and select it.
 
