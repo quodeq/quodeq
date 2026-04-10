@@ -142,7 +142,7 @@ Quodeq can evaluate **any codebase in any language**. The AI analysis engine rea
 
 ---
 
-## The Q&#178; Scoring Formula
+## The Q² Scoring Formula
 
 Quodeq scores each principle on a 0-10 scale using four independent constraints:
 
