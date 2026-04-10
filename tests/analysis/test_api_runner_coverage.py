@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+instructor = pytest.importorskip("instructor", reason="requires quodeq[api] extra")
+
 from quodeq.analysis._api_runner import (
     ApiRunnerConfig,
     _call_api,
