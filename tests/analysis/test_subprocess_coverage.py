@@ -295,6 +295,10 @@ class TestRunCliAnalysis:
 # _run_api_analysis_bridge
 # ---------------------------------------------------------------------------
 
+@pytest.mark.skipif(
+    not __import__("importlib").util.find_spec("instructor"),
+    reason="requires quodeq[api] extra",
+)
 class TestRunApiAnalysisBridge:
     def test_raises_when_no_model(self, tmp_path):
         stream = tmp_path / "stream.json"

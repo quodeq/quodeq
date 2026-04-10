@@ -1,5 +1,38 @@
 # Changelog
 
+## [1.0.0] — 2026-04-10
+
+### Features
+- **Desktop app** — standalone Quodeq.app (macOS) and Windows .exe packaging with CI build workflow
+- **Help tab** — comprehensive usage documentation covering getting started, providers, evaluations, violations, code map, standards, and AI-generated custom standards
+- **Scoped evaluations** — narrow analysis to a subdirectory or branch within a repository
+- **Inline verification** — replaces separate verification phase for faster incremental scans
+
+### Improvements
+- Instant "Closing..." overlay on window close with faster shutdown (4s to <1s)
+- Kill running evaluations on shutdown with close confirmation dialog
+- Cache dashboard data per run for zero-flash date switching
+- Sidebar-only scroll and loading state improvements
+
+### Security
+- Path traversal fixes using is_relative_to and validate_path_segment
+- SSRF protection on cloud provider URLs (private network blocking)
+- XSS escaping in webview close dialog and log route
+- API key sanitization in error responses
+- System directory scan blocking (/proc, /sys, /dev, /etc)
+
+### Reliability
+- Thread-safe rate limiter with Lock
+- Crash guards on env var parsing (int() with fallback)
+- None payload guards on standards CRUD routes
+- Temp file and worktree leak fixes
+- Narrowed bare except Exception to specific types
+
+### Code Quality
+- Performance: single-pass iterations, pre-indexed Maps, useMemo, chunked file hashing, bounded fetch concurrency
+- Maintainability: replaced bare except/pass with logging, fixed stale __all__, moved inline imports to module level, extracted duplicated code
+- Test coverage increased from 74% to 86% (+1011 tests)
+
 ## [0.10.0] — 2026-04-03
 
 ### Features

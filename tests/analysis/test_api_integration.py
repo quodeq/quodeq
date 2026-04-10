@@ -7,6 +7,8 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+pytest.importorskip("instructor", reason="requires quodeq[api] extra")
+
 from quodeq.analysis.subprocess import run_analysis
 from quodeq.analysis._config import AnalysisConfig
 
