@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.0-b1] — 2026-04-10
+## [1.0.0] — 2026-04-10
 
 ### Features
 - **Desktop app** — standalone Quodeq.app (macOS) and Windows .exe packaging with CI build workflow
