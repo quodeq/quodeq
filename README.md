@@ -53,10 +53,10 @@ Quodeq works with **local models** and **cloud AI CLIs**. Choose what fits your 
 Install [Ollama](https://ollama.com/download), pull a model, and select it in Settings:
 
 ```bash
-ollama pull gemma4:27b
+ollama pull gemma4:26b
 ```
 
-> `gemma4:27b` offers an excellent quality-to-cost ratio for local analysis.
+> We recommend [Gemma 4](https://deepmind.google/models/gemma/gemma-4/), specifically [`gemma4:26b`](https://ollama.com/library/gemma4:26b), for an excellent quality-to-cost ratio in local analysis.
 
 #### Cloud CLI providers (faster, deeper analysis)
 
