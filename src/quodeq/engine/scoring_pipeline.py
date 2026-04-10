@@ -15,20 +15,17 @@ _NA_LABEL = "N/A"
 def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -> dict:
     """Full pipeline: run per-dimension → score each → write reports.
 
-    Verification runs mechanically before each dimension's subagent pool
-    (inside process_dimension_with_subagents), not as a separate phase.
+    Each dimension is scored and written to disk as soon as it completes,
+    so completed dimensions survive if the process is cancelled mid-run.
 
     Returns dict of {dimension: overall_score_str}.
     """
     work_dir = config.work_dir or config.src
-    per_dim_evidence = run_per_dimension(config)
-
     results: dict[str, str] = {}
 
-    for dimension, evidence in per_dim_evidence.items():
+    def _score_dimension(dimension: str, evidence: "Evidence") -> None:
         scores = score_evidence(evidence, mode=mode)
         write_dimension_report(evidence, scores, dimension, output_dir)
-        # Clean up stream now that the eval JSON exists
         cleanup_stream(work_dir / f"{dimension}_live.stream")
         overall = scores.overall
         if mode == _NUMERICAL_MODE:
@@ -36,5 +33,7 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
             results[dimension] = f"{val}/10" if val is not None else _NA_LABEL
         else:
             results[dimension] = (overall.weighted_grade if overall else None) or _NA_LABEL
+
+    run_per_dimension(config, on_dimension_done=_score_dimension)
 
     return results

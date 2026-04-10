@@ -11,13 +11,32 @@ _AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" 
 # (data/config/ai_providers.json) cannot be loaded.
 _PROVIDER_CONFIGS_FALLBACK: dict[str, dict] = {
     "claude": {
+        "type": "cli",
+        "cmd": "claude",
+        "cmd_subcommand": "",
+        "base_args": "--print --output-format stream-json --verbose",
+        "prompt_style": "flag",
+        "prompt_flag": "-p",
+        "supports_mcp": True,
+        "supports_tools": True,
+        "supports_budget": True,
+        "supports_turns": True,
         "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
         "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
         "env_remove": ["CLAUDECODE"],
     },
     "codex": {
+        "type": "cli",
+        "cmd": "codex",
+        "cmd_subcommand": "exec",
+        "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
+        "prompt_style": "positional",
+        "mcp_style": "cli-register",
+        "supports_tools": False,
+        "supports_budget": False,
+        "supports_turns": False,
         "mcp_permission_args": [],
-        "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
+        "env_set_if_missing": {},
         "env_remove": [],
     },
 }

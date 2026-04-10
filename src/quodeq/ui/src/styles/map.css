@@ -57,6 +57,7 @@
   background: var(--color-surface-alt);
   border-radius: 6px;
   padding: 2px;
+  margin-bottom: 32px;
 }
 
 .map-pill {
@@ -199,11 +200,10 @@
   position: relative;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: 8px;
   background: var(--color-surface);
-  padding: var(--space-4);
 }
 
 /* ── Tooltip ─────────────────────────────────────────── */
@@ -329,6 +329,17 @@
   opacity: 0.8;
 }
 
+.heat-grid-cell.clickable,
+.heat-grid-num.clickable {
+  cursor: pointer;
+}
+
+.heat-grid-cell.clickable:hover,
+.heat-grid-num.clickable:hover {
+  opacity: 0.7;
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 30%, transparent);
+}
+
 .heat-grid-cell.empty {
   background: var(--color-surface-alt);
   color: var(--color-text-muted);
@@ -407,3 +418,4 @@
 .map-dim-pill:not(.active) {
   opacity: 0.5;
 }
+

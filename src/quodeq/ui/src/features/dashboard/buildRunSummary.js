@@ -29,16 +29,21 @@ export default function buildRunSummary(dimensions, apiSummary) {
       ? (scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1)
       : null;
 
+  let totalViolations = 0, totalCompliance = 0, critical = 0, major = 0, minor = 0;
+  for (const d of dimensions) {
+    totalViolations += d.totals?.violationCount || 0;
+    totalCompliance += d.totals?.complianceCount || 0;
+    critical += d.totals?.severity?.critical || 0;
+    major += d.totals?.severity?.major || 0;
+    minor += d.totals?.severity?.minor || 0;
+  }
+
   return {
     overallGrade: mostFrequentGrade(grades) || '-',
     numericAverage,
-    totalViolations: dimensions.reduce((sum, d) => sum + (d.totals?.violationCount || 0), 0),
-    totalCompliance: dimensions.reduce((sum, d) => sum + (d.totals?.complianceCount || 0), 0),
+    totalViolations,
+    totalCompliance,
     dimensionCount: dimensions.length,
-    severity: {
-      critical: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.critical || 0), 0),
-      major: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.major || 0), 0),
-      minor: dimensions.reduce((sum, d) => sum + (d.totals?.severity?.minor || 0), 0),
-    },
+    severity: { critical, major, minor },
   };
 }

@@ -16,7 +16,7 @@ def check_zero_findings(
     result: dict[str, Evidence], source_file_count: int, skipped_count: int = 0,
 ) -> None:
     """Raise EvaluationError if all dimensions produced zero findings."""
-    from quodeq.analysis._pipeline import EvaluationError
+    from quodeq.analysis.errors import EvaluationError
 
     if not result or source_file_count <= 0:
         return
@@ -37,6 +37,7 @@ def run_incremental_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
     *, process_fn: Callable[..., Evidence | None],
     log_result_fn: Callable[..., None],
+    on_dimension_done: Callable[[str, Evidence], None] | None = None,
 ) -> dict[str, Evidence]:
     """Run incremental per-dimension analysis.
 
@@ -66,6 +67,8 @@ def run_incremental_loop(
         if ev:
             log_result_fn(ev, dimension, idx, ctx.total)
             result[dimension] = ev
+            if on_dimension_done:
+                on_dimension_done(dimension, ev)
     check_zero_findings(result, config.source_file_count)
     return result
 
@@ -73,6 +76,7 @@ def run_incremental_loop(
 def run_per_dimension_loop(
     config: RunConfig, dimensions: list[str], ctx: _AnalysisContext,
     *, process_fn: Callable[..., Evidence | None],
+    on_dimension_done: Callable[[str, Evidence], None] | None = None,
 ) -> dict[str, Evidence]:
     """Per-dimension loop (fallback or single-dimension).
 
@@ -96,5 +100,7 @@ def run_per_dimension_loop(
             skipped_count += 1
             continue
         result[dimension] = ev
+        if on_dimension_done:
+            on_dimension_done(dimension, ev)
     check_zero_findings(result, config.source_file_count, skipped_count)
     return result

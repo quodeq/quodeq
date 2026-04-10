@@ -8,6 +8,7 @@ import sys
 
 from flask import Flask, Response, jsonify
 
+from quodeq.api._log_buffer import LogBuffer
 from quodeq.api._rate_limit import (
     InMemoryRateLimitStore,
     RateLimitStore,
@@ -42,6 +43,7 @@ def create_app(
     if test_config is not None:
         app.config.update(test_config)
     provider = provider or _default_provider()
+    app.config["_provider"] = provider
     store = rate_limit_store or create_rate_limit_store()
     eval_store = InMemoryRateLimitStore(
         window=_EVALUATION_RATE_LIMIT_WINDOW, max_requests=_EVALUATION_RATE_LIMIT_MAX,
@@ -61,13 +63,39 @@ def create_app(
 
     configure_security(app, store, api_key)
 
+    log_buffer = LogBuffer()
+    app.extensions["log_buffer"] = log_buffer
+
+    # Capture request logs in the ring buffer for the UI console.
+    # Terminal output is suppressed unless QUODEQ_VERBOSE=1 (set by --verbose).
+    verbose = os.environ.get("QUODEQ_VERBOSE") == "1"
+    for name in ("werkzeug", "quodeq.api"):
+        lgr = logging.getLogger(name)
+        lgr.handlers = [log_buffer.handler]
+        if verbose:
+            lgr.handlers.append(logging.StreamHandler())
+        lgr.propagate = False
+
     @app.get("/api/health")
     def health() -> Response:
-        """Return a simple health-check response."""
+        """Return a simple health-check response with server info."""
         from quodeq import __version__
-        return jsonify({"ok": True, "version": __version__})
+        from quodeq.shared.utils import get_action_api_host, get_action_api_port
+        host = get_action_api_host()
+        port = get_action_api_port()
+        display_host = "localhost" if host in ("127.0.0.1", "0.0.0.0") else host
+        payload: dict[str, object] = {
+            "ok": True,
+            "version": __version__,
+            "host": host,
+            "port": port,
+            "address": f"{display_host}:{port}",
+        }
+        if verbose:
+            payload["pid"] = os.getpid()
+        return jsonify(payload)
 
-    register_all_routes(app, provider, eval_store, static_dist)
+    register_all_routes(app, provider, eval_store, static_dist, log_buffer)
     return app
 
 
@@ -80,7 +108,16 @@ def main(env: dict[str, str] | None = None) -> None:
     # consider a secrets manager or platform keychain instead.
     app = create_app(static_dist=get_static_dist(), api_key=_env.get("QUODEQ_API_KEY"))
 
+    # Kill running evaluation subprocesses on shutdown
+    import atexit
+    def _cleanup_jobs():
+        provider = app.config.get("_provider")
+        if provider and hasattr(provider, "_jobs"):
+            provider._jobs.shutdown()
+    atexit.register(_cleanup_jobs)
+
     def _handle_shutdown(signum: int, frame: object) -> None:
+        _cleanup_jobs()
         raise SystemExit(0)
 
     if hasattr(signal, "SIGTERM"):

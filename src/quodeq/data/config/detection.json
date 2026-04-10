@@ -52,7 +52,7 @@
   },
   "skip_dirs": [
     "node_modules", "vendor", "venv", ".venv", "__pycache__",
-    "dist", "build", "out", ".next", "target",
+    "dist", "build", "out", ".next", "target", "static",
     ".git", ".svn", ".hg"
   ],
   "skip_patterns": ["*.min.js", "*.generated.*", "*.pb.go", "*.d.ts"]

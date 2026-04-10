@@ -17,13 +17,17 @@ class HttpClient(Protocol):
 
 class UrllibJsonClient:
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
+        import ssl
         import urllib.request
         req = urllib.request.Request(url, headers=headers or {})
-        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S) as resp:
+        ctx = ssl.create_default_context()
+        with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S, context=ctx) as resp:
             return json.loads(resp.read())
 
 class StandardsLibraryClient:
     def __init__(self, base_url: str, http_client: HttpClient, token: str | None = None) -> None:
+        if not base_url.startswith("https://"):
+            raise ValueError(f"Only https:// base URLs are allowed, got: {base_url!r}")
         self._base_url = base_url.rstrip("/")
         self._http = http_client
         self._token = token
@@ -53,7 +57,9 @@ class StandardsLibraryClient:
         self._validate_id(data.get("id", ""))
         content_hash = hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()[:_HASH_PREFIX_LEN]
         evaluators_dir.mkdir(parents=True, exist_ok=True)
-        dest = evaluators_dir / f"{data['id']}.json"
+        dest = (evaluators_dir / f"{data['id']}.json").resolve()
+        if not dest.is_relative_to(evaluators_dir.resolve()):
+            raise ValueError(f"Invalid standard ID from library: {data['id']}")
         # Check for collision with existing standard
         if dest.is_file():
             existing = json.loads(dest.read_text())

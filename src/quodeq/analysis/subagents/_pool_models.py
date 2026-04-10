@@ -27,6 +27,9 @@ class PoolPaths:
     work_dir: Path
     evidence_dir: Path
     queue_path: Path
+    src: Path | None = None
+    all_files: list[str] | None = None
+    standards_dir: Path | None = None
 
 
 @dataclass
@@ -36,6 +39,7 @@ class PoolOptions:
     prompt: str
     dimension: str | list[str]
     scout_first: bool = True
+    phase: str = "ANALYSIS"
 
 
 @dataclass

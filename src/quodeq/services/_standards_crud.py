@@ -1,6 +1,7 @@
 """CRUD and import operations for custom standards."""
 from __future__ import annotations
 
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -23,7 +24,7 @@ class JsonIO:
 
 
 def _validate_id(standard_id: str) -> None:
-    if not standard_id or "/" in standard_id or "\\" in standard_id or ".." in standard_id:
+    if not standard_id or "/" in standard_id or "\\" in standard_id or ".." in standard_id or os.sep in standard_id:
         raise ValueError(f"Invalid standard ID: {standard_id}")
 
 
@@ -41,6 +42,7 @@ def create(data: dict, evaluators_dir: Path, io: JsonIO) -> StandardDetail:
 
 def update(standard_id: str, data: dict, evaluators_dir: Path, io: JsonIO) -> StandardDetail:
     """Update an existing custom standard with new *data*."""
+    _validate_id(standard_id)
     path = evaluators_dir / f"{standard_id}.json"
     if not path.is_file():
         raise FileNotFoundError(f"Standard not found: {standard_id}")
@@ -53,6 +55,7 @@ def update(standard_id: str, data: dict, evaluators_dir: Path, io: JsonIO) -> St
 def delete(standard_id: str, evaluators_dir: Path, compiled_dir: Path,
            io: JsonIO, is_builtin: Callable[[str], bool]) -> None:
     """Delete a custom standard. Raises for built-in or managed standards."""
+    _validate_id(standard_id)
     path = evaluators_dir / f"{standard_id}.json"
     if not path.is_file():
         if (compiled_dir / f"{standard_id}.json").is_file() or is_builtin(standard_id):

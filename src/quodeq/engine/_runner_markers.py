@@ -36,5 +36,10 @@ def make_heartbeat(dim_name: str, idx: int, total: int) -> Callable[[int, dict],
         secs = elapsed % _SECONDS_PER_MINUTE
         mins = elapsed // _SECONDS_PER_MINUTE
         evidence = progress.get("evidence", 0)
-        log_info(f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | {evidence} findings")
+        violations = progress.get("violations", 0)
+        compliances = progress.get("compliances", 0)
+        log_info(
+            f"  [{idx}/{total}] {dim_name} | {mins}m{secs:02d}s | "
+            f"{evidence} findings | {violations} violations \u00b7 {compliances} compliance"
+        )
     return _cb

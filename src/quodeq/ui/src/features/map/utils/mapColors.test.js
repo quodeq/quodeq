@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { severityColor, complianceRateColor, healthColor, worstSeverity } from './mapColors.js';
+import { severityColor, complianceRateColor, healthColor, worstSeverity } from '../viz/core/mapColors.js';
 
 test('severityColor returns correct colors', () => {
   assert.equal(severityColor('critical'), 'var(--color-sev-critical-text)');

@@ -8,6 +8,7 @@ from flask import Flask, Response, jsonify, request
 from quodeq.services.ports import list_runs, read_run_data
 from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
+from quodeq.shared.validation import validate_path_segment
 
 
 def _eval_dir_from_app(app: Flask) -> str:
@@ -24,8 +25,13 @@ def register_rescore_routes(app: Flask) -> None:
         project = request.args.get("project", "")
         if not project:
             return jsonify({"error": "project query parameter is required"}), 400
-
         run_id = request.args.get("run", "")
+        try:
+            validate_path_segment(project)
+            if run_id and run_id != "latest":
+                validate_path_segment(run_id)
+        except ValueError:
+            return jsonify({"error": "Invalid project or run parameter"}), 400
         eval_dir = _eval_dir_from_app(app)
 
         # Resolve run ID

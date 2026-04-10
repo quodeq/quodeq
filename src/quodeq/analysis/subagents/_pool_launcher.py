@@ -21,8 +21,13 @@ def _compute_files_per_agent(total_files: int) -> int:
 
 
 def _default_subagent_model(env: dict[str, str] | None = None) -> str | None:
-    """Return the subagent model override, or None to use the client's default."""
-    return (env or os.environ).get("QUODEQ_SUBAGENT_MODEL") or None
+    """Return the subagent model override, or None to use the client's default.
+
+    Checks SUBAGENT_MODEL first (set by dashboard/service layer),
+    then QUODEQ_SUBAGENT_MODEL (direct env var override).
+    """
+    _env = env or os.environ
+    return _env.get("SUBAGENT_MODEL") or _env.get("QUODEQ_SUBAGENT_MODEL") or None
 
 
 @dataclass
@@ -32,6 +37,7 @@ class LaunchPoolParams:
     queue_path: Path
     prompt: str
     max_files_per_agent: int = _MAX_FILES_PER_AGENT
+    all_files: list[str] | None = None
 
 
 def _launch_pool(
@@ -39,7 +45,7 @@ def _launch_pool(
 ) -> tuple[Any, list[Any]]:
     """Create and run a SubagentPool, returning its results."""
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    subagent_model = config.options.subagent_model or _default_subagent_model()
+    subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
     base_ac = AnalysisConfig(
         analysis_budget=config.options.analysis_budget,
         compiled_dir=compiled_dir,
@@ -49,12 +55,22 @@ def _launch_pool(
         max_files_per_agent=params.max_files_per_agent,
         pool_budget=config.options.pool_budget if config.options.pool_budget is not None else _DEFAULT_POOL_BUDGET,
     )
+    n_agents = config.options.max_subagents
+
+    # Skip scout mode for providers without per-token billing (e.g. Codex with
+    # ChatGPT subscription).  Launch all agents immediately for faster results.
+    from quodeq.shared.utils import get_ai_cmd
+    ai_cmd = get_ai_cmd()
+    use_scout = ai_cmd not in ("codex", "gemini")
+
     pool = SubagentPool(
-        paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path),
+        paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,
+                        src=config.src, all_files=params.all_files, standards_dir=config.standards_dir),
         options=PoolOptions(
-            n_agents=config.options.max_subagents,
+            n_agents=n_agents,
             prompt=params.prompt,
             dimension=dim_id,
+            scout_first=use_scout,
         ),
         config=base_ac,
     )

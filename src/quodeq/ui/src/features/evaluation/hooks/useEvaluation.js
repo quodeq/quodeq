@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { startEvaluation, getEvaluation, cancelEvaluation, getDimensionEval, listEvaluations } from '../../../api/index.js';
-import { DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET, SUBAGENTS_STORAGE_KEY, POOL_BUDGET_STORAGE_KEY } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 const DIMENSION_POLL_INITIAL_MS = 2000;
 const DIMENSION_POLL_MAX_MS = 8000;
@@ -58,10 +58,16 @@ function handleJobUpdate(updated, refs, setJob, callbacks) {
 async function pollPartialDimensions(partialDimensionsRef, project, runId, refs, setLiveViolations) {
   const partial = [...partialDimensionsRef.current];
   if (!partial.length) return false;
-  const results = await Promise.allSettled(
-    partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
-  );
-  return results.some((r) => r.status === 'rejected');
+  const POLL_CONCURRENCY = 4;
+  let hadErrors = false;
+  for (let i = 0; i < partial.length; i += POLL_CONCURRENCY) {
+    const batch = partial.slice(i, i + POLL_CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
+    );
+    if (results.some((r) => r.status === 'rejected')) hadErrors = true;
+  }
+  return hadErrors;
 }
 
 function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef, setLiveViolations) {
@@ -109,11 +115,31 @@ function createJobPoller(refs, setters, startDimensionPolling) {
   };
 }
 
+/**
+ * Build the evaluation payload from provider settings.
+ * Throws if the orchestrator model is not configured.
+ */
 function preparePayload(payload, storage = localStorage) {
-  const maxSubagents = parseInt(storage.getItem(SUBAGENTS_STORAGE_KEY) || String(DEFAULT_MAX_SUBAGENTS), 10);
-  if (maxSubagents !== DEFAULT_MAX_SUBAGENTS) payload.maxSubagents = maxSubagents;
-  const poolBudget = parseInt(storage.getItem(POOL_BUDGET_STORAGE_KEY) || String(DEFAULT_POOL_BUDGET), 10);
-  if (poolBudget !== DEFAULT_POOL_BUDGET) payload.poolBudget = poolBudget;
+  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  if (!activeProvider) throw new Error('No AI provider selected. Go to Settings to configure one.');
+
+  const get = (key) => storage.getItem(providerKey(activeProvider, key));
+
+  payload.aiCmd = activeProvider;
+  const model = get('model');
+  if (!model) throw new Error('No orchestrator model selected. Go to Settings and select a model for the active provider.');
+  payload.aiModel = model;
+
+  const defaultSubagents = ['ollama'].includes(activeProvider) ? '1' : '5';
+  const subagents = parseInt(get('subagents') || defaultSubagents, 10);
+  payload.maxSubagents = subagents;
+
+  const defaultBudget = ['ollama'].includes(activeProvider) ? '0' : '600';
+  const poolBudget = parseInt(get('pool-budget') || defaultBudget, 10);
+  payload.poolBudget = poolBudget;
+
+  if (get('per-dimension') === 'true') payload.perDimension = true;
+  if (get('verify') === 'false') payload.verifyFindings = false;
 }
 
 function parseDimensions(payload) {
@@ -154,7 +180,7 @@ function useResumeRunning(setJob, startPolling, pollRef, dimPollRef) {
       stopTimer(pollRef);
       stopTimer(dimPollRef);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only: resume any running eval
 }
 
 function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling) {
@@ -164,8 +190,8 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
     refs.liveViolationsRef.current = {};
     refs.partialDimensionsRef.current = new Set();
     setLiveViolations({});
-    preparePayload(payload);
     try {
+      preparePayload(payload);
       const created = await startEvaluation(payload);
       setJob({ ...created, repo: payload.repo });
       startPolling(created.jobId);

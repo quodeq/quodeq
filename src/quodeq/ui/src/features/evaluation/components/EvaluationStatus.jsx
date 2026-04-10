@@ -106,6 +106,20 @@ function JobHeader({ job, onDismiss, onCancel }) {
   );
 }
 
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+
+function JobProviderBadge() {
+  const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const model = localStorage.getItem(providerKey(provider, 'model')) || '';
+  if (!provider) return null;
+  return (
+    <div className="job-meta-item">
+      <span className="job-meta-label">AI Provider</span>
+      <span className="job-meta-value">{provider}{model ? ` / ${model}` : ''}</span>
+    </div>
+  );
+}
+
 function JobMeta({ job, projectName }) {
   return (
     <div className="job-meta">
@@ -115,6 +129,7 @@ function JobMeta({ job, projectName }) {
           <span className="job-meta-value">{projectName}</span>
         </div>
       )}
+      <JobProviderBadge />
       <div className="job-meta-item">
         <span className="job-meta-label">Job ID</span>
         <div className="job-meta-id-row">

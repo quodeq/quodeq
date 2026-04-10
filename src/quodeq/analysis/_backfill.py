@@ -87,18 +87,25 @@ def run_backfill_phase(
     if not backfill_candidates:
         return backfill_taken
 
-    elapsed = time.monotonic() - backfill.phase_start
-    total_budget = config.options.pool_budget or _DEFAULT_POOL_BUDGET
-    remaining_budget = max(0, total_budget - int(elapsed))
+    pool_budget = config.options.pool_budget
+    unlimited = pool_budget is not None and pool_budget <= 0
 
-    if remaining_budget < _MIN_BACKFILL_BUDGET_S:
-        log_info(f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, but no budget remaining")
-        return backfill_taken
+    if not unlimited:
+        elapsed = time.monotonic() - backfill.phase_start
+        total_budget = pool_budget or _DEFAULT_POOL_BUDGET
+        remaining_budget = max(0, total_budget - int(elapsed))
 
-    log_info(
-        f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, "
-        f"{remaining_budget}s budget remaining"
-    )
+        if remaining_budget < _MIN_BACKFILL_BUDGET_S:
+            log_info(f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, but no budget remaining")
+            return backfill_taken
+        log_info(
+            f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, "
+            f"{remaining_budget}s budget remaining"
+        )
+    else:
+        remaining_budget = 0  # 0 = unlimited in pool
+        log_info(f"  [{dimension}] Backfill: {len(backfill_candidates)} unevaluated files, unlimited budget")
+
     original_options = config.options
     config.options = copy(original_options)
     config.options.incremental_file_filter = set(backfill_candidates)

@@ -20,12 +20,10 @@ def render_template(template: str, values: dict[str, str]) -> str:
 
     rendered = _PLACEHOLDER_RE.sub(_replace, template)
 
-    remaining = _PLACEHOLDER_RE.findall(rendered)
-    if remaining:
-        placeholders = ", ".join(f"{{{{{p}}}}}" for p in remaining)
-        raise ValueError(
-            f"Unresolved template placeholders: {placeholders}. "
-            f"Check template file matches expected variable names."
-        )
+    # Check only the template keys (not substituted content) for missing values
+    template_keys = set(_PLACEHOLDER_RE.findall(template))
+    missing = template_keys - set(values.keys())
+    if missing:
+        _logger.warning("Unresolved template placeholders: %s", ", ".join(sorted(missing)))
 
     return rendered

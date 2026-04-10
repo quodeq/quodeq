@@ -102,10 +102,11 @@ class TestBuildAccumulatedTrend:
 
 
 class TestBuildDashboard:
-    def test_raises_when_no_runs(self, tmp_path):
+    def test_returns_empty_when_no_runs(self, tmp_path):
         with patch("quodeq.services.dashboard.list_runs", return_value=[]):
-            with pytest.raises(FileNotFoundError, match="No runs found"):
-                build_dashboard(str(tmp_path), "proj", "latest")
+            result = build_dashboard(str(tmp_path), "proj", "latest")
+            assert result["dimensions"] == []
+            assert result["selectedRun"] is None
 
     def test_raises_when_run_not_found(self, tmp_path):
         with patch("quodeq.services.dashboard.list_runs", return_value=[_make_run("r1")]):

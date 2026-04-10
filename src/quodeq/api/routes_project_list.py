@@ -1,6 +1,7 @@
 """Project listing, mutation, and export routes."""
 from __future__ import annotations
 
+import json
 import logging
 from http import HTTPStatus
 from pathlib import Path
@@ -36,6 +37,9 @@ def _handle_update_project_path(provider: ActionProvider) -> Response | tuple[Re
     new_path = data.get("path", "").strip()
     if not new_path:
         body, status = error_response("Path is required", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+        return jsonify(body), status
+    if ".." in new_path or not Path(new_path).is_absolute():
+        body, status = error_response("Invalid path", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
         return jsonify(body), status
     _logger.info("update_project_path: project=%s, remote_addr=%s", project, request.remote_addr)
     ok = provider.update_project_path(reports_dir(), project, new_path)
@@ -112,3 +116,73 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.post("/api/projects/<project>/clone-local")
     def clone_project_local(project: str) -> Response | tuple[Response, int]:
         return _handle_clone_project_local(provider)
+
+    @app.get("/api/projects/<project>/scan")
+    def project_scan(project: str) -> Response | tuple[Response, int]:
+        """Return scan data for a project. Triggers scan if needed for local projects."""
+        from quodeq.shared.validation import validate_path_segment
+        validate_path_segment(project)
+
+        project_dir = Path(reports_dir()) / project
+        if not project_dir.is_dir():
+            body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+
+        scan_path = project_dir / "scan.json"
+        if scan_path.exists():
+            try:
+                data = json.loads(scan_path.read_text())
+                return jsonify(data)
+            except (json.JSONDecodeError, OSError):
+                pass
+
+        # Check if local — read repository_info.json
+        info_path = project_dir / "repository_info.json"
+        if not info_path.exists():
+            body, status = error_response("No scan available", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+
+        try:
+            info = json.loads(info_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            body, status = error_response("Could not read project info", HTTPStatus.INTERNAL_SERVER_ERROR, "INTERNAL")
+            return jsonify(body), status
+
+        if info.get("location") != "local" or not info.get("path"):
+            body, status = error_response("Scan only available for local projects", HTTPStatus.BAD_REQUEST, "NOT_LOCAL")
+            return jsonify(body), status
+
+        project_path = Path(info["path"])
+        if not project_path.is_dir():
+            body, status = error_response("Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
+            return jsonify(body), status
+
+        from quodeq.services._fs_scan import scan_project
+        result = scan_project(project_path, output_dir=project_dir)
+
+        import dataclasses
+        return jsonify(dataclasses.asdict(result))
+
+    @app.post("/api/scan")
+    def scan_path() -> Response | tuple[Response, int]:
+        """Scan a local path directly (no project required)."""
+        data = request.get_json(silent=True) or {}
+        target = data.get("path", "").strip()
+        if not target:
+            body, status = error_response("path is required", HTTPStatus.BAD_REQUEST, "MISSING_PATH")
+            return jsonify(body), status
+
+        target_path = Path(target).resolve()
+        # Block scanning system directories to prevent information disclosure
+        _blocked = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
+        if any(str(target_path).startswith(b) for b in _blocked):
+            body, status = error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
+            return jsonify(body), status
+        if not target_path.is_dir():
+            body, status = error_response("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
+            return jsonify(body), status
+
+        from quodeq.services._fs_scan import scan_project
+        import dataclasses
+        result = scan_project(target_path)
+        return jsonify(dataclasses.asdict(result))

@@ -59,8 +59,9 @@ if [ -z "$QUODEQ" ]; then
         # Using --only-binary :all: to reduce supply chain risk by avoiding
         # arbitrary code execution in source distributions (setup.py).
         # Using --no-deps to prevent transitive dependency attacks.
-        # Pin to known minimum version to mitigate supply-chain risk.
-        python3 -m pip install --user --only-binary :all: --no-deps "quodeq>=0.8.1" 2>&1
+        # Pin to exact major.minor to mitigate supply-chain risk.
+        # TODO: ship requirements.txt with hashes in the .app bundle.
+        python3 -m pip install --user --only-binary :all: --no-deps "quodeq>=1.0.0b1,<2" 2>&1
     fi
     export PATH="$PATH:$(python3 -m site --user-base)/bin"
     QUODEQ=$(command -v quodeq 2>/dev/null)

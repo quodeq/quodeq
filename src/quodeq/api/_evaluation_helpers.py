@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from http import HTTPStatus
 
 from flask import Response, jsonify, request
@@ -10,7 +11,7 @@ from quodeq.api.helpers import error_response
 from quodeq.services.tooling_mixin import get_allowed_client_ids as _get_allowed_ai_cmds
 from quodeq.services.base import _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
 
-_CREDENTIALS_RE = __import__("re").compile(r"(https?://)([^@]+)@")
+_CREDENTIALS_RE = re.compile(r"(https?://)([^@]+)@")
 _logger = logging.getLogger(__name__)
 
 # Bounds for user-supplied evaluation parameters
@@ -18,6 +19,7 @@ _MIN_SUBAGENTS = 1
 _MAX_SUBAGENTS = 10
 _MIN_POOL_BUDGET = 60
 _MAX_POOL_BUDGET = 3600
+_MAX_CONTEXT_SIZE = 2_000_000
 
 
 def _sanitize_url(url: str) -> str:
@@ -46,19 +48,25 @@ def _build_evaluation_options(payload: dict) -> "EvaluationOptions":
     from quodeq.services.base import EvaluationOptions  # deferred: avoid circular import at module level
     max_subagents_raw = payload.get("maxSubagents", _DEFAULT_MAX_SUBAGENTS)
     max_subagents = max(_MIN_SUBAGENTS, min(_MAX_SUBAGENTS, int(max_subagents_raw)))
-    pool_budget_raw = payload.get("poolBudget", _DEFAULT_POOL_BUDGET)
-    pool_budget = max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, int(pool_budget_raw)))
+    pool_budget_raw = int(payload.get("poolBudget", _DEFAULT_POOL_BUDGET))
+    pool_budget = 0 if pool_budget_raw == 0 else max(_MIN_POOL_BUDGET, min(_MAX_POOL_BUDGET, pool_budget_raw))
+    ai_model = payload.get("aiModel") or None
+    subagent_model = payload.get("subagentModel") or ai_model  # default to orchestrator
     return EvaluationOptions(
         discipline=payload.get("discipline"),
         dimensions=payload.get("dimensions") or "",
         numerical=bool(payload.get("numerical")),
         ai_cmd=payload.get("aiCmd") or None,
-        ai_model=payload.get("aiModel") or None,
-        subagent_model=payload.get("subagentModel") or None,
+        ai_model=ai_model,
+        subagent_model=subagent_model,
         verify_findings=bool(payload.get("verifyFindings", True)),
         max_subagents=max_subagents,
         pool_budget=pool_budget,
         incremental=bool(payload.get("incremental", False)),
+        per_dimension=bool(payload.get("perDimension", False)),
+        context_size=max(0, min(_MAX_CONTEXT_SIZE, int(payload.get("contextSize", 0)))),
+        branch=payload.get("branch") or None,
+        scope_path=payload.get("scopePath") or None,
     )
 
 

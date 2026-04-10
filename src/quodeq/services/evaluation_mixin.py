@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -15,6 +17,8 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_n
 
 if TYPE_CHECKING:
     from quodeq.services.jobs import JobManager
+
+_logger = logging.getLogger(__name__)
 
 _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
@@ -76,15 +80,48 @@ def _build_evaluate_cmd(
         cmd += ["--n-subagents", str(options.max_subagents)]
     if options.incremental:
         cmd += ["--incremental"]
+    if options.branch:
+        cmd += ["--branch", options.branch]
+    if options.scope_path:
+        cmd += ["--scope", options.scope_path]
     return cmd
 
 
-def _register_project(repo: str, discipline: str | None, reports_dir: str) -> None:
-    """Resolve and register the project UUID before evaluation starts."""
+def _register_project(repo: str, discipline: str | None, reports_dir: str, scope_path: str | None = None) -> None:
+    """Resolve/register project and run a scan for local projects.
+
+    For scoped evaluations, registers parent first, scans it, then registers
+    the child so both exist with scan data before the evaluation starts.
+    """
     repo_resolved = str(Path(repo).resolve()) if not is_repo_url(repo) else repo
     project_name = project_name_from_repo(repo)
     location = _LOCATION_ONLINE if is_repo_url(repo) else _LOCATION_LOCAL
-    resolve_project_uuid(Path(reports_dir), ProjectIdentity(project_name, repo_resolved, discipline, location))
+    reports_path = Path(reports_dir)
+
+    project_uuid = resolve_project_uuid(
+        reports_path,
+        ProjectIdentity(project_name, repo_resolved, discipline, location, scope_path=scope_path),
+    )
+
+    # Scan local projects so file lists are available immediately
+    if location == _LOCATION_LOCAL:
+        from quodeq.services._fs_scan import scan_project
+        repo_path = Path(repo_resolved)
+        if repo_path.is_dir():
+            project_dir = reports_path / project_uuid
+            scan_project(repo_path, output_dir=project_dir)
+            # For scoped projects, also scan the parent using the parent UUID from repo info
+            if scope_path:
+                import json
+                info_path = project_dir / "repository_info.json"
+                try:
+                    parent_uuid = json.loads(info_path.read_text()).get("parent")
+                    if parent_uuid:
+                        parent_dir = reports_path / parent_uuid
+                        if not (parent_dir / "scan.json").exists():
+                            scan_project(repo_path, output_dir=parent_dir)
+                except (json.JSONDecodeError, OSError):
+                    pass
 
 
 class FsEvaluationMixin:
@@ -114,14 +151,21 @@ class FsEvaluationMixin:
         built_env = {**base, "PYTHONUNBUFFERED": "1"}
         built_env["AI_CMD"] = options.ai_cmd or get_ai_cmd()
         ai_model = options.ai_model or get_ai_model()
+        subagent_model = options.subagent_model or ai_model
+        # Ensure both env vars are set consistently — prevents model swapping
+        # between verification (reads AI_MODEL) and analysis (reads SUBAGENT_MODEL)
         if ai_model:
             built_env["AI_MODEL"] = ai_model
-        if options.subagent_model:
-            built_env["SUBAGENT_MODEL"] = options.subagent_model
+        if subagent_model:
+            built_env["SUBAGENT_MODEL"] = subagent_model
         if not options.verify_findings:
             built_env["QUODEQ_NO_VERIFY"] = "1"
         if options.pool_budget != _DEFAULT_POOL_BUDGET:
             built_env["QUODEQ_POOL_BUDGET"] = str(options.pool_budget)
+        if options.per_dimension:
+            built_env["QUODEQ_NO_CONSOLIDATE"] = "1"
+        if options.context_size > 0:
+            built_env["QUODEQ_CONTEXT_SIZE"] = str(options.context_size)
         return built_env
 
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> JobSnapshot:
@@ -135,7 +179,7 @@ class FsEvaluationMixin:
                 raise FileNotFoundError(f"Repository not found: {repo}")
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
-        _register_project(repo, options.discipline, reports_dir)
+        _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
         env = self._build_eval_env(repo, options)
         if is_repo_url(repo):
             cwd = str(Path.cwd())
@@ -158,10 +202,80 @@ class FsEvaluationMixin:
         """Return the current status of an evaluation job."""
         return self._jobs.get_job(job_id)
 
-    def cancel_evaluation(self, job_id: str) -> bool:
-        """Cancel a running evaluation job."""
-        return self._jobs.cancel_job(job_id)
+    def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
+        """Cancel a running evaluation job and score any completed dimensions."""
+        # Get job info before cancellation
+        job = self._jobs.get_job(job_id)
+        ok = self._jobs.cancel_job(job_id)
+        if ok and reports_dir and job:
+            _score_completed_evidence(reports_dir, {
+                "outputProject": job.output_project,
+                "outputRunId": job.output_run_id,
+            })
+        return ok
 
-    def list_evaluations(self) -> list[JobSnapshot]:
-        """Return all evaluation jobs (running, done, failed, cancelled)."""
-        return self._jobs.list_jobs()
+    def score_failed_evaluation(self, job_id: str, reports_dir: str) -> bool:
+        """Score any completed dimensions from a failed evaluation."""
+        job = self._jobs.get_job(job_id)
+        if not job or job.get("status") not in ("failed", "cancelled"):
+            return False
+        _score_completed_evidence(reports_dir, job)
+        return True
+
+    def list_evaluations(self, *, limit: int = 0) -> list[JobSnapshot]:
+        """Return evaluation jobs (running, done, failed, cancelled).
+
+        When *limit* > 0 only the most recent *limit* jobs are returned.
+        """
+        jobs = self._jobs.list_jobs()
+        return jobs[:limit] if limit > 0 else jobs
+
+
+def _score_completed_evidence(reports_dir: str, job: dict) -> None:
+    """Score any dimensions that have evidence but no evaluation report.
+
+    Called after cancellation so completed dimensions are preserved in the
+    dashboard even when the overall run was cancelled.
+    """
+    project = job.get("outputProject")
+    run_id = job.get("outputRunId")
+    if not project or not run_id:
+        return
+
+    _log = _logger
+
+    evidence_dir = Path(reports_dir) / project / run_id / "evidence"
+    evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
+    if not evidence_dir.is_dir():
+        return
+
+    evaluation_dir.mkdir(parents=True, exist_ok=True)
+
+    for jsonl_path in evidence_dir.glob("*_evidence.jsonl"):
+        dim_id = jsonl_path.name.replace("_evidence.jsonl", "")
+        eval_file = evaluation_dir / f"{dim_id}.json"
+        if eval_file.exists():
+            continue  # already scored
+        if jsonl_path.stat().st_size == 0:
+            continue  # no findings
+        # Only score dimensions that passed verification (analysis queue exists)
+        queue_file = evidence_dir / f"{dim_id}_queue.json"
+        if not queue_file.exists():
+            continue  # verification not completed for this dimension
+
+        try:
+            from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
+            from quodeq.core.scoring.engine import score_evidence
+            from quodeq.analysis.report import write_dimension_report
+
+            evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
+                language="", repository="", date_str="",
+                source_file_count=0, files_read=0,
+            ))
+            if evidence is None:
+                continue
+            scores = score_evidence(evidence, mode="numerical")
+            write_dimension_report(evidence, scores, dim_id, evaluation_dir)
+            _log.info("Scored cancelled dimension '%s' for run %s", dim_id, run_id[:8])
+        except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
+            _log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)

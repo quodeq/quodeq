@@ -1,6 +1,7 @@
 """Template section renderers for analysis prompts."""
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -56,23 +57,27 @@ def render_compiled_standards(compiled_dir: Path, dimension: str, evaluators_dir
 
 
 def render_compact_standards(compiled_dir: Path, dimension: str, evaluators_dir: Path | None = None) -> str:
-    """Render a compact standards checklist for the AI analyzer.
+    """Render a compact standards checklist as JSON for the AI analyzer.
 
-    One line per requirement: ``REQ-ID: text``.
-    No principle headings (server derives principle from req ID),
-    no markdown formatting, no CWE refs (server enriches at report time).
+    Returns a compact JSON array grouped by principle with requirement IDs
+    and rules. No pretty-printing — minimizes token usage.
     """
     data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
         return _NO_STANDARDS_FOR_DIM
-    lines = []
+    checklist = []
     for principle in data.get("principles", []):
-        for req in principle.get("requirements", []):
-            line = f"{req['id']}: {req['text']}"
-            if req.get("description"):
-                line += f" — {req['description']}"
-            lines.append(line)
-    return "\n".join(lines)
+        reqs = principle.get("requirements", [])
+        if not reqs:
+            continue
+        checklist.append({
+            "principle": principle.get("name", "Unknown"),
+            "requirements": [
+                {"id": r["id"], "rule": r["text"]}
+                for r in reqs
+            ],
+        })
+    return json.dumps(checklist, separators=(",", ":"))
 
 
 def render_dimensions(dimensions_data: dict, dimension: str) -> str:

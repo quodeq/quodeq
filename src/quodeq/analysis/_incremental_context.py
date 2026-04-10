@@ -20,11 +20,13 @@ def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[
     """Load evaluator IDs from JSON files in *evaluators_dir* not already in *dims_data*."""
     import json as _json
     result = list(dims_data)
+    seen = set(result)
     for _p in evaluators_dir.glob("*.json"):
         try:
             _eid = _json.loads(_p.read_text()).get("id")
-            if _eid and _eid not in result:
+            if _eid and _eid not in seen:
                 result.append(_eid)
+                seen.add(_eid)
         except (OSError, ValueError, KeyError):
             pass
     return result
@@ -72,7 +74,7 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
         dimensions_data=dims_data,
         date_str=datetime.now(timezone.utc).isoformat(timespec="seconds"),
         template=load_template(config.options.template_path),
-        subagent_template=load_template(template_name="subagent.md"),
+        subagent_template=load_template(template_name="cli_subagent_prompt.md"),
         total=len(dimensions),
     )
     return dimensions, ctx

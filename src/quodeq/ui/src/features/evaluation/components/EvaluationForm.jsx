@@ -1,7 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import FolderBrowser from './FolderBrowser.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import DimensionSelector from './DimensionSelector.jsx';
+import BranchScopeSelector from './BranchScopeSelector.jsx';
+import { useScanData } from '../hooks/useScanData.js';
 
 
 const FOLDER_MARGIN_BOTTOM = 8;
@@ -51,6 +53,11 @@ function useEvaluationForm(onStart) {
   const { allDimensions, dimLoadError } = usePluginDimensions();
   const [selectedDims, setSelectedDims] = useState(new Set());
   const [folderBrowserOpen, setFolderBrowserOpen] = useState(false);
+  const [branch, setBranch] = useState(null);
+  const [scopePath, setScopePath] = useState(null);
+
+  // Reset scope when repo changes
+  useEffect(() => { setScopePath(null); setBranch(null); }, [repo]);
 
   const toggleDim = (id) => setSelectedDims((prev) => {
     const next = new Set(prev);
@@ -63,9 +70,13 @@ function useEvaluationForm(onStart) {
     e.preventDefault();
     const payload = { repo };
     if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
+    if (branch) payload.branch = branch;
+    if (scopePath) payload.scopePath = scopePath;
     onStart(payload);
     setRepo('');
     setSelectedDims(new Set());
+    setBranch(null);
+    setScopePath(null);
   };
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
   const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
@@ -84,14 +95,22 @@ function useEvaluationForm(onStart) {
     handleFolderSelect,
     handleRepoClear,
     dimLoadError,
+    branch,
+    setBranch,
+    scopePath,
+    setScopePath,
   };
 }
 
-export default function EvaluationForm({ onStart, disabled }) {
+export default function EvaluationForm({ onStart, disabled, selectedProject }) {
   const {
     repo, setRepo, allDimensions, selectedDims, folderBrowserOpen, setFolderBrowserOpen,
     toggleDim, selectAll, clearAll, handleSubmit, handleFolderSelect, handleRepoClear, dimLoadError,
+    branch, setBranch, scopePath, setScopePath,
   } = useEvaluationForm(onStart);
+
+  const isLocalRepo = !!repo && !repo.startsWith('http') && !repo.startsWith('git@') && !repo.includes('github.com');
+  const { scanData } = useScanData(null, isLocalRepo ? repo : null);
 
   const canSubmit = !disabled && !!repo && (allDimensions.length === 0 || selectedDims.size > 0);
 
@@ -104,6 +123,16 @@ export default function EvaluationForm({ onStart, disabled }) {
           onClear={handleRepoClear}
           onBrowse={() => setFolderBrowserOpen(true)}
         />
+
+        {isLocalRepo && (
+          <BranchScopeSelector
+            branches={scanData?.branches}
+            currentBranch={scanData?.currentBranch || branch}
+            projectPath={repo}
+            onScopeChange={setScopePath}
+            scopePath={scopePath}
+          />
+        )}
 
         {dimLoadError && <p className="inline-error" style={{ marginBottom: FOLDER_MARGIN_BOTTOM }}>{dimLoadError}</p>}
         {repo && allDimensions.length > 0 && (

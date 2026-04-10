@@ -1,12 +1,69 @@
 {
+  "ollama": {
+    "type": "api",
+    "order": 0,
+    "model": "gemma4:26b",
+    "api_base": "http://localhost:11434/v1"
+  },
   "claude": {
+    "type": "cli",
+    "order": 1,
+    "cmd": "claude",
+    "cmd_subcommand": "",
+    "base_args": "--print --output-format stream-json --verbose",
+    "prompt_style": "flag",
+    "prompt_flag": "-p",
+    "supports_mcp": true,
+    "supports_tools": true,
+    "supports_budget": true,
+    "supports_turns": true,
     "mcp_permission_args": ["--permission-mode", "bypassPermissions"],
     "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
     "env_remove": ["CLAUDECODE"]
   },
   "codex": {
+    "type": "cli",
+    "order": 2,
+    "cmd": "codex",
+    "cmd_subcommand": "exec",
+    "base_args": "--json --dangerously-bypass-approvals-and-sandbox",
+    "prompt_style": "positional",
+    "mcp_style": "cli-register",
+    "supports_tools": false,
+    "supports_budget": false,
+    "supports_turns": false,
     "mcp_permission_args": [],
-    "env_set_if_missing": {"CODEX_SANDBOX": "read-only"},
+    "env_set_if_missing": {},
     "env_remove": []
+  },
+  "gemini": {
+    "type": "cli",
+    "order": 3,
+    "cmd": "gemini",
+    "cmd_subcommand": "",
+    "base_args": "--output-format stream-json --yolo",
+    "prompt_style": "flag",
+    "prompt_flag": "-p",
+    "mcp_style": "cli-register",
+    "mcp_add_separator": false,
+    "mcp_permission_args": ["--allowed-mcp-server-names", "quodeq-findings"],
+    "supports_tools": false,
+    "supports_budget": false,
+    "supports_turns": false,
+    "env_set_if_missing": {},
+    "env_remove": []
+  },
+  "openrouter": {
+    "type": "api",
+    "order": 4,
+    "model": "anthropic/claude-sonnet-4",
+    "api_key_env": "OPENROUTER_API_KEY"
+  },
+  "custom": {
+    "type": "api",
+    "order": 99,
+    "model": "${AI_MODEL}",
+    "api_base": "${AI_API_BASE}",
+    "api_key_env": "AI_API_KEY"
   }
 }

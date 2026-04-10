@@ -21,6 +21,43 @@ from quodeq.services.ports import list_runs, safe_read_dir
 _MAX_PROJECT_BUILD_WORKERS = 8
 
 
+def find_children(reports_root: Path, parent_id: str) -> list[str]:
+    """Return UUIDs of child projects whose parent matches *parent_id*."""
+    children: list[str] = []
+    for entry in reports_root.iterdir():
+        if not entry.is_dir() or entry.name == parent_id:
+            continue
+        info_path = entry / "repository_info.json"
+        if not info_path.exists():
+            continue
+        try:
+            info = json.loads(info_path.read_text())
+            if info.get("parent") == parent_id:
+                children.append(entry.name)
+        except (json.JSONDecodeError, OSError):
+            continue
+    return children
+
+
+def _build_parent_child_sets(reports_root: Path, dir_names: list[str]) -> tuple[set[str], set[str]]:
+    """Single pass: return (parent_ids, subproject_ids) from repo info files."""
+    parent_ids: set[str] = set()
+    subproject_ids: set[str] = set()
+    for name in dir_names:
+        info_path = reports_root / name / "repository_info.json"
+        if not info_path.exists():
+            continue
+        try:
+            info = json.loads(info_path.read_text())
+            parent = info.get("parent")
+            if parent:
+                parent_ids.add(parent)
+                subproject_ids.add(name)
+        except (json.JSONDecodeError, OSError):
+            continue
+    return parent_ids, subproject_ids
+
+
 def build_project_list(reports_root: Path) -> list[ProjectEntry]:
     """Collect eligible project dirs and build entries in parallel."""
     max_listed = _max_projects_listed()
@@ -32,9 +69,11 @@ def build_project_list(reports_root: Path) -> list[ProjectEntry]:
         if len(dir_names) >= max_listed:
             break
 
+    parent_ids, subproject_ids = _build_parent_child_sets(reports_root, dir_names)
+
     def _build_one(name: str) -> ProjectEntry | None:
         runs = list_runs(reports_root, name)
-        if not runs:
+        if not runs and name not in parent_ids and name not in subproject_ids:
             return None
         return _build_project_entry(reports_root, name, runs)
 
@@ -69,6 +108,9 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
         resolved_path = new_path
         location = "online"
     else:
+        # Reject path-traversal attempts in the raw input before resolving.
+        if ".." in Path(new_path).parts:
+            return False
         resolved = Path(new_path).resolve()
         if not resolved.is_absolute() or not resolved.is_dir():
             return False
@@ -86,13 +128,21 @@ def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
 
 
 def delete_project(reports_dir: str, project: str) -> bool:
-    """Remove a project directory and all its report data."""
+    """Remove a project directory and all its report data.
+
+    If the project is a parent, cascade-deletes all children.
+    """
     reports_root = Path(reports_dir).resolve()
     project_path = (reports_root / project).resolve()
     if not project_path.is_relative_to(reports_root):
         return False
     if not project_path.exists() or not project_path.is_dir():
         return False
+
+    # Cascade: find and delete children first
+    for child_id in find_children(reports_root, project):
+        shutil.rmtree(reports_root / child_id, ignore_errors=True)
+
     try:
         shutil.rmtree(project_path)
     except OSError:

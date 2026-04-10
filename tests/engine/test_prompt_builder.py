@@ -234,7 +234,8 @@ class TestBuildAnalysisPrompt:
         assert standards_file.exists()
         content = standards_file.read_text()
         assert "### Confidentiality" not in content
-        assert "S-CON-1: Secrets MUST NOT be hardcoded" in content
+        assert '"S-CON-1"' in content
+        assert '"Secrets MUST NOT be hardcoded' in content
 
     def test_prompt_hash_present(self):
         template = load_template()

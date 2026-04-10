@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import DimensionCard from './DimensionCard.jsx';
 import AccumulatedOverviewPanel from './AccumulatedOverviewPanel.jsx';
 import RunOverviewPanel from './RunOverviewPanel.jsx';
@@ -60,10 +60,10 @@ function useDashboardHandlers(onNavigate, dashboard) {
     handleDimensionCardClick: (item, runId) => {
       if (!onNavigate) return;
       const dateLabel = dashboard?.selectedRun?.dateLabel || item.fromDateLabel;
-      onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel });
+      onNavigate('explorer', { dimension: item.dimension, runId: runId || item.fromRunId, dateLabel, fromProject: item.fromProject });
     },
     handleAccumulatedDimensionClick: (item) => {
-      if (onNavigate) onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel });
+      if (onNavigate) onNavigate('explorer', { dimension: item.dimension, runId: item.fromRunId, dateLabel: item.fromDateLabel, fromProject: item.fromProject });
     },
     handleFileClick: (fileObj) => { if (onNavigate) onNavigate('file', { file: fileObj }); },
   }), [onNavigate, dashboard]);
@@ -76,10 +76,12 @@ export default function DashboardPage({ data = {}, callbacks = {}, runMode = fal
   const selectedRunId = dashboard?.selectedRun?.runId || selectedRun;
   // Clear focused dimension when the active run changes to avoid showing stale data
   const prevRunRef = useRef(selectedRunId);
-  if (prevRunRef.current !== selectedRunId) {
-    prevRunRef.current = selectedRunId;
-    if (focusedDimension) setFocusedDimension(null);
-  }
+  useEffect(() => {
+    if (prevRunRef.current !== selectedRunId) {
+      prevRunRef.current = selectedRunId;
+      setFocusedDimension(null);
+    }
+  }, [selectedRunId]);
   // Merge rescored grades into accumulated dimensions so all cards reflect live scores
   const accumulatedDimensions = useMemo(() => {
     const dims = accumulated?.dimensions || [];

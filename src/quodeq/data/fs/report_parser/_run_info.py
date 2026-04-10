@@ -20,18 +20,22 @@ class RunInfo:
     run_id: str
     date_iso: str | None
     date_label: str
+    branch: str | None = None
+    scope_path: str | None = None
 
 
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
     """List directory entries, returning an empty list on OS errors.
+
+    Materializes entries lazily via scandir; the resulting list is typically
+    small (per-run directory) so full materialization is acceptable here.
 
     Example::
 
         entries = safe_read_dir(Path("/data/reports"))
     """
     try:
-        with os.scandir(path) as it:
-            return list(it)
+        return list(os.scandir(path))
     except OSError as exc:
         _logger.debug(
             "Could not list directory %s: %s. Check path exists and file permissions are correct",

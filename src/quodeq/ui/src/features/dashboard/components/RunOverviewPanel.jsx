@@ -41,10 +41,9 @@ function ViolationsByDimension({ dimensionsWithViolations, onDimensionClick, sel
   );
 }
 
-function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick }) {
+function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick, trendDelta }) {
+  const delta = trendDelta ?? null;
   const currScore = parseFloat(item.overallScore);
-  const prevScore = parseFloat(item.previousScore);
-  const delta = !isNaN(currScore) && !isNaN(prevScore) ? currScore - prevScore : null;
   const scored = splitScore(item.overallScore);
   const gradeClass = scoreColorClass(currScore);
   return (
@@ -83,13 +82,13 @@ function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick }) 
   );
 }
 
-function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionClick }) {
+function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionClick, trendDeltas }) {
   return (
     <div className="dimensions-grid">
       {[...dimensions]
         .sort((a, b) => a.dimension.localeCompare(b.dimension))
         .map((item) => (
-          <RunDimensionCard key={item.dimension} item={item} selectedRunId={selectedRunId} dateLabel={dateLabel} onDimensionClick={onDimensionClick} />
+          <RunDimensionCard key={item.dimension} item={item} selectedRunId={selectedRunId} dateLabel={dateLabel} onDimensionClick={onDimensionClick} trendDelta={trendDeltas?.[(item.dimension || '').toLowerCase()]} />
         ))}
     </div>
   );
@@ -98,17 +97,6 @@ function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionCl
 // ---------------------------------------------------------------------------
 // Run-specific overview panel
 // ---------------------------------------------------------------------------
-
-function computeRunScoreDelta(dashboard) {
-  const trendSeries = dashboard?.trend || [];
-  const currentRunId = dashboard?.selectedRun?.runId;
-  const idx = trendSeries.findIndex((t) => t.runId === currentRunId);
-  if (idx < 0 || idx + 1 >= trendSeries.length) return null;
-  const curr = parseFloat(trendSeries[idx].numericAverage);
-  const prev = parseFloat(trendSeries[idx + 1].numericAverage);
-  if (isNaN(curr) || isNaN(prev)) return null;
-  return (curr - prev).toFixed(1);
-}
 
 function StatsGrid({ runSummary, runTopFiles, runUniquePrinciples }) {
   return (
@@ -147,7 +135,7 @@ function StatsGrid({ runSummary, runTopFiles, runUniquePrinciples }) {
 }
 
 function RunHeroSection({ dashboard, selectedRunId, stats }) {
-  const { runSummary, runScoreDelta, runTopFiles, runUniquePrinciples } = stats;
+  const { runSummary, runTopFiles, runUniquePrinciples } = stats;
   return (
     <section className="acc-eval-panel panel">
       <div className="acc-eval-top">
@@ -169,9 +157,6 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
       <div className="acc-eval-golden">
         <div className="acc-eval-circle-col">
           <ScoreCircle score={runSummary.numericAverage} grade={runSummary.overallGrade} size={120} />
-          {runScoreDelta !== null && (
-            <div className="acc-eval-trend"><TrendBadge delta={runScoreDelta} showLabel={false} /></div>
-          )}
         </div>
         <div className="acc-eval-stats-col">
           <StatsGrid runSummary={runSummary} runTopFiles={runTopFiles} runUniquePrinciples={runUniquePrinciples} />
@@ -202,10 +187,21 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
   const runSummary = useMemo(() => buildRunSummary(dashboard?.dimensions), [dashboard]);
   const runTopFiles = useMemo(() => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])), [dashboard]);
   const dimensionsWithViolations = useMemo(() => sortDimensionsByViolationSeverity(dashboard?.dimensions || []), [dashboard]);
-  const runScoreDelta = useMemo(() => computeRunScoreDelta(dashboard), [dashboard]);
   const runUniquePrinciples = useMemo(() => {
     const violations = (dashboard?.dimensions || []).flatMap((d) => d.violations || []);
     return new Set(violations.map((v) => v.principle).filter(Boolean)).size;
+  }, [dashboard]);
+
+  // Build per-dimension deltas from the trend entry (same source as history rows)
+  const trendDeltas = useMemo(() => {
+    const currentRunId = dashboard?.selectedRun?.runId;
+    const entry = (dashboard?.trend || []).find(t => t.runId === currentRunId);
+    if (!entry?.dimensionDetails) return {};
+    const lookup = {};
+    for (const d of entry.dimensionDetails) {
+      if (d.delta != null) lookup[(d.dimension || '').toLowerCase()] = d.delta;
+    }
+    return lookup;
   }, [dashboard]);
 
   const isLoading = !dashboard || !dashboard.dimensions;
@@ -216,12 +212,12 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
         <div className="run-overview-spinner"><LoadingScreen /></div>
       ) : (
         <>
-          <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runScoreDelta, runTopFiles, runUniquePrinciples }} />
+          <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runTopFiles, runUniquePrinciples }} />
           <div className="section-header">
             <h3 className="section-title">Dimensions Analyzed</h3>
           </div>
           <div className="dimensions-panel">
-            <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} />
+            <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
           </div>
           <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />
           <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />

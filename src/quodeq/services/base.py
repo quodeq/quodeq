@@ -25,6 +25,10 @@ class EvaluationOptions:
     max_subagents: int = _DEFAULT_MAX_SUBAGENTS
     pool_budget: int = _DEFAULT_POOL_BUDGET
     incremental: bool = False
+    per_dimension: bool = False
+    branch: str | None = None
+    scope_path: str | None = None
+    context_size: int = 0
 
 
 class ProjectActions(Protocol):
@@ -82,7 +86,7 @@ class EvaluationActions(Protocol):
         """Return current status of an evaluation job."""
         ...
 
-    def cancel_evaluation(self, job_id: str) -> bool:
+    def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
         """Cancel a running evaluation job. Return True on success."""
         ...
 

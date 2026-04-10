@@ -1,7 +1,6 @@
 import EvaluationForm from './EvaluationForm.jsx';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
-import PowerSelector from './PowerSelector.jsx';
 
 const INITIAL_ANIM_DELAY = '0s';
 const CHIP_DELAY_1 = '0.55s';
@@ -40,29 +39,44 @@ function EvaluateHelpSection() {
   );
 }
 
-function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange, onPersistPower }) {
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+
+function ActiveProviderBadge() {
+  const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const model = localStorage.getItem(providerKey(provider, 'model')) || '';
+  if (!provider) return null;
+  return (
+    <div className="eval-provider-badge">
+      <span className="eval-provider-name">{provider}</span>
+      {model && <span className="eval-provider-model">{model}</span>}
+    </div>
+  );
+}
+
+function MagnifierIcon({ className }) {
+  return (
+    <svg className={className} width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <line x1="16.5" y1="16.5" x2="21" y2="21" />
+      <line x1="8" y1="11" x2="14" y2="11" />
+      <line x1="11" y1="8" x2="11" y2="14" />
+    </svg>
+  );
+}
+
+function EvaluateHeader({ isRunning }) {
   return (
     <header className="evaluate-header">
       <div className="evaluate-header-content">
         <div className={`evaluate-icon${isRunning ? ' running' : ''}`}>
           <div className="eval-icon-static">
-            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="7" />
-              <line x1="16.5" y1="16.5" x2="21" y2="21" />
-              <line x1="8" y1="11" x2="14" y2="11" />
-              <line x1="11" y1="8" x2="11" y2="14" />
-            </svg>
+            <MagnifierIcon />
           </div>
           <div className="eval-icon-animated">
             <span className="eval-file-chip" style={{animationDelay: INITIAL_ANIM_DELAY}} />
             <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_1}} />
             <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_2}} />
-            <svg className="eval-glass-sweep" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="7" />
-              <line x1="16.5" y1="16.5" x2="21" y2="21" />
-              <line x1="8" y1="11" x2="14" y2="11" />
-              <line x1="11" y1="8" x2="11" y2="14" />
-            </svg>
+            <MagnifierIcon className="eval-glass-sweep" />
           </div>
         </div>
         <div>
@@ -70,23 +84,23 @@ function EvaluateHeader({ isRunning, analysisPower, onAnalysisPowerChange, onPer
           <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
         </div>
       </div>
-      <PowerSelector value={analysisPower} onChange={onAnalysisPowerChange} onPersist={onPersistPower} />
+      <ActiveProviderBadge />
     </header>
   );
 }
 
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
-  const { selectedProject, analysisPower, onAnalysisPowerChange, onPersistPower } = context;
+  const { selectedProject, projectInfo } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
 
   return (
     <section className="evaluate-screen">
-      <EvaluateHeader isRunning={job?.status === 'running'} analysisPower={analysisPower} onAnalysisPowerChange={onAnalysisPowerChange} onPersistPower={onPersistPower} />
+      <EvaluateHeader isRunning={job?.status === 'running'} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} onStart={onStartEvaluation} disabled={false} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={onStartEvaluation} disabled={false} />
         )}
 
         {!job && (
@@ -94,11 +108,11 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
             <div className="panel-header">
               <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
             </div>
-            <EvaluationForm onStart={onStartEvaluation} disabled={false} />
+            <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={projectInfo} />
           </div>
         )}
 
-        {jobError && <div className="job-error-banner">Evaluation failed. Please check your inputs and try again.</div>}
+        {jobError && <div className="job-error-banner">{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
 
         {!job && <EvaluateHelpSection />}

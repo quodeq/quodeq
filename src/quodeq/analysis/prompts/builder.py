@@ -19,6 +19,50 @@ from quodeq.config.prompt_templates import render_template
 
 _logger = logging.getLogger(__name__)
 
+_TPL_EVALUATION_RULES = "EVALUATION_RULES"
+
+
+def _load_evaluation_rules() -> str:
+    """Load shared evaluation rules from evaluation_rules.md."""
+    try:
+        return load_template(template_name="evaluation_rules.md")
+    except (OSError, FileNotFoundError):
+        return ""
+
+
+def render_previous_findings_section(findings: list[dict]) -> str:
+    """Render a prompt section listing previous findings grouped by file."""
+    if not findings:
+        return ""
+
+    grouped: dict[str, list[dict]] = {}
+    for f in findings:
+        key = f.get("file", "(unknown file)")
+        grouped.setdefault(key, []).append(f)
+
+    lines = [
+        "",
+        "## Previous findings for files in this batch",
+        "",
+        "The following findings were reported in a prior evaluation. For each file",
+        "you analyze, confirm whether these findings still apply to the current code.",
+        "Report confirmed findings alongside any new ones you discover.",
+        "Dismiss findings that no longer apply by not reporting them.",
+        "",
+    ]
+    for filepath, file_findings in sorted(grouped.items()):
+        lines.append(f"### {filepath}")
+        for f in file_findings:
+            ftype = f.get("t", "finding")
+            req = f.get("req", "")
+            line_num = f.get("line", "?")
+            reason = f.get("reason", "")
+            lines.append(f"- [{ftype}] {req} line {line_num}: {reason}")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 # Re-export public API so existing ``from ...builder import X`` keeps working
 PromptContext = ctx.PromptContext
 __all__ = [
@@ -28,6 +72,7 @@ __all__ = [
     "load_template",
     "render_compiled_standards",
     "render_dimensions",
+    "render_previous_findings_section",
     "_load_dimension_data",
 ]
 
@@ -69,10 +114,15 @@ def build_analysis_prompt(template: str, context: ctx.PromptContext) -> str:
         "DIMENSIONS": dimensions_text,
         ctx.TPL_PROMPT_HASH: prompt_hash,
         ctx.TPL_SOURCE_MANIFEST: manifest_context,
+        _TPL_EVALUATION_RULES: _load_evaluation_rules(),
     }
     if context.extra_vars:
         values.update(context.extra_vars)
-    return render_template(template, values)
+    result = render_template(template, values)
+    prev_section = render_previous_findings_section(context.previous_findings)
+    if prev_section:
+        result += prev_section
+    return result
 
 
 def build_consolidated_prompt(
@@ -82,7 +132,7 @@ def build_consolidated_prompt(
 ) -> str:
     """Build a multi-dimension analysis prompt with all standards inline."""
     if template is None:
-        template = load_template(template_name="consolidated.md")
+        template = load_template(template_name="cli_consolidated_prompt.md")
 
     standards_text = render_all_standards(
         context.standards_dir, dimensions, evaluators_dir=context.evaluators_dir,
@@ -100,6 +150,7 @@ def build_consolidated_prompt(
         ctx.TPL_ANALYSIS_GUIDANCE: manifest_context,
         ctx.TPL_PROMPT_HASH: prompt_hash,
         ctx.TPL_SOURCE_MANIFEST: manifest_context,
+        _TPL_EVALUATION_RULES: _load_evaluation_rules(),
     }
     if context.extra_vars:
         values.update(context.extra_vars)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * Manages a browser-history-backed navigation stack.
@@ -48,7 +48,8 @@ function createNavActions(setNavStack, navStackRef) {
     setNavStack((prev) => {
       const stepsBack = prev.length - 1;
       if (stepsBack > 0) window.history.go(-stepsBack);
-      return [{ page }];
+      const prevKey = prev.length === 1 && prev[0].page === page ? (prev[0]._tabKey || 0) : 0;
+      return [{ page, _tabKey: prevKey + 1 }];
     });
   }
 
@@ -57,7 +58,7 @@ function createNavActions(setNavStack, navStackRef) {
 
 export function useNavStack() {
   const [navStack, setNavStack] = useState([{ page: 'overview' }]);
-  const navStackRef = { current: navStack };
+  const navStackRef = useRef(navStack);
   navStackRef.current = navStack;
 
   useEffect(() => {

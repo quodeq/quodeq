@@ -5,6 +5,7 @@ Internal module — use ``FileQueue`` from ``file_queue.py`` instead.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import tempfile
 from contextlib import contextmanager
@@ -14,9 +15,40 @@ from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
 
 _QUEUE_VERSION = 1
 
+_STALE_LOCK_THRESHOLD_SECS = 60
+
+_log = logging.getLogger(__name__)
+
 
 class FileQueueError(RuntimeError):
     """Raised on queue corruption or I/O failures."""
+
+
+def cleanup_stale_lock(lock_path: Path, threshold: float = _STALE_LOCK_THRESHOLD_SECS) -> bool:
+    """Remove a stale lock file if it exists and is older than *threshold* seconds.
+
+    Returns ``True`` if a stale lock was removed.  This is a defensive measure
+    for environments where ``flock`` may not release properly (e.g. networked
+    file-systems) or where the lock file was left behind by a hard crash.
+    """
+    try:
+        stat = lock_path.stat()
+    except FileNotFoundError:
+        return False
+
+    import time as _time
+    age = _time.time() - stat.st_mtime
+    if age > threshold:
+        try:
+            lock_path.unlink()
+        except FileNotFoundError:
+            pass  # another process already cleaned it up
+        _log.warning(
+            "Removed stale lock file %s (age=%.1fs, threshold=%.0fs)",
+            lock_path, age, threshold,
+        )
+        return True
+    return False
 
 
 @contextmanager

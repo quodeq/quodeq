@@ -17,7 +17,7 @@ def run_git_clone(url: str, clone_dest: Path) -> bool:
     env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
     try:
         _subprocess.run(
-            ["git", "clone", "--progress", url, str(clone_dest)],
+            ["git", "clone", "--progress", "--", url, str(clone_dest)],
             check=True,
             env=env,
             timeout=_GIT_CLONE_TIMEOUT_S,
@@ -61,7 +61,12 @@ def clone_to_local(
             return None
 
     project_name = info.get("name", url.split("/")[-1].replace(".git", ""))
+    # Sanitize project name to prevent path traversal
+    if "/" in project_name or "\\" in project_name or ".." in project_name:
+        return None
     clone_dest = dest_dir / project_name
+    if not clone_dest.resolve().is_relative_to(dest_dir.resolve()):
+        return None
 
     if clone_dest.exists():
         return None

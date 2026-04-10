@@ -34,7 +34,8 @@ def dismiss_finding(project_dir: Path, finding: dict) -> None:
     """Add a finding to the dismissed list. Deduplicates by (req, file, line)."""
     entries = load_dismissed(project_dir)
     new_key = _key(finding)
-    if any(_key(e) == new_key for e in entries):
+    existing_keys = {_key(e) for e in entries}
+    if new_key in existing_keys:
         return
     entry = {
         "req": finding.get("req", ""),

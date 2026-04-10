@@ -25,6 +25,8 @@ def fetch_with_retry(url: str, timeout: int = _DEFAULT_FETCH_TIMEOUT_S, max_retr
     Retries on network errors up to *max_retries* times, raising
     ``ConnectionError`` if all attempts fail.
     """
+    if not url.startswith("https://"):
+        raise ValueError(f"Only https:// URLs are allowed, got: {url!r}")
     last_exc: Exception | None = None
     for attempt in range(max_retries):
         _logger.info("Fetching %s (attempt %d/%d)", url, attempt + 1, max_retries)

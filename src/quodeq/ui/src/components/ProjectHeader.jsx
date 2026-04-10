@@ -23,6 +23,21 @@ function LanguageStats({ stats, totalFiles }) {
   );
 }
 
+function CoverageStat({ totalFiles, analyzedFiles }) {
+  if (!totalFiles || totalFiles === 0) return null;
+  const pct = analyzedFiles != null ? Math.round((analyzedFiles / totalFiles) * 100) : null;
+  if (pct == null) return null;
+  return (
+    <>
+      <span className="content-header-sep" aria-hidden="true">·</span>
+      <span className="content-stat">
+        <span className="content-stat-num" style={{ color: 'var(--color-accent)' }}>{pct}%</span>
+        <span className="content-stat-label">analyzed</span>
+      </span>
+    </>
+  );
+}
+
 export default function ProjectHeader({
   project = {},
   navigation = {},
@@ -63,6 +78,7 @@ export default function ProjectHeader({
       {meta && (
         <div className="content-header-meta">
           <LanguageStats stats={meta.languageStats} totalFiles={meta.totalFiles} />
+          <CoverageStat totalFiles={meta.totalFiles} analyzedFiles={meta.analyzedFiles} />
           {meta.repository && (
             <span className="content-meta-text">{meta.repository}</span>
           )}

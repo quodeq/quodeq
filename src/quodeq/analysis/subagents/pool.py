@@ -38,6 +38,7 @@ class SubagentPool:
         queue: WorkQueue | None = None,
     ):
         self._n = max(1, options.n_agents)
+        self._paths = paths
         self._work_dir, self._prompt = paths.work_dir, options.prompt
         self._evidence_dir, self._queue_path = paths.evidence_dir, paths.queue_path
         self._queue = queue
@@ -54,6 +55,7 @@ class SubagentPool:
             evidence_dir=self._evidence_dir, queue_path=self._queue_path,
         )
         self._scout_first, self._jsonl_lock = options.scout_first, threading.Lock()
+        self._phase = options.phase
         self._futures: dict[Future[SubagentResult], int] = {}
         self._finished: dict[str, bool] = {}
         self._next_idx = 0
@@ -92,11 +94,11 @@ class SubagentPool:
 
     def run(self) -> list[SubagentResult]:
         """Launch agents in parallel, returning a SubagentResult per agent."""
-        max_dur = self._base_config.pool_budget or _DEFAULT_POOL_BUDGET
+        max_dur = self._base_config.pool_budget if self._base_config.pool_budget is not None else _DEFAULT_POOL_BUDGET
         if self._scout_first:
-            log_info(f"Launching scout agent for {self._dimension_key} (max {self._n} agents)")
+            log_info(f"[{self._phase}] Launching scout agent for {self._dimension_key} (max {self._n} agents)")
         else:
-            log_info(f"Launching {self._n} agents for {self._dimension_key}")
+            log_info(f"[{self._phase}] Launching {self._n} agents for {self._dimension_key}")
         results: list[SubagentResult] = []
         self._finished.clear()
         self._futures.clear()

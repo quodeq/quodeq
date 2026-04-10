@@ -49,6 +49,8 @@ def should_respawn(
 ) -> int:
     """Return remaining file count if a new agent should be spawned, else 0."""
     remaining = get_queue(queue, queue_path).remaining()
+    if max_duration <= 0:
+        return remaining  # 0 = unlimited
     elapsed = time.monotonic() - pool_start
     if elapsed >= max_duration:
         if remaining > 0:

@@ -16,8 +16,17 @@ def get_ai_provider(env: dict[str, str] | None = None) -> str:
 
 
 def get_ai_cmd(env: dict[str, str] | None = None) -> str:
-    """Return the AI CLI command from environment or default."""
-    return (env or os.environ).get("AI_CMD", _get_config()["ai_cmd_default"])
+    """Return the AI CLI command from environment or default.
+
+    Falls back to AI_PROVIDER when AI_CMD is not set, so that
+    ``AI_PROVIDER=ollama`` implies ``AI_CMD=ollama`` unless overridden.
+    """
+    _env = env or os.environ
+    if "AI_CMD" in _env:
+        return _env["AI_CMD"]
+    if "AI_PROVIDER" in _env:
+        return _env["AI_PROVIDER"]
+    return _get_config()["ai_cmd_default"]
 
 
 def get_ai_model(env: dict[str, str] | None = None) -> str | None:

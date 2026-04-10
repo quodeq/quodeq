@@ -41,6 +41,16 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
         ai_cmd_error = _validate_ai_cmd(ai_cmd)
         if ai_cmd_error is not None:
             return ai_cmd_error
+        # Require an explicit model for API-type providers (e.g. Ollama)
+        if ai_cmd:
+            from quodeq.analysis._provider_cache import get_provider_configs
+            ptype = get_provider_configs().get(ai_cmd, {}).get("type")
+            if ptype == "api" and not payload.get("aiModel"):
+                body, status = error_response(
+                    "No model selected. Go to Settings and select an orchestrator model.",
+                    HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
+                )
+                return jsonify(body), status
         repo = payload.get("repo")
         _logger.info("start_evaluation: repo=%s, remote_addr=%s", _sanitize_url(repo), request.remote_addr)
         try:
@@ -54,6 +64,9 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
 
 def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
     """Register single-evaluation status and cancel routes."""
+    from quodeq.api.routes import _reports_dir
+
+    _scored_jobs: set[str] = set()
 
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
@@ -61,12 +74,24 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if not job:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
+        # Score any completed dimensions from failed/cancelled jobs (once)
+        job_status = getattr(job, "status", None)
+        if job_status in ("failed", "cancelled") and job_id not in _scored_jobs:
+            _scored_jobs.add(job_id)
+            try:
+                from quodeq.services.evaluation_mixin import _score_completed_evidence
+                _score_completed_evidence(_reports_dir(), {
+                    "outputProject": job.output_project,
+                    "outputRunId": job.output_run_id,
+                })
+            except Exception as exc:
+                _logger.debug("Could not score cancelled dimension for %s: %s", job_id, exc)
         return jsonify(to_camel_dict(job))
 
     @app.delete("/api/evaluations/<job_id>")
     def cancel_evaluation(job_id: str) -> Response | tuple[Response, int]:
         _logger.info("cancel_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
-        ok = provider.cancel_evaluation(job_id)
+        ok = provider.cancel_evaluation(job_id, reports_dir=_reports_dir())
         if not ok:
             body, status = error_response("Job not found or not running", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status

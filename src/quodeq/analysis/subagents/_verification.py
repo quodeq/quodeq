@@ -51,10 +51,46 @@ def _dispatch_verification_pool(
     manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
     _write_verify_manifest(grouped, manifest_path)
     files_to_verify = list(grouped.keys())
-    log_info(f"  [{dim_id}] Launching fast verification pool for {len(needs_verify)} findings across {len(files_to_verify)} files")
+    log_info(f"  [{dim_id}] [VERIFICATION] Launching pool for {len(needs_verify)} findings across {len(files_to_verify)} files")
     verify_results = _run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
-    log_success(f"  [{dim_id}] Verification pool complete")
+    log_success(f"  [{dim_id}] [VERIFICATION] Pool complete")
     return verify_results
+
+
+_MINI_VERIFY_MAX_AGENTS = 2
+_MINI_VERIFY_TIMEOUT_PER_10 = 60
+_MINI_VERIFY_MAX_TIMEOUT = 300
+
+
+def _dispatch_mini_verify(
+    config: RunConfig, dim_id: str, evidence_dir: Path, findings: list,
+) -> list:
+    """Post-analysis mini-verify for changed files not in the analysis queue."""
+    if not findings:
+        return []
+
+    from quodeq.analysis.subagents.verify import _group_by_file, _write_verify_manifest
+
+    grouped = _group_by_file(findings)
+    manifest_path = evidence_dir / f"{dim_id}_mini_verify_manifest.json"
+    _write_verify_manifest(grouped, manifest_path)
+    files_to_verify = list(grouped.keys())
+
+    n_files = len(files_to_verify)
+    timeout = min(_MINI_VERIFY_MAX_TIMEOUT, max(60, (n_files // 10 + 1) * _MINI_VERIFY_TIMEOUT_PER_10))
+
+    log_info(f"  [{dim_id}] [MINI-VERIFY] {len(findings)} findings across {n_files} changed files (not in analysis queue)")
+
+    from copy import copy
+    mini_config = copy(config)
+    mini_options = copy(config.options)
+    mini_options.pool_budget = timeout
+    mini_options.max_subagents = min(_MINI_VERIFY_MAX_AGENTS, config.options.max_subagents)
+    mini_config.options = mini_options
+
+    results = _run_verification_pool(mini_config, dim_id, evidence_dir, files_to_verify, manifest_path)
+    log_success(f"  [{dim_id}] [MINI-VERIFY] Complete")
+    return results
 
 
 def _run_verification_step(

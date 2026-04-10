@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from flask import Flask
 
+from quodeq.api._log_buffer import LogBuffer
+from quodeq.api._log_routes import register_log_routes
 from quodeq.api._rate_limit import RateLimitStore
 from quodeq.api.routes import (
     register_project_list_routes,
@@ -15,6 +17,7 @@ from quodeq.api.routes import (
 )
 from quodeq.api.standards_routes import register_standards_routes
 from quodeq.api.routes_findings import register_findings_routes
+from quodeq.api.llm_bridge_routes import register_llm_bridge_routes
 from quodeq.api.routes_rescore import register_rescore_routes
 from quodeq.services.base import ActionProvider
 
@@ -22,6 +25,7 @@ from quodeq.services.base import ActionProvider
 def register_all_routes(
     app: Flask, provider: ActionProvider,
     eval_store: RateLimitStore, static_dist: str | None,
+    log_buffer: LogBuffer | None = None,
 ) -> None:
     """Register all API route groups on the app.
 
@@ -39,4 +43,7 @@ def register_all_routes(
     register_standards_routes(app)
     register_findings_routes(app)
     register_rescore_routes(app)
+    register_llm_bridge_routes(app)
+    if log_buffer:
+        register_log_routes(app, log_buffer)
     register_static_routes(app, static_dist)

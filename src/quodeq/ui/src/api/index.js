@@ -9,7 +9,7 @@
  */
 
 import { createDashboard } from '../models/dashboard.js';
-import { createDimensionEval } from '../models/dimension.js';
+import { createDimension, createDimensionEval } from '../models/dimension.js';
 import { createJob } from '../models/job.js';
 import { createProject } from '../models/project.js';
 import { request, BASE } from './request.js';
@@ -90,14 +90,19 @@ export async function getDashboard(projectId, run = 'latest') {
 /** @returns {Promise<Object>} */
 export async function getAccumulated(projectId, asOfRun = null) {
   const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
-  return request(`/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
+  const data = await request(`/projects/${encodeURIComponent(projectId)}/accumulated${q}`);
+  if (data && Array.isArray(data.dimensions)) {
+    data.dimensions = data.dimensions.map(createDimension);
+  }
+  return data;
 }
 
 // ── Evaluations / Jobs ──────────────────────────────────────────────────
 
 /** @returns {Promise<import('../models/job.js').Job[]>} */
-export async function listEvaluations() {
-  const data = await request('/evaluations');
+export async function listEvaluations({ limit } = {}) {
+  const params = limit ? `?limit=${limit}` : '';
+  const data = await request(`/evaluations${params}`);
   return (data || []).map(createJob);
 }
 
@@ -177,6 +182,43 @@ export function getAiClients() {
  */
 export function getClientModels(clientId) {
   return request(`/ai-clients/${encodeURIComponent(clientId)}/models`);
+}
+
+// ── LLM Bridge ─────────────────────────────────────────────────────────
+
+export function getOllamaStatus() {
+  return request('/ollama/status');
+}
+
+export async function getOllamaModels() {
+  const data = await request('/ollama/models');
+  return data?.models ?? [];
+}
+
+export function testOllamaConcurrency(model) {
+  return request('/ollama/test-concurrency', {
+    method: 'POST',
+    body: JSON.stringify({ model }),
+  });
+}
+
+export function testProviderConnection({ apiBase, model, apiKey }) {
+  return request('/provider/test', {
+    method: 'POST',
+    body: JSON.stringify({ api_base: apiBase, model, api_key: apiKey }),
+  });
+}
+
+export function getKnownModels() {
+  return request('/known-models');
+}
+
+export function getProviderConfigs() {
+  return request('/provider-configs');
+}
+
+export function scanPath(dirPath) {
+  return request('/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: dirPath }) });
 }
 
 // Standards and findings APIs are re-exported at the top of this file.

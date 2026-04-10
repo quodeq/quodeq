@@ -18,6 +18,7 @@ from quodeq.services._job_model import (
     Job,
     JobStore,
     InMemoryJobStore,
+    FileJobStore,
     create_job_store,
     REPORT_PATH_RE,
     _MAX_COMPLETED_JOBS,
@@ -31,6 +32,7 @@ __all__ = [
     "Job",
     "JobStore",
     "InMemoryJobStore",
+    "FileJobStore",
     "create_job_store",
     "REPORT_PATH_RE",
     "JobManager",
@@ -90,6 +92,7 @@ class JobManager:
                 text=True,
                 cwd=cwd,
                 env=env,
+                start_new_session=True,
             )
         except (OSError, subprocess.SubprocessError) as exc:
             _logger.error("Failed to start job subprocess: %s", exc)
@@ -122,8 +125,20 @@ class JobManager:
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
-            process.terminate()
+            from quodeq.analysis._process import _kill_tree
+            _kill_tree(process.pid)
         return True
+
+    def shutdown(self) -> None:
+        """Kill all running job subprocesses. Called on server shutdown."""
+        with self._lock:
+            for job_id, process in list(self._processes.items()):
+                try:
+                    from quodeq.analysis._process import _kill_tree
+                    _kill_tree(process.pid)
+                except (ProcessLookupError, OSError):
+                    pass
+            self._processes.clear()
 
     def get_job(self, job_id: str) -> JobSnapshot | None:
         """Return the current state of a job, or None if not found."""
@@ -152,6 +167,12 @@ class JobManager:
         elif phase in ("analyzing", "scoring"):
             job.current_dimension = marker.get("dimension")
             job.phase = phase
+        elif phase == "report_path":
+            project = marker.get("project")
+            run_id = marker.get("runId")
+            if project and run_id:
+                job.output_project = project
+                job.output_run_id = run_id
 
     def _append_log(self, job: Job, line: str) -> None:
         if not line:
@@ -160,7 +181,9 @@ class JobManager:
             self._apply_marker(job, line)
             return
         job.logs.append(_ANSI_RE.sub("", line))
-        if _REPORT_PATH_MARKER in line:
+        # Fallback: extract report path from log text if the structured
+        # marker was not received (backward compat with older pipelines).
+        if not job.output_project and _REPORT_PATH_MARKER in line:
             match = REPORT_PATH_RE.search(line)
             if match:
                 job.output_project = match.group(1)

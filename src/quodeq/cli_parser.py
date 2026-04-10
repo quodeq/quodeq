@@ -68,6 +68,14 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "--incremental", action="store_true",
         help="Only analyze files changed since last evaluation (carry forward cached findings)",
     )
+    parser.add_argument(
+        "--branch", default=None,
+        help="Git branch to analyze (creates a temporary worktree)",
+    )
+    parser.add_argument(
+        "--scope", default=None,
+        help="Subdirectory to analyze (relative to repo root)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

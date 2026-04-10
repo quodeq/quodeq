@@ -22,6 +22,7 @@ class ProjectEntry:
     discipline: str | None = None
     path: str | None = None
     location: str | None = None
+    scope_path: str | None = None
     runs_count: int = 0
     latest_run_id: str | None = None
     latest_date: str | None = None
@@ -30,3 +31,6 @@ class ProjectEntry:
     latest_grade: str | None = None
     latest_score: float | None = None
     language_stats: dict[str, int] = field(default_factory=dict)
+    scan_date: str | None = None
+    total_files: int | None = None
+    analyzed_files: int | None = None

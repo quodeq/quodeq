@@ -25,6 +25,30 @@
   font-size: 1rem;
 }
 
+.eval-provider-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.eval-provider-name {
+  font-weight: var(--weight-semibold);
+  color: var(--color-text);
+  text-transform: capitalize;
+}
+
+.eval-provider-model {
+  font-family: monospace;
+  font-size: 0.72rem;
+}
+
 .evaluate-content {
   display: grid;
   gap: 24px;
@@ -89,6 +113,10 @@
 .evaluate-submit-btn:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+.evaluate-submit-btn--secondary {
+  font-size: 0.85rem;
 }
 
 .job-error {
@@ -772,7 +800,6 @@
   background: var(--color-danger-bg);
   color: var(--color-danger-text);
   opacity: 1;
-  transform: translateY(-50%) scale(1.1);
 }
 
 .input-clear-btn svg {
@@ -826,7 +853,7 @@
 .evaluate-form-large {
   display: flex;
   flex-direction: column;
-  gap: 24px;
+  gap: 16px;
 }
 
 .evaluate-form-large .form-group label {
@@ -835,6 +862,84 @@
   font-size: 0.85rem;
   font-weight: 600;
   color: var(--color-text);
+}
+
+.scope-toggle-group {
+  margin-bottom: 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.scope-compact-btn {
+  padding: 2px 8px;
+  background: var(--color-surface-alt);
+  border: 1px solid var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 0.7rem;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.scope-compact-btn:hover {
+  background: var(--color-accent);
+  color: var(--color-on-accent, #fff);
+}
+
+.scope-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 0.75rem;
+  align-self: flex-end;
+  white-space: nowrap;
+}
+
+.scope-path {
+  color: var(--color-accent);
+  font-family: monospace;
+}
+
+.scope-change-btn {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+}
+
+.scope-change-btn:hover {
+  color: var(--color-text);
+}
+
+.scope-branch-display {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-1);
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+  align-self: flex-end;
+}
+
+.scope-branch-label {
+  font-weight: var(--weight-medium);
+}
+
+.scope-branch-value {
+  color: var(--color-text);
+  font-family: monospace;
+  font-size: 0.75rem;
+}
+
+.form-hint {
+  display: block;
+  margin-top: var(--space-1);
+  font-size: 0.8rem;
+  color: var(--color-text-subtle);
 }
 
 /* Re-evaluate card */
@@ -921,6 +1026,17 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
   margin: var(--space-1) 0;
+}
+
+.re-eval-actions-group {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.re-eval-disabled-section {
+  opacity: 0.5;
+  pointer-events: none;
 }
 
 /* Dimension label row: label left, actions right */
@@ -1018,9 +1134,8 @@
 
 /* Improve submit button */
 .evaluate-submit-btn {
-  margin-top: 8px;
-  padding: 18px 36px;
-  font-size: 1.05rem;
+  padding: 12px 24px;
+  font-size: 0.9rem;
   font-weight: 600;
 }
 

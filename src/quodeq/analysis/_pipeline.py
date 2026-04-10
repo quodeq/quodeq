@@ -1,6 +1,8 @@
 """Pipeline coordination — dimension orchestration, merging, and public API."""
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis._dimension_ops import (
     _build_dimension_prompt,
@@ -16,8 +18,7 @@ from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.logging import log_warning
 
 
-class EvaluationError(RuntimeError):
-    """Raised when an evaluation completes but produces no usable findings."""
+from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
 
 
 def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
@@ -26,7 +27,10 @@ def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContex
     return _load_ctx(config)
 
 
-def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
+def _run_dimensions(
+    config: RunConfig,
+    on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
+) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
     from quodeq.analysis._incremental import (
         run_incremental_loop, run_per_dimension_loop,
@@ -40,20 +44,28 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
             config, dimensions, ctx,
             process_fn=_process_single_dimension,
             log_result_fn=_log_dimension_result,
+            on_dimension_done=on_dimension_done,
         )
 
     emit_marker("setup", dimensions=dimensions)
 
-    # Consolidated mode: evaluate all dimensions in one pass
+    # Consolidated mode: evaluate all dimensions in one pass.
+    # Disabled for API providers — per-dimension gives better coverage
+    # since local models struggle with 8 dimensions in one prompt.
+    from quodeq.analysis.subprocess import _get_provider_type
+    from quodeq.shared.utils import get_ai_cmd
+    _provider_type = _get_provider_type(get_ai_cmd())
     if (config.options.consolidated
             and len(dimensions) > 1
-            and config.options.max_subagents > 1):
+            and config.options.max_subagents > 1
+            and _provider_type != "api"):
         from quodeq.analysis.subagents.runner import process_consolidated_dimensions
         try:
             result = process_consolidated_dimensions(config, dimensions, ctx)
             if result:
+                dim_index = {d: i + 1 for i, d in enumerate(dimensions)}
                 for dim, ev in result.items():
-                    idx = dimensions.index(dim) + 1 if dim in dimensions else 0
+                    idx = dim_index.get(dim, 0)
                     _log_dimension_result(ev, dim, idx, len(dimensions))
                 return result
             log_warning("Consolidated mode produced no results, falling back to per-dimension")
@@ -63,6 +75,7 @@ def _run_dimensions(config: RunConfig) -> dict[str, Evidence]:
     return run_per_dimension_loop(
         config, dimensions, ctx,
         process_fn=_process_single_dimension,
+        on_dimension_done=on_dimension_done,
     )
 
 
@@ -76,6 +89,9 @@ def run(config: RunConfig) -> Evidence:
     )
 
 
-def run_per_dimension(config: RunConfig) -> dict[str, Evidence]:
+def run_per_dimension(
+    config: RunConfig,
+    on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
+) -> dict[str, Evidence]:
     """Like run(), but returns a dict of {dimension_id: Evidence} without merging."""
-    return _run_dimensions(config)
+    return _run_dimensions(config, on_dimension_done=on_dimension_done)

@@ -7,6 +7,7 @@ import { gradeColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
+import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 
 const columnStyle = { display: 'flex', flexDirection: 'column', gap: 2 };
 
@@ -192,9 +193,11 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
 }
 
 function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId) {
+  const principlesByName = new Map((evalData.principles || []).map((p) => [p.name, p]));
+  const gradesByPrinciple = new Map((evalData.principleGrades || []).map((p) => [p.principle, p]));
   return function buildEvalPrincipal(principleId) {
-    const principleData = (evalData.principles || []).find((p) => p.name === principleId);
-    const pg = (evalData.principleGrades || []).find((p) => p.principle === principleId);
+    const principleData = principlesByName.get(principleId);
+    const pg = gradesByPrinciple.get(principleId);
     return {
       principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
       dimension: evalData.dimension || '',
@@ -233,14 +236,15 @@ function mergeRescoreIntoEval(prev, dimData) {
 }
 
 async function fetchAndRescore(project, runId, dimension) {
-  const data = await getDimensionEval(project, runId, dimension);
-  try {
-    const rescored = await getRescore(project, runId);
+  const [data, rescored] = await Promise.all([
+    getDimensionEval(project, runId, dimension),
+    getRescore(project, runId).catch(() => null),
+  ]);
+  if (rescored) {
     const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
     return dimData ? mergeRescoreIntoEval(data, dimData) : data;
-  } catch {
-    return data; // rescore failure is non-fatal
   }
+  return data;
 }
 
 function useExplorerData(project, dimension, runId, refreshSignal) {
@@ -272,23 +276,33 @@ function useExplorerData(project, dimension, runId, refreshSignal) {
   return { evalData, loading, error, overallGrade, principleGrades, allViolations, ...stats };
 }
 
-export default function ExplorerPage({ project, dimension, runId, dateLabel, onNavigate, refreshSignal }) {
+export default function ExplorerPage({ project, dimension, runId, dateLabel, severityFilter, onNavigate, refreshSignal }) {
   const d = useExplorerData(project, dimension, runId, refreshSignal);
+  const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
   const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId);
 
+  // Apply severity filter
+  const filteredViolations = activeSevFilter
+    ? d.allViolations.filter(v => (v.severity || 'minor') === activeSevFilter)
+    : d.allViolations;
+  const filteredTopFiles = activeSevFilter
+    ? buildTopOffendingFiles(filteredViolations)
+    : d.topFiles;
+
   return (
     <>
       <DimensionOverview
-        data={{ evalData: d.evalData, runId, dateLabel, allViolations: d.allViolations }}
-        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: d.topFiles, uniquePrinciples: d.uniquePrinciples, principleGrades: d.principleGrades }}
+        data={{ evalData: d.evalData, runId, dateLabel, allViolations: filteredViolations }}
+        stats={{ overallGrade: d.overallGrade, severityCounts: d.severityCounts, totalCompliant: d.totalCompliant, topFiles: filteredTopFiles, uniquePrinciples: d.uniquePrinciples, principleGrades: d.principleGrades }}
         onNavigate={onNavigate}
       />
+      <SeverityFilterPills counts={d.severityCounts} activeFilter={activeSevFilter} onFilterChange={setActiveSevFilter} />
       <PrinciplesList evalData={d.evalData} principleGrades={d.principleGrades} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
-      <ViolationsByPrincipleSection allViolations={d.allViolations} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
-      <ViolationsByFileSection topFiles={d.topFiles} onNavigate={onNavigate} />
+      <ViolationsByPrincipleSection allViolations={filteredViolations} onNavigate={onNavigate} buildEvalPrincipal={buildEvalPrincipal} />
+      <ViolationsByFileSection topFiles={filteredTopFiles} onNavigate={onNavigate} />
     </>
   );
 }

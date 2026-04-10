@@ -154,9 +154,10 @@ class TestBuildDashboard:
         assert len(result["dimensions"]) == 1
         assert result["dimensions"][0]["dimension"] == "maintainability"
 
-    def test_raises_for_missing_project(self, tmp_path):
-        with pytest.raises(FileNotFoundError):
-            build_dashboard(str(tmp_path), "nonexistent", "latest")
+    def test_returns_empty_for_missing_project(self, tmp_path):
+        result = build_dashboard(str(tmp_path), "nonexistent", "latest")
+        assert result["dimensions"] == []
+        assert result["selectedRun"] is None
 
     def test_raises_for_missing_run(self, tmp_path):
         project = "proj-uuid"

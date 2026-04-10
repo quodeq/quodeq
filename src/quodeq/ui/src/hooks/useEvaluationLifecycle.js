@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useEvaluation } from '../features/evaluation/hooks/useEvaluation.js';
 import { getLevels, STORAGE_KEY as POWER_KEY } from '../features/evaluation/components/powerLevels.js';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
+
+const LOCAL_API_PROVIDERS = ['ollama'];
 
 /**
  * Manages the full evaluation lifecycle: start, poll, dismiss, cancel.
@@ -38,9 +41,19 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
   }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleStartEvaluation(payload) {
-    const levels = getLevels();
-    const subagentModel = levels.find(l => l.level === analysisPower)?.model;
-    startEvaluation({ ...payload, aiCmd: settings.aiCmd || undefined, aiModel: settings.aiModel || undefined, subagentModel, verifyFindings: settings.verifyFindings });
+    const activeProvider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+    const get = (key) => localStorage.getItem(providerKey(activeProvider, key));
+    // Ollama uses a single analysis model; CLI providers use tier-based selection.
+    // Falls back to the orchestrator model if no analysis-specific model is set.
+    const analysisModel = get('model-analysis');
+    let subagentModel;
+    if (analysisModel) {
+      subagentModel = analysisModel;
+    } else {
+      const tierNames = ['fast', 'balanced', 'thorough'];
+      subagentModel = get(`model-${tierNames[analysisPower - 1]}`) || get('model') || undefined;
+    }
+    startEvaluation({ ...payload, subagentModel });
   }
 
   function handleEvalDismiss(action) {
@@ -50,9 +63,13 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
     clearJob();
   }
 
+  const activeProvider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const isLocalApi = LOCAL_API_PROVIDERS.includes(activeProvider);
+
   return {
     job, jobError, liveViolations,
     analysisPower, setAnalysisPower, persistAnalysisPower,
     handleStartEvaluation, handleEvalDismiss, cancelEvaluation,
+    isLocalApi,
   };
 }

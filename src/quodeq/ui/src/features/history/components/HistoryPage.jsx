@@ -13,7 +13,7 @@ function computeDeltas(trend) {
     const curr = parseFloat(entry.numericAverage);
     const prev = parseFloat(trend[i + 1].numericAverage);
     if (isNaN(curr) || isNaN(prev)) return null;
-    return curr - prev;
+    return Math.round((curr - prev) * 10) / 10;
   });
 }
 

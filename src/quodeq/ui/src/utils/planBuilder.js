@@ -165,7 +165,7 @@ export function buildDimensionPlanFromViolations(dimName, violations) {
 }
 
 // ---------------------------------------------------------------------------
-// Shared group plan builder (used by PrincipleDetailPage, EvalPrincipleDetailPage, FileDetailPage)
+// Shared group plan builder (used by PrincipleDetailPage, FileDetailPage)
 // ---------------------------------------------------------------------------
 
 /**

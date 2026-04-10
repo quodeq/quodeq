@@ -32,6 +32,7 @@ def _build_project_entry(reports_root: Path, entry_name: str, runs: list[RunInfo
         discipline=meta["discipline"],
         path=meta["path"],
         location=meta["location"],
+        scope_path=meta.get("scopePath"),
         runs_count=len(runs),
         latest_run_id=runs[0].run_id if runs else None,
         latest_date=runs[0].date_iso if runs else None,

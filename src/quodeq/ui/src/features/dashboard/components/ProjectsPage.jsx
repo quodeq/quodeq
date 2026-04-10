@@ -91,6 +91,7 @@ function ProjectCard({ project, isSelected, cardProps = {}, children: cardChildr
         <div className="project-card-top">
           <div className="project-card-top-left">
             <span className="project-card-name">{project.displayName || name}</span>
+            {project.scopePath && <span className="scope-badge">{project.scopePath}</span>}
             <GradeChip grade={grade} score={score} />
           </div>
           <div className="project-card-top-right">
@@ -228,6 +229,7 @@ function ProjectCardGroup({ p, children: childProjects, selectedProject, onSelec
     <div key={id} className={`project-card-group${childSelected && !isSelected ? ' project-card--child-selected' : ''}`}>
       <ProjectCard project={p} isSelected={isSelected} cardProps={{ onSelect, footer: <CardFooter name={id} confirming={confirming} setConfirming={setConfirming} onDelete={onDelete} onExport={onExport} /> }}>
         <ProjectPathContent id={id} p={p} relocateActions={relocateActions} />
+        {hasChildren && (() => { const childCount = childProjects[id].length; return <span className="parent-summary">{childCount} sub-project{childCount !== 1 ? 's' : ''}</span>; })()}
       </ProjectCard>
       {hasChildren && <ProjectChildren childList={childProjects[id]} selectedProject={selectedProject} onSelect={onSelect} confirmActions={confirmActions} />}
     </div>

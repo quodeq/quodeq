@@ -188,7 +188,7 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
   );
 }
 
-export default function FolderBrowser({ onSelect, onClose, title = 'Select Repository Folder', confirmText = 'Use This Folder', showFiles = false }) {
+export default function FolderBrowser({ onSelect, onClose, title = 'Select Repository Folder', confirmText = 'Use This Folder', showFiles = false, rootPath = null }) {
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
@@ -205,10 +205,15 @@ export default function FolderBrowser({ onSelect, onClose, title = 'Select Repos
   const navigation = { setLoading, setNavError, updateNavState };
 
   function navigate(path) {
+    // Prevent navigating above rootPath when rootPath is set
+    if (rootPath && path && !path.startsWith(rootPath)) {
+      setPathInput(rootPath);
+      return;
+    }
     navigateFolder(path, navigation, showFiles);
   }
 
-  useEffect(() => { navigate(''); }, []);
+  useEffect(() => { navigate(rootPath || ''); }, [rootPath]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="modal-overlay" onClick={onClose}>

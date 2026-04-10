@@ -5,7 +5,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from quodeq.core.evidence._jsonl import judgment_to_dict, parse_jsonl_line, read_judgments
-from quodeq.core.evidence._refs import build_req_refs_lookup, resolve_llm_refs
+from quodeq.core.evidence._refs import build_req_refs_lookup, enrich_judgment, resolve_llm_refs
+from quodeq.shared.utils import open_text
 from quodeq.core.evidence._req_mapping import _GroupedJudgments, _group_judgments
 from quodeq.core.evidence.model import Evidence, Judgment, PrincipleEvidence, compute_coverage_pct
 
@@ -60,13 +61,25 @@ def parse_jsonl_to_evidence_by_dimension(
     jsonl_file: Path, context: EvidenceContext,
     compiled_dir: Path | None = None, evaluators_dir: Path | None = None,
 ) -> dict[str, Evidence]:
-    """Parse a multi-dimension JSONL file into per-dimension Evidence objects."""
-    judgments = read_judgments(jsonl_file, compiled_dir)
-    if not judgments:
+    """Parse a multi-dimension JSONL file into per-dimension Evidence objects.
+
+    Groups judgments by dimension incrementally during parsing to avoid
+    holding the full flat list in memory.
+    """
+    if not jsonl_file.exists():
         return {}
     by_dim: dict[str, list[Judgment]] = {}
-    for j in judgments:
-        by_dim.setdefault(j.dimension or "unknown", []).append(j)
+    opener = open_text
+    with opener(jsonl_file) as jf:
+        req_refs_cache: dict[str, dict[str, list[dict]]] = {}
+        for line in jf:
+            result = parse_jsonl_line(line)
+            if result is not None:
+                j, llm_refs = result
+                enrich_judgment(j, llm_refs, compiled_dir, req_refs_cache)
+                by_dim.setdefault(j.dimension or "unknown", []).append(j)
+    if not by_dim:
+        return {}
     return {
         dim: _build_evidence(context, _build_principles(
             _group_judgments(dj, dimension=dim, evaluators_dir=evaluators_dir), dim))

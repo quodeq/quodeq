@@ -19,8 +19,11 @@ const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
+const _cssVarCache = {};
 const cssVar = (name, fallback) => {
+  if (name in _cssVarCache) return _cssVarCache[name] || fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  _cssVarCache[name] = val;
   return val || fallback;
 };
 

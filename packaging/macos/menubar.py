@@ -152,7 +152,18 @@ class QuodeqApp(rumps.App):
         with self._state_lock:
             port = self._port
         port = port or self._find_running_port()
-        if port:
+        if not port:
+            return
+        quodeq_cmd = self._cached_cmds.get("quodeq")
+        if quodeq_cmd:
+            # Launches PyWebView window (or brings existing one to front via socket IPC)
+            subprocess.Popen(
+                [quodeq_cmd, "dashboard", "--no-build", "--port", str(port)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+        else:
             webbrowser.open(f"http://127.0.0.1:{port}")
 
     def _on_start(self, _):
