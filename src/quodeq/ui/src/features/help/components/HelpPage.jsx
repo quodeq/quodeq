@@ -6,7 +6,7 @@ const SECTIONS = [
   { id: 'providers', label: 'AI Providers' },
   { id: 'evaluations', label: 'Running Evaluations' },
   { id: 'dimensions', label: 'Quality Dimensions' },
-  { id: 'violations', label: 'Navigating Violations' },
+  { id: 'violations', label: 'Violations' },
   { id: 'map', label: 'Code Map' },
   { id: 'standards', label: 'Custom Standards' },
   { id: 'settings', label: 'Settings' },
@@ -238,8 +238,8 @@ function Dimensions() {
 function Violations() {
   return (
     <section className="help-section">
-      <h2>Navigating Violations</h2>
-      <p>The <strong>Violations</strong> tab shows all findings across your project, organized by dimension and severity.</p>
+      <h2>Violations</h2>
+      <p>The <strong>Violations</strong> tab is where you review, explore, and manage all findings from your evaluations.</p>
 
       <h3>Severity levels</h3>
       <table className="help-table">
@@ -254,7 +254,7 @@ function Violations() {
         </tbody>
       </table>
 
-      <h3>Exploring findings</h3>
+      <h3>Navigating findings</h3>
       <ul>
         <li><strong>Click a dimension</strong> to see all findings for that quality area</li>
         <li><strong>Click a file</strong> to see all violations in that specific file with code context</li>
@@ -262,8 +262,18 @@ function Violations() {
         <li><strong>Severity cells</strong> in the grid are clickable and filter by both dimension and severity</li>
       </ul>
 
+      <h3>Viewing dimensions and code</h3>
+      <p>From any violation, you can drill into its dimension to see the full picture: all principles, their scores, and every finding with the relevant code snippet. This helps you understand the context around a violation and decide whether to fix it, dismiss it, or accept the trade-off.</p>
+
       <h3>Dismissing findings</h3>
-      <p>If a finding is a false positive or intentionally accepted, you can dismiss it. Dismissed findings are excluded from scoring in future runs but can be restored at any time.</p>
+      <p>If a finding is a false positive or intentionally accepted, you can dismiss it directly from the violation detail view. Dismissed findings:</p>
+      <ul>
+        <li>Are moved to the <strong>Dismissed</strong> sub-tab in the Violations view</li>
+        <li>Are <strong>excluded from scoring</strong>. The dimension score updates immediately after dismissal</li>
+        <li>Are <strong>excluded from future evaluations</strong>. Re-running the evaluation will not report dismissed findings again</li>
+        <li>Can be <strong>restored at any time</strong> from the Dismissed tab, which brings them back into the active results</li>
+      </ul>
+      <p>Use this to filter out noise and focus on the violations that matter to your team. You can also use <strong>Restore All</strong> to bring back all dismissed findings at once.</p>
     </section>
   );
 }
@@ -342,22 +352,29 @@ function Standards() {
 
       <h3>Using AI to generate standards</h3>
       <div className="help-callout help-callout-tip">
-        <strong>Tip:</strong> You can ask an AI agent (Claude, ChatGPT, etc.) to create custom standards for you. Provide the schema above and describe what you want to evaluate.
+        <strong>Tip:</strong> You can ask any AI (Claude, ChatGPT, Gemini, etc.) to generate a custom standard for you. Just ask it to produce a <code>.json</code> file following the schema above, then import it into Quodeq.
       </div>
-      <p>Example prompt:</p>
-      <pre className="help-code">{`Create a Quodeq evaluation standard for React
-component best practices. Include principles for
-accessibility, performance, state management,
-and error boundaries.
+      <p>Ask the AI something like:</p>
+      <pre className="help-code">{`Generate a .quodeq JSON file for evaluating React component
+best practices. Include principles for accessibility,
+performance, state management, and error boundaries.
 
-Use this JSON schema:
+Use this structure:
 {
   "id": "react-best-practices",
   "name": "React Best Practices",
   "dimension": "react",
-  ...
+  "principles": [
+    {
+      "id": "P-REACT-A11Y",
+      "name": "Accessibility",
+      "requirements": [
+        { "id": "R-A11Y-1", "rule": "...", "severity": "major" }
+      ]
+    }
+  ]
 }`}</pre>
-      <p>The agent will generate a complete standard JSON that you can paste into the Standards editor or save as a <code>.json</code> file and import.</p>
+      <p>The AI will generate a complete standard JSON file. Save it as a <code>.json</code> file (the <code>.quodeq</code> extension is optional &mdash; it's a regular JSON file), then click the <strong>Import</strong> button in the <strong>Standards</strong> tab to load it into Quodeq.</p>
     </section>
   );
 }
