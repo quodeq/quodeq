@@ -13,8 +13,10 @@ _SYNC_ITEMS = ("src", "public", "package.json", "package-lock.json", ".npmrc", "
 
 
 def compute_source_hash(source_dir: Path) -> str:
-    """Compute a SHA-256 hash over all tracked source files."""
+    """Compute a SHA-256 hash over all tracked source files and the package version."""
+    from quodeq import __version__
     h = hashlib.sha256()
+    h.update(__version__.encode())
     files: list[Path] = []
     for item_name in _SYNC_ITEMS:
         item = source_dir / item_name
