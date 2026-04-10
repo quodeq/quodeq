@@ -77,9 +77,6 @@ function EvaluateHeader({ isRunning }) {
             <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_1}} />
             <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_2}} />
             <MagnifierIcon className="eval-glass-sweep" />
-              <line x1="8" y1="11" x2="14" y2="11" />
-              <line x1="11" y1="8" x2="11" y2="14" />
-            </svg>
           </div>
         </div>
         <div>
