@@ -24,7 +24,7 @@ __all__ = [
     "get_ollama_status",
     "list_ollama_models",
     "estimate_max_agents",
-    "test_concurrency",
+    "run_concurrency_test",
     "check_cloud_connection",
     "get_known_models",
 ]

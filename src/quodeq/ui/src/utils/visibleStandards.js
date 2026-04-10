@@ -19,14 +19,19 @@ export function readVisibleStandardIds() {
  * Compute summary stats from a filtered dimensions array.
  */
 export function computeSummaryFromDimensions(dimensions) {
-  const allViolations = dimensions.flatMap((d) => d.violations || []);
-  const totalCompliance = dimensions.reduce((sum, d) => sum + (d.compliance?.length || 0), 0);
+  let totalViolations = 0;
+  let totalCompliance = 0;
   const severity = { critical: 0, major: 0, minor: 0 };
-  for (const v of allViolations) {
-    const s = (v.severity || '').toLowerCase();
-    if (s === 'critical') severity.critical++;
-    else if (s === 'major') severity.major++;
-    else if (s === 'minor') severity.minor++;
+  for (const d of dimensions) {
+    const violations = d.violations || [];
+    totalViolations += violations.length;
+    totalCompliance += d.compliance?.length || 0;
+    for (const v of violations) {
+      const s = (v.severity || '').toLowerCase();
+      if (s === 'critical') severity.critical++;
+      else if (s === 'major') severity.major++;
+      else if (s === 'minor') severity.minor++;
+    }
   }
-  return { totalViolations: allViolations.length, totalCompliance, severity };
+  return { totalViolations, totalCompliance, severity };
 }

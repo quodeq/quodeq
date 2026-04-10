@@ -6,6 +6,7 @@ function createNode(name, path, isFile) {
     dimensions: {},
     complianceRate: 0,
     children: [],
+    _childMap: new Map(),
     items: [],
   };
 }
@@ -18,24 +19,27 @@ function ensurePath(root, filePath) {
     const part = parts[i];
     builtPath += (builtPath ? '/' : '') + part;
     const isFile = i === parts.length - 1;
-    let child = current.children.find((c) => c.name === part);
+    let child = current._childMap.get(part);
     if (!child) {
       child = createNode(part, builtPath, isFile);
       current.children.push(child);
+      current._childMap.set(part, child);
     }
     current = child;
   }
   return current;
 }
 
-function aggregateUp(node) {
-  if (node.children.length === 0) {
+const _MAX_TREE_DEPTH = 64;
+
+function aggregateUp(node, _depth = 0) {
+  if (_depth > _MAX_TREE_DEPTH || node.children.length === 0) {
     const total = node.violations + node.compliance;
     node.complianceRate = total > 0 ? node.compliance / total : 0;
     return;
   }
   for (const child of node.children) {
-    aggregateUp(child);
+    aggregateUp(child, _depth + 1);
     node.violations += child.violations;
     node.compliance += child.compliance;
     node.severity.critical += child.severity.critical;

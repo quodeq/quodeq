@@ -20,13 +20,16 @@ function DismissedCard({ d, onRestore }) {
             <div className="dismissed-detail-section">
               <div className="dismissed-detail-header">
                 <span className="dismissed-detail-label">Reason</span>
-                {(d.reqRefs || []).filter((r) => r.url && /^https?:\/\//.test(r.url)).length > 0 && (
-                  <span className="cwe-link-group">
-                    {d.reqRefs.filter((r) => r.url && /^https?:\/\//.test(r.url)).map((r, i) => (
-                      <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
-                    ))}
-                  </span>
-                )}
+                {(() => {
+                  const urlRefs = (d.reqRefs || []).filter((r) => r.url && /^https?:\/\//.test(r.url));
+                  return urlRefs.length > 0 && (
+                    <span className="cwe-link-group">
+                      {urlRefs.map((r, i) => (
+                        <a key={i} className="cwe-link" href={r.url} target="_blank" rel="noopener noreferrer">{r.label}</a>
+                      ))}
+                    </span>
+                  );
+                })()}
               </div>
               <p className="dismissed-detail-title">{d.title}</p>
             </div>

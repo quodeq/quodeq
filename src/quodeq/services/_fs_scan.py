@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 import subprocess
@@ -53,15 +54,27 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
 
 
 def _walk_files(root: Path) -> list[Path]:
-    """Walk directory tree, skipping common non-source directories."""
+    """Walk directory tree iteratively, skipping common non-source directories.
+
+    Uses a stack instead of recursion to avoid depth limits on deeply nested trees.
+    """
     files: list[Path] = []
-    for item in sorted(root.iterdir()):
-        if item.is_dir():
-            if item.name in _SKIP_DIRS or item.name.startswith("."):
-                continue
-            files.extend(_walk_files(item))
-        elif item.is_file():
-            files.append(item)
+    stack: list[Path] = [root]
+    while stack:
+        current = stack.pop()
+        try:
+            entries = sorted(current.iterdir())
+        except OSError:
+            continue
+        dirs: list[Path] = []
+        for item in entries:
+            if item.is_dir():
+                if item.name not in _SKIP_DIRS and not item.name.startswith("."):
+                    dirs.append(item)
+            elif item.is_file():
+                files.append(item)
+        # Push in reverse so alphabetical order is preserved via LIFO
+        stack.extend(reversed(dirs))
     return files
 
 
@@ -92,7 +105,6 @@ def _list_modules(project_dir: Path) -> list[str]:
 
 def _write_scan_json(scan: ScanData, output_dir: Path) -> None:
     """Persist scan data as JSON."""
-    import dataclasses
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = dataclasses.asdict(scan)
     (output_dir / "scan.json").write_text(json.dumps(payload, indent=2))

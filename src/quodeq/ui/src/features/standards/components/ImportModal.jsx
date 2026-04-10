@@ -121,9 +121,19 @@ function useImportActions(onImported, state) {
       return;
     }
     let data;
-    try { const text = await file.text(); data = JSON.parse(text); }
-    catch { setError('Invalid file: could not parse as JSON.'); setStep(STEP.ERROR); return; }
-    if (typeof data !== 'object' || Array.isArray(data)) { setError('Invalid file: expected a JSON object.'); setStep(STEP.ERROR); return; }
+    try {
+      const text = await file.text();
+      data = JSON.parse(text);
+    } catch {
+      setError('Invalid file: could not parse as JSON.');
+      setStep(STEP.ERROR);
+      return;
+    }
+    if (typeof data !== 'object' || Array.isArray(data)) {
+      setError('Invalid file: expected a JSON object.');
+      setStep(STEP.ERROR);
+      return;
+    }
     setParsedData(data);
     await importEvaluator(data, false);
   };

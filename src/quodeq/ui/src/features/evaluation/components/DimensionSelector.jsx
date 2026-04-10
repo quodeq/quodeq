@@ -23,13 +23,15 @@ function DimensionChip({ dim, isSelected, onToggle }) {
   );
 }
 
+import { useMemo } from 'react';
+
 export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll }) {
-  const sorted = [...allDimensions].sort((a, b) => {
+  const sorted = useMemo(() => [...allDimensions].sort((a, b) => {
     const oa = (TYPE_CONFIG[a.standardType] || DEFAULT_TYPE_CONFIG).order;
     const ob = (TYPE_CONFIG[b.standardType] || DEFAULT_TYPE_CONFIG).order;
     if (oa !== ob) return oa - ob;
     return (a.label || a.id).localeCompare(b.label || b.id);
-  });
+  }), [allDimensions]);
 
   return (
     <div className="form-group">

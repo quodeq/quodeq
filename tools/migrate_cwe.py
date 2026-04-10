@@ -30,25 +30,26 @@ def _build_cwe_lookup(jsonl_path: Path) -> dict[tuple[str, str, int], int]:
     """Parse a JSONL evidence file into a (principle, file, line) -> cwe_id map."""
     lookup: dict[tuple[str, str, int], int] = {}
     try:
-        lines = jsonl_path.read_text(encoding=_TEXT_ENCODING).splitlines()
+        fh = open(jsonl_path, encoding=_TEXT_ENCODING)
     except (OSError, UnicodeDecodeError) as exc:
         print(f"  SKIP  cannot read {jsonl_path}: {exc}")
         return lookup
-    for raw_line in lines:
-        stripped = raw_line.strip()
-        if not stripped:
-            continue
-        try:
-            obj = json.loads(stripped)
-        except json.JSONDecodeError:
-            print(f"  WARN  malformed JSONL line in {jsonl_path}: {stripped[:80]}")
-            continue
-        cwe = obj.get("cwe")
-        if not isinstance(cwe, int):
-            continue
-        key = (obj.get("p", ""), obj.get("file", ""), obj.get("line", 0))
-        if key not in lookup:
-            lookup[key] = cwe
+    with fh:
+        for raw_line in fh:
+            stripped = raw_line.strip()
+            if not stripped:
+                continue
+            try:
+                obj = json.loads(stripped)
+            except json.JSONDecodeError:
+                print(f"  WARN  malformed JSONL line in {jsonl_path}: {stripped[:80]}")
+                continue
+            cwe = obj.get("cwe")
+            if not isinstance(cwe, int):
+                continue
+            key = (obj.get("p", ""), obj.get("file", ""), obj.get("line", 0))
+            if key not in lookup:
+                lookup[key] = cwe
     return lookup
 
 

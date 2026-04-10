@@ -36,11 +36,12 @@ def select_best_refs(
         if len(refs) == 1:
             result.append(refs[0])
         else:
-            scored = [(r, text_overlap(r.get("name", ""), description, reason)) for r in refs]
-            max_score = max(s for _, s in scored)
-            if max_score == 0:
-                # No text match -- pick the broadest (first listed, typically the parent)
-                result.append(refs[0])
-            else:
-                result.append(max(scored, key=lambda x: x[1])[0])
+            best_ref = refs[0]
+            best_score = 0
+            for r in refs:
+                score = text_overlap(r.get("name", ""), description, reason)
+                if score > best_score:
+                    best_score = score
+                    best_ref = r
+            result.append(best_ref)
     return result

@@ -26,10 +26,17 @@ def _get_git_commit(src: Path) -> str | None:
         return None
 
 
+_HASH_CHUNK_SIZE = 1 << 16  # 64 KiB
+
+
 def _hash_file(path: Path) -> str | None:
-    """SHA-256 hash of a file's content."""
+    """SHA-256 hash of a file's content, streamed in chunks to limit memory."""
     try:
-        return hashlib.sha256(path.read_bytes()).hexdigest()
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            while chunk := f.read(_HASH_CHUNK_SIZE):
+                h.update(chunk)
+        return h.hexdigest()
     except OSError:
         return None
 
@@ -64,7 +71,9 @@ def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir
 
 def save_fingerprint(fingerprint: dict, evidence_dir: Path) -> Path:
     """Save fingerprint to the evidence directory."""
+    from quodeq.shared.validation import validate_path_segment
     dim = fingerprint["dimension"]
+    validate_path_segment(dim)
     path = evidence_dir / f"{dim}_fingerprint.json"
     path.write_text(json.dumps(fingerprint, indent=2))
     return path

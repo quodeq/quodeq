@@ -22,11 +22,14 @@ export function useStandards() {
   const handleDuplicate = useCallback(async (id, newId) => { await duplicateStandard(id, newId); refresh(); }, [refresh]);
 
   const grouped = {
-    [STANDARD_TYPES.BUILTIN]: standards.filter((s) => s.type === STANDARD_TYPES.BUILTIN),
-    [STANDARD_TYPES.QUODEQ]: standards.filter((s) => s.type === STANDARD_TYPES.QUODEQ),
-    [STANDARD_TYPES.COMMUNITY]: standards.filter((s) => s.type === STANDARD_TYPES.COMMUNITY),
-    [STANDARD_TYPES.CUSTOM]: standards.filter((s) => s.type === STANDARD_TYPES.CUSTOM),
+    [STANDARD_TYPES.BUILTIN]: [],
+    [STANDARD_TYPES.QUODEQ]: [],
+    [STANDARD_TYPES.COMMUNITY]: [],
+    [STANDARD_TYPES.CUSTOM]: [],
   };
+  for (const s of standards) {
+    if (grouped[s.type]) grouped[s.type].push(s);
+  }
 
   return { standards, grouped, loading, error, refresh, handleDelete, handleDuplicate };
 }

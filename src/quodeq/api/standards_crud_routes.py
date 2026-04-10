@@ -18,17 +18,22 @@ def register_crud_routes(app: Flask, get_service) -> None:
     def create_standard() -> tuple[Response, int]:
         svc = get_service(app)
         payload = request.get_json(force=True)
+        if not isinstance(payload, dict):
+            return error_response("Request body must be a JSON object", 400, "bad_request")
         logger.info("standards.create id=%s", payload.get("id", "<unknown>"))
         try:
             detail = svc.create_standard(payload)
         except ValueError as exc:
-            return error_response(str(exc), 400, "bad_request")
+            logger.debug("standards.create validation error: %s", exc)
+            return error_response("Invalid standard data", 400, "bad_request")
         return jsonify(to_camel_dict(detail)), 201
 
     @app.put("/api/standards/<standard_id>")
     def update_standard(standard_id: str) -> Response:
         svc = get_service(app)
         payload = request.get_json(force=True)
+        if not isinstance(payload, dict):
+            return error_response("Request body must be a JSON object", 400, "bad_request")
         logger.info("standards.update id=%s", standard_id)
         try:
             detail = svc.update_standard(standard_id, payload)
@@ -54,6 +59,8 @@ def register_crud_routes(app: Flask, get_service) -> None:
     def duplicate_standard(standard_id: str) -> tuple[Response, int]:
         svc = get_service(app)
         payload = request.get_json(force=True)
+        if not isinstance(payload, dict):
+            return error_response("Request body must be a JSON object", 400, "bad_request")
         new_id = payload.get("newId") or payload.get("new_id")
         if not new_id:
             return error_response("newId is required", 400, "bad_request")
@@ -61,5 +68,6 @@ def register_crud_routes(app: Flask, get_service) -> None:
         try:
             detail = svc.duplicate_standard(standard_id, new_id)
         except (FileNotFoundError, ValueError) as exc:
-            return error_response(str(exc), 400, "bad_request")
+            logger.debug("standards.duplicate error: %s", exc)
+            return error_response("Could not duplicate standard", 400, "bad_request")
         return jsonify(to_camel_dict(detail)), 201

@@ -111,7 +111,7 @@ class TestScoreCompletedEvidence:
         queue = evidence_dir / "dim_queue.json"
         queue.write_text("[]")
 
-        with patch("quodeq.core.evidence.parser.parse_jsonl_to_evidence", side_effect=Exception("parse fail")):
+        with patch("quodeq.core.evidence.parser.parse_jsonl_to_evidence", side_effect=ValueError("parse fail")):
             _score_completed_evidence(str(tmp_path), {
                 "outputProject": "proj", "outputRunId": "run1"
             })  # should not raise

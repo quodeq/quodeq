@@ -114,11 +114,8 @@ function ModelSettings({ aiCmd, models }) {
           onChange={(e) => {
             const v = e.target.value;
             onAiModelChange(v);
-            if (v) {
-              localStorage.setItem(AI_MODEL_STORAGE_KEY, v);
-            } else {
-              localStorage.removeItem(AI_MODEL_STORAGE_KEY);
-            }
+            if (v) localStorage.setItem(AI_MODEL_STORAGE_KEY, v);
+            else localStorage.removeItem(AI_MODEL_STORAGE_KEY);
           }}
         />
       </div>

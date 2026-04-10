@@ -9,12 +9,12 @@ const addEntryTitle = (v) => ({ ...v, _entryTitle: v.principle || 'Violation' })
  * @returns {string} Formatted plan text.
  */
 export function buildFilePlanText(file) {
-  const allViolations = SEVERITY_ORDER.flatMap((sev) =>
-    (file.violationsBySeverity?.[sev] || []).map(addEntryTitle)
-  );
+  const allViolations = [];
   const violationsBySeverity = {};
   for (const sev of SEVERITY_ORDER) {
-    violationsBySeverity[sev] = (file.violationsBySeverity?.[sev] || []).map(addEntryTitle);
+    const mapped = (file.violationsBySeverity?.[sev] || []).map(addEntryTitle);
+    violationsBySeverity[sev] = mapped;
+    allViolations.push(...mapped);
   }
   return buildGroupPlanText({
     title: `\`${file.file}\``,

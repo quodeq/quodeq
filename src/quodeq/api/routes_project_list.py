@@ -173,6 +173,11 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             return jsonify(body), status
 
         target_path = Path(target).resolve()
+        # Block scanning system directories to prevent information disclosure
+        _blocked = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
+        if any(str(target_path).startswith(b) for b in _blocked):
+            body, status = error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
+            return jsonify(body), status
         if not target_path.is_dir():
             body, status = error_response("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
             return jsonify(body), status

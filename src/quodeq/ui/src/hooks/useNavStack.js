@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 /**
  * Manages a browser-history-backed navigation stack.
@@ -58,7 +58,7 @@ function createNavActions(setNavStack, navStackRef) {
 
 export function useNavStack() {
   const [navStack, setNavStack] = useState([{ page: 'overview' }]);
-  const navStackRef = { current: navStack };
+  const navStackRef = useRef(navStack);
   navStackRef.current = navStack;
 
   useEffect(() => {

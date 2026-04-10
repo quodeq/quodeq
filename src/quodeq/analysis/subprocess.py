@@ -14,6 +14,14 @@ import logging
 import os
 from pathlib import Path
 
+
+def _safe_int(value: str, default: int = 0) -> int:
+    """Convert string to int, returning *default* on failure."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
 from quodeq.analysis._command import (
     _build_ai_cmd,
     _build_analysis_env,
@@ -115,9 +123,10 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     Prioritizes code files over markup/styles and caps total size to
     fit within local model context limits.
     """
-    all_files: list[Path] = []
-    for ext in _CODE_EXTS | _MARKUP_EXTS:
-        all_files.extend(work_dir.rglob(f"*{ext}"))
+    _ALL_EXTS = _CODE_EXTS | _MARKUP_EXTS
+    all_files: list[Path] = [
+        f for f in work_dir.rglob("*") if f.is_file() and f.suffix in _ALL_EXTS
+    ]
     # Filter out non-source dirs, dotdirs, empty files, and oversized files
     filtered = [
         f for f in all_files
@@ -273,7 +282,7 @@ def _run_api_analysis_bridge(
             model=model,
             api_base=api_base,
             api_key=api_key,
-            context_size=int(os.environ.get("QUODEQ_CONTEXT_SIZE", "0")),
+            context_size=_safe_int(os.environ.get("QUODEQ_CONTEXT_SIZE", "0")),
         ),
         compiled_dir=cfg.compiled_dir,
         dimension=cfg.dimension,

@@ -138,7 +138,7 @@ export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLab
               box.y < p.y + p.h && box.y + box.h > p.y
             );
             if (overlaps) return null;
-            placed.push(box);
+            if (placed.length < 100) placed.push(box);
             return (
               <text
                 key={'lbl-' + (child.path || child.name)}

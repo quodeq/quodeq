@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 import sys
 from pathlib import Path
@@ -15,6 +17,8 @@ from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_n
 
 if TYPE_CHECKING:
     from quodeq.services.jobs import JobManager
+
+_logger = logging.getLogger(__name__)
 
 _LOCATION_ONLINE = "online"
 _LOCATION_LOCAL = "local"
@@ -218,9 +222,13 @@ class FsEvaluationMixin:
         _score_completed_evidence(reports_dir, job)
         return True
 
-    def list_evaluations(self) -> list[JobSnapshot]:
-        """Return all evaluation jobs (running, done, failed, cancelled)."""
-        return self._jobs.list_jobs()
+    def list_evaluations(self, *, limit: int = 0) -> list[JobSnapshot]:
+        """Return evaluation jobs (running, done, failed, cancelled).
+
+        When *limit* > 0 only the most recent *limit* jobs are returned.
+        """
+        jobs = self._jobs.list_jobs()
+        return jobs[:limit] if limit > 0 else jobs
 
 
 def _score_completed_evidence(reports_dir: str, job: dict) -> None:
@@ -234,8 +242,7 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
     if not project or not run_id:
         return
 
-    import logging
-    _log = logging.getLogger(__name__)
+    _log = _logger
 
     evidence_dir = Path(reports_dir) / project / run_id / "evidence"
     evaluation_dir = Path(reports_dir) / project / run_id / "evaluation"
@@ -270,5 +277,5 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
             scores = score_evidence(evidence, mode="numerical")
             write_dimension_report(evidence, scores, dim_id, evaluation_dir)
             _log.info("Scored cancelled dimension '%s' for run %s", dim_id, run_id[:8])
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
             _log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)

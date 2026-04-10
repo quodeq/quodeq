@@ -1,6 +1,7 @@
 """Template section renderers for analysis prompts."""
 from __future__ import annotations
 
+import json
 import logging
 from pathlib import Path
 
@@ -61,7 +62,6 @@ def render_compact_standards(compiled_dir: Path, dimension: str, evaluators_dir:
     Returns a compact JSON array grouped by principle with requirement IDs
     and rules. No pretty-printing — minimizes token usage.
     """
-    import json
     data = _load_dimension_data(compiled_dir, dimension, evaluators_dir=evaluators_dir)
     if data is None:
         return _NO_STANDARDS_FOR_DIM

@@ -8,8 +8,10 @@ Requires the ``quodeq[api]`` extra: ``pip install 'quodeq[api]'``
 """
 from __future__ import annotations
 
+import io
 import json
 import logging
+import re
 from dataclasses import dataclass
 from enum import Enum as _Enum
 from pathlib import Path
@@ -74,14 +76,13 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
     Local models sometimes drop a brace in long arrays, producing invalid
     JSON. We try to parse each object individually.
     """
-    import re
     objects = re.findall(r'\{[^{}]*\}', raw_json)
     findings = []
     for obj_str in objects:
         try:
             f = _Finding.model_validate_json(obj_str)
             findings.append(f.model_dump())
-        except Exception:
+        except (ValueError, KeyError, TypeError):
             continue
     return findings
 
@@ -154,7 +155,6 @@ def _enrich_findings(
             work_dir=work_dir,
         )
 
-        import io
         buf = io.StringIO()
         router = FindingsRouter(buf, context=ctx)
         for f in findings:

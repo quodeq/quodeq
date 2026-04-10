@@ -124,12 +124,12 @@ function MapBreadcrumb({ path, onNavigate, onBack }) {
 
 function findSubtree(root, path) {
   if (!path) return root;
-  // Walk the tree matching by node.path (handles collapsed names like "java/app/src")
-  function walk(node) {
+  function walk(node, depth = 0) {
+    if (depth > 64) return null;
     if (node.path === path) return node;
     for (const child of node.children) {
       if (path === child.path || path.startsWith(child.path + '/')) {
-        const found = walk(child);
+        const found = walk(child, depth + 1);
         if (found) return found;
       }
     }
@@ -141,11 +141,12 @@ function findSubtree(root, path) {
 function findParentPath(root, currentPath) {
   // Find the parent node's path in the (possibly collapsed) tree
   if (!currentPath) return '';
-  function walk(node) {
+  function walk(node, depth = 0) {
+    if (depth > 64) return null;
     for (const child of node.children) {
       if (child.path === currentPath) return node.path;
       if (currentPath.startsWith(child.path + '/')) {
-        const found = walk(child);
+        const found = walk(child, depth + 1);
         if (found !== null) return found;
       }
     }

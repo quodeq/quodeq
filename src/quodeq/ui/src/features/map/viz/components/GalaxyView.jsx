@@ -163,7 +163,8 @@ function buildScene(dimensions, W, H, standardTypes) {
       // Repulsion pass — enforce minimum distance between stars in cluster
       const clStars = stars.slice(startIdx);
       const minGap = 60;
-      for (let iter = 0; iter < 6; iter++) {
+      const clIters = clStars.length > 30 ? 3 : 6;
+      for (let iter = 0; iter < clIters; iter++) {
         for (let a2 = 0; a2 < clStars.length; a2++) {
           for (let b2 = a2 + 1; b2 < clStars.length; b2++) {
             const sa = clStars[a2], sb = clStars[b2];
@@ -261,19 +262,30 @@ function buildScene(dimensions, W, H, standardTypes) {
 
   stars.forEach((s, i) => { s.principleCount = (principles[i] || []).length; });
 
-  // Connections between dimensions that share files
+  // Connections between dimensions that share files — build a file→dim index for efficiency
   const dimFiles = dimensions.map(d => new Set((d.violations || []).map(v => v.file).filter(Boolean)));
   const connections = [];
-  for (let i = 0; i < dimensions.length; i++) {
-    for (let j = i + 1; j < dimensions.length; j++) {
-      let shared = 0;
-      dimFiles[i].forEach(f => { if (dimFiles[j].has(f)) shared++; });
-      if (shared > 0) {
-        const maxFiles = Math.max(dimFiles[i].size, dimFiles[j].size, 1);
-        connections.push({ a: i, b: j, s: Math.min(1, shared / maxFiles) });
+  const fileToDims = new Map();
+  dimFiles.forEach((files, idx) => {
+    files.forEach(f => {
+      if (!fileToDims.has(f)) fileToDims.set(f, []);
+      fileToDims.get(f).push(idx);
+    });
+  });
+  const sharedCounts = new Map();
+  fileToDims.forEach((dimIdxs) => {
+    for (let a = 0; a < dimIdxs.length; a++) {
+      for (let b = a + 1; b < dimIdxs.length; b++) {
+        const key = dimIdxs[a] < dimIdxs[b] ? `${dimIdxs[a]}-${dimIdxs[b]}` : `${dimIdxs[b]}-${dimIdxs[a]}`;
+        sharedCounts.set(key, (sharedCounts.get(key) || 0) + 1);
       }
     }
-  }
+  });
+  sharedCounts.forEach((shared, key) => {
+    const [i, j] = key.split('-').map(Number);
+    const maxFiles = Math.max(dimFiles[i].size, dimFiles[j].size, 1);
+    connections.push({ a: i, b: j, s: Math.min(1, shared / maxFiles) });
+  });
 
   const bgRng = seededRng(seedHash('bg:' + dimFingerprint));
   const bg = Array.from({ length: 120 }, () => ({

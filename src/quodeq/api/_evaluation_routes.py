@@ -84,8 +84,8 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
                     "outputProject": job.output_project,
                     "outputRunId": job.output_run_id,
                 })
-            except Exception:
-                pass
+            except Exception as exc:
+                _logger.debug("Could not score cancelled dimension for %s: %s", job_id, exc)
         return jsonify(to_camel_dict(job))
 
     @app.delete("/api/evaluations/<job_id>")

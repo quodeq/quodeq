@@ -1,12 +1,13 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 export default function FilePickerDialog({ files, selectedFile, onSelect, onClose }) {
   const [search, setSearch] = useState('');
 
   const needle = search.trim().toLowerCase();
-  const filtered = needle
-    ? (files || []).filter((f) => f.toLowerCase().includes(needle))
-    : (files || []);
+  const filtered = useMemo(
+    () => needle ? (files || []).filter((f) => f.toLowerCase().includes(needle)) : (files || []),
+    [needle, files],
+  );
 
   return (
     <div className="dialog-backdrop" onClick={onClose}>

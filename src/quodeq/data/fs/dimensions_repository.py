@@ -14,15 +14,18 @@ class FilesystemDimensionsRepository:
     def __init__(self, root: Path) -> None:
         self._root = root
 
-    def list_dimensions(self) -> list[str]:
+    def list_dimensions(self, *, limit: int = 0) -> list[str]:
         """Return sorted names of all available dimensions.
+
+        When *limit* > 0 only the first *limit* entries are returned.
 
         Example::
 
             repo = FilesystemDimensionsRepository(root)
             names = repo.list_dimensions()  # ['maintainability', 'security', ...]
         """
-        return list_json_dir(self._root / "dimensions", "Dimensions directory not found")
+        names = list_json_dir(self._root / "dimensions", "Dimensions directory not found")
+        return names[:limit] if limit > 0 else names
 
     def get_dimension(self, name: str) -> dict:
         """Load and return a single dimension definition by name.

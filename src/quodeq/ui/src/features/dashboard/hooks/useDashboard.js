@@ -6,13 +6,18 @@ const REFRESH_DEBOUNCE_MS = 300;
 
 function dimKey(d) { return (d.dimension || '').toLowerCase(); }
 
-/** Rescore multiple runs in parallel, returning { [runId]: rescoreData } */
+const RESCORE_CONCURRENCY = 5;
+
+/** Rescore multiple runs with bounded concurrency, returning { [runId]: rescoreData } */
 async function fetchRescores(project, runIds) {
-  const results = await Promise.all(
-    runIds.map(rid => getRescore(project, rid).then(r => ({ rid, ...r })).catch(() => null))
-  );
   const byRun = {};
-  for (const r of results) { if (r) byRun[r.rid] = r; }
+  for (let i = 0; i < runIds.length; i += RESCORE_CONCURRENCY) {
+    const batch = runIds.slice(i, i + RESCORE_CONCURRENCY);
+    const results = await Promise.all(
+      batch.map(rid => getRescore(project, rid).then(r => ({ rid, ...r })).catch(() => null))
+    );
+    for (const r of results) { if (r) byRun[r.rid] = r; }
+  }
   return byRun;
 }
 

@@ -11,9 +11,15 @@ _PRUNE_THRESHOLD_MULTIPLIER = 2  # prune per-IP list when it exceeds max_request
 
 def _rate_limit_window(env: dict[str, str] | None = None) -> int:
     """Return the rate-limit window in seconds."""
-    return int((env or os.environ).get("QUODEQ_RATE_LIMIT_WINDOW", str(_DEFAULT_RATE_LIMIT_WINDOW)))
+    try:
+        return int((env or os.environ).get("QUODEQ_RATE_LIMIT_WINDOW", str(_DEFAULT_RATE_LIMIT_WINDOW)))
+    except (ValueError, TypeError):
+        return _DEFAULT_RATE_LIMIT_WINDOW
 
 
 def _rate_limit_max(env: dict[str, str] | None = None) -> int:
     """Return the maximum number of requests per window."""
-    return int((env or os.environ).get("QUODEQ_RATE_LIMIT_MAX", str(_DEFAULT_RATE_LIMIT_MAX)))
+    try:
+        return int((env or os.environ).get("QUODEQ_RATE_LIMIT_MAX", str(_DEFAULT_RATE_LIMIT_MAX)))
+    except (ValueError, TypeError):
+        return _DEFAULT_RATE_LIMIT_MAX

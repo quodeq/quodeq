@@ -1,6 +1,7 @@
 """Rate-limit store protocol and in-memory implementation."""
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
 from typing import Protocol, runtime_checkable
 
@@ -47,6 +48,7 @@ class InMemoryRateLimitStore:
         max_ips: int = _RATE_STORE_MAX_IPS,
     ) -> None:
         self._store: OrderedDict[str, list[float]] = OrderedDict()
+        self._lock = threading.Lock()
         self._window = window if window is not None else _rate_limit_window()
         self._max_requests = max_requests if max_requests is not None else _rate_limit_max()
         self._max_ips = max_ips
@@ -79,6 +81,10 @@ class InMemoryRateLimitStore:
         """Record a state-changing request from *ip* at time *now*."""
         if not ip:
             return
+        with self._lock:
+            self._record_unlocked(ip, now)
+
+    def _record_unlocked(self, ip: str, now: float) -> None:
         self._periodic_cleanup(now)
         timestamps = self._store.setdefault(ip, [])
         timestamps.append(now)
@@ -88,6 +94,10 @@ class InMemoryRateLimitStore:
 
     def check(self, ip: str, now: float) -> bool:
         """Return True if *ip* has exceeded the rate limit at time *now*."""
+        with self._lock:
+            return self._check_unlocked(ip, now)
+
+    def _check_unlocked(self, ip: str, now: float) -> bool:
         self._evict_stale(now)
         timestamps = [t for t in self._store.get(ip, []) if now - t < self._window]
         if not timestamps:

@@ -56,8 +56,9 @@ async function poll() {
       data.lines.forEach(e => {
         const line = document.createElement('div');
         const ts = e.timestamp ? e.timestamp.slice(11, 19) : '';
-        line.innerHTML = '<span class="ts">[' + ts + ']</span> ' +
-          e.line.replace(/</g, '&lt;');
+        const ets = ts.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        line.innerHTML = '<span class="ts">[' + ets + ']</span> ' +
+          e.line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
         frag.appendChild(line);
         since = e.index;
       });

@@ -297,7 +297,7 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
         if not scoped.exists():
             print(f"Scope path does not exist: {scoped}", file=sys.stderr)
             return None
-        if not str(scoped).startswith(str(src)):
+        if not scoped.is_relative_to(src):
             print(f"Scope must be within the repository: {scope}", file=sys.stderr)
             return None
         scope_path = scope
@@ -428,7 +428,16 @@ def run_evaluate(args: argparse.Namespace) -> int:
     if inputs is None:
         return 1
 
-    return _run_pipeline_with_cleanup(args, inputs, _setup_run_dirs(args, inputs.src))
+    try:
+        paths = _setup_run_dirs(args, inputs.src)
+    except Exception:
+        # Clean up worktree if _setup_run_dirs fails
+        worktree_dir = getattr(args, "_worktree_dir", None)
+        worktree_origin = getattr(args, "_worktree_origin", None)
+        if worktree_dir and worktree_origin:
+            _cleanup_worktree(worktree_origin, worktree_dir)
+        raise
+    return _run_pipeline_with_cleanup(args, inputs, paths)
 
 
 _COMMAND_HANDLERS: dict[str, Callable] = {

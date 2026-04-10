@@ -88,7 +88,7 @@ function aggregateViolationEntry(bucket, dimension, entry) {
   bucket.set(file, current);
 }
 
-export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = Infinity) {
+export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = 500) {
   const bucket = new Map();
 
   dimensions.forEach((dimension) => {

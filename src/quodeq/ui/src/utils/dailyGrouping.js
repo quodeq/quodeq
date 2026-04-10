@@ -53,10 +53,11 @@ export function collectDayDimensions(trend, selectedRunId) {
  */
 export function buildDailyRuns(availableRuns, trend) {
   if (!availableRuns || !availableRuns.length) return [];
+  const trendMap = new Map(trend.map((r) => [r.runId, r]));
   const byDay = [];
   let lastDate = null;
   for (const run of availableRuns) {
-    const t = trend.find((r) => r.runId === run.runId);
+    const t = trendMap.get(run.runId);
     const datePart = (t?.dateISO || '').slice(0, 10);
     if (datePart !== lastDate) {
       byDay.push(run);

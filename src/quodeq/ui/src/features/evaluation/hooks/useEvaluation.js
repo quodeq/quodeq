@@ -58,10 +58,16 @@ function handleJobUpdate(updated, refs, setJob, callbacks) {
 async function pollPartialDimensions(partialDimensionsRef, project, runId, refs, setLiveViolations) {
   const partial = [...partialDimensionsRef.current];
   if (!partial.length) return false;
-  const results = await Promise.allSettled(
-    partial.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
-  );
-  return results.some((r) => r.status === 'rejected');
+  const POLL_CONCURRENCY = 4;
+  let hadErrors = false;
+  for (let i = 0; i < partial.length; i += POLL_CONCURRENCY) {
+    const batch = partial.slice(i, i + POLL_CONCURRENCY);
+    const results = await Promise.allSettled(
+      batch.map((dim) => pollSingleDimension(dim, project, runId, refs, setLiveViolations))
+    );
+    if (results.some((r) => r.status === 'rejected')) hadErrors = true;
+  }
+  return hadErrors;
 }
 
 function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef, setLiveViolations) {
@@ -174,7 +180,7 @@ function useResumeRunning(setJob, startPolling, pollRef, dimPollRef) {
       stopTimer(pollRef);
       stopTimer(dimPollRef);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only: resume any running eval
 }
 
 function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling) {

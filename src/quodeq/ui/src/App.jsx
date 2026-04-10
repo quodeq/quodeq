@@ -124,8 +124,9 @@ const ROUTE_RENDERERS = {
     const dims = acc?.dimensions || [];
     const nav = props.navigation.handleNavigate;
 
+    const dimMap = new Map(dims.map(d => [d.dimension, d]));
     function navigateToPrinciple(principleObj, severity) {
-      const dim = dims.find(d => d.dimension === principleObj.dimension);
+      const dim = dimMap.get(principleObj.dimension);
       const pg = (dim?.principles || []).find(p => (p.name || p.principle) === principleObj.principle);
       nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
     }

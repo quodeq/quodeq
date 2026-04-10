@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { getKnownModels } from '../../../api/index.js';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
@@ -40,9 +40,15 @@ export default function CliProviderTab({ providerId, state, update }) {
       .catch(() => setSuggestions([]));
   }, [providerId]);
 
-  const fast = suggestions.filter((m) => m.tier === 'fast');
-  const balanced = suggestions.filter((m) => m.tier === 'balanced');
-  const thorough = suggestions.filter((m) => m.tier === 'thorough');
+  const { fast, balanced, thorough } = useMemo(() => {
+    const f = [], b = [], t = [];
+    for (const m of suggestions) {
+      if (m.tier === 'fast') f.push(m);
+      else if (m.tier === 'balanced') b.push(m);
+      else if (m.tier === 'thorough') t.push(m);
+    }
+    return { fast: f, balanced: b, thorough: t };
+  }, [suggestions]);
 
   return (
     <>
