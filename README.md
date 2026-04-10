@@ -35,7 +35,7 @@ quodeq dashboard       # Launch the dashboard
 
 That's it. The dashboard lets you point to any project and run evaluations from the UI.
 
-> Also available via `pip install quodeq`, or download the [macOS DMG / Windows installer](https://github.com/quodeq/quodeq/releases/latest) from Releases.
+> Also available via `pip install quodeq`.
 
 ### Requirements
 
@@ -96,15 +96,6 @@ Opens at `http://localhost:4173` with:
 - **Custom standards** to create your own evaluation dimensions or import from the library
 
 Click any dimension, file, or principle to explore the details. Dismiss false positives directly from the UI. Dismissed findings are excluded from future evaluations.
-
-### QuodeqBar (macOS)
-
-A native menu bar companion app to manage the dashboard. Start/stop the server, see evaluation status at a glance, and open the dashboard in one click.
-
-> Download the DMG from [Releases](https://github.com/quodeq/quodeq/releases/latest). The app is not yet code-signed, so macOS will block it on first launch. Run this once to allow it:
-> ```
-> xattr -cr /Applications/Quodeq.app
-> ```
 
 ### CLI usage
 
