@@ -40,6 +40,17 @@ jobs:
       - name: Set up Python
         run: uv python install 3.12
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build web UI
+        run: |
+          cd src/quodeq/ui
+          npm ci
+          npm run build
+
       - name: Build package
         run: uv build
 
