@@ -56,7 +56,7 @@ Install [Ollama](https://ollama.com/download), pull a model, and select it in Se
 ollama pull gemma4:26b
 ```
 
-> We recommend [Gemma 4](https://deepmind.google/models/gemma/gemma-4/), specifically [`gemma4:26b`](https://ollama.com/library/gemma4:26b), for an excellent quality-to-cost ratio in local analysis.
+> We recommend [Gemma 4](https://deepmind.google/models/gemma/gemma-4/), specifically [`gemma4:26b`](https://ollama.com/library/gemma4:26b), for an excellent quality-to-cost ratio in local analysis. Reducing the context window to 32k still gives good results and allows running multiple subagents in parallel.
 
 #### Cloud CLI providers (faster, deeper analysis)
 
