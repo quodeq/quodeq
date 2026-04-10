@@ -115,7 +115,7 @@ def _serve_native(
     except ImportError:
         raise RuntimeError(
             "pywebview is not installed. "
-            "Install it with 'pip install quodeq[desktop]' or use --browser."
+            "Try reinstalling with 'pip install --upgrade quodeq' or use --browser."
         )
 
     from quodeq.dashboard._instance import InstanceController
