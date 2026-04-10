@@ -7,12 +7,12 @@
 
 <h2 align="center">The quality code compass</h2>
 <p align="center"><em>Your guide to drive any codebase to excellence.</em></p>
-<p align="center"><strong>v1.0.0</strong></p>
+<p align="center"><strong>v1.0.3</strong></p>
 
 <p align="center">
-  Quodeq scans any codebase with AI and scores it across six quality dimensions --
+  Quodeq scans any codebase with AI and scores it across six quality dimensions:
   <strong>Security</strong>, <strong>Reliability</strong>, <strong>Maintainability</strong>,
-  <strong>Performance</strong>, <strong>Flexibility</strong>, and <strong>Usability</strong> --
+  <strong>Performance</strong>, <strong>Flexibility</strong>, and <strong>Usability</strong>,
   based on ISO 25010. Get grades, find violations, fix what matters.
 </p>
 
@@ -22,7 +22,7 @@
 
 ---
 
-> **Why now?** AI models can now autonomously find and exploit zero-day vulnerabilities across operating systems, browsers, and web applications. Thousands of previously unknown flaws have been uncovered in weeks, not years. The code you ship today will be read by models that can spot what humans miss. If your codebase carries security debt, reliability gaps, or maintenance shortcuts, the window to fix them is shrinking fast. Quodeq helps you prepare your software -- find what's wrong, enforce quality standards, and harden your code before the next generation of models is used against it.
+> **Why now?** AI models can now autonomously find and exploit zero-day vulnerabilities across operating systems, browsers, and web applications. Thousands of previously unknown flaws have been uncovered in weeks, not years. The code you ship today will be read by models that can spot what humans miss. If your codebase carries security debt, reliability gaps, or maintenance shortcuts, the window to fix them is shrinking fast. Quodeq helps you prepare your software: find vulnerabilities, enforce quality standards, and harden your code before the next generation of models is used against it.
 
 ---
 
@@ -35,7 +35,7 @@ quodeq dashboard       # Launch the dashboard
 
 That's it. The dashboard lets you point to any project and run evaluations from the UI.
 
-> Also available via `pip install quodeq`, or download the [macOS DMG](https://github.com/quodeq/quodeq/releases/latest) / [Windows installer](https://github.com/quodeq/quodeq/releases/latest) from Releases.
+> Also available via `pip install quodeq`, or download the [macOS DMG / Windows installer](https://github.com/quodeq/quodeq/releases/latest) from Releases.
 
 ### Requirements
 
@@ -46,25 +46,31 @@ That's it. The dashboard lets you point to any project and run evaluations from 
 
 ### AI Providers
 
-Quodeq works with **local models** and **cloud AI CLIs**. Choose what fits your workflow:
+Quodeq works with **local models** and **cloud AI CLIs**. Choose what fits your workflow.
 
 #### Local models (free, private, your code never leaves your machine)
 
-| Provider | Setup |
-|---|---|
-| [Ollama](https://ollama.com) | `ollama pull gemma3:27b` -- then select Ollama in Settings |
+Install [Ollama](https://ollama.com/download), pull a model, and select it in Settings:
+
+```bash
+ollama pull gemma4:27b
+```
+
+> `gemma4:27b` offers an excellent quality-to-cost ratio for local analysis.
 
 #### Cloud CLI providers (faster, deeper analysis)
 
-| Provider | Setup |
-|---|---|
-| [Claude Code](https://docs.anthropic.com/en/docs/claude-code) | `npm i -g @anthropic-ai/claude-code` |
-| [Codex CLI](https://github.com/openai/codex) | `npm i -g @openai/codex` |
-| [Gemini CLI](https://github.com/google-gemini/gemini-cli) | `npm i -g @anthropic-ai/gemini-cli` |
+Install any of these CLI tools and Quodeq will auto-detect them:
 
-After installing a CLI provider, go to **Settings** in the dashboard and select it. Quodeq auto-detects installed providers.
+| Provider | Install | Docs |
+|---|---|---|
+| Claude Code | [Installation guide](https://code.claude.com/docs/en/quickstart) | [docs](https://code.claude.com/docs) |
+| Codex CLI | `npm i -g @openai/codex` | [docs](https://developers.openai.com/codex/quickstart) |
+| Gemini CLI | `npm i -g @google/gemini-cli` | [docs](https://geminicli.com/docs/get-started/installation/) |
 
-> **Tip:** For local models, `gemma3:27b` offers an excellent quality-to-cost ratio. For cloud, Claude Sonnet gives the best balance of speed, quality, and cost.
+After installing a provider, go to **Settings** in the dashboard and select it.
+
+> For cloud, Claude Sonnet gives the best balance of speed, quality, and cost.
 
 ---
 
@@ -85,13 +91,13 @@ quodeq dashboard
 
 Opens at `http://localhost:4173` with:
 
-- **Overall grade and score** -- A-F letter grade, numeric score /10, trend across runs
-- **Dimension breakdown** -- individual scores per quality dimension with severity counts
-- **Violations explorer** -- drill into findings by file, principle, or CWE classification
-- **Code map** -- visual heatmap of your codebase showing where issues concentrate
-- **Top offending files** -- ranked list of where to focus remediation
-- **Run history** -- track how your codebase evolves over time
-- **Custom standards** -- create your own evaluation dimensions or import from the library
+- **Overall grade and score** with A-F letter grade, numeric score /10, and trend across runs
+- **Dimension breakdown** with individual scores per quality dimension and severity counts
+- **Violations explorer** to drill into findings by file, principle, or CWE classification
+- **Code map** showing a visual heatmap of your codebase and where issues concentrate
+- **Top offending files** ranked by impact for focused remediation
+- **Run history** to track how your codebase evolves over time
+- **Custom standards** to create your own evaluation dimensions or import from the library
 
 Click any dimension, file, or principle to explore the details. Dismiss false positives directly from the UI. Dismissed findings are excluded from future evaluations.
 
@@ -117,11 +123,11 @@ Run `quodeq evaluate --help` and `quodeq dashboard --help` for all available opt
 
 ## How It Works
 
-1. **Detect** -- identifies the languages and structure of the codebase
-2. **Analyze** -- sends an AI agent with read-only tools to explore the code
-3. **Collect** -- findings stream as structured JSONL via tool calls
-4. **Score** -- maps findings to ISO 25010 principles with CWE classifications
-5. **Report** -- produces per-dimension reports with grades, violations, and compliance
+1. **Detect** identifies the languages and structure of the codebase
+2. **Analyze** sends an AI agent with read-only tools to explore the code
+3. **Collect** findings stream as structured JSONL via tool calls
+4. **Score** maps findings to ISO 25010 principles with CWE classifications
+5. **Report** produces per-dimension reports with grades, violations, and compliance
 
 Results are stored in `~/.quodeq/evaluations/` and persist across sessions.
 
@@ -131,8 +137,8 @@ By default, Quodeq evaluates six quality dimensions based on **ISO 25010**: Secu
 
 It also ships with additional built-in standards:
 
-- **Clean Architecture** -- dependency rules, layer boundaries, separation of concerns
-- **Domain-Driven Design** -- bounded contexts, aggregates, ubiquitous language
+- **Clean Architecture** for layer separation, dependency rules, and boundary enforcement
+- **Domain-Driven Design** for bounded contexts, aggregates, and ubiquitous language
 
 You can **create your own standards** from the dashboard, or ask any AI to generate one as a `.json` file and import it. See the Help tab in the dashboard for the full schema.
 
@@ -144,12 +150,12 @@ Quodeq can evaluate **any codebase in any language**. The AI analysis engine rea
 
 ## The Q² Scoring Formula
 
-Quodeq scores each principle on a 0-10 scale using four independent constraints:
+Quodeq scores each principle on a 0 to 10 scale using four independent constraints:
 
-1. **Violation Base** -- hyperbolic curve where the first violations hurt most (`10 / (1 + K * weighted_violations)`)
-2. **Compliance Lift** -- evidence of good practices fills the gap between the base and 10
-3. **Violation Ceiling** -- log-based cap prevents compliance from overriding significant violations
-4. **Severity Grade Floor** -- grade labels match reality (only critical violations can produce a "Critical" grade)
+1. **Violation Base** is a hyperbolic curve where the first violations hurt most (`10 / (1 + K * weighted_violations)`)
+2. **Compliance Lift** is evidence of good practices that fills the gap between the base and 10
+3. **Violation Ceiling** is a log-based cap that prevents compliance from overriding significant violations
+4. **Severity Grade Floor** ensures grade labels match reality (only critical violations can produce a "Critical" grade)
 
 The final score: `max(floor, min(ceiling, base + (10 - base) * lift))`
 
