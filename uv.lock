@@ -1291,19 +1291,17 @@ wheels = [
 
 [[package]]
 name = "quodeq"
-version = "1.0.0"
+version = "1.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "flask" },
     { name = "jsonschema" },
+    { name = "pywebview" },
 ]
 
 [package.optional-dependencies]
 api = [
     { name = "instructor" },
-]
-desktop = [
-    { name = "pywebview" },
 ]
 
 [package.dev-dependencies]
@@ -1318,9 +1316,9 @@ requires-dist = [
     { name = "flask", specifier = "==3.1.3" },
     { name = "instructor", marker = "extra == 'api'", specifier = ">=1.15.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
-    { name = "pywebview", marker = "extra == 'desktop'", specifier = ">=5.0" },
+    { name = "pywebview", specifier = ">=5.0" },
 ]
-provides-extras = ["api", "desktop"]
+provides-extras = ["api"]
 
 [package.metadata.requires-dev]
 dev = [
