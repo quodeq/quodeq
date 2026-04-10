@@ -169,8 +169,6 @@ uv sync
 uv run pytest
 ```
 
-### Built with Claude Code
-
 Development powered by [Claude Code](https://claude.ai/code) from [Anthropic](https://anthropic.com).
 
 ## Changelog
