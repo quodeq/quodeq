@@ -101,7 +101,10 @@ Click any dimension, file, or principle to explore the details. Dismiss false po
 
 A native menu bar companion app to manage the dashboard. Start/stop the server, see evaluation status at a glance, and open the dashboard in one click.
 
-> Download the DMG from [Releases](https://github.com/quodeq/quodeq/releases/latest). Since it's not yet signed, on first launch right-click the app, then click **Open** in the dialog.
+> Download the DMG from [Releases](https://github.com/quodeq/quodeq/releases/latest). The app is not yet code-signed, so macOS will block it on first launch. Run this once to allow it:
+> ```
+> xattr -cr /Applications/Quodeq.app
+> ```
 
 ### CLI usage
 
