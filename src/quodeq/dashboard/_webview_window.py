@@ -5,6 +5,7 @@ import json
 import os
 import signal
 import sys
+import threading
 from pathlib import Path
 
 import webview
@@ -134,7 +135,25 @@ class _WindowApi:
         self._api_pid = api_pid
         self._instance = instance
 
+    _CLOSING_OVERLAY_JS = """
+        (function() {
+            var d = document.createElement('div');
+            d.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;pointer-events:all';
+            d.innerHTML = '<div style="color:var(--color-text-muted,#8b949e);font-family:inherit;font-size:0.95rem;text-align:center">'
+                + '<div style="margin-bottom:10px;opacity:0.7">Closing...</div></div>';
+            document.body.appendChild(d);
+        })()
+    """
+
     def close(self) -> None:
+        # Show closing overlay immediately so the user sees feedback
+        if self._window:
+            try:
+                self._window.evaluate_js(self._CLOSING_OVERLAY_JS)
+            except Exception:
+                pass
+
+        # Check for running evaluation — fast path (0.5s timeout)
         job = self._get_running_evaluation() if self._window else None
         if job:
             try:
@@ -145,10 +164,16 @@ class _WindowApi:
                     os._exit(0)
             except Exception:
                 pass
-        if self._api_pid:
-            _kill_api(self._api_pid)
-        if self._instance:
-            self._instance.shutdown()
+
+        # Cleanup and exit — run in a thread so os._exit fires fast
+        def _cleanup():
+            if self._api_pid:
+                _kill_api(self._api_pid)
+            if self._instance:
+                self._instance.shutdown()
+        t = threading.Thread(target=_cleanup, daemon=True)
+        t.start()
+        t.join(timeout=0.3)
         os._exit(0)
 
     def _get_running_evaluation(self) -> dict | None:
