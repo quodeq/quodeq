@@ -53,6 +53,6 @@ def _save_index(reports_dir: Path, index: dict[str, str]) -> None:
         with os.fdopen(fd, "w") as f:
             json.dump(index, f, indent=2)
         os.replace(tmp, index_path)
-    except OSError as exc:
+    except Exception as exc:
         logging.getLogger(__name__).warning("Could not save project index: %s", exc)
         _cleanup_tmp(tmp)

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
 import sys
@@ -276,5 +277,5 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
             scores = score_evidence(evidence, mode="numerical")
             write_dimension_report(evidence, scores, dim_id, evaluation_dir)
             _log.info("Scored cancelled dimension '%s' for run %s", dim_id, run_id[:8])
-        except Exception as exc:
+        except (OSError, json.JSONDecodeError, ValueError, KeyError) as exc:
             _log.debug("Could not score cancelled dimension '%s': %s", dim_id, exc)

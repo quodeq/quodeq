@@ -18,6 +18,8 @@ def register_crud_routes(app: Flask, get_service) -> None:
     def create_standard() -> tuple[Response, int]:
         svc = get_service(app)
         payload = request.get_json(force=True)
+        if not isinstance(payload, dict):
+            return error_response("Request body must be a JSON object", 400, "bad_request")
         logger.info("standards.create id=%s", payload.get("id", "<unknown>"))
         try:
             detail = svc.create_standard(payload)
@@ -30,6 +32,8 @@ def register_crud_routes(app: Flask, get_service) -> None:
     def update_standard(standard_id: str) -> Response:
         svc = get_service(app)
         payload = request.get_json(force=True)
+        if not isinstance(payload, dict):
+            return error_response("Request body must be a JSON object", 400, "bad_request")
         logger.info("standards.update id=%s", standard_id)
         try:
             detail = svc.update_standard(standard_id, payload)
@@ -55,6 +59,8 @@ def register_crud_routes(app: Flask, get_service) -> None:
     def duplicate_standard(standard_id: str) -> tuple[Response, int]:
         svc = get_service(app)
         payload = request.get_json(force=True)
+        if not isinstance(payload, dict):
+            return error_response("Request body must be a JSON object", 400, "bad_request")
         new_id = payload.get("newId") or payload.get("new_id")
         if not new_id:
             return error_response("newId is required", 400, "bad_request")

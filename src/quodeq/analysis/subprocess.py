@@ -14,6 +14,14 @@ import logging
 import os
 from pathlib import Path
 
+
+def _safe_int(value: str, default: int = 0) -> int:
+    """Convert string to int, returning *default* on failure."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
+
 from quodeq.analysis._command import (
     _build_ai_cmd,
     _build_analysis_env,
@@ -274,7 +282,7 @@ def _run_api_analysis_bridge(
             model=model,
             api_base=api_base,
             api_key=api_key,
-            context_size=int(os.environ.get("QUODEQ_CONTEXT_SIZE", "0")),
+            context_size=_safe_int(os.environ.get("QUODEQ_CONTEXT_SIZE", "0")),
         ),
         compiled_dir=cfg.compiled_dir,
         dimension=cfg.dimension,
