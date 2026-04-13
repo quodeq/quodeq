@@ -198,7 +198,6 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
       const created = await startEvaluation(payload);
       setJob({ ...created, repo: payload.repo });
       startPolling(created.jobId);
-      try { localStorage.setItem('quodeq-evaluate-dot-dismissed', '1'); } catch {}
     } catch (err) {
       setJobError(err.message);
     }
