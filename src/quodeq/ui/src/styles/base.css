@@ -573,6 +573,10 @@ textarea:focus {
   opacity: 0.9;
 }
 
+.settings-info-toast {
+  background: var(--color-accent, #3b82f6);
+}
+
 @keyframes toast-in {
   from { opacity: 0; transform: translateX(-50%) translateY(12px); }
   to { opacity: 1; transform: translateX(-50%) translateY(0); }
