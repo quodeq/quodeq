@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import HistoryRunRow from './HistoryRunRow.jsx';
-import HistoryChartPanel from './HistoryChartPanel.jsx';
+const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
@@ -50,7 +50,9 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
           </div>
         )}
       </div>
-      <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
+      <Suspense fallback={null}>
+        <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
+      </Suspense>
       <div className="section-header"><h3 className="section-title">Evaluations</h3></div>
       <div className="history-list">
         {visible.map((entry, i) => (
