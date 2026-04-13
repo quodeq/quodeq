@@ -56,18 +56,6 @@ Each finding includes a reason, the offending code, and a fix plan. Results are 
 
 ## Getting Started
 
-### macOS App (no dependencies needed)
-
-Download the latest `.dmg` from [Releases](https://github.com/quodeq/quodeq/releases/latest), open it, and drag `Quodeq.app` to Applications. On first launch:
-
-```bash
-xattr -cr /Applications/Quodeq.app    # Required for unsigned apps
-```
-
-Or right-click the app, select Open, then click Open in the dialog.
-
-### pip / pipx
-
 ```bash
 pipx install quodeq    # Install quodeq
 quodeq                 # Launch the dashboard
@@ -76,6 +64,16 @@ quodeq                 # Launch the dashboard
 Running `quodeq` opens the dashboard, where you can point to any project and run evaluations from the UI. Also available via `pip install quodeq`.
 
 **Requirements:** [Python 3.12+](https://www.python.org/downloads/) and [Node.js 18+](https://nodejs.org/) (for the dashboard UI).
+
+### macOS App (beta)
+
+Download the `.dmg` from [Releases](https://github.com/quodeq/quodeq/releases/latest), open it, and drag `Quodeq.app` to Applications. On first launch:
+
+```bash
+xattr -cr /Applications/Quodeq.app    # Required for unsigned apps
+```
+
+Or right-click the app, select Open, then click Open in the dialog.
 
 ---
 
