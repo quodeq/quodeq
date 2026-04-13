@@ -14,9 +14,9 @@ function roundOneDecimal(n) {
 
 /**
  * Recompute accumulated and run averages using only visible dimensions,
- * matching the Overview score circle calculation.
+ * applying rescored values when available to match the Overview score circle.
  */
-function filterTrendByVisibleStandards(trend, visibleSet) {
+function filterTrendByVisibleStandards(trend, visibleSet, rescoreLookup) {
   const accByDim = {};
   const reversed = [...trend].reverse(); // oldest first
   const filtered = [];
@@ -24,13 +24,18 @@ function filterTrendByVisibleStandards(trend, visibleSet) {
     for (const d of (entry.dimensionDetails || [])) {
       const dimId = (d.dimension || '').toLowerCase();
       if (visibleSet.has(dimId) && d.score != null) {
-        accByDim[dimId] = d.score;
+        const rescored = rescoreLookup[dimId];
+        accByDim[dimId] = rescored ? parseFloat(rescored.overallScore) || d.score : d.score;
       }
     }
-    const accScores = Object.values(accByDim).filter((s) => s != null);
+    const accScores = Object.values(accByDim).filter((s) => s != null && !isNaN(s));
     const accAvg = accScores.length > 0 ? roundOneDecimal(accScores.reduce((a, b) => a + b, 0) / accScores.length) : null;
     const visibleDetails = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-    const runScores = visibleDetails.map((d) => d.score).filter((s) => s != null);
+    const runScores = visibleDetails.map((d) => {
+      const dimId = (d.dimension || '').toLowerCase();
+      const rescored = rescoreLookup[dimId];
+      return rescored ? parseFloat(rescored.overallScore) || d.score : d.score;
+    }).filter((s) => s != null && !isNaN(s));
     const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
     filtered.push({ ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: visibleDetails });
   }
@@ -96,12 +101,12 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   );
 }
 
-export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks }) {
+export default function HistoryPage({ trend: rawTrend, rescoreLookup, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
-  const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
+  const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet, rescoreLookup || {}), [rawTrend, visibleSet, rescoreLookup]);
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
     selectedRun: selectedRunId || 'latest',

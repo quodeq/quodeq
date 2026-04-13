@@ -168,9 +168,11 @@ const ROUTE_RENDERERS = {
     const trend = props.dashboardData.dashboard?.trend || [];
     const runs = props.dashboardData.availableRuns || [];
     const idx = props.dashboardData.overviewRunIndex || 0;
+    const rescoreLookup = props.dashboardData.rescoreLookup || {};
     return (
       <HistoryPage
         trend={trend}
+        rescoreLookup={rescoreLookup}
         selection={{
           selectedRunId: resolveHistorySelectedRunId(props.navigation.historySelectedRun, trend),
           selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
