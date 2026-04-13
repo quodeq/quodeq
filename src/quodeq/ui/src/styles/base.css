@@ -550,6 +550,34 @@ textarea:focus {
   font-size: var(--text-sm);
 }
 
+.job-error-toast {
+  position: fixed;
+  top: var(--space-4, 16px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: var(--color-danger, #dc3545);
+  color: #fff;
+  padding: var(--space-3, 12px) var(--space-6, 24px);
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  max-width: 540px;
+  text-align: center;
+  animation: toast-in 0.3s ease;
+  cursor: pointer;
+}
+
+.job-error-toast:hover {
+  opacity: 0.9;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(-12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 .no-data-cell {
   color: var(--color-text-muted);
   font-size: var(--text-sm);

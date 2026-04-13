@@ -89,13 +89,35 @@ function EvaluateHeader({ isRunning }) {
   );
 }
 
+import { useState, useEffect } from 'react';
+
+function ErrorToast({ message, onDismiss }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 8000);
+    return () => clearTimeout(timer);
+  }, [message, onDismiss]);
+
+  return (
+    <div className="job-error-toast" onClick={onDismiss}>
+      {typeof message === 'string' ? message.slice(0, 200) : 'An error occurred'}
+    </div>
+  );
+}
+
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, projectInfo } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
+  const [toastDismissed, setToastDismissed] = useState(false);
+
+  useEffect(() => { setToastDismissed(false); }, [jobError]);
 
   return (
     <section className="evaluate-screen">
+      {jobError && !toastDismissed && (
+        <ErrorToast message={jobError} onDismiss={() => setToastDismissed(true)} />
+      )}
+
       <EvaluateHeader isRunning={job?.status === 'running'} />
 
       <div className="evaluate-content">
@@ -109,11 +131,9 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
               <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
             </div>
             <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={projectInfo} />
-            {jobError && <div className="job-error-banner" ref={el => el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}>{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
           </div>
         )}
 
-        {job && jobError && <div className="job-error-banner">{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
 
         {!job && <EvaluateHelpSection />}
