@@ -34,7 +34,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
         <div className="settings-budget-control">
           <input
             type="text"
-            className="settings-model-input"
+            className={`settings-model-input${!state.model ? ' settings-model-input--required' : ''}`}
             value={state.model}
             placeholder="e.g. qwen/qwen3.6-plus-preview:free"
             onChange={(e) => update('model', e.target.value)}
@@ -43,6 +43,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
             {testing ? 'Testing...' : 'Test'}
           </button>
         </div>
+        {!state.model && <span className="settings-model-hint">Required before running an evaluation</span>}
         {testResult && (
           <span className={`settings-description ${testResult.success ? '' : 'settings-error'}`}>
             {testResult.success ? `Connected (${testResult.latency_ms}ms)` : testResult.error}

@@ -4,12 +4,14 @@ import ServerStatus from './ServerStatus.jsx';
 import ProviderSettings from './ProviderSettings.jsx';
 
 function ModelSelector({ value, models, onChange }) {
+  const needsModel = !value;
   return (
     <div className="settings-model-field">
-      <select className="settings-model-input" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Click to select</option>
+      <select className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Select a model</option>
         {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
       </select>
+      {needsModel && <span className="settings-model-hint">Required before running an evaluation</span>}
     </div>
   );
 }
