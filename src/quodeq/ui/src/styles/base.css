@@ -574,7 +574,9 @@ textarea:focus {
 }
 
 .settings-info-toast {
-  background: var(--color-accent, #3b82f6);
+  background: var(--color-surface-alt, #1c2128);
+  color: var(--color-text, #e6edf3);
+  border: 1px solid var(--color-border, #333);
 }
 
 @keyframes toast-in {
