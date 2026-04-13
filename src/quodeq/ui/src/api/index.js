@@ -78,6 +78,19 @@ export function cloneToLocal(projectId, destination) {
   });
 }
 
+// ── Unified Scores ─────────────────────────────────────────────────────
+
+/** @returns {Promise<{accumulated: Object, trend: Array, availableRuns: Array}>} */
+export async function getProjectScores(projectId, asOfRun = null) {
+  const q = asOfRun ? `?asOf=${encodeURIComponent(asOfRun)}` : '';
+  return request(`/projects/${encodeURIComponent(projectId)}/scores${q}`);
+}
+
+/** @returns {Promise<{dimensions: Array, summary: Object}>} */
+export async function getRunScores(projectId, runId) {
+  return request(`/projects/${encodeURIComponent(projectId)}/scores/${encodeURIComponent(runId)}`);
+}
+
 // ── Dashboard ───────────────────────────────────────────────────────────
 
 /** @returns {Promise<import('../models/dashboard.js').Dashboard>} */

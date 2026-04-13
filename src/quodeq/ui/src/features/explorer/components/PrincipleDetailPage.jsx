@@ -4,7 +4,7 @@ import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
-import { getRescore } from '../../../api/index.js';
+import { getRunScores } from '../../../api/index.js';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 
@@ -172,7 +172,7 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
     setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
     // Fire rescore to update principle score/grade
     if (project && runId) {
-      getRescore(project, runId).then((rescored) => {
+      getRunScores(project, runId).then((rescored) => {
         const dimMap = new Map((rescored.dimensions || []).map((d) => [d.dimension, d]));
         const dimData = dimMap.get(dimension);
         if (!dimData) return;
