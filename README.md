@@ -56,6 +56,18 @@ Each finding includes a reason, the offending code, and a fix plan. Results are 
 
 ## Getting Started
 
+### macOS App (no dependencies needed)
+
+Download the latest `.dmg` from [Releases](https://github.com/quodeq/quodeq/releases/latest), open it, and drag `Quodeq.app` to Applications. On first launch:
+
+```bash
+xattr -cr /Applications/Quodeq.app    # Required for unsigned apps
+```
+
+Or right-click the app, select Open, then click Open in the dialog.
+
+### pip / pipx
+
 ```bash
 pipx install quodeq    # Install quodeq
 quodeq                 # Launch the dashboard
