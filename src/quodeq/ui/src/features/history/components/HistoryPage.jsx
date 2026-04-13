@@ -13,34 +13,33 @@ function roundOneDecimal(n) {
 }
 
 /**
- * Recompute accumulated and run averages using only visible dimensions,
- * applying rescored values when available to match the Overview score circle.
+ * Recompute accumulated and run averages using only visible dimensions.
+ * Uses the same accumulation logic as Overview's buildFilteredTrend:
+ * walks all runs oldest-first to build acc state, then maps each run
+ * with the accumulated average at that point in time.
  */
-function filterTrendByVisibleStandards(trend, visibleSet, rescoreLookup) {
+function filterTrendByVisibleStandards(trend, visibleSet) {
   const accByDim = {};
-  const reversed = [...trend].reverse(); // oldest first
-  const filtered = [];
-  for (const entry of reversed) {
+  const accByRun = new Map();
+  const rawReversed = [...trend].reverse();
+  for (const entry of rawReversed) {
     for (const d of (entry.dimensionDetails || [])) {
       const dimId = (d.dimension || '').toLowerCase();
       if (visibleSet.has(dimId) && d.score != null) {
-        const rescored = rescoreLookup[dimId];
-        accByDim[dimId] = rescored ? parseFloat(rescored.overallScore) || d.score : d.score;
+        accByDim[dimId] = d.score;
       }
     }
-    const accScores = Object.values(accByDim).filter((s) => s != null && !isNaN(s));
+    const accScores = Object.values(accByDim).filter((s) => s != null);
     const accAvg = accScores.length > 0 ? roundOneDecimal(accScores.reduce((a, b) => a + b, 0) / accScores.length) : null;
-    const visibleDetails = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-    const runScores = visibleDetails.map((d) => {
-      const dimId = (d.dimension || '').toLowerCase();
-      const rescored = rescoreLookup[dimId];
-      return rescored ? parseFloat(rescored.overallScore) || d.score : d.score;
-    }).filter((s) => s != null && !isNaN(s));
-    const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
-    filtered.push({ ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: visibleDetails });
+    accByRun.set(entry.runId, accAvg);
   }
-  filtered.reverse();
-  return filtered;
+  return trend.map((entry) => {
+    const accAvg = accByRun.get(entry.runId) ?? null;
+    const visibleDetails = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
+    const runScores = visibleDetails.map((d) => d.score).filter((s) => s != null);
+    const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
+    return { ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: visibleDetails };
+  });
 }
 
 function computeDeltas(trend) {
@@ -101,12 +100,25 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   );
 }
 
-export default function HistoryPage({ trend: rawTrend, rescoreLookup, selection, availableRuns, dimensions, callbacks }) {
+export default function HistoryPage({ trend: rawTrend, accumulatedDimensions, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
-  const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet, rescoreLookup || {}), [rawTrend, visibleSet, rescoreLookup]);
+  const trend = useMemo(() => {
+    const filtered = filterTrendByVisibleStandards(rawTrend || [], visibleSet);
+    // Override the latest entry's accumulated score with the Overview-matching value
+    // (which includes rescore from dismissed findings)
+    if (filtered.length > 0 && accumulatedDimensions && accumulatedDimensions.length > 0) {
+      const visibleDims = accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
+      const scores = visibleDims.map((d) => parseFloat(d.overallScore)).filter((s) => !isNaN(s));
+      if (scores.length > 0) {
+        const accAvg = roundOneDecimal(scores.reduce((a, b) => a + b, 0) / scores.length);
+        filtered[0] = { ...filtered[0], numericAverage: accAvg };
+      }
+    }
+    return filtered;
+  }, [rawTrend, visibleSet, accumulatedDimensions]);
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
     selectedRun: selectedRunId || 'latest',
