@@ -32,13 +32,15 @@ function filterTrendByVisibleStandards(trend, visibleSet) {
     const accAvg = accScores.length > 0 ? roundOneDecimal(accScores.reduce((a, b) => a + b, 0) / accScores.length) : null;
     accByRun.set(entry.runId, accAvg);
   }
-  return trend.map((entry) => {
-    const accAvg = accByRun.get(entry.runId) ?? null;
-    const visibleDetails = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-    const runScores = visibleDetails.map((d) => d.score).filter((s) => s != null);
-    const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
-    return { ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: visibleDetails };
-  });
+  return trend
+    .map((entry) => {
+      const accAvg = accByRun.get(entry.runId) ?? null;
+      const visibleDetails = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
+      const runScores = visibleDetails.map((d) => d.score).filter((s) => s != null);
+      const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
+      return { ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: visibleDetails };
+    })
+    .filter((entry) => entry.dimensionDetails.length > 0);
 }
 
 function computeDeltas(trend) {
