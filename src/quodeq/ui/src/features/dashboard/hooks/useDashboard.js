@@ -152,13 +152,21 @@ function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, se
               runsByProject[proj].add(rid);
             }
           }
+          // Map each dimension to its specific run to avoid cross-contamination
+          const dimToRun = {};
+          for (const d of data.dimensions) {
+            const key = dimKey(d);
+            const rid = d.fromRunId || d.runId;
+            if (key && rid) dimToRun[key] = rid;
+          }
           const lookup = {};
           for (const [proj, rids] of Object.entries(runsByProject)) {
             const byRun = await fetchRescores(proj, [...rids]);
             if (!active) return;
-            for (const [, r] of Object.entries(byRun)) {
+            for (const [rid, r] of Object.entries(byRun)) {
               for (const d of (r.dimensions || []).map(createDimension)) {
-                lookup[dimKey(d)] = d;
+                const key = dimKey(d);
+                if (dimToRun[key] === rid) lookup[key] = d;
               }
             }
           }
