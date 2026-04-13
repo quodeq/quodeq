@@ -18,17 +18,18 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
   }
 
   function handleExportProject(projectId) {
-    const url = getProjectExportUrl(projectId);
-    // PyWebView: open in system browser (which handles downloads)
-    if (window.pywebview?.api?.open_browser) {
-      window.pywebview.api.open_browser(`/api/projects/${encodeURIComponent(projectId)}/export`);
+    const proj = projects.find((p) => (p.id || p.name) === projectId);
+    const filename = `${proj?.name || projectId}.zip`;
+    // PyWebView: native Save dialog, fetches server-side
+    if (window.pywebview?.api?.download_url) {
+      window.pywebview.api.download_url(`/api/projects/${encodeURIComponent(projectId)}/export`, filename);
       return;
     }
     // Regular browser: <a download> works
-    const proj = projects.find((p) => (p.id || p.name) === projectId);
+    const url = getProjectExportUrl(projectId);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `${proj?.name || projectId}.zip`;
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);

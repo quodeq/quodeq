@@ -243,6 +243,30 @@ class _WindowApi:
         url = self._base_url + path if self._base_url else path
         webbrowser.open(url)
 
+    def download_url(self, path: str, filename: str) -> bool:
+        """Fetch a URL from the API and save it via native Save dialog."""
+        if not self._window or not self._base_url:
+            return False
+        ext = filename.rsplit('.', 1)[-1] if '.' in filename else '*'
+        result = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            save_filename=filename,
+            file_types=(f'{ext.upper()} files (*.{ext})', 'All files (*.*)'),
+        )
+        if not result:
+            return False
+        save_path = result if isinstance(result, str) else result[0] if result else None
+        if not save_path:
+            return False
+        try:
+            import urllib.request
+            url = self._base_url + path
+            with urllib.request.urlopen(url, timeout=120) as resp:
+                Path(save_path).write_bytes(resp.read())
+            return True
+        except (OSError, Exception):
+            return False
+
     def save_file(self, content: str, filename: str) -> bool:
         """Open a native Save dialog and write content to the chosen path."""
         if not self._window:
