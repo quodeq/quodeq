@@ -101,7 +101,7 @@ const SETTINGS_TOAST_KEY = 'quodeq-settings-toast-seen';
 
 function SettingsToast({ onDismiss }) {
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 5000);
+    const timer = setTimeout(onDismiss, 8000);
     return () => clearTimeout(timer);
   }, [onDismiss]);
 
