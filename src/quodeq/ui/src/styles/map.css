@@ -206,39 +206,6 @@
   background: var(--color-surface);
 }
 
-/* ── Dark mode override (scoped to viz container) ──── */
-
-.map-viz-container.map-viz-dark {
-  --color-bg:           var(--primitive-flynn-950);
-  --color-surface:      var(--primitive-flynn-900);
-  --color-surface-alt:  var(--primitive-flynn-800);
-  --color-border:       var(--primitive-flynn-700);
-
-  --color-text:         var(--primitive-flynn-200);
-  --color-text-muted:   var(--primitive-flynn-500);
-
-  --color-accent:       var(--primitive-flynn-accent);
-  --color-accent-soft:  color-mix(in srgb, var(--primitive-flynn-accent) 10%, transparent);
-
-  --color-sev-critical-text:   var(--primitive-flynn-sev-critical-dark);
-  --color-sev-critical-border: color-mix(in srgb, var(--primitive-flynn-sev-critical-dark) 42%, transparent);
-  --color-sev-major-text:      var(--primitive-flynn-sev-major-dark);
-  --color-sev-major-border:    color-mix(in srgb, var(--primitive-flynn-sev-major-dark) 38%, transparent);
-  --color-sev-minor-text:      var(--primitive-flynn-sev-minor-dark);
-  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-flynn-sev-minor-dark) 32%, transparent);
-
-  --color-grade-top-text:    var(--primitive-flynn-accent);
-  --color-grade-high-text:   #8aafcc;
-  --color-grade-mid-text:    var(--primitive-ired-300);
-  --color-grade-low-text:    var(--primitive-ired-400);
-  --color-grade-bottom-text: var(--primitive-crimson-200);
-
-  --color-compliance:        var(--primitive-flynn-accent);
-  --color-compliance-border: color-mix(in srgb, var(--primitive-flynn-accent) 38%, transparent);
-
-  color-scheme: dark;
-}
-
 /* ── Tooltip ─────────────────────────────────────────── */
 
 .map-tooltip {

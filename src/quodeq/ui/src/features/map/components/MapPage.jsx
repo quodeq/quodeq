@@ -16,11 +16,22 @@ let _savedGalaxyMode = 'filesystem';
 const MAP_LABELS_KEY = 'quodeq-map-labels';
 const MAP_DARK_KEY = 'quodeq-map-dark';
 
-function isAppDark() {
+function getAppThemeInfo() {
   const attr = document.documentElement.getAttribute('data-theme') || '';
-  if (attr.includes('dark')) return true;
-  if (attr.includes('light')) return false;
-  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark = attr.includes('dark') || (!attr.includes('light') && prefersDark);
+  // Extract family: "neo-dark" → "neo", "dark" → "daruma", "" → "daruma"
+  const family = attr.replace(/-?(dark|light)$/, '') || 'daruma';
+  return { isDark, family, attr };
+}
+
+function isAppDark() {
+  return getAppThemeInfo().isDark;
+}
+
+function getDarkThemeAttr() {
+  const { family } = getAppThemeInfo();
+  return family === 'daruma' ? 'dark' : `${family}-dark`;
 }
 
 const VIEW_MODES = [
@@ -151,7 +162,7 @@ function buildBreadcrumbPath(root, path) {
 
 function MapVizContainer({ vizStyle, viewMode, galaxyMode, setGalaxyMode, node, fullTree, currentPath, onPathChange, dimensions, onDrillDown, onFileClick, onNavigate, showLabels, setShowLabels, darkMode, setDarkMode, breadcrumb, onBreadcrumbNav, resetKey, projectName, standardTypes }) {
   return (
-    <div className={`map-viz-container${darkMode ? ' map-viz-dark' : ''}`}>
+    <div className="map-viz-container" {...(darkMode && !isAppDark() ? { 'data-theme': getDarkThemeAttr() } : {})}>
       {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} projectName={projectName} />}
       <div className="map-viz-toggles">
         <label className="map-label-toggle">
