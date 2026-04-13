@@ -4,13 +4,13 @@ import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
 import ProviderSettings from './ProviderSettings.jsx';
 
-function ModelSuggestInput({ label, value, suggestions, placeholder, onChange }) {
+function ModelSuggestInput({ label, value, suggestions, placeholder, onChange, required }) {
   return (
     <div className="settings-model-field">
       {label && <label className="settings-model-label">{label}</label>}
       <input
         type="text"
-        className="settings-model-input"
+        className={`settings-model-input${required && !value ? ' settings-model-input--required' : ''}`}
         list={`models-${label}`}
         value={value}
         placeholder={placeholder || 'Select or type model'}
@@ -55,9 +55,12 @@ export default function CliProviderTab({ providerId, state, update }) {
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label">Model</span>
-          <span className="settings-description">Override the default model. Leave blank to use client default.</span>
+          <span className="settings-description">Select the model to use for evaluation</span>
         </div>
-        <ModelSuggestInput value={state.model} suggestions={suggestions} onChange={(v) => update('model', v)} />
+        <div className="settings-model-field">
+          <ModelSuggestInput value={state.model} suggestions={suggestions} onChange={(v) => update('model', v)} required />
+          {!state.model && <span className="settings-model-hint">Select a model to get started</span>}
+        </div>
       </div>
       <details className="settings-advanced">
         <summary className="settings-advanced-toggle">Advanced</summary>
