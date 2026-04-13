@@ -237,9 +237,15 @@ def _run_api_analysis_bridge(
     api_key = os.environ.get(api_key_env, "") if api_key_env else ""
 
     if not model:
-        raise AnalysisError(f"No model configured for API provider '{ai_cmd}'")
+        raise AnalysisError(
+            f"No model configured for provider '{ai_cmd}'. "
+            f"Go to Settings in the dashboard to select a model, or set AI_MODEL in your environment."
+        )
     if not api_base:
-        raise AnalysisError(f"No api_base configured for API provider '{ai_cmd}'")
+        raise AnalysisError(
+            f"No API base URL configured for provider '{ai_cmd}'. "
+            f"Go to Settings in the dashboard to configure it, or set the URL in ai_providers.json."
+        )
 
     jsonl_file = cfg.jsonl_file
     if jsonl_file is None:

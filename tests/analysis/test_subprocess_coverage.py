@@ -315,7 +315,7 @@ class TestRunApiAnalysisBridge:
         provider = {"ollama": {"type": "api", "model": "llama3.1"}}
 
         with patch("quodeq.analysis.subprocess.get_provider_configs", return_value=provider), \
-             pytest.raises(Exception, match="No api_base configured"):
+             pytest.raises(Exception, match="No API base URL configured"):
             _run_api_analysis_bridge(tmp_path, "test", stream, cfg)
 
     def test_empty_queue_writes_empty_files(self, tmp_path):
