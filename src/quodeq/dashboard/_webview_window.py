@@ -284,18 +284,15 @@ def _icon_path(ext: str) -> str | None:
 
 
 def _set_app_icon() -> None:
-    """Set the application icon and menu bar title (dock on macOS, taskbar on Windows)."""
+    """Set the application icon (dock on macOS, taskbar on Windows)."""
     if sys.platform == "darwin":
         try:
-            from AppKit import NSApplication, NSImage, NSProcessInfo  # type: ignore[import-untyped]
-            app = NSApplication.sharedApplication()
+            from AppKit import NSApplication, NSImage  # type: ignore[import-untyped]
             path = _icon_path(".icns")
             if path:
                 icon = NSImage.alloc().initWithContentsOfFile_(path)
                 if icon:
-                    app.setApplicationIconImage_(icon)
-            # Change menu bar title from "Python" to "quodeq"
-            NSProcessInfo.processInfo().setValue_forKey_("quodeq", "processName")
+                    NSApplication.sharedApplication().setApplicationIconImage_(icon)
         except ImportError:
             pass
     elif sys.platform == "win32":
