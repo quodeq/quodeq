@@ -4,7 +4,39 @@ import HistoryChartPanel from './HistoryChartPanel.jsx';
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
+import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
+
 const MAX_VISIBLE = 20;
+
+function roundOneDecimal(n) {
+  return Math.round(n * 10) / 10;
+}
+
+/**
+ * Recompute accumulated and run averages using only visible dimensions,
+ * matching the Overview score circle calculation.
+ */
+function filterTrendByVisibleStandards(trend, visibleSet) {
+  const accByDim = {};
+  const reversed = [...trend].reverse(); // oldest first
+  const filtered = [];
+  for (const entry of reversed) {
+    for (const d of (entry.dimensionDetails || [])) {
+      const dimId = (d.dimension || '').toLowerCase();
+      if (visibleSet.has(dimId) && d.score != null) {
+        accByDim[dimId] = d.score;
+      }
+    }
+    const accScores = Object.values(accByDim).filter((s) => s != null);
+    const accAvg = accScores.length > 0 ? roundOneDecimal(accScores.reduce((a, b) => a + b, 0) / accScores.length) : null;
+    const visibleDetails = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
+    const runScores = visibleDetails.map((d) => d.score).filter((s) => s != null);
+    const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
+    filtered.push({ ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: visibleDetails });
+  }
+  filtered.reverse();
+  return filtered;
+}
 
 function computeDeltas(trend) {
   return trend.map((entry, i) => {
@@ -64,10 +96,12 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   );
 }
 
-export default function HistoryPage({ trend, selection, availableRuns, dimensions, callbacks }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
+  const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
+  const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
     selectedRun: selectedRunId || 'latest',
