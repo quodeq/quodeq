@@ -1,9 +1,10 @@
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import {
-  TAU, getThemeColors, scoreRGB, sevRGB, rgb, rgba,
+  TAU, getThemeColors, invalidateThemeColors, scoreRGB, sevRGB, rgb, rgba,
   drawGlow, drawParticles, mkParticles,
   seedHash, seededRng, gradeToScore, LEGEND_ITEMS,
 } from '../core/galaxyCore.js';
+import VizBreadcrumb from './VizBreadcrumb.jsx';
 
 /** Group violations and compliance by principle name, returning { [principleName]: { violations, compliance } } */
 function groupByPrinciple(dim) {
@@ -318,9 +319,12 @@ function buildScene(dimensions, W, H, standardTypes) {
 let _savedGalaxyNav = null;
 let _savedGalaxyCam = null;
 
-export default function GalaxyView({ dimensions, onNavigate, showLabels = true, setShowLabels, resetKey = 0, projectName = '', standardTypes = {} }) {
+export default function GalaxyView({ dimensions, onNavigate, showLabels = true, setShowLabels, darkMode, resetKey = 0, projectName = '', standardTypes = {} }) {
   const canvasRef = useRef(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
+
+  // Invalidate cached theme colors when dark mode toggles
+  useEffect(() => { invalidateThemeColors(); }, [darkMode]);
 
   // Build layout once when dimension structure or standard types change
   const dimKey = useMemo(() => dimensions.map(d => d.dimension).sort().join('|'), [dimensions]);
@@ -545,8 +549,8 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
       }
 
       // --- Draw ---
-      // Background (uses theme colors)
-      const tc = getThemeColors();
+      // Background (uses theme colors from the viz container for dark mode scoping)
+      const tc = getThemeColors(canvasRef.current?.parentElement);
       const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
       grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
       ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
@@ -985,22 +989,13 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
         onClick={handleClick}
       />
       {/* Breadcrumb */}
-      <div style={{ position: 'absolute', top: 8, left: 12, display: 'flex', gap: 4, alignItems: 'center', fontSize: 12, zIndex: 2 }}>
-        {breadcrumb.map((bc, i) => (
-          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {i > 0 && <span style={{ color: 'var(--color-border)' }}>{'\u203A'}</span>}
-            <span
-              style={{ color: i === breadcrumb.length - 1 ? 'var(--color-text)' : 'var(--color-text-muted)', cursor: i < breadcrumb.length - 1 ? 'pointer' : 'default', padding: '3px 8px', borderRadius: 4, transition: 'all 0.2s' }}
-              onClick={i < breadcrumb.length - 1 ? () => {
-                if (bc.action) { bc.action(); startTransition(true); saveNav(); }
-                else goToDepth(bc.depth);
-              } : undefined}
-              onMouseEnter={i < breadcrumb.length - 1 ? (e) => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 15%, transparent)'; e.target.style.color = 'var(--color-text)'; } : undefined}
-              onMouseLeave={i < breadcrumb.length - 1 ? (e) => { e.target.style.background = 'transparent'; e.target.style.color = 'var(--color-text-muted)'; } : undefined}
-            >{bc.label}</span>
-          </span>
-        ))}
-      </div>
+      <VizBreadcrumb items={breadcrumb.map((bc, i) => ({
+        label: bc.label,
+        onClick: i < breadcrumb.length - 1 ? () => {
+          if (bc.action) { bc.action(); startTransition(true); saveNav(); }
+          else goToDepth(bc.depth);
+        } : undefined,
+      }))} />
       {/* Tooltip */}
       <div
         ref={tooltipRef}
@@ -1014,11 +1009,6 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
           </span>
         ))}
       </div>
-      {/* Labels toggle */}
-      <label className="map-label-toggle" style={{ position: 'absolute', bottom: 8, right: 16, zIndex: 2 }}>
-        <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels?.(e.target.checked)} />
-        Labels
-      </label>
       {/* Level info panel */}
       {levelInfo && (
         <div style={{ position: 'absolute', top: 12, right: 16, background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '12px 18px', fontSize: 12, zIndex: 2, backdropFilter: 'blur(8px)', minWidth: 160 }}>

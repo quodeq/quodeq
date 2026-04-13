@@ -1,9 +1,10 @@
 import { useRef, useEffect, useMemo, useCallback, useState } from 'react';
 import {
-  TAU, getThemeColors, scoreRGB, sevRGB, rgb, rgba,
+  TAU, getThemeColors, invalidateThemeColors, scoreRGB, sevRGB, rgb, rgba,
   drawGlow, drawParticles,
   seedHash, seededRng, LEGEND_ITEMS,
 } from '../core/galaxyCore.js';
+import VizBreadcrumb from './VizBreadcrumb.jsx';
 
 /* ── Position consistency engine ── */
 
@@ -66,27 +67,12 @@ function buildFolderScene(node, W, H) {
     const total = (c.violations || 0) + (c.compliance || 0);
     const desc = ip.isFolder ? countDescendants(c) : 0;
     const radius = ip.isFolder
-      ? 12 + Math.sqrt(Math.max(desc, 1)) * 3.5
-      : 7 + Math.sqrt(c.violations || 1) * 1.8;
+      ? 6 + Math.sqrt(Math.max(desc, 1)) * 1.2
+      : 5 + Math.sqrt(c.violations || 1) * 1.2;
     const rate = c.complianceRate || 0;
     const sev = c.severity || { critical: 0, major: 0, minor: 0 };
     let col;
-    if (ip.isFolder) {
-      col = scoreRGB(rate * 10);
-    } else if (c.violations > 0) {
-      // Blend severity color with compliance color based on how bad the ratio is
-      const sevCol = sevRGB(sev.critical > 0 ? 'critical' : sev.major > 0 ? 'major' : 'minor');
-      const compCol = getThemeColors().compliance;
-      // rate 0 = full severity, rate 1 = full compliance
-      const blend = Math.min(1, rate * 1.5); // aggressive: only fully green above 66%
-      col = {
-        r: Math.round(sevCol.r + (compCol.r - sevCol.r) * blend),
-        g: Math.round(sevCol.g + (compCol.g - sevCol.g) * blend),
-        b: Math.round(sevCol.b + (compCol.b - sevCol.b) * blend),
-      };
-    } else {
-      col = c.compliance > 0 ? getThemeColors().compliance : getThemeColors().textMuted;
-    }
+    col = scoreRGB(rate * 10);
 
     const distFactor = ip.isFolder ? (0.35 + ip.dist * 0.65) : (0.2 + ip.dist * 0.5);
     const dist = positioned.length === 1 ? 0 : spread * distFactor;
@@ -166,7 +152,8 @@ function buildFolderScene(node, W, H) {
 
   // Repulsion pass — push overlapping stars apart
   // Adaptively reduce iterations for large sets to keep O(n^2) bounded
-  const minGap = 10 + Math.min(n, 20) * 1.5; // scales: 2 items=13px, 10=25px, 20+=40px
+  const folderGap = 10 + Math.min(n, 20) * 1.0;
+  const fileGap = 1;
   const repulsionIters = rootStars.length > 50 ? 3 : rootStars.length > 20 ? 5 : 8;
   for (let iter = 0; iter < repulsionIters; iter++) {
     for (let i = 0; i < rootStars.length; i++) {
@@ -174,7 +161,9 @@ function buildFolderScene(node, W, H) {
         const a = rootStars[i], b = rootStars[j];
         const dx = b.ox - a.ox, dy = b.oy - a.oy;
         const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-        const minDist = a.radius + b.radius + minGap;
+        // Tight gap between files, normal gap when a folder is involved
+        const gap = (!a.isFolder && !b.isFolder) ? fileGap : folderGap;
+        const minDist = a.radius + b.radius + gap;
         if (dist < minDist) {
           const push = (minDist - dist) / 2;
           const nx = dx / dist, ny = dy / dist;
@@ -194,11 +183,20 @@ function buildFolderScene(node, W, H) {
     rootStars.forEach(s => { s.ox -= cx2; s.oy -= cy2; });
   }
 
+  // Normalize: if stars extend too far after repulsion, scale everything down to fit.
+  // Target: all stars + their visual footprint within a circle of radius targetR.
+  const targetR = Math.min(W, H) * 0.42;
   let _maxExtent = 0;
   rootStars.forEach(s => {
-    const ext = Math.max(Math.abs(s.ox) + s.radius * 2, Math.abs(s.oy) + s.radius * 2);
+    const margin = s.particles.length > 0 ? s.radius * 3 : s.radius * 2;
+    const ext = Math.max(Math.abs(s.ox) + margin, Math.abs(s.oy) + margin);
     if (ext > _maxExtent) _maxExtent = ext;
   });
+  if (_maxExtent > targetR && _maxExtent > 0) {
+    const scale = targetR / _maxExtent;
+    rootStars.forEach(s => { s.ox *= scale; s.oy *= scale; });
+    _maxExtent = targetR;
+  }
 
   // Minimum spanning tree — connects ALL stars into one constellation
   const lines = [];
@@ -239,13 +237,33 @@ let _savedFolderCam = null;
 
 /* ── Component ── */
 
-export default function GalaxyFolderView({ node, onFileClick, onNavigate, showLabels = true, setShowLabels, resetKey = 0, projectName = '' }) {
+function buildNavPath(root, targetPath) {
+  const path = [root];
+  if (targetPath) {
+    let cur = root;
+    while (cur && cur.path !== targetPath) {
+      const child = (cur.children || []).find(c => targetPath === c.path || targetPath.startsWith(c.path + '/'));
+      if (!child) break;
+      path.push(child);
+      cur = child;
+    }
+  }
+  return path;
+}
+
+export default function GalaxyFolderView({ node, currentPath = '', onPathChange, onFileClick, onNavigate, showLabels = true, setShowLabels, darkMode, resetKey = 0, projectName = '' }) {
   const canvasRef = useRef(null);
   const [size, setSize] = useState({ w: 800, h: 600 });
 
-  // Navigation: path is an array of node references
-  const hasSavedDeep = _savedFolderNav && _savedFolderNav.path.length > 1;
-  const navRef = useRef(hasSavedDeep ? { ..._savedFolderNav } : { path: [node] });
+  // Invalidate cached theme colors when dark mode toggles
+  useEffect(() => { invalidateThemeColors(); }, [darkMode]);
+
+  // Navigation: path is an array of node references.
+  // Initialize from currentPath so we start at the correct depth on mount.
+  const navRef = useRef(null);
+  if (navRef.current === null) {
+    navRef.current = { path: buildNavPath(node, currentPath) };
+  }
   const camRef = useRef(_savedFolderCam ? { ..._savedFolderCam } : null);
   const animRef = useRef(null);
   const frameCount = useRef(0);
@@ -285,18 +303,31 @@ export default function GalaxyFolderView({ node, onFileClick, onNavigate, showLa
     return s;
   }, [currentNode]);
 
-  // Keep nav path root in sync with prop
+  // Sync nav path when currentPath changes externally (after mount)
+  const prevSyncPath = useRef(currentPath);
   useEffect(() => {
-    if (navRef.current.path.length <= 1) {
-      navRef.current.path = [node];
-    }
-  }, [node]);
+    if (currentPath === prevSyncPath.current) return;
+    prevSyncPath.current = currentPath;
+    navRef.current = { path: buildNavPath(node, currentPath) };
+    _savedFolderNav = null;
+    _savedFolderCam = null;
+    camRef.current = null;
+    sceneRef.current = null;
+    nextSceneRef.current = null;
+    flyRef.current = null;
+    zoomedFileRef.current = null;
+    focusedFolderRef.current = null;
+    setNavVersion(v => v + 1);
+  }, [currentPath, node]);
 
   const saveNav = useCallback(() => {
     _savedFolderNav = { ...navRef.current, path: [...navRef.current.path] };
     _savedFolderCam = camRef.current ? { ...camRef.current } : null;
     setNavVersion(v => v + 1);
-  }, []);
+    // Sync path back to parent for cross-view navigation
+    const cur = navRef.current.path[navRef.current.path.length - 1];
+    if (cur && onPathChange) onPathChange(cur.path || '');
+  }, [onPathChange]);
 
   const startTransition = useCallback((zoomingOut = false) => {
     const cam = camRef.current;
@@ -343,7 +374,7 @@ export default function GalaxyFolderView({ node, onFileClick, onNavigate, showLa
   const getFitZoom = useCallback((s) => {
     const ext = s?._maxExtent;
     if (!ext || ext <= 0) return 1;
-    const halfView = Math.min(size.w, size.h) / 2 - 30;
+    const halfView = Math.min(size.w, size.h) / 2 * 0.85; // 15% breathing room
     return Math.min(halfView / ext, 4);
   }, [size.w, size.h]);
 
@@ -537,7 +568,7 @@ export default function GalaxyFolderView({ node, onFileClick, onNavigate, showLa
       }
 
       // --- Draw ---
-      const tc = getThemeColors();
+      const tc = getThemeColors(canvasRef.current?.parentElement);
       const grad = ctx.createRadialGradient(W / 2, H / 2, 0, W / 2, H / 2, Math.max(W, H) * 0.6);
       grad.addColorStop(0, tc.bgAlt); grad.addColorStop(1, tc.bg);
       ctx.fillStyle = grad; ctx.fillRect(0, 0, W, H);
@@ -1005,19 +1036,10 @@ export default function GalaxyFolderView({ node, onFileClick, onNavigate, showLa
         onClick={handleClick}
       />
       {/* Breadcrumb */}
-      <div style={{ position: 'absolute', top: 8, left: 12, display: 'flex', gap: 4, alignItems: 'center', fontSize: 12, zIndex: 2 }}>
-        {breadcrumb.map((bc, i) => (
-          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
-            {i > 0 && <span style={{ color: 'var(--color-border)' }}>{'\u203A'}</span>}
-            <span
-              style={{ color: i === breadcrumb.length - 1 ? 'var(--color-text)' : 'var(--color-text-muted)', cursor: i < breadcrumb.length - 1 ? 'pointer' : 'default', padding: '3px 8px', borderRadius: 4, transition: 'all 0.2s' }}
-              onClick={i < breadcrumb.length - 1 ? () => goToPathIndex(bc.idx) : undefined}
-              onMouseEnter={i < breadcrumb.length - 1 ? (e) => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 15%, transparent)'; e.target.style.color = 'var(--color-text)'; } : undefined}
-              onMouseLeave={i < breadcrumb.length - 1 ? (e) => { e.target.style.background = 'transparent'; e.target.style.color = 'var(--color-text-muted)'; } : undefined}
-            >{bc.label}</span>
-          </span>
-        ))}
-      </div>
+      <VizBreadcrumb items={breadcrumb.map((bc, i) => ({
+        label: bc.label,
+        onClick: i < breadcrumb.length - 1 ? () => goToPathIndex(bc.idx) : undefined,
+      }))} />
       {/* Tooltip */}
       <div
         ref={tooltipRef}
@@ -1031,11 +1053,6 @@ export default function GalaxyFolderView({ node, onFileClick, onNavigate, showLa
           </span>
         ))}
       </div>
-      {/* Labels toggle */}
-      <label className="map-label-toggle" style={{ position: 'absolute', bottom: 8, right: 16, zIndex: 2 }}>
-        <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels?.(e.target.checked)} />
-        Labels
-      </label>
       {/* Level info panel */}
       {levelInfo && (
         <div style={{ position: 'absolute', top: 12, right: 16, background: 'color-mix(in srgb, var(--color-surface) 88%, transparent)', border: '1px solid var(--color-border)', borderRadius: 10, padding: '12px 18px', fontSize: 12, zIndex: 2, backdropFilter: 'blur(8px)', minWidth: 160 }}>
