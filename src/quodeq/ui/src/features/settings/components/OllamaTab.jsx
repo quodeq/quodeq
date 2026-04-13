@@ -1,15 +1,17 @@
 import { useState, useEffect } from 'react';
 import { getOllamaModels, testOllamaConcurrency } from '../../../api/index.js';
 import ServerStatus from './ServerStatus.jsx';
-import ProviderSettings from './ProviderSettings.jsx';
+import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 
 function ModelSelector({ value, models, onChange }) {
+  const needsModel = !value;
   return (
     <div className="settings-model-field">
-      <select className="settings-model-input" value={value} onChange={(e) => onChange(e.target.value)}>
-        <option value="">Click to select</option>
+      <select className={`settings-model-input${needsModel ? ' settings-model-input--required' : ''}`} value={value} onChange={(e) => onChange(e.target.value)}>
+        <option value="">Select a model</option>
         {models.map((m) => <option key={m.name} value={m.name}>{m.name}</option>)}
       </select>
+      {needsModel && <span className="settings-model-hint">Required before running an evaluation</span>}
     </div>
   );
 }
@@ -57,7 +59,13 @@ export default function OllamaTab({ state, update }) {
         </div>
         {testResult && <span className="settings-description">Recommended: {testResult.recommended} agents</span>}
       </div>
-      <ProviderSettings state={state} update={update} providerType="local-api" />
+      <TimeLimitSetting state={state} update={update} />
+      <details className="settings-advanced">
+        <summary className="settings-advanced-toggle">Advanced</summary>
+        <div className="settings-advanced-content">
+          <AdvancedAnalysisSettings state={state} update={update} />
+        </div>
+      </details>
     </>
   );
 }

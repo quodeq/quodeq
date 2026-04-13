@@ -89,7 +89,11 @@ export default function ServerSection() {
   }, [logLines]);
 
   function handlePopOut() {
-    window.open('/logs', '_blank', 'width=800,height=500');
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_browser) {
+      window.pywebview.api.open_browser('/logs');
+    } else {
+      window.open(window.location.origin + '/logs', '_blank', 'width=800,height=500');
+    }
   }
 
   function handleClear() {

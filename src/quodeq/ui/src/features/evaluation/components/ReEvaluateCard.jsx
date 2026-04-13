@@ -79,7 +79,7 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const clearAll = () => setSelectedDims(new Set());
   const buildPayload = (extra) => {
     const payload = { repo: info.path, ...extra };
-    if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
+    payload.dimensions = [...selectedDims];
     if (branch) payload.branch = branch;
     if (scopePath) payload.scopePath = scopePath;
     return payload;
@@ -184,7 +184,7 @@ function ActionButtons({ info, project, disabled, canStart, cloning, handleIncre
         onClick={handleIncremental}
         title="Only analyze files changed since last evaluation"
       >
-        {disabled ? 'Running...' : 'Scan changes'}
+        {disabled ? 'Running...' : 'Scan incremental'}
       </button>
       <button
         type="button"
@@ -194,7 +194,7 @@ function ActionButtons({ info, project, disabled, canStart, cloning, handleIncre
         onClick={handleStart}
         title="Fresh re-evaluation of all selected dimensions"
       >
-        Full scan
+        Clean scan
       </button>
     </div>
   );
@@ -208,7 +208,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
   } = actions;
 
-  const canStart = !disabled && !cloning && selectedDims.size > 0 && !info.pathMissing;
+  const canStart = !disabled && !cloning && !info.pathMissing;
 
   return (
     <div className="panel evaluate-panel">

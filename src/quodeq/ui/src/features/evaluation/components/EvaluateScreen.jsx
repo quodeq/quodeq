@@ -89,10 +89,37 @@ function EvaluateHeader({ isRunning }) {
   );
 }
 
+import { useState, useEffect, useRef } from 'react';
+
+function ErrorToast({ message, onDismiss }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 5000);
+    return () => clearTimeout(timer);
+  }, [message, onDismiss]);
+
+  return (
+    <div className="job-error-toast" onClick={onDismiss}>
+      {typeof message === 'string' ? message.slice(0, 200) : 'An error occurred'}
+    </div>
+  );
+}
+
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, projectInfo } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
+  const [toastKey, setToastKey] = useState(0);
+  const [toastVisible, setToastVisible] = useState(false);
+
+  useEffect(() => {
+    if (jobError) setToastVisible(true);
+  }, [jobError, toastKey]);
+
+  const wrappedOnStart = (payload) => {
+    setToastVisible(false);
+    setToastKey(k => k + 1);
+    onStartEvaluation(payload);
+  };
 
   return (
     <section className="evaluate-screen">
@@ -100,7 +127,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={onStartEvaluation} disabled={false} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} />
         )}
 
         {!job && (
@@ -108,15 +135,18 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
             <div className="panel-header">
               <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
             </div>
-            <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={projectInfo} />
+            <EvaluationForm onStart={wrappedOnStart} disabled={false} selectedProject={projectInfo} />
           </div>
         )}
 
-        {jobError && <div className="job-error-banner">{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
 
         {!job && <EvaluateHelpSection />}
       </div>
+
+      {jobError && toastVisible && (
+        <ErrorToast key={toastKey} message={jobError} onDismiss={() => setToastVisible(false)} />
+      )}
     </section>
   );
 }

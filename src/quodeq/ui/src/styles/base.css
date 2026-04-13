@@ -550,6 +550,34 @@ textarea:focus {
   font-size: var(--text-sm);
 }
 
+.job-error-toast {
+  position: fixed;
+  bottom: var(--space-6, 24px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  background: var(--color-danger, #dc3545);
+  color: #fff;
+  padding: var(--space-3, 12px) var(--space-6, 24px);
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.25);
+  max-width: 540px;
+  text-align: center;
+  animation: toast-in 0.3s ease;
+  cursor: pointer;
+}
+
+.job-error-toast:hover {
+  opacity: 0.9;
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
 .no-data-cell {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
@@ -1309,6 +1337,64 @@ textarea:focus {
 .settings-model-input:focus {
   outline: none;
   border-color: var(--color-accent);
+}
+
+.settings-model-input--required {
+  border-color: var(--color-danger);
+  background: color-mix(in srgb, var(--color-danger) 5%, var(--color-bg-card));
+}
+
+.settings-model-input--required::placeholder {
+  color: var(--color-danger);
+  opacity: 0.7;
+}
+
+.settings-model-hint {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--color-danger);
+  margin-top: 4px;
+}
+
+.settings-advanced {
+  border-bottom: 1px solid var(--color-border);
+}
+
+.settings-advanced-toggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  width: 100%;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: var(--space-4, 16px) var(--space-6, 24px);
+  user-select: none;
+  list-style: none;
+  transition: color 150ms ease;
+}
+
+.settings-advanced-toggle:hover {
+  color: var(--color-text);
+}
+
+.settings-advanced-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.settings-advanced-toggle::after {
+  content: '\25B8';
+  font-size: 0.85em;
+  transition: transform 150ms ease;
+  margin-left: auto;
+}
+
+.settings-advanced[open] > .settings-advanced-toggle::after {
+  transform: rotate(90deg);
+}
+
+.settings-advanced-content .settings-row:last-child {
+  border-bottom: none;
 }
 
 .settings-model-input[type="number"] {

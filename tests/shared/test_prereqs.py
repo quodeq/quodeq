@@ -3,7 +3,10 @@ from unittest.mock import patch
 
 import pytest
 
-from quodeq.shared.prereqs import check_node, check_npm, check_claude_code, check_dashboard_prereqs, check_evaluate_prereqs
+from quodeq.shared.prereqs import (
+    check_node, check_npm, check_dashboard_prereqs, check_evaluate_prereqs,
+    _check_cli_provider, _check_api_provider, _is_provider_explicitly_configured,
+)
 
 
 class TestCheckNode:
@@ -42,16 +45,46 @@ class TestCheckNpm:
             check_npm()
 
 
-class TestCheckClaudeCode:
+class TestCheckCliProvider:
     def test_missing_claude_raises(self):
         with patch("subprocess.run", side_effect=FileNotFoundError):
-            with pytest.raises(RuntimeError, match="Claude Code"):
-                check_claude_code()
+            with pytest.raises(RuntimeError, match="configured as your AI provider but was not found"):
+                _check_cli_provider("claude")
+
+    def test_missing_provider_includes_settings_hint(self):
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            with pytest.raises(RuntimeError, match="dashboard Settings"):
+                _check_cli_provider("codex")
 
     def test_valid_claude_passes(self):
         result = subprocess.CompletedProcess([], 0, stdout="1.0.0\n")
         with patch("subprocess.run", return_value=result):
-            check_claude_code()
+            _check_cli_provider("claude")
+
+
+class TestCheckApiProvider:
+    def test_ollama_not_running_raises(self):
+        with patch("urllib.request.urlopen", side_effect=OSError("Connection refused")):
+            with pytest.raises(RuntimeError, match="server is not running"):
+                _check_api_provider("ollama")
+
+    def test_non_ollama_api_passes(self):
+        # Non-ollama API providers have no connectivity check
+        _check_api_provider("openrouter")
+
+
+class TestIsProviderExplicitlyConfigured:
+    def test_no_env_returns_false(self):
+        with patch.dict("os.environ", {}, clear=True):
+            assert not _is_provider_explicitly_configured()
+
+    def test_ai_provider_set_returns_true(self):
+        with patch.dict("os.environ", {"AI_PROVIDER": "ollama"}):
+            assert _is_provider_explicitly_configured()
+
+    def test_ai_cmd_set_returns_true(self):
+        with patch.dict("os.environ", {"AI_CMD": "claude"}):
+            assert _is_provider_explicitly_configured()
 
 
 class TestCompositeChecks:
@@ -61,7 +94,17 @@ class TestCompositeChecks:
         with patch("subprocess.run", side_effect=[node_result, npm_result]):
             check_dashboard_prereqs()
 
-    def test_evaluate_prereqs_checks_claude(self):
+    def test_evaluate_no_provider_configured_raises(self):
+        with patch.dict("os.environ", {}, clear=True):
+            with pytest.raises(RuntimeError, match="No AI provider configured"):
+                check_evaluate_prereqs()
+
+    def test_evaluate_with_cli_provider_checks_binary(self):
         result = subprocess.CompletedProcess([], 0, stdout="1.0.0\n")
-        with patch("subprocess.run", return_value=result):
-            check_evaluate_prereqs()
+        with patch.dict("os.environ", {"AI_PROVIDER": "claude"}):
+            with patch("subprocess.run", return_value=result):
+                with patch(
+                    "quodeq.analysis._provider_cache.get_provider_configs",
+                    return_value={"claude": {"type": "cli", "cmd": "claude"}},
+                ):
+                    check_evaluate_prereqs()
