@@ -227,11 +227,23 @@ function mergeRescoreIntoEval(prev, dimData) {
     const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
     return match ? { ...pg, score: match.score, grade: match.grade } : pg;
   });
+  // Build set of dismissed violation keys for filtering
+  const rescViolationKeys = new Set(
+    (dimData.violations || []).map((v) => `${v.req || ''}|${v.file || ''}|${v.line || 0}`)
+  );
+  // Filter violations to only include those that survived rescore
+  const filteredViolations = dimData.violations != null
+    ? (prev.violations || []).filter((v) => rescViolationKeys.has(`${v.req || ''}|${v.file || ''}|${v.line || 0}`))
+    : prev.violations;
+  // Update totals
+  const totals = dimData.totals ?? prev.totals;
   return {
     ...prev,
+    violations: filteredViolations,
     principleGrades: updatedGrades,
     overallScore: dimData.overallScore ?? prev.overallScore,
     overallGrade: dimData.overallGrade ?? prev.overallGrade,
+    totals,
   };
 }
 

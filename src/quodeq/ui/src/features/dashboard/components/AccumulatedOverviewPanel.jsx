@@ -191,12 +191,13 @@ function buildFilteredTrend(trend, dailyTrend, visibleSet) {
 
 function buildFilteredAccumulated(accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun) {
   if (!accumulated) return accumulated;
-  const scores = filteredDimensions.map((d) => parseFloat(d.overallScore)).filter((s) => !isNaN(s));
-  const numericAverage = scores.length > 0
-    ? roundOneDecimal(scores.reduce((a, b) => a + b, 0) / scores.length)
-    : null;
+  // Use the trend's accumulated average (consistent with History) instead of
+  // recomputing from rescored dimensions which can produce different values.
   const selectedIdx = currentOverviewRun ? filteredDailyTrend.findIndex((t) => t.runId === currentOverviewRun) : 0;
-  const prevIdx = (selectedIdx >= 0 ? selectedIdx : 0) + 1;
+  const idx = selectedIdx >= 0 ? selectedIdx : 0;
+  const trendAvg = idx < filteredDailyTrend.length ? parseFloat(filteredDailyTrend[idx]?.numericAverage) : null;
+  const numericAverage = (trendAvg != null && !isNaN(trendAvg)) ? trendAvg : null;
+  const prevIdx = idx + 1;
   const prevAvg = prevIdx < filteredDailyTrend.length ? parseFloat(filteredDailyTrend[prevIdx]?.numericAverage) : null;
   const { totalViolations, totalCompliance, severity } = computeSummaryFromDimensions(filteredDimensions);
   return {

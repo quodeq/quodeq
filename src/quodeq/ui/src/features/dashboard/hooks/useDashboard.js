@@ -107,9 +107,7 @@ function fetchTrendEffect(selectedProject, setDashboard) {
           return {
             ...t,
             dimensionDetails: details,
-            numericAverage: r.summary?.numericAverage ?? t.numericAverage,
             runNumericAverage: r.summary?.numericAverage ?? t.runNumericAverage,
-            overallGrade: r.summary?.overallGrade ?? t.overallGrade,
             runOverallGrade: r.summary?.overallGrade ?? t.runOverallGrade,
           };
         });
