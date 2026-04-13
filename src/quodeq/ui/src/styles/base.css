@@ -207,12 +207,13 @@ body {
 
 .sidebar-nav-dot {
   position: absolute;
-  top: 6px;
-  right: 6px;
-  width: 6px;
-  height: 6px;
+  top: 4px;
+  right: 4px;
+  width: 9px;
+  height: 9px;
   border-radius: 50%;
   background: var(--color-accent);
+  box-shadow: 0 0 4px var(--color-accent);
 }
 
 .sidebar-nav-item.active {
