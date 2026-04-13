@@ -1356,17 +1356,27 @@ textarea:focus {
 }
 
 .settings-advanced {
-  margin-top: var(--space-2, 8px);
+  margin-top: var(--space-4, 16px);
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-2, 8px);
 }
 
 .settings-advanced-toggle {
-  font-size: var(--text-sm, 0.875rem);
+  font-size: var(--text-xs, 0.75rem);
   font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
   color: var(--color-text-muted);
   cursor: pointer;
   padding: var(--space-2, 8px) 0;
   user-select: none;
   list-style: none;
+  opacity: 0.7;
+  transition: opacity 150ms ease;
+}
+
+.settings-advanced-toggle:hover {
+  opacity: 1;
 }
 
 .settings-advanced-toggle::-webkit-details-marker {
@@ -1376,13 +1386,17 @@ textarea:focus {
 .settings-advanced-toggle::before {
   content: '\25B6';
   display: inline-block;
-  margin-right: 6px;
-  font-size: 0.65em;
+  margin-right: 8px;
+  font-size: 0.6em;
   transition: transform 150ms ease;
 }
 
 .settings-advanced[open] > .settings-advanced-toggle::before {
   transform: rotate(90deg);
+}
+
+.settings-advanced-content {
+  padding-top: var(--space-2, 8px);
 }
 
 .settings-model-input[type="number"] {
