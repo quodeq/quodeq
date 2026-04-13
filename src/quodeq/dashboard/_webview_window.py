@@ -243,6 +243,27 @@ class _WindowApi:
         url = self._base_url + path if self._base_url else path
         webbrowser.open(url)
 
+    def save_file(self, content: str, filename: str) -> bool:
+        """Open a native Save dialog and write content to the chosen path."""
+        if not self._window:
+            return False
+        ext = filename.rsplit('.', 1)[-1] if '.' in filename else '*'
+        result = self._window.create_file_dialog(
+            webview.SAVE_DIALOG,
+            save_filename=filename,
+            file_types=(f'{ext.upper()} files (*.{ext})', 'All files (*.*)'),
+        )
+        if not result:
+            return False
+        path = result if isinstance(result, str) else result[0] if result else None
+        if not path:
+            return False
+        try:
+            Path(path).write_text(content, encoding='utf-8')
+            return True
+        except OSError:
+            return False
+
     def minimize(self) -> None:
         if self._window:
             self._window.minimize()
