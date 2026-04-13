@@ -109,10 +109,11 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
               <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
             </div>
             <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={projectInfo} />
+            {jobError && <div className="job-error-banner" ref={el => el?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })}>{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
           </div>
         )}
 
-        {jobError && <div className="job-error-banner">{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
+        {job && jobError && <div className="job-error-banner">{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
 
         {!job && <EvaluateHelpSection />}
