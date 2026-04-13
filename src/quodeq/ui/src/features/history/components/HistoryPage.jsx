@@ -5,6 +5,7 @@ import HistoryChartPanel from './HistoryChartPanel.jsx';
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
+import { collapseByDay } from '../../../utils/dailyGrouping.js';
 
 const MAX_VISIBLE = 20;
 
@@ -44,6 +45,8 @@ function filterTrendByVisibleStandards(trend, visibleSet) {
 
 function computeDeltas(trend) {
   return trend.map((entry, i) => {
+    // Use Overview-matching delta for the latest entry if available
+    if (entry._overviewDelta != null) return entry._overviewDelta;
     if (i >= trend.length - 1) return null;
     const curr = parseFloat(entry.numericAverage);
     const prev = parseFloat(trend[i + 1].numericAverage);
@@ -107,14 +110,17 @@ export default function HistoryPage({ trend: rawTrend, accumulatedDimensions, se
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => {
     const filtered = filterTrendByVisibleStandards(rawTrend || [], visibleSet);
-    // Override the latest entry's accumulated score with the Overview-matching value
-    // (which includes rescore from dismissed findings)
+    // Override the latest entry's accumulated score and delta with Overview-matching values
     if (filtered.length > 0 && accumulatedDimensions && accumulatedDimensions.length > 0) {
       const visibleDims = accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
       const scores = visibleDims.map((d) => parseFloat(d.overallScore)).filter((s) => !isNaN(s));
       if (scores.length > 0) {
         const accAvg = roundOneDecimal(scores.reduce((a, b) => a + b, 0) / scores.length);
-        filtered[0] = { ...filtered[0], numericAverage: accAvg };
+        // Compute delta using daily-collapsed trend (same as Overview)
+        const daily = collapseByDay(filtered);
+        const prevDayAvg = daily.length >= 2 ? parseFloat(daily[1].numericAverage) : null;
+        const delta = (prevDayAvg != null && !isNaN(prevDayAvg)) ? roundOneDecimal(accAvg - prevDayAvg) : null;
+        filtered[0] = { ...filtered[0], numericAverage: accAvg, _overviewDelta: delta };
       }
     }
     return filtered;
