@@ -17,6 +17,11 @@ class _DimensionBuckets:
     prev_run_latest_map: dict[str, DimensionResult] = field(default_factory=dict)
 
 
+def _has_valid_score(dim: DimensionResult) -> bool:
+    """Return True if the dimension carries a usable overall score."""
+    return bool(dim.overall_score)
+
+
 def _classify_dimension(
     dim: DimensionResult, run_id: str, run_info: RunInfo | None, is_first_run: bool,
     buckets: _DimensionBuckets,
@@ -26,12 +31,15 @@ def _classify_dimension(
     if not dim_name:
         return
     if dim_name not in buckets.latest_by_dimension:
-        buckets.latest_by_dimension[dim_name] = replace(
-            dim,
-            from_run_id=run_id,
-            from_date_iso=run_info.date_iso if run_info else None,
-            from_date_label=run_info.date_label if run_info else None,
-        )
+        # Only accept as latest if the dimension has a valid score;
+        # otherwise keep searching older runs for a scored result.
+        if _has_valid_score(dim):
+            buckets.latest_by_dimension[dim_name] = replace(
+                dim,
+                from_run_id=run_id,
+                from_date_iso=run_info.date_iso if run_info else None,
+                from_date_label=run_info.date_label if run_info else None,
+            )
     elif dim_name not in buckets.prev_occurrence:
         buckets.prev_occurrence[dim_name] = replace(dim, run_id=run_id)
     if not is_first_run and dim_name not in buckets.prev_run_latest_map:
