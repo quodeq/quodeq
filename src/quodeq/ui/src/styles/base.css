@@ -180,6 +180,7 @@ body {
 }
 
 .sidebar-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -202,6 +203,17 @@ body {
 .sidebar-nav-item:hover {
   background: var(--color-surface-alt);
   color: var(--color-text);
+}
+
+.sidebar-nav-dot {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 4px var(--color-accent);
 }
 
 .sidebar-nav-item.active {
@@ -556,8 +568,8 @@ textarea:focus {
   left: 50%;
   transform: translateX(-50%);
   z-index: 9999;
-  background: var(--color-danger, #dc3545);
-  color: #fff;
+  background: var(--color-text, #e6edf3);
+  color: var(--color-bg, #0d1117);
   padding: var(--space-3, 12px) var(--space-6, 24px);
   border-radius: var(--radius-md, 8px);
   font-size: var(--text-sm, 0.875rem);
@@ -571,6 +583,11 @@ textarea:focus {
 
 .job-error-toast:hover {
   opacity: 0.9;
+}
+
+.settings-info-toast {
+  background: var(--color-text, #e6edf3);
+  color: var(--color-bg, #0d1117);
 }
 
 @keyframes toast-in {

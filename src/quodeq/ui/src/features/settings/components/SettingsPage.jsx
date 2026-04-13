@@ -97,11 +97,34 @@ function SettingsHeader() {
   );
 }
 
+import { SETTINGS_TOAST_SEEN_KEY } from '../../../constants.js';
+
+function SettingsToast({ onDismiss }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, 8000);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
+  return (
+    <div className="job-error-toast settings-info-toast" onClick={onDismiss}>
+      Cloud providers (Claude, Codex, Gemini) use their API tokens. Ollama runs locally at no cost.
+    </div>
+  );
+}
+
 export default function SettingsPage({ theme }) {
   const { mode: themeMode, family: themeFamily, onApplyMode, onApplyFamily } = theme;
   const [appVersion, setAppVersion] = useState(null);
   const [settingsPhrase, setSettingsPhrase] = useState('');
   const [providerConfigs, setProviderConfigs] = useState({});
+  const [showToast, setShowToast] = useState(() => {
+    try { return !localStorage.getItem(SETTINGS_TOAST_SEEN_KEY); } catch { return true; }
+  });
+
+  function dismissToast() {
+    setShowToast(false);
+    try { localStorage.setItem(SETTINGS_TOAST_SEEN_KEY, '1'); } catch {}
+  }
 
   useEffect(() => {
     setSettingsPhrase(_SETTINGS_PHRASES[Math.floor(Math.random() * _SETTINGS_PHRASES.length)]);
@@ -112,6 +135,7 @@ export default function SettingsPage({ theme }) {
   return (
     <div className="settings-page">
       <SettingsHeader />
+      {showToast && <SettingsToast onDismiss={dismissToast} />}
       <div className="settings-body settings-body--full">
         <div className="settings-grid">
           <ProviderTabs providerConfigs={providerConfigs} />
