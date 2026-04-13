@@ -2,16 +2,28 @@ import { useState, useEffect } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_PROJECTS, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP } from '../constants/navigation.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
 
+const SETTINGS_DOT_DISMISSED = 'quodeq-settings-dot-dismissed';
+const EVALUATE_DOT_DISMISSED = 'quodeq-evaluate-dot-dismissed';
+
 function useSetupStatus() {
   const [status, setStatus] = useState({ needsSettings: false, readyToEvaluate: false });
 
   useEffect(() => {
     function check() {
+      const settingsDismissed = localStorage.getItem(SETTINGS_DOT_DISMISSED);
+      const evaluateDismissed = localStorage.getItem(EVALUATE_DOT_DISMISSED);
       const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
       const model = provider ? localStorage.getItem(providerKey(provider, 'model')) || '' : '';
+      const configured = !!(provider && model);
+
+      // Settings dot: show until provider+model configured, then dismiss permanently
+      if (configured && !settingsDismissed) {
+        localStorage.setItem(SETTINGS_DOT_DISMISSED, '1');
+      }
+
       setStatus({
-        needsSettings: !provider || !model,
-        readyToEvaluate: !!(provider && model),
+        needsSettings: !configured && !settingsDismissed,
+        readyToEvaluate: configured && !evaluateDismissed,
       });
     }
     check();
