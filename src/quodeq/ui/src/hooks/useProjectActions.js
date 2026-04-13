@@ -19,6 +19,12 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
 
   function handleExportProject(projectId) {
     const url = getProjectExportUrl(projectId);
+    // PyWebView: open in system browser (which handles downloads)
+    if (window.pywebview?.api?.open_browser) {
+      window.pywebview.api.open_browser(`/api/projects/${encodeURIComponent(projectId)}/export`);
+      return;
+    }
+    // Regular browser: <a download> works
     const proj = projects.find((p) => (p.id || p.name) === projectId);
     const a = document.createElement('a');
     a.href = url;
