@@ -22,9 +22,10 @@ Quodeq exists to change that.
 
 **Open source. MIT license. Runs locally. No telemetry. No account. No servers.**
 
-Scans any codebase with AI across six quality dimensions from [ISO 25010](https://www.iso.org/standard/35733.html): **Security**, **Reliability**, **Maintainability**, **Performance**, **Flexibility**, and **Usability**. Every finding maps to a [CWE](https://cwe.mitre.org/) identifier. You get grades, violations with line numbers, and a fix plan.
+Scans any codebase with AI across six quality dimensions from [ISO 25010](https://www.iso.org/standard/35733.html):
+**Security**, **Reliability**, **Maintainability**, **Performance**, **Flexibility**, and **Usability**.
 
-Cloud providers (Claude, Gemini, Codex) for speed. Local models via [Ollama](https://ollama.com) for privacy.
+Every finding maps to a [CWE](https://cwe.mitre.org/) identifier. You get grades, violations with line numbers, and a fix plan. Cloud providers (Claude, Gemini, Codex) for speed. Local models via [Ollama](https://ollama.com) for privacy.
 
 ---
 
@@ -69,6 +70,7 @@ Running `quodeq` opens the dashboard, where you can point to any project and run
     <img src="res/dashboard.png" alt="Quodeq Dashboard" width="900" />
   </picture>
 </p>
+<br>
 
 - **Grades and scores** per dimension with A-F letter grades, numeric scores, and trends across runs
 - **Violations explorer** to drill into findings by file, principle, or CWE classification
@@ -91,12 +93,12 @@ quodeq evaluate /path/to/project -d security        # Single dimension
 
 Choose what fits your workflow. Configure in **Settings** from the dashboard.
 
-| | Provider | Type | Getting started |
-|---|---|---|---|
-| | [Ollama](https://ollama.com/download) | Local | Free, private, code never leaves your machine |
-| | [Claude Code](https://code.claude.com/docs/en/quickstart) | Cloud | Best balance of speed, quality, and cost |
-| | [Codex CLI](https://developers.openai.com/codex/quickstart) | Cloud | OpenAI models |
-| | [Gemini CLI](https://geminicli.com/docs/get-started/installation/) | Cloud | Google models |
+| Provider | Type | Getting started |
+|---|---|---|
+| [Ollama](https://ollama.com/download) | Local | Free, private, code never leaves your machine |
+| [Claude Code](https://code.claude.com/docs/en/quickstart) | Cloud | Best balance of speed, quality, and cost |
+| [Codex CLI](https://developers.openai.com/codex/quickstart) | Cloud | OpenAI models |
+| [Gemini CLI](https://geminicli.com/docs/get-started/installation/) | Cloud | Google models |
 
 > For local analysis we recommend [Gemma 4](https://deepmind.google/models/gemma/gemma-4/) ([`gemma4:26b`](https://ollama.com/library/gemma4:26b)). Reducing the context window to 32k still gives good results and allows running multiple subagents in parallel.
 
