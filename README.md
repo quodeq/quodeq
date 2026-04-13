@@ -84,6 +84,8 @@ Running `quodeq` opens the dashboard, where you can point to any project and run
 
 Click any dimension, file, or principle to explore the details. Dismiss false positives directly from the UI.
 
+Running `quodeq` is equivalent to `quodeq dashboard`. Both open the same UI.
+
 ### CLI
 
 ```bash
