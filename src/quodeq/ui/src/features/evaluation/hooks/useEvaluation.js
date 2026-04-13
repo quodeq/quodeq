@@ -191,6 +191,9 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
     refs.partialDimensionsRef.current = new Set();
     setLiveViolations({});
     try {
+      if (Array.isArray(payload.dimensions) && payload.dimensions.length === 0) {
+        throw new Error('Select at least one dimension.');
+      }
       preparePayload(payload);
       const created = await startEvaluation(payload);
       setJob({ ...created, repo: payload.repo });
