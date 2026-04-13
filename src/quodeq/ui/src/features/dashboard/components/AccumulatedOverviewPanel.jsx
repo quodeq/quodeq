@@ -1,11 +1,11 @@
-import { useMemo } from 'react';
+import { useMemo, lazy, Suspense } from 'react';
 import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import DimensionCardsGrid from './DimensionCardsGrid.jsx';
 import { formatRunId, scoreColorClass, complianceRatio } from '../../../utils/formatters.js';
 import { sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
 import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGrouping.js';
-import RunHistoryPanel from './RunHistoryPanel.jsx';
+const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
@@ -201,7 +201,9 @@ export default function AccumulatedOverviewPanel({ data, callbacks }) {
       />
 
       <div className="history-panels-row">
-        <RunHistoryPanel trend={filteredDailyTrend} selectedRunId={currentOverviewRun} onBarClick={onRunClick} />
+        <Suspense fallback={null}>
+          <RunHistoryPanel trend={filteredDailyTrend} selectedRunId={currentOverviewRun} onBarClick={onRunClick} />
+        </Suspense>
         <DimensionScorePanel dimensions={filteredDimensions} onBarClick={onDimensionClick} runDate={filteredStats.lastRun.date} runId={filteredStats.lastRun.runId} />
       </div>
 
