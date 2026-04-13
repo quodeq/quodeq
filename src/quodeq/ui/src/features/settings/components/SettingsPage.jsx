@@ -97,7 +97,7 @@ function SettingsHeader() {
   );
 }
 
-const SETTINGS_TOAST_KEY = 'quodeq-settings-toast-seen';
+import { SETTINGS_TOAST_SEEN_KEY } from '../../../constants.js';
 
 function SettingsToast({ onDismiss }) {
   useEffect(() => {
@@ -118,12 +118,12 @@ export default function SettingsPage({ theme }) {
   const [settingsPhrase, setSettingsPhrase] = useState('');
   const [providerConfigs, setProviderConfigs] = useState({});
   const [showToast, setShowToast] = useState(() => {
-    try { return !localStorage.getItem(SETTINGS_TOAST_KEY); } catch { return true; }
+    try { return !localStorage.getItem(SETTINGS_TOAST_SEEN_KEY); } catch { return true; }
   });
 
   function dismissToast() {
     setShowToast(false);
-    try { localStorage.setItem(SETTINGS_TOAST_KEY, '1'); } catch {}
+    try { localStorage.setItem(SETTINGS_TOAST_SEEN_KEY, '1'); } catch {}
   }
 
   useEffect(() => {

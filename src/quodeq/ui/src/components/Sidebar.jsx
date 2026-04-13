@@ -1,17 +1,14 @@
 import { useState, useEffect } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_PROJECTS, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP } from '../constants/navigation.jsx';
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
-
-const SETTINGS_DOT_DISMISSED = 'quodeq-settings-dot-dismissed';
-const EVALUATE_DOT_DISMISSED = 'quodeq-evaluate-dot-dismissed';
+import { ACTIVE_PROVIDER_KEY, providerKey, SETTINGS_DOT_DISMISSED_KEY_KEY, EVALUATE_DOT_DISMISSED_KEY_KEY } from '../constants.js';
 
 function useSetupStatus() {
   const [status, setStatus] = useState({ needsSettings: false, readyToEvaluate: false });
 
   useEffect(() => {
     function check() {
-      const settingsDismissed = localStorage.getItem(SETTINGS_DOT_DISMISSED);
-      const evaluateDismissed = localStorage.getItem(EVALUATE_DOT_DISMISSED);
+      const settingsDismissed = localStorage.getItem(SETTINGS_DOT_DISMISSED_KEY);
+      const evaluateDismissed = localStorage.getItem(EVALUATE_DOT_DISMISSED_KEY);
       const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
       const model = provider ? localStorage.getItem(providerKey(provider, 'model')) || '' : '';
       const configured = !!(provider && model);
@@ -86,14 +83,14 @@ export default function Sidebar({ activeTab, onNavTab }) {
         <NavButton id="violations" label="Violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="map" label="Map" icon={ICON_MAP} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="history" label="History" icon={ICON_HISTORY} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="evaluate" label="Evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={(id) => { try { localStorage.setItem(EVALUATE_DOT_DISMISSED, '1'); } catch {} onNavTab(id); }} showDot={readyToEvaluate} />
+        <NavButton id="evaluate" label="Evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={(id) => { try { localStorage.setItem(EVALUATE_DOT_DISMISSED_KEY, '1'); } catch {} onNavTab(id); }} showDot={readyToEvaluate} />
         <NavButton id="standards" label="Standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="projects" label="Projects" icon={ICON_PROJECTS} activeTab={activeTab} onNavTab={onNavTab} />
       </nav>
 
       <div className="sidebar-bottom-nav">
         <NavButton id="help" label="Help" icon={ICON_HELP} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="settings" label="Settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={(id) => { try { localStorage.setItem(SETTINGS_DOT_DISMISSED, '1'); } catch {} onNavTab(id); }} showDot={needsSettings} />
+        <NavButton id="settings" label="Settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={(id) => { try { localStorage.setItem(SETTINGS_DOT_DISMISSED_KEY, '1'); } catch {} onNavTab(id); }} showDot={needsSettings} />
       </div>
     </aside>
   );

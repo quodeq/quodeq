@@ -44,14 +44,14 @@ function lastRelevantLog(logs) {
   return null;
 }
 
-const CONSOLE_DOT_KEY = 'quodeq-console-dot-dismissed';
+import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
 
 function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isFailed = job.status === STATUS.FAILED;
   const isLost = job.status === STATUS.LOST;
   const [showDot, setShowDot] = useState(() => {
-    try { return !localStorage.getItem(CONSOLE_DOT_KEY); } catch { return true; }
+    try { return !localStorage.getItem(CONSOLE_DOT_DISMISSED_KEY); } catch { return true; }
   });
   return (
     <>
@@ -59,7 +59,7 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
         className="eval-status-row eval-status-row--clickable"
         role="button"
         tabIndex={0}
-        onClick={() => { setConsoleOpen(o => !o); if (showDot) { setShowDot(false); try { localStorage.setItem(CONSOLE_DOT_KEY, '1'); } catch {} } }}
+        onClick={() => { setConsoleOpen(o => !o); if (showDot) { setShowDot(false); try { localStorage.setItem(CONSOLE_DOT_DISMISSED_KEY, '1'); } catch {} } }}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen(o => !o); } }}
         aria-label={consoleOpen ? 'Hide console' : 'Show console'}
       >
