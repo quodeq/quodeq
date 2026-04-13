@@ -24,13 +24,17 @@ from quodeq.services.dismissed import recount_totals
 def _finding_to_dict(f: Finding) -> dict[str, Any]:
     """Convert a Finding dataclass to the dict format scoring internals expect.
 
-    The tally functions use 'vt' for violation_type and dict.get() for access.
+    Only includes 'vt' when the finding has an explicit violation_type, so
+    ``evidence_has_taxonomy()`` selects the same mode (taxonomy vs reason)
+    that the original evaluation used.
     """
-    return {
+    d: dict[str, Any] = {
         "severity": f.severity or "minor",
         "reason": f.reason or "",
-        "vt": f.violation_type or "",
     }
+    if f.violation_type:
+        d["vt"] = f.violation_type
+    return d
 
 
 def _score_principle(violations: list[Finding], compliance: list[Finding]) -> tuple[float | None, str]:
@@ -73,6 +77,9 @@ def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> Dimension
         v for v in dim.violations
         if (v.req or "", v.file or "", v.line or 0) not in dismissed
     ]
+    # If no violations were actually dismissed, return the original scores
+    if len(filtered_violations) == len(dim.violations):
+        return dim
 
     # Group violations and compliance by principle
     principles_violations = _group_by_principle(filtered_violations)
