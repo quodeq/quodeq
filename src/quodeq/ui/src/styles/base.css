@@ -204,6 +204,15 @@ body {
   color: var(--color-text);
 }
 
+.sidebar-nav-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .sidebar-nav-item.active {
   background: var(--color-accent-soft);
   color: var(--color-accent);

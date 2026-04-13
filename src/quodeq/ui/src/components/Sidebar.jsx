@@ -1,4 +1,27 @@
+import { useState, useEffect } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_PROJECTS, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP } from '../constants/navigation.jsx';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
+
+function useSetupStatus() {
+  const [status, setStatus] = useState({ needsSettings: false, readyToEvaluate: false });
+
+  useEffect(() => {
+    function check() {
+      const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+      const model = provider ? localStorage.getItem(providerKey(provider, 'model')) || '' : '';
+      setStatus({
+        needsSettings: !provider || !model,
+        readyToEvaluate: !!(provider && model),
+      });
+    }
+    check();
+    window.addEventListener('storage', check);
+    const interval = setInterval(check, 2000);
+    return () => { window.removeEventListener('storage', check); clearInterval(interval); };
+  }, []);
+
+  return status;
+}
 
 function Logo() {
   return (
@@ -23,7 +46,7 @@ function Logo() {
   );
 }
 
-function NavButton({ id, label, icon, activeTab, onNavTab }) {
+function NavButton({ id, label, icon, activeTab, onNavTab, showDot }) {
   return (
     <button
       type="button"
@@ -33,11 +56,14 @@ function NavButton({ id, label, icon, activeTab, onNavTab }) {
     >
       {icon}
       <span className="sidebar-nav-label">{label}</span>
+      {showDot && <span className="sidebar-nav-dot" />}
     </button>
   );
 }
 
 export default function Sidebar({ activeTab, onNavTab }) {
+  const { needsSettings, readyToEvaluate } = useSetupStatus();
+
   return (
     <aside className="sidebar">
       <div className="sidebar-header">
@@ -52,14 +78,14 @@ export default function Sidebar({ activeTab, onNavTab }) {
         <NavButton id="violations" label="Violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="map" label="Map" icon={ICON_MAP} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="history" label="History" icon={ICON_HISTORY} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="evaluate" label="Evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={onNavTab} />
+        <NavButton id="evaluate" label="Evaluate" icon={ICON_EVALUATE} activeTab={activeTab} onNavTab={onNavTab} showDot={readyToEvaluate} />
         <NavButton id="standards" label="Standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={onNavTab} />
         <NavButton id="projects" label="Projects" icon={ICON_PROJECTS} activeTab={activeTab} onNavTab={onNavTab} />
       </nav>
 
       <div className="sidebar-bottom-nav">
         <NavButton id="help" label="Help" icon={ICON_HELP} activeTab={activeTab} onNavTab={onNavTab} />
-        <NavButton id="settings" label="Settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={onNavTab} />
+        <NavButton id="settings" label="Settings" icon={ICON_SETTINGS} activeTab={activeTab} onNavTab={onNavTab} showDot={needsSettings} />
       </div>
     </aside>
   );
