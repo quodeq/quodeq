@@ -39,8 +39,7 @@ function _loadDimensions() {
     listStandards().catch(() => []),
   ]).then(([plugins, standards]) => {
     const seen = deduplicateDimensions(plugins, standards);
-    const visibleSet = new Set(readVisibleStandardIds());
-    _cachedDimensions = [...seen.values()].filter((d) => visibleSet.has(d.id));
+    _cachedDimensions = [...seen.values()];
     return _cachedDimensions;
   }).catch((err) => {
     console.warn('Failed to load dimensions:', err);
@@ -55,17 +54,22 @@ export function invalidateDimensionCache() {
   _cachePromise = null;
 }
 
+function _filterVisible(dims) {
+  const visibleSet = new Set(readVisibleStandardIds());
+  return dims.filter((d) => visibleSet.has(d.id));
+}
+
 export function usePluginDimensions() {
-  const [allDimensions, setAllDimensions] = useState(_cachedDimensions || []);
+  const [allDimensions, setAllDimensions] = useState(() => _cachedDimensions ? _filterVisible(_cachedDimensions) : []);
   const [dimLoadError, setDimLoadError] = useState(null);
 
   useEffect(() => {
     if (_cachedDimensions) {
-      setAllDimensions(_cachedDimensions);
+      setAllDimensions(_filterVisible(_cachedDimensions));
       return;
     }
     _loadDimensions().then((dims) => {
-      setAllDimensions(dims);
+      setAllDimensions(_filterVisible(dims));
       setDimLoadError(null);
     }).catch(() => {
       setDimLoadError('Failed to load dimensions.');
