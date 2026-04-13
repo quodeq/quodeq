@@ -56,16 +56,6 @@ def build_accumulated_trend(
         for dim in run_dims:
             if dim.dimension:
                 prev_by_dim[dim.dimension] = dim
-        # Build accumulated dimension details (all dimensions seen so far)
-        acc_dim_details = []
-        for dim_name in sorted(acc_by_dim):
-            dim = acc_by_dim[dim_name]
-            score = parse_numeric_score(dim.overall_score) if dim.overall_score else None
-            acc_dim_details.append({
-                "dimension": dim_name,
-                "score": score,
-                "grade": dim.overall_grade,
-            })
         trend.append(
             {
                 "runId": item.run_id,
@@ -74,7 +64,6 @@ def build_accumulated_trend(
                 "dimensionsCount": len(run_dim_names),
                 "dimensions": run_dim_names,
                 "dimensionDetails": dim_details,
-                "accumulatedDimensionDetails": acc_dim_details,
                 "accumulatedDimensionsCount": len(acc_by_dim),
                 "runNumericAverage": run_avg,
                 "runOverallGrade": (

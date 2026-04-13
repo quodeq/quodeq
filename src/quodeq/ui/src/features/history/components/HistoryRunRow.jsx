@@ -39,12 +39,10 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
     runNumericAverage, runOverallGrade,
     numericAverage, overallGrade,
     dimensionDetails,
-    accumulatedDimensionDetails,
   } = entry;
   const runScore = parseFloat(runNumericAverage);
   const accScore = parseFloat(numericAverage);
   const dims = dimensionDetails || [];
-  const accDims = accumulatedDimensionDetails || [];
   const runLetter = gradeLabel(runOverallGrade) || '—';
   const accLetter = gradeLabel(overallGrade) || '—';
   const runGradeWord = runOverallGrade ? capitalize(runOverallGrade) : '';
@@ -83,16 +81,6 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
           <span className="history-row-acc-score">{isNaN(accScore) ? '—' : accScore.toFixed(1)}</span>
           <TrendBadge delta={delta} />
         </div>
-        {accDims.length > dims.length && (
-          <div className="history-row-eval-dims" style={{ marginTop: '4px', opacity: 0.7 }}>
-            {accDims.map((d) => (
-              <span key={d.dimension} className="history-dim-tag">
-                {capitalize(d.dimension)}
-                {d.score != null && <span className="history-dim-score">{d.score.toFixed(1)}</span>}
-              </span>
-            ))}
-          </div>
-        )}
       </div>
     </button>
   );
