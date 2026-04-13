@@ -25,7 +25,10 @@ let _themeColors = null;
 let _themeSourceEl = null;
 let _themeObserver = null;
 export function getThemeColors(sourceEl) {
-  const el = sourceEl || document.documentElement;
+  // Prefer previously-set source element (the .map-viz-container) so that
+  // callers without an explicit element (scoreRGB, sevRGB) still read the
+  // correct scoped CSS variables (e.g. .map-viz-dark overrides).
+  const el = sourceEl || _themeSourceEl || document.documentElement;
   if (_themeColors && _themeSourceEl === el) return _themeColors;
   _themeSourceEl = el;
   const style = getComputedStyle(el);
@@ -49,13 +52,18 @@ export function getThemeColors(sourceEl) {
     surface: raw('--color-surface') || '#1a1a2e',
   };
   if (!_themeObserver) {
-    _themeObserver = new MutationObserver(() => { _themeColors = null; _themeSourceEl = null; });
+    _themeObserver = new MutationObserver(() => { _themeColors = null; });
     _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
+  }
+  // Also watch the source element itself for class changes (e.g. map-viz-dark toggle)
+  if (el !== document.documentElement && el._themeObs === undefined) {
+    el._themeObs = new MutationObserver(() => { _themeColors = null; });
+    el._themeObs.observe(el, { attributes: true, attributeFilter: ['class'] });
   }
   return _themeColors;
 }
 
-export function invalidateThemeColors() { _themeColors = null; _themeSourceEl = null; }
+export function invalidateThemeColors() { _themeColors = null; }
 
 // score is 0-10 scale (matching the app's grading system)
 export function scoreRGB(score) {
