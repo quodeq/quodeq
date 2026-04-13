@@ -89,7 +89,7 @@ function EvaluateHeader({ isRunning }) {
   );
 }
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 function ErrorToast({ message, onDismiss }) {
   useEffect(() => {
@@ -108,21 +108,30 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, projectInfo } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
-  const [toastDismissed, setToastDismissed] = useState(false);
+  const [toastVisible, setToastVisible] = useState(false);
+  const errorCount = useRef(0);
+  const prevError = useRef('');
 
-  useEffect(() => { setToastDismissed(false); }, [jobError]);
+  useEffect(() => {
+    if (jobError) {
+      errorCount.current += 1;
+      setToastVisible(true);
+    }
+    prevError.current = jobError || '';
+  }, [jobError]);
+
+  const wrappedOnStart = (payload) => {
+    setToastVisible(false);
+    onStartEvaluation(payload);
+  };
 
   return (
     <section className="evaluate-screen">
-      {jobError && !toastDismissed && (
-        <ErrorToast message={jobError} onDismiss={() => setToastDismissed(true)} />
-      )}
-
       <EvaluateHeader isRunning={job?.status === 'running'} />
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={onStartEvaluation} disabled={false} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} />
         )}
 
         {!job && (
@@ -130,7 +139,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
             <div className="panel-header">
               <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
             </div>
-            <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={projectInfo} />
+            <EvaluationForm onStart={wrappedOnStart} disabled={false} selectedProject={projectInfo} />
           </div>
         )}
 
@@ -138,6 +147,10 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
         {!job && <EvaluateHelpSection />}
       </div>
+
+      {jobError && toastVisible && (
+        <ErrorToast key={errorCount.current} message={jobError} onDismiss={() => setToastVisible(false)} />
+      )}
     </section>
   );
 }
