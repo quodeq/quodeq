@@ -48,7 +48,7 @@ Keep pull requests focused on a single change. If you are fixing a bug and also 
 
 ## Security
 
-If you find a security vulnerability, do not open a public issue. Email security@quodeq.ai instead. See [SECURITY.md](SECURITY.md) for details.
+If you find a security vulnerability, do not open a public issue. Email quodeq.ai@gmail.com instead. See [SECURITY.md](SECURITY.md) for details.
 
 ## License
 
