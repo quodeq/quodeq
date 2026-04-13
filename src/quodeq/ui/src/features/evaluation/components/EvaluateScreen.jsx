@@ -93,7 +93,7 @@ import { useState, useEffect } from 'react';
 
 function ErrorToast({ message, onDismiss }) {
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 8000);
+    const timer = setTimeout(onDismiss, 5000);
     return () => clearTimeout(timer);
   }, [message, onDismiss]);
 
