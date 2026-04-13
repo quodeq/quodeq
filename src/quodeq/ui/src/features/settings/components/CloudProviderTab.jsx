@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { testProviderConnection } from '../../../api/index.js';
-import ProviderSettings from './ProviderSettings.jsx';
+import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 
 export default function CloudProviderTab({ providerId, providerConfig, state, update }) {
   const [testing, setTesting] = useState(false);
@@ -65,7 +65,13 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
           onChange={(e) => update('subagents', e.target.value)}
         />
       </div>
-      <ProviderSettings state={state} update={update} providerType="cloud-api" />
+      <TimeLimitSetting state={state} update={update} />
+      <details className="settings-advanced">
+        <summary className="settings-advanced-toggle">Advanced</summary>
+        <div className="settings-advanced-content">
+          <AdvancedAnalysisSettings state={state} update={update} />
+        </div>
+      </details>
     </>
   );
 }

@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { getKnownModels } from '../../../api/index.js';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
-import ProviderSettings from './ProviderSettings.jsx';
+import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 
 function ModelSuggestInput({ label, value, suggestions, placeholder, onChange, required }) {
   return (
@@ -77,7 +77,7 @@ export default function CliProviderTab({ providerId, state, update }) {
           onChange={(e) => update('subagents', e.target.value)}
         />
       </div>
-      <ProviderSettings state={state} update={update} providerType="cli" />
+      <TimeLimitSetting state={state} update={update} />
       <details className="settings-advanced">
         <summary className="settings-advanced-toggle">Advanced</summary>
         <div className="settings-advanced-content">
@@ -99,6 +99,7 @@ export default function CliProviderTab({ providerId, state, update }) {
               <ModelSuggestInput label="Thorough" value={state['model-thorough']} suggestions={thorough.length ? thorough : suggestions} placeholder={thorough[0]?.label} onChange={(v) => update('model-thorough', v)} />
             </div>
           </div>
+          <AdvancedAnalysisSettings state={state} update={update} />
         </div>
       </details>
     </>

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { getOllamaModels, testOllamaConcurrency } from '../../../api/index.js';
 import ServerStatus from './ServerStatus.jsx';
-import ProviderSettings from './ProviderSettings.jsx';
+import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 
 function ModelSelector({ value, models, onChange }) {
   const needsModel = !value;
@@ -59,7 +59,13 @@ export default function OllamaTab({ state, update }) {
         </div>
         {testResult && <span className="settings-description">Recommended: {testResult.recommended} agents</span>}
       </div>
-      <ProviderSettings state={state} update={update} providerType="local-api" />
+      <TimeLimitSetting state={state} update={update} />
+      <details className="settings-advanced">
+        <summary className="settings-advanced-toggle">Advanced</summary>
+        <div className="settings-advanced-content">
+          <AdvancedAnalysisSettings state={state} update={update} />
+        </div>
+      </details>
     </>
   );
 }
