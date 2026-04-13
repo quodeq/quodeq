@@ -234,6 +234,14 @@ class _WindowApi:
             })()
         """
 
+    def open_browser(self, path: str = '/') -> None:
+        """Open a URL in the system default browser."""
+        import webbrowser
+        if self._window:
+            base = self._window.get_current_url().split('#')[0].rstrip('/')
+            base = base.rsplit('/', 1)[0] if '/' in base.lstrip('http') else base
+            webbrowser.open(base + path)
+
     def minimize(self) -> None:
         if self._window:
             self._window.minimize()
