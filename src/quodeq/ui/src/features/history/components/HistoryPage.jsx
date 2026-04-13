@@ -4,6 +4,7 @@ import HistoryChartPanel from './HistoryChartPanel.jsx';
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
+import { collapseByDay } from '../../../utils/dailyGrouping.js';
 
 const MAX_VISIBLE = 20;
 
@@ -42,7 +43,7 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
     <div className="history-page">
       <div className="page-header">
         <h2 className="page-title">History</h2>
-        <span className="page-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
+        <span className="page-count">{trend.length} day{trend.length !== 1 ? 's' : ''}</span>
         {availableRuns && availableRuns.length > 0 && (
           <div className="history-run-nav">
             <RunNavigator currentRun={runNavLabel} isLatest={overviewRunIndex === 0} isOldest={overviewRunIndex >= availableRuns.length - 1} actions={{ onPrev: handleRunPrev, onNext: handleRunNext, onLatest: handleRunLatest, onView: () => { if (currentOverviewRun) onRunClick(currentOverviewRun); } }} />
@@ -65,10 +66,11 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   );
 }
 
-export default function HistoryPage({ trend, selection, availableRuns, dimensions, callbacks }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
+  const trend = useMemo(() => collapseByDay(rawTrend || []), [rawTrend]);
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
     selectedRun: selectedRunId || 'latest',
