@@ -207,6 +207,7 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
         else:
             print("Starting evaluation (this may take several minutes per dimension)...", file=sys.stderr)
             scores = run_full(config, evaluation_dir, mode=args.mode)
+            print(f"Report path: {evaluation_dir}/", file=sys.stderr)
             print(f"Reports written to {evaluation_dir}/", file=sys.stderr)
             for dim, score in scores.items():
                 print(f"  {dim}: {score}")
