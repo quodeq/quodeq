@@ -59,40 +59,43 @@ export default function CliProviderTab({ providerId, state, update }) {
         </div>
         <ModelSuggestInput value={state.model} suggestions={suggestions} onChange={(v) => update('model', v)} />
       </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Analysis power</span>
-          <span className="settings-description">Controls which model tier is used for analysis</span>
+      <details className="settings-advanced">
+        <summary className="settings-advanced-toggle">Advanced</summary>
+        <div className="settings-row">
+          <div className="settings-row-label">
+            <span className="settings-label">Analysis power</span>
+            <span className="settings-description">Controls which model tier is used for analysis</span>
+          </div>
+          <PowerSelector value={power} onChange={setPower} onPersist={persistPower} />
         </div>
-        <PowerSelector value={power} onChange={setPower} onPersist={persistPower} />
-      </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Analysis models</span>
-          <span className="settings-description">Override models per power level</span>
+        <div className="settings-row">
+          <div className="settings-row-label">
+            <span className="settings-label">Analysis models</span>
+            <span className="settings-description">Override models per power level</span>
+          </div>
+          <div className="settings-model-overrides">
+            <ModelSuggestInput label="Fast" value={state['model-fast']} suggestions={fast.length ? fast : suggestions} placeholder={fast[0]?.label} onChange={(v) => update('model-fast', v)} />
+            <ModelSuggestInput label="Balanced" value={state['model-balanced']} suggestions={balanced.length ? balanced : suggestions} placeholder={balanced[0]?.label} onChange={(v) => update('model-balanced', v)} />
+            <ModelSuggestInput label="Thorough" value={state['model-thorough']} suggestions={thorough.length ? thorough : suggestions} placeholder={thorough[0]?.label} onChange={(v) => update('model-thorough', v)} />
+          </div>
         </div>
-        <div className="settings-model-overrides">
-          <ModelSuggestInput label="Fast" value={state['model-fast']} suggestions={fast.length ? fast : suggestions} placeholder={fast[0]?.label} onChange={(v) => update('model-fast', v)} />
-          <ModelSuggestInput label="Balanced" value={state['model-balanced']} suggestions={balanced.length ? balanced : suggestions} placeholder={balanced[0]?.label} onChange={(v) => update('model-balanced', v)} />
-          <ModelSuggestInput label="Thorough" value={state['model-thorough']} suggestions={thorough.length ? thorough : suggestions} placeholder={thorough[0]?.label} onChange={(v) => update('model-thorough', v)} />
+        <div className="settings-row">
+          <div className="settings-row-label">
+            <span className="settings-label">Max parallel agents</span>
+            <span className="settings-description">Number of subagents to run in parallel (1–10)</span>
+          </div>
+          <input
+            type="number"
+            className="settings-model-input"
+            min={1}
+            max={10}
+            value={parseInt(state.subagents || '5', 10)}
+            onBlur={(e) => update('subagents', Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5)))}
+            onChange={(e) => update('subagents', e.target.value)}
+          />
         </div>
-      </div>
-      <div className="settings-row">
-        <div className="settings-row-label">
-          <span className="settings-label">Max parallel agents</span>
-          <span className="settings-description">Number of subagents to run in parallel (1–10)</span>
-        </div>
-        <input
-          type="number"
-          className="settings-model-input"
-          min={1}
-          max={10}
-          value={parseInt(state.subagents || '5', 10)}
-          onBlur={(e) => update('subagents', Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5)))}
-          onChange={(e) => update('subagents', e.target.value)}
-        />
-      </div>
-      <ProviderSettings state={state} update={update} providerType="cli" />
+        <ProviderSettings state={state} update={update} providerType="cli" />
+      </details>
     </>
   );
 }

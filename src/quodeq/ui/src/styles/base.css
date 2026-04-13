@@ -1355,6 +1355,36 @@ textarea:focus {
   margin-top: 4px;
 }
 
+.settings-advanced {
+  margin-top: var(--space-2, 8px);
+}
+
+.settings-advanced-toggle {
+  font-size: var(--text-sm, 0.875rem);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: var(--space-2, 8px) 0;
+  user-select: none;
+  list-style: none;
+}
+
+.settings-advanced-toggle::-webkit-details-marker {
+  display: none;
+}
+
+.settings-advanced-toggle::before {
+  content: '\25B6';
+  display: inline-block;
+  margin-right: 6px;
+  font-size: 0.65em;
+  transition: transform 150ms ease;
+}
+
+.settings-advanced[open] > .settings-advanced-toggle::before {
+  transform: rotate(90deg);
+}
+
 .settings-model-input[type="number"] {
   width: 80px;
   text-align: center;
