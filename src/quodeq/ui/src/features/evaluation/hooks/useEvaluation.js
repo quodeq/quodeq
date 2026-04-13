@@ -121,13 +121,13 @@ function createJobPoller(refs, setters, startDimensionPolling) {
  */
 function preparePayload(payload, storage = localStorage) {
   const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  if (!activeProvider) throw new Error('No AI provider selected. Go to Settings to configure one.');
+  if (!activeProvider) throw new Error('No provider selected. Go to Settings to configure one.');
 
   const get = (key) => storage.getItem(providerKey(activeProvider, key));
 
   payload.aiCmd = activeProvider;
   const model = get('model');
-  if (!model) throw new Error('No orchestrator model selected. Go to Settings and select a model for the active provider.');
+  if (!model) throw new Error('No model selected. Go to Settings and select one.');
   payload.aiModel = model;
 
   const defaultSubagents = ['ollama'].includes(activeProvider) ? '1' : '5';

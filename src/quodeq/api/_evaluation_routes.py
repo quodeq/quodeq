@@ -47,7 +47,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             ptype = get_provider_configs().get(ai_cmd, {}).get("type")
             if ptype == "api" and not payload.get("aiModel"):
                 body, status = error_response(
-                    "No model selected. Go to Settings and select an orchestrator model.",
+                    "No model selected. Go to Settings and select one.",
                     HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
                 )
                 return jsonify(body), status
