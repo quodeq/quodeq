@@ -82,41 +82,9 @@ function fetchTrendEffect(selectedProject, setDashboard) {
   let active = true;
 
   getDashboard(selectedProject, 'latest')
-    .then(async (payload) => {
+    .then((payload) => {
       if (!active) return;
-      const trend = payload.trend || [];
-      const runIds = [...new Set(trend.map(t => t.runId).filter(Boolean))];
-      if (runIds.length === 0) { if (active) setDashboard(prev => ({ ...prev, trend })); return; }
-      try {
-        const byRun = await fetchRescores(selectedProject, runIds);
-        if (!active) return;
-        const rescoredTrend = trend.map(t => {
-          const r = byRun[t.runId];
-          if (!r) return t;
-          const dl = {};
-          for (const d of (r.dimensions || [])) dl[dimKey(d)] = d;
-          const details = (t.dimensionDetails || []).map(dd => {
-            const rd = dl[dimKey(dd)];
-            if (!rd) return dd;
-            return {
-              ...dd,
-              score: rd.overallScore ? parseFloat(rd.overallScore) : dd.score,
-              overallGrade: rd.overallGrade || dd.overallGrade,
-            };
-          });
-          return {
-            ...t,
-            dimensionDetails: details,
-            numericAverage: r.summary?.numericAverage ?? t.numericAverage,
-            runNumericAverage: r.summary?.numericAverage ?? t.runNumericAverage,
-            overallGrade: r.summary?.overallGrade ?? t.overallGrade,
-            runOverallGrade: r.summary?.overallGrade ?? t.runOverallGrade,
-          };
-        });
-        if (active) setDashboard(prev => ({ ...prev, trend: rescoredTrend }));
-      } catch {
-        if (active) setDashboard(prev => ({ ...prev, trend }));
-      }
+      setDashboard(prev => ({ ...prev, trend: payload.trend || [] }));
     })
     .catch(() => {});
 
