@@ -8,7 +8,8 @@ import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGroupin
 import RunHistoryPanel from './RunHistoryPanel.jsx';
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
-import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
+import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
+import { filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import CopyButton, { FileTextIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildOverviewReport } from '../../../utils/reportBuilder.js';
@@ -112,14 +113,14 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
   );
 }
 
-function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, dimensionsWithViolations, selectedDayDimNames, rescoreLookup }) {
+function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, dimensionsWithViolations, selectedDayDimNames }) {
   return (
     <>
       <div className="section-header">
         <h3 className="section-title">Quality Dimensions</h3>
       </div>
       <div className="dimensions-panel">
-        <DimensionCardsGrid sortedDimensions={sortedDimensions} onDimensionClick={onDimensionClick} selectedDayDimNames={selectedDayDimNames} rescoreLookup={rescoreLookup} />
+        <DimensionCardsGrid sortedDimensions={sortedDimensions} onDimensionClick={onDimensionClick} selectedDayDimNames={selectedDayDimNames} />
       </div>
 
       {dimensionsWithViolations.length > 0 && (
@@ -145,65 +146,6 @@ function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, dime
       )}
     </>
   );
-}
-
-// ---------------------------------------------------------------------------
-// Pure computation helpers extracted from the component
-// ---------------------------------------------------------------------------
-
-const roundOneDecimal = (n) => Math.round(n * 10) / 10;
-
-function buildFilteredTrend(trend, dailyTrend, visibleSet) {
-  const accByDim = {};
-  const accByDate = new Map(); // date string → accAvg
-  const visibleDates = new Set();
-  const rawReversed = [...trend].reverse(); // oldest first
-  for (const entry of rawReversed) {
-    let hasVisible = false;
-    for (const d of (entry.dimensionDetails || [])) {
-      const dimId = (d.dimension || '').toLowerCase();
-      if (visibleSet.has(dimId) && d.score != null) {
-        accByDim[dimId] = d.score;
-        hasVisible = true;
-      }
-    }
-    if (hasVisible) {
-      const accScores = Object.values(accByDim).filter((s) => s != null);
-      const accAvg = accScores.length > 0 ? roundOneDecimal(accScores.reduce((a, b) => a + b, 0) / accScores.length) : null;
-      const datePart = (entry.dateISO || '').slice(0, 10);
-      accByDate.set(datePart, accAvg);
-      visibleDates.add(datePart);
-    }
-  }
-  // Match daily entries by date, only include days with visible evaluations
-  return dailyTrend
-    .filter((entry) => visibleDates.has((entry.dateISO || '').slice(0, 10)))
-    .map((entry) => {
-      const datePart = (entry.dateISO || '').slice(0, 10);
-      const accAvg = accByDate.get(datePart) ?? null;
-      const details = (entry.dimensionDetails || []).filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-      const runScores = details.map((d) => d.score).filter((s) => s != null);
-      const runAvg = runScores.length > 0 ? roundOneDecimal(runScores.reduce((a, b) => a + b, 0) / runScores.length) : null;
-      const dims = (entry.dimensions || []).filter((d) => visibleSet.has(d.toLowerCase()));
-      return { ...entry, numericAverage: accAvg, runNumericAverage: runAvg, dimensionDetails: details, dimensions: dims, dimensionsCount: dims.length };
-    });
-}
-
-function buildFilteredAccumulated(accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun) {
-  if (!accumulated) return accumulated;
-  // Use the trend's accumulated average (consistent with History) instead of
-  // recomputing from rescored dimensions which can produce different values.
-  const selectedIdx = currentOverviewRun ? filteredDailyTrend.findIndex((t) => t.runId === currentOverviewRun) : 0;
-  const idx = selectedIdx >= 0 ? selectedIdx : 0;
-  const trendAvg = idx < filteredDailyTrend.length ? parseFloat(filteredDailyTrend[idx]?.numericAverage) : null;
-  const numericAverage = (trendAvg != null && !isNaN(trendAvg)) ? trendAvg : null;
-  const prevIdx = idx + 1;
-  const prevAvg = prevIdx < filteredDailyTrend.length ? parseFloat(filteredDailyTrend[prevIdx]?.numericAverage) : null;
-  const { totalViolations, totalCompliance, severity } = computeSummaryFromDimensions(filteredDimensions);
-  return {
-    ...accumulated,
-    summary: { ...accumulated.summary, numericAverage, previousNumericAverage: prevAvg, totalViolations, totalCompliance, severity },
-  };
 }
 
 // ---------------------------------------------------------------------------
@@ -236,15 +178,15 @@ function useAccumulatedComputations(data) {
 
   const visibleIds = useMemo(() => readVisibleStandardIds(), [accumulatedDimensions]);
   const visibleSet = useMemo(() => new Set(visibleIds), [visibleIds]);
-  const filteredDailyTrend = useMemo(() => buildFilteredTrend(trend, dailyTrend, visibleSet), [trend, dailyTrend, visibleSet]);
+  const filteredDailyTrend = useMemo(() => filterTrendByVisibleStandardsDaily(trend, dailyTrend, visibleSet), [trend, dailyTrend, visibleSet]);
   const filteredDimensions = useMemo(() => accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase())), [accumulatedDimensions, visibleIds]);
-  const filteredAccumulated = useMemo(() => buildFilteredAccumulated(accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun), [accumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]);
+  const filteredAccumulated = useMemo(() => filterAccumulatedByVisibleStandards(accumulated, visibleSet, filteredDailyTrend, currentOverviewRun), [accumulated, visibleSet, filteredDailyTrend, currentOverviewRun]);
   const filteredStats = useMemo(() => computeAccumulatedStats(filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun), [filteredAccumulated, filteredDimensions, filteredDailyTrend, currentOverviewRun]);
 
   return { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats };
 }
 
-export default function AccumulatedOverviewPanel({ data, callbacks, rescoreLookup }) {
+export default function AccumulatedOverviewPanel({ data, callbacks }) {
   const { onRunClick, onDimensionClick } = callbacks;
   const { currentOverviewRun, selectedDayDimNames, filteredDailyTrend, filteredDimensions, filteredAccumulated, filteredStats } = useAccumulatedComputations(data);
 
@@ -268,7 +210,6 @@ export default function AccumulatedOverviewPanel({ data, callbacks, rescoreLooku
         onDimensionClick={onDimensionClick}
         dimensionsWithViolations={filteredStats.dimsWithViolations}
         selectedDayDimNames={selectedDayDimNames}
-        rescoreLookup={rescoreLookup}
       />
     </>
   );

@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { getDimensionEval, getRescore } from '../../../api/index.js';
+import { getDimensionEval, getRunScores } from '../../../api/index.js';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton, { SparkleIcon, FileTextIcon } from '../../../components/CopyButton.jsx';
@@ -250,7 +250,7 @@ function mergeRescoreIntoEval(prev, dimData) {
 async function fetchAndRescore(project, runId, dimension) {
   const [data, rescored] = await Promise.all([
     getDimensionEval(project, runId, dimension),
-    getRescore(project, runId).catch(() => null),
+    getRunScores(project, runId).catch(() => null),
   ]);
   if (rescored) {
     const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
@@ -275,7 +275,7 @@ function useExplorerData(project, dimension, runId, refreshSignal) {
   useEffect(() => {
     if (refreshSignal === initialRef.current) return;
     if (!evalData || !project || !runId) return;
-    getRescore(project, runId).then((rescored) => {
+    getRunScores(project, runId).then((rescored) => {
       const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
       if (dimData) setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
     }).catch(() => {});
