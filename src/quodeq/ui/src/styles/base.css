@@ -180,6 +180,7 @@ body {
 }
 
 .sidebar-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -205,12 +206,13 @@ body {
 }
 
 .sidebar-nav-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
   width: 6px;
   height: 6px;
   border-radius: 50%;
   background: var(--color-accent);
-  margin-left: auto;
-  flex-shrink: 0;
 }
 
 .sidebar-nav-item.active {
