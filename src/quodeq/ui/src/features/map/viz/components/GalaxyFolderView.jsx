@@ -93,7 +93,7 @@ function buildFolderScene(node, W, H) {
               or: radius * 1.5 + fRng() * radius * 1.0,
               os: (0.015 + fRng() * 0.03) * (fRng() > 0.5 ? 1 : -1),
               op: fRng() * TAU,
-              sz: sevName === 'critical' ? 4.5 + fRng() * 1.0 : sevName === 'major' ? 3.5 + fRng() * 0.8 : 2.5 + fRng() * 0.5,
+              sz: sevName === 'critical' ? 3.0 + fRng() * 0.7 : sevName === 'major' ? 2.3 + fRng() * 0.5 : 1.6 + fRng() * 0.4,
               ec: 0.7 + fRng() * 0.3,
               tp: fRng() * TAU,
             });
@@ -114,7 +114,7 @@ function buildFolderScene(node, W, H) {
             or: radius * 1.2 + rng2() * radius * 1.5,
             os: (0.03 + rng2() * 0.07) * (rng2() > 0.5 ? 1 : -1),
             op: rng2() * TAU,
-            sz: sevName === 'critical' ? 3.2 + rng2() * 0.8 : sevName === 'major' ? 2.6 + rng2() * 0.5 : 1.8 + rng2() * 0.5,
+            sz: sevName === 'critical' ? 2.2 + rng2() * 0.5 : sevName === 'major' ? 1.8 + rng2() * 0.4 : 1.2 + rng2() * 0.3,
             ec: 0.65 + rng2() * 0.35,
             tp: rng2() * TAU,
           });
