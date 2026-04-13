@@ -1356,47 +1356,45 @@ textarea:focus {
 }
 
 .settings-advanced {
-  margin-top: var(--space-4, 16px);
-  border-top: 1px solid var(--color-border);
-  padding-top: var(--space-2, 8px);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .settings-advanced-toggle {
-  font-size: var(--text-xs, 0.75rem);
-  font-weight: 600;
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2, 8px);
+  width: 100%;
+  font-size: var(--text-sm);
+  font-weight: var(--weight-medium);
   color: var(--color-text-muted);
   cursor: pointer;
-  padding: var(--space-2, 8px) 0;
+  padding: var(--space-4, 16px) var(--space-6, 24px);
   user-select: none;
   list-style: none;
-  opacity: 0.7;
-  transition: opacity 150ms ease;
+  transition: color 150ms ease;
 }
 
 .settings-advanced-toggle:hover {
-  opacity: 1;
+  color: var(--color-text);
 }
 
 .settings-advanced-toggle::-webkit-details-marker {
   display: none;
 }
 
-.settings-advanced-toggle::before {
-  content: '\25B6';
-  display: inline-block;
-  margin-right: 8px;
-  font-size: 0.6em;
+.settings-advanced-toggle::after {
+  content: '\25B8';
+  font-size: 0.85em;
   transition: transform 150ms ease;
+  margin-left: auto;
 }
 
-.settings-advanced[open] > .settings-advanced-toggle::before {
+.settings-advanced[open] > .settings-advanced-toggle::after {
   transform: rotate(90deg);
 }
 
-.settings-advanced-content {
-  padding-top: var(--space-2, 8px);
+.settings-advanced-content .settings-row:last-child {
+  border-bottom: none;
 }
 
 .settings-model-input[type="number"] {
