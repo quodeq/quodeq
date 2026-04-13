@@ -16,9 +16,10 @@ function useSetupStatus() {
       const model = provider ? localStorage.getItem(providerKey(provider, 'model')) || '' : '';
       const configured = !!(provider && model);
 
+      const showSettings = !settingsDismissed;
       setStatus({
-        needsSettings: !settingsDismissed,
-        readyToEvaluate: configured && !evaluateDismissed,
+        needsSettings: showSettings,
+        readyToEvaluate: !showSettings && configured && !evaluateDismissed,
       });
     }
     check();
