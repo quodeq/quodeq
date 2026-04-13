@@ -22,10 +22,13 @@ export function parseCSSColor(cssColor) {
 }
 
 let _themeColors = null;
+let _themeSourceEl = null;
 let _themeObserver = null;
-export function getThemeColors() {
-  if (_themeColors) return _themeColors;
-  const style = getComputedStyle(document.documentElement);
+export function getThemeColors(sourceEl) {
+  const el = sourceEl || document.documentElement;
+  if (_themeColors && _themeSourceEl === el) return _themeColors;
+  _themeSourceEl = el;
+  const style = getComputedStyle(el);
   const get = (v) => parseCSSColor(style.getPropertyValue(v).trim() || '#888');
   const raw = (v) => style.getPropertyValue(v).trim();
   _themeColors = {
@@ -46,11 +49,13 @@ export function getThemeColors() {
     surface: raw('--color-surface') || '#1a1a2e',
   };
   if (!_themeObserver) {
-    _themeObserver = new MutationObserver(() => { _themeColors = null; });
+    _themeObserver = new MutationObserver(() => { _themeColors = null; _themeSourceEl = null; });
     _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
   }
   return _themeColors;
 }
+
+export function invalidateThemeColors() { _themeColors = null; _themeSourceEl = null; }
 
 // score is 0-10 scale (matching the app's grading system)
 export function scoreRGB(score) {

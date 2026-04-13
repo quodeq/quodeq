@@ -206,6 +206,39 @@
   background: var(--color-surface);
 }
 
+/* ── Dark mode override (scoped to viz container) ──── */
+
+.map-viz-container.map-viz-dark {
+  --color-bg:           var(--primitive-flynn-950);
+  --color-surface:      var(--primitive-flynn-900);
+  --color-surface-alt:  var(--primitive-flynn-800);
+  --color-border:       var(--primitive-flynn-700);
+
+  --color-text:         var(--primitive-flynn-200);
+  --color-text-muted:   var(--primitive-flynn-500);
+
+  --color-accent:       var(--primitive-flynn-accent);
+  --color-accent-soft:  color-mix(in srgb, var(--primitive-flynn-accent) 10%, transparent);
+
+  --color-sev-critical-text:   var(--primitive-flynn-sev-critical-dark);
+  --color-sev-critical-border: color-mix(in srgb, var(--primitive-flynn-sev-critical-dark) 42%, transparent);
+  --color-sev-major-text:      var(--primitive-flynn-sev-major-dark);
+  --color-sev-major-border:    color-mix(in srgb, var(--primitive-flynn-sev-major-dark) 38%, transparent);
+  --color-sev-minor-text:      var(--primitive-flynn-sev-minor-dark);
+  --color-sev-minor-border:    color-mix(in srgb, var(--primitive-flynn-sev-minor-dark) 32%, transparent);
+
+  --color-grade-top-text:    var(--primitive-flynn-accent);
+  --color-grade-high-text:   #8aafcc;
+  --color-grade-mid-text:    var(--primitive-ired-300);
+  --color-grade-low-text:    var(--primitive-ired-400);
+  --color-grade-bottom-text: var(--primitive-crimson-200);
+
+  --color-compliance:        var(--primitive-flynn-accent);
+  --color-compliance-border: color-mix(in srgb, var(--primitive-flynn-accent) 38%, transparent);
+
+  color-scheme: dark;
+}
+
 /* ── Tooltip ─────────────────────────────────────────── */
 
 .map-tooltip {
@@ -346,13 +379,21 @@
   border-color: transparent;
 }
 
-/* ── Dimension filter ────────────────────────────────── */
+/* ── Viz toggle row ─────────────────────────────────── */
 
-.map-label-toggle {
+.map-viz-toggles {
   position: absolute;
   bottom: var(--space-2);
   right: var(--space-2);
   z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* ── Switch toggle ──────────────────────────────────── */
+
+.map-label-toggle {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -361,7 +402,7 @@
   color: var(--color-text-muted);
   cursor: pointer;
   white-space: nowrap;
-  transition: opacity 150ms ease;
+  transition: color 150ms ease;
 }
 
 .map-label-toggle:hover {
@@ -370,30 +411,35 @@
 
 .map-label-toggle input[type="checkbox"] {
   appearance: none;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid color-mix(in srgb, var(--color-accent) 50%, transparent);
-  border-radius: 3px;
-  background: transparent;
+  width: 28px;
+  height: 16px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--color-text-muted) 30%, transparent);
   cursor: pointer;
   position: relative;
   flex-shrink: 0;
+  transition: background 200ms ease;
+}
+
+.map-label-toggle input[type="checkbox"]::after {
+  content: '';
+  position: absolute;
+  left: 2px;
+  top: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--color-text-muted);
+  transition: transform 200ms ease, background 200ms ease;
 }
 
 .map-label-toggle input[type="checkbox"]:checked {
-  background: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 60%, transparent);
 }
 
 .map-label-toggle input[type="checkbox"]:checked::after {
-  content: '';
-  position: absolute;
-  left: 3px;
-  top: 1px;
-  width: 5px;
-  height: 8px;
-  border: solid var(--color-surface);
-  border-width: 0 2px 2px 0;
-  transform: rotate(45deg);
+  transform: translateX(12px);
+  background: var(--color-accent);
 }
 
 .heat-grid-dim-row {

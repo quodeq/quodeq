@@ -1,8 +1,8 @@
 import { useState, useMemo, useRef, useEffect } from 'react';
 import {
   buildFileTree, treeNodeToFileObj,
-  RiskMatrixView, ZoomablePackView, resetSavedFocus,
-  GalaxyView, GalaxyFolderView,
+  RiskMatrixView, ZoomablePackView,
+  GalaxyView, GalaxyFolderView, VizBreadcrumb,
 } from '../viz/index.js';
 import { complianceRatio } from '../../../utils/formatters.js';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
@@ -12,6 +12,16 @@ let _savedMapPath = '';
 let _savedVizStyle = 'zoompack';
 let _savedViewMode = 'health';
 let _savedGalaxyMode = 'filesystem';
+
+const MAP_LABELS_KEY = 'quodeq-map-labels';
+const MAP_DARK_KEY = 'quodeq-map-dark';
+
+function isAppDark() {
+  const attr = document.documentElement.getAttribute('data-theme') || '';
+  if (attr.includes('dark')) return true;
+  if (attr.includes('light')) return false;
+  return window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
 
 const VIEW_MODES = [
   { id: 'health', label: 'Health' },
@@ -100,25 +110,12 @@ function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, galaxyMode,
   );
 }
 
-function MapBreadcrumb({ path, onNavigate, onBack }) {
-  if (path.length === 0) return null;
-  const segments = [{ name: 'Root', path: '' }, ...path];
+function MapBreadcrumb({ path, onNavigate, projectName }) {
+  const segments = [{ name: projectName || 'Project', path: '' }, ...path];
   return (
-    <div className="map-breadcrumb">
-      <button type="button" className="map-breadcrumb-back" onClick={onBack} title="Go back">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-      </button>
-      {segments.map((seg, i) => (
-        <span key={seg.path}>
-          {i > 0 && <span className="map-breadcrumb-sep">&rsaquo;</span>}
-          {i < segments.length - 1 ? (
-            <button type="button" className="map-breadcrumb-seg" onClick={() => onNavigate(seg.path)}>{seg.name}</button>
-          ) : (
-            <span className="map-breadcrumb-current">{seg.name}</span>
-          )}
-        </span>
-      ))}
-    </div>
+    <VizBreadcrumb
+      items={segments.map((seg, i) => ({ label: seg.name, onClick: i < segments.length - 1 ? () => onNavigate(seg.path) : undefined }))}
+    />
   );
 }
 
@@ -138,23 +135,6 @@ function findSubtree(root, path) {
   return walk(root) || root;
 }
 
-function findParentPath(root, currentPath) {
-  // Find the parent node's path in the (possibly collapsed) tree
-  if (!currentPath) return '';
-  function walk(node, depth = 0) {
-    if (depth > 64) return null;
-    for (const child of node.children) {
-      if (child.path === currentPath) return node.path;
-      if (currentPath.startsWith(child.path + '/')) {
-        const found = walk(child, depth + 1);
-        if (found !== null) return found;
-      }
-    }
-    return null;
-  }
-  return walk(root) ?? '';
-}
-
 function buildBreadcrumbPath(root, path) {
   if (!path) return [];
   // Walk the collapsed tree to build breadcrumb from actual node names
@@ -169,36 +149,37 @@ function buildBreadcrumbPath(root, path) {
   return crumbs;
 }
 
-function MapVizContainer({ vizStyle, viewMode, galaxyMode, setGalaxyMode, node, dimensions, onDrillDown, onFileClick, onNavigate, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey, projectName, standardTypes }) {
+function MapVizContainer({ vizStyle, viewMode, galaxyMode, setGalaxyMode, node, fullTree, currentPath, onPathChange, dimensions, onDrillDown, onFileClick, onNavigate, showLabels, setShowLabels, darkMode, setDarkMode, breadcrumb, onBreadcrumbNav, resetKey, projectName, standardTypes }) {
   return (
-    <div className="map-viz-container">
-      {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} onBack={onBack} />}
-      {vizStyle !== 'galaxy' && (
+    <div className={`map-viz-container${darkMode ? ' map-viz-dark' : ''}`}>
+      {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} projectName={projectName} />}
+      <div className="map-viz-toggles">
         <label className="map-label-toggle">
           <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
           Labels
         </label>
-      )}
+        {!isAppDark() && (
+          <label className="map-label-toggle">
+            <input type="checkbox" checked={!darkMode} onChange={(e) => setDarkMode(!e.target.checked)} />
+            Light
+          </label>
+        )}
+      </div>
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
-      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={node} onFileClick={onFileClick} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} />}
+      {vizStyle === 'zoompack' && <ZoomablePackView node={fullTree} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} currentPath={currentPath} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={fullTree} currentPath={currentPath} onPathChange={onPathChange} onFileClick={onFileClick} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} />}
     </div>
   );
 }
 
 let _lastTabKey = null;
 
-function resetMapSavedState() {
-  _savedMapPath = '';
-  resetSavedFocus();
-}
-
 export default function MapPage({ data, callbacks, tabKey = 0 }) {
   // Reset only on fresh tab click (tabKey changed), not on back from detail
   const isFreshTabClick = _lastTabKey !== null && tabKey !== _lastTabKey;
   _lastTabKey = tabKey;
-  if (isFreshTabClick) resetMapSavedState();
+  if (isFreshTabClick) _savedMapPath = '';
 
   // Lock parent to viewport height while map is active
   useEffect(() => {
@@ -231,7 +212,24 @@ export default function MapPage({ data, callbacks, tabKey = 0 }) {
   const setVizStyle = (v) => { _savedVizStyle = v; _setVizStyle(v); };
   const [galaxyMode, _setGalaxyMode] = useState(_savedGalaxyMode);
   const setGalaxyMode = (v) => { _savedGalaxyMode = v; _setGalaxyMode(v); };
-  const [showLabels, setShowLabels] = useState(false);
+  const [showLabels, _setShowLabels] = useState(() => { try { const v = localStorage.getItem(MAP_LABELS_KEY); return v === null ? true : v === '1'; } catch { return true; } });
+  const setShowLabels = (v) => { _setShowLabels(v); try { localStorage.setItem(MAP_LABELS_KEY, v ? '1' : '0'); } catch {} };
+  // Dark mode: in dark app theme → always dark (no toggle).
+  // In light app theme → default dark, user can switch to light, remembered across tabs.
+  const [darkMode, _setDarkMode] = useState(() => {
+    if (isAppDark()) return true;
+    try { const v = localStorage.getItem(MAP_DARK_KEY); return v === null ? true : v === '1'; } catch { return true; }
+  });
+  const setDarkMode = (v) => { _setDarkMode(v); try { localStorage.setItem(MAP_DARK_KEY, v ? '1' : '0'); } catch {} };
+  // Reset when app theme changes
+  useEffect(() => {
+    const obs = new MutationObserver(() => {
+      if (isAppDark()) { _setDarkMode(true); }
+      else { try { const v = localStorage.getItem(MAP_DARK_KEY); _setDarkMode(v === null ? true : v === '1'); } catch { _setDarkMode(true); } }
+    });
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
   const [currentPath, _setCurrentPath] = useState(_savedMapPath);
   const setCurrentPath = (p) => { _savedMapPath = p; _setCurrentPath(p); };
 
@@ -241,7 +239,6 @@ export default function MapPage({ data, callbacks, tabKey = 0 }) {
     if (tabKey !== prevTabKey.current) {
       prevTabKey.current = tabKey;
       setCurrentPath('');
-      resetSavedFocus();
       callbacks?.onRefresh?.();
     }
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -297,10 +294,6 @@ export default function MapPage({ data, callbacks, tabKey = 0 }) {
     callbacks.onNavigate('file', { file: treeNodeToFileObj(treeNode), sourceTab: 'map' });
   };
   const handleBreadcrumbNav = (path) => setCurrentPath(path);
-  const handleBack = () => {
-    if (!currentPath) return;
-    setCurrentPath(findParentPath(fullTree, currentPath));
-  };
 
   if (allDimensions.length === 0) {
     return (
@@ -320,7 +313,7 @@ export default function MapPage({ data, callbacks, tabKey = 0 }) {
         </span>
         <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
       </div>
-      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} node={currentNode} dimensions={filteredDimensions} onDrillDown={handleDrillDown} onFileClick={handleFileClick} onNavigate={callbacks?.onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} projectName={data?.projectName} standardTypes={standardTypes} />
+      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} node={currentNode} fullTree={fullTree} currentPath={currentPath} onPathChange={setCurrentPath} dimensions={filteredDimensions} onDrillDown={handleDrillDown} onFileClick={handleFileClick} onNavigate={callbacks?.onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} setDarkMode={setDarkMode} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} resetKey={tabKey} projectName={data?.projectName} standardTypes={standardTypes} />
     </div>
   );
 }
