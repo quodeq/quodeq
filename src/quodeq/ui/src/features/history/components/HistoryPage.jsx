@@ -99,24 +99,12 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   );
 }
 
-export default function HistoryPage({ trend: rawTrend, accumulatedDimensions, selection, availableRuns, dimensions, callbacks }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
-  const trend = useMemo(() => {
-    const filtered = filterTrendByVisibleStandards(rawTrend || [], visibleSet);
-    // Override the latest entry's accumulated score and delta with Overview-matching values
-    if (filtered.length > 0 && accumulatedDimensions && accumulatedDimensions.length > 0) {
-      const visibleDims = accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
-      const scores = visibleDims.map((d) => parseFloat(d.overallScore)).filter((s) => !isNaN(s));
-      if (scores.length > 0) {
-        const accAvg = roundOneDecimal(scores.reduce((a, b) => a + b, 0) / scores.length);
-        filtered[0] = { ...filtered[0], numericAverage: accAvg };
-      }
-    }
-    return filtered;
-  }, [rawTrend, visibleSet, accumulatedDimensions]);
+  const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
     selectedRun: selectedRunId || 'latest',

@@ -168,27 +168,17 @@ const ROUTE_RENDERERS = {
     const trend = props.dashboardData.dashboard?.trend || [];
     const runs = props.dashboardData.availableRuns || [];
     const idx = props.dashboardData.overviewRunIndex || 0;
-    // Compute the Overview-matching accumulated score (with rescore + visible filtering)
-    const rescoreLookup = props.dashboardData.rescoreLookup || {};
-    const rawDims = props.dashboardData.accumulated?.dimensions || [];
-    const accDims = Object.keys(rescoreLookup).length > 0
-      ? rawDims.map((dim) => {
-          const match = rescoreLookup[(dim.dimension || '').toLowerCase()];
-          return match ? { ...dim, overallScore: match.overallScore, overallGrade: match.overallGrade } : dim;
-        })
-      : rawDims;
     return (
       <HistoryPage
         trend={trend}
-        accumulatedDimensions={accDims}
         selection={{
           selectedRunId: resolveHistorySelectedRunId(props.navigation.historySelectedRun, trend),
           selectedRunScore: props.dashboardData.accumulated?.summary?.numericAverage,
         }}
         availableRuns={runs}
         dimensions={{
-          accumulatedDimensions: accDims,
-          lastRun: { date: rawDims[0]?.fromDateLabel, runId: rawDims[0]?.fromRunId },
+          accumulatedDimensions: props.dashboardData.accumulated?.dimensions || [],
+          lastRun: { date: props.dashboardData.accumulated?.dimensions?.[0]?.fromDateLabel, runId: props.dashboardData.accumulated?.dimensions?.[0]?.fromRunId },
         }}
         callbacks={{
           onRunClick: (runId, dateLabel) => props.navigation.handleNavigate('history-run', { runId, dateLabel }),
