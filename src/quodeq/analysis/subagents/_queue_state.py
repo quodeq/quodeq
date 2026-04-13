@@ -43,7 +43,7 @@ def cleanup_stale_lock(lock_path: Path, threshold: float = _STALE_LOCK_THRESHOLD
             lock_path.unlink()
         except FileNotFoundError:
             pass  # another process already cleaned it up
-        _log.warning(
+        _log.debug(
             "Removed stale lock file %s (age=%.1fs, threshold=%.0fs)",
             lock_path, age, threshold,
         )
