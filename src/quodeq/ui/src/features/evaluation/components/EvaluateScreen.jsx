@@ -108,20 +108,16 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, projectInfo } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
+  const [toastKey, setToastKey] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
-  const errorCount = useRef(0);
-  const prevError = useRef('');
 
   useEffect(() => {
-    if (jobError) {
-      errorCount.current += 1;
-      setToastVisible(true);
-    }
-    prevError.current = jobError || '';
-  }, [jobError]);
+    if (jobError) setToastVisible(true);
+  }, [jobError, toastKey]);
 
   const wrappedOnStart = (payload) => {
     setToastVisible(false);
+    setToastKey(k => k + 1);
     onStartEvaluation(payload);
   };
 
@@ -149,7 +145,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
       </div>
 
       {jobError && toastVisible && (
-        <ErrorToast key={errorCount.current} message={jobError} onDismiss={() => setToastVisible(false)} />
+        <ErrorToast key={toastKey} message={jobError} onDismiss={() => setToastVisible(false)} />
       )}
     </section>
   );
