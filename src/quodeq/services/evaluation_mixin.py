@@ -67,7 +67,10 @@ def _build_evaluate_cmd(
     repo_path = Path(repo)
     repo_arg = repo if is_repo_url(repo) else str(repo_path.resolve())
 
-    cmd = [sys.executable, "-m", "quodeq.cli", "evaluate", repo_arg]
+    if getattr(sys, "frozen", False):
+        cmd = [sys.executable, "--_evaluate", "evaluate", repo_arg]
+    else:
+        cmd = [sys.executable, "-m", "quodeq.cli", "evaluate", repo_arg]
     cmd += ["-o", reports_abs]
     if options.dimensions:
         if isinstance(options.dimensions, list):

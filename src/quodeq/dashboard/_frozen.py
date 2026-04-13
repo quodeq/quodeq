@@ -8,6 +8,7 @@ import sys
 _MODULE_MAP = {
     "api": "quodeq.api.app",
     "webview": "quodeq.dashboard._webview_window",
+    "evaluate": "quodeq.cli",
 }
 
 _CMD_DISCOVERY_TIMEOUT_S = 5

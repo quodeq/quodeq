@@ -37,6 +37,13 @@ def main() -> int:
             webview_main()
             return 0
 
+        if flag == "--_evaluate":
+            # Rewrite argv so the CLI sees [prog, "evaluate", ...args]
+            sys.argv = [sys.argv[0]] + sys.argv[2:]
+            from quodeq.cli import main as cli_main
+            return cli_main()
+
+
     # Normal dashboard launch — force --no-build in frozen mode
     argv = None
     if getattr(sys, "frozen", False):
