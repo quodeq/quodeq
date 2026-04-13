@@ -10,19 +10,44 @@
 <p align="center"><strong>v1.0.3</strong></p>
 
 <p align="center">
-  Quodeq scans any codebase with AI and scores it across six quality dimensions:
-  <strong>Security</strong>, <strong>Reliability</strong>, <strong>Maintainability</strong>,
-  <strong>Performance</strong>, <strong>Flexibility</strong>, and <strong>Usability</strong>,
-  based on ISO 25010. Get grades, find violations, fix what matters.
-</p>
-
-<p align="center">
-  <a href="https://www.youtube.com/watch?v=YUq9cr__2CI">Watch the demo</a> · <a href="https://quodeq.ai">Website</a> · <a href="https://github.com/quodeq/quodeq/releases/latest">Releases</a>
+  <a href="https://www.youtube.com/watch?v=YUq9cr__2CI">Watch the 2-min demo</a> · <a href="https://quodeq.ai">Website</a> · <a href="https://quodeq.ai/blog/">Blog</a> · <a href="https://github.com/quodeq/quodeq/releases/latest">Releases</a>
 </p>
 
 ---
 
-> **Why now?** AI models can now autonomously find and exploit zero-day vulnerabilities across operating systems, browsers, and web applications. Thousands of previously unknown flaws have been uncovered in weeks, not years. The code you ship today will be read by models that can spot what humans miss. If your codebase carries security debt, reliability gaps, or maintenance shortcuts, the window to fix them is shrinking fast. Quodeq helps you prepare your software: find vulnerabilities, enforce quality standards, and harden your code before the next generation of models is used against it.
+### Why
+
+AI models can now autonomously find and exploit zero-day vulnerabilities across operating systems, browsers, and web applications. Thousands of previously unknown flaws have been uncovered in weeks, not years. The code you ship today will be read by models that can spot what humans miss.
+
+But the tools to prepare for this are locked behind enterprise contracts and partner programs. Quodeq exists to change that.
+
+**Open source. MIT license. Runs locally. No telemetry. No account. No servers.**
+
+Quodeq scans any codebase with AI and scores it across six quality dimensions based on [ISO 25010](https://www.iso.org/standard/35733.html): **Security**, **Reliability**, **Maintainability**, **Performance**, **Flexibility**, and **Usability**. Every finding maps to a [CWE](https://cwe.mitre.org/) identifier. You get grades, violations with line numbers, and a fix plan.
+
+You choose how it runs. Cloud providers (Claude, Gemini, Codex) for speed. Local models via [Ollama](https://ollama.com) for privacy. Your code, your choice.
+
+---
+
+## What It Finds
+
+Quodeq evaluates real code and returns structured findings with severity, CWE classification, and file location:
+
+```
+CRITICAL  src/db.py:15        SQL Injection via string concatenation     CWE-89
+          query = f"SELECT * FROM users WHERE id = {user_id}"
+
+HIGH      src/auth.py:42      Hardcoded credentials in source code       CWE-798
+          credentials = {"user": "admin", "pass": "secret123"}
+
+MEDIUM    src/api.py:88       Missing rate limiting on login endpoint     CWE-307
+          @app.route("/login", methods=["POST"])
+
+MINOR     src/utils.py:23     Bare except clause hides errors             CWE-396
+          except: pass
+```
+
+Each finding includes a reason, the offending snippet, and a fix plan. Results are stored as JSON on your machine and viewable in the dashboard or as raw files.
 
 ---
 
@@ -30,10 +55,10 @@
 
 ```bash
 pipx install quodeq    # Install quodeq
-quodeq dashboard       # Launch the dashboard
+quodeq                 # Launch the dashboard
 ```
 
-That's it. The dashboard lets you point to any project and run evaluations from the UI.
+That's it. Running `quodeq` with no arguments opens the dashboard, where you can point to any project and run evaluations from the UI.
 
 > Also available via `pip install quodeq`.
 
@@ -75,7 +100,8 @@ After installing a provider, go to **Settings** in the dashboard and select it.
 The Quodeq Dashboard is the main way to use Quodeq. Launch evaluations, browse results, and track quality over time.
 
 ```bash
-quodeq dashboard
+quodeq                 # Launch the dashboard (default command)
+quodeq dashboard       # Same as above, explicit form
 ```
 
 <p align="center">
@@ -107,7 +133,7 @@ quodeq evaluate /path/to/project --scope src/api    # Scoped to a subdirectory
 quodeq evaluate /path/to/project -d security        # Single dimension
 ```
 
-Run `quodeq evaluate --help` and `quodeq dashboard --help` for all available options.
+Run `quodeq evaluate --help` and `quodeq --help` for all available options.
 
 ---
 
@@ -138,18 +164,9 @@ Quodeq can evaluate **any codebase in any language**. The AI analysis engine rea
 
 ---
 
-## The Q² Scoring Formula
+## Scoring
 
-Quodeq scores each principle on a 0 to 10 scale using four independent constraints:
-
-1. **Violation Base** is a hyperbolic curve where the first violations hurt most (`10 / (1 + K * weighted_violations)`)
-2. **Compliance Lift** is evidence of good practices that fills the gap between the base and 10
-3. **Violation Ceiling** is a log-based cap that prevents compliance from overriding significant violations
-4. **Severity Grade Floor** ensures grade labels match reality (only critical violations can produce a "Critical" grade)
-
-The final score: `max(floor, min(ceiling, base + (10 - base) * lift))`
-
-Full details in [src/quodeq/core/scoring/README.md](src/quodeq/core/scoring/README.md).
+Quodeq scores each principle on a 0 to 10 scale using four independent constraints: violation base, compliance lift, violation ceiling, and severity grade floor. Full details in [the scoring formula documentation](src/quodeq/core/scoring/README.md).
 
 ## Development
 
@@ -159,12 +176,10 @@ uv sync
 uv run pytest
 ```
 
-Development powered by [Claude Code](https://claude.ai/code) from [Anthropic](https://anthropic.com).
-
 ## Changelog
 
 See [CHANGELOG.md](CHANGELOG.md) for release history.
 
 ## License
 
-See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

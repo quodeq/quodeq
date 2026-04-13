@@ -450,9 +450,13 @@ def main(argv: list[str] | None = None) -> int:
     load_env_file(default_paths())
     parser = build_parser()
     args, remaining = parser.parse_known_args(argv)
-    if args.handler_command == "evaluate":
+    command = getattr(args, "handler_command", None) or args.command
+    # Default to dashboard when no subcommand is given
+    if command is None:
+        return dashboard_main(argv[1:] if argv is not None else sys.argv[1:])
+    if command == "evaluate":
         return run_evaluate(args)
-    handler = _COMMAND_HANDLERS.get(args.handler_command)
+    handler = _COMMAND_HANDLERS.get(command)
     if handler:
         return handler(argv)
     return 1
