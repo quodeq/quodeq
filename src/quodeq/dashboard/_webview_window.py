@@ -128,12 +128,15 @@ class _WindowApi:
         self._window: webview.Window | None = None
         self._api_pid = 0
         self._instance: InstanceController | None = None
+        self._base_url: str = ''
 
     def bind(self, window: webview.Window, api_pid: int = 0,
-             instance: InstanceController | None = None) -> None:
+             instance: InstanceController | None = None,
+             base_url: str = '') -> None:
         self._window = window
         self._api_pid = api_pid
         self._instance = instance
+        self._base_url = base_url.rstrip('/')
 
     _CLOSING_OVERLAY_JS = """
         (function() {
@@ -237,10 +240,8 @@ class _WindowApi:
     def open_browser(self, path: str = '/') -> None:
         """Open a URL in the system default browser."""
         import webbrowser
-        if self._window:
-            base = self._window.get_current_url().split('#')[0].rstrip('/')
-            base = base.rsplit('/', 1)[0] if '/' in base.lstrip('http') else base
-            webbrowser.open(base + path)
+        url = self._base_url + path if self._base_url else path
+        webbrowser.open(url)
 
     def minimize(self) -> None:
         if self._window:
@@ -324,7 +325,7 @@ def main() -> None:
                                     frameless=True, easy_drag=True,
                                     background_color='#0d1117', hidden=True,
                                     js_api=api)
-    api.bind(window, api_pid=api_pid, instance=instance)
+    api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
 
     def _on_reload(new_url: str) -> None:
         window.load_url(new_url)
