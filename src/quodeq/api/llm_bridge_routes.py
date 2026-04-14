@@ -12,6 +12,7 @@ from quodeq.llm_bridge import (
     get_provider_configs,
 )
 from quodeq.llm_bridge._cloud import check_cloud_connection
+from quodeq.shared.url_validation import validate_url_safe
 
 
 def register_llm_bridge_routes(app: Flask) -> None:
@@ -46,8 +47,14 @@ def register_llm_bridge_routes(app: Flask) -> None:
     @app.post("/api/provider/test")
     def provider_test() -> Response:
         data = request.get_json() or {}
+        api_base = data.get("api_base", "")
+        if api_base:
+            try:
+                validate_url_safe(api_base, allow_private=True)
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
         result = check_cloud_connection(
-            api_base=data.get("api_base", ""),
+            api_base=api_base,
             model=data.get("model", ""),
             api_key=data.get("api_key", ""),
         )

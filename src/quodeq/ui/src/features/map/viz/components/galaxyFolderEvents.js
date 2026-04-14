@@ -1,4 +1,5 @@
 import { getThemeColors, rgb } from '../core/galaxyCore.js';
+import { escapeHtml } from '../../../../utils/escapeHtml.js';
 import { buildFolderScene, countDescendants } from './galaxyFolderScene.js';
 
 /**
@@ -37,7 +38,7 @@ export function createEventHandlers(refs, params) {
     const ff = refs.focusedFolderRef.current;
     const isFocused = h.type === 'folder' && ff && ff.starIdx === h.starIdx;
     const action = h.type === 'file' ? 'zoom in' : isFocused ? 'enter folder' : 'focus';
-    el.innerHTML = `<div style="font-weight:600;color:${nameCol};margin-bottom:4px">${name}</div>${rows.join('')}<div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">Click to ${action}</div>`;
+    el.innerHTML = `<div style="font-weight:600;color:${nameCol};margin-bottom:4px">${escapeHtml(name)}</div>${rows.join('')}<div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">Click to ${action}</div>`;
     el.style.display = 'block';
     el.style.left = Math.min(cx + 16, window.innerWidth - 200) + 'px';
     el.style.top = Math.min(cy + 16, window.innerHeight - 160) + 'px';

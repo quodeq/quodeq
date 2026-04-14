@@ -23,10 +23,12 @@ from pydantic import BaseModel, Field
 from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
 from quodeq.core.standards.refs import load_compiled_requirements
 from quodeq.engine._ref_utils import load_compiled_refs
+from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
 _MAX_RETRIES = 2
+_OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +95,8 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
 
 def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
     """Call LLM via Instructor — returns validated finding dicts."""
+    if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
+        validate_url_safe(config.api_base, allow_private=True)
     client = instructor.from_openai(
         openai.OpenAI(base_url=config.api_base, api_key=config.api_key or "ollama"),
         mode=instructor.Mode.JSON,

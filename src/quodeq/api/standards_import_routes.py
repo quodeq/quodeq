@@ -29,7 +29,8 @@ def register_import_routes(app: Flask, get_service, get_library_client) -> None:
         try:
             library.import_standard(file_path, Path(app.config["STANDARDS_EVALUATORS_DIR"]))
         except ValueError as exc:
-            return error_response(str(exc), 409, "conflict")
+            logger.warning("Library import conflict: %s", exc)
+            return error_response("Import conflict", 409, "conflict")
         except Exception as exc:
             logger.warning("Library import failed: %s", exc)
             return error_response("Import from library failed", 502, "import_error")
@@ -48,9 +49,11 @@ def register_import_routes(app: Flask, get_service, get_library_client) -> None:
         try:
             result = svc.import_from_file(data, force=force)
         except ValueError as exc:
-            return error_response(str(exc), 400, "validation_error")
+            logger.warning("standards.import validation error: %s", exc)
+            return error_response("Invalid import data", 400, "validation_error")
         except PermissionError as exc:
-            return error_response(str(exc), 403, "forbidden")
+            logger.warning("standards.import permission error: %s", exc)
+            return error_response("Permission denied", 403, "forbidden")
         if result["status"] == "conflict":
             return jsonify({
                 "status": "conflict",

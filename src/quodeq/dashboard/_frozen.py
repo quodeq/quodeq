@@ -14,6 +14,15 @@ _MODULE_MAP = {
 
 _CMD_DISCOVERY_TIMEOUT_S = 5
 
+# SECURITY: Only allow well-known shell paths to prevent execution of
+# arbitrary binaries via a crafted $SHELL environment variable.
+_ALLOWED_SHELLS = {
+    "/bin/bash", "/bin/zsh", "/bin/sh",
+    "/usr/bin/bash", "/usr/bin/zsh", "/usr/bin/sh",
+    "/usr/local/bin/bash", "/usr/local/bin/zsh",
+    "/opt/homebrew/bin/bash", "/opt/homebrew/bin/zsh",
+}
+
 
 def is_frozen() -> bool:
     """Return True when running inside a PyInstaller bundle."""
@@ -43,6 +52,8 @@ def source_user_path() -> None:
         cmd = ('source ~/.zprofile 2>/dev/null; source ~/.zshrc 2>/dev/null; '
                'source ~/.bash_profile 2>/dev/null; echo $PATH')
         shell = os.environ.get("SHELL", "/bin/zsh")
+        if shell not in _ALLOWED_SHELLS:
+            shell = "/bin/zsh"
         result = subprocess.run(
             [shell, "-c", cmd], capture_output=True, text=True,
             timeout=_CMD_DISCOVERY_TIMEOUT_S,

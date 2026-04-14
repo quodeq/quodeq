@@ -172,6 +172,15 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             return jsonify(body), status
 
         target_path = Path(target).resolve()
+        # Allowlist: only permit paths under user home or the evaluations directory
+        _home = Path.home().resolve()
+        _eval_dir = Path(reports_dir()).resolve()
+        _allowed_roots = (_home, _eval_dir)
+        if not any(target_path == root or target_path.is_relative_to(root) for root in _allowed_roots):
+            body, status = error_response(
+                "Scan path must be under home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN",
+            )
+            return jsonify(body), status
         # Block scanning system directories to prevent information disclosure
         _blocked = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
         if any(str(target_path).startswith(b) for b in _blocked):

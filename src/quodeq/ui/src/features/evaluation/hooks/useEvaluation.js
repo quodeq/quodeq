@@ -111,7 +111,8 @@ function createJobPoller(refs, setters, startDimensionPolling) {
         handleJobUpdate(updated, localRefs, setJob, callbacks);
       } catch (err) {
         setJob((prev) => prev ? { ...prev, status: 'lost' } : prev);
-        setJobError(err.message);
+        console.error('Poll error:', err);
+        setJobError('Evaluation polling failed');
         stopTimer(pollRef);
         stopTimer(dimPollRef);
       }
@@ -207,7 +208,8 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
       setJob({ ...created, repo: prepared.repo });
       startPolling(created.jobId);
     } catch (err) {
-      setJobError(err.message);
+      console.error('Start error:', err);
+      setJobError(err.message?.startsWith('No ') || err.message?.startsWith('Select ') ? err.message : 'Failed to start evaluation');
     }
   }
 
@@ -223,7 +225,8 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
       await cancelEvaluation(jobId);
       clearJob();
     } catch (err) {
-      setJobError(err.message);
+      console.error('Cancel error:', err);
+      setJobError('Failed to cancel evaluation');
     }
   }
 

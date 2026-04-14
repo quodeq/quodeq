@@ -27,6 +27,7 @@ export default function ServerSection() {
   const [health, setHealth] = useState(null);
   const [status, setStatus] = useState('checking');
   const [consoleOpen, setConsoleOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [logLines, setLogLines] = useState([]);
   const sinceRef = useRef(-1);
   const logRef = useRef(null);
@@ -119,13 +120,27 @@ export default function ServerSection() {
         {status === 'online' && health?.address && <span className="server-address">{health.address}</span>}
       </div>
 
+      {/* Server details (port, PID, version) are intentionally available
+          for this local-only development tool to aid debugging. They are
+          hidden by default behind a toggle to avoid casual disclosure. */}
       {status === 'online' && health && (
         <div className="settings-row">
           <div className="settings-row-label">
-            <span className="settings-label">Details</span>
-            <span className="settings-description">
-              Port <strong>{health.port}</strong> &middot; PID <strong>{health.pid}</strong> &middot; v{health.version}
+            <span
+              className="settings-label"
+              role="button"
+              tabIndex={0}
+              style={{ cursor: 'pointer' }}
+              onClick={() => setDetailsOpen((o) => !o)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailsOpen((o) => !o); } }}
+            >
+              Details {detailsOpen ? '\u25BE' : '\u25B8'}
             </span>
+            {detailsOpen && (
+              <span className="settings-description">
+                Port <strong>{health.port}</strong> &middot; PID <strong>{health.pid}</strong> &middot; v{health.version}
+              </span>
+            )}
           </div>
         </div>
       )}

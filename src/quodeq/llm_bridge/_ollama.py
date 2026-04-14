@@ -31,7 +31,8 @@ def get_ollama_status(base_url: str = _OLLAMA_BASE) -> dict:
                 "address": base_url.replace("http://", ""),
             }
     except (urllib.error.URLError, ConnectionRefusedError, OSError) as exc:
-        return {"running": False, "error": str(exc)}
+        _log.warning("Ollama status check failed: %s", exc)
+        return {"running": False, "error": "Connection failed"}
 
 
 def list_ollama_models(base_url: str = _OLLAMA_BASE) -> list[dict]:

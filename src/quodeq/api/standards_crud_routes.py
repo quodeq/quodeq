@@ -38,7 +38,8 @@ def _handle_update(get_service, app: Flask, standard_id: str) -> Response:
     except FileNotFoundError:
         return error_response(f"Standard not found: {standard_id}", 404, "not_found")
     except PermissionError as exc:
-        return error_response(str(exc), 403, "forbidden")
+        logger.warning("standards.update permission error: %s", exc)
+        return error_response("Permission denied", 403, "forbidden")
     return jsonify(to_camel_dict(detail))
 
 
@@ -51,7 +52,8 @@ def _handle_delete(get_service, app: Flask, standard_id: str) -> tuple[str, int]
     except FileNotFoundError:
         return error_response(f"Standard not found: {standard_id}", 404, "not_found")
     except PermissionError as exc:
-        return error_response(str(exc), 403, "forbidden")
+        logger.warning("standards.delete permission error: %s", exc)
+        return error_response("Permission denied", 403, "forbidden")
     return "", 204
 
 
