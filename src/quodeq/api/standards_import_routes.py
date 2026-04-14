@@ -33,7 +33,10 @@ def register_import_routes(app: Flask, get_service, get_library_client) -> None:
             return error_response("Import conflict", 409, "conflict")
         except Exception as exc:
             logger.warning("Library import failed: %s", exc)
-            return error_response("Import from library failed", 502, "import_error")
+            return error_response(
+                "Import from library failed. Check that the library server is reachable and the standard file is valid.",
+                502, "import_error",
+            )
         logger.info("standards.import_from_library file=%s", file_path)
         return jsonify({"status": "imported"}), 201
 

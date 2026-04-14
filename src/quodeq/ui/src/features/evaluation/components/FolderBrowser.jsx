@@ -157,7 +157,7 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
       />
       <button className="folder-nav-btn" onClick={handleCreate} disabled={!name.trim()}>Create</button>
       <button className="folder-nav-btn" onClick={onClose}>✕</button>
-      {error && <span className="inline-error">{error}</span>}
+      {error && <span className="inline-error" role="alert">{error}</span>}
     </div>
   );
 }

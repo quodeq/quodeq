@@ -27,5 +27,8 @@ class WebRepository:
         """GET *path*, validate response contains a list at *key*, and return it."""
         data = self._get_dict(path)
         if key not in data or not isinstance(data[key], list):
-            raise InvalidDataError("Invalid data format: expected 'data' to be a list")
+            raise InvalidDataError(
+                f"Invalid data format: expected '{key}' to be a list. "
+                f"Verify the API response structure and that the endpoint is returning the correct data."
+            )
         return data[key]

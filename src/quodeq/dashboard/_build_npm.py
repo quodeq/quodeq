@@ -63,7 +63,9 @@ def run_npm_build(workdir: Path, static_dir: Path) -> None:
     """Run npm install (if needed) and npm run build."""
     npm = shutil.which("npm")
     if npm is None:
-        raise FileNotFoundError("npm not found on PATH")
+        raise FileNotFoundError(
+            "npm not found on PATH. Install Node.js from https://nodejs.org/ or via your package manager."
+        )
 
     if not (workdir / "node_modules").is_dir():
         log_info("Installing npm dependencies...")

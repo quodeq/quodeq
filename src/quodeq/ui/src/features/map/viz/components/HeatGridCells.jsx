@@ -22,6 +22,7 @@ export default function HeatGridCells({ row, onCellClick }) {
               style={hasValue ? severityCellStyle(sev) : undefined}
               onClick={() => hasValue && onCellClick?.({ row, severity: sev })}
               role={hasValue ? 'button' : undefined}
+              tabIndex={hasValue ? 0 : undefined}
             >
               {count || '—'}
             </div>

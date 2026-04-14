@@ -276,6 +276,8 @@ export default function GalaxyFolderView({ node, currentPath = '', onPathChange,
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
+        role="img"
+        aria-label="Galaxy folder visualization of project structure"
       />
       <VizBreadcrumb items={breadcrumb.map((bc, i) => ({
         label: bc.label,

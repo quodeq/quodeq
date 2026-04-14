@@ -288,6 +288,7 @@ export default function ZoomablePackView({ node, viewMode, onDrillDown, onFileCl
         viewBox={`${-PAD} ${-PAD} ${BASE_SIZE + PAD * 2} ${BASE_SIZE + PAD * 2}`}
         style={{ width: '100%', height: '100%', overflow: 'hidden' }}
         onClick={handleBgClick}
+        aria-label="Zoomable pack visualization of project compliance by folder and file"
       >
         <defs>
           <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">

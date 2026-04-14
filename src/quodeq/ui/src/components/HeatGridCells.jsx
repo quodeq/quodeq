@@ -22,6 +22,7 @@ export default function HeatGridCells({ row, onCellClick }) {
               style={hasValue ? severityCellStyle(sev) : undefined}
               onClick={() => hasValue && onCellClick?.({ row, severity: sev })}
               role={hasValue ? 'button' : undefined}
+              aria-label={`${sev}: ${count} violation${count !== 1 ? 's' : ''} in ${row.name || 'row'}`}
             >
               {count || '—'}
             </div>

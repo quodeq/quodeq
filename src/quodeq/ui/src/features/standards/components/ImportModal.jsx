@@ -11,7 +11,7 @@ function buildImportedCopyId(id) {
 function PickStep({ fileRef, onFile, onClose }) {
   return (
     <>
-      <h3 className="modal-title">Import Evaluator</h3>
+      <h3 id="import-modal-title" className="modal-title">Import Evaluator</h3>
       <p className="modal-body">Select a <strong>.quodeq</strong> file to import.</p>
       <input ref={fileRef} type="file" accept=".quodeq,.json" onChange={onFile} style={{ margin: '12px 0' }} />
       <div className="modal-actions">
@@ -24,7 +24,7 @@ function PickStep({ fileRef, onFile, onClose }) {
 function ImportingStep() {
   return (
     <>
-      <h3 className="modal-title">Importing...</h3>
+      <h3 id="import-modal-title" className="modal-title">Importing...</h3>
       <p className="modal-body">Validating and importing evaluator.</p>
     </>
   );
@@ -33,7 +33,7 @@ function ImportingStep() {
 function ErrorStep({ error, onClose }) {
   return (
     <>
-      <h3 className="modal-title">Import Failed</h3>
+      <h3 id="import-modal-title" className="modal-title">Import Failed</h3>
       <p className="modal-body modal-body--warning">{error}</p>
       <div className="modal-actions">
         <button type="button" className="btn-secondary" onClick={onClose}>Close</button>
@@ -45,7 +45,7 @@ function ErrorStep({ error, onClose }) {
 function WarningsStep({ warnings, onClose, onProceed }) {
   return (
     <>
-      <h3 className="modal-title">Security Warnings</h3>
+      <h3 id="import-modal-title" className="modal-title">Security Warnings</h3>
       <p className="modal-body modal-body--warning">
         This evaluator contains text that may attempt to manipulate the AI during analysis:
       </p>
@@ -64,7 +64,7 @@ function ConflictStep({ parsedData, conflict, warnings, actions }) {
   const { onClose, onImportAsCopy, onOverwrite } = actions;
   return (
     <>
-      <h3 className="modal-title">ID Already Exists</h3>
+      <h3 id="import-modal-title" className="modal-title">ID Already Exists</h3>
       <p className="modal-body">
         A standard with ID <strong>{parsedData?.id}</strong> already exists
         {conflict?.name ? ` ("${conflict.name}")` : ''}.
@@ -174,7 +174,7 @@ export default function ImportModal({ onClose, onImported }) {
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-dialog" onClick={(e) => e.stopPropagation()}>
+      <div className="modal-dialog" role="dialog" aria-modal="true" aria-labelledby="import-modal-title" onClick={(e) => e.stopPropagation()}>
         {step === STEP.PICK && <PickStep fileRef={fileRef} onFile={handleFile} onClose={onClose} />}
         {step === STEP.REVIEWING && <ImportingStep />}
         {step === STEP.ERROR && <ErrorStep error={error} onClose={onClose} />}

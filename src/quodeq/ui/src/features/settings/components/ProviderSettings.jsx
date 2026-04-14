@@ -15,8 +15,8 @@ export function TimeLimitSetting({ state, update }) {
       </div>
       <div className="settings-budget-control">
         <div className="theme-toggle">
-          <button type="button" className={`theme-toggle-btn${unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', '0')}>Unlimited</button>
-          <button type="button" className={`theme-toggle-btn${!unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', String(DEFAULT_POOL_BUDGET))}>Limited</button>
+          <button type="button" className={`theme-toggle-btn${unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', '0')} aria-pressed={unlimited}>Unlimited</button>
+          <button type="button" className={`theme-toggle-btn${!unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', String(DEFAULT_POOL_BUDGET))} aria-pressed={!unlimited}>Limited</button>
         </div>
         <input
           type="number"

@@ -25,7 +25,7 @@ export default function ScoreCircle({ score, grade, size = 120 }) {
 
   return (
     <div className="score-circle" style={{ width: size, height: size, position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }}>
+      <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: 'rotate(-90deg)' }} aria-hidden="true">
         <circle
           cx={size / 2} cy={size / 2} r={radius}
           fill="none" stroke="var(--color-border)" strokeWidth={strokeWidth}

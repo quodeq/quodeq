@@ -2,7 +2,10 @@
 from __future__ import annotations
 
 import json as _json
+import logging
 from pathlib import Path
+
+_logger = logging.getLogger(__name__)
 
 
 def carry_forward_findings(
@@ -31,6 +34,11 @@ def carry_forward_findings(
                 if entry.get("file") in unchanged_files:
                     out.write(_json.dumps(entry) + "\n")
                     count += 1
-    except OSError:
+    except OSError as exc:
+        _logger.warning(
+            "Carry-forward failed for %s: %s. "
+            "Check file permissions and that the output directory is writable.",
+            prev_jsonl, exc,
+        )
         return 0
     return count

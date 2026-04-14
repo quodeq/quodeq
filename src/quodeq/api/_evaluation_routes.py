@@ -60,7 +60,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             options = _build_evaluation_options(payload)
             job = provider.start_evaluation(repo=repo, reports_dir=_reports_dir(), options=options)
         except (FileNotFoundError, ValueError):
-            body, status = error_response("Invalid repository", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response(
+                "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
+                HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            )
             return jsonify(body), status
         return jsonify(to_camel_dict(job)), HTTPStatus.ACCEPTED
 

@@ -35,6 +35,7 @@ function TabContent({ provider, providerConfig }) {
 export default function ProviderTabs({ providerConfigs }) {
   const { getAiClients } = useApi();
   const [clients, setClients] = useState([]);
+  const [clientsError, setClientsError] = useState(null);
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem(ACTIVE_PROVIDER_KEY) || '');
   useEffect(() => {
     getAiClients().then((data) => {
@@ -64,7 +65,8 @@ export default function ProviderTabs({ providerConfigs }) {
         }
         localStorage.setItem(MIGRATION_DONE_KEY, '1');
       }
-    }).catch(() => setClients([]));
+      setClientsError(null);
+    }).catch(() => { setClients([]); setClientsError('Failed to load AI providers. Check that the server is running.'); });
   }, []);
 
   const selectTab = (id) => {
@@ -79,16 +81,19 @@ export default function ProviderTabs({ providerConfigs }) {
       <div className="panel-header">
         <h2 className="settings-section-title">Analysis</h2>
       </div>
+      {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label">AI Provider</span>
           <span className="settings-description">Select the AI provider used when running evaluations</span>
         </div>
-        <div className="provider-tab-bar">
+        <div className="provider-tab-bar" role="tablist">
           {clients.map((c) => (
             <button
               key={c.id}
               type="button"
+              role="tab"
+              aria-selected={c.id === activeTab}
               className={`provider-tab${c.id === activeTab ? ' provider-tab--active' : ''}`}
               onClick={() => selectTab(c.id)}
             >

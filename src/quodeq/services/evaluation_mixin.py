@@ -177,11 +177,17 @@ class FsEvaluationMixin:
         """Start an asynchronous evaluation subprocess for a repository."""
         if is_repo_url(repo):
             if not is_valid_repo_url(repo):
-                raise ValueError(f"Invalid repository URL format: {repo}")
+                raise ValueError(
+                    f"Invalid repository URL format: {repo}. "
+                    f"Expected a URL like https://github.com/owner/repo or git@github.com:owner/repo.git"
+                )
         else:
             resolved = Path(repo).resolve()
             if not resolved.exists():
-                raise FileNotFoundError(f"Repository not found: {repo}")
+                raise FileNotFoundError(
+                    f"Repository not found: {repo}. "
+                    f"Check that the path exists and is accessible from this machine."
+                )
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)

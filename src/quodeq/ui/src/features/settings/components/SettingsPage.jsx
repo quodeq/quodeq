@@ -46,6 +46,7 @@ function ThemeSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
               type="button"
               className={`theme-toggle-btn${themeMode === value ? ' active' : ''}`}
               onClick={() => onApplyMode(value)}
+              aria-pressed={themeMode === value}
             >
               {label}
             </button>
@@ -64,6 +65,7 @@ function ThemeSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
               type="button"
               className={`theme-family-card${themeFamily === value ? ' active' : ''}`}
               onClick={() => onApplyFamily(value)}
+              aria-pressed={themeFamily === value}
             >
               <span className="theme-family-label">{label}</span>
             </button>

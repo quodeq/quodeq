@@ -319,7 +319,12 @@ def _resolve_evaluation_inputs(args: argparse.Namespace) -> ResolvedInputs | Non
 
     paths = default_paths()
     if not paths.detection_file.exists() or not paths.dimensions_file.exists():
-        print("Configuration not found: detection.json and dimensions.json are required.", file=sys.stderr)
+        print(
+            "Configuration not found: detection.json and dimensions.json are required. "
+            "These files are created automatically when you install Quodeq standards. "
+            f"Expected location: {paths.detection_file.parent}",
+            file=sys.stderr,
+        )
         return None
 
     language = _resolve_language(args, src, paths)

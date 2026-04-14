@@ -18,7 +18,7 @@ function SectionNav({ active, onSelect }) {
   return (
     <nav className="help-section-nav">
       {SECTIONS.map(s => (
-        <button key={s.id} className={`help-section-btn${active === s.id ? ' active' : ''}`} onClick={() => onSelect(s.id)}>{s.label}</button>
+        <button key={s.id} className={`help-section-btn${active === s.id ? ' active' : ''}`} onClick={() => onSelect(s.id)} aria-pressed={active === s.id}>{s.label}</button>
       ))}
     </nav>
   );

@@ -41,7 +41,7 @@ export function useProjectActions({ projects, selectedProject, handleProjectChan
       await relocateProject(projectId, newPath);
     } catch (err) {
       console.error('Relocate failed:', err);
-      alert('Failed to relocate project. Please try again.');
+      alert(`Failed to relocate project: ${err.message || 'unknown error'}. Check that the target path is writable and try again.`);
       return;
     }
     loadProjects();

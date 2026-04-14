@@ -4,7 +4,7 @@ from __future__ import annotations
 from http import HTTPStatus
 from pathlib import Path
 
-from flask import abort, request
+from flask import abort, jsonify, make_response, request
 
 from quodeq.shared.utils import get_evaluations_dir
 
@@ -21,5 +21,9 @@ def reports_dir(default_path: str | None = None, request_args: dict | None = Non
     resolved = Path(raw).resolve()
     default_resolved = Path(fallback).resolve()
     if not resolved.is_relative_to(default_resolved):
-        abort(HTTPStatus.FORBIDDEN)
+        response = make_response(
+            jsonify({"error": "Access denied: path is outside the allowed directory", "code": "FORBIDDEN"}),
+            HTTPStatus.FORBIDDEN,
+        )
+        abort(response)
     return str(resolved)

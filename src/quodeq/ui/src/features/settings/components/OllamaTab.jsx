@@ -20,11 +20,15 @@ function ModelSelector({ value, models, onChange }) {
 export default function OllamaTab({ state, update }) {
   const { getOllamaModels, testOllamaConcurrency } = useApi();
   const [models, setModels] = useState([]);
+  const [modelsError, setModelsError] = useState(null);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
+  const [testError, setTestError] = useState(null);
 
   useEffect(() => {
-    getOllamaModels().then(setModels).catch(() => setModels([]));
+    getOllamaModels()
+      .then((data) => { setModels(data); setModelsError(null); })
+      .catch(() => { setModels([]); setModelsError('Failed to load Ollama models. Check that Ollama is running.'); });
   }, []);
 
   const runTest = async () => {
@@ -34,13 +38,14 @@ export default function OllamaTab({ state, update }) {
       const result = await testOllamaConcurrency(state.model);
       setTestResult(result);
       if (result.recommended) update('subagents', String(result.recommended));
-    } catch (err) { console.warn('Ollama concurrency test failed', err); setTestResult(null); }
+    } catch (err) { console.warn('Ollama concurrency test failed', err); setTestResult(null); setTestError('Concurrency test failed. Verify Ollama is running and the model is loaded.'); }
     setTesting(false);
   };
 
   return (
     <>
       <ServerStatus />
+      {modelsError && <div className="settings-row"><span className="settings-error">{modelsError}</span></div>}
       <div className="settings-row">
         <div className="settings-row-label">
           <span className="settings-label">Model</span>
@@ -60,6 +65,7 @@ export default function OllamaTab({ state, update }) {
           </button>
         </div>
         {testResult && <span className="settings-description">Recommended: {testResult.recommended} agents</span>}
+        {testError && <span className="settings-error">{testError}</span>}
       </div>
       <TimeLimitSetting state={state} update={update} />
       <details className="settings-advanced">

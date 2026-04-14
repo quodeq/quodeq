@@ -73,7 +73,7 @@ export function usePluginDimensions() {
       setAllDimensions(_filterVisible(dims));
       setDimLoadError(null);
     }).catch(() => {
-      setDimLoadError('Failed to load dimensions.');
+      setDimLoadError('Failed to load dimensions. Try refreshing the page or check that the server is running.');
     });
   }, []);
 
