@@ -36,11 +36,23 @@ class EvidencePaths:
     dimension_key: str
 
 
+_cached_file_queues: dict[Path, WorkQueue] = {}
+
+
 def get_queue(queue: WorkQueue | None, queue_path: Path) -> WorkQueue:
-    """Return the injected queue or construct a FileQueue from the path."""
+    """Return the injected queue or construct a FileQueue from the path.
+
+    When *queue* is None a ``FileQueue`` is constructed from *queue_path*.
+    The result is cached by path so repeated calls avoid rebuilding the queue.
+    """
     if queue is not None:
         return queue
-    return FileQueue(queue_path)
+    cached = _cached_file_queues.get(queue_path)
+    if cached is not None:
+        return cached
+    fq: WorkQueue = FileQueue(queue_path)
+    _cached_file_queues[queue_path] = fq
+    return fq
 
 
 def should_respawn(

@@ -25,8 +25,8 @@ from quodeq.shared.utils import get_action_api_host, get_action_api_port, get_st
 
 _logger = logging.getLogger(__name__)
 
-_EVALUATION_RATE_LIMIT_WINDOW = 300  # 5-minute window for evaluation creation
-_EVALUATION_RATE_LIMIT_MAX = 10  # max evaluations per window
+_EVALUATION_RATE_LIMIT_WINDOW = int(os.environ.get("QUODEQ_RATE_LIMIT_WINDOW", "300"))
+_EVALUATION_RATE_LIMIT_MAX = int(os.environ.get("QUODEQ_RATE_LIMIT_MAX", "10"))
 
 
 def _default_provider() -> ActionProvider:

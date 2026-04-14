@@ -30,7 +30,10 @@ def register_findings_routes(app: Flask) -> None:
         project = request.args.get("project", "")
         if not project:
             return jsonify([])
-        return jsonify(load_dismissed(_project_dir(_eval_dir(), project)))
+        limit = request.args.get("limit", 500, type=int)
+        offset = request.args.get("offset", 0, type=int)
+        items = load_dismissed(_project_dir(_eval_dir(), project))
+        return jsonify(items[offset:offset + limit])
 
     @app.post("/api/findings/dismiss")
     def dismiss() -> tuple[Response, int]:

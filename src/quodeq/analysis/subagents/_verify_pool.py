@@ -10,10 +10,10 @@ from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
-_VERIFY_MAX_FILES_PER_AGENT = 40
-_VERIFY_MAX_TURNS = 100
-_VERIFY_MAX_DURATION = 600
-_VERIFY_N_AGENTS = 5
+_VERIFY_MAX_FILES_PER_AGENT = int(os.environ.get("QUODEQ_VERIFY_MAX_FILES_PER_AGENT", "40"))
+_VERIFY_MAX_TURNS = int(os.environ.get("QUODEQ_VERIFY_MAX_TURNS", "100"))
+_VERIFY_MAX_DURATION = int(os.environ.get("QUODEQ_VERIFY_MAX_DURATION", "600"))
+_VERIFY_N_AGENTS = int(os.environ.get("QUODEQ_VERIFY_N_AGENTS", "5"))
 _DEFAULT_FAST_MODEL = "haiku"
 
 

@@ -123,14 +123,17 @@ function ViolationsRoute({ params, props }) {
   const nav = props.navigation.handleNavigate;
 
   const dimMap = new Map(dims.map(d => [d.dimension, d]));
+  const principleMap = new Map(
+    dims.flatMap(d => (d.principles || []).map(p => [`${d.dimension}\0${p.name || p.principle}`, p]))
+  );
   function navigateToPrinciple(principleObj, severity) {
     const dim = dimMap.get(principleObj.dimension);
-    const pg = (dim?.principles || []).find(p => (p.name || p.principle) === principleObj.principle);
+    const pg = principleMap.get(`${principleObj.dimension}\0${principleObj.principle}`);
     nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
   }
 
   function navigateToDimension(row, severity) {
-    const dim = row.raw || dims.find(d => d.dimension === row.dimension);
+    const dim = row.raw || dimMap.get(row.dimension);
     if (!dim) return;
     nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, severity, sourceTab: 'violations' });
   }

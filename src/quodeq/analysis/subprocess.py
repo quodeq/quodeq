@@ -129,25 +129,34 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     all_files: list[Path] = [
         f for f in work_dir.rglob("*") if f.is_file() and f.suffix in _ALL_EXTS
     ]
+    # Cache stat results to avoid repeated syscalls on the same files
+    stat_cache: dict[Path, int] = {}
+    for f in all_files:
+        try:
+            stat_cache[f] = f.stat().st_size
+        except OSError:
+            pass
+
     # Filter out non-source dirs, dotdirs, empty files, and oversized files
     filtered = [
         f for f in all_files
-        if not any(p in f.parts for p in _SKIP_DIRS)
+        if f in stat_cache
+        and not any(p in f.parts for p in _SKIP_DIRS)
         and not any(p.startswith(".") for p in f.relative_to(work_dir).parts)
-        and 0 < f.stat().st_size < _MAX_API_FILE_SIZE
+        and 0 < stat_cache[f] < _MAX_API_FILE_SIZE
     ]
     # Prioritize code files over markup
     code_files = [f for f in filtered if f.suffix in _CODE_EXTS]
     markup_files = [f for f in filtered if f.suffix in _MARKUP_EXTS]
     # Within each group, sort by size (moderate files first — not too small, not too big)
-    code_files.sort(key=lambda f: f.stat().st_size, reverse=True)
-    markup_files.sort(key=lambda f: f.stat().st_size, reverse=True)
+    code_files.sort(key=lambda f: stat_cache[f], reverse=True)
+    markup_files.sort(key=lambda f: stat_cache[f], reverse=True)
 
     # Fill up to the prompt char budget
     selected: list[Path] = []
     total_chars = 0
     for f in code_files + markup_files:
-        size = f.stat().st_size
+        size = stat_cache[f]
         if total_chars + size > _MAX_API_PROMPT_CHARS:
             continue
         selected.append(f)

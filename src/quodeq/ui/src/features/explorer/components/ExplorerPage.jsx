@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton, { SparkleIcon, FileTextIcon } from '../../../components/CopyButton.jsx';
@@ -166,15 +166,24 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, sev
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
-  const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId);
+  const buildEvalPrincipal = useMemo(
+    () => buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId),
+    [d.evalData, d.complianceByPrinciple, project, runId]
+  );
 
   // Apply severity filter
-  const filteredViolations = activeSevFilter
-    ? d.allViolations.filter(v => (v.severity || 'minor') === activeSevFilter)
-    : d.allViolations;
-  const filteredTopFiles = activeSevFilter
-    ? buildTopOffendingFiles(filteredViolations)
-    : d.topFiles;
+  const filteredViolations = useMemo(
+    () => activeSevFilter
+      ? d.allViolations.filter(v => (v.severity || 'minor') === activeSevFilter)
+      : d.allViolations,
+    [d.allViolations, activeSevFilter]
+  );
+  const filteredTopFiles = useMemo(
+    () => activeSevFilter
+      ? buildTopOffendingFiles(filteredViolations)
+      : d.topFiles,
+    [filteredViolations, activeSevFilter, d.topFiles]
+  );
 
   return (
     <>

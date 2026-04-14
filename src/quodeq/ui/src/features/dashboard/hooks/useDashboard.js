@@ -7,6 +7,7 @@ const REFRESH_DEBOUNCE_MS = 300;
 // Run data cache — only for the per-run dashboard view (dimensions/summary).
 // The unified scores endpoint handles accumulated + rescore + trend.
 // Shared mutable state; use clearDashboardCache() for test resets.
+const MAX_RUN_CACHE_SIZE = 100;
 const _runCache = new Map();
 function _runCacheKey(project, run) { return `${project}\0${run || 'latest'}`; }
 
@@ -38,6 +39,7 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
   getDashboard(selectedProject, selectedRun)
     .then((payload) => {
       if (!active) return;
+      if (_runCache.size >= MAX_RUN_CACHE_SIZE) _runCache.delete(_runCache.keys().next().value);
       _runCache.set(cacheKey, payload);
       if (active) setDashboard(payload);
     })

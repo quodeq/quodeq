@@ -53,12 +53,12 @@ def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanDa
     return result
 
 
-def _walk_files(root: Path) -> list[Path]:
-    """Walk directory tree iteratively, skipping common non-source directories.
+def _walk_files(root: Path):
+    """Walk directory tree iteratively, yielding file paths lazily.
 
     Uses a stack instead of recursion to avoid depth limits on deeply nested trees.
+    Yields ``Path`` objects one at a time instead of accumulating into a list.
     """
-    files: list[Path] = []
     stack: list[Path] = [root]
     while stack:
         current = stack.pop()
@@ -72,10 +72,9 @@ def _walk_files(root: Path) -> list[Path]:
                 if item.name not in _SKIP_DIRS and not item.name.startswith("."):
                     dirs.append(item)
             elif item.is_file():
-                files.append(item)
+                yield item
         # Push in reverse so alphabetical order is preserved via LIFO
         stack.extend(reversed(dirs))
-    return files
 
 
 def _list_branches(project_dir: Path) -> list[str]:

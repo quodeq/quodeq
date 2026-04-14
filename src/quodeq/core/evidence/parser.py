@@ -92,6 +92,10 @@ def parse_jsonl_to_evidence(
     compiled_dir: Path | None = None, evaluators_dir: Path | None = None,
 ) -> Evidence:
     """Parse extracted JSONL file into a complete Evidence object."""
+    # NOTE: read_judgments materializes all judgments into a list.  This is
+    # intentional because _group_judgments needs random access and the caller
+    # indexes judgments[0] for the dimension name.  For streaming scenarios use
+    # parse_jsonl_to_evidence_by_dimension which groups incrementally.
     judgments = read_judgments(jsonl_file, compiled_dir)
     dim = judgments[0].dimension if judgments else ""
     grouped = _group_judgments(judgments, dimension=dim, evaluators_dir=evaluators_dir)

@@ -47,7 +47,7 @@ class RunStorage(Protocol):
         """Load all dimension evaluations and evidence for a single run."""
         ...
 
-    def list_runs(self, project: str, *, limit: int = 0) -> list[RunInfo]:
+    def list_runs(self, project: str, *, limit: int = 100) -> list[RunInfo]:
         """Return runs for a project, sorted newest-first by date."""
         ...
 

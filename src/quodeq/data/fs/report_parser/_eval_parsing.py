@@ -43,6 +43,8 @@ def parse_eval_from_json(json_path: Path, project: str, run_id: str, dimension: 
 
     principle_map = build_principle_map(data)
 
+    # Intentional full materialization: these lists are included in a dict that
+    # gets JSON-serialized by the caller, so lazy iteration would not help.
     violations = [to_camel_dict(build_finding(v, include_severity=True)) for v in data.get("violations", [])]
     compliance = [to_camel_dict(build_finding(c, include_severity=False)) for c in data.get("compliance", [])]
 

@@ -58,7 +58,7 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
     return dimensions
 
 
-def list_runs(reports_root: Path, project: str, *, limit: int = 0) -> list[RunInfo]:
+def list_runs(reports_root: Path, project: str, *, limit: int = 100) -> list[RunInfo]:
     """Return runs for a project, sorted newest-first by date.
 
     When *limit* > 0 only the most recent *limit* runs are returned.

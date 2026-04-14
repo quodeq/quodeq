@@ -96,7 +96,7 @@ def _compute_parent_accumulated(
     # Track which child each dimension came from
     dim_source: dict[str, str] = {}  # dimension_name -> child_project_id
     for child in children:
-        child_runs = list_runs(reports_root, child)
+        child_runs = list_runs(reports_root, child, limit=50)
         if not child_runs:
             continue
         result = _compute_result(reports_root, child, child_runs, cache_config)

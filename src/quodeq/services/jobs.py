@@ -147,10 +147,15 @@ class JobManager:
                 return None
             return job.to_dict()
 
-    def list_jobs(self) -> list[JobSnapshot]:
-        """Return all tracked jobs as frozen snapshots."""
+    def list_jobs(self, *, limit: int = 100, offset: int = 0) -> list[JobSnapshot]:
+        """Return tracked jobs as frozen snapshots with pagination.
+
+        When *limit* is 0 all jobs are returned (no cap).
+        """
         with self._lock:
-            return [job.to_dict() for job in self._store.list()]
+            all_jobs = [job.to_dict() for job in self._store.list()]
+        page = all_jobs[offset:] if offset else all_jobs
+        return page[:limit] if limit > 0 else page
 
     @staticmethod
     def _apply_marker(job: Job, line: str) -> None:

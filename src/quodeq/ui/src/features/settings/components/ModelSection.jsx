@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/components/powerLevels.js';
 import { AI_CMD_STORAGE_KEY } from '../../../constants.js';
 
@@ -22,8 +23,8 @@ function ClientSelector({ aiCmd, availableClients }) {
     );
   }
 
-  const cliClients = availableClients.filter((c) => c.type === 'cli' || !c.type);
-  const apiClients = availableClients.filter((c) => c.type === 'api');
+  const cliClients = useMemo(() => availableClients.filter((c) => c.type === 'cli' || !c.type), [availableClients]);
+  const apiClients = useMemo(() => availableClients.filter((c) => c.type === 'api'), [availableClients]);
 
   return (
     <>

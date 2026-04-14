@@ -113,9 +113,14 @@ def health_check(port: int) -> bool:
 
 
 def is_evaluating(port: int) -> bool:
-    """Check if any evaluation job is currently running."""
+    """Check if any evaluation job is currently running.
+
+    NOTE: The evaluations endpoint does not support server-side filtering
+    by status, so we fetch all jobs and filter client-side.  A ``limit=1``
+    query param is passed to reduce payload size when the endpoint supports it.
+    """
     try:
-        url = f"http://127.0.0.1:{port}{_API_EVALUATIONS_PATH}"
+        url = f"http://127.0.0.1:{port}{_API_EVALUATIONS_PATH}?limit=1&status=running"
         with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
             return any(j.get("status") == "running" for j in json.loads(r.read()))
     except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):

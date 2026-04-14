@@ -22,7 +22,7 @@ _MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
-_CONSUME_BATCH_SIZE = 1
+_CONSUME_BATCH_SIZE = 50
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 
 
@@ -217,7 +217,8 @@ class FileJobStore:
     def put(self, job: Job) -> None:
         with self._lock:
             self._jobs[job.job_id] = job
-            self._write(job)
+            job_data = _job_to_json(job)
+        self._write_data(job.job_id, job_data)
 
     def list(self) -> list[Job]:
         with self._lock:
@@ -233,16 +234,20 @@ class FileJobStore:
 
     def _write(self, job: Job) -> None:
         """Write a single job to disk. Caller must hold the lock."""
-        path = self._persist_dir / f"{job.job_id}.json"
+        self._write_data(job.job_id, _job_to_json(job))
+
+    def _write_data(self, job_id: str, data: dict) -> None:
+        """Write pre-serialized job data to disk. Does NOT require the lock."""
+        path = self._persist_dir / f"{job_id}.json"
         tmp = path.with_suffix(".tmp")
         try:
-            tmp.write_text(json.dumps(_job_to_json(job), indent=2), encoding="utf-8")
+            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
             # SECURITY: restrict job files to owner-only read/write
             os.chmod(tmp, 0o600)
             tmp.replace(path)
             os.chmod(path, 0o600)
         except OSError:
-            _logger.warning("Failed to persist job %s", job.job_id, exc_info=True)
+            _logger.warning("Failed to persist job %s", job_id, exc_info=True)
             tmp.unlink(missing_ok=True)
 
     def _load_all(self) -> None:

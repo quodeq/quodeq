@@ -35,7 +35,7 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunChange } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
-  const deltas = computeDeltas(trend);
+  const deltas = useMemo(() => computeDeltas(trend), [trend]);
   const visible = showAll ? trend : trend.slice(0, MAX_VISIBLE);
   const hasMore = trend.length > MAX_VISIBLE && !showAll;
 
