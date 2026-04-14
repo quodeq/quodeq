@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import {
   BarChart,
   Bar,
@@ -11,13 +12,16 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 
-const _cssVarCache = {};
+const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
-  if (name in _cssVarCache) return _cssVarCache[name] || fallback;
+  if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  _cssVarCache[name] = val;
+  _cssVarCache.set(name, val);
   return val || fallback;
 };
+new MutationObserver(() => _cssVarCache.clear()).observe(
+  document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
+);
 
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
 const CHART_LEFT_MARGIN = -16;
@@ -98,6 +102,14 @@ function DimensionTooltip({ active, payload }) {
 
 
 export default function DimensionScorePanel({ dimensions = [], onBarClick, runDate, runId }) {
+  // Force re-render when theme changes so bar colors update
+  const [, setThemeVersion] = useState(0);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setThemeVersion(v => v + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
+
   if (!dimensions || dimensions.length === 0) return null;
 
   const data = [...dimensions]
