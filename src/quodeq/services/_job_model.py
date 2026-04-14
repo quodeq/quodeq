@@ -22,7 +22,7 @@ _MAX_LOG_LINES = 600  # rolling buffer size for per-job log lines
 _MAX_COMPLETED_JOBS = 100  # max completed/failed/cancelled jobs to retain
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
 _CC_MARKER_PREFIX = '{"' + CC_MARKER_KEY
-_CONSUME_BATCH_SIZE = 50
+_CONSUME_BATCH_SIZE = 1
 REPORT_PATH_RE = re.compile(r"Report path:.*[/\\]([^/\\\s]+)[/\\]([^/\\\s]+)[/\\]evaluation")
 
 
