@@ -12,6 +12,7 @@ from quodeq.config.discipline_registry import DisciplineRegistry
 _logger = logging.getLogger(__name__)
 
 _MIN_FILES_PER_TARGET = 3
+_UNKNOWN_LANG = "unknown"
 
 
 def target_name(language: str, category: str | None) -> str:
@@ -92,7 +93,7 @@ def _walk_and_group(
             suffix = os.path.splitext(fname)[1]
             if suffix in all_extensions:
                 rel = os.path.relpath(os.path.join(dirpath, fname), src)
-                lang = ext_map.get(suffix, "unknown")
+                lang = ext_map.get(suffix, _UNKNOWN_LANG)
                 files_by_lang.setdefault(lang, []).append(rel)
                 ext_counts[suffix] += 1
                 ext_counts_by_lang.setdefault(lang, Counter())[suffix] += 1

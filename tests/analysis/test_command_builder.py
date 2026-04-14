@@ -10,6 +10,7 @@ from quodeq.analysis._command import _build_ai_cmd
 from quodeq.analysis._config import AnalysisConfig
 
 
+# Read-only test fixtures — no test mutates these dicts, so module-level sharing is safe.
 _CLAUDE_CFG = {
     "claude": {
         "type": "cli",

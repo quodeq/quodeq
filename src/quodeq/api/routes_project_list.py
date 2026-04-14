@@ -17,6 +17,7 @@ from quodeq.services.base import ActionProvider
 from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
+_BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
 
 
 def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
@@ -98,18 +99,22 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
+        """Update the local filesystem path for a project."""
         return _handle_update_project_path(provider)
 
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
+        """Export a project as a ZIP archive."""
         return export_project_zip(project, reports_dir())
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
+        """Delete a project and all its run data."""
         return _handle_delete_project(provider)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:
+        """Return repository metadata for a project."""
         info = provider.get_project_info(reports_dir(), project)
         if not info:
             body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -118,6 +123,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.post("/api/projects/<project>/clone-local")
     def clone_project_local(project: str) -> Response | tuple[Response, int]:
+        """Clone an online project to a local directory."""
         return _handle_clone_project_local(provider)
 
     @app.get("/api/projects/<project>/scan")
@@ -164,7 +170,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.post("/api/scan")
     def scan_path() -> Response | tuple[Response, int]:
-        """Scan a local path directly (no project required)."""
+        """Scan a local directory path directly (no registered project required)."""
         data = request.get_json(silent=True) or {}
         target = data.get("path", "").strip()
         if not target:
@@ -182,8 +188,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             )
             return jsonify(body), status
         # Block scanning system directories to prevent information disclosure
-        _blocked = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
-        if any(str(target_path).startswith(b) for b in _blocked):
+        if any(str(target_path).startswith(b) for b in _BLOCKED_SCAN_PATHS):
             body, status = error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
             return jsonify(body), status
         if not target_path.is_dir():

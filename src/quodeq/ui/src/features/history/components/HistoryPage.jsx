@@ -46,7 +46,17 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
         <span className="page-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
         {availableRuns && availableRuns.length > 0 && (
           <div className="history-run-nav">
-            <RunNavigator currentRun={runNavLabel} isLatest={overviewRunIndex === 0} isOldest={overviewRunIndex >= availableRuns.length - 1} actions={{ onPrev: handleRunPrev, onNext: handleRunNext, onLatest: handleRunLatest, onView: () => { if (currentOverviewRun) onRunClick(currentOverviewRun); } }} />
+            <RunNavigator
+              currentRun={runNavLabel}
+              isLatest={overviewRunIndex === 0}
+              isOldest={overviewRunIndex >= availableRuns.length - 1}
+              actions={{
+                onPrev: handleRunPrev,
+                onNext: handleRunNext,
+                onLatest: handleRunLatest,
+                onView: () => { if (currentOverviewRun) onRunClick(currentOverviewRun); },
+              }}
+            />
           </div>
         )}
       </div>

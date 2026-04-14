@@ -133,7 +133,6 @@ _get_gpu_memory = _detect_memory
 
 def run_concurrency_test(
     model: str,
-    max_agents: int = 5,
     base_url: str = _OLLAMA_BASE,
 ) -> dict:
     """Estimate max parallel agents based on VRAM usage.

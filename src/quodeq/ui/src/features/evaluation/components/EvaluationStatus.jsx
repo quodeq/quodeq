@@ -6,6 +6,8 @@ import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
+const DOT_OFFSET_TOP = -2;
+const DOT_OFFSET_RIGHT = -4;
 
 function deriveProjectName(repo) {
   if (!repo) return null;
@@ -80,7 +82,7 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
             <line x1="9" y1="11" x2="12" y2="11" />
           </svg>
           {consoleOpen ? '▾' : '▸'}
-          {showDot && !consoleOpen && <span className="sidebar-nav-dot" style={{ top: -2, right: -4 }} />}
+          {showDot && !consoleOpen && <span className="sidebar-nav-dot" style={{ top: DOT_OFFSET_TOP, right: DOT_OFFSET_RIGHT }} />}
         </span>
       </div>
       {consoleOpen && (

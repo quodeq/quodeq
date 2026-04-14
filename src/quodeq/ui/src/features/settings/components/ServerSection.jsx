@@ -5,6 +5,8 @@ const LOG_POLL_MS = 2000;
 const MAX_LOG_LINES = 500;
 const CONSOLE_POPUP_WIDTH = 800;
 const CONSOLE_POPUP_HEIGHT = 500;
+const ISO_TIME_START = 11;
+const ISO_TIME_END = 19;
 
 /**
  * Open a path in either pywebview's native browser or a regular browser popup.
@@ -175,7 +177,7 @@ export default function ServerSection() {
                 <pre>
                   {logLines.length
                     ? logLines.map((e) => {
-                        const ts = e.timestamp ? e.timestamp.slice(11, 19) : '';
+                        const ts = e.timestamp ? e.timestamp.slice(ISO_TIME_START, ISO_TIME_END) : '';
                         return `[${ts}] ${e.line}`;
                       }).join('\n')
                     : 'No logs yet\u2026'}

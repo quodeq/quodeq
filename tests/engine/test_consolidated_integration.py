@@ -14,14 +14,21 @@ from quodeq.analysis.subagents.runner import process_consolidated_dimensions
 from quodeq.analysis.runner import AnalysisOptions, RunConfig
 from quodeq.analysis.manifest import SourceManifest, AnalysisTarget
 
+_TEST_DIM_SECURITY = "security"
+_TEST_DIM_MAINTAINABILITY = "maintainability"
+_TEST_REQ_SECURITY = "S-CON-1"
+_TEST_REQ_MAINTAINABILITY = "M-MOD-1"
+_TEST_PRINCIPLE_SECURITY = "Confidentiality"
+_TEST_PRINCIPLE_MAINTAINABILITY = "Modularity"
+
 
 def _write_compiled_standards(tmp_path):
     """Create minimal compiled standards for security and maintainability."""
     compiled = tmp_path / "standards" / "compiled"
     compiled.mkdir(parents=True)
     for dim, req_id, principle in [
-        ("security", "S-CON-1", "Confidentiality"),
-        ("maintainability", "M-MOD-1", "Modularity"),
+        (_TEST_DIM_SECURITY, _TEST_REQ_SECURITY, _TEST_PRINCIPLE_SECURITY),
+        (_TEST_DIM_MAINTAINABILITY, _TEST_REQ_MAINTAINABILITY, _TEST_PRINCIPLE_MAINTAINABILITY),
     ]:
         data = {
             "id": dim,
@@ -53,18 +60,18 @@ def _consolidated_run_analysis(work_dir, prompt, stream_file, config):
     if config.jsonl_file:
         with open(config.jsonl_file, "a") as f:
             f.write(json.dumps({
-                "schema_version": 1, "p": "Confidentiality", "d": "security",
-                "t": "violation", "req": "S-CON-1", "file": "a.py", "line": 1,
+                "schema_version": 1, "p": _TEST_PRINCIPLE_SECURITY, "d": _TEST_DIM_SECURITY,
+                "t": "violation", "req": _TEST_REQ_SECURITY, "file": "a.py", "line": 1,
                 "w": "hardcoded secret", "severity": "critical", "snippet": "KEY='abc'",
             }) + "\n")
             f.write(json.dumps({
-                "schema_version": 1, "p": "Modularity", "d": "maintainability",
-                "t": "violation", "req": "M-MOD-1", "file": "b.py", "line": 10,
+                "schema_version": 1, "p": _TEST_PRINCIPLE_MAINTAINABILITY, "d": _TEST_DIM_MAINTAINABILITY,
+                "t": "violation", "req": _TEST_REQ_MAINTAINABILITY, "file": "b.py", "line": 10,
                 "w": "high complexity", "severity": "major", "snippet": "def big():...",
             }) + "\n")
             f.write(json.dumps({
-                "schema_version": 1, "p": "Confidentiality", "d": "security",
-                "t": "compliance", "req": "S-CON-1", "file": "c.py", "line": 5,
+                "schema_version": 1, "p": _TEST_PRINCIPLE_SECURITY, "d": _TEST_DIM_SECURITY,
+                "t": "compliance", "req": _TEST_REQ_SECURITY, "file": "c.py", "line": 5,
                 "w": "secrets properly loaded", "severity": "major", "snippet": "os.environ['KEY']",
             }) + "\n")
 
@@ -89,8 +96,8 @@ def _make_consolidated_config(tmp_path):
         manifest=manifest, target=target,
         dimensions_data={
             "applies": [
-                {"id": "security", "weight": 1.0},
-                {"id": "maintainability", "weight": 1.0},
+                {"id": _TEST_DIM_SECURITY, "weight": 1.0},
+                {"id": _TEST_DIM_MAINTAINABILITY, "weight": 1.0},
             ],
         },
     )
@@ -107,17 +114,17 @@ class TestConsolidatedIntegration:
         config, ctx = _make_consolidated_config(tmp_path)
 
         with patch("quodeq.analysis.subagents._pool_worker.run_analysis", _consolidated_run_analysis):
-            result = process_consolidated_dimensions(config, ["security", "maintainability"], ctx)
+            result = process_consolidated_dimensions(config, [_TEST_DIM_SECURITY, _TEST_DIM_MAINTAINABILITY], ctx)
 
-        assert "security" in result
-        assert "maintainability" in result
+        assert _TEST_DIM_SECURITY in result
+        assert _TEST_DIM_MAINTAINABILITY in result
 
-        sec = result["security"]
+        sec = result[_TEST_DIM_SECURITY]
         sec_v = sum(len(pe.violations) for pe in sec.principles.values())
         sec_c = sum(len(pe.compliance) for pe in sec.principles.values())
         assert sec_v == 1
         assert sec_c == 1
 
-        maint = result["maintainability"]
+        maint = result[_TEST_DIM_MAINTAINABILITY]
         maint_v = sum(len(pe.violations) for pe in maint.principles.values())
         assert maint_v == 1

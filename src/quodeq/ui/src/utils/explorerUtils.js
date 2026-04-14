@@ -10,8 +10,7 @@ export {
   buildGroupPlanText,
   buildSingleViolationPlanText,
 } from './planBuilder.js';
-
-const KNOWN_SEVERITIES = ['critical', 'major', 'minor', 'unknown'];
+import { KNOWN_SEVERITIES } from './constants.js';
 
 function normalizeSeverity(value) {
   const normalized = String(value || 'unknown').toLowerCase();

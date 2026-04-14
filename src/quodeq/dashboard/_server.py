@@ -27,6 +27,8 @@ from quodeq.dashboard._process import (
 from quodeq.shared.logging import log_success
 from quodeq.shared.utils import IS_WIN32
 
+_HTTP_SCHEME = "http"
+
 
 def _ensure_action_api(
     host: str,
@@ -47,7 +49,7 @@ def _ensure_action_api(
                 "or use a TLS reverse proxy."
             )
     for port in range(start_port, start_port + max_tries):
-        base_url = f"http://{host}:{port}"
+        base_url = f"{_HTTP_SCHEME}://{host}:{port}"
         if _is_port_open(host, port):
             if action_api_healthy(base_url):
                 return base_url, None

@@ -18,6 +18,7 @@ from ._mapper_reports import _extract_totals, parse_principle_grade
 
 
 def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
+    """Parse a raw dict into a DimensionResult dataclass."""
     dim = raw.get("dimension")
     if not isinstance(dim, str):
         msg = f"DimensionResult.dimension must be str, got {type(dim).__name__}"
@@ -55,6 +56,7 @@ def parse_dimension_result(raw: dict[str, object]) -> DimensionResult:
 
 
 def parse_grade_breakdown(raw: dict[str, object]) -> GradeBreakdown:
+    """Parse a raw dict into a GradeBreakdown dataclass."""
     return GradeBreakdown(
         grade=_str(raw, "grade"),
         count=_int(raw, "count"),
@@ -62,6 +64,7 @@ def parse_grade_breakdown(raw: dict[str, object]) -> GradeBreakdown:
 
 
 def parse_dimension_summary(raw: dict[str, object]) -> DimensionSummary:
+    """Parse a raw dict into a DimensionSummary dataclass."""
     gb_raw = raw.get("gradeBreakdown")
     grade_breakdown: list[GradeBreakdown] = []
     if isinstance(gb_raw, list):

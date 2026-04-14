@@ -9,6 +9,7 @@ import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
 
+const TOOLBAR_GAP = 8;
 const columnStyle = { display: 'flex', flexDirection: 'column', gap: 2 };
 
 function DimensionOverview({ data, stats, onNavigate }) {
@@ -21,7 +22,7 @@ function DimensionOverview({ data, stats, onNavigate }) {
           <span className="explorer-dimension-title">{evalData.dimension}</span>
           {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-start', gap: TOOLBAR_GAP }}>
           <CopyButton
             label="Report"
             className="fix-plan-btn-header"

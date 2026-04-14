@@ -74,18 +74,18 @@ export function useAppSettings() {
     return () => mql.removeEventListener('change', handler);
   }, [themeMode, themeFamily]);
 
-  function applyMode(value) {
+  function applyMode(value, storage = localStorage) {
     if (!VALID_MODES.includes(value)) return;
     setThemeMode(value);
-    localStorage.setItem(MODE_KEY, value);
+    storage.setItem(MODE_KEY, value);
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     applyDataTheme(resolveDataTheme(value, themeFamily, prefersDark));
   }
 
-  function applyFamily(value) {
+  function applyFamily(value, storage = localStorage) {
     if (!VALID_FAMILIES.includes(value)) return;
     setThemeFamily(value);
-    localStorage.setItem(FAMILY_KEY, value);
+    storage.setItem(FAMILY_KEY, value);
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     applyDataTheme(resolveDataTheme(themeMode, value, prefersDark));
   }

@@ -5,6 +5,8 @@ from dataclasses import dataclass, field
 
 @dataclass(frozen=True, slots=True)
 class ProjectMetadata:
+    """Immutable metadata for a registered project (name, location, discipline)."""
+
     name: str
     parent: str | None = None
     display_name: str | None = None
@@ -15,6 +17,8 @@ class ProjectMetadata:
 
 @dataclass(frozen=True, slots=True)
 class ProjectEntry:
+    """Immutable project listing entry with run statistics and latest scores."""
+
     id: str
     name: str
     parent: str | None = None

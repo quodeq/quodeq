@@ -10,6 +10,10 @@ from pathlib import Path
 from quodeq.data.fs._index_io import _MAX_LEGACY_SCAN
 from quodeq.data.fs._models import ProjectIdentity
 
+_REPO_INFO_FILENAME = "repository_info.json"
+_LOCATION_ONLINE = "online"
+_URL_PREFIXES = ("https://", "git@")
+
 
 def _index_key(identity: ProjectIdentity) -> str:
     """Return a stable string key for the (name, path[, scope]) tuple."""
@@ -42,7 +46,7 @@ def _find_existing_project(
         scanned += 1
         if scanned > _MAX_LEGACY_SCAN:
             break
-        info_file = entry / "repository_info.json"
+        info_file = entry / _REPO_INFO_FILENAME
         if not info_file.exists():
             continue
         try:
@@ -65,7 +69,7 @@ def _create_project(
     parent_uuid: str | None = None,
 ) -> str:
     """Create a new UUID project directory, write repository_info.json, and index it."""
-    if identity.location == "online" and not identity.repo_path.startswith(("https://", "git@")):
+    if identity.location == _LOCATION_ONLINE and not identity.repo_path.startswith(_URL_PREFIXES):
         logging.getLogger(__name__).warning(
             "Online project '%s' has a non-URL path '%s'; expected a remote URL.",
             identity.project_name,
@@ -86,7 +90,7 @@ def _create_project(
     if parent_uuid:
         info["parent"] = parent_uuid
     try:
-        (project_dir / "repository_info.json").write_text(json.dumps(info, indent=2))
+        (project_dir / _REPO_INFO_FILENAME).write_text(json.dumps(info, indent=2))
     except OSError as exc:
         logging.getLogger(__name__).warning("Could not write repository_info.json: %s", exc)
     index = load_fn(reports_dir)

@@ -6,6 +6,9 @@ from quodeq.core.scoring.engine import score_evidence
 
 from tests.engine.conftest import make_evidence_with_confidence
 
+_TEST_FILE = "a.ts"
+_TEST_SNIPPET = "eval(x)"
+
 
 # ---------------------------------------------------------------------------
 # Compliance dampening tests
@@ -17,7 +20,7 @@ def test_balanced_ratio_lifts_score():
     base = 10/(1+0.12*4.0) = 6.8, lift from 1 compliance type is small.
     """
     violations = [
-        {"file": "a.ts", "line": 1, "snippet": "eval(x)", "reason": "r",
+        {"file": _TEST_FILE, "line": 1, "snippet": _TEST_SNIPPET, "reason": "r",
          "severity": "critical", "vt": "code-injection"},
     ]
     compliance = [
@@ -42,7 +45,7 @@ def test_strong_compliance_lifts_toward_ceiling():
     base = 10/(1+0.12*1.5) = 8.5, lift pushes toward ceiling of 9.3.
     """
     violations = [
-        {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
+        {"file": _TEST_FILE, "line": 1, "snippet": "x", "reason": "r",
          "severity": "major", "vt": "bad-pattern"},
     ]
     compliance = [
@@ -65,7 +68,7 @@ def test_strong_compliance_lifts_toward_ceiling():
 def test_no_compliance_gives_base_only():
     """No compliance → score equals the violation base, no lift."""
     violations = [
-        {"file": "a.ts", "line": 1, "snippet": "x", "reason": "r",
+        {"file": _TEST_FILE, "line": 1, "snippet": "x", "reason": "r",
          "severity": "major", "vt": "bad"},
     ]
     ev = make_evidence_with_confidence(
@@ -151,7 +154,7 @@ def test_overall_low_confidence_when_most_insufficient():
     pe_high = PrincipleEvidence(
         practice_id="p3", display_name="P3", dimension="security",
         severity="high", violations=[], compliance=[
-            {"file": "a.ts", "line": 1, "snippet": "ok", "reason": "safe"},
+            {"file": _TEST_FILE, "line": 1, "snippet": "ok", "reason": "safe"},
         ],
         metrics={"total_instances": 10, "compliant": 10, "violating": 0,
                  "compliance_percentage": 100.0, "confidence_level": "high", "is_balanced": False},

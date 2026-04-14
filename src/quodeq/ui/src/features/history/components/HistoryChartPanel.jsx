@@ -20,6 +20,13 @@ const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
 const DESELECTED_BAR_OPACITY = 0.55;
+const CHART_MARGIN = { top: 32, right: 8, bottom: 0, left: -16 };
+const LABEL_DELTA_FONT_SIZE = 9;
+const LABEL_DELTA_Y_OFFSET = 25;
+const LABEL_ARROW_FONT_SIZE = 11;
+const LABEL_ARROW_Y_OFFSET = 14;
+const LABEL_TIER_FONT_SIZE = 9;
+const LABEL_TIER_MAX_OFFSET = 9;
 const HOVER_STROKE_WIDTH = 1.5;
 const TREND_LINE_STROKE_WIDTH = 2.5;
 const TREND_LINE_OPACITY = 0.55;
@@ -103,22 +110,22 @@ function TrendBarLabel({ x, y, width, height, index, data }) {
     <g>
       {hasDelta && (
         <>
-          <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={color}>
+          <text x={cx} y={y - LABEL_DELTA_Y_OFFSET} textAnchor="middle" fontSize={LABEL_DELTA_FONT_SIZE} fill={color}>
             {d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1)}
           </text>
           <text
-            x={cx} y={y - 14}
+            x={cx} y={y - LABEL_ARROW_Y_OFFSET}
             textAnchor="middle" dominantBaseline="central"
-            fontSize={11} fill={color}
-            transform={`rotate(${Math.round(angleFromDelta(d))}, ${cx}, ${y - 14})`}
+            fontSize={LABEL_ARROW_FONT_SIZE} fill={color}
+            transform={`rotate(${Math.round(angleFromDelta(d))}, ${cx}, ${y - LABEL_ARROW_Y_OFFSET})`}
           >↑</text>
         </>
       )}
       {tier && height > 12 && (
         <text
-          x={cx} y={y + Math.min(height / 2, 9)}
+          x={cx} y={y + Math.min(height / 2, LABEL_TIER_MAX_OFFSET)}
           textAnchor="middle" dominantBaseline="central"
-          fontSize={9} fill="white" fillOpacity={0.85}
+          fontSize={LABEL_TIER_FONT_SIZE} fill="white" fillOpacity={0.85}
         >{tier}</text>
       )}
     </g>
@@ -158,7 +165,7 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
   const axisTick = buildAxisTick();
   return (
     <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-      <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
+      <ComposedChart data={data} margin={CHART_MARGIN}>
         <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
         <XAxis dataKey="dateLabel" tickFormatter={formatShortDate} tick={axisTick} axisLine={false} tickLine={false} />
         <YAxis domain={[0, 10]} ticks={[0, REF_LINE_LOW, REF_LINE_MID, REF_LINE_HIGH, 10]} tick={axisTick} axisLine={false} tickLine={false} />

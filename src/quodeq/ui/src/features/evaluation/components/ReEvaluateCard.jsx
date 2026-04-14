@@ -7,7 +7,9 @@ import DimensionSelector from './DimensionSelector.jsx';
 import FolderBrowser from './FolderBrowser.jsx';
 
 
-const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' };
+const BUTTON_ROW_GAP = '8px';
+const REPO_URL_PLACEHOLDER = 'https://github.com/org/repo';
+const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_ROW_GAP, alignItems: 'center' };
 const flexButtonStyle = { flex: 1 };
 
 function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }) {
@@ -124,13 +126,13 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
   return (
     <div className="re-eval-stale-warning">
       <p>This project was evaluated from a remote repo but the original URL was not saved. Enter the URL to restore reevaluation.</p>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: BUTTON_ROW_GAP, alignItems: 'center' }}>
         <input
           type="text"
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') handleUrlRestore(); }}
-          placeholder="https://github.com/org/repo"
+          placeholder={REPO_URL_PLACEHOLDER}
           className="re-eval-url-input"
           disabled={urlSaving}
           aria-label="Repository URL for reevaluation"

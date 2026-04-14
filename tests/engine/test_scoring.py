@@ -5,6 +5,9 @@ from quodeq.core.scoring.engine import score_evidence
 
 from tests.engine.conftest import make_evidence_with_confidence
 
+_TEST_FILE = "a.ts"
+_TEST_SNIPPET = "eval(x)"
+
 
 def _make_evidence(violations=None, compliance=None) -> Evidence:
     pe = PrincipleEvidence(
@@ -13,7 +16,7 @@ def _make_evidence(violations=None, compliance=None) -> Evidence:
         dimension="security",
         severity="high",
         violations=violations or [
-            {"file": "a.ts", "line": 1, "snippet": "eval(x)", "reason": "injection", "severity": "high", "vt": "code-injection"},
+            {"file": _TEST_FILE, "line": 1, "snippet": _TEST_SNIPPET, "reason": "injection", "severity": "high", "vt": "code-injection"},
         ],
         compliance=compliance or [
             {"file": "b.ts", "line": 2, "snippet": "JSON.parse(x)", "reason": "safe"},
@@ -120,7 +123,7 @@ def test_numerical_high_confidence_with_violations():
     ev = make_evidence_with_confidence(
         confidence_level="high", n_violations=2, n_compliance=8,
         violations=[
-            {"file": "a.ts", "line": 1, "snippet": "eval(x)", "reason": "r", "severity": "critical", "vt": "code-injection"},
+            {"file": _TEST_FILE, "line": 1, "snippet": _TEST_SNIPPET, "reason": "r", "severity": "critical", "vt": "code-injection"},
             {"file": "b.ts", "line": 2, "snippet": "eval(y)", "reason": "r", "severity": "major", "vt": "unsafe-call"},
         ],
     )
@@ -155,7 +158,7 @@ def test_weighted_overall_excludes_insufficient():
     pe_high = PrincipleEvidence(
         practice_id="p-high", display_name="High Conf", dimension="security",
         severity="high",
-        violations=[{"file": "a.ts", "line": 1, "snippet": "x", "reason": "r", "severity": "critical", "vt": "vt1"}],
+        violations=[{"file": _TEST_FILE, "line": 1, "snippet": "x", "reason": "r", "severity": "critical", "vt": "vt1"}],
         compliance=[{"file": "b.ts", "line": 2, "snippet": "y", "reason": "r"}] * 9,
         metrics={"total_instances": 10, "compliant": 9, "violating": 1,
                  "compliance_percentage": 90.0, "confidence_level": "high", "is_balanced": True},

@@ -39,6 +39,7 @@ _SETTINGS_HINT = (
 )
 
 _VERSION_CMD_TIMEOUT_S = 30
+_API_CHECK_TIMEOUT_S = 5
 
 
 def _run_version_cmd(cmd: list[str]) -> str:
@@ -118,12 +119,13 @@ def _check_cli_provider(provider: str) -> None:
         ) from exc
 
 
-def _check_api_provider(provider: str) -> None:
+def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
     """Check that an API provider has basic connectivity (Ollama: server running)."""
+    _env = env or os.environ
     if provider == "ollama":
         try:
-            _ollama_base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
-            urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=5)
+            _ollama_base = _env.get("OLLAMA_BASE_URL", "http://localhost:11434")
+            urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=_API_CHECK_TIMEOUT_S)
         except (urllib.error.URLError, OSError) as exc:
             raise RuntimeError(
                 "Ollama is configured as your AI provider but the server is not running.\n\n"

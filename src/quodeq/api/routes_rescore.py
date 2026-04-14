@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from http import HTTPStatus
 
 from flask import Flask, Response, jsonify, request
 
@@ -24,7 +25,7 @@ def register_rescore_routes(app: Flask) -> None:
     def rescore() -> Response | tuple[Response, int]:
         project = request.args.get("project", "")
         if not project:
-            body, status = error_response("project query parameter is required", 400, "MISSING_PARAM")
+            body, status = error_response("project query parameter is required", HTTPStatus.BAD_REQUEST, "MISSING_PARAM")
             return jsonify(body), status
         run_id = request.args.get("run", "")
         try:
@@ -32,7 +33,7 @@ def register_rescore_routes(app: Flask) -> None:
             if run_id and run_id != "latest":
                 validate_path_segment(run_id)
         except ValueError:
-            body, status = error_response("Invalid project or run parameter", 400, "INVALID_PARAM")
+            body, status = error_response("Invalid project or run parameter", HTTPStatus.BAD_REQUEST, "INVALID_PARAM")
             return jsonify(body), status
         eval_dir = _eval_dir_from_app(app)
 
@@ -40,14 +41,14 @@ def register_rescore_routes(app: Flask) -> None:
         if not run_id or run_id == "latest":
             runs = list_runs(Path(eval_dir), project, limit=1)
             if not runs:
-                body, status = error_response("No runs found for project", 404, "NOT_FOUND")
+                body, status = error_response("No runs found for project", HTTPStatus.NOT_FOUND, "NOT_FOUND")
                 return jsonify(body), status
             run_id = runs[0].run_id
 
         try:
             dimensions = read_run_data(Path(eval_dir), project, run_id)
         except FileNotFoundError:
-            body, status = error_response("Run data not found", 404, "NOT_FOUND")
+            body, status = error_response("Run data not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
 
         project_dir = Path(eval_dir) / project

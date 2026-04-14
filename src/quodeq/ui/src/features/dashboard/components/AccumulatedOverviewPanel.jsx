@@ -8,6 +8,8 @@ import { collapseByDay, collectDayDimensions } from '../../../utils/dailyGroupin
 const RunHistoryPanel = lazy(() => import('./RunHistoryPanel.jsx'));
 import DimensionScorePanel from './DimensionScorePanel.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
+
+const HERO_SCORE_CIRCLE_SIZE = 120;
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandardsDaily, filterAccumulatedByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import CopyButton, { FileTextIcon } from '../../../components/CopyButton.jsx';
@@ -83,7 +85,7 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
           <ScoreCircle
             score={summary?.numericAverage}
             grade={summary?.overallGrade}
-            size={120}
+            size={HERO_SCORE_CIRCLE_SIZE}
           />
           {scoreDelta !== null && (
             <div className="acc-eval-trend">

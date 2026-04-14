@@ -5,6 +5,7 @@ import { listStandards } from '../../../api/standards.js';
 
 const MAP_LABELS_KEY = 'quodeq-map-labels';
 const MAP_DARK_KEY = 'quodeq-map-dark';
+const MAX_TREE_DEPTH = 64;
 
 function isAppDark() {
   const attr = document.documentElement.getAttribute('data-theme') || '';
@@ -15,7 +16,7 @@ function isAppDark() {
 function findSubtree(root, path) {
   if (!path) return root;
   function walk(node, depth = 0) {
-    if (depth > 64) return null;
+    if (depth > MAX_TREE_DEPTH) return null;
     if (node.path === path) return node;
     for (const child of node.children) {
       if (path === child.path || path.startsWith(child.path + '/')) {

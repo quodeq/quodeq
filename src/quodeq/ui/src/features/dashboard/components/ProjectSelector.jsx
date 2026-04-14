@@ -1,9 +1,12 @@
-// Props: { projects, selectedProject, selectedRun, runs, onProjectChange, onRunChange }
+// Props: { projects, selectedProject, selectedRun, runs, onChange }
 // Project dropdown + run selector dropdown
 // projects: array of { name } or strings
 // runs: array of { runId, dateLabel }
 
-export default function ProjectSelector({ projects, selectedProject, selectedRun, runs, onChange: { onProjectChange, onRunChange } = {} }) {
+const NO_PROJECT_LABEL = 'No analyzed project';
+
+export default function ProjectSelector({ projects, selectedProject, selectedRun, runs, onChange }) {
+  const { onProjectChange, onRunChange } = onChange || {};
   const projectList = (projects || []).map((p) =>
     typeof p === 'string' ? { name: p } : p
   );
@@ -22,7 +25,7 @@ export default function ProjectSelector({ projects, selectedProject, selectedRun
           onChange={(e) => onProjectChange?.(e.target.value)}
         >
           {projectList.length === 0 ? (
-            <option value="">No analyzed project</option>
+            <option value="">{NO_PROJECT_LABEL}</option>
           ) : null}
           {projectList.map((project) => (
             <option key={project.id || project.name} value={project.id || project.name}>

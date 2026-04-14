@@ -9,6 +9,8 @@ from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_f
 from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
 
+_DEFAULT_DISMISSED_LIMIT = 500
+
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
     validate_path_segment(project)
@@ -30,7 +32,7 @@ def register_findings_routes(app: Flask) -> None:
         project = request.args.get("project", "")
         if not project:
             return jsonify([])
-        limit = request.args.get("limit", 500, type=int)
+        limit = request.args.get("limit", _DEFAULT_DISMISSED_LIMIT, type=int)
         offset = request.args.get("offset", 0, type=int)
         items = load_dismissed(_project_dir(_eval_dir(), project))
         return jsonify(items[offset:offset + limit])

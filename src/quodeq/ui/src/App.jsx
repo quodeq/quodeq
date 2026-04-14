@@ -19,6 +19,7 @@ import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 
+const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
 
 /**
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
@@ -212,8 +213,7 @@ const ROUTE_RENDERERS = {
  */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  const noProjectTabs = ['evaluate', 'standards', 'settings', 'help'];
-  if (!noProjectTabs.includes(page)) {
+  if (!NO_PROJECT_TABS.includes(page)) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
       if (!props.navigation?.projectsLoaded) return <LoadingScreen />;

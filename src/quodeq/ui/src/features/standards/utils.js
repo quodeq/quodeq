@@ -6,9 +6,13 @@
  * @param {number} sequenceNumber - 1-based sequence within the principle.
  * @returns {string} A deterministic requirement ID like "MYST-ERR-01".
  */
+const MAX_STD_PREFIX_CHARS = 4;
+const MAX_PRINCIPLE_PREFIX_CHARS = 3;
+const SEQ_PAD_WIDTH = 2;
+
 export function generateRequirementId(standardId, principleName, sequenceNumber) {
-  const prefix = (standardId || 'std').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4);
-  const pPrefix = (principleName || 'P').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
-  const seq = String(sequenceNumber).padStart(2, '0');
+  const prefix = (standardId || 'std').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, MAX_STD_PREFIX_CHARS);
+  const pPrefix = (principleName || 'P').replace(/[^a-zA-Z]/g, '').slice(0, MAX_PRINCIPLE_PREFIX_CHARS).toUpperCase();
+  const seq = String(sequenceNumber).padStart(SEQ_PAD_WIDTH, '0');
   return `${prefix}-${pPrefix}-${seq}`;
 }

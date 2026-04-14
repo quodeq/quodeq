@@ -2,6 +2,8 @@ import { useState, useRef } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
+const WARNINGS_MAX_HEIGHT = 200;
+const CONFLICT_MAX_HEIGHT = 120;
 const STEP = { PICK: 'pick', REVIEWING: 'reviewing', ERROR: 'error', WARNINGS: 'warnings', CONFLICT: 'conflict' };
 
 function buildImportedCopyId(id) {
@@ -49,7 +51,7 @@ function WarningsStep({ warnings, onClose, onProceed }) {
       <p className="modal-body modal-body--warning">
         This evaluator contains text that may attempt to manipulate the AI during analysis:
       </p>
-      <ul className="modal-body" style={{ fontSize: '0.85rem', maxHeight: 200, overflow: 'auto' }}>
+      <ul className="modal-body" style={{ fontSize: '0.85rem', maxHeight: WARNINGS_MAX_HEIGHT, overflow: 'auto' }}>
         {warnings.map((w, i) => <li key={i}>{w}</li>)}
       </ul>
       <div className="modal-actions">
@@ -74,7 +76,7 @@ function ConflictStep({ parsedData, conflict, warnings, actions }) {
           <p className="modal-body modal-body--warning" style={{ fontSize: '0.85rem' }}>
             Security warnings were also detected:
           </p>
-          <ul className="modal-body" style={{ fontSize: '0.8rem', maxHeight: 120, overflow: 'auto' }}>
+          <ul className="modal-body" style={{ fontSize: '0.8rem', maxHeight: CONFLICT_MAX_HEIGHT, overflow: 'auto' }}>
             {warnings.map((w, i) => <li key={i}>{w}</li>)}
           </ul>
         </>

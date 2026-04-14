@@ -7,6 +7,7 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
 // provider config (ai_providers.json) which can flag additional local providers.
 const LOCAL_API_PROVIDERS = ['ollama'];
 const TIER_NAMES = ['fast', 'balanced', 'thorough'];
+const DEFAULT_ANALYSIS_POWER = 2;
 
 /**
  * Manages the full evaluation lifecycle: start, poll, dismiss, cancel.
@@ -21,7 +22,7 @@ export function useEvaluationLifecycle({ settings, navigation, projects, storage
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
 
   const [analysisPower, setAnalysisPower] = useState(() => {
-    try { return Number(storage.getItem(POWER_KEY)) || 2; } catch (e) { console.warn('localStorage unavailable:', e); return 2; }
+    try { return Number(storage.getItem(POWER_KEY)) || DEFAULT_ANALYSIS_POWER; } catch (e) { console.warn('localStorage unavailable:', e); return DEFAULT_ANALYSIS_POWER; }
   });
 
   function persistAnalysisPower(level) {

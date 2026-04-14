@@ -46,6 +46,7 @@ _REPORT_PATH_MARKER = "Report path:"
 _PROCESS_WAIT_TIMEOUT_S = 30
 _EXIT_CODE_SPAWN_FAILURE = -1
 _EXIT_CODE_TIMEOUT = -9
+_DEFAULT_LIST_LIMIT = 100
 
 # Canonical job status strings.
 STATUS_RUNNING = "running"
@@ -148,7 +149,7 @@ class JobManager:
                 return None
             return job.to_dict()
 
-    def list_jobs(self, *, limit: int = 100, offset: int = 0) -> list[JobSnapshot]:
+    def list_jobs(self, *, limit: int = _DEFAULT_LIST_LIMIT, offset: int = 0) -> list[JobSnapshot]:
         """Return tracked jobs as frozen snapshots with pagination.
 
         When *limit* is 0 all jobs are returned (no cap).
@@ -229,13 +230,16 @@ class JobManager:
             for jid in completed[:excess]:
                 self._store.delete(jid)
 
-    _JOB_TIMEOUT_S = int(os.environ.get("QUODEQ_JOB_TIMEOUT_S", "7200"))  # 2 hours max per evaluation job
+    @property
+    def _job_timeout_s(self) -> int:
+        """Job timeout in seconds — reads from env at call time for lazy configuration."""
+        return int(os.environ.get("QUODEQ_JOB_TIMEOUT_S", "7200"))
 
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
         try:
-            exit_code = process.wait(timeout=self._JOB_TIMEOUT_S)
+            exit_code = process.wait(timeout=self._job_timeout_s)
         except subprocess.TimeoutExpired:
-            _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._JOB_TIMEOUT_S)
+            _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._job_timeout_s)
             process.kill()
             process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
             exit_code = _EXIT_CODE_TIMEOUT

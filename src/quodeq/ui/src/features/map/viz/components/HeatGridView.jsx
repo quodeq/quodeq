@@ -1,25 +1,32 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from './HeatGridCells.jsx';
 
+const COL_NAME = 'name';
+const COL_CRITICAL = 'critical';
+const COL_MAJOR = 'major';
+const COL_MINOR = 'minor';
+const COL_VIOLATIONS = 'violations';
+const COL_HEALTH = 'health';
+
 const COLUMNS = [
-  { id: 'name', label: 'File / Folder', align: 'left' },
-  { id: 'critical', label: 'Critical' },
-  { id: 'major', label: 'Major' },
-  { id: 'minor', label: 'Minor' },
-  { id: 'violations', label: 'Violations' },
-  { id: 'health', label: 'Health' },
+  { id: COL_NAME, label: 'File / Folder', align: 'left' },
+  { id: COL_CRITICAL, label: 'Critical' },
+  { id: COL_MAJOR, label: 'Major' },
+  { id: COL_MINOR, label: 'Minor' },
+  { id: COL_VIOLATIONS, label: 'Violations' },
+  { id: COL_HEALTH, label: 'Health' },
 ];
 
 function sortRows(items, sortCol, sortDir) {
   return [...items].sort((a, b) => {
     let va, vb;
     switch (sortCol) {
-      case 'name': va = a.name || ''; vb = b.name || ''; return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
-      case 'critical': va = a.severity.critical; vb = b.severity.critical; break;
-      case 'major': va = a.severity.major; vb = b.severity.major; break;
-      case 'minor': va = a.severity.minor; vb = b.severity.minor; break;
-      case 'violations': va = a.violations; vb = b.violations; break;
-      case 'health': va = a.complianceRate; vb = b.complianceRate; break;
+      case COL_NAME: va = a.name || ''; vb = b.name || ''; return sortDir === 'asc' ? va.localeCompare(vb) : vb.localeCompare(va);
+      case COL_CRITICAL: va = a.severity.critical; vb = b.severity.critical; break;
+      case COL_MAJOR: va = a.severity.major; vb = b.severity.major; break;
+      case COL_MINOR: va = a.severity.minor; vb = b.severity.minor; break;
+      case COL_VIOLATIONS: va = a.violations; vb = b.violations; break;
+      case COL_HEALTH: va = a.complianceRate; vb = b.complianceRate; break;
       default: return 0;
     }
     const diff = sortDir === 'asc' ? va - vb : vb - va;
@@ -28,7 +35,7 @@ function sortRows(items, sortCol, sortDir) {
 }
 
 export default function HeatGridView({ node, onDrillDown, onFileClick, onCellClick }) {
-  const [sortCol, setSortCol] = useState('violations');
+  const [sortCol, setSortCol] = useState(COL_VIOLATIONS);
   const [sortDir, setSortDir] = useState('desc');
 
   const rows = useMemo(() => {
@@ -42,7 +49,7 @@ export default function HeatGridView({ node, onDrillDown, onFileClick, onCellCli
       setSortDir((d) => d === 'asc' ? 'desc' : 'asc');
     } else {
       setSortCol(col);
-      setSortDir(col === 'name' ? 'asc' : 'desc');
+      setSortDir(col === COL_NAME ? 'asc' : 'desc');
     }
   };
 

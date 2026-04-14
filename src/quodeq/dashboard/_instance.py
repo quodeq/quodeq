@@ -154,7 +154,7 @@ class InstanceController:
             sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             sock.settimeout(_SOCK_TIMEOUT)
             with sock:
-                sock.connect(("127.0.0.1", self._tcp_port))
+                sock.connect((_TCP_LOCALHOST, self._tcp_port))
                 sock.sendall(f"{_RELOAD_PREFIX}{url}".encode("utf-8"))
         else:
             sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)

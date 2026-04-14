@@ -94,6 +94,19 @@ def _build_evaluate_cmd(
     return cmd
 
 
+def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path) -> None:
+    """Scan the parent project directory if it lacks a scan.json."""
+    info_path = project_dir / "repository_info.json"
+    try:
+        parent_uuid = json.loads(info_path.read_text()).get("parent")
+        if parent_uuid:
+            parent_dir = reports_path / parent_uuid
+            if not (parent_dir / "scan.json").exists():
+                scan_project(repo_path, output_dir=parent_dir)
+    except (json.JSONDecodeError, OSError):
+        pass
+
+
 def _register_project(repo: str, discipline: str | None, reports_dir: str, scope_path: str | None = None) -> None:
     """Resolve/register project and run a scan for local projects.
 
@@ -118,15 +131,7 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str, scope
             scan_project(repo_path, output_dir=project_dir)
             # For scoped projects, also scan the parent using the parent UUID from repo info
             if scope_path:
-                info_path = project_dir / "repository_info.json"
-                try:
-                    parent_uuid = json.loads(info_path.read_text()).get("parent")
-                    if parent_uuid:
-                        parent_dir = reports_path / parent_uuid
-                        if not (parent_dir / "scan.json").exists():
-                            scan_project(repo_path, output_dir=parent_dir)
-                except (json.JSONDecodeError, OSError):
-                    pass
+                _scan_parent_project(project_dir, reports_path, repo_path)
 
 
 class FsEvaluationMixin:

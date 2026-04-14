@@ -16,6 +16,7 @@ _HOMEBREW_ARM64 = "/opt/homebrew/bin"
 _HOMEBREW_X86 = "/usr/local/bin"
 _API_HEALTH_PATH = "/api/health"
 _API_EVALUATIONS_PATH = "/api/evaluations"
+_LOCAL_BASE_URL = "http://127.0.0.1"
 
 
 def _homebrew_bin_dirs(
@@ -105,7 +106,7 @@ def _find_commands_uncached(env: dict[str, str] | None) -> dict[str, str | None]
 def health_check(port: int) -> bool:
     """Check if the dashboard is responding on the given port."""
     try:
-        url = f"http://127.0.0.1:{port}{_API_HEALTH_PATH}"
+        url = f"{_LOCAL_BASE_URL}:{port}{_API_HEALTH_PATH}"
         with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
             return json.loads(r.read()).get("ok") is True
     except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):
@@ -120,7 +121,7 @@ def is_evaluating(port: int) -> bool:
     query param is passed to reduce payload size when the endpoint supports it.
     """
     try:
-        url = f"http://127.0.0.1:{port}{_API_EVALUATIONS_PATH}?limit=1&status=running"
+        url = f"{_LOCAL_BASE_URL}:{port}{_API_EVALUATIONS_PATH}?limit=1&status=running"
         with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
             return any(j.get("status") == "running" for j in json.loads(r.read()))
     except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):

@@ -114,7 +114,10 @@ def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) ->
     config = _resolve_paths_and_build(config)
     validate_paths(config)
 
-    environ = env if env is not None else os.environ
+    if env is not None:
+        environ = env.copy()
+    else:
+        environ = os.environ
     if config.build.verbose:
         environ["QUODEQ_VERBOSE"] = "1"
 

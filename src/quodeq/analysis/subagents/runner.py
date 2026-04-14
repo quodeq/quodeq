@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.analysis._types import RunConfig
@@ -48,6 +49,25 @@ class DimensionCallbacks:
     parse_evidence: Callable[..., Evidence | None]
 
 
+@dataclass
+class _DimensionContext:
+    """Grouped parameters for dimension processing."""
+    dim_id: str
+    idx: int
+    ctx: Any
+    files: list[str]
+    evidence_dir: Path
+
+
+@dataclass
+class _PoolExecutionParams:
+    """Grouped parameters for pool execution and evidence collection."""
+    inline_findings: list[dict]
+    mini_verify_findings: list[dict]
+    queue_path: Path
+    files_per_agent: int
+
+
 def process_consolidated_dimensions(
     config: RunConfig, dimensions: list[str], ctx: Any,
 ) -> dict[str, Evidence]:
@@ -56,60 +76,56 @@ def process_consolidated_dimensions(
 
 
 def _prepare_findings_and_queue(
-    config: RunConfig, dim_id: str, idx: int, ctx: Any,
-    files: list[str], evidence_dir: Path,
-) -> tuple[list[dict], list[dict], Path, int]:
-    """Load previous findings, partition by fingerprint, and create the file queue.
-
-    Returns (inline_findings, mini_verify_findings, queue_path, files_per_agent).
-    """
-    prev_findings = _load_and_filter_previous(config, dim_id, evidence_dir)
+    config: RunConfig, dc: _DimensionContext,
+) -> _PoolExecutionParams:
+    """Load previous findings, partition by fingerprint, and create the file queue."""
+    prev_findings = _load_and_filter_previous(config, dc.dim_id, dc.evidence_dir)
     carry_forward: list[dict] = []
     needs_verify: list[dict] = []
     if prev_findings:
-        prev_fp, _ = find_previous_fingerprint(evidence_dir, dim_id)
+        prev_fp, _ = find_previous_fingerprint(dc.evidence_dir, dc.dim_id)
         carry_forward, needs_verify = partition_findings_by_fingerprint(
             prev_findings, prev_fp, config.src,
-            standards_dir=config.standards_dir, dimension=dim_id,
+            standards_dir=config.standards_dir, dimension=dc.dim_id,
         )
     if carry_forward:
-        written = write_carry_forward_findings(carry_forward, evidence_dir, dim_id)
-        log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {written} findings carried forward")
+        written = write_carry_forward_findings(carry_forward, dc.evidence_dir, dc.dim_id)
+        log_info(f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {written} findings carried forward")
 
-    queue_files = set(files)
+    queue_files = set(dc.files)
     inline_findings, mini_verify_findings = classify_findings(needs_verify, queue_files)
 
-    queue_path = evidence_dir / f"{dim_id}_queue.json"
-    files_per_agent = _compute_files_per_agent(len(files))
-    FileQueue(queue_path, files, max_files_per_agent=files_per_agent)
-    log_info(f"  [{idx}/{ctx.total}] {dim_id} -- {len(files)} files queued, {len(inline_findings)} inline findings")
+    queue_path = dc.evidence_dir / f"{dc.dim_id}_queue.json"
+    files_per_agent = _compute_files_per_agent(len(dc.files))
+    FileQueue(queue_path, dc.files, max_files_per_agent=files_per_agent)
+    log_info(f"  [{dc.idx}/{dc.ctx.total}] {dc.dim_id} -- {len(dc.files)} files queued, {len(inline_findings)} inline findings")
 
-    return inline_findings, mini_verify_findings, queue_path, files_per_agent
+    return _PoolExecutionParams(
+        inline_findings=inline_findings, mini_verify_findings=mini_verify_findings,
+        queue_path=queue_path, files_per_agent=files_per_agent,
+    )
 
 
 def _execute_pool_and_collect(
-    config: RunConfig, dim_id: str, ctx: Any,
-    files: list[str], evidence_dir: Path,
-    inline_findings: list[dict], mini_verify_findings: list[dict],
-    queue_path: Path, files_per_agent: int,
+    config: RunConfig, dc: _DimensionContext, pool_params: _PoolExecutionParams,
 ) -> Evidence | None:
     """Build prompt, launch pool, save fingerprint, and collect evidence."""
-    prompt = _build_subagent_prompt(config, dim_id, ctx, inline_findings=inline_findings)
+    prompt = _build_subagent_prompt(config, dc.dim_id, dc.ctx, inline_findings=pool_params.inline_findings)
     params = LaunchPoolParams(
-        evidence_dir=evidence_dir, queue_path=queue_path,
-        prompt=prompt, max_files_per_agent=files_per_agent,
-        all_files=files,
+        evidence_dir=dc.evidence_dir, queue_path=pool_params.queue_path,
+        prompt=prompt, max_files_per_agent=pool_params.files_per_agent,
+        all_files=dc.files,
     )
-    pool, results = _launch_pool(config, dim_id, params)
+    pool, results = _launch_pool(config, dc.dim_id, params)
 
-    fp = build_fingerprint(config.src, files, dim_id, config.standards_dir)
-    save_fingerprint(fp, evidence_dir)
+    fp = build_fingerprint(config.src, dc.files, dc.dim_id, config.standards_dir)
+    save_fingerprint(fp, dc.evidence_dir)
 
-    if mini_verify_findings:
-        verify_results = _dispatch_mini_verify(config, dim_id, evidence_dir, mini_verify_findings)
+    if pool_params.mini_verify_findings:
+        verify_results = _dispatch_mini_verify(config, dc.dim_id, dc.evidence_dir, pool_params.mini_verify_findings)
         results = results + verify_results
 
-    return _collect_evidence(config, dim_id, evidence_dir, _CollectionContext(results=results, ctx=ctx, files=files))
+    return _collect_evidence(config, dc.dim_id, dc.evidence_dir, _CollectionContext(results=results, ctx=dc.ctx, files=dc.files))
 
 
 def process_dimension_with_subagents(
@@ -133,10 +149,7 @@ def process_dimension_with_subagents(
         stream_file, jsonl_file = callbacks.run_analysis(config, dim_id, prompt, idx, ctx)
         return callbacks.parse_evidence(config, dim_id, stream_file, jsonl_file, ctx)
 
-    inline_findings, mini_verify_findings, queue_path, files_per_agent = \
-        _prepare_findings_and_queue(config, dim_id, idx, ctx, files, evidence_dir)
+    dc = _DimensionContext(dim_id=dim_id, idx=idx, ctx=ctx, files=files, evidence_dir=evidence_dir)
+    pool_params = _prepare_findings_and_queue(config, dc)
 
-    return _execute_pool_and_collect(
-        config, dim_id, ctx, files, evidence_dir,
-        inline_findings, mini_verify_findings, queue_path, files_per_agent,
-    )
+    return _execute_pool_and_collect(config, dc, pool_params)

@@ -17,6 +17,10 @@ from quodeq.analysis.subagents._queue_state import (
 )
 from quodeq.analysis.subagents.types import WorkQueue  # noqa: F401 — re-export
 
+_KEY_FILES = "files"
+_KEY_AGENT = "agent"
+_KEY_TS = "ts"
+
 
 class FileQueue:
     """Distributes files across N subagent processes via a locked JSON file.
@@ -76,7 +80,7 @@ class FileQueue:
                 return []
             state["pending"] = pending[count:]
             state["taken"].append({
-                "files": batch, "agent": agent_id, "ts": time.time(),
+                _KEY_FILES: batch, _KEY_AGENT: agent_id, _KEY_TS: time.time(),
             })
             if agent_id:
                 totals = state.setdefault("agent_totals", {})
@@ -103,7 +107,7 @@ class FileQueue:
         """
         with locked(self._lock_path):
             state = read_state(self._path)
-        taken = sum(len(e["files"]) for e in state["taken"])
+        taken = sum(len(e[_KEY_FILES]) for e in state["taken"])
         return len(state["pending"]), taken
 
     def taken_log(self) -> list[dict]:

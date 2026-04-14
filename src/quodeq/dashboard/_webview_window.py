@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import html as _html
+import json
 import os
 import signal
 import sys
@@ -19,6 +20,17 @@ from quodeq.dashboard._webview_html import INJECT_JS, CLOSING_OVERLAY_JS
 _WINDOW_WIDTH = 1280
 _WINDOW_HEIGHT = 800
 _WINDOW_BG_COLOR = '#0d1117'
+_CLEANUP_JOIN_TIMEOUT_S = 0.3
+_EVAL_CHECK_TIMEOUT_S = 0.5
+_DOWNLOAD_TIMEOUT_S = 120
+
+# Dialog CSS layout constants
+_DIALOG_PADDING = "24px 28px"
+_DIALOG_BORDER_RADIUS = "12px"
+_DIALOG_FONT_SIZE = "0.82rem"
+_BUTTON_PADDING = "10px 16px"
+_BUTTON_BORDER_RADIUS = "6px"
+_BUTTON_FONT_SIZE = "0.85rem"
 
 
 class _WindowApi:
@@ -54,7 +66,7 @@ class _WindowApi:
                 if choice == 'back':
                     return
                 if choice == 'keep':
-                    os._exit(0)
+                    os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
             except Exception:
                 pass
 
@@ -66,8 +78,8 @@ class _WindowApi:
                 self._instance.shutdown()
         t = threading.Thread(target=_cleanup, daemon=True)
         t.start()
-        t.join(timeout=0.3)
-        os._exit(0)
+        t.join(timeout=_CLEANUP_JOIN_TIMEOUT_S)
+        os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
 
     def _get_running_evaluation(self) -> dict | None:
         """Return the first running evaluation job, or None."""
@@ -75,7 +87,7 @@ class _WindowApi:
             url = self._window.get_current_url().split("#")[0].rstrip("/")
             base = url.rsplit("/", 1)[0] if "/" in url.lstrip("http") else url
             req = urllib.request.Request(f"{base}/api/evaluations")
-            with urllib.request.urlopen(req, timeout=0.5) as resp:
+            with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
                 jobs = json.loads(resp.read())
                 for j in (jobs if isinstance(jobs, list) else []):
                     if j.get("status") == "running":
@@ -101,27 +113,27 @@ class _WindowApi:
             info_parts.append(f"Phase: <b>{phase}</b>")
         info_html = "<br>".join(info_parts) if info_parts else "Running..."
 
-        return """
-            (function() {
+        return f"""
+            (function() {{
                 var d = document.createElement('div');
                 d.id = '_qd_close_dialog';
                 d.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.5);display:flex;align-items:center;justify-content:center';
-                d.innerHTML = '<div style="background:var(--color-surface,#1c2128);border:1px solid var(--color-border,#333);border-radius:12px;padding:24px 28px;max-width:420px;color:var(--color-text,#e6edf3);font-family:inherit">'
+                d.innerHTML = '<div style="background:var(--color-surface,#1c2128);border:1px solid var(--color-border,#333);border-radius:{_DIALOG_BORDER_RADIUS};padding:{_DIALOG_PADDING};max-width:420px;color:var(--color-text,#e6edf3);font-family:inherit">'
                     + '<h3 style="margin:0 0 12px;font-size:1rem">Evaluation in progress</h3>'
-                    + '<div style="margin:0 0 16px;padding:10px 14px;background:var(--color-surface-alt,#161b22);border-radius:6px;font-size:0.82rem;line-height:1.6;color:var(--color-text-muted,#8b949e)">""" + info_html + """</div>'
+                    + '<div style="margin:0 0 16px;padding:10px 14px;background:var(--color-surface-alt,#161b22);border-radius:{_BUTTON_BORDER_RADIUS};font-size:{_DIALOG_FONT_SIZE};line-height:1.6;color:var(--color-text-muted,#8b949e)">{info_html}</div>'
                     + '<div style="display:flex;flex-direction:column;gap:8px">'
-                    + '<button id="_qd_close_keep" style="padding:10px 16px;border:1px solid var(--color-border,#333);border-radius:6px;background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:0.85rem">Close window (evaluation continues in background)</button>'
-                    + '<button id="_qd_close_cancel" style="padding:10px 16px;border:1px solid #da3633;border-radius:6px;background:transparent;color:#f85149;cursor:pointer;font-size:0.85rem">Cancel evaluation and close</button>'
-                    + '<button id="_qd_close_back" style="padding:10px 16px;border:none;border-radius:6px;background:transparent;color:var(--color-text-muted,#8b949e);cursor:pointer;font-size:0.85rem">Go back</button>'
+                    + '<button id="_qd_close_keep" style="padding:{_BUTTON_PADDING};border:1px solid var(--color-border,#333);border-radius:{_BUTTON_BORDER_RADIUS};background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Close window (evaluation continues in background)</button>'
+                    + '<button id="_qd_close_cancel" style="padding:{_BUTTON_PADDING};border:1px solid #da3633;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:#f85149;cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Cancel evaluation and close</button>'
+                    + '<button id="_qd_close_back" style="padding:{_BUTTON_PADDING};border:none;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:var(--color-text-muted,#8b949e);cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Go back</button>'
                     + '</div></div>';
                 document.body.appendChild(d);
-                return new Promise(function(resolve) {
-                    document.getElementById('_qd_close_keep').onclick = function() { d.remove(); resolve('keep'); };
-                    document.getElementById('_qd_close_cancel').onclick = function() { d.remove(); resolve('cancel'); };
-                    document.getElementById('_qd_close_back').onclick = function() { d.remove(); resolve('back'); };
-                    d.onclick = function(e) { if (e.target === d) { d.remove(); resolve('back'); } };
-                });
-            })()
+                return new Promise(function(resolve) {{
+                    document.getElementById('_qd_close_keep').onclick = function() {{ d.remove(); resolve('keep'); }};
+                    document.getElementById('_qd_close_cancel').onclick = function() {{ d.remove(); resolve('cancel'); }};
+                    document.getElementById('_qd_close_back').onclick = function() {{ d.remove(); resolve('back'); }};
+                    d.onclick = function(e) {{ if (e.target === d) {{ d.remove(); resolve('back'); }} }};
+                }});
+            }})()
         """
 
     def open_browser(self, path: str = '/') -> None:
@@ -146,7 +158,7 @@ class _WindowApi:
             return False
         try:
             url = self._base_url + path
-            with urllib.request.urlopen(url, timeout=120) as resp:
+            with urllib.request.urlopen(url, timeout=_DOWNLOAD_TIMEOUT_S) as resp:
                 Path(save_path).write_bytes(resp.read())
             return True
         except (OSError, Exception):

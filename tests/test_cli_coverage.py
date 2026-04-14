@@ -95,7 +95,7 @@ class TestResolveRepo:
         assert result is None
         assert "does not exist" in capsys.readouterr().err
 
-    @patch("quodeq._cli_evaluation.is_repo_url")
+    @patch("quodeq._cli_resolution.is_repo_url")
     def test_invalid_repo_url(self, mock_is_url, capsys):
         from quodeq.cli import _resolve_repo
         mock_is_url.side_effect = ValueError("Invalid URL")
@@ -104,8 +104,8 @@ class TestResolveRepo:
         assert result is None
         assert "Invalid URL" in capsys.readouterr().err
 
-    @patch("quodeq._cli_evaluation.is_repo_url", return_value=True)
-    @patch("quodeq._cli_evaluation.prepare_repository", side_effect=OSError("clone failed"))
+    @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
+    @patch("quodeq.shared.repo_handler.prepare_repository", side_effect=OSError("clone failed"))
     def test_remote_clone_failure(self, mock_prep, mock_is_url, capsys):
         from quodeq.cli import _resolve_repo
         args = argparse.Namespace(repo="https://github.com/x/y")
@@ -113,8 +113,8 @@ class TestResolveRepo:
         assert result is None
         assert "Failed to clone" in capsys.readouterr().err
 
-    @patch("quodeq._cli_evaluation.is_repo_url", return_value=True)
-    @patch("quodeq._cli_evaluation.prepare_repository")
+    @patch("quodeq._cli_resolution.is_repo_url", return_value=True)
+    @patch("quodeq.shared.repo_handler.prepare_repository")
     def test_remote_clone_success(self, mock_prep, mock_is_url, tmp_path):
         from quodeq.cli import _resolve_repo
         repo_dir = tmp_path / "cloned"
@@ -131,8 +131,8 @@ class TestResolveRepo:
         worktree_dir = tmp_path / "wt"
         worktree_dir.mkdir()
         args = argparse.Namespace(repo=str(repo_dir), branch="feature/x")
-        with patch("quodeq._cli_evaluation.is_repo_url", return_value=False), \
-             patch("quodeq._cli_evaluation._create_worktree", return_value=worktree_dir) as mock_wt:
+        with patch("quodeq._cli_resolution.is_repo_url", return_value=False), \
+             patch("quodeq._cli_resolution._create_worktree", return_value=worktree_dir) as mock_wt:
             result = _resolve_repo(args)
             assert result == worktree_dir
             assert args._worktree_origin == repo_dir.resolve()
@@ -143,8 +143,8 @@ class TestResolveRepo:
         repo_dir = tmp_path / "myrepo"
         repo_dir.mkdir()
         args = argparse.Namespace(repo=str(repo_dir), branch="bad-branch")
-        with patch("quodeq._cli_evaluation.is_repo_url", return_value=False), \
-             patch("quodeq._cli_evaluation._create_worktree", return_value=None):
+        with patch("quodeq._cli_resolution.is_repo_url", return_value=False), \
+             patch("quodeq._cli_resolution._create_worktree", return_value=None):
             result = _resolve_repo(args)
             assert result is None
 
@@ -155,7 +155,7 @@ class TestResolveRepo:
 
 class TestSetupRunDirs:
     @patch("quodeq._cli_evaluation.resolve_project_uuid", return_value="proj-uuid-123")
-    @patch("quodeq._cli_evaluation.is_repo_url", return_value=False)
+    @patch("quodeq._cli_resolution.is_repo_url", return_value=False)
     @patch("quodeq._cli_evaluation.project_name_from_repo", return_value="myproject")
     def test_creates_directories(self, mock_name, mock_url, mock_uuid, tmp_path):
         from quodeq.cli import _setup_run_dirs
@@ -190,7 +190,7 @@ class TestResolveLanguage:
         result = _resolve_language(args, tmp_path, paths)
         assert result is None
 
-    @patch("quodeq._cli_evaluation.validate_path_segment", side_effect=ValueError("bad"))
+    @patch("quodeq._cli_resolution.validate_path_segment", side_effect=ValueError("bad"))
     def test_invalid_language_raises(self, mock_validate):
         from quodeq.cli import _resolve_language
         args = argparse.Namespace(language="../evil")

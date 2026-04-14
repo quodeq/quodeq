@@ -8,6 +8,7 @@ import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
 
 const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'pool-budget': String(DEFAULT_POOL_BUDGET) };
+const DEFAULT_PROVIDER_ORDER = 50;
 
 const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
 const LEGACY_AI_CMD_KEY = 'cc-ai-cmd';
@@ -32,38 +33,43 @@ function TabContent({ provider, providerConfig }) {
   return <CloudProviderTab providerId={provider.id} providerConfig={providerConfig} state={state} update={update} />;
 }
 
+function useMigrateLegacySettings(clients) {
+  useEffect(() => {
+    if (clients.length === 0) return;
+    if (localStorage.getItem(MIGRATION_DONE_KEY)) return;
+    const targetId = localStorage.getItem(LEGACY_AI_CMD_KEY) || clients[0].id;
+    for (const [oldKey, newSuffix] of Object.entries(LEGACY_SETTING_MIGRATIONS)) {
+      const oldVal = localStorage.getItem(oldKey);
+      if (oldVal !== null) {
+        localStorage.setItem(`cc-${targetId}-${newSuffix}`, oldVal);
+        localStorage.removeItem(oldKey);
+      }
+    }
+    localStorage.setItem(MIGRATION_DONE_KEY, '1');
+  }, [clients]);
+}
+
 export default function ProviderTabs({ providerConfigs }) {
   const { getAiClients } = useApi();
   const [clients, setClients] = useState([]);
   const [clientsError, setClientsError] = useState(null);
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem(ACTIVE_PROVIDER_KEY) || '');
+
+  useMigrateLegacySettings(clients);
+
   useEffect(() => {
     getAiClients().then((data) => {
       const raw = data.clients || [];
       // Sort by 'order' field from provider configs (ai_providers.json)
       const list = [...raw].sort((a, b) => {
-        const oa = providerConfigs?.[a.id]?.order ?? 50;
-        const ob = providerConfigs?.[b.id]?.order ?? 50;
+        const oa = providerConfigs?.[a.id]?.order ?? DEFAULT_PROVIDER_ORDER;
+        const ob = providerConfigs?.[b.id]?.order ?? DEFAULT_PROVIDER_ORDER;
         return oa - ob;
       });
       setClients(list);
       if (!activeTab && list.length > 0) {
         setActiveTab(list[0].id);
         localStorage.setItem(ACTIVE_PROVIDER_KEY, list[0].id);
-      }
-
-      // Migrate old global settings to active provider
-      if (!localStorage.getItem(MIGRATION_DONE_KEY) && list.length > 0) {
-        const targetId = localStorage.getItem(LEGACY_AI_CMD_KEY) || list[0].id;
-        const migrations = LEGACY_SETTING_MIGRATIONS;
-        for (const [oldKey, newSuffix] of Object.entries(migrations)) {
-          const oldVal = localStorage.getItem(oldKey);
-          if (oldVal !== null) {
-            localStorage.setItem(`cc-${targetId}-${newSuffix}`, oldVal);
-            localStorage.removeItem(oldKey);
-          }
-        }
-        localStorage.setItem(MIGRATION_DONE_KEY, '1');
       }
       setClientsError(null);
     }).catch(() => { setClients([]); setClientsError('Failed to load AI providers. Check that the server is running.'); });

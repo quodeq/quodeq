@@ -10,6 +10,9 @@ from quodeq.data.fs.report_parser.runs import list_runs
 from quodeq.shared.logging import log_debug
 from quodeq.shared.utils import open_text
 
+_TYPE_VIOLATION = "violation"
+_TYPE_COMPLIANCE = "compliance"
+
 
 def _find_previous_evidence(reports_root: Path, project_uuid: str, current_run_id: str, dim_id: str) -> Path | None:
     """Find the JSONL evidence file from the most recent previous run."""
@@ -36,7 +39,7 @@ def _parse_finding_line(line: str) -> dict | None:
         entry = json.loads(line)
     except json.JSONDecodeError:
         return None
-    if entry.get("p") and entry.get("t") in ("violation", "compliance"):
+    if entry.get("p") and entry.get("t") in (_TYPE_VIOLATION, _TYPE_COMPLIANCE):
         return entry
     return None
 

@@ -65,11 +65,7 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
             <span key={d.dimension} className="history-dim-tag">
               {capitalize(d.dimension)}
               {d.score != null && <span className="history-dim-score">{d.score.toFixed(1)}</span>}
-              {d.delta != null && (
-                <span className={`history-dim-trend ${d.delta > 0 ? 'trend-up' : d.delta < 0 ? 'trend-down' : ''}`}>
-                  {d.delta > 0 ? '▲' : d.delta < 0 ? '▼' : '—'}{d.delta !== 0 ? Math.abs(d.delta).toFixed(1) : ''}
-                </span>
-              )}
+              {d.delta != null && <TrendBadge delta={d.delta} />}
             </span>
           ))}
         </div>

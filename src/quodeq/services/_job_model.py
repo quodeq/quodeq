@@ -149,7 +149,9 @@ class InMemoryJobStore:
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_PERSIST_DIR = Path(os.environ.get("QUODEQ_JOB_PERSIST_DIR", str(Path.home() / ".quodeq" / "run" / "jobs")))
+def _default_persist_dir() -> Path:
+    """Read persist dir from env at call time for lazy configuration."""
+    return Path(os.environ.get("QUODEQ_JOB_PERSIST_DIR", str(Path.home() / ".quodeq" / "run" / "jobs")))
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
 
 
@@ -199,7 +201,7 @@ class FileJobStore:
     """
 
     def __init__(self, persist_dir: Path | None = None) -> None:
-        self._persist_dir = persist_dir or _DEFAULT_PERSIST_DIR
+        self._persist_dir = persist_dir or _default_persist_dir()
         self._persist_dir.mkdir(parents=True, exist_ok=True)
         # SECURITY: restrict directory to owner-only access
         os.chmod(self._persist_dir, 0o700)

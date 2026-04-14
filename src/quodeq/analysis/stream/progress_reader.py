@@ -7,6 +7,9 @@ from pathlib import Path
 from quodeq.analysis.stream.counters import extract_files_from_event, parse_stream_event
 from quodeq.shared.logging import log_debug
 
+_TYPE_VIOLATION = "violation"
+_TYPE_COMPLIANCE = "compliance"
+
 
 class _IncrementalProgressReader:
     """Reads new bytes from stream/JSONL files since last check."""
@@ -84,9 +87,9 @@ class _IncrementalProgressReader:
                             t = _json.loads(stripped).get("t", "")
                         except (ValueError, AttributeError):
                             t = ""
-                        if t == "violation":
+                        if t == _TYPE_VIOLATION:
                             self._violations += 1
-                        elif t == "compliance":
+                        elif t == _TYPE_COMPLIANCE:
                             self._compliances += 1
             if partial.strip():
                 self._jsonl_count += 1
@@ -94,9 +97,9 @@ class _IncrementalProgressReader:
                     t = _json.loads(partial.strip()).get("t", "")
                 except (ValueError, AttributeError):
                     t = ""
-                if t == "violation":
+                if t == _TYPE_VIOLATION:
                     self._violations += 1
-                elif t == "compliance":
+                elif t == _TYPE_COMPLIANCE:
                     self._compliances += 1
         except OSError as exc:
             log_debug(f"Failed to read JSONL {self._jsonl_file}: {exc}")

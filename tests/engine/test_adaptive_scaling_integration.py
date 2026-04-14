@@ -9,6 +9,8 @@ from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
+_TEST_FILE_PATTERN = "src/f{}.py"
+
 
 def _counting_run_analysis(call_log):
     """Factory: returns a mock run_analysis that logs agent IDs."""
@@ -33,7 +35,7 @@ class TestAdaptiveScalingIntegration:
         """The exact scenario from the spec: 20 files should use 1 agent."""
         call_log = []
         queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, [f"src/f{i}.py" for i in range(20)])
+        FileQueue(queue_path, [_TEST_FILE_PATTERN.format(i) for i in range(20)])
 
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
@@ -52,7 +54,7 @@ class TestAdaptiveScalingIntegration:
         """200 files should trigger scale-up beyond scout."""
         call_log = []
         queue_path = tmp_path / "queue.json"
-        FileQueue(queue_path, [f"src/f{i}.py" for i in range(200)], max_files_per_agent=30)
+        FileQueue(queue_path, [_TEST_FILE_PATTERN.format(i) for i in range(200)], max_files_per_agent=30)
 
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),

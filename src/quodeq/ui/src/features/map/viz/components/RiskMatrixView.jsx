@@ -16,6 +16,8 @@ const LABEL_FONT_MIN = 8;
 const LABEL_FONT_DIVISOR = 3;
 const LABEL_CHAR_WIDTH_FACTOR = 0.55;
 const LABEL_PLACED_CAP = 100;
+const AXIS_SCALE_MARGIN = 1.15;
+const ENTRANCE_DELAY_MS = 50;
 const TOOLTIP_FLIP_X_THRESHOLD = 0.65;
 const TOOLTIP_FLIP_Y_THRESHOLD = 0.75;
 
@@ -40,8 +42,8 @@ function useBubbleLayout(node) {
     });
     return {
       points: pts,
-      maxX: Math.max(1, ...pts.map((p) => p.x)) * 1.15,
-      maxY: Math.max(1, ...pts.map((p) => p.y)) * 1.15,
+      maxX: Math.max(1, ...pts.map((p) => p.x)) * AXIS_SCALE_MARGIN,
+      maxY: Math.max(1, ...pts.map((p) => p.y)) * AXIS_SCALE_MARGIN,
       maxB: Math.max(1, ...pts.map((p) => p.b)),
     };
   }, [items]);
@@ -169,7 +171,7 @@ function MatrixTooltip({ tip }) {
 export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLabels = true }) {
   const [tip, setTip] = useState(null);
   const [entered, setEntered] = useState(false);
-  useEffect(() => { const t = setTimeout(() => setEntered(true), 50); return () => clearTimeout(t); }, []);
+  useEffect(() => { const t = setTimeout(() => setEntered(true), ENTRANCE_DELAY_MS); return () => clearTimeout(t); }, []);
 
   const { points, px, py, br } = useBubbleLayout(node);
 
