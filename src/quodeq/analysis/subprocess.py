@@ -285,7 +285,7 @@ def _run_api_analysis_bridge(
     Builds its own prompt using assemble_api_prompt() instead of the CLI
     prompt, which contains MCP tool-use instructions that confuse API models.
     """
-    from quodeq.analysis._api_runner import run_api_analysis, ApiRunnerConfig  # optional dep: instructor
+    from quodeq.analysis._api_runner import run_api_analysis, ApiRunnerConfig
 
     model, api_base, api_key = _resolve_provider_config(cfg)
 

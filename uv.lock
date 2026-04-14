@@ -1295,18 +1295,13 @@ version = "1.0.5"
 source = { editable = "." }
 dependencies = [
     { name = "flask" },
+    { name = "instructor" },
     { name = "jsonschema" },
     { name = "pywebview" },
 ]
 
-[package.optional-dependencies]
-api = [
-    { name = "instructor" },
-]
-
 [package.dev-dependencies]
 dev = [
-    { name = "openai" },
     { name = "pytest" },
     { name = "pytest-cov" },
 ]
@@ -1314,15 +1309,13 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "flask", specifier = "==3.1.3" },
-    { name = "instructor", marker = "extra == 'api'", specifier = ">=1.15.0" },
+    { name = "instructor", specifier = ">=1.15.0" },
     { name = "jsonschema", specifier = "==4.26.0" },
     { name = "pywebview", specifier = ">=5.0" },
 ]
-provides-extras = ["api"]
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "openai", specifier = ">=1.0.0" },
     { name = "pytest", specifier = "==9.0.3" },
     { name = "pytest-cov", specifier = "==7.1.0" },
 ]
