@@ -66,7 +66,7 @@ class _WindowApi:
                 if choice == 'back':
                     return
                 if choice == 'keep':
-                    sys.exit(0)
+                    os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
             except Exception:
                 pass
 
@@ -79,7 +79,7 @@ class _WindowApi:
         t = threading.Thread(target=_cleanup, daemon=True)
         t.start()
         t.join(timeout=_CLEANUP_JOIN_TIMEOUT_S)
-        sys.exit(0)
+        os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
 
     def _get_running_evaluation(self) -> dict | None:
         """Return the first running evaluation job, or None."""
