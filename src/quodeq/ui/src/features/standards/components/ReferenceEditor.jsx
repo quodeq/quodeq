@@ -69,11 +69,12 @@ function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilter
 function CweBrowserModal({ onSelect, onClose }) {
   const { listCwes } = useApi();
   const [cwes, setCwes] = useState([]);
+  const [cweError, setCweError] = useState(null);
   const [query, setQuery] = useState('');
   const [filterAbstraction, setFilterAbstraction] = useState('');
   const searchRef = useRef(null);
 
-  useEffect(() => { listCwes().then(setCwes).catch(() => setCwes([])); }, [listCwes]);
+  useEffect(() => { listCwes().then((data) => { setCwes(data); setCweError(null); }).catch(() => { setCwes([]); setCweError('Failed to load CWE list. Check your connection and try again.'); }); }, [listCwes]);
   useEffect(() => { if (searchRef.current) searchRef.current.focus(); }, []);
 
   const filtered = useMemo(() => cwes.filter((c) => {
@@ -90,6 +91,7 @@ function CweBrowserModal({ onSelect, onClose }) {
           <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
         </div>
         <CweFilterBar searchRef={searchRef} query={query} setQuery={setQuery} filterAbstraction={filterAbstraction} setFilterAbstraction={setFilterAbstraction} />
+        {cweError && <div className="error-banner">{cweError}</div>}
         <div className="cwe-browser-count">{filtered.length} of {cwes.length} CWEs</div>
         <CweList filtered={filtered} onSelect={onSelect} onClose={onClose} />
       </div>

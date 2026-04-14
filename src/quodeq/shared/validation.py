@@ -17,4 +17,7 @@ def validate_path_segment(*segments: str) -> None:
 def validate_resolved_within(path: Path, root: Path) -> None:
     """Raise ValueError if *path* resolves outside *root*."""
     if not path.resolve().is_relative_to(root.resolve()):
-        raise ValueError("Path escapes its root directory")
+        raise ValueError(
+            "Path escapes its root directory. "
+            "Ensure the path does not contain '..' segments or symlinks that resolve outside the project root."
+        )

@@ -213,7 +213,7 @@ class QuodeqApp(rumps.App):
         cmds = self._cached_cmds
         quodeq_cmd = cmds.get("quodeq")
         if not quodeq_cmd:
-            self._set_error("quodeq not in PATH")
+            self._set_error("quodeq not in PATH. Install with 'pip install quodeq' or add its location to your PATH.")
             self._status_item.title = "Stopped"
             return
         self._status_item.title = "Starting..."
@@ -231,7 +231,12 @@ class QuodeqApp(rumps.App):
                 err = f.read(_STDERR_READ_MAX).strip()
         except OSError:
             err = "unknown error"
-        self._set_error(f"Crashed (exit {self._process.returncode}): {err[:_ERROR_DISPLAY_MAX]}")
+        sanitized = err[:_ERROR_DISPLAY_MAX].replace("\n", " ").strip()
+        self._set_error(
+            f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). "
+            f"Try restarting. Details: {sanitized}" if sanitized else
+            f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). Try restarting."
+        )
         self._status_item.title = "Stopped"
         self._cleanup_stderr_log()
 

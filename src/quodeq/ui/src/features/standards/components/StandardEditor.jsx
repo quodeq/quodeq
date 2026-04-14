@@ -98,7 +98,7 @@ function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
       <div className="standard-editor-tree-panel" style={{ width: treeWidth, minWidth: MIN_TREE_WIDTH, maxWidth: MAX_TREE_WIDTH }}>
         <StandardTree standard={standard} selectedNode={selectedNode} actions={actions} />
       </div>
-      <div className="standard-editor-divider" onMouseDown={onDividerMouseDown} />
+      <div className="standard-editor-divider" role="separator" tabIndex={0} onMouseDown={onDividerMouseDown} onKeyDown={(e) => { if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') e.preventDefault(); }} />
       <div className="standard-editor-detail-panel">
         <StandardDetail standard={standard} selectedNode={selectedNode} onUpdateField={updateField} editable={editable} isNew={isNew} />
       </div>

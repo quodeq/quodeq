@@ -87,7 +87,7 @@ function MapControls({ viewState, galaxyState, dimensionState }) {
       {vizStyle === 'zoompack' && (
         <div className="map-pill-group">
           {VIEW_MODES.map((m) => (
-            <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)}>
+            <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)} aria-pressed={viewMode === m.id}>
               {m.label}
             </button>
           ))}
@@ -96,7 +96,7 @@ function MapControls({ viewState, galaxyState, dimensionState }) {
       {vizStyle === 'galaxy' && (
         <div className="map-pill-group">
           {GALAXY_MODES.map((m) => (
-            <button key={m.id} type="button" className={`map-pill${galaxyMode === m.id ? ' active' : ''}`} onClick={() => setGalaxyMode(m.id)}>
+            <button key={m.id} type="button" className={`map-pill${galaxyMode === m.id ? ' active' : ''}`} onClick={() => setGalaxyMode(m.id)} aria-pressed={galaxyMode === m.id}>
               {m.label}
             </button>
           ))}
@@ -104,7 +104,7 @@ function MapControls({ viewState, galaxyState, dimensionState }) {
       )}
       <div className="map-pill-group">
         {VIZ_STYLES.map((s) => (
-          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? 'Coming soon' : ''}>
+          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? 'Coming soon' : ''} aria-pressed={vizStyle === s.id}>
             {s.label}
           </button>
         ))}

@@ -8,16 +8,19 @@ import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.j
 const DEFAULT_POWER_LEVEL = 2;
 
 function ModelSuggestInput({ label, value, suggestions, placeholder, onChange, required }) {
+  const inputId = `model-input-${label || 'default'}`;
   return (
     <div className="settings-model-field">
-      {label && <label className="settings-model-label">{label}</label>}
+      {label && <label className="settings-model-label" htmlFor={inputId}>{label}</label>}
       <input
         type="text"
+        id={inputId}
         className={`settings-model-input${required && !value ? ' settings-model-input--required' : ''}`}
         list={`models-${label}`}
         value={value}
         placeholder={placeholder || 'Select or type model'}
         onChange={(e) => onChange(e.target.value)}
+        aria-label={label ? `${label} model` : 'Model'}
       />
       <datalist id={`models-${label}`}>
         {suggestions.map((m) => <option key={m.id} value={m.id}>{m.label}</option>)}
@@ -79,6 +82,7 @@ export default function CliProviderTab({ providerId, state, update }) {
           value={parseInt(state.subagents || String(DEFAULT_SUBAGENTS), 10)}
           onBlur={(e) => update('subagents', Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || DEFAULT_SUBAGENTS)))}
           onChange={(e) => update('subagents', e.target.value)}
+          aria-label="Max parallel agents"
         />
       </div>
       <TimeLimitSetting state={state} update={update} />

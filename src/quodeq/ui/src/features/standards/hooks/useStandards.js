@@ -19,8 +19,22 @@ export function useStandards() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const handleDelete = useCallback(async (id) => { await deleteStandard(id); refresh(); }, [refresh]);
-  const handleDuplicate = useCallback(async (id, newId) => { await duplicateStandard(id, newId); refresh(); }, [refresh]);
+  const handleDelete = useCallback(async (id) => {
+    try {
+      await deleteStandard(id);
+      refresh();
+    } catch (err) {
+      setError(err.message || 'Failed to delete standard');
+    }
+  }, [refresh]);
+  const handleDuplicate = useCallback(async (id, newId) => {
+    try {
+      await duplicateStandard(id, newId);
+      refresh();
+    } catch (err) {
+      setError(err.message || 'Failed to duplicate standard');
+    }
+  }, [refresh]);
 
   const grouped = {
     [STANDARD_TYPES.BUILTIN]: [],

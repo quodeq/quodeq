@@ -175,7 +175,7 @@ export default function RiskMatrixView({ node, onDrillDown, onFileClick, showLab
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block' }}>
+      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block' }} aria-label="Risk matrix showing file violations by severity and frequency">
         <defs>
           <radialGradient id="riskDanger" cx="100%" cy="0%" r="100%">
             <stop offset="0%" stopColor="var(--color-sev-critical-text)" stopOpacity="0.12" />

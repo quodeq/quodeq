@@ -126,7 +126,7 @@ export default function EvaluationForm({ onStart, disabled, selectedProject }) {
           />
         )}
 
-        {dimLoadError && <p className="inline-error" style={{ marginBottom: FOLDER_MARGIN_BOTTOM }}>{dimLoadError}</p>}
+        {dimLoadError && <p className="inline-error" role="alert" style={{ marginBottom: FOLDER_MARGIN_BOTTOM }}>{dimLoadError}</p>}
         {repo && allDimensions.length > 0 && (
           <DimensionSelector
             allDimensions={allDimensions}

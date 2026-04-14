@@ -91,7 +91,7 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   );
 }
 
-function useDismissedFindings(selectedProject, onRefresh) {
+function useDismissedFindings(selectedProject, onRefresh, setRestoreError) {
   const [dismissed, setDismissed] = useState([]);
 
   useEffect(() => {
@@ -106,8 +106,9 @@ function useDismissedFindings(selectedProject, onRefresh) {
       onRefresh?.();
     } catch (err) {
       console.error('Failed to restore finding:', err);
+      setRestoreError?.('Failed to restore finding. Please try again.');
     }
-  }, [selectedProject, onRefresh]);
+  }, [selectedProject, onRefresh, setRestoreError]);
 
   const handleRestoreAll = useCallback(async () => {
     try {
@@ -116,8 +117,9 @@ function useDismissedFindings(selectedProject, onRefresh) {
       onRefresh?.();
     } catch (err) {
       console.error('Failed to restore all findings:', err);
+      setRestoreError?.('Failed to restore all findings. Please try again.');
     }
-  }, [selectedProject, onRefresh]);
+  }, [selectedProject, onRefresh, setRestoreError]);
 
   return { dismissed, handleRestore, handleRestoreAll };
 }
@@ -128,7 +130,8 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
   const [fileCurrentPath, _setFileCurrentPath] = useState(savedFilePathRef.current);
   const setFileCurrentPath = (v) => { savedFilePathRef.current = v; _setFileCurrentPath(v); };
 
-  const { dismissed, handleRestore, handleRestoreAll } = useDismissedFindings(selectedProject, onRefresh);
+  const [restoreError, setRestoreError] = useState(null);
+  const { dismissed, handleRestore, handleRestoreAll } = useDismissedFindings(selectedProject, onRefresh, setRestoreError);
 
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
@@ -149,7 +152,7 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
 
   return {
     activeSubTab, setActiveSubTab, dismissed,
-    handleRestore, handleRestoreAll, visibleDimensions,
+    handleRestore, handleRestoreAll, restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
   };
@@ -226,13 +229,14 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
 
   const {
     activeSubTab, setActiveSubTab, dismissed,
-    handleRestore, handleRestoreAll, visibleDimensions,
+    handleRestore, handleRestoreAll, restoreError, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
   } = useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, savedSubTabRef, savedFilePathRef });
 
   return (
     <div className="violations-page">
+      {restoreError && <div className="error-banner">{restoreError}</div>}
       <div className="map-header">
         <h2 className="page-title">Violations</h2>
         <div className="map-pill-group">

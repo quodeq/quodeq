@@ -71,7 +71,7 @@ def handle_tools_call(
     if name == GET_NEXT_FILES_NAME:
         if queue is None:
             return _ok(request_id, {
-                "content": [{"type": "text", "text": "No file queue configured."}],
+                "content": [{"type": "text", "text": "No file queue configured. Ensure the evaluation was started with a file manifest and the queue path is set."}],
                 "isError": True,
             })
         count = args.get("count", _DEFAULT_FILE_BATCH_SIZE)

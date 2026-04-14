@@ -33,6 +33,9 @@ export default function FileShape({ cx, cy, r, color, borderColor, glow, handler
         fill={color} fillOpacity={FILE_FILL_OPACITY} stroke={stroke} strokeWidth={0.8 / totalScale}
         filter={glow ? 'url(#glow)' : undefined}
         style={{ cursor: handlers?.onClick ? 'pointer' : 'default', transition: 'fill-opacity 0.2s ease' }}
+        tabIndex={handlers?.onClick ? 0 : undefined}
+        role={handlers?.onClick ? 'button' : undefined}
+        onKeyDown={handlers?.onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handlers.onClick(e); } } : undefined}
         {...handlers}
       />
       <path d={FOLD_PATH}

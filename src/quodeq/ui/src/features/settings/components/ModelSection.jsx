@@ -80,11 +80,13 @@ function handleModelChange(level, value, setter, storageKey = `${MODEL_STORAGE_P
 }
 
 function ModelOverrideInput({ label, value, setter, level, placeholder }) {
+  const inputId = `model-override-${level}`;
   return (
     <div className="settings-model-field">
-      <label className="settings-model-label">{label}</label>
+      <label className="settings-model-label" htmlFor={inputId}>{label}</label>
       <input
         type="text"
+        id={inputId}
         className="settings-model-input"
         value={value}
         placeholder={placeholder}
@@ -113,6 +115,7 @@ function ModelSettings({ aiCmd, models }) {
           value={aiModel}
           placeholder="default"
           onChange={(e) => handleModelChange(null, e.target.value, onAiModelChange, AI_MODEL_STORAGE_KEY)}
+          aria-label="Model override"
         />
       </div>
       <div className="settings-row">

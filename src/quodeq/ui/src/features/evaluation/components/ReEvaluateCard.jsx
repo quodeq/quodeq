@@ -133,6 +133,7 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
           placeholder="https://github.com/org/repo"
           className="re-eval-url-input"
           disabled={urlSaving}
+          aria-label="Repository URL for reevaluation"
         />
         <button
           type="button"

@@ -40,6 +40,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
             value={state.model}
             placeholder="e.g. qwen/qwen3.6-plus-preview:free"
             onChange={(e) => update('model', e.target.value)}
+            aria-label="Model identifier"
           />
           <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !state.model}>
             {testing ? 'Testing...' : 'Test'}
@@ -65,6 +66,7 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
           value={parseInt(state.subagents || '1', 10)}
           onBlur={(e) => update('subagents', Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || 1)))}
           onChange={(e) => update('subagents', e.target.value)}
+          aria-label="Max parallel agents"
         />
       </div>
       <TimeLimitSetting state={state} update={update} />

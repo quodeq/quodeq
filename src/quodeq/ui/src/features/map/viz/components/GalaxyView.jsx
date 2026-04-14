@@ -266,6 +266,8 @@ export default function GalaxyView({ dimensions, onNavigate, showLabels = true, 
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
+        role="img"
+        aria-label="Galaxy visualization of project compliance"
       />
       {/* Breadcrumb */}
       <VizBreadcrumb items={breadcrumb.map((bc, i) => ({

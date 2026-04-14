@@ -30,7 +30,11 @@ def _load_dimension_data(
     try:
         return read_json(path)
     except (OSError, ValueError) as exc:
-        _logger.warning("Failed to load dimension %s: %s", dimension, exc)
+        _logger.warning(
+            "Failed to load dimension %s: %s. "
+            "Check that the compiled standards JSON file exists and is valid.",
+            dimension, exc,
+        )
         return None
 
 

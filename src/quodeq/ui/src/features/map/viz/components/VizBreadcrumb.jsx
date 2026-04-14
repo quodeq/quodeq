@@ -29,6 +29,9 @@ export default function VizBreadcrumb({ items }) {
               onClick={clickable ? item.onClick : undefined}
               onMouseEnter={clickable ? (e) => { e.target.style.background = 'color-mix(in srgb, var(--color-accent) 15%, transparent)'; e.target.style.color = 'var(--color-text)'; } : undefined}
               onMouseLeave={clickable ? (e) => { e.target.style.background = 'transparent'; e.target.style.color = 'var(--color-text-muted)'; } : undefined}
+              tabIndex={clickable ? 0 : undefined}
+              role={clickable ? 'button' : undefined}
+              onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.onClick(); } } : undefined}
             >{item.label}</span>
           </span>
         );

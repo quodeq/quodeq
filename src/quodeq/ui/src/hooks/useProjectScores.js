@@ -58,7 +58,7 @@ function fetchRunScoresEffect(selectedProject, selectedRun, setScores, setLoadin
       _cache.set(key, data);
       setScores(data);
     })
-    .catch(() => { if (active) setError('Failed to load score data.'); })
+    .catch(() => { if (active) setError('Failed to load score data. Check your connection and try refreshing.'); })
     .finally(() => { if (active) setLoading(false); });
   return () => { active = false; };
 }

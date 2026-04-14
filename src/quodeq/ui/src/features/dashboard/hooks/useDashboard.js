@@ -43,7 +43,7 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
       _runCache.set(cacheKey, payload);
       if (active) setDashboard(payload);
     })
-    .catch(() => { if (active) setError('Failed to load dashboard data.'); })
+    .catch(() => { if (active) setError('Failed to load dashboard data. Check your connection and try refreshing.'); })
     .finally(() => { if (active) setLoading(false); });
 
   return () => { active = false; };

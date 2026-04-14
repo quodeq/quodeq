@@ -163,15 +163,12 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
 export default function ExplorerPage({ project, dimension, runId, dateLabel, severityFilter, onNavigate, refreshSignal }) {
   const d = useExplorerData(project, dimension, runId, refreshSignal);
   const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
-  if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
-  if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
-  if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
+
+  // All hooks must run before any early returns (React hooks rules)
   const buildEvalPrincipal = useMemo(
-    () => buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId),
+    () => d.evalData ? buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId) : () => ({}),
     [d.evalData, d.complianceByPrinciple, project, runId]
   );
-
-  // Apply severity filter
   const filteredViolations = useMemo(
     () => activeSevFilter
       ? d.allViolations.filter(v => (v.severity || 'minor') === activeSevFilter)
@@ -184,6 +181,10 @@ export default function ExplorerPage({ project, dimension, runId, dateLabel, sev
       : d.topFiles,
     [filteredViolations, activeSevFilter, d.topFiles]
   );
+
+  if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
+  if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
+  if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
 
   return (
     <>
