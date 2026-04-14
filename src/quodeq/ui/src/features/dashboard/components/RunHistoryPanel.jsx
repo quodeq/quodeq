@@ -25,6 +25,7 @@ const REF_LINE_HIGH = 7.5;
 const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
   if (_cssVarCache.has(name)) return _cssVarCache.get(name);
+  if (typeof document === 'undefined') return fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const result = val || fallback;
   _cssVarCache.set(name, result);
@@ -35,10 +36,12 @@ const cssVar = (name, fallback) => {
 export function clearCssVarCache() { _cssVarCache.clear(); }
 
 // Auto-clear cache when theme changes (data-theme attribute mutation)
-new MutationObserver(() => _cssVarCache.clear()).observe(
-  document.documentElement,
-  { attributes: true, attributeFilter: ['data-theme'] },
-);
+if (typeof document !== 'undefined') {
+  new MutationObserver(() => _cssVarCache.clear()).observe(
+    document.documentElement,
+    { attributes: true, attributeFilter: ['data-theme'] },
+  );
+}
 
 const GRADE_CSS_VARS = {
   'grade-top':    '--color-grade-top-text',

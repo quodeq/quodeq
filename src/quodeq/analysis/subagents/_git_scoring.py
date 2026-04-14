@@ -31,7 +31,13 @@ def _has_git(src: Path) -> bool:
 
 
 def _run_git_log(src: Path, months: int = 3) -> str | None:
-    """Run git log and return raw output, or None if git unavailable."""
+    """Run git log and return raw output, or None if git unavailable.
+
+    This function (together with ``_iter_git_log``) is the git abstraction
+    layer: all git subprocess calls are funnelled through these two helpers,
+    making it straightforward to swap in a different git backend or mock
+    git access in tests.
+    """
     if not _has_git(src):
         return None
     try:

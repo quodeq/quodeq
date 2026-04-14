@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getProjectInfo, relocateProject, cloneToLocal } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { useScanData } from '../hooks/useScanData.js';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
@@ -10,7 +10,7 @@ import FolderBrowser from './FolderBrowser.jsx';
 const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' };
 const flexButtonStyle = { flex: 1 };
 
-function useReEvalInfo(project, initialInfo) {
+function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }) {
   const [info, setInfo] = useState(initialInfo || null);
   const [error, setError] = useState(null);
   const [urlInput, setUrlInput] = useState('');
@@ -77,7 +77,9 @@ function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) 
 }
 
 function useReEvaluateCard(project, onStart, projectInfo) {
-  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo);
+  const api = useApi();
+  const { getProjectInfo, relocateProject, cloneToLocal } = api;
+  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
   const { allDimensions } = usePluginDimensions();
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);

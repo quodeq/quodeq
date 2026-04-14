@@ -3,9 +3,10 @@
  * were previously inlined inside App, keeping the root component focused
  * on composition rather than API plumbing.
  */
-import { deleteProject, getProjectExportUrl, relocateProject } from '../api/index.js';
+import { useApi } from '../api/ApiContext.jsx';
 
 export function useProjectActions({ projects, selectedProject, handleProjectChange, loadProjects }) {
+  const { deleteProject, getProjectExportUrl, relocateProject } = useApi();
   async function handleDeleteProject(projectId) {
     try {
       await deleteProject(projectId);

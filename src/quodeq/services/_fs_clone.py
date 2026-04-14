@@ -12,7 +12,7 @@ from typing import Any
 from quodeq.data.fs.repo_handler import _PRIVATE_HOST_RE, _resolves_to_private
 from quodeq.shared.repo_handler import is_valid_repo_url
 
-_GIT_CLONE_TIMEOUT_S = 300
+_GIT_CLONE_TIMEOUT_S = int(os.environ.get("QUODEQ_GIT_CLONE_TIMEOUT_S", "300"))
 
 
 def run_git_clone(url: str, clone_dest: Path) -> bool:

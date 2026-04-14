@@ -1,5 +1,5 @@
 import { useState, useRef } from 'react';
-import { importStandard } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 const MAX_FILE_SIZE = 1024 * 1024; // 1MB
 const STEP = { PICK: 'pick', REVIEWING: 'reviewing', ERROR: 'error', WARNINGS: 'warnings', CONFLICT: 'conflict' };
@@ -88,7 +88,7 @@ function ConflictStep({ parsedData, conflict, warnings, actions }) {
   );
 }
 
-async function importEvaluator(data, force, onImported, state) {
+async function importEvaluator(data, force, onImported, state, importStandard) {
   const { setStep, setError, setWarnings, setConflict } = state;
   setStep(STEP.REVIEWING);
   try {
@@ -111,7 +111,7 @@ async function importEvaluator(data, force, onImported, state) {
   }
 }
 
-async function handleFileInput(e, onImported, state) {
+async function handleFileInput(e, onImported, state, importStandard) {
   const { setStep, setError, setParsedData } = state;
   const file = e.target.files?.[0];
   if (!file) return;
@@ -135,31 +135,32 @@ async function handleFileInput(e, onImported, state) {
     return;
   }
   setParsedData(data);
-  await importEvaluator(data, false, onImported, state);
+  await importEvaluator(data, false, onImported, state, importStandard);
 }
 
-function useImportActions(onImported, state) {
+function useImportActions(onImported, state, importStandard) {
   const { parsedData, setParsedData } = state;
 
-  const handleFile = async (e) => handleFileInput(e, onImported, state);
-  const handleForceImport = async () => { await importEvaluator(parsedData, true, onImported, state); };
+  const handleFile = async (e) => handleFileInput(e, onImported, state, importStandard);
+  const handleForceImport = async () => { await importEvaluator(parsedData, true, onImported, state, importStandard); };
   const handleImportAsCopy = async () => {
     const copied = { ...parsedData, id: buildImportedCopyId(parsedData.id) };
     setParsedData(copied);
-    await importEvaluator(copied, false, onImported, state);
+    await importEvaluator(copied, false, onImported, state, importStandard);
   };
-  const handleProceedWithWarnings = async () => { await importEvaluator(parsedData, true, onImported, state); };
+  const handleProceedWithWarnings = async () => { await importEvaluator(parsedData, true, onImported, state, importStandard); };
   return { handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
 }
 
 function useImportModal(onImported) {
+  const { importStandard } = useApi();
   const [step, setStep] = useState(STEP.PICK);
   const [error, setError] = useState(null);
   const [warnings, setWarnings] = useState([]);
   const [conflict, setConflict] = useState(null);
   const [parsedData, setParsedData] = useState(null);
   const fileRef = useRef(null);
-  const actions = useImportActions(onImported, { setStep, setError, setWarnings, setConflict, parsedData, setParsedData });
+  const actions = useImportActions(onImported, { setStep, setError, setWarnings, setConflict, parsedData, setParsedData }, importStandard);
 
   return { step, error, warnings, conflict, parsedData, fileRef, ...actions };
 }

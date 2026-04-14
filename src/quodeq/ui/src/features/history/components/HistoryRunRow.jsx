@@ -4,7 +4,7 @@ function formatDate(dateISO) {
   if (!dateISO) return '';
   try {
     const d = new Date(dateISO);
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
   } catch { return ''; }
 }
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from pathlib import Path
@@ -13,7 +14,7 @@ from quodeq.shared.utils import read_json
 
 _logger = logging.getLogger(__name__)
 
-_PLUGIN_CACHE_TTL = 60  # seconds; allows runtime plugin changes to propagate
+_PLUGIN_CACHE_TTL = int(os.environ.get("QUODEQ_PLUGIN_CACHE_TTL", "60"))  # seconds; allows runtime plugin changes to propagate
 
 
 class _PluginCache:

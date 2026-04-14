@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 import json
+import os
 import threading
 import uuid
 from typing import Any, Callable, Iterable
@@ -228,7 +229,7 @@ class JobManager:
             for jid in completed[:excess]:
                 self._store.delete(jid)
 
-    _JOB_TIMEOUT_S = 7200  # 2 hours max per evaluation job
+    _JOB_TIMEOUT_S = int(os.environ.get("QUODEQ_JOB_TIMEOUT_S", "7200"))  # 2 hours max per evaluation job
 
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
         try:

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import ipaddress
 import re
-import socket
+
+from quodeq.shared.ssrf import is_private_address
 
 _REPO_URL_RE = re.compile(
     r"^(https?://[\w.\-]+/[\w.\-/]+(\.git)?|git@[\w.\-]+:[\w.\-/]+(\.git)?)$"
@@ -24,22 +24,10 @@ _PRIVATE_HOST_RE = re.compile(
 def _resolves_to_private(hostname: str) -> bool:
     """Return True if *hostname* resolves to a private/loopback IP address.
 
-    Used to block DNS-rebinding attacks where a public-looking hostname
-    resolves to an internal address at request time.
+    Delegates to the shared SSRF module to avoid duplicating DNS-resolution
+    and private-address detection logic.
     """
-    try:
-        results = socket.getaddrinfo(hostname, None)
-    except OSError:
-        # If we can't resolve, treat as private to fail safe.
-        return True
-    for _family, _type, _proto, _canonname, sockaddr in results:
-        addr = sockaddr[0]
-        try:
-            if ipaddress.ip_address(addr).is_private:
-                return True
-        except ValueError:
-            continue
-    return False
+    return is_private_address(hostname)
 
 
 def is_valid_repo_url(url: str) -> bool:

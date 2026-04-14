@@ -14,26 +14,26 @@ const DEFAULTS = {
   'verify': 'true',
 };
 
-function loadProviderState(providerId, overrides) {
+function loadProviderState(providerId, overrides, storage = localStorage) {
   const merged = { ...DEFAULTS, ...overrides };
   const state = {};
   for (const key of SETTINGS) {
-    state[key] = localStorage.getItem(providerKey(providerId, key)) ?? merged[key];
+    state[key] = storage.getItem(providerKey(providerId, key)) ?? merged[key];
   }
   return state;
 }
 
-function saveProviderSetting(providerId, key, value) {
-  localStorage.setItem(providerKey(providerId, key), String(value));
+function saveProviderSetting(providerId, key, value, storage = localStorage) {
+  storage.setItem(providerKey(providerId, key), String(value));
 }
 
-export default function useProviderSettings(providerId, defaults) {
-  const [state, setState] = useState(() => loadProviderState(providerId, defaults));
+export default function useProviderSettings(providerId, defaults, { storage = localStorage } = {}) {
+  const [state, setState] = useState(() => loadProviderState(providerId, defaults, storage));
 
   const update = useCallback((key, value) => {
     setState(prev => ({ ...prev, [key]: String(value) }));
-    saveProviderSetting(providerId, key, value);
-  }, [providerId]);
+    saveProviderSetting(providerId, key, value, storage);
+  }, [providerId, storage]);
 
   return { state, update };
 }

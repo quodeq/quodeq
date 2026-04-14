@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { browseDirectory, createDirectory } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 function FileIcon() {
   return (
@@ -116,7 +116,7 @@ function FolderFooter({ selectedFolder, onClose, onConfirm, confirmText = 'Use T
   );
 }
 
-async function navigateFolder(path, navigation, showFiles) {
+async function navigateFolder(path, navigation, showFiles, browseDirectory) {
   const { setLoading, setNavError, updateNavState } = navigation;
   setLoading(true);
   setNavError(null);
@@ -131,6 +131,7 @@ async function navigateFolder(path, navigation, showFiles) {
 }
 
 function NewFolderInput({ currentPath, navigate, onClose }) {
+  const { createDirectory } = useApi();
   const [name, setName] = useState('');
   const [error, setError] = useState(null);
 
@@ -189,6 +190,7 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
 }
 
 export default function FolderBrowser({ onSelect, onClose, title = 'Select Repository Folder', confirmText = 'Use This Folder', showFiles = false, rootPath = null }) {
+  const { browseDirectory } = useApi();
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
@@ -210,8 +212,8 @@ export default function FolderBrowser({ onSelect, onClose, title = 'Select Repos
       setPathInput(rootPath);
       return;
     }
-    navigateFolder(path, navigation, showFiles);
-  }, [rootPath, showFiles]); // eslint-disable-line react-hooks/exhaustive-deps
+    navigateFolder(path, navigation, showFiles, browseDirectory);
+  }, [rootPath, showFiles, browseDirectory]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { navigate(rootPath || ''); }, [rootPath, navigate]);
 

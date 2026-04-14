@@ -4,7 +4,7 @@ import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
-import { getRunScores } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 
@@ -166,6 +166,7 @@ function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
 }
 
 function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
+  const { getRunScores } = useApi();
   const { principle, dimension, project, runId } = evalPrincipal;
   const [dismissedSet, setDismissedSet] = useState(new Set());
   const [liveScore, setLiveScore] = useState(null);

@@ -95,8 +95,18 @@ def estimate_max_agents(
     }
 
 
-def _get_gpu_memory() -> float:
-    """Detect total GPU/unified memory in bytes. Returns 0 if unknown."""
+def _detect_memory() -> float:
+    """Detect total GPU/unified memory in bytes via platform dispatch.
+
+    Currently supports:
+    - **macOS (Darwin)**: reports unified memory via ``sysctl hw.memsize``.
+    - **Linux**: queries NVIDIA discrete GPU memory via ``nvidia-smi``.
+
+    Extension points: add branches for Windows (``wmic`` or WMI) and
+    AMD ROCm (``rocm-smi``) as needed.
+
+    Returns 0 if detection fails or the platform is unsupported.
+    """
     system = platform.system()
     try:
         if system == "Darwin":
@@ -115,6 +125,10 @@ def _get_gpu_memory() -> float:
     except (subprocess.SubprocessError, FileNotFoundError, ValueError, OSError):
         pass
     return 0
+
+
+# Keep backward-compatible alias
+_get_gpu_memory = _detect_memory
 
 
 def run_concurrency_test(

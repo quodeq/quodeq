@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listPlugins, listStandards } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { STANDARD_TYPES } from '../../standards/hooks/useStandards.js';
 
@@ -32,7 +32,7 @@ function deduplicateDimensions(plugins, standards) {
 let _cachedDimensions = null;
 let _cachePromise = null;
 
-function _loadDimensions() {
+function _loadDimensions(listPlugins, listStandards) {
   if (_cachePromise) return _cachePromise;
   _cachePromise = Promise.all([
     listPlugins().catch(() => []),
@@ -60,6 +60,7 @@ function _filterVisible(dims) {
 }
 
 export function usePluginDimensions() {
+  const { listPlugins, listStandards } = useApi();
   const [allDimensions, setAllDimensions] = useState(() => _cachedDimensions ? _filterVisible(_cachedDimensions) : []);
   const [dimLoadError, setDimLoadError] = useState(null);
 
@@ -68,7 +69,7 @@ export function usePluginDimensions() {
       setAllDimensions(_filterVisible(_cachedDimensions));
       return;
     }
-    _loadDimensions().then((dims) => {
+    _loadDimensions(listPlugins, listStandards).then((dims) => {
       setAllDimensions(_filterVisible(dims));
       setDimLoadError(null);
     }).catch(() => {

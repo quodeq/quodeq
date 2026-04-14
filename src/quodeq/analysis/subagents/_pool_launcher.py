@@ -14,7 +14,7 @@ from quodeq.shared.utils import get_ai_cmd
 
 _MAX_FILES_PER_AGENT = 30
 _MAX_FILES_PER_AGENT_CAP = 50
-_NON_SCOUT_PROVIDERS = ("codex", "gemini")
+_NON_SCOUT_PROVIDERS = tuple(os.environ.get("QUODEQ_NON_SCOUT_PROVIDERS", "codex,gemini").split(","))
 
 
 def _compute_files_per_agent(total_files: int) -> int:

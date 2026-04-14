@@ -10,8 +10,8 @@ from quodeq.llm_bridge import (
     run_concurrency_test,
     get_known_models,
     get_provider_configs,
+    check_cloud_connection,
 )
-from quodeq.llm_bridge._cloud import check_cloud_connection
 from quodeq.shared.url_validation import validate_url_safe
 
 

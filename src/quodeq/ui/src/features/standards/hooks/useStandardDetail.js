@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getStandard, createStandard, updateStandard } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { generateRequirementId } from '../utils.js';
 import { deepClone } from '../../../utils/deepClone.js';
 import { STANDARD_TYPES } from './useStandards.js';
@@ -51,7 +51,7 @@ function useTreeMutations(setStandard, setDirty, setSelectedNode) {
   return { addPrinciple, removePrinciple, addRequirement, removeRequirement };
 }
 
-function useStandardMutations(standard, setStandard, setDirty, standardId, isNew) {
+function useStandardMutations(standard, setStandard, setDirty, standardId, isNew, { createStandard, updateStandard }) {
   const [selectedNode, setSelectedNode] = useState(null);
 
   // Deep clone is required here to ensure React detects state changes via
@@ -86,12 +86,13 @@ function useStandardMutations(standard, setStandard, setDirty, standardId, isNew
 }
 
 export function useStandardDetail(standardId, isNew) {
+  const { getStandard, createStandard, updateStandard } = useApi();
   const [standard, setStandard] = useState(null);
   const [loading, setLoading] = useState(!isNew);
   const [error, setError] = useState(null);
   const [dirty, setDirty] = useState(false);
 
-  const mutations = useStandardMutations(standard, setStandard, setDirty, standardId, isNew);
+  const mutations = useStandardMutations(standard, setStandard, setDirty, standardId, isNew, { createStandard, updateStandard });
 
   useEffect(() => {
     if (isNew) {

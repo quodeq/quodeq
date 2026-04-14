@@ -16,17 +16,21 @@ import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/for
 const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
   if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
+  if (typeof document === 'undefined') return fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   _cssVarCache.set(name, val);
   return val || fallback;
 };
-new MutationObserver(() => _cssVarCache.clear()).observe(
-  document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
-);
+if (typeof document !== 'undefined') {
+  new MutationObserver(() => _cssVarCache.clear()).observe(
+    document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
+  );
+}
 
 /** Clear the CSS variable cache; exported for test resets. */
 export function clearCssVarCache() { _cssVarCache.clear(); }
 
+// Domain constants that match backend scoring tiers (see grading.py).
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
 const CHART_LEFT_MARGIN = -16;
 const CHART_HEIGHT = 160;
@@ -57,7 +61,9 @@ function trendColorClass(angle) {
   return 'trend-same';
 }
 
-// Shortcodes mirror src/quodeq/config/dimensions.py
+// Shortcodes mirror src/quodeq/config/dimensions.py.
+// Ideally these would come from a /api/dimensions config endpoint;
+// hardcoded for now to avoid an extra network round-trip.
 const DIM_CODE = {
   affordability:  'aff',
   availability:   'avl',

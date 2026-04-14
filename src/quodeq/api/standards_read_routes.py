@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import logging
+import os
 import time as _time
 
 from flask import Flask, Response, jsonify, request
@@ -13,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 _cwe_cache: list | None = None
 _cwe_cache_time: float = 0.0
-_CWE_CACHE_TTL = 3600  # 1 hour
+_CWE_CACHE_TTL = int(os.environ.get("QUODEQ_CWE_CACHE_TTL", "3600"))  # 1 hour
 
 
 def reset_cwe_cache() -> None:

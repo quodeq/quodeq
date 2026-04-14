@@ -149,7 +149,7 @@ class InMemoryJobStore:
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_PERSIST_DIR = Path.home() / ".quodeq" / "run" / "jobs"
+_DEFAULT_PERSIST_DIR = Path(os.environ.get("QUODEQ_JOB_PERSIST_DIR", str(Path.home() / ".quodeq" / "run" / "jobs")))
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
 
 

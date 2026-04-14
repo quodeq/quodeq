@@ -1,11 +1,10 @@
 """Cloud API provider testing — connection verification."""
 from __future__ import annotations
 
-import ipaddress
 import logging
-import socket
 import time
-import urllib.parse
+
+from quodeq.shared.url_validation import validate_url_safe
 
 try:
     import openai
@@ -14,30 +13,17 @@ except ImportError:
 
 _log = logging.getLogger(__name__)
 
-_ALLOWED_SCHEMES = {"http", "https"}
 _MIN_KEY_LEN_FOR_REDACTION = 8
 _MAX_ERROR_BRIEF_LEN = 120
 
 
-def _is_private_url(url: str) -> bool:
-    """Return True if *url* targets a private/internal network address."""
-    try:
-        parsed = urllib.parse.urlparse(url)
-        if parsed.scheme not in _ALLOWED_SCHEMES:
-            return True
-        hostname = parsed.hostname or ""
-        if not hostname:
-            return True
-        # Allow localhost explicitly (needed for Ollama)
-        if hostname in ("localhost", "127.0.0.1", "::1"):
-            return False
-        for info in socket.getaddrinfo(hostname, None):
-            addr = ipaddress.ip_address(info[4][0])
-            if addr.is_private or addr.is_loopback or addr.is_link_local:
-                return True
-    except (ValueError, OSError):
-        return True
-    return False
+def _create_client(api_base: str, api_key: str) -> "openai.OpenAI":
+    """Create an OpenAI client.
+
+    Extracted as a factory so callers can override or mock client creation
+    (e.g. for testing or custom transport adapters).
+    """
+    return openai.OpenAI(base_url=api_base, api_key=api_key)
 
 
 def check_cloud_connection(
@@ -46,16 +32,23 @@ def check_cloud_connection(
     model: str,
     api_key: str,
 ) -> dict:
-    """Test a cloud API provider connection with a minimal request."""
+    """Test a cloud API provider connection with a minimal request.
+
+    The caller supplies ``api_base`` and ``api_key``, providing an adapter-
+    pattern seam: callers control *which* endpoint and credentials are used,
+    and ``_create_client`` can be monkey-patched for testing or custom transports.
+    """
     if openai is None:
         return {"success": False, "error": "openai package not installed. Install with: pip install 'quodeq[api]'"}
     if not api_base:
         return {"success": False, "error": "API base URL is required"}
-    if _is_private_url(api_base):
+    try:
+        validate_url_safe(api_base)
+    except ValueError:
         return {"success": False, "error": "Cannot connect to private/internal network addresses"}
 
     try:
-        client = openai.OpenAI(base_url=api_base, api_key=api_key)
+        client = _create_client(api_base, api_key)
         start = time.monotonic()
         client.chat.completions.create(
             model=model,

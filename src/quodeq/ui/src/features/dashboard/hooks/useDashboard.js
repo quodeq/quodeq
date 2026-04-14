@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getDashboard } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { useProjectScores, clearScoresCache } from '../../../hooks/useProjectScores.js';
 
 const REFRESH_DEBOUNCE_MS = 300;
@@ -22,7 +22,7 @@ export function clearDashboardCache(project) {
   }
 }
 
-function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError) {
+function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError, getDashboard) {
   if (!selectedProject) { setDashboard(null); setError(null); return; }
 
   const cacheKey = _runCacheKey(selectedProject, selectedRun);
@@ -77,6 +77,7 @@ function useDebouncedRefresh(selectedProject, refreshScores, setRefreshKey) {
 }
 
 export function useDashboard({ selectedProject, selectedRun }) {
+  const { getDashboard } = useApi();
   const [dashboard, setDashboard] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -90,8 +91,8 @@ export function useDashboard({ selectedProject, selectedRun }) {
 
   useEffect(() => {
     setLoading(true);
-    return fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError);
-  }, [selectedProject, selectedRun, refreshKey]);
+    return fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError, getDashboard);
+  }, [selectedProject, selectedRun, refreshKey, getDashboard]);
 
   const dashboardWithTrend = useMemo(() => {
     if (!dashboard) return null;

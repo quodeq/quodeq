@@ -2,10 +2,11 @@
 from __future__ import annotations
 
 import json
+import os
 import threading
 from pathlib import Path
 
-_AI_PROVIDERS_PATH = Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json"
+_AI_PROVIDERS_PATH = Path(os.environ.get("QUODEQ_AI_PROVIDERS_PATH", str(Path(__file__).resolve().parent.parent / "data" / "config" / "ai_providers.json")))
 
 # Fallback provider configs used when the primary JSON file
 # (data/config/ai_providers.json) cannot be loaded.

@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react';
-import { getAiClients } from '../../../api/index.js';
-import { ACTIVE_PROVIDER_KEY } from '../../../constants.js';
+import { useApi } from '../../../api/ApiContext.jsx';
+import { ACTIVE_PROVIDER_KEY, DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET } from '../../../constants.js';
 import useProviderSettings from '../hooks/useProviderSettings.js';
 import { classifyProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
 
-const CLI_DEFAULTS = { 'subagents': '5', 'pool-budget': '600' };
+const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'pool-budget': String(DEFAULT_POOL_BUDGET) };
 
 const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
 const LEGACY_AI_CMD_KEY = 'cc-ai-cmd';
@@ -33,6 +33,7 @@ function TabContent({ provider, providerConfig }) {
 }
 
 export default function ProviderTabs({ providerConfigs }) {
+  const { getAiClients } = useApi();
   const [clients, setClients] = useState([]);
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem(ACTIVE_PROVIDER_KEY) || '');
   useEffect(() => {

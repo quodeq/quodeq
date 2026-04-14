@@ -99,8 +99,8 @@ def _run_cli_analysis(
         _check_process_result(process, stream_err)
 
 
-_MAX_API_PROMPT_CHARS = 30_000  # Target prompt size for local models (~8K tokens)
-_MAX_API_FILE_SIZE = 15_000  # Skip files larger than 15KB
+_MAX_API_PROMPT_CHARS = int(os.environ.get("QUODEQ_MAX_API_PROMPT_CHARS", "30000"))  # Target prompt size for local models (~8K tokens)
+_MAX_API_FILE_SIZE = int(os.environ.get("QUODEQ_MAX_API_FILE_SIZE", "15000"))  # Skip files larger than 15KB
 
 
 def _load_skip_dirs() -> frozenset[str]:
@@ -167,7 +167,7 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     return selected
 
 
-_MAX_STANDARDS_CHARS = 50_000  # Allow full standards for models with large context
+_MAX_STANDARDS_CHARS = int(os.environ.get("QUODEQ_MAX_STANDARDS_CHARS", "50000"))  # Allow full standards for models with large context
 
 
 def _load_standards_text(compiled_dir: Path | None, dimension: str | None) -> str:

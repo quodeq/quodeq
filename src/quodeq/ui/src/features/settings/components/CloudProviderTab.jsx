@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { testProviderConnection } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 
 export default function CloudProviderTab({ providerId, providerConfig, state, update }) {
+  const { testProviderConnection } = useApi();
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);
 

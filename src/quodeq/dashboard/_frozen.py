@@ -49,6 +49,8 @@ def source_user_path() -> None:
     if not is_frozen() or sys.platform == "win32":
         return
     try:
+        # macOS-standard shell profile paths. These cover the default zsh
+        # and bash configurations; exotic setups may need QUODEQ_PATH override.
         cmd = ('source ~/.zprofile 2>/dev/null; source ~/.zshrc 2>/dev/null; '
                'source ~/.bash_profile 2>/dev/null; echo $PATH')
         shell = os.environ.get("SHELL", "/bin/zsh")

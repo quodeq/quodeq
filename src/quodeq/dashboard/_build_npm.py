@@ -10,8 +10,8 @@ from quodeq.shared.logging import log_info
 
 from quodeq.dashboard._build_hash import _SYNC_ITEMS
 
-_NPM_INSTALL_TIMEOUT_S = 300
-_NPM_BUILD_TIMEOUT_S = 600
+_NPM_INSTALL_TIMEOUT_S = int(os.environ.get("QUODEQ_NPM_INSTALL_TIMEOUT_S", "300"))
+_NPM_BUILD_TIMEOUT_S = int(os.environ.get("QUODEQ_NPM_BUILD_TIMEOUT_S", "600"))
 
 
 def _quodeq_dir(env: dict[str, str] | None = None) -> Path:

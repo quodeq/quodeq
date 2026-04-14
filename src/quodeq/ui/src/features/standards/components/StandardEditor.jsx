@@ -21,8 +21,10 @@ function useResizable(defaultWidth) {
     dragging.current = true;
     startX.current = e.clientX;
     startWidth.current = width;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
+    if (typeof document !== 'undefined') {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+    }
   }, [width]);
 
   useEffect(() => {
@@ -34,8 +36,10 @@ function useResizable(defaultWidth) {
     };
     const onMouseUp = () => {
       dragging.current = false;
-      document.body.style.cursor = '';
-      document.body.style.userSelect = '';
+      if (typeof document !== 'undefined') {
+        document.body.style.cursor = '';
+        document.body.style.userSelect = '';
+      }
     };
     document.addEventListener('mousemove', onMouseMove);
     document.addEventListener('mouseup', onMouseUp);

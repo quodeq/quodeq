@@ -1,6 +1,11 @@
 """Queue state persistence: atomic JSON read/write with file locking.
 
 Internal module — use ``FileQueue`` from ``file_queue.py`` instead.
+
+The filesystem implementation below satisfies ``QueueStateProtocol``.
+To swap in a different backend (e.g. Redis, database), implement that
+protocol and pass your instance where ``read_state``/``write_state`` are
+called.
 """
 from __future__ import annotations
 
@@ -10,10 +15,24 @@ import os
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 import time as _time
 
 from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
+
+
+@runtime_checkable
+class QueueStateProtocol(Protocol):
+    """Abstraction for queue state storage.
+
+    The default implementation uses the filesystem (``read_state`` /
+    ``write_state`` module functions).  Implement this protocol to back
+    the queue with a different storage layer.
+    """
+
+    def read(self, path: Path) -> dict: ...
+    def write(self, state: dict, path: Path) -> None: ...
 
 _QUEUE_VERSION = 1
 

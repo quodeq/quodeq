@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { listStandards, deleteStandard, duplicateStandard } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
 export function useStandards() {
+  const { listStandards, deleteStandard, duplicateStandard } = useApi();
   const [standards, setStandards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);

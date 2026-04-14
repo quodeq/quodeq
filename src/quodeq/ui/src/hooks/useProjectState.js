@@ -1,25 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import { listProjects } from '../api/index.js';
+import { useApi } from '../api/ApiContext.jsx';
 
 const STORAGE_KEY = 'quodeq_selected_project';
 const DEFAULT_RUN = 'latest';
 
-function persistProject(setter, name) {
+function persistProject(setter, name, storage = localStorage) {
   setter(name);
-  try { localStorage.setItem(STORAGE_KEY, name); } catch { /* private browsing */ }
+  try { storage.setItem(STORAGE_KEY, name); } catch { /* private browsing */ }
 }
 
-function readStoredProject() {
-  try { return localStorage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
+function readStoredProject(storage = localStorage) {
+  try { return storage.getItem(STORAGE_KEY) || ''; } catch { return ''; }
 }
 
 /** Resolve which project to select from a loaded list, migrating stale storage if needed. */
-function resolveInitialProject(list, currentProject, onChangeProject, onNoProjects) {
+function resolveInitialProject(list, currentProject, onChangeProject, onNoProjects, storage) {
   if (list.length === 0) {
     if (onNoProjects) onNoProjects();
     return;
   }
-  const current = currentProject || readStoredProject();
+  const current = currentProject || readStoredProject(storage);
   const match = current && list.find((p) => (p.id || p.name) === current);
   if (!match) {
     const pick = list[0].id || list[0].name || list[0];
@@ -37,10 +37,11 @@ function resolveInitialProject(list, currentProject, onChangeProject, onNoProjec
  *   setSelectedRun: Function, loadProjects: Function, handleProjectChange: Function,
  *   handleRunChange: Function, selectProjectAndRun: Function }}
  */
-export function useProjectState({ onNoProjects }) {
+export function useProjectState({ onNoProjects, storage = localStorage }) {
+  const { listProjects } = useApi();
   const [projects, setProjects] = useState([]);
   const [projectsLoaded, setProjectsLoaded] = useState(false);
-  const [selectedProject, setSelectedProject] = useState(readStoredProject);
+  const [selectedProject, setSelectedProject] = useState(() => readStoredProject(storage));
   const [selectedRun, setSelectedRun] = useState(DEFAULT_RUN);
 
   const loadProjects = useCallback(() => {
@@ -55,18 +56,18 @@ export function useProjectState({ onNoProjects }) {
   }, []);
 
   useEffect(() => {
-    loadProjects().then((list) => resolveInitialProject(list, selectedProject, handleProjectChange, onNoProjects));
+    loadProjects().then((list) => resolveInitialProject(list, selectedProject, handleProjectChange, onNoProjects, storage));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleProjectChange(name) {
-    persistProject(setSelectedProject, name);
+    persistProject(setSelectedProject, name, storage);
     setSelectedRun(DEFAULT_RUN);
   }
 
   function handleRunChange(runId) { setSelectedRun(runId); }
 
   function selectProjectAndRun(project, runId) {
-    persistProject(setSelectedProject, project);
+    persistProject(setSelectedProject, project, storage);
     setSelectedRun(runId || DEFAULT_RUN);
   }
 

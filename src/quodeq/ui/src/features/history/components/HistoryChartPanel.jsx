@@ -26,13 +26,16 @@ const TREND_LINE_OPACITY = 0.55;
 const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
   if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
+  if (typeof document === 'undefined') return fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   _cssVarCache.set(name, val);
   return val || fallback;
 };
-new MutationObserver(() => _cssVarCache.clear()).observe(
-  document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
-);
+if (typeof document !== 'undefined') {
+  new MutationObserver(() => _cssVarCache.clear()).observe(
+    document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
+  );
+}
 
 const SCORE_EXEMPLARY = 9;
 const SCORE_GOOD = 7;

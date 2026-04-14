@@ -10,6 +10,7 @@ as the existing endpoints, so the frontend sees no schema change.
 """
 from __future__ import annotations
 
+import os
 from dataclasses import replace
 from pathlib import Path
 from typing import Any, Callable
@@ -27,7 +28,7 @@ from quodeq.services.rescore import _rescore_dimension
 from quodeq.services.scoring._rescore import rescore_run_raw
 
 
-_MAX_HISTORY_RUNS = 100
+_MAX_HISTORY_RUNS = int(os.environ.get("QUODEQ_MAX_HISTORY_RUNS", "100"))
 
 
 def get_scores_raw(
