@@ -89,6 +89,15 @@ function EvaluateHeader({ isRunning }) {
   );
 }
 
+function sanitizeErrorMessage(message) {
+  if (typeof message !== 'string') return 'An error occurred';
+  if (message.includes('\n') || /[/\\](?:usr|home|tmp|var|etc|src|node_modules)/.test(message) || message.length > 120) {
+    console.error('Raw error:', message);
+    return 'An error occurred. Check the console for details.';
+  }
+  return message;
+}
+
 function ErrorToast({ message, onDismiss }) {
   useEffect(() => {
     const timer = setTimeout(onDismiss, 5000);
@@ -97,7 +106,7 @@ function ErrorToast({ message, onDismiss }) {
 
   return (
     <div className="job-error-toast" onClick={onDismiss}>
-      {typeof message === 'string' ? message.slice(0, 200) : 'An error occurred'}
+      {sanitizeErrorMessage(message)}
     </div>
   );
 }

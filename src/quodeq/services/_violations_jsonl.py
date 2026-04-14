@@ -20,6 +20,7 @@ from quodeq.services.violations_parsing import (
 )
 from quodeq.config.paths import default_paths
 from quodeq.shared.utils import open_text
+from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ def _load_req_to_principle(dimension: str, evaluators_dir: "Path | None" = None)
         evaluators_dir = default_paths().evaluators_dir
     if not evaluators_dir.is_dir():
         return {}
+    validate_path_segment(dimension)
     path = evaluators_dir / f"{dimension}.json"
     if not path.is_file():
         return {}

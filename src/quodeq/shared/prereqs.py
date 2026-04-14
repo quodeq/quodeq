@@ -45,12 +45,18 @@ def _run_version_cmd(cmd: list[str]) -> str:
     """Run a command and return its stdout, or raise FileNotFoundError.
 
     ``shell=True`` is required on Windows so that ``where`` and other
-    shell built-ins resolve correctly.  The *cmd* list is always
-    hard-coded by callers in this module (never user-influenced),
-    so the shell injection risk does not apply.
+    shell built-ins resolve correctly and executables installed via npm
+    (which are .cmd shims) can be found on PATH.  The *cmd* parameter
+    is always a ``list[str]`` hard-coded by callers in this module
+    (never user-influenced), so the shell injection risk does not apply.
 
     SECURITY: Do not pass user-controlled strings into *cmd*.
+    All callers in this module construct *cmd* from string literals
+    (e.g. ``["node", "--version"]``).  If this function is ever
+    exposed to external input, ``shell=True`` MUST be removed.
     """
+    if not isinstance(cmd, list):
+        raise TypeError("cmd must be a list of strings, not a raw string")
     result = subprocess.run(
         cmd, capture_output=True, text=True, check=True, shell=_IS_WIN32,
         timeout=_VERSION_CMD_TIMEOUT_S,

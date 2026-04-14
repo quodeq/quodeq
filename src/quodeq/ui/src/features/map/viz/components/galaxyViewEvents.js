@@ -1,4 +1,5 @@
 import { rgb } from '../core/galaxyCore.js';
+import { escapeHtml } from '../../../../utils/escapeHtml.js';
 
 /**
  * Build tooltip HTML and position it.
@@ -35,7 +36,7 @@ export function updateTooltip(el, hovered, animating, cx, cy) {
     if (sn > 0) rows.push(row('Minor', sn, 'var(--color-sev-minor-text)'));
   }
   rows.push(row('Compliance', d.compliance));
-  el.innerHTML = `<div style="font-weight:600;color:${rgb(d.col)};margin-bottom:4px">${d.name}</div>
+  el.innerHTML = `<div style="font-weight:600;color:${rgb(d.col)};margin-bottom:4px">${escapeHtml(d.name)}</div>
     ${rows.join('')}
     <div style="margin-top:6px;color:var(--color-text-muted);font-size:11px;opacity:0.6">Click to explore</div>`;
   el.style.display = 'block';

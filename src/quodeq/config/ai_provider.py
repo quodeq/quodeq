@@ -53,14 +53,24 @@ def _write_env(paths: ConfigPaths, provider: str, api_key_var: str, api_key_valu
         f"export AI_PROVIDER={provider}",
     ]
     if api_key_value:
-        # SECURITY: The raw API key value is written to the env file because it
-        # is sourced by subprocesses at runtime. The file is chmod 0600. For
-        # production, prefer a platform keychain or secrets manager.
+        # SECURITY: The raw API key value is written to the env file in
+        # cleartext because it must be sourced by subprocesses at runtime.
+        # The file is created with mode 0600 (owner read/write only) via
+        # atomic write + fchmod.  This is a known trade-off for local CLI
+        # tools where no platform keychain integration is available.
+        #
+        # For production / shared-server deployments:
+        #   - Use the QUODEQ_API_KEY environment variable directly, or
+        #   - Store the key in a platform keychain (macOS Keychain,
+        #     GNOME Keyring, Windows Credential Manager), or
+        #   - Use a secrets manager (Vault, AWS Secrets Manager, etc.)
         lines.append(f"export {api_key_var}={api_key_value}")
         masked = "***" + api_key_value[-4:] if len(api_key_value) > 4 else "****"
         log_warning(
-            f"API key ({masked}) written to {paths.env_file} (mode 0600). "
-            f"For production, prefer a platform keychain or secrets manager."
+            f"API key ({masked}) will be stored in cleartext at "
+            f"{paths.env_file} (mode 0600). For production deployments, "
+            f"prefer the QUODEQ_API_KEY environment variable, a platform "
+            f"keychain, or a secrets manager instead of writing keys to disk."
         )
     fd, tmp_path = tempfile.mkstemp(dir=str(paths.env_file.parent), suffix=".tmp")
     closed = False

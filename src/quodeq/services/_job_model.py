@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from collections import deque
@@ -200,6 +201,8 @@ class FileJobStore:
     def __init__(self, persist_dir: Path | None = None) -> None:
         self._persist_dir = persist_dir or _DEFAULT_PERSIST_DIR
         self._persist_dir.mkdir(parents=True, exist_ok=True)
+        # SECURITY: restrict directory to owner-only access
+        os.chmod(self._persist_dir, 0o700)
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
         self._load_all()
@@ -234,7 +237,10 @@ class FileJobStore:
         tmp = path.with_suffix(".tmp")
         try:
             tmp.write_text(json.dumps(_job_to_json(job), indent=2), encoding="utf-8")
+            # SECURITY: restrict job files to owner-only read/write
+            os.chmod(tmp, 0o600)
             tmp.replace(path)
+            os.chmod(path, 0o600)
         except OSError:
             _logger.warning("Failed to persist job %s", job.job_id, exc_info=True)
             tmp.unlink(missing_ok=True)
