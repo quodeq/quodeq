@@ -1,5 +1,33 @@
 # Changelog
 
+## [1.0.5] — 2026-04-14
+
+### Features
+- **Galaxy view** — unified galaxy visualization with file system and standards constellations, folder drill-down, circle pack info panel, and legend
+- **Fix plan risk analysis** — risk analysis section added to fix plan templates
+- **Onboarding dots** — one-time sidebar dot indicators for setup flow (settings, evaluate)
+- **Console pop-out** — open evaluation console in system browser from native window
+- **Dashboard as default** — running `quodeq` without a subcommand opens the dashboard
+
+### Improvements
+- **Unified scoring** — server-side rescore pipeline, accumulated rescore per specific run, history rows match overview scores
+- **Code quality** — resolved 640+ violations across maintainability (426), usability (65), flexibility (82), performance (46), and security (22)
+- **Map visualization** — circle pack smoothness, shared map navigation, dark mode toggle, galaxy particle sizing
+- **Native window** — larger window control dots with hover glow, native Save dialogs for standard/project downloads
+- **Code-split recharts** — eliminated 500kB chunk warning via lazy loading
+- **CI** — drop `--extra api` (instructor now a base dep), test on Python 3.13 only
+
+### Fixes
+- History chart bar colors update on theme change
+- Map dark mode uses current theme family instead of hardcoded value
+- Evaluation form respects current standards visibility
+- Skip scoreless dimensions so cards show last valid evaluation
+- Emit Report path marker so dashboard auto-refreshes after evaluation
+- File locking for dismissed findings storage to prevent corruption
+- Bundle schemas, configs, and full module tree in PyInstaller spec
+- Evaluation subprocess works in frozen .app bundle
+- Include package version in UI build hash so upgrades trigger rebuild
+
 ## [1.0.0] — 2026-04-10
 
 ### Features
@@ -250,6 +278,8 @@ Same as 0.4.1 — initial stable release of the v0.4 feature set.
 - Accumulated view no longer hides stale dimensions
 - Timezone-aware ISO date parsing
 
+[1.0.5]: https://github.com/quodeq/quodeq/compare/v1.0.0...v1.0.5
+[1.0.0]: https://github.com/quodeq/quodeq/compare/v0.9.0...v1.0.0
 [0.9.0]: https://github.com/quodeq/quodeq/compare/v0.8.1...v0.9.0
 [0.8.1]: https://github.com/quodeq/quodeq/compare/v0.8.0...v0.8.1
 [0.8.0]: https://github.com/quodeq/quodeq/compare/v0.7.0...v0.8.0
