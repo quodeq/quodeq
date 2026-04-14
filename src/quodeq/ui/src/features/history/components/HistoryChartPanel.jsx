@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { formatShortDate, angleFromDelta, scoreTierLabel, gradeLetter } from '../../../utils/formatters.js';
 import {
   ComposedChart,
@@ -23,13 +23,16 @@ const DESELECTED_BAR_OPACITY = 0.55;
 const HOVER_STROKE_WIDTH = 1.5;
 const TREND_LINE_STROKE_WIDTH = 2.5;
 const TREND_LINE_OPACITY = 0.55;
-const _cssVarCache = {};
+const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
-  if (name in _cssVarCache) return _cssVarCache[name] || fallback;
+  if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  _cssVarCache[name] = val;
+  _cssVarCache.set(name, val);
   return val || fallback;
 };
+new MutationObserver(() => _cssVarCache.clear()).observe(
+  document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
+);
 
 const SCORE_EXEMPLARY = 9;
 const SCORE_GOOD = 7;
@@ -171,6 +174,13 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
 
 export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  // Force re-render when theme changes so bar colors update
+  const [, setThemeVersion] = useState(0);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setThemeVersion(v => v + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
 
   if (!trend || trend.length < 2) return null;
 
