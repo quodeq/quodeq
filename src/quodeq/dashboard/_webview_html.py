@@ -13,7 +13,7 @@ _CONTROLS_MAC = """\
     display: flex;
     gap: 6px;
     z-index: 99999;
-    padding: 12px 11px;
+    padding: 14px 10px;
     pointer-events: auto;
   }
   .qd-traffic::after {
@@ -24,11 +24,11 @@ _CONTROLS_MAC = """\
     z-index: -1;
   }
   .qd-dot {
-    width: 10px; height: 10px;
+    width: 11px; height: 11px;
     border-radius: 50%;
     border: none;
     cursor: pointer;
-    transition: background 0.2s;
+    transition: background 0.15s, transform 0.15s, opacity 0.15s, box-shadow 0.15s;
     padding: 0;
     background: var(--color-text-muted, #484f58);
     opacity: 0.4;
@@ -41,6 +41,10 @@ _CONTROLS_MAC = """\
   body:has(.sidebar:hover) .qd-dot--minimize { background: #febc2e; }
   .qd-traffic:hover .qd-dot--maximize,
   body:has(.sidebar:hover) .qd-dot--maximize { background: #28c840; }
+  .qd-dot:hover { transform: scale(1.25); }
+  .qd-dot--close:hover { box-shadow: 0 0 6px rgba(255, 95, 87, 0.6); }
+  .qd-dot--minimize:hover { box-shadow: 0 0 6px rgba(254, 188, 46, 0.6); }
+  .qd-dot--maximize:hover { box-shadow: 0 0 6px rgba(40, 200, 64, 0.6); }
   .sidebar { padding-top: 26px !important; }
   body:has(.qd-traffic:hover) .app-shell {
     grid-template-columns: var(--sidebar-expanded-width) 1fr;
