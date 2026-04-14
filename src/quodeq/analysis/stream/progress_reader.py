@@ -1,6 +1,7 @@
 """Incremental progress reader for AI analysis stream and JSONL files."""
 from __future__ import annotations
 
+import json as _json
 from pathlib import Path
 
 from quodeq.analysis.stream.counters import extract_files_from_event, parse_stream_event
@@ -48,7 +49,6 @@ class _IncrementalProgressReader:
         if self._jsonl_file is None or not self._jsonl_file.exists():
             return
         try:
-            import json as _json
             with open(self._jsonl_file, "rb") as jf:
                 jf.seek(self._jsonl_offset)
                 new_bytes = jf.read()

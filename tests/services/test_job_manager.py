@@ -93,7 +93,7 @@ class TestCancelJob:
         mgr = JobManager(job_store=store)
         assert mgr.cancel_job("j1") is False
 
-    @patch("quodeq.analysis._process._kill_tree")
+    @patch("quodeq.services.jobs._kill_tree")
     def test_cancel_running_job(self, mock_kill):
         store = InMemoryJobStore()
         store.put(Job("j1", STATUS_RUNNING, [], "now", None, None))
@@ -113,7 +113,7 @@ class TestCancelJob:
 
 
 class TestShutdown:
-    @patch("quodeq.analysis._process._kill_tree")
+    @patch("quodeq.services.jobs._kill_tree")
     def test_shutdown_kills_all(self, mock_kill):
         store = InMemoryJobStore()
         mgr = JobManager(job_store=store)

@@ -61,6 +61,19 @@ _MAJOR_SCORE_CAP = 5
 _MAX_SCORE = 10
 
 
+def _compute_severity_deduction(
+    count: int, type_cap: int, penalty: float, score_cap: int,
+) -> tuple[float, int]:
+    """Compute deduction and score cap for a single severity level.
+
+    Returns (deduction_points, effective_score_cap).
+    """
+    effective = min(count, type_cap)
+    deduction = effective * penalty
+    cap = score_cap if count >= type_cap else _MAX_SCORE
+    return deduction, cap
+
+
 def build_deductions(
     violation_type_counts: dict[str, int],
     scale_multiplier: int = 1,
@@ -68,6 +81,7 @@ def build_deductions(
     critical_penalty: float | None = None,
     major_penalty: float | None = None,
     minor_penalty: float | None = None,
+    config: _PenaltyConfig | None = None,
 ) -> Deductions:
     """Compute point deductions for numerical mode.
 
@@ -80,26 +94,22 @@ def build_deductions(
     - If the raw major count reaches 5*scale, the score is hard-capped at 5.
     - Both caps may apply simultaneously (take min).
     """
-    crit_pen = critical_penalty if critical_penalty is not None else _penalty_config.critical
-    maj_pen = major_penalty if major_penalty is not None else _penalty_config.major
-    min_pen = minor_penalty if minor_penalty is not None else _penalty_config.minor
+    cfg = config if config is not None else _penalty_config
+    crit_pen = critical_penalty if critical_penalty is not None else cfg.critical
+    maj_pen = major_penalty if major_penalty is not None else cfg.major
+    min_pen = minor_penalty if minor_penalty is not None else cfg.minor
 
     n_critical = violation_type_counts.get("critical", 0)
     n_major = violation_type_counts.get("major", 0)
     n_minor = violation_type_counts.get("minor", 0)
 
-    critical_type_cap = _CRITICAL_SCORE_CAP * scale_multiplier
-    major_type_cap = _MAJOR_SCORE_CAP * scale_multiplier
-
-    effective_critical = min(n_critical, critical_type_cap)
-    effective_major = min(n_major, major_type_cap)
-
-    critical_deduction = effective_critical * crit_pen
-    major_deduction = effective_major * maj_pen
+    critical_deduction, cap_from_critical = _compute_severity_deduction(
+        n_critical, _CRITICAL_SCORE_CAP * scale_multiplier, crit_pen, _CRITICAL_SCORE_CAP,
+    )
+    major_deduction, cap_from_major = _compute_severity_deduction(
+        n_major, _MAJOR_SCORE_CAP * scale_multiplier, maj_pen, _MAJOR_SCORE_CAP,
+    )
     minor_deduction = n_minor * min_pen
-
-    cap_from_critical = _CRITICAL_SCORE_CAP if n_critical >= critical_type_cap else _MAX_SCORE
-    cap_from_major = _MAJOR_SCORE_CAP if n_major >= major_type_cap else _MAX_SCORE
 
     return Deductions(
         critical_type_count=n_critical,

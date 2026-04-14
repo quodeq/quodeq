@@ -9,6 +9,15 @@ import CloudProviderTab from './CloudProviderTab.jsx';
 
 const CLI_DEFAULTS = { 'subagents': '5', 'pool-budget': '600' };
 
+const MIGRATION_DONE_KEY = 'cc-provider-tabs-migrated';
+const LEGACY_AI_CMD_KEY = 'cc-ai-cmd';
+const LEGACY_SETTING_MIGRATIONS = {
+  'cc-max-subagents': 'subagents',
+  'cc-pool-budget': 'pool-budget',
+  'cc-per-dimension': 'per-dimension',
+  'cc-ai-model': 'model',
+};
+
 function TabContent({ provider, providerConfig }) {
   const classification = classifyProvider(provider.id, provider.type, providerConfig);
   const defaults = classification === 'cli' ? CLI_DEFAULTS : undefined;
@@ -42,15 +51,9 @@ export default function ProviderTabs({ providerConfigs }) {
       }
 
       // Migrate old global settings to active provider
-      const MIGRATION_KEY = 'cc-provider-tabs-migrated';
-      if (!localStorage.getItem(MIGRATION_KEY) && list.length > 0) {
-        const targetId = localStorage.getItem('cc-ai-cmd') || list[0].id;
-        const migrations = {
-          'cc-max-subagents': 'subagents',
-          'cc-pool-budget': 'pool-budget',
-          'cc-per-dimension': 'per-dimension',
-          'cc-ai-model': 'model',
-        };
+      if (!localStorage.getItem(MIGRATION_DONE_KEY) && list.length > 0) {
+        const targetId = localStorage.getItem(LEGACY_AI_CMD_KEY) || list[0].id;
+        const migrations = LEGACY_SETTING_MIGRATIONS;
         for (const [oldKey, newSuffix] of Object.entries(migrations)) {
           const oldVal = localStorage.getItem(oldKey);
           if (oldVal !== null) {
@@ -58,7 +61,7 @@ export default function ProviderTabs({ providerConfigs }) {
             localStorage.removeItem(oldKey);
           }
         }
-        localStorage.setItem(MIGRATION_KEY, '1');
+        localStorage.setItem(MIGRATION_DONE_KEY, '1');
       }
     }).catch(() => setClients([]));
   }, []);

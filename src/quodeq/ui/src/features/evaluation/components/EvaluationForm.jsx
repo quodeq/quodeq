@@ -48,6 +48,19 @@ function RepoInput({ repo, onRepoChange, onClear, onBrowse }) {
   );
 }
 
+function buildAndSubmit(onStart, formState) {
+  const { repo, selectedDims, branch, scopePath, setRepo, setSelectedDims, setBranch, setScopePath } = formState;
+  const payload = { repo };
+  if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
+  if (branch) payload.branch = branch;
+  if (scopePath) payload.scopePath = scopePath;
+  onStart(payload);
+  setRepo('');
+  setSelectedDims(new Set());
+  setBranch(null);
+  setScopePath(null);
+}
+
 function useEvaluationForm(onStart) {
   const [repo, setRepo] = useState('');
   const { allDimensions, dimLoadError } = usePluginDimensions();
@@ -56,7 +69,6 @@ function useEvaluationForm(onStart) {
   const [branch, setBranch] = useState(null);
   const [scopePath, setScopePath] = useState(null);
 
-  // Reset scope when repo changes
   useEffect(() => { setScopePath(null); setBranch(null); }, [repo]);
 
   const toggleDim = (id) => setSelectedDims((prev) => {
@@ -68,37 +80,17 @@ function useEvaluationForm(onStart) {
   const clearAll = () => setSelectedDims(new Set());
   const handleSubmit = (e) => {
     e.preventDefault();
-    const payload = { repo };
-    if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
-    if (branch) payload.branch = branch;
-    if (scopePath) payload.scopePath = scopePath;
-    onStart(payload);
-    setRepo('');
-    setSelectedDims(new Set());
-    setBranch(null);
-    setScopePath(null);
+    buildAndSubmit(onStart, { repo, selectedDims, branch, scopePath, setRepo, setSelectedDims, setBranch, setScopePath });
   };
   const handleFolderSelect = (path) => { setRepo(path); setFolderBrowserOpen(false); };
   const handleRepoClear = () => { setRepo(''); setSelectedDims(new Set()); };
 
   return {
-    repo,
-    setRepo,
-    allDimensions,
-    selectedDims,
-    folderBrowserOpen,
-    setFolderBrowserOpen,
-    toggleDim,
-    selectAll,
-    clearAll,
-    handleSubmit,
-    handleFolderSelect,
-    handleRepoClear,
-    dimLoadError,
-    branch,
-    setBranch,
-    scopePath,
-    setScopePath,
+    repo, setRepo, allDimensions, selectedDims,
+    folderBrowserOpen, setFolderBrowserOpen,
+    toggleDim, selectAll, clearAll, handleSubmit,
+    handleFolderSelect, handleRepoClear, dimLoadError,
+    branch, setBranch, scopePath, setScopePath,
   };
 }
 

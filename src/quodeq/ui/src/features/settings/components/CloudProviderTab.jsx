@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { testProviderConnection } from '../../../api/index.js';
+import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 
 export default function CloudProviderTab({ providerId, providerConfig, state, update }) {
@@ -58,10 +59,10 @@ export default function CloudProviderTab({ providerId, providerConfig, state, up
         <input
           type="number"
           className="settings-model-input"
-          min={1}
-          max={10}
+          min={MIN_SUBAGENTS}
+          max={MAX_SUBAGENTS}
           value={parseInt(state.subagents || '1', 10)}
-          onBlur={(e) => update('subagents', Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 1)))}
+          onBlur={(e) => update('subagents', Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || 1)))}
           onChange={(e) => update('subagents', e.target.value)}
         />
       </div>

@@ -13,6 +13,7 @@ _logger = logging.getLogger(__name__)
 _SOCK_TIMEOUT = 0.5
 _RELOAD_PREFIX = "reload:"
 _MAX_UNIX_SOCK_PATH_LEN = 100
+_TCP_LOCALHOST = "127.0.0.1"
 _RECV_BUFFER_SIZE = 4096
 _IS_WIN32 = sys.platform == "win32"
 _WIN_PORT_FILE = "dashboard.port"
@@ -49,6 +50,11 @@ class InstanceController:
         self._server_sock: socket.socket | None = None
         self._listen_thread: threading.Thread | None = None
         self._shutdown_event = threading.Event()
+
+    @property
+    def sock_path(self) -> Path:
+        """Public accessor for the socket/port-file path."""
+        return self._sock_path
 
     # ── Unix socket helpers (macOS/Linux) ──
 
@@ -105,7 +111,7 @@ class InstanceController:
                 port = int(self._port_file.read_text().strip())
                 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
                     probe.settimeout(_SOCK_TIMEOUT)
-                    probe.connect(("127.0.0.1", port))
+                    probe.connect((_TCP_LOCALHOST, port))
                 self._tcp_port = port
                 return False
             except (ConnectionRefusedError, OSError, ValueError):
@@ -113,7 +119,7 @@ class InstanceController:
                 self._port_file.unlink(missing_ok=True)
 
         self._server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self._server_sock.bind(("127.0.0.1", 0))
+        self._server_sock.bind((_TCP_LOCALHOST, 0))
         self._tcp_port = self._server_sock.getsockname()[1]
         self._server_sock.listen(1)
         self._server_sock.settimeout(_SOCK_TIMEOUT)

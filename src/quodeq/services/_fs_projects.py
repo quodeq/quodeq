@@ -17,6 +17,8 @@ from quodeq.services._fs_project_helpers import (
     _max_projects_listed,
 )
 from quodeq.services.ports import list_runs, safe_read_dir
+from quodeq.shared.repo_handler import is_valid_repo_url
+from quodeq.shared.utils import is_repo_url
 
 _MAX_PROJECT_BUILD_WORKERS = 8
 
@@ -86,9 +88,6 @@ def build_project_list(reports_root: Path) -> list[ProjectEntry]:
 
 def update_project_path(reports_dir: str, project: str, new_path: str) -> bool:
     """Update the path stored in a project's metadata."""
-    from quodeq.shared.utils import is_repo_url
-    from quodeq.shared.repo_handler import is_valid_repo_url
-
     reports_root = Path(reports_dir).resolve()
     info_path = (reports_root / project).resolve()
     if not info_path.is_relative_to(reports_root):

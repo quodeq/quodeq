@@ -12,7 +12,12 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
+from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
+from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
+from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.engine._runner_markers import cleanup_stream
 from quodeq.shared.logging import log_info, log_warning
 
 
@@ -28,9 +33,6 @@ def _build_consolidated_config(
     compiled_dir: "Path | None" = None,
 ) -> AnalysisConfig:
     """Build AnalysisConfig for consolidated mode."""
-    # Deferred import: breaks circular dependency between _consolidated and runner.
-    from quodeq.analysis.subagents.runner import _default_subagent_model
-
     subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
     pool_budget_val = config.options.pool_budget
     return AnalysisConfig(
@@ -50,10 +52,6 @@ def _collect_consolidated_results(
     results: list[Any], paths: _ConsolidatedPaths, files: list[str],
 ) -> dict[str, Evidence]:
     """Deduplicate and parse consolidated results into per-dimension Evidence."""
-    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
-    from quodeq.analysis.stream.counters import count_files_in_stream
-    from quodeq.engine._runner_markers import cleanup_stream
-
     merged_jsonl = paths.evidence_dir / "consolidated_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
@@ -116,8 +114,6 @@ def process_consolidated_dimensions(
     config: "RunConfig", dimensions: list[str], ctx: Any,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
-    from quodeq.analysis.subagents.runner import _list_source_files, _compute_files_per_agent
-
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     evidence_dir = config.work_dir or config.src
 

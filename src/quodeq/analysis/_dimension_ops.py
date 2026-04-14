@@ -18,7 +18,7 @@ def _save_dimension_fingerprint(
     analyzed_files: set[str] | None = None,
 ) -> None:
     """Save a fingerprint after any successful dimension analysis."""
-    from quodeq.analysis._incremental import save_dimension_fingerprint
+    from quodeq.analysis._incremental_evidence import save_dimension_fingerprint
     save_dimension_fingerprint(config, dimension, files, analyzed_files)
 
 
@@ -62,5 +62,5 @@ def _run_dimension_incremental(
     config: RunConfig, dimension: str, idx: int, ctx: _AnalysisContext,
 ) -> Evidence | None:
     """Incremental path: detect changes, carry forward, analyze only changed files."""
-    from quodeq.analysis._incremental import run_dimension_incremental
+    from quodeq.analysis._incremental_orchestrator import run_dimension_incremental
     return run_dimension_incremental(config, dimension, idx, ctx)

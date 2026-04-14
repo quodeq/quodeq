@@ -1,6 +1,7 @@
 """Project listing, mutation, and export routes."""
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from http import HTTPStatus
@@ -11,7 +12,9 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip
+from quodeq.services._fs_scan import scan_project
 from quodeq.services.base import ActionProvider
+from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
 
@@ -120,7 +123,6 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
     @app.get("/api/projects/<project>/scan")
     def project_scan(project: str) -> Response | tuple[Response, int]:
         """Return scan data for a project. Triggers scan if needed for local projects."""
-        from quodeq.shared.validation import validate_path_segment
         validate_path_segment(project)
 
         project_dir = Path(reports_dir()) / project
@@ -157,10 +159,7 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             body, status = error_response("Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
             return jsonify(body), status
 
-        from quodeq.services._fs_scan import scan_project
         result = scan_project(project_path, output_dir=project_dir)
-
-        import dataclasses
         return jsonify(dataclasses.asdict(result))
 
     @app.post("/api/scan")
@@ -182,7 +181,5 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             body, status = error_response("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
             return jsonify(body), status
 
-        from quodeq.services._fs_scan import scan_project
-        import dataclasses
         result = scan_project(target_path)
         return jsonify(dataclasses.asdict(result))

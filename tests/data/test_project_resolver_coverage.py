@@ -131,7 +131,7 @@ class TestResolveProjectUuid:
         assert len(index_store) == 1
 
     @patch("quodeq.data.fs.project_resolver._find_existing_project", return_value="existing-uuid")
-    @patch("quodeq.services._fs_projects.find_children", return_value=[])
+    @patch("quodeq.data.fs.project_resolver.find_children", return_value=[])
     def test_unscoped_existing_no_children(self, mock_children, mock_find, tmp_path):
         reports = tmp_path / "reports"
         reports.mkdir()
@@ -147,7 +147,7 @@ class TestResolveProjectUuid:
 
     @patch("quodeq.data.fs.project_resolver._create_project", return_value="dot-uuid")
     @patch("quodeq.data.fs.project_resolver._find_existing_project")
-    @patch("quodeq.services._fs_projects.find_children", return_value=["child-1"])
+    @patch("quodeq.data.fs.project_resolver.find_children", return_value=["child-1"])
     def test_unscoped_existing_with_children_creates_dot(self, mock_children, mock_find, mock_create, tmp_path):
         """When an unscoped project has children, a dot-scoped project is created."""
         reports = tmp_path / "reports"
@@ -164,7 +164,7 @@ class TestResolveProjectUuid:
         assert uuid_str == "dot-uuid"
 
     @patch("quodeq.data.fs.project_resolver._find_existing_project")
-    @patch("quodeq.services._fs_projects.find_children", return_value=["child-1"])
+    @patch("quodeq.data.fs.project_resolver.find_children", return_value=["child-1"])
     def test_unscoped_existing_with_children_returns_existing_dot(self, mock_children, mock_find, tmp_path):
         """When dot project already exists, return it."""
         reports = tmp_path / "reports"

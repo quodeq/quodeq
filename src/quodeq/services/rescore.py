@@ -70,22 +70,11 @@ def _group_by_principle(
     return groups
 
 
-def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> DimensionResult:
-    """Rescore a single dimension after filtering dismissed findings."""
-    # Filter violations -- dismissed key is (req, file, line)
-    filtered_violations = [
-        v for v in dim.violations
-        if (v.req or "", v.file or "", v.line or 0) not in dismissed
-    ]
-    # If no violations were actually dismissed, return the original scores
-    if len(filtered_violations) == len(dim.violations):
-        return dim
-
-    # Group violations and compliance by principle
-    principles_violations = _group_by_principle(filtered_violations)
-    principles_compliance = _group_by_principle(dim.compliance)
-
-    # Score each principle
+def _score_all_principles(
+    principles_violations: dict[str, list[Finding]],
+    principles_compliance: dict[str, list[Finding]],
+) -> tuple[dict[str, PrincipleScore], list[PrincipleGrade]]:
+    """Score each principle and return (scores_dict, grades_list)."""
     all_principle_names = set(principles_violations) | set(principles_compliance)
     principle_scores: dict[str, PrincipleScore] = {}
     principle_grades: list[PrincipleGrade] = []
@@ -97,19 +86,31 @@ def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> Dimension
         score_str = f"{final_score}/10" if final_score is not None else None
 
         principle_scores[name] = PrincipleScore(
-            display_name=name,
-            weight="1",
-            final_score=final_score,
-            grade=grade,
+            display_name=name, weight="1", final_score=final_score, grade=grade,
         )
         principle_grades.append(PrincipleGrade(principle=name, score=score_str, grade=grade))
+    return principle_scores, principle_grades
 
-    # Aggregate to dimension overall
+
+def _rescore_dimension(dim: DimensionResult, dismissed: set[tuple]) -> DimensionResult:
+    """Rescore a single dimension after filtering dismissed findings."""
+    filtered_violations = [
+        v for v in dim.violations
+        if (v.req or "", v.file or "", v.line or 0) not in dismissed
+    ]
+    if len(filtered_violations) == len(dim.violations):
+        return dim
+
+    principles_violations = _group_by_principle(filtered_violations)
+    principles_compliance = _group_by_principle(dim.compliance)
+    principle_scores, principle_grades = _score_all_principles(
+        principles_violations, principles_compliance,
+    )
+
     overall = weighted_overall(principle_scores, MODE_NUMERICAL)
     overall_score_str = f"{overall.weighted_score}/10" if overall.weighted_score is not None else None
     overall_grade = overall.grade or overall.weighted_grade
 
-    # Recount totals
     compliance_count = dim.totals.compliance_count if dim.totals else len(dim.compliance)
     new_totals = recount_totals(filtered_violations, compliance_count=compliance_count)
 

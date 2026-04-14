@@ -14,14 +14,16 @@ from quodeq.api._evaluation_helpers import (
 )
 from quodeq.api.helpers import error_response, validate_evaluation_payload
 from quodeq.core.types import to_camel_dict
+from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
+from quodeq.services.evaluation_mixin import _score_completed_evidence
 
 _logger = logging.getLogger(__name__)
 
 
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
-    from quodeq.api.routes import _reports_dir
 
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
@@ -43,7 +45,6 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             return ai_cmd_error
         # Require an explicit model for API-type providers (e.g. Ollama)
         if ai_cmd:
-            from quodeq.analysis._provider_cache import get_provider_configs
             ptype = get_provider_configs().get(ai_cmd, {}).get("type")
             if ptype == "api" and not payload.get("aiModel"):
                 body, status = error_response(
@@ -64,7 +65,6 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
 
 def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
     """Register single-evaluation status and cancel routes."""
-    from quodeq.api.routes import _reports_dir
 
     _scored_jobs: set[str] = set()
 
@@ -79,7 +79,6 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if job_status in ("failed", "cancelled") and job_id not in _scored_jobs:
             _scored_jobs.add(job_id)
             try:
-                from quodeq.services.evaluation_mixin import _score_completed_evidence
                 _score_completed_evidence(_reports_dir(), {
                     "outputProject": job.output_project,
                     "outputRunId": job.output_run_id,

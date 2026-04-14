@@ -21,6 +21,7 @@ from quodeq.analysis.subagents._pool_scaling import (
     should_respawn,
 )
 from quodeq.analysis.subagents.file_queue import WorkQueue
+from quodeq.shared.logging import log_warning as _log_warn
 
 
 @dataclass
@@ -68,8 +69,6 @@ def scout_loop(ctx: LoopContext) -> None:
 
 def immediate_loop(ctx: LoopContext) -> None:
     """Launch all agents immediately, respawning as they complete."""
-    from quodeq.shared.logging import log_warning as _log_warn
-
     ev_paths = EvidencePaths(ctx.shared_jsonl_path, ctx.evidence_dir, ctx.dimension_key)
     for _ in range(ctx.n_agents):
         ctx.submit_fn()

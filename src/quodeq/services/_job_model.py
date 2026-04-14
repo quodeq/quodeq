@@ -12,6 +12,8 @@ from pathlib import Path
 import re
 from typing import Protocol, runtime_checkable
 
+from datetime import datetime, timezone
+
 from quodeq.core.types import JobSnapshot
 from quodeq.shared.constants import CC_MARKER_KEY
 
@@ -264,8 +266,6 @@ class FileJobStore:
             if not job.ended_at:
                 continue
             try:
-                from datetime import datetime, timezone
-
                 ended = datetime.fromisoformat(job.ended_at)
                 if ended.tzinfo is None:
                     ended = ended.replace(tzinfo=timezone.utc)

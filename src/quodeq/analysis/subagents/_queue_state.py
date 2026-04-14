@@ -11,6 +11,8 @@ import tempfile
 from contextlib import contextmanager
 from pathlib import Path
 
+import time as _time
+
 from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
 
 _QUEUE_VERSION = 1
@@ -36,7 +38,6 @@ def cleanup_stale_lock(lock_path: Path, threshold: float = _STALE_LOCK_THRESHOLD
     except FileNotFoundError:
         return False
 
-    import time as _time
     age = _time.time() - stat.st_mtime
     if age > threshold:
         try:

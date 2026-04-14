@@ -42,8 +42,8 @@ function applyInitialTheme() {
   if (oldFamily && LEGACY_FAMILY_MAP[oldFamily]) {
     localStorage.setItem(LS_THEME_FAMILY, LEGACY_FAMILY_MAP[oldFamily]);
   }
-  const mode = localStorage.getItem(LS_THEME_MODE) || 'system';
-  const family = localStorage.getItem(LS_THEME_FAMILY) || 'daruma';
+  const mode = localStorage.getItem(LS_THEME_MODE) || THEME_MODES.SYSTEM;
+  const family = localStorage.getItem(LS_THEME_FAMILY) || THEME_FAMILIES.DARUMA;
   const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   const dataTheme = resolveDataTheme(mode, family, prefersDark);
   if (dataTheme !== null) {

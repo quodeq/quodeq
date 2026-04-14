@@ -6,13 +6,63 @@ from pathlib import Path
 
 from quodeq.core.types import DimensionResult
 from quodeq.core.scoring.internals import score_to_grade_label
-from quodeq.services.ports import RunInfo, calculate_trend, most_frequent_grade
+from quodeq.services.ports import RunInfo, calculate_trend, list_runs, most_frequent_grade
 from quodeq.services.scoring._run_scores import get_run_dimensions, parse_score
 from quodeq.services.scoring._rescore import rescore_run
 from quodeq.services.scoring._types import (
     AccumulatedSummary,
     ScoredDimension,
 )
+
+
+def _enrich_dimension(sd: ScoredDimension, run_id: str, run_info: RunInfo) -> ScoredDimension:
+    """Enrich a ScoredDimension with run metadata."""
+    return ScoredDimension(
+        dimension=sd.dimension,
+        overall_score=sd.overall_score,
+        overall_grade=sd.overall_grade,
+        violation_count=sd.violation_count,
+        compliance_count=sd.compliance_count,
+        severity_critical=sd.severity_critical,
+        severity_major=sd.severity_major,
+        severity_minor=sd.severity_minor,
+        from_run_id=run_id,
+        from_date_iso=run_info.date_iso,
+        from_date_label=run_info.date_label,
+    )
+
+
+def _collect_latest_by_dim(
+    reports_root: Path, project: str, all_runs: list[RunInfo],
+) -> tuple[dict[str, tuple[ScoredDimension, RunInfo]], dict[str, ScoredDimension], dict[str, ScoredDimension]]:
+    """Walk runs newest-first, collecting latest/previous dimension occurrences.
+
+    Returns (latest_by_dim, prev_occurrence, prev_run_latest).
+    """
+    latest_by_dim: dict[str, tuple[ScoredDimension, RunInfo]] = {}
+    prev_occurrence: dict[str, ScoredDimension] = {}
+    prev_run_latest: dict[str, ScoredDimension] = {}
+    rescored_cache: dict[str, dict[str, ScoredDimension]] = {}
+
+    for run_idx, run_info in enumerate(all_runs):
+        run_id = run_info.run_id
+        if run_id not in rescored_cache:
+            scored_dims = rescore_run(reports_root, project, run_id)
+            rescored_cache[run_id] = {sd.dimension.lower(): sd for sd in scored_dims}
+
+        run_dims = rescored_cache[run_id]
+        for dim_key, sd in run_dims.items():
+            if not sd.dimension:
+                continue
+            enriched = _enrich_dimension(sd, run_id, run_info)
+            if dim_key not in latest_by_dim:
+                latest_by_dim[dim_key] = (enriched, run_info)
+            elif dim_key not in prev_occurrence:
+                prev_occurrence[dim_key] = enriched
+            if run_idx > 0 and dim_key not in prev_run_latest:
+                prev_run_latest[dim_key] = enriched
+
+    return latest_by_dim, prev_occurrence, prev_run_latest
 
 
 def build_accumulated(
@@ -28,47 +78,10 @@ def build_accumulated(
 
     Returns (dimensions, summary).
     """
-    # Track which runs we need to rescore (only those contributing a latest dimension)
-    latest_by_dim: dict[str, tuple[ScoredDimension, RunInfo]] = {}
-    prev_occurrence: dict[str, ScoredDimension] = {}
-    prev_run_latest: dict[str, ScoredDimension] = {}
+    latest_by_dim, prev_occurrence, prev_run_latest = _collect_latest_by_dim(
+        reports_root, project, all_runs,
+    )
 
-    # Cache rescored runs to avoid re-rescoring the same run
-    rescored_cache: dict[str, dict[str, ScoredDimension]] = {}
-
-    for run_idx, run_info in enumerate(all_runs):
-        run_id = run_info.run_id
-        if run_id not in rescored_cache:
-            scored_dims = rescore_run(reports_root, project, run_id)
-            rescored_cache[run_id] = {sd.dimension.lower(): sd for sd in scored_dims}
-
-        run_dims = rescored_cache[run_id]
-        for dim_key, sd in run_dims.items():
-            if not sd.dimension:
-                continue
-            # Enrich with run metadata
-            enriched = ScoredDimension(
-                dimension=sd.dimension,
-                overall_score=sd.overall_score,
-                overall_grade=sd.overall_grade,
-                violation_count=sd.violation_count,
-                compliance_count=sd.compliance_count,
-                severity_critical=sd.severity_critical,
-                severity_major=sd.severity_major,
-                severity_minor=sd.severity_minor,
-                from_run_id=run_id,
-                from_date_iso=run_info.date_iso,
-                from_date_label=run_info.date_label,
-            )
-            if dim_key not in latest_by_dim:
-                latest_by_dim[dim_key] = (enriched, run_info)
-            elif dim_key not in prev_occurrence:
-                prev_occurrence[dim_key] = enriched
-            # First non-latest run's dimensions for previous average
-            if run_idx > 0 and dim_key not in prev_run_latest:
-                prev_run_latest[dim_key] = enriched
-
-    # Compute trends by comparing latest to previous occurrence
     dimensions: list[ScoredDimension] = []
     for dim_key, (sd, _run_info) in latest_by_dim.items():
         prev = prev_occurrence.get(dim_key)
@@ -92,7 +105,6 @@ def build_accumulated(
             stale=sd.stale,
         ))
 
-    # Build summary
     summary = _build_summary(dimensions, list(prev_run_latest.values()))
     return dimensions, summary
 
@@ -104,8 +116,6 @@ def build_accumulated_with_children(
     children: list[str],
 ) -> tuple[list[ScoredDimension], AccumulatedSummary]:
     """Build accumulated state including child project dimensions."""
-    from quodeq.services.ports import list_runs
-
     all_dims: list[ScoredDimension] = []
     if own_runs:
         own_dims, _ = build_accumulated(reports_root, project, own_runs)

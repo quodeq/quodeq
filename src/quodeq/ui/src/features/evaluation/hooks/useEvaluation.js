@@ -6,6 +6,11 @@ const DIMENSION_POLL_INITIAL_MS = 2000;
 const DIMENSION_POLL_MAX_MS = 8000;
 const JOB_POLL_INITIAL_MS = 1500;
 const MAX_DIM_POLL_FAILURES = 10;
+const POLL_CONCURRENCY = 4;
+const DEFAULT_OLLAMA_SUBAGENTS = '1';
+const DEFAULT_CLI_SUBAGENTS = '5';
+const DEFAULT_OLLAMA_BUDGET = '0';
+const DEFAULT_CLI_BUDGET = '600';
 
 function stopTimer(ref) {
   if (ref.current) {
@@ -58,7 +63,6 @@ function handleJobUpdate(updated, refs, setJob, callbacks) {
 async function pollPartialDimensions(partialDimensionsRef, project, runId, refs, setLiveViolations) {
   const partial = [...partialDimensionsRef.current];
   if (!partial.length) return false;
-  const POLL_CONCURRENCY = 4;
   let hadErrors = false;
   for (let i = 0; i < partial.length; i += POLL_CONCURRENCY) {
     const batch = partial.slice(i, i + POLL_CONCURRENCY);
@@ -125,21 +129,25 @@ function preparePayload(payload, storage = localStorage) {
 
   const get = (key) => storage.getItem(providerKey(activeProvider, key));
 
-  payload.aiCmd = activeProvider;
   const model = get('model');
   if (!model) throw new Error('No model selected. Go to Settings and select one.');
-  payload.aiModel = model;
 
-  const defaultSubagents = ['ollama'].includes(activeProvider) ? '1' : '5';
+  const defaultSubagents = ['ollama'].includes(activeProvider) ? DEFAULT_OLLAMA_SUBAGENTS : DEFAULT_CLI_SUBAGENTS;
   const subagents = parseInt(get('subagents') || defaultSubagents, 10);
-  payload.maxSubagents = subagents;
 
-  const defaultBudget = ['ollama'].includes(activeProvider) ? '0' : '600';
+  const defaultBudget = ['ollama'].includes(activeProvider) ? DEFAULT_OLLAMA_BUDGET : DEFAULT_CLI_BUDGET;
   const poolBudget = parseInt(get('pool-budget') || defaultBudget, 10);
-  payload.poolBudget = poolBudget;
 
-  if (get('per-dimension') === 'true') payload.perDimension = true;
-  if (get('verify') === 'false') payload.verifyFindings = false;
+  const result = {
+    ...payload,
+    aiCmd: activeProvider,
+    aiModel: model,
+    maxSubagents: subagents,
+    poolBudget,
+  };
+  if (get('per-dimension') === 'true') result.perDimension = true;
+  if (get('verify') === 'false') result.verifyFindings = false;
+  return result;
 }
 
 function parseDimensions(payload) {
@@ -180,7 +188,7 @@ function useResumeRunning(setJob, startPolling, pollRef, dimPollRef) {
       stopTimer(pollRef);
       stopTimer(dimPollRef);
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only: resume any running eval
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- mount-only: resume any running eval; startPolling is stable (defined outside render cycle via refs)
 }
 
 function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPolling) {
@@ -194,9 +202,9 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
       if (Array.isArray(payload.dimensions) && payload.dimensions.length === 0) {
         throw new Error('Select at least one dimension.');
       }
-      preparePayload(payload);
-      const created = await startEvaluation(payload);
-      setJob({ ...created, repo: payload.repo });
+      const prepared = preparePayload(payload);
+      const created = await startEvaluation(prepared);
+      setJob({ ...created, repo: prepared.repo });
       startPolling(created.jobId);
     } catch (err) {
       setJobError(err.message);

@@ -6,7 +6,8 @@ from pathlib import Path
 from quodeq.analysis._backfill import extract_files_from_jsonl
 from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
 from quodeq.analysis._types import RunConfig, _AnalysisContext
-from quodeq.analysis.subagents.runner import _list_source_files
+from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.shared.logging import log_debug
@@ -28,7 +29,6 @@ def save_dimension_fingerprint(
             queue_files: set[str] = set()
             queue_path = evidence_dir / f"{dimension}_queue.json"
             if queue_path.exists():
-                from quodeq.analysis.subagents.file_queue import FileQueue
                 try:
                     queue_files = set(FileQueue(queue_path).all_taken_files())
                 except (OSError, ValueError, KeyError) as exc:

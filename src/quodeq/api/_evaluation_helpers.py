@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import re
+import time as _time
 from http import HTTPStatus
 
 from flask import Response, jsonify, request
@@ -74,7 +75,6 @@ def _check_eval_rate_limit(eval_rate_store: object | None) -> tuple[Response, in
     """Return an error response if the evaluation rate limit is exceeded, or None."""
     if eval_rate_store is None:
         return None
-    import time as _time
     ip = request.remote_addr or "unknown"
     now = _time.monotonic()
     if eval_rate_store.check(ip, now):  # type: ignore[union-attr]

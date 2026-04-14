@@ -10,9 +10,9 @@ from pathlib import Path
 
 from flask import Response, after_this_request, jsonify, send_file
 
-_logger = logging.getLogger(__name__)
-
 from quodeq.api.helpers import error_response
+
+_logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_ZIP_SIZE_MB = 500
 

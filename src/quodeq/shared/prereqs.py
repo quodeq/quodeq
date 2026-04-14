@@ -3,8 +3,11 @@ from __future__ import annotations
 
 import os
 import subprocess
+import urllib.error
+import urllib.request
 
-from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
+from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_ai_cmd
 
 _INSTALL_HINT_NODE = (
     "Install it from https://nodejs.org/ or via your package manager:\n"
@@ -112,8 +115,6 @@ def _check_cli_provider(provider: str) -> None:
 def _check_api_provider(provider: str) -> None:
     """Check that an API provider has basic connectivity (Ollama: server running)."""
     if provider == "ollama":
-        import urllib.request
-        import urllib.error
         try:
             urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5)
         except (urllib.error.URLError, OSError) as exc:
@@ -137,9 +138,6 @@ def check_evaluate_prereqs() -> None:
     Checks the configured AI provider instead of always assuming Claude.
     If no provider is configured, tells the user to select one.
     """
-    from quodeq.shared.utils import get_ai_cmd
-    from quodeq.analysis._provider_cache import get_provider_configs
-
     if not _is_provider_explicitly_configured():
         raise RuntimeError(
             "No AI provider configured.\n\n"

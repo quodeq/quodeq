@@ -6,5 +6,13 @@ export { default as HeatGridView } from './components/HeatGridView.jsx';
 export { default as FileShape } from './components/FileShape.jsx';
 export { default as VizBreadcrumb } from './components/VizBreadcrumb.jsx';
 export { buildFileTree, treeNodeToFileObj } from './core/fileTree.js';
-export * from './core/mapColors.js';
-export * from './core/galaxyCore.js';
+export {
+  severityColor, complianceRateColor, severityCellStyle, complianceRateCellStyle,
+  healthColor, worstSeverity, nodeBorderColor, nodeColor, nodeSize,
+} from './core/mapColors.js';
+export {
+  TAU, parseCSSColor, getThemeColors, invalidateThemeColors,
+  scoreRGB, sevRGB, rgb, rgba,
+  drawGlow, drawParticles, mkParticles,
+  seedHash, seededRng, gradeToScore, LEGEND_ITEMS,
+} from './core/galaxyCore.js';

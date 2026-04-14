@@ -15,8 +15,13 @@ def _models_path() -> Path:
     return Path(__file__).resolve().parent.parent / "data" / "config" / "known_models.json"
 
 
-def get_known_models() -> dict[str, list[dict]]:
-    """Load known model suggestions per CLI provider."""
+def get_known_models(*, _cache: dict | None = None) -> dict[str, list[dict]]:
+    """Load known model suggestions per CLI provider.
+
+    *_cache* can be injected for testing to bypass the module-level cache.
+    """
+    if _cache is not None:
+        return _cache
     global _KNOWN_MODELS
     if _KNOWN_MODELS is not None:
         return _KNOWN_MODELS
@@ -26,3 +31,9 @@ def get_known_models() -> dict[str, list[dict]]:
     except (OSError, json.JSONDecodeError) as exc:
         _log.warning("Could not load known_models.json: %s", exc)
         return {}
+
+
+def reset_known_models() -> None:
+    """Clear the cached models. Useful for test isolation."""
+    global _KNOWN_MODELS
+    _KNOWN_MODELS = None

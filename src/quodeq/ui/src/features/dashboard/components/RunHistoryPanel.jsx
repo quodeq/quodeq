@@ -20,6 +20,8 @@ const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
 
+// Module-level CSS variable cache. Cleared automatically by MutationObserver
+// when the data-theme attribute changes. Use clearCssVarCache() for test resets.
 const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
   if (_cssVarCache.has(name)) return _cssVarCache.get(name);
@@ -28,6 +30,9 @@ const cssVar = (name, fallback) => {
   _cssVarCache.set(name, result);
   return result;
 };
+
+/** Clear the CSS variable cache. Called automatically by MutationObserver on theme change; exported for test resets. */
+export function clearCssVarCache() { _cssVarCache.clear(); }
 
 // Auto-clear cache when theme changes (data-theme attribute mutation)
 new MutationObserver(() => _cssVarCache.clear()).observe(

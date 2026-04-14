@@ -37,16 +37,51 @@ export function clearScoresCache(project) {
  *   refreshScores: () => void,
  * }}
  */
-export function useProjectScores({ selectedProject, selectedRun }) {
-  const [scores, setScores] = useState(null);
-  const [latestScores, setLatestScores] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+function fetchRunScoresEffect(selectedProject, selectedRun, setScores, setLoading, setError) {
+  if (!selectedProject) { setScores(null); setError(null); return; }
+  const asOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
+  const key = _cacheKey(selectedProject, asOf);
+  const cached = _cache.get(key);
+  if (cached) {
+    setScores(cached);
+    setLoading(false);
+    return;
+  }
 
-  // Clear stale data on project change
-  const prevProjectRef = useRef(selectedProject);
-  const prevRunRef = useRef(selectedRun);
+  let active = true;
+  setLoading(true);
+  getProjectScores(selectedProject, asOf)
+    .then((data) => {
+      if (!active) return;
+      _cache.set(key, data);
+      setScores(data);
+    })
+    .catch(() => { if (active) setError('Failed to load score data.'); })
+    .finally(() => { if (active) setLoading(false); });
+  return () => { active = false; };
+}
+
+function fetchLatestScoresEffect(selectedProject, setLatestScores) {
+  if (!selectedProject) { setLatestScores(null); return; }
+  const key = _cacheKey(selectedProject, null);
+  const cached = _cache.get(key);
+  if (cached) {
+    setLatestScores(cached);
+    return;
+  }
+
+  let active = true;
+  getProjectScores(selectedProject)
+    .then((data) => {
+      if (!active) return;
+      _cache.set(key, data);
+      setLatestScores(data);
+    })
+    .catch(() => {}); // non-fatal for latest
+  return () => { active = false; };
+}
+
+function syncScoresOnChange(prevProjectRef, prevRunRef, selectedProject, selectedRun, setScores, setLatestScores, setError) {
   if (prevProjectRef.current !== selectedProject) {
     prevProjectRef.current = selectedProject;
     prevRunRef.current = selectedRun;
@@ -55,65 +90,35 @@ export function useProjectScores({ selectedProject, selectedRun }) {
     setError(null);
   } else if (prevRunRef.current !== selectedRun) {
     prevRunRef.current = selectedRun;
-    // Apply cached data synchronously
     const asOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
     const cached = _cache.get(_cacheKey(selectedProject, asOf));
     if (cached) setScores(cached);
   }
+}
 
-  // Fetch scores for selected run (as_of)
+export function useProjectScores({ selectedProject, selectedRun }) {
+  const [scores, setScores] = useState(null);
+  const [latestScores, setLatestScores] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const prevProjectRef = useRef(selectedProject);
+  const prevRunRef = useRef(selectedRun);
+  syncScoresOnChange(prevProjectRef, prevRunRef, selectedProject, selectedRun, setScores, setLatestScores, setError);
+
   useEffect(() => {
-    if (!selectedProject) { setScores(null); setError(null); return; }
-    const asOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
-    const key = _cacheKey(selectedProject, asOf);
-    const cached = _cache.get(key);
-    if (cached) {
-      setScores(cached);
-      setLoading(false);
-      return;
-    }
-
-    let active = true;
-    setLoading(true);
-    getProjectScores(selectedProject, asOf)
-      .then((data) => {
-        if (!active) return;
-        _cache.set(key, data);
-        setScores(data);
-      })
-      .catch(() => { if (active) setError('Failed to load score data.'); })
-      .finally(() => { if (active) setLoading(false); });
-    return () => { active = false; };
+    return fetchRunScoresEffect(selectedProject, selectedRun, setScores, setLoading, setError);
   }, [selectedProject, selectedRun, refreshKey]);
 
-  // Fetch latest scores (no as_of) separately for components that always need latest
   useEffect(() => {
-    if (!selectedProject) { setLatestScores(null); return; }
-    const key = _cacheKey(selectedProject, null);
-    const cached = _cache.get(key);
-    if (cached) {
-      setLatestScores(cached);
-      return;
-    }
-
-    let active = true;
-    getProjectScores(selectedProject)
-      .then((data) => {
-        if (!active) return;
-        _cache.set(key, data);
-        setLatestScores(data);
-      })
-      .catch(() => {}); // non-fatal for latest
-    return () => { active = false; };
+    return fetchLatestScoresEffect(selectedProject, setLatestScores);
   }, [selectedProject, refreshKey]);
 
   const availableRuns = useMemo(() => {
     const trend = scores?.trend || latestScores?.trend || [];
     if (trend.length === 0) return [];
-    return trend.map((row) => ({
-      runId: row.runId,
-      dateLabel: row.dateLabel || row.runId,
-    }));
+    return trend.map((row) => ({ runId: row.runId, dateLabel: row.dateLabel || row.runId }));
   }, [scores, latestScores]);
 
   const refreshTimerRef = useRef(null);

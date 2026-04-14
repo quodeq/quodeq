@@ -13,6 +13,10 @@ from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import is_valid_repo_url
+from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
+from quodeq.core.scoring.engine import score_evidence
+from quodeq.analysis.report import write_dimension_report
+from quodeq.services._fs_scan import scan_project
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
 
 if TYPE_CHECKING:
@@ -108,14 +112,12 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str, scope
 
     # Scan local projects so file lists are available immediately
     if location == _LOCATION_LOCAL:
-        from quodeq.services._fs_scan import scan_project
         repo_path = Path(repo_resolved)
         if repo_path.is_dir():
             project_dir = reports_path / project_uuid
             scan_project(repo_path, output_dir=project_dir)
             # For scoped projects, also scan the parent using the parent UUID from repo info
             if scope_path:
-                import json
                 info_path = project_dir / "repository_info.json"
                 try:
                     parent_uuid = json.loads(info_path.read_text()).get("parent")
@@ -267,10 +269,6 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
             continue  # verification not completed for this dimension
 
         try:
-            from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
-            from quodeq.core.scoring.engine import score_evidence
-            from quodeq.analysis.report import write_dimension_report
-
             evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
                 language="", repository="", date_str="",
                 source_file_count=0, files_read=0,

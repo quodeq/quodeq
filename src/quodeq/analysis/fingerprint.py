@@ -11,7 +11,9 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.analysis.subagents.verify import resolve_evidence_paths
 from quodeq.data.fs.report_parser.runs import list_runs
+from quodeq.shared.validation import validate_path_segment
 
 
 def _get_git_commit(src: Path) -> str | None:
@@ -71,7 +73,6 @@ def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir
 
 def save_fingerprint(fingerprint: dict, evidence_dir: Path) -> Path:
     """Save fingerprint to the evidence directory."""
-    from quodeq.shared.validation import validate_path_segment
     dim = fingerprint["dimension"]
     validate_path_segment(dim)
     path = evidence_dir / f"{dim}_fingerprint.json"
@@ -98,8 +99,6 @@ def find_previous_fingerprint(
     Walks the run history to find the latest run (other than the current one)
     that has a fingerprint for the given dimension.
     """
-    from quodeq.analysis.subagents.verify import resolve_evidence_paths
-
     paths_info = resolve_evidence_paths(evidence_dir)
     if not paths_info:
         return None, None

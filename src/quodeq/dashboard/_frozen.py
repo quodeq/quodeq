@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import subprocess
 import sys
 
@@ -52,7 +53,6 @@ def source_user_path() -> None:
     except (subprocess.TimeoutExpired, OSError):
         pass
     # Fallback: add common locations
-    import platform
     brew = "/opt/homebrew/bin" if platform.machine() == "arm64" else "/usr/local/bin"
     extra = f"{os.path.expanduser('~/.local/bin')}:{brew}"
     os.environ["PATH"] = f"{os.environ.get('PATH', '')}:{extra}"

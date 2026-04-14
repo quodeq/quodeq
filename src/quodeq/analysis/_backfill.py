@@ -6,6 +6,7 @@ import time
 from copy import copy
 from dataclasses import dataclass
 from pathlib import Path
+from quodeq.analysis._dimension_ops import _process_single_dimension
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.incremental import identify_backfill_files
 from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
@@ -77,9 +78,6 @@ def run_backfill_phase(
 
     Returns the set of backfill files actually taken.
     """
-    # Deferred import: breaks circular dependency between _backfill and runner.
-    from quodeq.analysis.runner import _process_single_dimension
-
     backfill_candidates = identify_backfill_files(backfill.files, list(backfill.prev_analyzed), backfill.phase1_files)
     output_jsonl = backfill.evidence_dir / f"{dimension}_evidence.jsonl"
     backfill_taken: set[str] = set()

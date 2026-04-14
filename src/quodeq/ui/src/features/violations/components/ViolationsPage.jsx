@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { listDismissedFindings, restoreFinding, restoreAllFindings } from '../../../api/index.js';
 import { readVisibleStandardIds, computeSummaryFromDimensions } from '../../../utils/visibleStandards.js';
 import { complianceRatio } from '../../../utils/formatters.js';
@@ -91,15 +91,8 @@ function FileSubTab({ dimensions, onFileClick, currentPath, setCurrentPath }) {
   );
 }
 
-let _savedSubTab = 'dimension';
-let _savedFilePath = '';
-
-function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh }) {
-  const [activeSubTab, _setActiveSubTab] = useState(_savedSubTab);
-  const setActiveSubTab = (v) => { _savedSubTab = v; _setActiveSubTab(v); };
+function useDismissedFindings(selectedProject, onRefresh) {
   const [dismissed, setDismissed] = useState([]);
-  const [fileCurrentPath, _setFileCurrentPath] = useState(_savedFilePath);
-  const setFileCurrentPath = (v) => { _savedFilePath = v; _setFileCurrentPath(v); };
 
   useEffect(() => {
     if (!selectedProject) return;
@@ -126,6 +119,17 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh }
     }
   }, [selectedProject, onRefresh]);
 
+  return { dismissed, handleRestore, handleRestoreAll };
+}
+
+function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, savedSubTabRef, savedFilePathRef }) {
+  const [activeSubTab, _setActiveSubTab] = useState(savedSubTabRef.current);
+  const setActiveSubTab = (v) => { savedSubTabRef.current = v; _setActiveSubTab(v); };
+  const [fileCurrentPath, _setFileCurrentPath] = useState(savedFilePathRef.current);
+  const setFileCurrentPath = (v) => { savedFilePathRef.current = v; _setFileCurrentPath(v); };
+
+  const { dismissed, handleRestore, handleRestoreAll } = useDismissedFindings(selectedProject, onRefresh);
+
   const visibleDimensions = useMemo(() => {
     const visibleSet = new Set(readVisibleStandardIds());
     return accumulatedDimensions.filter((d) => visibleSet.has((d.dimension || '').toLowerCase()));
@@ -151,17 +155,71 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh }
   };
 }
 
-let _lastViolationsTabKey = null;
+function ViolationsStatsGrid({ summary, topFilesCount, uniquePrinciples, dimensionCount }) {
+  return (
+    <section className="panel violations-stats-panel">
+      <div className="violations-stats-grid">
+        <div className="acc-eval-stat-block">
+          <span className="acc-eval-stat-label">Violations</span>
+          <span className="acc-eval-stat-value">{summary.totalViolations || 0}</span>
+          <div className="acc-eval-tags">
+            {(summary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{summary.severity.critical} critical</span>}
+            {(summary.severity?.major || 0) > 0 && <span className="severity-tag major">{summary.severity.major} major</span>}
+            {(summary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{summary.severity.minor} minor</span>}
+          </div>
+        </div>
+        <div className="acc-eval-stat-block">
+          <span className="acc-eval-stat-label">Compliance</span>
+          <span className="acc-eval-stat-value">{summary.totalCompliance || 0}</span>
+        </div>
+        <div className="acc-eval-stat-block">
+          <span className="acc-eval-stat-label">Ratio</span>
+          <span className="acc-eval-stat-value">{complianceRatio(summary.totalViolations || 0, summary.totalCompliance || 0)}</span>
+        </div>
+        <div className="acc-eval-stat-block">
+          <span className="acc-eval-stat-label">Files</span>
+          <span className="acc-eval-stat-value">{topFilesCount}</span>
+        </div>
+        <div className="acc-eval-stat-block">
+          <span className="acc-eval-stat-label">Principles</span>
+          <span className="acc-eval-stat-value">{uniquePrinciples}</span>
+        </div>
+        <div className="acc-eval-stat-block">
+          <span className="acc-eval-stat-label">Dimensions</span>
+          <span className="acc-eval-stat-value">{dimensionCount}</span>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ViolationsSubTabContent({ activeSubTab, visibleDimensions, dismissed, callbacks, fileCurrentPath, setFileCurrentPath, handleRestore, handleRestoreAll }) {
+  if (activeSubTab === 'file') {
+    return <FileSubTab dimensions={visibleDimensions} onFileClick={callbacks.onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />;
+  }
+  if (activeSubTab === 'dimension') {
+    return <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={callbacks.onDimensionClick} onPrincipleClick={callbacks.onPrincipleClick} onCellClick={callbacks.onCellClick} />;
+  }
+  if (activeSubTab === 'dismissed') {
+    return dismissed.length > 0
+      ? <DismissedSubTab dismissed={dismissed} onRestore={handleRestore} onRestoreAll={handleRestoreAll} />
+      : <p className="empty-state">No dismissed violations.</p>;
+  }
+  return null;
+}
 
 export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 0 }) {
-  const isFreshTabClick = _lastViolationsTabKey !== null && tabKey !== _lastViolationsTabKey;
-  _lastViolationsTabKey = tabKey;
-  if (isFreshTabClick) _savedFilePath = '';
+  const savedSubTabRef = useRef('dimension');
+  const savedFilePathRef = useRef('');
+  const lastViolationsTabKeyRef = useRef(null);
+
+  const isFreshTabClick = lastViolationsTabKeyRef.current !== null && tabKey !== lastViolationsTabKeyRef.current;
+  lastViolationsTabKeyRef.current = tabKey;
+  if (isFreshTabClick) savedFilePathRef.current = '';
 
   const { accumulatedDimensions, selectedProject } = data;
-  const { onDimensionClick, onFileClick, onPrincipleClick, onRefresh } = callbacks;
+  const { onRefresh } = callbacks;
 
-  // Refresh data on mount (ensures fresh data after returning from detail pages) and on tab re-click
   useEffect(() => {
     onRefresh?.();
   }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -171,7 +229,7 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
     handleRestore, handleRestoreAll, visibleDimensions,
     summary, topFilesCount, uniquePrinciples,
     fileCurrentPath, setFileCurrentPath,
-  } = useViolationsData({ accumulatedDimensions, selectedProject, onRefresh });
+  } = useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, savedSubTabRef, savedFilePathRef });
 
   return (
     <div className="violations-page">
@@ -189,50 +247,12 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
           ))}
         </div>
       </div>
-      <section className="panel violations-stats-panel">
-        <div className="violations-stats-grid">
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Violations</span>
-            <span className="acc-eval-stat-value">{summary.totalViolations || 0}</span>
-            <div className="acc-eval-tags">
-              {(summary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{summary.severity.critical} critical</span>}
-              {(summary.severity?.major || 0) > 0 && <span className="severity-tag major">{summary.severity.major} major</span>}
-              {(summary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{summary.severity.minor} minor</span>}
-            </div>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Compliance</span>
-            <span className="acc-eval-stat-value">{summary.totalCompliance || 0}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Ratio</span>
-            <span className="acc-eval-stat-value">{complianceRatio(summary.totalViolations || 0, summary.totalCompliance || 0)}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Files</span>
-            <span className="acc-eval-stat-value">{topFilesCount}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Principles</span>
-            <span className="acc-eval-stat-value">{uniquePrinciples}</span>
-          </div>
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Dimensions</span>
-            <span className="acc-eval-stat-value">{visibleDimensions.length}</span>
-          </div>
-        </div>
-      </section>
-      {activeSubTab === 'file' && (
-        <FileSubTab dimensions={visibleDimensions} onFileClick={onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />
-      )}
-      {activeSubTab === 'dimension' && (
-        <DimensionHeatGridView dimensions={visibleDimensions} onDimensionClick={onDimensionClick} onPrincipleClick={onPrincipleClick} onCellClick={callbacks.onCellClick} />
-      )}
-      {activeSubTab === 'dismissed' && (
-        dismissed.length > 0
-          ? <DismissedSubTab dismissed={dismissed} onRestore={handleRestore} onRestoreAll={handleRestoreAll} />
-          : <p className="empty-state">No dismissed violations.</p>
-      )}
+      <ViolationsStatsGrid summary={summary} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} dimensionCount={visibleDimensions.length} />
+      <ViolationsSubTabContent
+        activeSubTab={activeSubTab} visibleDimensions={visibleDimensions} dismissed={dismissed}
+        callbacks={callbacks} fileCurrentPath={fileCurrentPath} setFileCurrentPath={setFileCurrentPath}
+        handleRestore={handleRestore} handleRestoreAll={handleRestoreAll}
+      />
     </div>
   );
 }

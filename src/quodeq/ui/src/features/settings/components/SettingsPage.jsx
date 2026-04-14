@@ -4,6 +4,7 @@ import SettingsAside from './SettingsAside.jsx';
 import AboutSection from './AboutSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
 import ServerSection from './ServerSection.jsx';
+import { SETTINGS_TOAST_SEEN_KEY } from '../../../constants.js';
 
 const MODE_OPTIONS = [
   { value: 'system',   label: 'System' },
@@ -97,11 +98,11 @@ function SettingsHeader() {
   );
 }
 
-import { SETTINGS_TOAST_SEEN_KEY } from '../../../constants.js';
+const TOAST_DISMISS_MS = 8000;
 
 function SettingsToast({ onDismiss }) {
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 8000);
+    const timer = setTimeout(onDismiss, TOAST_DISMISS_MS);
     return () => clearTimeout(timer);
   }, [onDismiss]);
 

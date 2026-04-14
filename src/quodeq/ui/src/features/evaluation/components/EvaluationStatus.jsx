@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
 
@@ -43,8 +45,6 @@ function lastRelevantLog(logs) {
   }
   return null;
 }
-
-import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
 
 function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
   const isRunning = job.status === STATUS.RUNNING;
@@ -111,8 +111,6 @@ function JobHeader({ job, onDismiss, onCancel }) {
     </div>
   );
 }
-
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 function JobProviderBadge() {
   const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';

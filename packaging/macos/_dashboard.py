@@ -20,6 +20,7 @@ _MAX_START_RETRIES = 20
 _HEALTH_POLL_INTERVAL_S = 0.5
 _STDERR_READ_MAX = 500
 _ERROR_DISPLAY_MAX = 200
+_SUBPROCESS_TIMEOUT_S = 5
 
 
 class DashboardCallbacks(NamedTuple):
@@ -62,7 +63,7 @@ def build_dashboard_cmd(quodeq_cmd: str, app_port: int) -> list[str]:
     try:
         help_out = subprocess.run(
             [quodeq_cmd, "dashboard", "--help"],
-            capture_output=True, text=True, timeout=5,
+            capture_output=True, text=True, timeout=_SUBPROCESS_TIMEOUT_S,
         ).stdout
         if "--no-open" in help_out:
             cmd.append("--no-open")

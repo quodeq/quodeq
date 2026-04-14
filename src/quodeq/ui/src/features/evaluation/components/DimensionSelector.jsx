@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 const TYPE_CONFIG = {
   quodeq:    { label: 'Quodeq',    className: 'dimension-chip-type--quodeq',    order: 1 },
   custom:    { label: 'Custom',    className: 'dimension-chip-type--custom',    order: 3 },
@@ -22,8 +24,6 @@ function DimensionChip({ dim, isSelected, onToggle }) {
     </button>
   );
 }
-
-import { useMemo } from 'react';
 
 export default function DimensionSelector({ allDimensions, selectedDims, onToggle, onSelectAll, onClearAll }) {
   const sorted = useMemo(() => [...allDimensions].sort((a, b) => {

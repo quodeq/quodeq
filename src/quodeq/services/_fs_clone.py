@@ -4,16 +4,19 @@ from __future__ import annotations
 
 import json
 import os
+import subprocess as _subprocess
+import urllib.parse
 from pathlib import Path
 from typing import Any
+
+from quodeq.data.fs.repo_handler import _PRIVATE_HOST_RE, _resolves_to_private
+from quodeq.shared.repo_handler import is_valid_repo_url
 
 _GIT_CLONE_TIMEOUT_S = 300
 
 
 def run_git_clone(url: str, clone_dest: Path) -> bool:
     """Execute ``git clone`` for *url* into *clone_dest*."""
-    import subprocess as _subprocess
-
     env = {**os.environ, "GIT_LFS_SKIP_SMUDGE": "1"}
     try:
         _subprocess.run(
@@ -31,8 +34,6 @@ def clone_to_local(
     reports_dir: str, project: str, destination: str, *, get_project_info_fn: Any,
 ) -> dict[str, Any] | None:
     """Clone an online project's repo to a local path and update its metadata."""
-    from quodeq.shared.repo_handler import is_valid_repo_url
-
     reports_root = Path(reports_dir).resolve()
     info_path = (reports_root / project / "repository_info.json").resolve()
     if not info_path.is_relative_to(reports_root) or not info_path.exists():
@@ -50,12 +51,9 @@ def clone_to_local(
     if not dest_dir.is_dir():
         return None
 
-    from quodeq.data.fs.repo_handler import _PRIVATE_HOST_RE, _resolves_to_private
-
     if _PRIVATE_HOST_RE.match(url):
         return None
     if url.startswith("http"):
-        import urllib.parse
         hostname = urllib.parse.urlparse(url).hostname or ""
         if hostname and _resolves_to_private(hostname):
             return None

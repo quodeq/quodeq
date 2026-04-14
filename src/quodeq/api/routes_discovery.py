@@ -9,9 +9,10 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.core.types import to_camel_dict
+from quodeq.services.base import ActionProvider
+from quodeq.services.plugin_discovery import discover_plugins
 
 _logger = logging.getLogger(__name__)
-from quodeq.services.base import ActionProvider
 
 # Error keyword returned by browse_repo when the path exists but is not a directory.
 _BROWSE_NOT_A_DIR_KEYWORD = "not a directory"
@@ -91,7 +92,6 @@ def register_discovery_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.get("/api/plugins")
     def plugins() -> Response:
-        from quodeq.services.plugin_discovery import discover_plugins  # deferred: avoid circular import at module level
         return jsonify([to_camel_dict(p) for p in discover_plugins()])
 
     @app.get("/api/browse")

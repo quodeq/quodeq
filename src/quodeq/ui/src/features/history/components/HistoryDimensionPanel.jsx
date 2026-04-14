@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import { formatShortDate, angleFromDelta, gradeLetter } from '../../../utils/formatters.js';
 
+// Module-level CSS variable cache. Use clearCssVarCache() for test resets.
 const _cssVarCache = {};
 const cssVar = (name, fallback) => {
   if (name in _cssVarCache) return _cssVarCache[name] || fallback;
@@ -18,6 +19,9 @@ const cssVar = (name, fallback) => {
   _cssVarCache[name] = val;
   return val || fallback;
 };
+
+/** Clear the CSS variable cache; exported for test resets. */
+export function clearCssVarCache() { for (const k in _cssVarCache) delete _cssVarCache[k]; }
 
 const SCORE_THRESHOLDS = { exemplary: 9, good: 7, adequate: 5, poor: 3 };
 const CHART_LEFT_MARGIN = -16;
@@ -97,10 +101,8 @@ function DimensionTooltip({ active, payload }) {
 }
 
 
-export default function DimensionScorePanel({ dimensions = [], onBarClick, runDate, runId }) {
-  if (!dimensions || dimensions.length === 0) return null;
-
-  const data = [...dimensions]
+function prepareDimensionData(dimensions) {
+  return [...dimensions]
     .sort((a, b) => a.dimension.localeCompare(b.dimension))
     .map((d) => {
       const curr = parseFloat(d.overallScore);
@@ -108,30 +110,82 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
       const delta = !isNaN(curr) && !isNaN(prev) ? curr - prev : null;
       return { ...d, numericScore: isNaN(curr) ? 0 : curr, delta };
     });
+}
 
-  const renderTrendLabel = ({ x, y, width, index }) => {
-    const entry = data[index];
-    if (entry?.delta === null || entry?.delta === undefined) return null;
-    const cx = x + width / 2;
-    const angle = angleFromDelta(entry.delta);
-    const colorCls = trendColorClass(angle);
-    const fill = trendColorVar(colorCls);
-    const deltaStr = entry.delta > 0 ? `+${entry.delta.toFixed(1)}` : entry.delta.toFixed(1);
-    return (
-      <g>
-        <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={fill}>
-          {deltaStr}
-        </text>
-        <text
-          x={cx} y={y - 14}
-          textAnchor="middle" fontSize={11} fill={fill}
-          transform={`rotate(${Math.round(angle)}, ${cx}, ${y - 14})`}
+function renderTrendLabel(data, { x, y, width, index }) {
+  const entry = data[index];
+  if (entry?.delta === null || entry?.delta === undefined) return null;
+  const cx = x + width / 2;
+  const angle = angleFromDelta(entry.delta);
+  const colorCls = trendColorClass(angle);
+  const fill = trendColorVar(colorCls);
+  const deltaStr = entry.delta > 0 ? `+${entry.delta.toFixed(1)}` : entry.delta.toFixed(1);
+  return (
+    <g>
+      <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={fill}>
+        {deltaStr}
+      </text>
+      <text
+        x={cx} y={y - 14}
+        textAnchor="middle" fontSize={11} fill={fill}
+        transform={`rotate(${Math.round(angle)}, ${cx}, ${y - 14})`}
+      >
+        ↑
+      </text>
+    </g>
+  );
+}
+
+function DimensionBarChart({ data, onBarClick }) {
+  return (
+    <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
+      <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: CHART_LEFT_MARGIN }}>
+        <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
+        <XAxis
+          dataKey="dimension"
+          tickFormatter={dimCode}
+          tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
+          interval={0}
+          axisLine={false}
+          tickLine={false}
+        />
+        <YAxis
+          domain={[0, 10]}
+          ticks={CHART_Y_TICKS}
+          tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
+          axisLine={false}
+          tickLine={false}
+        />
+        <Tooltip content={DimensionTooltip} cursor={false} isAnimationActive={false} />
+        <ReferenceLine y={2.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+        <ReferenceLine y={5}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
+        <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
+        <Bar
+          dataKey="numericScore"
+          radius={CHART_BAR_RADIUS}
+          maxBarSize={CHART_MAX_BAR_SIZE}
+          label={(props) => renderTrendLabel(data, props)}
+          isAnimationActive={false}
+          cursor={onBarClick ? 'pointer' : 'default'}
+          onClick={(entry) => onBarClick?.(entry)}
         >
-          ↑
-        </text>
-      </g>
-    );
-  };
+          {data.map((entry, i) => (
+            <Cell
+              key={entry.dimension ?? i}
+              fill={scoreBarColor(entry.numericScore)}
+              opacity={CHART_CELL_OPACITY}
+            />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+export default function DimensionScorePanel({ dimensions = [], onBarClick, runDate, runId }) {
+  if (!dimensions || dimensions.length === 0) return null;
+
+  const data = prepareDimensionData(dimensions);
 
   return (
     <section className="run-history-panel panel" aria-label="Dimension scores bar chart">
@@ -144,47 +198,7 @@ export default function DimensionScorePanel({ dimensions = [], onBarClick, runDa
           </span>
         )}
       </div>
-      <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-        <BarChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: CHART_LEFT_MARGIN }}>
-          <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
-          <XAxis
-            dataKey="dimension"
-            tickFormatter={dimCode}
-            tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
-            interval={0}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            domain={[0, 10]}
-            ticks={CHART_Y_TICKS}
-            tick={{ fontSize: 11, fill: cssVar('--color-chart-axis') }}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip content={DimensionTooltip} cursor={false} isAnimationActive={false} />
-          <ReferenceLine y={2.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
-          <ReferenceLine y={5}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.3} />
-          <ReferenceLine y={7.5} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.15} />
-          <Bar
-            dataKey="numericScore"
-            radius={CHART_BAR_RADIUS}
-            maxBarSize={CHART_MAX_BAR_SIZE}
-            label={renderTrendLabel}
-            isAnimationActive={false}
-            cursor={onBarClick ? 'pointer' : 'default'}
-            onClick={(entry) => onBarClick?.(entry)}
-          >
-            {data.map((entry, i) => (
-              <Cell
-                key={entry.dimension ?? i}
-                fill={scoreBarColor(entry.numericScore)}
-                opacity={CHART_CELL_OPACITY}
-              />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      <DimensionBarChart data={data} onBarClick={onBarClick} />
     </section>
   );
 }

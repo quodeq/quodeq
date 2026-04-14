@@ -3,6 +3,8 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import ssl
+import urllib.request
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -17,8 +19,6 @@ class HttpClient(Protocol):
 
 class UrllibJsonClient:
     def get_json(self, url: str, headers: dict[str, str] | None = None) -> Any:
-        import ssl
-        import urllib.request
         req = urllib.request.Request(url, headers=headers or {})
         ctx = ssl.create_default_context()
         with urllib.request.urlopen(req, timeout=_HTTP_TIMEOUT_S, context=ctx) as resp:
@@ -39,10 +39,12 @@ class StandardsLibraryClient:
         return h
 
     def fetch_index(self) -> list[dict]:
+        """Retrieve the remote standards library index."""
         data = self._http.get_json(f"{self._base_url}/index.json", headers=self._headers())
         return data.get("standards", [])
 
     def fetch_standard(self, file_path: str) -> dict:
+        """Download a single standard JSON by its library file path."""
         return self._http.get_json(f"{self._base_url}/{file_path}", headers=self._headers())
 
     @staticmethod
@@ -51,6 +53,7 @@ class StandardsLibraryClient:
             raise ValueError(f"Invalid standard ID from library: {standard_id}")
 
     def import_standard(self, file_path: str, evaluators_dir: Path) -> Path:
+        """Fetch a remote standard and save it locally as a managed evaluator."""
         if ".." in file_path:
             raise ValueError(f"Invalid library file path: {file_path}")
         data = self.fetch_standard(file_path)

@@ -88,64 +88,68 @@ function ConflictStep({ parsedData, conflict, warnings, actions }) {
   );
 }
 
+async function importEvaluator(data, force, onImported, state) {
+  const { setStep, setError, setWarnings, setConflict } = state;
+  setStep(STEP.REVIEWING);
+  try {
+    const result = await importStandard(data, force);
+    if (result._conflict) {
+      setConflict(result.existing);
+      setWarnings(result.warnings || []);
+      setStep(STEP.CONFLICT);
+      return;
+    }
+    if (result.warnings?.length > 0 && !force) {
+      setWarnings(result.warnings);
+      setStep(STEP.WARNINGS);
+      return;
+    }
+    onImported();
+  } catch (err) {
+    setError(err.message || 'Import failed');
+    setStep(STEP.ERROR);
+  }
+}
+
+async function handleFileInput(e, onImported, state) {
+  const { setStep, setError, setParsedData } = state;
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (file.size > MAX_FILE_SIZE) {
+    setError(`File too large (${(file.size / 1024).toFixed(0)} KB). Maximum is 1 MB.`);
+    setStep(STEP.ERROR);
+    return;
+  }
+  let data;
+  try {
+    const text = await file.text();
+    data = JSON.parse(text);
+  } catch {
+    setError('Invalid file: could not parse as JSON.');
+    setStep(STEP.ERROR);
+    return;
+  }
+  if (typeof data !== 'object' || Array.isArray(data)) {
+    setError('Invalid file: expected a JSON object.');
+    setStep(STEP.ERROR);
+    return;
+  }
+  setParsedData(data);
+  await importEvaluator(data, false, onImported, state);
+}
+
 function useImportActions(onImported, state) {
-  const { setStep, setError, setWarnings, setConflict, parsedData, setParsedData } = state;
-  const importEvaluator = async (data, force) => {
-    setStep(STEP.REVIEWING);
-    try {
-      const result = await importStandard(data, force);
-      if (result._conflict) {
-        setConflict(result.existing);
-        setWarnings(result.warnings || []);
-        setStep(STEP.CONFLICT);
-        return;
-      }
-      if (result.warnings?.length > 0 && !force) {
-        setWarnings(result.warnings);
-        setStep(STEP.WARNINGS);
-        return;
-      }
-      onImported();
-    } catch (err) {
-      setError(err.message || 'Import failed');
-      setStep(STEP.ERROR);
-    }
-  };
+  const { parsedData, setParsedData } = state;
 
-  const handleFile = async (e) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_FILE_SIZE) {
-      setError(`File too large (${(file.size / 1024).toFixed(0)} KB). Maximum is 1 MB.`);
-      setStep(STEP.ERROR);
-      return;
-    }
-    let data;
-    try {
-      const text = await file.text();
-      data = JSON.parse(text);
-    } catch {
-      setError('Invalid file: could not parse as JSON.');
-      setStep(STEP.ERROR);
-      return;
-    }
-    if (typeof data !== 'object' || Array.isArray(data)) {
-      setError('Invalid file: expected a JSON object.');
-      setStep(STEP.ERROR);
-      return;
-    }
-    setParsedData(data);
-    await importEvaluator(data, false);
-  };
-
-  const handleForceImport = async () => { await importEvaluator(parsedData, true); };
+  const handleFile = async (e) => handleFileInput(e, onImported, state);
+  const handleForceImport = async () => { await importEvaluator(parsedData, true, onImported, state); };
   const handleImportAsCopy = async () => {
     const copied = { ...parsedData, id: buildImportedCopyId(parsedData.id) };
     setParsedData(copied);
-    await importEvaluator(copied, false);
+    await importEvaluator(copied, false, onImported, state);
   };
-  const handleProceedWithWarnings = async () => { await importEvaluator(parsedData, true); };
-  return { importEvaluator, handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
+  const handleProceedWithWarnings = async () => { await importEvaluator(parsedData, true, onImported, state); };
+  return { handleFile, handleForceImport, handleImportAsCopy, handleProceedWithWarnings };
 }
 
 function useImportModal(onImported) {

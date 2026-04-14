@@ -140,11 +140,15 @@ def _serve_native(
     api_pid = str(action_api_process.pid) if action_api_process else ""
 
     subprocess.Popen(
-        subprocess_cmd("webview", [action_api_url, str(instance._sock_path), api_pid]),
+        subprocess_cmd("webview", [action_api_url, str(instance.sock_path), api_pid]),
         start_new_session=True,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+
+# Public alias for cross-module use within the dashboard package
+serve_and_wait = _serve_and_wait
 
 
 def _serve_blocking(

@@ -2,8 +2,10 @@
 from __future__ import annotations
 
 import time
+from pathlib import Path
 
 from quodeq.analysis._backfill import BackfillContext, extract_files_from_jsonl, run_backfill_phase
+from quodeq.analysis.incremental import ClassificationInput, classify_files
 from quodeq.analysis._incremental_context import IncrementalCoverage
 from quodeq.analysis._incremental_phases import (
     _finalize_incremental, _list_all_source_files,
@@ -11,6 +13,7 @@ from quodeq.analysis._incremental_phases import (
 )
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.fingerprint import find_previous_fingerprint
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.core.evidence.model import Evidence
 
 
@@ -22,9 +25,6 @@ def _actual_analyzed_files(evidence_dir: "Path", dimension: str) -> set[str]:
     which lists files *queued* for analysis — not files that finished before
     the pool timed out.
     """
-    from pathlib import Path
-    from quodeq.analysis.subagents.file_queue import FileQueue
-
     analyzed: set[str] = set()
     queue_path = Path(evidence_dir) / f"{dimension}_queue.json"
     if queue_path.exists():
@@ -49,7 +49,6 @@ def run_dimension_incremental(
     if not files:
         return None
 
-    from quodeq.analysis.incremental import ClassificationInput, classify_files
     classification = classify_files(
         inputs=ClassificationInput(
             src=config.src, files=files, prev_fingerprint=prev_fp,

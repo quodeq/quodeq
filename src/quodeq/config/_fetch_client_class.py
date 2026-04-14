@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import logging
 import os
+import ssl as _ssl
 import threading
 import time
 import urllib.error
@@ -75,7 +76,6 @@ class FetchClient:
                 if hostname and not self._allow_private and _is_private_hostname(hostname):
                     _logger.warning("Blocked fetch after DNS re-check: %s", hostname)
                     return None
-                import ssl as _ssl
                 req = urllib.request.Request(url, headers=headers or {})
                 _ctx = _ssl.create_default_context()
                 with urllib.request.urlopen(req, timeout=self._timeout, context=_ctx) as r:

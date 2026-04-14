@@ -69,12 +69,12 @@ function ClientSelector({ aiCmd, availableClients }) {
   );
 }
 
-function handleModelChange(level, value, setter) {
+function handleModelChange(level, value, setter, storageKey = `${MODEL_STORAGE_PREFIX}${level}`) {
   setter(value);
   if (value) {
-    localStorage.setItem(`${MODEL_STORAGE_PREFIX}${level}`, value);
+    localStorage.setItem(storageKey, value);
   } else {
-    localStorage.removeItem(`${MODEL_STORAGE_PREFIX}${level}`);
+    localStorage.removeItem(storageKey);
   }
 }
 
@@ -111,12 +111,7 @@ function ModelSettings({ aiCmd, models }) {
           className="settings-model-input"
           value={aiModel}
           placeholder="default"
-          onChange={(e) => {
-            const v = e.target.value;
-            onAiModelChange(v);
-            if (v) localStorage.setItem(AI_MODEL_STORAGE_KEY, v);
-            else localStorage.removeItem(AI_MODEL_STORAGE_KEY);
-          }}
+          onChange={(e) => handleModelChange(null, e.target.value, onAiModelChange, AI_MODEL_STORAGE_KEY)}
         />
       </div>
       <div className="settings-row">

@@ -7,6 +7,7 @@ from collections import Counter
 from pathlib import Path
 
 from quodeq.analysis.manifest_models import AnalysisTarget, SourceManifest
+from quodeq.config.discipline_registry import DisciplineRegistry
 
 _logger = logging.getLogger(__name__)
 
@@ -26,8 +27,6 @@ def _build_targets_from_disciplines(
 ) -> list[AnalysisTarget]:
     """Build AnalysisTarget list using discipline matching, consuming matched languages."""
     try:
-        from quodeq.config.discipline_registry import DisciplineRegistry
-
         registry = DisciplineRegistry.from_file(disciplines_conf)
         matches = registry.detect_matches(src)
     except (ValueError, OSError) as exc:

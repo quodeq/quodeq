@@ -14,14 +14,6 @@ import logging
 import os
 from pathlib import Path
 
-
-def _safe_int(value: str, default: int = 0) -> int:
-    """Convert string to int, returning *default* on failure."""
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return default
-
 from quodeq.analysis._command import (
     _build_ai_cmd,
     _build_analysis_env,
@@ -31,8 +23,18 @@ from quodeq.analysis._command import (
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPaths
 from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
 from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
 from quodeq.analysis.stream.counters import count_files_in_stream
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.shared.utils import get_ai_cmd
+
+
+def _safe_int(value: str, default: int = 0) -> int:
+    """Convert string to int, returning *default* on failure."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 _log = logging.getLogger(__name__)
 
@@ -216,17 +218,11 @@ def _render_standards_grouped(data: dict) -> str:
     return _json.dumps(checklist, separators=(",", ":"))
 
 
-def _run_api_analysis_bridge(
-    work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
-) -> None:
-    """Run analysis via direct API call (new behavior).
+def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
+    """Look up model, api_base, and api_key from provider config.
 
-    Builds its own prompt using assemble_api_prompt() instead of the CLI
-    prompt, which contains MCP tool-use instructions that confuse API models.
+    Raises AnalysisError if model or api_base are missing.
     """
-    from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
-    from quodeq.analysis._api_runner import run_api_analysis, ApiRunnerConfig
-
     ai_cmd = cfg.ai_cmd or get_ai_cmd()
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
@@ -246,14 +242,17 @@ def _run_api_analysis_bridge(
             f"No API base URL configured for provider '{ai_cmd}'. "
             f"Go to Settings in the dashboard to configure it, or set the URL in ai_providers.json."
         )
+    return model, api_base, api_key
 
-    jsonl_file = cfg.jsonl_file
-    if jsonl_file is None:
-        jsonl_file = Path(str(stream_file).replace(".stream", "_evidence.jsonl"))
 
-    # Get source files: from queue (subagent mode) or by scanning (single-pass mode)
+def _gather_api_source_files(
+    work_dir: Path, cfg: AnalysisConfig, jsonl_file: Path, stream_file: Path,
+) -> list[Path] | None:
+    """Gather source files from queue or by scanning.
+
+    Returns None (and writes empty output) when the queue is exhausted.
+    """
     if cfg.queue_path and cfg.queue_path.exists():
-        from quodeq.analysis.subagents.file_queue import FileQueue
         queue = FileQueue(cfg.queue_path)
         taken = queue.take(count=min(cfg.max_files_per_agent or 10, 3), agent_id=cfg.agent_id)
         source_files = [
@@ -262,12 +261,32 @@ def _run_api_analysis_bridge(
         ]
         _log.debug("Took %d files from queue for API analysis", len(source_files))
         if not source_files:
-            # No more files — write empty evidence and return
             jsonl_file.write_text("")
             stream_file.write_text('{"type":"api_runner","status":"complete"}\n')
-            return
-    else:
-        source_files = _gather_source_files(work_dir)
+            return None
+        return source_files
+    return _gather_source_files(work_dir)
+
+
+def _run_api_analysis_bridge(
+    work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
+) -> None:
+    """Run analysis via direct API call (new behavior).
+
+    Builds its own prompt using assemble_api_prompt() instead of the CLI
+    prompt, which contains MCP tool-use instructions that confuse API models.
+    """
+    from quodeq.analysis._api_runner import run_api_analysis, ApiRunnerConfig  # optional dep: instructor
+
+    model, api_base, api_key = _resolve_provider_config(cfg)
+
+    jsonl_file = cfg.jsonl_file
+    if jsonl_file is None:
+        jsonl_file = Path(str(stream_file).replace(".stream", "_evidence.jsonl"))
+
+    source_files = _gather_api_source_files(work_dir, cfg, jsonl_file, stream_file)
+    if source_files is None:
+        return
 
     standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension)
     api_prompt = assemble_api_prompt(
@@ -278,9 +297,7 @@ def _run_api_analysis_bridge(
         repo_root=work_dir,
     )
 
-    # Pass relative paths so the runner can resolve short filenames from model output
     rel_paths = [str(f.relative_to(work_dir)) for f in source_files]
-
     run_api_analysis(
         prompt=api_prompt,
         jsonl_file=jsonl_file,
@@ -296,7 +313,6 @@ def _run_api_analysis_bridge(
         source_file_paths=rel_paths,
     )
 
-    # Write a minimal stream file so downstream checks (is_stream_valid) pass
     stream_file.write_text('{"type":"api_runner","status":"complete"}\n')
     _log.debug("API analysis complete, evidence written to %s", jsonl_file)
 

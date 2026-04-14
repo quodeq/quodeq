@@ -6,6 +6,7 @@ from copy import copy
 from dataclasses import replace
 from collections.abc import Callable
 
+from quodeq.analysis._incremental_orchestrator import run_dimension_incremental
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.core.evidence.model import Evidence
 # NOTE: logging in inner layer — tracked for middleware extraction
@@ -49,7 +50,6 @@ def run_incremental_loop(
             ``(config, dimension, idx, ctx) -> Evidence | None``).
         log_result_fn: Callback to log a completed dimension result.
     """
-    from quodeq.analysis._incremental import run_dimension_incremental
     from quodeq.engine._runner_markers import emit_marker
 
     result: dict[str, Evidence] = {}
