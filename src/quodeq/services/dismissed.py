@@ -3,16 +3,23 @@
 The filesystem implementation below satisfies ``DismissedStoreProtocol``.
 To use a different backend (e.g. database), implement that protocol and
 wire it in place of the module-level functions.
+
+All read-modify-write operations are protected by a POSIX file lock
+(``dismissed.json.lock``) to prevent data corruption from concurrent
+API requests or parallel evaluations.
 """
 from __future__ import annotations
 
 import json
+import os
+from contextlib import contextmanager
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Protocol, runtime_checkable
 
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
+from quodeq.data._file_lock import lock_file, unlock_file
 
 
 @runtime_checkable
@@ -38,6 +45,20 @@ def _dismissed_path(project_dir: Path) -> Path:
     return project_dir / _FILENAME
 
 
+@contextmanager
+def _locked(project_dir: Path):
+    """Exclusive file lock for dismissed.json read-modify-write operations."""
+    lock_path = project_dir / "dismissed.json.lock"
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+    try:
+        lock_file(fd)
+        yield
+    finally:
+        unlock_file(fd)
+        os.close(fd)
+
+
 def _key(entry: dict) -> tuple:
     return (entry.get("req", ""), entry.get("file", ""), entry.get("line", 0))
 
@@ -55,57 +76,60 @@ def load_dismissed(project_dir: Path) -> list[dict]:
 
 def dismiss_finding(project_dir: Path, finding: dict) -> None:
     """Add a finding to the dismissed list. Deduplicates by (req, file, line)."""
-    entries = load_dismissed(project_dir)
-    new_key = _key(finding)
-    existing_keys = {_key(e) for e in entries}
-    if new_key in existing_keys:
-        return
-    entry = {
-        "req": finding.get("req", ""),
-        "file": finding.get("file", ""),
-        "line": finding.get("line", 0),
-        "dimension": finding.get("dimension", ""),
-        "principle": finding.get("principle", ""),
-        "severity": finding.get("severity", ""),
-        "title": finding.get("title", ""),
-        "reason": finding.get("reason", ""),
-        "reqRefs": finding.get("reqRefs", []),
-        "context": finding.get("context", ""),
-        "snippet": finding.get("snippet", ""),
-        "scope": finding.get("scope", ""),
-        "endLine": finding.get("endLine", 0),
-        "dismissed_at": datetime.now(timezone.utc).isoformat(),
-    }
-    entries.append(entry)
-    _dismissed_path(project_dir).write_text(
-        json.dumps(entries, indent=2), encoding="utf-8",
-    )
+    with _locked(project_dir):
+        entries = load_dismissed(project_dir)
+        new_key = _key(finding)
+        existing_keys = {_key(e) for e in entries}
+        if new_key in existing_keys:
+            return
+        entry = {
+            "req": finding.get("req", ""),
+            "file": finding.get("file", ""),
+            "line": finding.get("line", 0),
+            "dimension": finding.get("dimension", ""),
+            "principle": finding.get("principle", ""),
+            "severity": finding.get("severity", ""),
+            "title": finding.get("title", ""),
+            "reason": finding.get("reason", ""),
+            "reqRefs": finding.get("reqRefs", []),
+            "context": finding.get("context", ""),
+            "snippet": finding.get("snippet", ""),
+            "scope": finding.get("scope", ""),
+            "endLine": finding.get("endLine", 0),
+            "dismissed_at": datetime.now(timezone.utc).isoformat(),
+        }
+        entries.append(entry)
+        _dismissed_path(project_dir).write_text(
+            json.dumps(entries, indent=2), encoding="utf-8",
+        )
 
 
 def restore_finding(project_dir: Path, finding: dict) -> None:
     """Remove a finding from the dismissed list by (req, file, line)."""
-    entries = load_dismissed(project_dir)
-    target = _key(finding)
-    updated = [e for e in entries if _key(e) != target]
-    if len(updated) == len(entries):
-        return
-    path = _dismissed_path(project_dir)
-    if updated:
-        path.write_text(json.dumps(updated, indent=2), encoding="utf-8")
-    elif path.exists():
-        path.unlink()
+    with _locked(project_dir):
+        entries = load_dismissed(project_dir)
+        target = _key(finding)
+        updated = [e for e in entries if _key(e) != target]
+        if len(updated) == len(entries):
+            return
+        path = _dismissed_path(project_dir)
+        if updated:
+            path.write_text(json.dumps(updated, indent=2), encoding="utf-8")
+        elif path.exists():
+            path.unlink()
 
 
 def restore_all_findings(project_dir: Path) -> int:
     """Remove all dismissed findings. Returns the count of restored items."""
-    entries = load_dismissed(project_dir)
-    count = len(entries)
-    if count == 0:
-        return 0
-    path = _dismissed_path(project_dir)
-    if path.exists():
-        path.unlink()
-    return count
+    with _locked(project_dir):
+        entries = load_dismissed(project_dir)
+        count = len(entries)
+        if count == 0:
+            return 0
+        path = _dismissed_path(project_dir)
+        if path.exists():
+            path.unlink()
+        return count
 
 
 def dismissed_keys(project_dir: Path) -> set[tuple]:
