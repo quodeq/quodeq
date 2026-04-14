@@ -1,12 +1,35 @@
-"""Persistent storage for dismissed findings — per-project JSON file."""
+"""Persistent storage for dismissed findings — per-project JSON file.
+
+The filesystem implementation below satisfies ``DismissedStoreProtocol``.
+To use a different backend (e.g. database), implement that protocol and
+wire it in place of the module-level functions.
+"""
 from __future__ import annotations
 
 import json
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Protocol, runtime_checkable
 
 from quodeq.core.types.finding import Finding, SeverityTally, Totals
+
+
+@runtime_checkable
+class DismissedStoreProtocol(Protocol):
+    """Abstraction for dismissed-findings storage.
+
+    The default implementation uses per-project JSON files on the
+    filesystem (the module-level ``load_dismissed`` / ``dismiss_finding``
+    / ``restore_finding`` functions).  Implement this protocol to back
+    the store with a database or other persistence layer.
+    """
+
+    def load(self, project_dir: Path) -> list[dict]: ...
+    def dismiss(self, project_dir: Path, finding: dict) -> None: ...
+    def restore(self, project_dir: Path, finding: dict) -> None: ...
+    def restore_all(self, project_dir: Path) -> int: ...
+
 
 _FILENAME = "dismissed.json"
 

@@ -43,6 +43,8 @@ function buildBreadcrumbPath(root, path) {
 
 export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
   const savedMapPathRef = useRef('');
+  // UI defaults for map visualisation mode. These are presentation-layer
+  // defaults only; they do not affect evaluation logic or server behaviour.
   const savedVizStyleRef = useRef('zoompack');
   const savedViewModeRef = useRef('health');
   const savedGalaxyModeRef = useRef('filesystem');
@@ -53,8 +55,12 @@ export default function useMapPageState({ data, callbacks, tabKey = 0 }) {
   lastTabKeyRef.current = tabKey;
   if (isFreshTabClick) savedMapPathRef.current = '';
 
-  // Lock parent to viewport height while map is active
+  // Lock parent to viewport height while map is active.
+  // Uses document.querySelector because the .dashboard ancestor is outside
+  // this component's React tree. A ref-based approach would require
+  // threading a ref from a distant parent.
   useEffect(() => {
+    if (typeof document === 'undefined') return;
     const dashboard = document.querySelector('.dashboard');
     if (dashboard) {
       dashboard.classList.add('dashboard--fullheight');

@@ -79,7 +79,7 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
   const entry = (trend || []).find((r) => r.runId === currentOverviewRun);
   if (entry?.dateISO) {
     try {
-      return new Date(entry.dateISO).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      return new Date(entry.dateISO).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
     } catch { return entry.dateISO; }
   }
   return dailyRuns[overviewRunIndex]?.dateLabel || currentOverviewRun;

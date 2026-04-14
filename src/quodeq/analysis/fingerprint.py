@@ -17,7 +17,12 @@ from quodeq.shared.validation import validate_path_segment
 
 
 def _get_git_commit(src: Path) -> str | None:
-    """Get current HEAD commit hash, or None if not a git repo."""
+    """Get current HEAD commit hash, or None if not a git repo.
+
+    This is the single git abstraction point for fingerprinting: all git
+    subprocess access is funnelled through this helper, making it easy to
+    mock or replace in tests.
+    """
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],

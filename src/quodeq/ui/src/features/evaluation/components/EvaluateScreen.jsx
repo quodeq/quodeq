@@ -41,9 +41,9 @@ function EvaluateHelpSection() {
   );
 }
 
-function ActiveProviderBadge() {
-  const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  const model = localStorage.getItem(providerKey(provider, 'model')) || '';
+function ActiveProviderBadge({ storage = localStorage }) {
+  const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const model = storage.getItem(providerKey(provider, 'model')) || '';
   if (!provider) return null;
   return (
     <div className="eval-provider-badge">

@@ -122,7 +122,8 @@ def _check_api_provider(provider: str) -> None:
     """Check that an API provider has basic connectivity (Ollama: server running)."""
     if provider == "ollama":
         try:
-            urllib.request.urlopen("http://localhost:11434/api/tags", timeout=5)
+            _ollama_base = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
+            urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=5)
         except (urllib.error.URLError, OSError) as exc:
             raise RuntimeError(
                 "Ollama is configured as your AI provider but the server is not running.\n\n"

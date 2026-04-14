@@ -9,6 +9,8 @@ import { SERVER_BASE_URL } from '../config.js';
  *
  * Returns [serverConnected, setServerConnected].
  */
+// Standard quodeq port range (4180-4183). The server picks the first
+// available port; the client probes alternates when the current one drops.
 const DEFAULT_ALT_PORTS = [4180, 4181, 4182, 4183];
 const HEALTH_CHECK_TIMEOUT_MS = 2000;
 const HEALTH_POLL_INTERVAL_MS = 5000;

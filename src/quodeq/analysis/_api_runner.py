@@ -16,6 +16,9 @@ from dataclasses import dataclass
 from enum import Enum as _Enum
 from pathlib import Path
 
+# The openai and instructor imports are used at the _call_api() abstraction
+# boundary, which is the adapter seam: all LLM communication flows through
+# _call_api(), making it the single point to swap transport or providers.
 import instructor
 import openai
 from pydantic import BaseModel, Field

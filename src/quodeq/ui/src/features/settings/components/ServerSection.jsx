@@ -6,6 +6,19 @@ const MAX_LOG_LINES = 500;
 const CONSOLE_POPUP_WIDTH = 800;
 const CONSOLE_POPUP_HEIGHT = 500;
 
+/**
+ * Open a path in either pywebview's native browser or a regular browser popup.
+ * Centralises the pywebview branch so callers don't need to check manually.
+ */
+function openUrl(path, { width, height } = {}) {
+  if (window.pywebview?.api?.open_browser) {
+    window.pywebview.api.open_browser(path);
+  } else {
+    const features = width && height ? `width=${width},height=${height}` : '';
+    window.open(window.location.origin + path, '_blank', features);
+  }
+}
+
 function ping() {
   return fetch('/api/health?_t=' + Date.now())
     .then((r) => r.ok ? r.json() : null)
@@ -93,11 +106,7 @@ export default function ServerSection() {
   }, [logLines]);
 
   function handlePopOut() {
-    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_browser) {
-      window.pywebview.api.open_browser('/logs');
-    } else {
-      window.open(window.location.origin + '/logs', '_blank', `width=${CONSOLE_POPUP_WIDTH},height=${CONSOLE_POPUP_HEIGHT}`);
-    }
+    openUrl('/logs', { width: CONSOLE_POPUP_WIDTH, height: CONSOLE_POPUP_HEIGHT });
   }
 
   function handleClear() {

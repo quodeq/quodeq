@@ -1,6 +1,12 @@
 /**
  * galaxyCore.js — Shared rendering engine for Galaxy visualizations.
  * Extracted from GalaxyView.jsx proven patterns.
+ *
+ * NOTE: This module requires a DOM environment (document.createElement,
+ * getComputedStyle, MutationObserver). It is browser-only by design and
+ * should not be imported in non-browser contexts (e.g. Node/SSR).
+ * getThemeColors() accepts an optional sourceEl and cache parameter to
+ * allow injection for testing.
  */
 
 export const TAU = Math.PI * 2;

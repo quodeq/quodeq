@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -19,7 +20,7 @@ class ConfigPaths:
     @property
     def evaluators_dir(self) -> Path:
         """Global directory for custom evaluator JSON files."""
-        return Path.home() / ".quodeq" / "evaluators"
+        return Path(os.environ.get("QUODEQ_EVALUATORS_DIR", str(Path.home() / ".quodeq" / "evaluators")))
 
     @property
     def vroot(self) -> Path:

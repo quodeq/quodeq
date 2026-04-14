@@ -1,6 +1,7 @@
 """Verification step helpers — extracted from runner.py for file-length limits."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -63,9 +64,9 @@ def _dispatch_verification_pool(
     return verify_results
 
 
-_MINI_VERIFY_MAX_AGENTS = 2
-_MINI_VERIFY_TIMEOUT_PER_10 = 60
-_MINI_VERIFY_MAX_TIMEOUT = 300
+_MINI_VERIFY_MAX_AGENTS = int(os.environ.get("QUODEQ_MINI_VERIFY_MAX_AGENTS", "2"))
+_MINI_VERIFY_TIMEOUT_PER_10 = int(os.environ.get("QUODEQ_MINI_VERIFY_TIMEOUT_PER_10", "60"))
+_MINI_VERIFY_MAX_TIMEOUT = int(os.environ.get("QUODEQ_MINI_VERIFY_MAX_TIMEOUT", "300"))
 
 
 def _dispatch_mini_verify(

@@ -18,9 +18,9 @@ _logger = logging.getLogger(__name__)
 class FetchClient:
     """Thread-safe HTTP fetcher with circuit breaker (trips after repeated failures)."""
 
-    _CIRCUIT_THRESHOLD = 5
-    _MAX_RETRIES = 2
-    _RETRY_BACKOFF_S = 0.5
+    _CIRCUIT_THRESHOLD = int(os.environ.get("QUODEQ_CIRCUIT_THRESHOLD", "5"))
+    _MAX_RETRIES = int(os.environ.get("QUODEQ_MAX_RETRIES", "2"))
+    _RETRY_BACKOFF_S = float(os.environ.get("QUODEQ_RETRY_BACKOFF_S", "0.5"))
 
     def _record_success(self) -> None:
         """Reset the failure counter on a successful fetch."""

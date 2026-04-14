@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
-import { getDimensionEval, getRunScores } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { buildTopOffendingFiles } from '../../../utils/explorerUtils.js';
 
 export function computeAllViolations(evalData) {
@@ -90,7 +90,7 @@ function mergeRescoreIntoEval(prev, dimData) {
   };
 }
 
-async function fetchAndRescore(project, runId, dimension) {
+async function fetchAndRescore(project, runId, dimension, getDimensionEval, getRunScores) {
   const [data, rescored] = await Promise.all([
     getDimensionEval(project, runId, dimension),
     getRunScores(project, runId).catch(() => null),
@@ -103,16 +103,17 @@ async function fetchAndRescore(project, runId, dimension) {
 }
 
 export function useExplorerData(project, dimension, runId, refreshSignal) {
+  const { getDimensionEval, getRunScores } = useApi();
   const [evalData, setEvalData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     setLoading(true);
-    fetchAndRescore(project, runId, dimension)
+    fetchAndRescore(project, runId, dimension, getDimensionEval, getRunScores)
       .then((data) => { setEvalData(data); setLoading(false); })
       .catch((err) => { setError(err.message); setLoading(false); });
-  }, [project, dimension, runId]);
+  }, [project, dimension, runId, getDimensionEval, getRunScores]);
 
   const initialRef = useRef(refreshSignal);
   useEffect(() => {

@@ -1,6 +1,7 @@
 export const ISO_25010_URL = 'https://www.iso.org/';
 
-// Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation)
+// Settings defaults & localStorage keys (shared by SettingsPage + useEvaluation).
+// These client-side defaults can be overridden by server config (ai_providers.json).
 export const DEFAULT_MAX_SUBAGENTS = 5;
 export const DEFAULT_POOL_BUDGET = 600;
 export const MIN_SUBAGENTS = 1;

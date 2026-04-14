@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
-import { getOllamaStatus } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 const POLL_MS = 5000;
 
 export default function ServerStatus() {
+  const { getOllamaStatus } = useApi();
   const [status, setStatus] = useState(null);
   const timerRef = useRef(null);
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { listCwes } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 const EDITABLE_REF_TYPES = ['cwe', 'book', 'url', 'other'];
 const BUILTIN_REF_TYPES = ['cwe', 'asvs', 'cert', 'cisq', 'wcag22'];
@@ -67,12 +67,13 @@ function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilter
 }
 
 function CweBrowserModal({ onSelect, onClose }) {
+  const { listCwes } = useApi();
   const [cwes, setCwes] = useState([]);
   const [query, setQuery] = useState('');
   const [filterAbstraction, setFilterAbstraction] = useState('');
   const searchRef = useRef(null);
 
-  useEffect(() => { listCwes().then(setCwes).catch(() => setCwes([])); }, []);
+  useEffect(() => { listCwes().then(setCwes).catch(() => setCwes([])); }, [listCwes]);
   useEffect(() => { if (searchRef.current) searchRef.current.focus(); }, []);
 
   const filtered = useMemo(() => cwes.filter((c) => {

@@ -13,7 +13,7 @@ import ViolationsPage from './features/violations/components/ViolationsPage.jsx'
 import MapPage from './features/map/components/MapPage.jsx';
 import HelpPage from './features/help/components/HelpPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
-import { dismissFinding } from './api/index.js';
+import { useApi } from './api/ApiContext.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
@@ -90,7 +90,7 @@ function renderEvalPrincipleDetail(params, props) {
       evalPrincipal={evalPrincipal}
       severityFilter={params.severity || null}
       onDismiss={(v) => {
-        dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
+        props.dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
           .then(() => props.refreshDashboard?.())
           .catch((e) => console.error('[Dismiss] failed:', e));
       }}
@@ -243,6 +243,7 @@ function AppShell({ sidebar, header, breadcrumb, content }) {
 }
 
 export default function App() {
+  const { dismissFinding } = useApi();
   const state = useAppState();
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
 
@@ -270,6 +271,7 @@ export default function App() {
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
+    dismissFinding,
   };
 
   return (

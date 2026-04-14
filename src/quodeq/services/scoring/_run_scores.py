@@ -1,6 +1,7 @@
 """Read scores from a single run -- the ONLY module that touches disk."""
 from __future__ import annotations
 
+import os
 import threading
 from collections import OrderedDict
 from pathlib import Path
@@ -9,11 +10,13 @@ from quodeq.core.types import DimensionResult
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services.ports import RunInfo, list_runs, parse_numeric_score
 
-_DEFAULT_CACHE_MAX = 256
+_DEFAULT_CACHE_MAX = int(os.environ.get("QUODEQ_DEFAULT_CACHE_MAX", "256"))
 
 # Module-level shared cache so all callers within the same process share it.
-# NOTE: get_run_dimensions() accepts injectable `cache` and `cache_lock`
-# parameters, allowing callers (and tests) to bypass this shared state.
+# This is intentional for single-process deployment (the quodeq server runs
+# as a single process).  For multi-process setups, callers can inject their
+# own cache and lock via the `cache` and `cache_lock` parameters of
+# get_run_dimensions(), completely bypassing this process-local state.
 _cache: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
 _cache_lock = threading.Lock()
 

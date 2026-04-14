@@ -32,9 +32,9 @@ from _dashboard import (
     _ERROR_DISPLAY_MAX,
 )
 
-_POLL_INTERVAL = 5
+_POLL_INTERVAL = int(os.environ.get("QUODEQ_POLL_INTERVAL", "5"))
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
-_AUTO_START_DELAY_S = 1.5
+_AUTO_START_DELAY_S = float(os.environ.get("QUODEQ_AUTO_START_DELAY_S", "1.5"))
 _DEFAULT_PORTS = "4173,4174,4175,4180,4181,4182,4183"
 
 

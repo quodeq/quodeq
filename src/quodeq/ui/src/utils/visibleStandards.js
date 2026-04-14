@@ -4,9 +4,9 @@ import { VISIBLE_STANDARDS_STORAGE_KEY, DEFAULT_VISIBLE_STANDARDS } from '../con
  * Read the visible standard IDs from localStorage.
  * Returns the default ISO dimensions if nothing is stored.
  */
-export function readVisibleStandardIds() {
+export function readVisibleStandardIds(storage = localStorage) {
   try {
-    const raw = localStorage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
+    const raw = storage.getItem(VISIBLE_STANDARDS_STORAGE_KEY);
     if (!raw) return DEFAULT_VISIBLE_STANDARDS;
     const parsed = JSON.parse(raw);
     return Array.isArray(parsed) ? parsed : DEFAULT_VISIBLE_STANDARDS;

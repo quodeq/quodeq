@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getOllamaModels, testOllamaConcurrency } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import ServerStatus from './ServerStatus.jsx';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
@@ -18,6 +18,7 @@ function ModelSelector({ value, models, onChange }) {
 }
 
 export default function OllamaTab({ state, update }) {
+  const { getOllamaModels, testOllamaConcurrency } = useApi();
   const [models, setModels] = useState([]);
   const [testing, setTesting] = useState(false);
   const [testResult, setTestResult] = useState(null);

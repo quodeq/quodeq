@@ -3,6 +3,8 @@ import { useEvaluation } from '../features/evaluation/hooks/useEvaluation.js';
 import { getLevels, STORAGE_KEY as POWER_KEY } from '../features/evaluation/components/powerLevels.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
 
+// Providers that run inference locally via an API. Extensible via server-side
+// provider config (ai_providers.json) which can flag additional local providers.
 const LOCAL_API_PROVIDERS = ['ollama'];
 const TIER_NAMES = ['fast', 'balanced', 'thorough'];
 

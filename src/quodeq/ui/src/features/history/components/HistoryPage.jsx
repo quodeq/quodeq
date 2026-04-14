@@ -87,7 +87,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     if (entry?.dateISO) {
       try {
         const d = new Date(entry.dateISO);
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
       } catch { return entry.dateISO || ''; }
     }
     return entry?.dateLabel || currentOverviewRun;
