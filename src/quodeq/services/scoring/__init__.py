@@ -24,11 +24,14 @@ from quodeq.services.dashboard import (
 from quodeq.services._dashboard_trend import build_accumulated_trend
 from quodeq.services.dismissed import dismissed_keys
 from quodeq.services.ports import RunInfo, list_runs
-from quodeq.services.rescore import _rescore_dimension
+from quodeq.services.rescore import _rescore_dimension, rescore_dimensions
 from quodeq.services.scoring._rescore import rescore_run_raw
+from quodeq.services.scoring._summary import recompute_summary
 
 
-_MAX_HISTORY_RUNS = int(os.environ.get("QUODEQ_MAX_HISTORY_RUNS", "100"))
+def _max_history_runs() -> int:
+    """Read max history runs from env at call time for lazy configuration."""
+    return int(os.environ.get("QUODEQ_MAX_HISTORY_RUNS", "100"))
 
 
 def get_scores_raw(
@@ -62,8 +65,6 @@ def _rescore_runs_by_dimension(
     dims: list[dict], reports_root: Path, project: str, dismissed: set[tuple],
 ) -> dict[str, dict]:
     """Rescore each unique run and return a map of dim_key -> rescored dict."""
-    from quodeq.services.rescore import rescore_dimensions
-
     dim_to_run: dict[str, str] = {}
     for d in dims:
         key = (d.get("dimension") or "").lower()
@@ -130,7 +131,6 @@ def _rescore_accumulated_response(
     rescored_by_dim = _rescore_runs_by_dimension(dims, reports_root, project, dismissed)
     new_dims = _merge_rescored_dims(dims, rescored_by_dim)
 
-    from quodeq.services.scoring._summary import recompute_summary
     new_summary = recompute_summary(new_dims, accumulated.get("summary", {}))
     return {**accumulated, "dimensions": new_dims, "summary": new_summary}
 
@@ -169,7 +169,7 @@ def get_project_scores(
     accumulated = _rescore_accumulated_response(accumulated, reports_root, project)
 
     # Build trend using a rescoring fetcher (applies dismissals to each run)
-    history_runs = all_runs[:_MAX_HISTORY_RUNS]
+    history_runs = all_runs[:_max_history_runs()]
     rescoring_fetcher = _make_rescoring_fetcher(reports_root, project)
     trend = build_accumulated_trend(history_runs, rescoring_fetcher)
 

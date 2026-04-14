@@ -6,11 +6,12 @@ import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/in
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
 
+const MAX_TREE_DEPTH = 64;
 
 function findSubtree(root, path) {
   if (!path) return root;
   function walk(node, depth = 0) {
-    if (depth > 64) return null;
+    if (depth > MAX_TREE_DEPTH) return null;
     if (node.path === path) return node;
     for (const child of node.children) {
       const found = walk(child, depth + 1);
@@ -196,7 +197,8 @@ function ViolationsStatsGrid({ summary, topFilesCount, uniquePrinciples, dimensi
   );
 }
 
-function ViolationsSubTabContent({ activeSubTab, visibleDimensions, dismissed, callbacks, fileCurrentPath, setFileCurrentPath, handleRestore, handleRestoreAll }) {
+function ViolationsSubTabContent(props) {
+  const { activeSubTab, visibleDimensions, dismissed, callbacks, fileCurrentPath, setFileCurrentPath, handleRestore, handleRestoreAll } = props;
   if (activeSubTab === 'file') {
     return <FileSubTab dimensions={visibleDimensions} onFileClick={callbacks.onFileClick} currentPath={fileCurrentPath} setCurrentPath={setFileCurrentPath} />;
   }

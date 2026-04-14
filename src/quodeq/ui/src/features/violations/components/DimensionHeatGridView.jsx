@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import HeatGridCells from '../../../components/HeatGridCells.jsx';
 
+const DEFAULT_SEVERITY = 'minor';
+const PRINCIPLE_INDENT_PX = 24;
+
 const COLUMNS = [
   { id: 'name', label: 'Dimension / Principle', align: 'left' },
   { id: 'critical', label: 'Critical' },
@@ -66,7 +69,7 @@ function buildDimensionGroup(dim) {
   const principleMap = new Map();
 
   for (const v of violations) {
-    const sev = (v.severity || 'minor').toLowerCase();
+    const sev = (v.severity || DEFAULT_SEVERITY).toLowerCase();
     if (dimSev[sev] !== undefined) dimSev[sev]++;
     const pName = v.principle || '(unknown)';
     if (!principleMap.has(pName)) principleMap.set(pName, newPrincipleEntry());
@@ -156,7 +159,7 @@ export default function DimensionHeatGridView({ dimensions, onDimensionClick, on
                     tabIndex={0}
                     onClick={() => isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj)}
                     onKeyDown={(e) => e.key === 'Enter' && (isDim ? onDimensionClick?.(row.raw) : onPrincipleClick?.(row.principleObj))}
-                    style={isDim ? undefined : { paddingLeft: 24 }}
+                    style={isDim ? undefined : { paddingLeft: PRINCIPLE_INDENT_PX }}
                   >
                     {row.name}
                   </div>

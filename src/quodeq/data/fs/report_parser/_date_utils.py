@@ -23,7 +23,7 @@ def normalize_date(raw: str) -> tuple[str, str] | None:
             if parsed.tzinfo is not None:
                 parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
             sortable = parsed.isoformat(timespec='seconds') if "T" in fmt else parsed.date().isoformat()
-            label = parsed.strftime("%-d %b %Y")
+            label = parsed.strftime(f"{parsed.day} %b %Y")
             return sortable, label
         except ValueError:
             continue

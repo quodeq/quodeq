@@ -39,6 +39,10 @@ __all__ = [
     "prioritize_files",
 ]
 
+_DEFAULT_FAN_IN_DIVISOR = 3
+_DEFAULT_FAN_IN_MAX = 5
+_DEFAULT_PREV_VIOLATIONS_MAX = 5
+
 
 @dataclass
 class PriorityContext:
@@ -62,9 +66,9 @@ def prioritize_files(
     evidence_dir = context.evidence_dir if context else None
     config = context.config if context else None
     priority_config = load_priority_config()
-    fan_in_divisor = priority_config.get("fan_in_divisor", 3)
-    fan_in_max = priority_config.get("fan_in_max", 5)
-    max_prev_violations = priority_config.get("previous_violations_max", 5)
+    fan_in_divisor = priority_config.get("fan_in_divisor", _DEFAULT_FAN_IN_DIVISOR)
+    fan_in_max = priority_config.get("fan_in_max", _DEFAULT_FAN_IN_MAX)
+    max_prev_violations = priority_config.get("previous_violations_max", _DEFAULT_PREV_VIOLATIONS_MAX)
 
     # Batch computations (one pass each)
     fan_in = compute_fan_in(files, src, language or "") if language else {}

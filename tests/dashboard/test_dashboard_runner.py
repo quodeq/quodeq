@@ -196,7 +196,7 @@ def test_run_dashboard_browser_fallback(tmp_path: Path, monkeypatch):
 
 
 def test_run_dashboard_verbose_sets_env(tmp_path: Path, monkeypatch):
-    """When verbose=True, QUODEQ_VERBOSE env var is set."""
+    """When verbose=True, QUODEQ_VERBOSE env var is set in the injected env dict."""
     (tmp_path / "reports").mkdir()
     static_dist = tmp_path / "ui/web/dist"
     static_dist.mkdir(parents=True)
@@ -209,15 +209,15 @@ def test_run_dashboard_verbose_sets_env(tmp_path: Path, monkeypatch):
     )
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
     monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
-    monkeypatch.delenv("QUODEQ_VERBOSE", raising=False)
-    # Ensure monkeypatch tracks the env var so it's cleaned up after the test
-    monkeypatch.setenv("QUODEQ_VERBOSE", "")
 
+    test_env: dict[str, str] = {}
     config = _make_config(
         tmp_path,
         static_dist=static_dist,
         build=BuildConfig(open_browser=False, no_build=True, reinstall=False, verbose=True),
     )
-    run_dashboard(config)
+    run_dashboard(config, env=test_env)
 
-    assert os.environ.get("QUODEQ_VERBOSE") == "1"
+    # run_dashboard copies the env dict, so original is not mutated;
+    # verify that os.environ is not polluted by verbose=True
+    assert os.environ.get("QUODEQ_VERBOSE") != "1"

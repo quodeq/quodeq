@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from copy import copy
+from dataclasses import replace
 from pathlib import Path
 
-from quodeq.analysis._dimension_ops import _process_single_dimension
 from quodeq.analysis._incremental_context import IncrementalCoverage
 from quodeq.analysis._incremental_evidence import parse_evidence_from_jsonl, save_dimension_fingerprint
 from quodeq.analysis._types import RunConfig, _AnalysisContext
@@ -29,13 +29,12 @@ def _run_phase1_analysis(
         return parse_evidence_from_jsonl(config, dimension, ctx, jsonl_file, len(classification.unchanged))
 
     log_info(f"  [{dimension}] Analyzing {len(classification.to_analyze)} changed files ({len(classification.unchanged)} cached)")
-    original_options = config.options
-    config.options = copy(original_options)
-    config.options.incremental_file_filter = set(classification.to_analyze)
-    try:
-        ev = _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
-    finally:
-        config.options = original_options
+    # Deferred import: circular dependency _dimension_ops → _incremental_orchestrator → _incremental_phases → _dimension_ops
+    from quodeq.analysis._dimension_ops import _process_single_dimension
+    modified_options = copy(config.options)
+    modified_options.incremental_file_filter = set(classification.to_analyze)
+    modified_config = replace(config, options=modified_options)
+    ev = _process_single_dimension(modified_config, dimension, idx, ctx, emit_log=False)
 
     # Dedup: carried-forward + new findings may overlap
     output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"

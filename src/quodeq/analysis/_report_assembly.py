@@ -18,6 +18,8 @@ from quodeq.analysis._report_scoring import (
 )
 from quodeq.analysis._report_findings import build_principle_rows
 
+_MAX_SCORE = 10
+
 
 @dataclass
 class _ReportData:
@@ -81,7 +83,7 @@ def build_report_json(
 
     weighted = aggregate.get(_FIELD_WEIGHTED_SCORE) or aggregate.get(_FIELD_WEIGHTED_SCORE_SNAKE)
     if weighted is not None:
-        top_score = f"{round(weighted, 1)}/10"
+        top_score = f"{round(weighted, 1)}/{_MAX_SCORE}"
         top_grade = aggregate.get("grade") or grade_from_score(top_score)
     else:
         top_score = None

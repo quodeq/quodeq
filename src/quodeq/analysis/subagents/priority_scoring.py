@@ -10,6 +10,8 @@ from quodeq.analysis.subagents.priority_config import load_priority_config
 from quodeq.analysis.subagents.priority_fan_in import compute_fan_in
 from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension
 
+_SIZE_SCORE_CAP = 5
+
 # Re-export compute_fan_in so existing imports from this module still work
 __all__ = [
     "compute_base_score",
@@ -64,7 +66,7 @@ def compute_dimension_boost(
         keywords = config.get("dimension_keywords", {}).get(dim, [])
         if not keywords and dim == "maintainability":
             divisor = config.get("maintainability_size_divisor", 2000)
-            score = min(5, int(file_size / divisor))
+            score = min(_SIZE_SCORE_CAP, int(file_size / divisor))
         else:
             score = 0
             for kw in keywords:

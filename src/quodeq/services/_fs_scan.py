@@ -15,6 +15,7 @@ _logger = logging.getLogger(__name__)
 
 # Directories to skip during file tree walk
 _SKIP_DIRS = {".git", "__pycache__", "node_modules", ".venv", "venv", ".tox", "dist", "build", ".eggs"}
+_GIT_TIMEOUT_S = 10
 
 
 def scan_project(project_dir: Path, *, output_dir: Path | None = None) -> ScanData:
@@ -84,7 +85,7 @@ def _list_branches(project_dir: Path) -> list[str]:
     try:
         result = subprocess.run(
             ["git", "-C", str(project_dir), "branch", "--format=%(refname:short)"],
-            capture_output=True, text=True, timeout=10,
+            capture_output=True, text=True, timeout=_GIT_TIMEOUT_S,
         )
         if result.returncode != 0:
             return []

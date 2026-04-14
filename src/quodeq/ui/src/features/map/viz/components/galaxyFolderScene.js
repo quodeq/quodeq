@@ -41,6 +41,22 @@ export function layoutChildren(node) {
   }));
 }
 
+/* ── Physics / layout constants ── */
+
+const BASE_FACTOR_MIN = 0.25;
+const BASE_FACTOR_SCALE = 0.2;
+const RADIUS_MULTIPLIER = 1.2;
+const FOLDER_DIST_MIN = 0.35;
+const FOLDER_DIST_MAX = 0.65;
+const FILE_DIST_MIN = 0.2;
+const FILE_DIST_MAX = 0.5;
+const REPULSION_ITERATIONS = 50;
+const REPULSION_RADIUS = 3;
+const REPULSION_STRENGTH = 5;
+const REPULSION_DECAY = 8;
+const TARGET_RADIUS_FRACTION = 0.42;
+const BG_STAR_COUNT = 120;
+
 /* ── Scene builder ── */
 
 export function countDescendants(node) {
@@ -55,20 +71,20 @@ export function buildFolderScene(node, W, H) {
 
   const rootStars = [];
   const n = positioned.length;
-  const baseFactor = 0.25 + Math.sqrt(n) * 0.2;
+  const baseFactor = BASE_FACTOR_MIN + Math.sqrt(n) * BASE_FACTOR_SCALE;
   const spread = Math.min(W, H) * baseFactor;
 
   positioned.forEach((ip, i) => {
     const c = ip.child;
     const desc = ip.isFolder ? countDescendants(c) : 0;
     const radius = ip.isFolder
-      ? 6 + Math.sqrt(Math.max(desc, 1)) * 1.2
-      : 5 + Math.sqrt(c.violations || 1) * 1.2;
+      ? 6 + Math.sqrt(Math.max(desc, 1)) * RADIUS_MULTIPLIER
+      : 5 + Math.sqrt(c.violations || 1) * RADIUS_MULTIPLIER;
     const rate = c.complianceRate || 0;
     const sev = c.severity || { critical: 0, major: 0, minor: 0 };
     const col = scoreRGB(rate * 10);
 
-    const distFactor = ip.isFolder ? (0.35 + ip.dist * 0.65) : (0.2 + ip.dist * 0.5);
+    const distFactor = ip.isFolder ? (FOLDER_DIST_MIN + ip.dist * FOLDER_DIST_MAX) : (FILE_DIST_MIN + ip.dist * FILE_DIST_MAX);
     const dist = positioned.length === 1 ? 0 : spread * distFactor;
     const ox = Math.cos(ip.angle) * dist;
     const oy = Math.sin(ip.angle) * dist;
@@ -145,7 +161,7 @@ export function buildFolderScene(node, W, H) {
   // Repulsion pass
   const folderGap = 10 + Math.min(n, 20) * 1.0;
   const fileGap = 1;
-  const repulsionIters = rootStars.length > 50 ? 3 : rootStars.length > 20 ? 5 : 8;
+  const repulsionIters = rootStars.length > REPULSION_ITERATIONS ? REPULSION_RADIUS : rootStars.length > 20 ? REPULSION_STRENGTH : REPULSION_DECAY;
   for (let iter = 0; iter < repulsionIters; iter++) {
     for (let i = 0; i < rootStars.length; i++) {
       for (let j = i + 1; j < rootStars.length; j++) {
@@ -174,7 +190,7 @@ export function buildFolderScene(node, W, H) {
   }
 
   // Normalize to fit
-  const targetR = Math.min(W, H) * 0.42;
+  const targetR = Math.min(W, H) * TARGET_RADIUS_FRACTION;
   let _maxExtent = 0;
   rootStars.forEach(s => {
     const margin = s.particles.length > 0 ? s.radius * 3 : s.radius * 2;
@@ -210,7 +226,7 @@ export function buildFolderScene(node, W, H) {
   }
 
   // Background
-  const bg = Array.from({ length: 120 }, () => ({
+  const bg = Array.from({ length: BG_STAR_COUNT }, () => ({
     x: Math.random(), y: Math.random(),
     sz: Math.random() * 1.2,
     tw: Math.random() * TAU,

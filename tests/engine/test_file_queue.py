@@ -156,6 +156,8 @@ class TestConcurrency:
         results: list[list[str]] = []
 
         def worker(agent_id: str) -> list[str]:
+            # Uses FileQueue(qp) directly — tests real filesystem integration
+            # to verify cross-thread file-locking correctness.
             q = FileQueue(qp)
             taken: list[str] = []
             while True:

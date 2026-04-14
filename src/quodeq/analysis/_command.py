@@ -132,6 +132,7 @@ def _build_ai_cmd(
     return args, mcp_config_path
 
 
+_MCP_REGISTER_TIMEOUT_S = 10
 _MCP_SERVER_PREFIX = "quodeq-findings"
 _cli_mcp_lock = threading.Lock()
 _cli_mcp_registered: set[str] = set()  # tracks (cmd, name) pairs
@@ -204,7 +205,7 @@ def _register_cli_mcp(cmd: str, config: AnalysisConfig, work_dir: Path | None = 
         register_cmd.extend(mcp_args)
         _log.debug("Registering MCP server '%s': %s", name, " ".join(register_cmd))
         try:
-            subprocess.run(register_cmd, check=True, capture_output=True, timeout=10)
+            subprocess.run(register_cmd, check=True, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S)
             _cli_mcp_registered.add(key)
             return name
         except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError) as exc:
@@ -217,7 +218,7 @@ def _unregister_cli_mcp(cmd: str, name: str) -> None:
     try:
         subprocess.run(
             [cmd, "mcp", "remove", name],
-            check=False, capture_output=True, timeout=10,
+            check=False, capture_output=True, timeout=_MCP_REGISTER_TIMEOUT_S,
         )
     except (subprocess.TimeoutExpired, FileNotFoundError):
         pass

@@ -26,6 +26,7 @@ def _parse_progress_info(raw: dict[str, object]) -> ProgressInfo:
 
 
 def parse_violation_response(raw: dict[str, object]) -> ViolationResponse:
+    """Parse a raw dict into a ViolationResponse dataclass."""
     dim = _require_str(raw, "dimension", "ViolationResponse")
     run_id = _require_str(raw, "runId", "ViolationResponse")
     project = _require_str(raw, "project", "ViolationResponse")
@@ -65,6 +66,7 @@ def _parse_violation_file_entry(raw: dict[str, object]) -> ViolationFileEntry:
 
 
 def parse_violation_summary(raw: dict[str, object]) -> ViolationSummary:
+    """Parse a raw dict into a ViolationSummary dataclass."""
     files_raw = raw.get("files")
     files: list[ViolationFileEntry] = []
     if isinstance(files_raw, list):
@@ -80,6 +82,7 @@ def parse_violation_summary(raw: dict[str, object]) -> ViolationSummary:
 
 
 def parse_trend_point(raw: dict[str, object]) -> TrendPoint:
+    """Parse a raw dict into a TrendPoint dataclass."""
     run_id = _require_str(raw, "runId", "TrendPoint")
     raw_dims = raw.get("dimensions")
     dims = tuple(raw_dims) if isinstance(raw_dims, list) else ()

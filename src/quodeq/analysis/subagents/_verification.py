@@ -64,6 +64,7 @@ def _dispatch_verification_pool(
     return verify_results
 
 
+_MINI_VERIFY_MIN_TIMEOUT_S = 60
 _MINI_VERIFY_MAX_AGENTS = int(os.environ.get("QUODEQ_MINI_VERIFY_MAX_AGENTS", "2"))
 _MINI_VERIFY_TIMEOUT_PER_10 = int(os.environ.get("QUODEQ_MINI_VERIFY_TIMEOUT_PER_10", "60"))
 _MINI_VERIFY_MAX_TIMEOUT = int(os.environ.get("QUODEQ_MINI_VERIFY_MAX_TIMEOUT", "300"))
@@ -82,7 +83,7 @@ def _dispatch_mini_verify(
     files_to_verify = list(grouped.keys())
 
     n_files = len(files_to_verify)
-    timeout = min(_MINI_VERIFY_MAX_TIMEOUT, max(60, (n_files // 10 + 1) * _MINI_VERIFY_TIMEOUT_PER_10))
+    timeout = min(_MINI_VERIFY_MAX_TIMEOUT, max(_MINI_VERIFY_MIN_TIMEOUT_S, (n_files // 10 + 1) * _MINI_VERIFY_TIMEOUT_PER_10))
 
     log_info(f"  [{dim_id}] [MINI-VERIFY] {len(findings)} findings across {n_files} changed files (not in analysis queue)")
 

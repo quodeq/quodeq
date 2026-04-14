@@ -36,6 +36,7 @@ class QueueStateProtocol(Protocol):
 
 _QUEUE_VERSION = 1
 
+_LOCK_FILE_MODE = 0o600
 _STALE_LOCK_THRESHOLD_SECS = 60
 
 _log = logging.getLogger(__name__)
@@ -78,7 +79,7 @@ def locked(lock_path: Path):
     The lock file is never deleted — it's harmless and avoids races
     where one process unlinks it while another is about to lock it.
     """
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, _LOCK_FILE_MODE)
     try:
         lock_file(fd)
         yield

@@ -15,6 +15,8 @@ from quodeq.analysis.subagents.verify import resolve_evidence_paths
 from quodeq.data.fs.report_parser.runs import list_runs
 from quodeq.shared.validation import validate_path_segment
 
+_GIT_TIMEOUT_S = 5
+
 
 def _get_git_commit(src: Path) -> str | None:
     """Get current HEAD commit hash, or None if not a git repo.
@@ -26,7 +28,7 @@ def _get_git_commit(src: Path) -> str | None:
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            cwd=str(src), capture_output=True, text=True, timeout=5,
+            cwd=str(src), capture_output=True, text=True, timeout=_GIT_TIMEOUT_S,
         )
         return result.stdout.strip() if result.returncode == 0 else None
     except (OSError, subprocess.TimeoutExpired):

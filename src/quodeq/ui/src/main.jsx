@@ -31,21 +31,21 @@ const LEGACY_FAMILY_MAP = {
   cyber: THEME_FAMILIES.DECKARD,
 };
 
-function applyInitialTheme() {
-  const oldTheme = localStorage.getItem(LS_THEME);
+function applyInitialTheme(storage = localStorage, mediaQuery = window.matchMedia) {
+  const oldTheme = storage.getItem(LS_THEME);
   if (oldTheme !== null) {
     const [m, f] = LEGACY_THEME_MAP[oldTheme] || [THEME_MODES.SYSTEM, THEME_FAMILIES.DARUMA];
-    localStorage.setItem(LS_THEME_MODE, m);
-    localStorage.setItem(LS_THEME_FAMILY, f);
-    localStorage.removeItem(LS_THEME);
+    storage.setItem(LS_THEME_MODE, m);
+    storage.setItem(LS_THEME_FAMILY, f);
+    storage.removeItem(LS_THEME);
   }
-  const oldFamily = localStorage.getItem(LS_THEME_FAMILY);
+  const oldFamily = storage.getItem(LS_THEME_FAMILY);
   if (oldFamily && LEGACY_FAMILY_MAP[oldFamily]) {
-    localStorage.setItem(LS_THEME_FAMILY, LEGACY_FAMILY_MAP[oldFamily]);
+    storage.setItem(LS_THEME_FAMILY, LEGACY_FAMILY_MAP[oldFamily]);
   }
-  const mode = localStorage.getItem(LS_THEME_MODE) || THEME_MODES.SYSTEM;
-  const family = localStorage.getItem(LS_THEME_FAMILY) || THEME_FAMILIES.DARUMA;
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const mode = storage.getItem(LS_THEME_MODE) || THEME_MODES.SYSTEM;
+  const family = storage.getItem(LS_THEME_FAMILY) || THEME_FAMILIES.DARUMA;
+  const prefersDark = mediaQuery('(prefers-color-scheme: dark)').matches;
   const dataTheme = resolveDataTheme(mode, family, prefersDark);
   if (dataTheme !== null) {
     document.documentElement.setAttribute('data-theme', dataTheme);

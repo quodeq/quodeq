@@ -12,6 +12,7 @@ from quodeq.core.types import to_camel_dict
 
 logger = logging.getLogger(__name__)
 
+# Module-level mutable cache — reset via reset_cwe_cache() for test isolation.
 _cwe_cache: list | None = None
 _cwe_cache_time: float = 0.0
 _CWE_CACHE_TTL = int(os.environ.get("QUODEQ_CWE_CACHE_TTL", "3600"))  # 1 hour

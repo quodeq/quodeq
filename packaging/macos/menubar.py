@@ -32,6 +32,7 @@ from _dashboard import (
     _ERROR_DISPLAY_MAX,
 )
 
+_DEFAULT_APP_PORT = 4173
 _POLL_INTERVAL = int(os.environ.get("QUODEQ_POLL_INTERVAL", "5"))
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
 _AUTO_START_DELAY_S = float(os.environ.get("QUODEQ_AUTO_START_DELAY_S", "1.5"))
@@ -41,7 +42,7 @@ _DEFAULT_PORTS = "4173,4174,4175,4180,4181,4182,4183"
 def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
     env = env or os.environ
-    app_port = int(env.get("QUODEQ_PORT", "4173"))
+    app_port = int(env.get("QUODEQ_PORT", str(_DEFAULT_APP_PORT)))
     ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", _DEFAULT_PORTS).split(","))
     return app_port, ports
 

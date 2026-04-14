@@ -10,6 +10,12 @@ from quodeq.engine import mcp_findings
 from quodeq.core.evidence.model import Evidence, PrincipleEvidence
 from quodeq.analysis.subagents.file_queue import FileQueue
 
+_TEST_PRINCIPLE = "ts-001"
+_TEST_DIMENSION = "security"
+_TEST_SEVERITY = "high"
+_TEST_SNIPPET = "eval(x)"
+_TEST_REASON = "injection"
+
 
 def _fake_run_analysis(work_dir, prompt, stream_file, config):
     """Mock run_analysis that writes some findings and drains the queue."""
@@ -51,14 +57,14 @@ def _run_server(input_lines: list[str], findings_file: str) -> list[dict]:
 def _evidence_line(**overrides) -> str:
     """Build a JSONL evidence line with sensible defaults."""
     obj = {
-        "p": "ts-001",
+        "p": _TEST_PRINCIPLE,
         "t": "violation",
-        "d": "security",
+        "d": _TEST_DIMENSION,
         "w": "eval usage",
         "file": "src/app.ts",
         "line": 10,
         "snippet": "eval(userInput)",
-        "severity": "high",
+        "severity": _TEST_SEVERITY,
         "vt": "code-injection",
         "reason": "eval is dangerous",
     }
@@ -75,7 +81,7 @@ def make_evidence_with_confidence(
 ):
     """Build Evidence with explicit confidence level and finding counts."""
     viol = violations or [
-        {"file": f"v{i}.ts", "line": i, "snippet": "eval(x)", "reason": "injection", "severity": "high", "vt": "code-injection"}
+        {"file": f"v{i}.ts", "line": i, "snippet": _TEST_SNIPPET, "reason": _TEST_REASON, "severity": _TEST_SEVERITY, "vt": "code-injection"}
         for i in range(n_violations)
     ]
     comp = compliance or [
@@ -85,10 +91,10 @@ def make_evidence_with_confidence(
     total = len(viol) + len(comp)
     pct = round(len(comp) / total * 100, 1) if total > 0 else 0.0
     pe = PrincipleEvidence(
-        practice_id="ts-001",
+        practice_id=_TEST_PRINCIPLE,
         display_name="Avoid eval()",
-        dimension="security",
-        severity="high",
+        dimension=_TEST_DIMENSION,
+        severity=_TEST_SEVERITY,
         violations=viol,
         compliance=comp,
         metrics={
@@ -107,5 +113,5 @@ def make_evidence_with_confidence(
         source_file_count=100,
         files_read=50,
         coverage_pct=50.0,
-        principles={"ts-001": pe},
+        principles={_TEST_PRINCIPLE: pe},
     )

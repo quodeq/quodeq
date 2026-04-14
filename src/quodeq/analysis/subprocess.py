@@ -314,7 +314,7 @@ def _run_api_analysis_bridge(
             model=model,
             api_base=api_base,
             api_key=api_key,
-            context_size=_safe_int(os.environ.get("QUODEQ_CONTEXT_SIZE", "0")),
+            context_size=cfg.context_size,
         ),
         compiled_dir=cfg.compiled_dir,
         dimension=cfg.dimension,

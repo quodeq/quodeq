@@ -7,6 +7,7 @@ const DIMENSION_POLL_MAX_MS = 8000;
 const JOB_POLL_INITIAL_MS = 1500;
 const MAX_DIM_POLL_FAILURES = 10;
 const POLL_CONCURRENCY = 4;
+const POLL_BACKOFF_FACTOR = 1.5;
 const DEFAULT_OLLAMA_SUBAGENTS = '1';
 const DEFAULT_CLI_SUBAGENTS = String(DEFAULT_MAX_SUBAGENTS);
 const DEFAULT_OLLAMA_BUDGET = '0';
@@ -83,7 +84,7 @@ function createDimensionPoller(dimPollRef, dimFailCountRef, partialDimensionsRef
     function scheduleNext() {
       dimPollRef.current = setTimeout(async () => {
         const anyFailed = await pollPartialDimensions(partialDimensionsRef, project, runId, refs, setLiveViolations, getDimensionEval);
-        delay = anyFailed ? Math.min(delay * 1.5, DIMENSION_POLL_MAX_MS) : DIMENSION_POLL_INITIAL_MS;
+        delay = anyFailed ? Math.min(delay * POLL_BACKOFF_FACTOR, DIMENSION_POLL_MAX_MS) : DIMENSION_POLL_INITIAL_MS;
         scheduleNext();
       }, delay);
     }

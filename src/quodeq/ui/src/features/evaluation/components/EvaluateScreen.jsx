@@ -7,6 +7,7 @@ import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 const INITIAL_ANIM_DELAY = '0s';
 const CHIP_DELAY_1 = '0.55s';
 const CHIP_DELAY_2 = '1.1s';
+const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
 function EvaluateHelpSection() {
   return (
@@ -100,7 +101,7 @@ function sanitizeErrorMessage(message) {
 
 function ErrorToast({ message, onDismiss }) {
   useEffect(() => {
-    const timer = setTimeout(onDismiss, 5000);
+    const timer = setTimeout(onDismiss, TOAST_DISMISS_TIMEOUT_MS);
     return () => clearTimeout(timer);
   }, [message, onDismiss]);
 

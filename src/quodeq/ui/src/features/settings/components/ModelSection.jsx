@@ -70,12 +70,12 @@ function ClientSelector({ aiCmd, availableClients }) {
   );
 }
 
-function handleModelChange(level, value, setter, storageKey = `${MODEL_STORAGE_PREFIX}${level}`) {
+function handleModelChange(level, value, setter, storageKey = `${MODEL_STORAGE_PREFIX}${level}`, storage = localStorage) {
   setter(value);
   if (value) {
-    localStorage.setItem(storageKey, value);
+    storage.setItem(storageKey, value);
   } else {
-    localStorage.removeItem(storageKey);
+    storage.removeItem(storageKey);
   }
 }
 

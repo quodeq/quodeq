@@ -73,6 +73,12 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
 
     _scored_jobs: set[str] = set()
 
+    def reset_scored_jobs() -> None:
+        """Clear the scored-jobs set. Useful for test isolation."""
+        _scored_jobs.clear()
+
+    app.extensions["reset_scored_jobs"] = reset_scored_jobs
+
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
         job = provider.get_evaluation_status(job_id)

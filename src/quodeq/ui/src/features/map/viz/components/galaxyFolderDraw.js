@@ -95,7 +95,7 @@ export function drawStars(ctx, activeScene, params) {
     const starAlpha = s.isFolder && sr > dimThreshold
       ? Math.max(0.15, 1 - (sr - dimThreshold) / 80)
       : 1;
-    drawGlow(ctx, sc.x, sc.y, sr, s.col, starAlpha);
+    drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: starAlpha });
 
     // Folder stars: nebula + cluster detail
     if (s.isFolder) {
@@ -146,7 +146,7 @@ export function drawStars(ctx, activeScene, params) {
     // File particles
     if (s.particles.length > 0) {
       const pScale = cam.z * 0.5;
-      drawParticles(ctx, sc.x, sc.y, s.particles, pScale, 0.8, t, pScale);
+      drawParticles(ctx, s.particles, { cx: sc.x, cy: sc.y, scale: pScale, alpha: 0.8, t, drawScale: pScale });
     }
 
     // Labeled violation orbs at high zoom
@@ -160,7 +160,7 @@ export function drawStars(ctx, activeScene, params) {
         const tw = 0.5 + 0.06 * Math.sin(t * 0.4 + p.tp);
         const psr = p.sz * vScale * 0.5;
         if (psr > 1.5) {
-          drawGlow(ctx, px, py, psr, p.col, vAlpha * tw);
+          drawGlow(ctx, { x: px, y: py, r: psr, col: p.col, alpha: vAlpha * tw });
           if (showLabels && psr > 3) {
             const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
             ctx.font = `500 ${Math.max(7, Math.min(11, psr * 0.8))}px -apple-system,BlinkMacSystemFont,sans-serif`;

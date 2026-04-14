@@ -6,6 +6,7 @@ import {
   GROUP_PLAN_OUTPUT,
   FIX_HINTS,
 } from './planConstants.js';
+import { KNOWN_SEVERITIES } from './constants.js';
 
 const PLAN_SNIPPET_MAX_LINES = 5;
 
@@ -56,12 +57,6 @@ export function getFixHint(req) {
   const prefix = req.replace(/-\d+$/, '');
   return FIX_HINTS[prefix] || null;
 }
-
-// ---------------------------------------------------------------------------
-// Internal constants used by plan builders
-// ---------------------------------------------------------------------------
-
-const KNOWN_SEVERITIES = ['critical', 'major', 'minor', 'unknown'];
 
 // ---------------------------------------------------------------------------
 // Helpers

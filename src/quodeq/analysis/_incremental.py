@@ -1,4 +1,11 @@
-"""Incremental dimension analysis — re-export hub for backward compatibility."""
+"""Incremental dimension analysis — re-export hub for backward compatibility.
+
+This module re-exports symbols from their canonical locations so that
+existing callers (``_pipeline.py``, tests, etc.) can import from a single
+place.  Canonical modules: ``_incremental_context``, ``_incremental_evidence``,
+``_incremental_phases``, ``_incremental_orchestrator``, ``_loops``,
+``fingerprint``, and ``subagents._source_files``.
+"""
 from __future__ import annotations
 
 from quodeq.analysis._incremental_context import (  # noqa: F401

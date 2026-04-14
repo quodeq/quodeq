@@ -5,6 +5,8 @@ import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
+
+const HERO_SCORE_CIRCLE_SIZE = 120;
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { formatRunId, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
@@ -158,7 +160,7 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
       </div>
       <div className="acc-eval-golden">
         <div className="acc-eval-circle-col">
-          <ScoreCircle score={runSummary.numericAverage} grade={runSummary.overallGrade} size={120} />
+          <ScoreCircle score={runSummary.numericAverage} grade={runSummary.overallGrade} size={HERO_SCORE_CIRCLE_SIZE} />
         </div>
         <div className="acc-eval-stats-col">
           <StatsGrid runSummary={runSummary} runTopFiles={runTopFiles} runUniquePrinciples={runUniquePrinciples} />

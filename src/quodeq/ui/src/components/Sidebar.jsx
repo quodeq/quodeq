@@ -4,15 +4,15 @@ import { ACTIVE_PROVIDER_KEY, providerKey, SETTINGS_DOT_DISMISSED_KEY, EVALUATE_
 
 const SETUP_POLL_INTERVAL_MS = 2000;
 
-function useSetupStatus() {
+function useSetupStatus(storage = localStorage) {
   const [status, setStatus] = useState({ needsSettings: false, readyToEvaluate: false });
 
   useEffect(() => {
     function check() {
-      const settingsDismissed = localStorage.getItem(SETTINGS_DOT_DISMISSED_KEY);
-      const evaluateDismissed = localStorage.getItem(EVALUATE_DOT_DISMISSED_KEY);
-      const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
-      const model = provider ? localStorage.getItem(providerKey(provider, 'model')) || '' : '';
+      const settingsDismissed = storage.getItem(SETTINGS_DOT_DISMISSED_KEY);
+      const evaluateDismissed = storage.getItem(EVALUATE_DOT_DISMISSED_KEY);
+      const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+      const model = provider ? storage.getItem(providerKey(provider, 'model')) || '' : '';
       const configured = !!(provider && model);
 
       const showSettings = !settingsDismissed;

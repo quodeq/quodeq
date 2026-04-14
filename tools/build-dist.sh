@@ -10,8 +10,9 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-STATIC_DIR="$REPO_ROOT/src/quodeq/static"
-WEB_DIR="$REPO_ROOT/ui/web"
+# Standard project layout paths; override via environment if needed.
+STATIC_DIR="${QUODEQ_STATIC_DIR:-$REPO_ROOT/src/quodeq/static}"
+WEB_DIR="${QUODEQ_WEB_DIR:-$REPO_ROOT/ui/web}"
 
 echo "==> Building web UI..."
 cd "$WEB_DIR"

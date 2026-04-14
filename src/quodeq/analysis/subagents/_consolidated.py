@@ -28,6 +28,15 @@ class _ConsolidatedPaths:
     compiled_dir: "Path | None" = None
 
 
+@dataclass(frozen=True)
+class _ConsolidatedRunContext:
+    """Grouped context for consolidated result collection."""
+    dimensions: list[str]
+    ctx: Any
+    results: list[Any]
+    files: list[str]
+
+
 def _build_consolidated_config(
     config: "RunConfig", dimensions: list[str], files_per_agent: int,
     compiled_dir: "Path | None" = None,
@@ -48,15 +57,14 @@ def _build_consolidated_config(
 
 
 def _collect_consolidated_results(
-    config: "RunConfig", dimensions: list[str], ctx: Any,
-    results: list[Any], paths: _ConsolidatedPaths, files: list[str],
+    config: "RunConfig", run_ctx: _ConsolidatedRunContext, paths: _ConsolidatedPaths,
 ) -> dict[str, Evidence]:
     """Deduplicate and parse consolidated results into per-dimension Evidence."""
     merged_jsonl = paths.evidence_dir / "consolidated_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
     total_files_read = 0
-    for r in results:
+    for r in run_ctx.results:
         if r.stream_file.exists():
             total_files_read += len(count_files_in_stream(r.stream_file))
             cleanup_stream(r.stream_file)
@@ -71,14 +79,14 @@ def _collect_consolidated_results(
             pass
 
     # Save per-dimension fingerprints so incremental works after consolidated runs
-    for dim in dimensions:
-        fp = build_fingerprint(config.src, files, dim, config.standards_dir, analyzed_files=analyzed or None)
+    for dim in run_ctx.dimensions:
+        fp = build_fingerprint(config.src, run_ctx.files, dim, config.standards_dir, analyzed_files=analyzed or None)
         save_fingerprint(fp, paths.evidence_dir)
 
     ev_ctx = EvidenceContext(
         language=config.language,
         repository=str(config.src),
-        date_str=ctx.date_str,
+        date_str=run_ctx.ctx.date_str,
         source_file_count=config.source_file_count,
         files_read=total_files_read,
         module=config.target.name if config.target else "",
@@ -144,4 +152,5 @@ def process_consolidated_dimensions(
     results = pool.run()
 
     # 4. Collect and return per-dimension evidence
-    return _collect_consolidated_results(config, dimensions, ctx, results, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir), files)
+    run_context = _ConsolidatedRunContext(dimensions=dimensions, ctx=ctx, results=results, files=files)
+    return _collect_consolidated_results(config, run_context, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir))

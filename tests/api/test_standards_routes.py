@@ -4,6 +4,11 @@ from pathlib import Path
 import pytest
 from quodeq.api.app import create_app
 
+_TEST_STANDARD_PAYLOAD = {
+    "id": "my-std", "name": "My Standard", "description": "Test standard",
+    "weight": 1.0, "source": "Test", "principles": [],
+}
+
 @pytest.fixture()
 def dirs(tmp_path):
     evaluators = tmp_path / "evaluators"
@@ -52,8 +57,7 @@ def test_get_standard_not_found(client):
 
 # Write endpoints
 def test_create_standard(client):
-    payload = {"id": "my-std", "name": "My Standard", "description": "Test standard", "weight": 1.0, "source": "Test", "principles": []}
-    resp = client.post("/api/standards", json=payload, headers={"Origin": "http://localhost"})
+    resp = client.post("/api/standards", json=_TEST_STANDARD_PAYLOAD, headers={"Origin": "http://localhost"})
     assert resp.status_code == 201
     data = resp.get_json()
     assert data["id"] == "my-std"

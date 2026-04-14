@@ -8,6 +8,7 @@ const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: 'ISO-25010', [STANDARD_TYPES.QUO
 
 const MIN_TREE_WIDTH = 180;
 const MAX_TREE_WIDTH = 600;
+const INLINE_ERROR_MARGIN = '8px 16px';
 const DEFAULT_TREE_WIDTH = 280;
 
 function useResizable(defaultWidth) {
@@ -146,7 +147,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
         dirty={dirty} editable={editable}
         onBack={onBack} onSave={handleSave}
       />
-      {error && <p className="inline-error" style={{ margin: '8px 16px' }}>{error}</p>}
+      {error && <p className="inline-error" style={{ margin: INLINE_ERROR_MARGIN }}>{error}</p>}
       <EditorBody
         treeProps={{ standard, selectedNode, actions: treeActions, editable }}
         detailProps={{ updateField, isNew }}

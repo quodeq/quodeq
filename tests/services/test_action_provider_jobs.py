@@ -9,6 +9,7 @@ from quodeq.core.types import JobSnapshot
 from quodeq.services.jobs import JobManager
 
 _FAKE_REPORT_PATH = "Report path: /app/reports/sample-project/20260220/evaluation"
+_TEST_TIMEOUT_S = 5.0
 
 
 class FakeProcess:
@@ -48,7 +49,7 @@ def completed_success_job() -> JobSnapshot:
     manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["echo", "ok"])
     job_id_holder.append(job.job_id)
-    done.wait(timeout=5.0)
+    done.wait(timeout=_TEST_TIMEOUT_S)
     result = manager.get_job(job.job_id)
     assert result is not None
     return result
@@ -88,7 +89,7 @@ def test_markers_parsed_from_merged_stream() -> None:
     manager, done = _make_manager_with_event(spawn_impl, job_id_holder)
     job = manager.start_job(["echo"])
     job_id_holder.append(job.job_id)
-    done.wait(timeout=5.0)
+    done.wait(timeout=_TEST_TIMEOUT_S)
     result = manager.get_job(job.job_id)
     assert result is not None
     assert result.phase == "analyzing"
@@ -107,7 +108,7 @@ def test_job_manager_handles_failure() -> None:
     job = manager.start_job(["false"])
     job_id_holder.append(job.job_id)
 
-    done.wait(timeout=5.0)
+    done.wait(timeout=_TEST_TIMEOUT_S)
     result = manager.get_job(job.job_id)
     assert result is not None
 

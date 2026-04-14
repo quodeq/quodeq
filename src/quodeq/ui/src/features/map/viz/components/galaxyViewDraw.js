@@ -107,7 +107,7 @@ export function drawFrame(ctx, scene, cam, nav, opts) {
       });
     }
 
-    drawGlow(ctx, sc.x, sc.y, sr, s.col, isSelected ? clusterDim : dimFade);
+    drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: s.col, alpha: isSelected ? clusterDim : dimFade });
     // Hide dimension label when zoomed past galaxy level
     const labelAlpha = isSelected ? Math.max(0, 1 - (cam.z - 1.5) / 2) : dimFade;
     if (showLabels && labelAlpha > 0.01) {
@@ -148,8 +148,8 @@ export function drawFrame(ctx, scene, cam, nav, opts) {
       const cappedScale = Math.min(0.8, 5 * 0.12 / Math.max(pScale, 0.01));
       const particleDrawScale = isSelectedPrin ? pScale * 0.8 : pScale * cappedScale;
       const particleOrbitScale = isSelectedPrin ? pScale * 0.8 : pScale * Math.max(cappedScale, 0.5);
-      if (particleFade > 0.01) drawParticles(ctx, sc.x, sc.y, p.particles, particleOrbitScale, pAlpha * particleFade, t, particleDrawScale);
-      drawGlow(ctx, sc.x, sc.y, sr, p.col, pAlpha);
+      if (particleFade > 0.01) drawParticles(ctx, p.particles, { cx: sc.x, cy: sc.y, scale: particleOrbitScale, alpha: pAlpha * particleFade, t, drawScale: particleDrawScale });
+      drawGlow(ctx, { x: sc.x, y: sc.y, r: sr, col: p.col, alpha: pAlpha });
       // Only fade labels/scores — hide on non-selected when zoomed into a principle
       const prinLabelAlpha = isSelectedPrin ? Math.max(0, 1 - (cam.z - 12) / 20) : (nav.prin !== null ? Math.max(0, 1 - (cam.z - 12) / 15) : 1);
       if (showLabels && prinLabelAlpha > 0.01) {
@@ -180,7 +180,7 @@ export function drawFrame(ctx, scene, cam, nav, opts) {
       const py = psc.y + Math.sin(a) * p.or * vScale;
       const tw = 0.5 + 0.06 * Math.sin(t * 0.4 + p.tp);
       const sr = p.sz * vScale * 0.5;
-      drawGlow(ctx, px, py, sr, p.col, vAlpha * tw);
+      drawGlow(ctx, { x: px, y: py, r: sr, col: p.col, alpha: vAlpha * tw });
       if (showLabels && sr > 3) {
         const sevName = p.sev.charAt(0).toUpperCase() + p.sev.slice(1);
         ctx.font = `500 ${Math.max(7, Math.min(11, sr * 0.8))}px -apple-system,BlinkMacSystemFont,sans-serif`;

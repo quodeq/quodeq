@@ -27,6 +27,10 @@ export function parseCSSColor(cssColor) {
   return { r, g, b };
 }
 
+// Intentional module-level cache: stores parsed CSS theme colors to avoid
+// repeated DOM reads on every frame. getThemeColors(sourceEl, { cache })
+// provides an injection point for tests — pass a cache object to bypass
+// the module-level singleton entirely.
 let _themeColors = null;
 let _themeSourceEl = null;
 let _themeObserver = null;
@@ -99,7 +103,7 @@ const GLOW_CENTER_ALPHA = 0.15;
 const GLOW_MID_ALPHA = 0.9;
 const GLOW_EDGE_ALPHA = 0.6;
 
-export function drawGlow(ctx, x, y, r, col, alpha) {
+export function drawGlow(ctx, { x, y, r, col, alpha }) {
   if (r < 0.3 || alpha < 0.01) return;
   const { r: cr, g, b } = col;
   const gl = ctx.createRadialGradient(x, y, r * GLOW_INNER_RATIO, x, y, r * GLOW_OUTER_RATIO);
@@ -113,7 +117,7 @@ export function drawGlow(ctx, x, y, r, col, alpha) {
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = co; ctx.fill();
 }
 
-export function drawParticles(ctx, cx, cy, particles, scale, alpha, t, drawScale) {
+export function drawParticles(ctx, particles, { cx, cy, scale, alpha, t, drawScale }) {
   const ds = drawScale ?? scale;
   particles.forEach(p => {
     const a = t * p.os + p.op;

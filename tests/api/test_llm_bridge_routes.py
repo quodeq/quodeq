@@ -6,6 +6,8 @@ from unittest.mock import patch
 
 import pytest
 
+_TEST_API_KEY = "sk-test"
+
 
 @pytest.fixture()
 def client(tmp_path):
@@ -45,7 +47,7 @@ class TestProviderTest:
                 "provider": "openrouter",
                 "model": "test",
                 "api_base": "https://example.com/v1",
-                "api_key": "sk-test",
+                "api_key": _TEST_API_KEY,
             }, headers={"Origin": "http://localhost"})
 
         assert resp.status_code == 200

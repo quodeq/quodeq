@@ -186,7 +186,6 @@ class TestFindingsRouterMultiDimension:
 
         router.receive({"req": "S-CON-1", "t": "violation", "file": "a.py", "line": 1, "w": "test"})
 
-        import json
         line = json.loads(fh.getvalue().strip())
         assert line["d"] == "security"
 

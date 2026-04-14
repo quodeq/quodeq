@@ -10,7 +10,9 @@ import { useEvaluationLifecycle } from './useEvaluationLifecycle.js';
 import { useProjectActions } from './useProjectActions.js';
 import { useVisibleRuns } from './useVisibleRuns.js';
 
-export const KNOWN_TABS = ['overview', 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'help', 'settings'];
+export const TAB_OVERVIEW = 'overview';
+const TAB_HISTORY_RUN = 'history-run';
+export const KNOWN_TABS = [TAB_OVERVIEW, 'violations', 'map', 'history', 'projects', 'evaluate', 'standards', 'help', 'settings'];
 export const PROJECT_TABS = KNOWN_TABS.slice(0, 4);
 
 function computeDerivedState(accumulated, dashboard, selectedProject, projects) {
@@ -88,7 +90,11 @@ export function formatDayLabel(trend, currentOverviewRun, dailyRuns, overviewRun
 export function useAppState() {
   const nav = useAppNavigation();
   const { serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navReset, navTab, projectBundle, handleNavigate, handleRunChange, historySelectedRun, setHistorySelectedRun } = nav;
-  const { projects, projectsLoaded, setProjects, selectedProject, selectedRun, setSelectedRun, loadProjects, handleProjectChange, selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject } = projectBundle;
+  const {
+    projects, projectsLoaded, setProjects, selectedProject,
+    selectedRun, setSelectedRun, loadProjects, handleProjectChange,
+    selectProjectAndRun, handleDeleteProject, handleExportProject, handleRelocateProject,
+  } = projectBundle;
   const settings = useAppSettings();
   const effectiveRun = activePage.page === 'history-run' ? historySelectedRun : selectedRun;
   const { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, refreshDashboard } = useDashboard({ selectedProject, selectedRun: effectiveRun });
@@ -113,10 +119,10 @@ export function useAppState() {
 
   const activeTab = KNOWN_TABS.includes(activePage.page) ? activePage.page
     : activePage.sourceTab && KNOWN_TABS.includes(activePage.sourceTab) ? activePage.sourceTab
-    : activePage.page === 'history-run' ? 'history'
-    : 'overview';
+    : activePage.page === TAB_HISTORY_RUN ? 'history'
+    : TAB_OVERVIEW;
   const showProjectHeader = PROJECT_TABS.includes(activeTab) && projects.length > 0 && !!selectedProject;
-  const showRunNav = activeTab === 'overview' && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
+  const showRunNav = activeTab === TAB_OVERVIEW && showProjectHeader && visibleDailyRuns.length > 0 && navStack.length === 1;
 
   return {
     serverConnected, setServerConnected, navStack, activePage, navPop, navGoTo, navTab,

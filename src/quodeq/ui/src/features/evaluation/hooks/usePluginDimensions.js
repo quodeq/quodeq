@@ -59,6 +59,10 @@ function _filterVisible(dims) {
   return dims.filter((d) => visibleSet.has(d.id));
 }
 
+/**
+ * Loads and caches all plugin dimensions, filtering by visible standard IDs.
+ * @returns {{ allDimensions: Array, dimLoadError: string|null }}
+ */
 export function usePluginDimensions() {
   const { listPlugins, listStandards } = useApi();
   const [allDimensions, setAllDimensions] = useState(() => _cachedDimensions ? _filterVisible(_cachedDimensions) : []);

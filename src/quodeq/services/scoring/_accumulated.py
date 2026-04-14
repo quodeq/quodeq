@@ -151,12 +151,15 @@ def build_accumulated_with_children(
     return all_dims, summary
 
 
+_TREND_EPSILON = 0.05
+
+
 def _compute_trend(current: float | None, previous: float | None) -> str:
     """Compute trend string from numeric scores."""
     if current is None or previous is None:
         return "none"
     diff = current - previous
-    if abs(diff) < 0.05:
+    if abs(diff) < _TREND_EPSILON:
         return "same"
     return "up" if diff > 0 else "down"
 

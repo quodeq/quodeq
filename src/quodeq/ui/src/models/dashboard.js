@@ -24,7 +24,8 @@ import { createDimension } from './dimension.js';
 export function createDashboard(raw) {
   if (!raw || typeof raw !== 'object') return raw;
   return {
-    ...raw,
     dimensions: (raw.dimensions || []).map(createDimension),
+    trend: raw.trend,
+    selectedRun: raw.selectedRun,
   };
 }
