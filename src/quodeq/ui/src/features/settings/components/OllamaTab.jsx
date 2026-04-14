@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getOllamaModels, testOllamaConcurrency } from '../../../api/index.js';
+import { MIN_SUBAGENTS, MAX_SUBAGENTS } from '../../../constants.js';
 import ServerStatus from './ServerStatus.jsx';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
 
@@ -32,7 +33,7 @@ export default function OllamaTab({ state, update }) {
       const result = await testOllamaConcurrency(state.model);
       setTestResult(result);
       if (result.recommended) update('subagents', String(result.recommended));
-    } catch { setTestResult(null); }
+    } catch (err) { console.warn('Ollama concurrency test failed', err); setTestResult(null); }
     setTesting(false);
   };
 
@@ -52,7 +53,7 @@ export default function OllamaTab({ state, update }) {
           <span className="settings-description">Auto-detected from VRAM. Test for accuracy.</span>
         </div>
         <div className="settings-budget-control">
-          <input type="number" className="settings-model-input" min={1} max={10} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} />
+          <input type="number" className="settings-model-input" min={MIN_SUBAGENTS} max={MAX_SUBAGENTS} value={state.subagents} onChange={(e) => update('subagents', e.target.value)} />
           <button type="button" className="settings-action-btn" onClick={runTest} disabled={testing || !state.model}>
             {testing ? 'Testing...' : 'Auto-detect'}
           </button>

@@ -23,7 +23,7 @@ class TestWriteCarryForwardFindings:
         assert count == 2
         jsonl = tmp_path / "security_evidence.jsonl"
         assert jsonl.exists()
-        lines = [l for l in jsonl.read_text().splitlines() if l.strip()]
+        lines = [line for line in jsonl.read_text().splitlines() if line.strip()]
         assert len(lines) == 2
         assert json.loads(lines[0])["file"] == "a.py"
         assert json.loads(lines[1])["file"] == "b.py"
@@ -35,7 +35,7 @@ class TestWriteCarryForwardFindings:
         findings = [{"p": "Mod", "t": "violation", "file": "a.py", "line": 1, "reason": "new"}]
         count = write_carry_forward_findings(findings, tmp_path, "security")
         assert count == 1
-        lines = [l for l in jsonl.read_text().splitlines() if l.strip()]
+        lines = [line for line in jsonl.read_text().splitlines() if line.strip()]
         assert len(lines) == 2  # original + new
         assert json.loads(lines[0])["file"] == "x.py"  # original preserved
         assert json.loads(lines[1])["file"] == "a.py"   # new appended
@@ -61,8 +61,8 @@ class TestRunVerificationStepFingerprint:
         return config
 
     @patch("quodeq.analysis.subagents._verification._run_verification_pool")
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
-    @patch("quodeq.analysis.fingerprint.find_previous_fingerprint")
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.find_previous_fingerprint")
     def test_unchanged_files_carried_forward_not_sent_to_pool(
         self, mock_find_fp, mock_load_findings, mock_pool, tmp_path,
     ):
@@ -104,13 +104,13 @@ class TestRunVerificationStepFingerprint:
         # Carried forward findings should be in JSONL
         output_jsonl = evidence_dir / "security_evidence.jsonl"
         assert output_jsonl.exists()
-        lines = [json.loads(l) for l in output_jsonl.read_text().splitlines() if l.strip()]
-        unchanged_findings = [l for l in lines if l.get("file") == "unchanged.py"]
+        lines = [json.loads(line) for line in output_jsonl.read_text().splitlines() if line.strip()]
+        unchanged_findings = [line for line in lines if line.get("file") == "unchanged.py"]
         assert len(unchanged_findings) == 1
 
     @patch("quodeq.analysis.subagents._verification._run_verification_pool")
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
-    @patch("quodeq.analysis.fingerprint.find_previous_fingerprint")
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.find_previous_fingerprint")
     def test_incremental_filters_to_file_filter_only(
         self, mock_find_fp, mock_load_findings, mock_pool, tmp_path,
     ):
@@ -148,6 +148,6 @@ class TestRunVerificationStepFingerprint:
         # JSONL should NOT have unchanged.py findings (that's _maybe_carry_forward's job)
         output_jsonl = evidence_dir / "security_evidence.jsonl"
         if output_jsonl.exists():
-            lines = [json.loads(l) for l in output_jsonl.read_text().splitlines() if l.strip()]
-            unchanged_findings = [l for l in lines if l.get("file") == "unchanged.py"]
+            lines = [json.loads(line) for line in output_jsonl.read_text().splitlines() if line.strip()]
+            unchanged_findings = [line for line in lines if line.get("file") == "unchanged.py"]
             assert len(unchanged_findings) == 0

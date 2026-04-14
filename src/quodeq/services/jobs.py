@@ -14,6 +14,7 @@ import subprocess
 
 from quodeq.core.types import JobSnapshot
 
+from quodeq.analysis._process import _kill_tree
 from quodeq.services._job_model import (
     Job,
     JobStore,
@@ -125,7 +126,6 @@ class JobManager:
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
-            from quodeq.analysis._process import _kill_tree
             _kill_tree(process.pid)
         return True
 
@@ -134,7 +134,6 @@ class JobManager:
         with self._lock:
             for job_id, process in list(self._processes.items()):
                 try:
-                    from quodeq.analysis._process import _kill_tree
                     _kill_tree(process.pid)
                 except (ProcessLookupError, OSError):
                     pass

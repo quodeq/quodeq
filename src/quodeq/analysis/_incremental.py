@@ -11,7 +11,7 @@ from quodeq.analysis._incremental_evidence import (  # noqa: F401
     save_dimension_fingerprint,
 )
 from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint  # noqa: F401
-from quodeq.analysis.subagents.runner import _list_source_files  # noqa: F401
+from quodeq.analysis.subagents._source_files import _list_source_files  # noqa: F401
 from quodeq.analysis._incremental_phases import (  # noqa: F401
     _finalize_incremental,
     _list_all_source_files,

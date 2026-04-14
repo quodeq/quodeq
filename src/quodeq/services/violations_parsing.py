@@ -125,7 +125,7 @@ def parse_violations_from_evidence(evidence_path: Path, ctx: ViolationContext) -
 
 
 # ---------------------------------------------------------------------------
-# Re-exports for backward compatibility
+# Re-exports for backward compatibility (must stay at bottom to avoid circular imports)
 # ---------------------------------------------------------------------------
 
 from quodeq.services._violations_jsonl import parse_violations_from_jsonl  # noqa: E402

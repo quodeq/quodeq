@@ -2,6 +2,9 @@ import { useState, useEffect, useRef } from 'react';
 
 const HEALTH_POLL_MS = 10000;
 const LOG_POLL_MS = 2000;
+const MAX_LOG_LINES = 500;
+const CONSOLE_POPUP_WIDTH = 800;
+const CONSOLE_POPUP_HEIGHT = 500;
 
 function ping() {
   return fetch('/api/health?_t=' + Date.now())
@@ -66,7 +69,7 @@ export default function ServerSection() {
           if (data.lines.length) {
             setLogLines((prev) => {
               const next = [...prev, ...data.lines];
-              return next.length > 500 ? next.slice(-500) : next;
+              return next.length > MAX_LOG_LINES ? next.slice(-MAX_LOG_LINES) : next;
             });
             sinceRef.current = data.lines[data.lines.length - 1].index;
           }
@@ -92,7 +95,7 @@ export default function ServerSection() {
     if (window.pywebview && window.pywebview.api && window.pywebview.api.open_browser) {
       window.pywebview.api.open_browser('/logs');
     } else {
-      window.open(window.location.origin + '/logs', '_blank', 'width=800,height=500');
+      window.open(window.location.origin + '/logs', '_blank', `width=${CONSOLE_POPUP_WIDTH},height=${CONSOLE_POPUP_HEIGHT}`);
     }
   }
 

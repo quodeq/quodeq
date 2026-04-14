@@ -19,8 +19,8 @@ class TestLoadAndFilterPrevious:
         opts = AnalysisOptions(incremental_file_filter=incremental_filter)
         return RunConfig(src=tmp_path, language="python", options=opts)
 
-    @patch("quodeq.services.dismissed.dismissed_keys", return_value=set())
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.dismissed_keys", return_value=set())
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
     def test_returns_empty_when_no_previous(self, mock_load, mock_dk, tmp_path):
         from quodeq.analysis.subagents._verification import _load_and_filter_previous
         mock_load.return_value = []
@@ -29,8 +29,8 @@ class TestLoadAndFilterPrevious:
         result = _load_and_filter_previous(self._make_config(tmp_path), "security", evidence_dir)
         assert result == []
 
-    @patch("quodeq.services.dismissed.dismissed_keys", return_value=set())
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.dismissed_keys", return_value=set())
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
     def test_returns_all_findings_no_filter(self, mock_load, mock_dk, tmp_path):
         from quodeq.analysis.subagents._verification import _load_and_filter_previous
         findings = [{"file": "a.py", "p": "p1", "line": 1}, {"file": "b.py", "p": "p2", "line": 2}]
@@ -40,8 +40,8 @@ class TestLoadAndFilterPrevious:
         result = _load_and_filter_previous(self._make_config(tmp_path), "security", evidence_dir)
         assert len(result) == 2
 
-    @patch("quodeq.services.dismissed.dismissed_keys", return_value=set())
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.dismissed_keys", return_value=set())
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
     def test_applies_incremental_file_filter(self, mock_load, mock_dk, tmp_path):
         from quodeq.analysis.subagents._verification import _load_and_filter_previous
         findings = [{"file": "a.py", "p": "p1", "line": 1}, {"file": "b.py", "p": "p2", "line": 2}]
@@ -53,8 +53,8 @@ class TestLoadAndFilterPrevious:
         assert len(result) == 1
         assert result[0]["file"] == "a.py"
 
-    @patch("quodeq.services.dismissed.dismissed_keys")
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.dismissed_keys")
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
     def test_filters_dismissed_findings(self, mock_load, mock_dk, tmp_path):
         from quodeq.analysis.subagents._verification import _load_and_filter_previous
         findings = [
@@ -75,9 +75,9 @@ class TestLoadAndFilterPrevious:
 # ---------------------------------------------------------------------------
 
 class TestDispatchVerificationPool:
-    @patch("quodeq.analysis.subagents._verify_pool.run_verification_pool")
-    @patch("quodeq.analysis.subagents.verify._write_verify_manifest")
-    @patch("quodeq.analysis.subagents.verify._group_by_file")
+    @patch("quodeq.analysis.subagents._verification.run_verification_pool")
+    @patch("quodeq.analysis.subagents._verification._write_verify_manifest")
+    @patch("quodeq.analysis.subagents._verification._group_by_file")
     def test_dispatches_pool(self, mock_group, mock_write, mock_pool, tmp_path):
         from quodeq.analysis.subagents._verification import _dispatch_verification_pool
         mock_group.return_value = {"a.py": [{"file": "a.py"}]}
@@ -102,9 +102,9 @@ class TestDispatchMiniVerify:
         result = _dispatch_mini_verify(config, "security", tmp_path, [])
         assert result == []
 
-    @patch("quodeq.analysis.subagents._verify_pool.run_verification_pool")
-    @patch("quodeq.analysis.subagents.verify._write_verify_manifest")
-    @patch("quodeq.analysis.subagents.verify._group_by_file")
+    @patch("quodeq.analysis.subagents._verification.run_verification_pool")
+    @patch("quodeq.analysis.subagents._verification._write_verify_manifest")
+    @patch("quodeq.analysis.subagents._verification._group_by_file")
     def test_mini_verify_caps_agents_and_budget(self, mock_group, mock_write, mock_pool, tmp_path):
         from quodeq.analysis.subagents._verification import (
             _dispatch_mini_verify, _MINI_VERIFY_MAX_AGENTS, _MINI_VERIFY_MAX_TIMEOUT,
@@ -127,8 +127,8 @@ class TestDispatchMiniVerify:
 # ---------------------------------------------------------------------------
 
 class TestRunVerificationStep:
-    @patch("quodeq.services.dismissed.dismissed_keys", return_value=set())
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension", return_value=[])
+    @patch("quodeq.analysis.subagents._verification.dismissed_keys", return_value=set())
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension", return_value=[])
     def test_returns_empty_when_no_previous(self, mock_load, mock_dk, tmp_path):
         from quodeq.analysis.subagents._verification import _run_verification_step
         config = RunConfig(src=tmp_path, language="python")
@@ -137,11 +137,11 @@ class TestRunVerificationStep:
         result = _run_verification_step(config, "security", evidence_dir, ["a.py"])
         assert result == []
 
-    @patch("quodeq.analysis.subagents._verify_pool.run_verification_pool", return_value=[])
-    @patch("quodeq.analysis.subagents.verify.write_carry_forward_findings", return_value=3)
-    @patch("quodeq.analysis.subagents.verify.partition_findings_by_fingerprint")
-    @patch("quodeq.services.dismissed.dismissed_keys", return_value=set())
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.run_verification_pool", return_value=[])
+    @patch("quodeq.analysis.subagents._verification.write_carry_forward_findings", return_value=3)
+    @patch("quodeq.analysis.subagents._verification.partition_findings_by_fingerprint")
+    @patch("quodeq.analysis.subagents._verification.dismissed_keys", return_value=set())
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
     def test_carry_forward_only(self, mock_load, mock_dk, mock_partition, mock_write_cf, mock_pool, tmp_path):
         from quodeq.analysis.subagents._verification import _run_verification_step
         mock_load.return_value = [{"file": "a.py", "p": "", "line": 0}]
@@ -153,13 +153,13 @@ class TestRunVerificationStep:
         assert result == []
         mock_write_cf.assert_called_once()
 
-    @patch("quodeq.analysis.subagents._verify_pool.run_verification_pool", return_value=[{"verified": True}])
-    @patch("quodeq.analysis.subagents.verify._write_verify_manifest")
-    @patch("quodeq.analysis.subagents.verify._group_by_file", return_value={"b.py": [{"file": "b.py"}]})
-    @patch("quodeq.analysis.subagents.verify.write_carry_forward_findings", return_value=1)
-    @patch("quodeq.analysis.subagents.verify.partition_findings_by_fingerprint")
-    @patch("quodeq.services.dismissed.dismissed_keys", return_value=set())
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.run_verification_pool", return_value=[{"verified": True}])
+    @patch("quodeq.analysis.subagents._verification._write_verify_manifest")
+    @patch("quodeq.analysis.subagents._verification._group_by_file", return_value={"b.py": [{"file": "b.py"}]})
+    @patch("quodeq.analysis.subagents._verification.write_carry_forward_findings", return_value=1)
+    @patch("quodeq.analysis.subagents._verification.partition_findings_by_fingerprint")
+    @patch("quodeq.analysis.subagents._verification.dismissed_keys", return_value=set())
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
     def test_mixed_carry_forward_and_verify(self, mock_load, mock_dk, mock_partition, mock_write_cf, mock_group, mock_write_m, mock_pool, tmp_path):
         from quodeq.analysis.subagents._verification import _run_verification_step
         mock_load.return_value = [{"file": "a.py", "p": "", "line": 0}, {"file": "b.py", "p": "", "line": 0}]
@@ -170,14 +170,14 @@ class TestRunVerificationStep:
         result = _run_verification_step(config, "security", evidence_dir, ["a.py", "b.py"], prev_fingerprint={})
         assert result == [{"verified": True}]
 
-    @patch("quodeq.analysis.subagents._verify_pool.run_verification_pool", return_value=[])
-    @patch("quodeq.analysis.subagents.verify._write_verify_manifest")
-    @patch("quodeq.analysis.subagents.verify._group_by_file", return_value={"a.py": [{"file": "a.py"}]})
-    @patch("quodeq.analysis.subagents.verify.write_carry_forward_findings", return_value=0)
-    @patch("quodeq.analysis.subagents.verify.partition_findings_by_fingerprint")
-    @patch("quodeq.analysis.fingerprint.find_previous_fingerprint", return_value=(None, None))
-    @patch("quodeq.services.dismissed.dismissed_keys", return_value=set())
-    @patch("quodeq.analysis.subagents.verify.load_previous_findings_for_dimension")
+    @patch("quodeq.analysis.subagents._verification.run_verification_pool", return_value=[])
+    @patch("quodeq.analysis.subagents._verification._write_verify_manifest")
+    @patch("quodeq.analysis.subagents._verification._group_by_file", return_value={"a.py": [{"file": "a.py"}]})
+    @patch("quodeq.analysis.subagents._verification.write_carry_forward_findings", return_value=0)
+    @patch("quodeq.analysis.subagents._verification.partition_findings_by_fingerprint")
+    @patch("quodeq.analysis.subagents._verification.find_previous_fingerprint", return_value=(None, None))
+    @patch("quodeq.analysis.subagents._verification.dismissed_keys", return_value=set())
+    @patch("quodeq.analysis.subagents._verification.load_previous_findings_for_dimension")
     def test_no_prev_fingerprint_looks_it_up(self, mock_load, mock_dk, mock_find_fp, mock_partition, mock_write_cf, mock_group, mock_write_m, mock_pool, tmp_path):
         from quodeq.analysis.subagents._verification import _run_verification_step
         mock_load.return_value = [{"file": "a.py", "p": "", "line": 0}]

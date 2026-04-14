@@ -15,6 +15,8 @@ except ImportError:
 _log = logging.getLogger(__name__)
 
 _ALLOWED_SCHEMES = {"http", "https"}
+_MIN_KEY_LEN_FOR_REDACTION = 8
+_MAX_ERROR_BRIEF_LEN = 120
 
 
 def _is_private_url(url: str) -> bool:
@@ -69,7 +71,7 @@ def check_cloud_connection(
         error_type = type(exc).__name__
         raw = str(exc)
         # Strip potential API key fragments from error messages
-        if api_key and len(api_key) > 8 and api_key in raw:
+        if api_key and len(api_key) > _MIN_KEY_LEN_FOR_REDACTION and api_key in raw:
             raw = raw.replace(api_key, "***")
-        brief = raw[:120] if raw else "unknown error"
+        brief = raw[:_MAX_ERROR_BRIEF_LEN] if raw else "unknown error"
         return {"success": False, "error": f"{error_type}: {brief}"}

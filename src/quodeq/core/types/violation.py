@@ -16,6 +16,8 @@ class ProgressInfo:
 
 @dataclass(frozen=True, slots=True)
 class ViolationResponse:
+    """Result of a dimension analysis containing violations and compliance findings."""
+
     dimension: str
     run_id: str
     project: str
@@ -27,6 +29,8 @@ class ViolationResponse:
 
 @dataclass(frozen=True, slots=True)
 class ViolationFileEntry:
+    """Per-file violation counts grouped by severity."""
+
     path: str
     count: int = 0
     critical: int = 0
@@ -36,6 +40,8 @@ class ViolationFileEntry:
 
 @dataclass(frozen=True, slots=True)
 class ViolationSummary:
+    """Aggregate violation totals across all analysed files."""
+
     total: int = 0
     critical: int = 0
     major: int = 0

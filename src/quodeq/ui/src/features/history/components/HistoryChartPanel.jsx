@@ -19,6 +19,10 @@ const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
+const DESELECTED_BAR_OPACITY = 0.55;
+const HOVER_STROKE_WIDTH = 1.5;
+const TREND_LINE_STROKE_WIDTH = 2.5;
+const TREND_LINE_OPACITY = 0.55;
 const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
   if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
@@ -159,10 +163,10 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
         <ReferenceLines />
         <Bar dataKey="numericAverage" radius={[3, 3, 0, 0]} maxBarSize={40} label={renderTrendLabel} isAnimationActive={false} cursor={onBarClick ? 'pointer' : 'default'} onMouseEnter={(_, index) => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)} onClick={(entry) => onBarClick?.(entry.runId)}>
           {data.map((entry, i) => (
-            <Cell key={entry.runId ?? i} fill={scoreBarColor(entry.numericAverage)} opacity={entry.runId === selectedRunId ? 1 : 0.55} stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'} strokeWidth={hoveredIndex === i ? 1.5 : 0} />
+            <Cell key={entry.runId ?? i} fill={scoreBarColor(entry.numericAverage)} opacity={entry.runId === selectedRunId ? 1 : DESELECTED_BAR_OPACITY} stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'} strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0} />
           ))}
         </Bar>
-        <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-chart-line')} strokeOpacity={0.55} strokeWidth={2.5} dot={false} activeDot={false} />
+        <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-chart-line')} strokeOpacity={TREND_LINE_OPACITY} strokeWidth={TREND_LINE_STROKE_WIDTH} dot={false} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );

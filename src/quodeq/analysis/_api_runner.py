@@ -20,6 +20,10 @@ import instructor
 import openai
 from pydantic import BaseModel, Field
 
+from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
+from quodeq.core.standards.refs import load_compiled_requirements
+from quodeq.engine._ref_utils import load_compiled_refs
+
 _log = logging.getLogger(__name__)
 
 _MAX_RETRIES = 2
@@ -142,10 +146,6 @@ def _enrich_findings(
     if not compiled_dir:
         return findings
     try:
-        from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
-        from quodeq.engine._ref_utils import load_compiled_refs
-        from quodeq.core.standards.refs import load_compiled_requirements
-
         compiled_refs = load_compiled_refs(compiled_dir, dimension) or {}
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
         ctx = CompiledContext(

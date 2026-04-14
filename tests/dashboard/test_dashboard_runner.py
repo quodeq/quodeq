@@ -152,7 +152,7 @@ def test_run_dashboard_native_window(tmp_path: Path, monkeypatch):
     def fake_serve(url, proc, config):
         webview_calls.append(config.build.use_native)
 
-    monkeypatch.setattr(_server, "_serve_and_wait", fake_serve)
+    monkeypatch.setattr(_server, "serve_and_wait", fake_serve)
 
     config = _make_config(
         tmp_path,
@@ -184,7 +184,7 @@ def test_run_dashboard_browser_fallback(tmp_path: Path, monkeypatch):
     def fake_serve(url, proc, config):
         browser_calls.append(config.build.use_native)
 
-    monkeypatch.setattr(_server, "_serve_and_wait", fake_serve)
+    monkeypatch.setattr(_server, "serve_and_wait", fake_serve)
 
     config = _make_config(
         tmp_path,
@@ -210,6 +210,8 @@ def test_run_dashboard_verbose_sets_env(tmp_path: Path, monkeypatch):
     monkeypatch.setattr(runner, "maybe_build_ui", lambda *a, **k: static_dist)
     monkeypatch.setattr(runner, "check_dashboard_prereqs", lambda: None)
     monkeypatch.delenv("QUODEQ_VERBOSE", raising=False)
+    # Ensure monkeypatch tracks the env var so it's cleaned up after the test
+    monkeypatch.setenv("QUODEQ_VERBOSE", "")
 
     config = _make_config(
         tmp_path,

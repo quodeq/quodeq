@@ -1,8 +1,10 @@
 import RunNavigator from '../features/dashboard/components/RunNavigator.jsx';
 import { formatRunId, extDisplayName } from '../utils/formatters.js';
 
+const MAX_DISPLAYED_STATS = 5;
+
 function LanguageStats({ stats, totalFiles }) {
-  const sorted = stats ? Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, 5) : [];
+  const sorted = stats ? Object.entries(stats).sort(([, a], [, b]) => b - a).slice(0, MAX_DISPLAYED_STATS) : [];
   if (!totalFiles && sorted.length === 0) return null;
   const total = totalFiles || (sorted.length > 0 ? sorted.reduce((sum, [, c]) => sum + c, 0) : null);
   return (

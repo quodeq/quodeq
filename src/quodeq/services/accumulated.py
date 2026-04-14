@@ -12,6 +12,7 @@ from quodeq.core.types import DimensionResult
 from quodeq.shared.utils import _env_int
 from quodeq.services._cache import make_lru_dimension_fetcher
 from quodeq.services.dismissed import filter_dismissed_from_dimensions
+from quodeq.services._fs_projects import find_children as _find_children
 
 # Re-export helpers so existing external imports keep working.
 from quodeq.services._accumulated_data import _read_all_run_data  # noqa: F401
@@ -77,9 +78,6 @@ def _compute_result(
     severity = _aggregate_severity_counts(all_dims)
     avg, prev_avg = _compute_accumulated_scores(all_dims, prev_run_latest)
     return _AccumulatedResult(all_dims, dims_with_trend, severity, avg, prev_avg)
-
-
-from quodeq.services._fs_projects import find_children as _find_children  # noqa: E402
 
 
 def _compute_parent_accumulated(

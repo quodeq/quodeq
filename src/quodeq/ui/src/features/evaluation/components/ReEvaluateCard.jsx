@@ -50,22 +50,8 @@ function useReEvalInfo(project, initialInfo) {
   return { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
-function useReEvaluateCard(project, onStart, projectInfo) {
-  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo);
-  const { allDimensions } = usePluginDimensions();
+function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) {
   const [selectedDims, setSelectedDims] = useState(new Set());
-  const [branch, setBranch] = useState(null);
-  const [scopePath, setScopePath] = useState(null);
-
-  // Reset scope when project changes
-  useEffect(() => { setScopePath(null); setBranch(null); }, [project]);
-  const [cloneBrowserOpen, setCloneBrowserOpen] = useState(false);
-  const [cloning, setCloning] = useState(false);
-  const [cloneDest, setCloneDest] = useState('');
-  const [cloneError, setCloneError] = useState(null);
-
-  const isLocal = info?.location === 'local';
-  const { scanData } = useScanData(isLocal ? project : null);
 
   const toggleDim = (id) => {
     setSelectedDims((prev) => {
@@ -86,6 +72,27 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   };
   const handleStart = () => onStart(buildPayload());
   const handleIncremental = () => onStart(buildPayload({ incremental: true }));
+
+  return { selectedDims, toggleDim, selectAll, clearAll, handleStart, handleIncremental };
+}
+
+function useReEvaluateCard(project, onStart, projectInfo) {
+  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo);
+  const { allDimensions } = usePluginDimensions();
+  const [branch, setBranch] = useState(null);
+  const [scopePath, setScopePath] = useState(null);
+
+  useEffect(() => { setScopePath(null); setBranch(null); }, [project]);
+  const [cloneBrowserOpen, setCloneBrowserOpen] = useState(false);
+  const [cloning, setCloning] = useState(false);
+  const [cloneDest, setCloneDest] = useState('');
+  const [cloneError, setCloneError] = useState(null);
+
+  const isLocal = info?.location === 'local';
+  const { scanData } = useScanData(isLocal ? project : null);
+
+  const { selectedDims, toggleDim, selectAll, clearAll, handleStart, handleIncremental } =
+    useDimensionSelection(allDimensions, info, branch, scopePath, onStart);
 
   async function handleCloneToLocal(destination) {
     setCloneBrowserOpen(false);

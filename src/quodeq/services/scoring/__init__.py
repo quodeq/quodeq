@@ -57,31 +57,12 @@ def _make_rescoring_fetcher(
     return rescoring_fetcher
 
 
-def _rescore_accumulated_response(
-    accumulated: dict[str, Any],
-    reports_root: Path,
-    project: str,
-) -> dict[str, Any]:
-    """Apply rescore to an accumulated response dict (in-place compatible shape).
-
-    Filters dismissed violations from each dimension, recalculates scores,
-    and recomputes the summary.
-    """
-    dismissed = dismissed_keys(reports_root / project)
-    if not dismissed or not accumulated:
-        return accumulated
-
+def _rescore_runs_by_dimension(
+    dims: list[dict], reports_root: Path, project: str, dismissed: set[tuple],
+) -> dict[str, dict]:
+    """Rescore each unique run and return a map of dim_key -> rescored dict."""
     from quodeq.services.rescore import rescore_dimensions
-    from quodeq.services.ports import read_run_data
-    from quodeq.services._cache import make_lru_dimension_fetcher
 
-    # The accumulated response has camelCase dicts, but we need DimensionResult
-    # objects to rescore. We can rescore each dimension's source run and map back.
-    dims = accumulated.get("dimensions", [])
-    if not dims:
-        return accumulated
-
-    # Build a map: dimension_key -> run_id from accumulated dimensions
     dim_to_run: dict[str, str] = {}
     for d in dims:
         key = (d.get("dimension") or "").lower()
@@ -89,7 +70,6 @@ def _rescore_accumulated_response(
         if key and rid:
             dim_to_run[key] = rid
 
-    # Rescore each unique run
     fetcher = _make_run_dimension_fetcher(reports_root, project)
     rescored_by_dim: dict[str, dict] = {}
     seen_runs: dict[str, dict[str, dict]] = {}
@@ -104,8 +84,11 @@ def _rescore_accumulated_response(
         rd = seen_runs[run_id].get(dim_key)
         if rd:
             rescored_by_dim[dim_key] = rd
+    return rescored_by_dim
 
-    # Merge rescored data into accumulated dimensions
+
+def _merge_rescored_dims(dims: list[dict], rescored_by_dim: dict[str, dict]) -> list[dict]:
+    """Merge rescored data into accumulated dimensions."""
     new_dims = []
     for d in dims:
         key = (d.get("dimension") or "").lower()
@@ -122,11 +105,32 @@ def _rescore_accumulated_response(
             })
         else:
             new_dims.append(d)
+    return new_dims
 
-    # Recompute summary from rescored dimensions
+
+def _rescore_accumulated_response(
+    accumulated: dict[str, Any],
+    reports_root: Path,
+    project: str,
+) -> dict[str, Any]:
+    """Apply rescore to an accumulated response dict (in-place compatible shape).
+
+    Filters dismissed violations from each dimension, recalculates scores,
+    and recomputes the summary.
+    """
+    dismissed = dismissed_keys(reports_root / project)
+    if not dismissed or not accumulated:
+        return accumulated
+
+    dims = accumulated.get("dimensions", [])
+    if not dims:
+        return accumulated
+
+    rescored_by_dim = _rescore_runs_by_dimension(dims, reports_root, project, dismissed)
+    new_dims = _merge_rescored_dims(dims, rescored_by_dim)
+
     from quodeq.services.scoring._summary import recompute_summary
     new_summary = recompute_summary(new_dims, accumulated.get("summary", {}))
-
     return {**accumulated, "dimensions": new_dims, "summary": new_summary}
 
 

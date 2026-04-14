@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { ICON_OVERVIEW, ICON_VIOLATIONS, ICON_MAP, ICON_HISTORY, ICON_EVALUATE, ICON_PROJECTS, ICON_SETTINGS, ICON_STANDARDS, ICON_HELP } from '../constants/navigation.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey, SETTINGS_DOT_DISMISSED_KEY, EVALUATE_DOT_DISMISSED_KEY } from '../constants.js';
 
+const SETUP_POLL_INTERVAL_MS = 2000;
+
 function useSetupStatus() {
   const [status, setStatus] = useState({ needsSettings: false, readyToEvaluate: false });
 
@@ -21,7 +23,7 @@ function useSetupStatus() {
     }
     check();
     window.addEventListener('storage', check);
-    const interval = setInterval(check, 2000);
+    const interval = setInterval(check, SETUP_POLL_INTERVAL_MS);
     return () => { window.removeEventListener('storage', check); clearInterval(interval); };
   }, []);
 

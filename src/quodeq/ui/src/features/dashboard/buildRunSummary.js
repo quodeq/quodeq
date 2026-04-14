@@ -7,7 +7,7 @@ import { mostFrequentGrade } from '../../utils/formatters.js';
  * Falls back to client-side aggregation when the API response does
  * not include it (legacy endpoints or partial responses).
  *
- * TODO: once the API always returns a summary, remove the fallback.
+ * Once the API always returns a summary, the fallback below can be removed.
  */
 export default function buildRunSummary(dimensions, apiSummary) {
   if (apiSummary) return apiSummary;

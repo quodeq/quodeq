@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import platform
 import subprocess
 import urllib.request
@@ -10,8 +11,12 @@ import urllib.error
 
 _log = logging.getLogger(__name__)
 
-_OLLAMA_BASE = "http://localhost:11434"
+_OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 _TIMEOUT_S = 3
+_MAX_PARALLEL_AGENTS = 5
+_SYSCTL_TIMEOUT_S = 3
+_NVIDIA_SMI_TIMEOUT_S = 5
+_MIB_TO_BYTES = 1024 * 1024
 
 
 def get_ollama_status(base_url: str = _OLLAMA_BASE) -> dict:
@@ -80,7 +85,7 @@ def estimate_max_agents(
 
     effective_size = model_size * overhead_factor
     max_contexts = int(gpu_memory / effective_size)
-    estimate = max(1, min(max_contexts, 5))
+    estimate = max(1, min(max_contexts, _MAX_PARALLEL_AGENTS))
 
     return {
         "estimate": estimate,
@@ -95,17 +100,17 @@ def _get_gpu_memory() -> float:
     try:
         if system == "Darwin":
             # macOS: unified memory — total system RAM is the GPU budget
-            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=3)
+            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=_SYSCTL_TIMEOUT_S)
             return float(out.strip())
         if system == "Linux":
             # Try nvidia-smi for discrete GPU
             out = subprocess.check_output(
                 ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
-                timeout=5,
+                timeout=_NVIDIA_SMI_TIMEOUT_S,
             )
             # First GPU, value in MiB
             mib = float(out.decode().strip().split("\n")[0])
-            return mib * 1024 * 1024
+            return mib * _MIB_TO_BYTES
     except (subprocess.SubprocessError, FileNotFoundError, ValueError, OSError):
         pass
     return 0

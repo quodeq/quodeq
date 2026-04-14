@@ -9,7 +9,9 @@ from quodeq.analysis._types import RunConfig
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence
 from quodeq.analysis.subagents.pool import SubagentPool
+from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint as _default_save
 from quodeq.analysis.subagents._pool_launcher import _collect_all_evidence
+from quodeq.engine._runner_markers import cleanup_stream
 
 
 @dataclass
@@ -30,9 +32,6 @@ def _collect_evidence(
     *collection.save_fingerprint_fn* is an injectable ``(fingerprint, dir) -> None``
     for persistence; defaults to ``analysis.fingerprint.save_fingerprint``.
     """
-    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint as _default_save
-    from quodeq.engine._runner_markers import cleanup_stream
-
     _save = collection.save_fingerprint_fn or _default_save
 
     merged_jsonl = evidence_dir / f"{dim_id}_evidence.jsonl"

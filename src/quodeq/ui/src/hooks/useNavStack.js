@@ -1,5 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 
+const DEFAULT_PAGE = 'overview';
+
 /**
  * Manages a browser-history-backed navigation stack.
  *
@@ -40,7 +42,7 @@ function createNavActions(setNavStack, navStackRef) {
     setNavStack((prev) => {
       const stepsBack = prev.length - 1;
       if (stepsBack > 0) window.history.go(-stepsBack);
-      return [{ page: 'overview' }];
+      return [{ page: DEFAULT_PAGE }];
     });
   }
 
@@ -57,12 +59,12 @@ function createNavActions(setNavStack, navStackRef) {
 }
 
 export function useNavStack() {
-  const [navStack, setNavStack] = useState([{ page: 'overview' }]);
+  const [navStack, setNavStack] = useState([{ page: DEFAULT_PAGE }]);
   const navStackRef = useRef(navStack);
   navStackRef.current = navStack;
 
   useEffect(() => {
-    window.history.replaceState({ navIndex: 0, entry: { page: 'overview' } }, '');
+    window.history.replaceState({ navIndex: 0, entry: { page: DEFAULT_PAGE } }, '');
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {

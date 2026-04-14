@@ -10,6 +10,8 @@ import webbrowser
 
 import rumps
 
+_PKILL_TIMEOUT_S = 5
+
 from _helpers import (
     find_commands as _find_commands,
     find_icon as _find_icon,
@@ -269,7 +271,7 @@ class QuodeqApp(rumps.App):
             _kill_port_processes(port)
         for pattern in _PROCESS_PATTERNS:
             try:
-                subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=5)
+                subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=_PKILL_TIMEOUT_S)
             except (subprocess.TimeoutExpired, OSError):
                 pass
         with self._state_lock:

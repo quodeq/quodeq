@@ -43,13 +43,15 @@ class TestCreateWorktree:
         _make_git_repo(repo, branches=["feature/test"])
 
         wt = _create_worktree(repo, "feature/test")
-        assert wt is not None
-        assert wt.is_dir()
-        assert (wt / "branch_file.txt").exists()
-        assert (wt / "branch_file.txt").read_text() == "from feature/test"
-
-        # Clean up
-        subprocess.run(["git", "-C", str(repo), "worktree", "remove", str(wt), "--force"], capture_output=True)
+        try:
+            assert wt is not None
+            assert wt.is_dir()
+            assert (wt / "branch_file.txt").exists()
+            assert (wt / "branch_file.txt").read_text() == "from feature/test"
+        finally:
+            # Clean up even if assertions fail
+            if wt is not None:
+                subprocess.run(["git", "-C", str(repo), "worktree", "remove", str(wt), "--force"], capture_output=True)
 
     def test_returns_none_for_nonexistent_branch(self, tmp_path: Path) -> None:
         from quodeq.cli import _create_worktree

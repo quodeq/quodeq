@@ -15,6 +15,7 @@ from quodeq.api.standards_crud_routes import register_crud_routes
 from quodeq.api.standards_import_routes import register_import_routes
 from quodeq.api.standards_read_routes import register_read_routes
 from quodeq.services.standards import StandardsService
+from quodeq.services.standards_library import StandardsLibraryClient, UrllibJsonClient
 
 
 def _get_service(app: Flask) -> StandardsService:
@@ -38,7 +39,6 @@ def _get_library_client(app: Flask):
     base_url = app.config.get("STANDARDS_LIBRARY_URL")
     if not base_url:
         return None
-    from quodeq.services.standards_library import StandardsLibraryClient, UrllibJsonClient
     token = app.config.get("STANDARDS_LIBRARY_TOKEN")
     return StandardsLibraryClient(base_url=base_url, http_client=UrllibJsonClient(), token=token)
 

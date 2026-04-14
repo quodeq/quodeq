@@ -10,6 +10,7 @@ from quodeq.data.fs.report_parser import parse_eval_from_json, parse_eval_markdo
 from quodeq.core.types import ViolationFileEntry, ViolationResponse, ViolationSummary
 from quodeq.shared.utils import _env_int, read_text
 from quodeq.services.violation_context import ViolationContext  # noqa: F401 — re-export
+from quodeq.services.dismissed import dismissed_keys as _dismissed_keys
 from quodeq.services.violations_parsing import (
     parse_violations_from_evidence,
     parse_violations_from_jsonl,
@@ -78,6 +79,31 @@ def _filter_dismissed_from_result(
     return result
 
 
+def _try_evidence_formats(
+    base: Path, dimension: str, ctx: ViolationContext,
+    _exists, _stat, compiled_dir, dkeys: set[tuple],
+) -> ViolationResponse | dict[str, Any] | None:
+    """Try evidence file formats (JSON, JSONL, stream) as fallbacks."""
+    evidence_path = base / "evidence" / f"{dimension}_evidence.json"
+    if _exists(evidence_path):
+        return _filter_dismissed_from_result(
+            parse_violations_from_evidence(evidence_path, ctx), dkeys,
+        )
+
+    jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
+    stream_path = base / "evidence" / f"{dimension}_live.stream"
+    if _exists(jsonl_path) and _stat(jsonl_path).st_size > 0:
+        return parse_violations_from_jsonl(
+            jsonl_path, stream_path, ctx, compiled_dir=compiled_dir,
+            dismissed_keys=dkeys,
+        )
+
+    if _exists(stream_path):
+        return parse_violations_from_stream(stream_path, ctx)
+
+    return None
+
+
 def resolve_dimension_eval(
     base: Path, project: str, run_id: str, dimension: str,
     options: _ResolveOptions | None = None,
@@ -87,8 +113,6 @@ def resolve_dimension_eval(
     *options* bundles injectable filesystem callbacks and the compiled
     standards directory for testing without a real FS.
     """
-    from quodeq.services.dismissed import dismissed_keys as _dismissed_keys
-
     opts = options or _ResolveOptions()
     _exists = opts.exists_fn
     _stat = opts.stat_fn
@@ -112,25 +136,7 @@ def resolve_dimension_eval(
         )
 
     ctx = ViolationContext(project=project, run_id=run_id, dimension=dimension)
-
-    evidence_path = base / "evidence" / f"{dimension}_evidence.json"
-    if _exists(evidence_path):
-        return _filter_dismissed_from_result(
-            parse_violations_from_evidence(evidence_path, ctx), dkeys,
-        )
-
-    jsonl_path = base / "evidence" / f"{dimension}_evidence.jsonl"
-    stream_path = base / "evidence" / f"{dimension}_live.stream"
-    if _exists(jsonl_path) and _stat(jsonl_path).st_size > 0:
-        return parse_violations_from_jsonl(
-            jsonl_path, stream_path, ctx, compiled_dir=compiled_dir,
-            dismissed_keys=dkeys,
-        )
-
-    if _exists(stream_path):
-        return parse_violations_from_stream(stream_path, ctx)
-
-    return None
+    return _try_evidence_formats(base, dimension, ctx, _exists, _stat, compiled_dir, dkeys)
 
 
 def aggregate_violations(dashboard: dict[str, Any]) -> ViolationSummary:

@@ -12,6 +12,8 @@ from quodeq.services.ports import RunInfo, list_runs, parse_numeric_score
 _DEFAULT_CACHE_MAX = 256
 
 # Module-level shared cache so all callers within the same process share it.
+# NOTE: get_run_dimensions() accepts injectable `cache` and `cache_lock`
+# parameters, allowing callers (and tests) to bypass this shared state.
 _cache: OrderedDict[tuple, list[DimensionResult]] = OrderedDict()
 _cache_lock = threading.Lock()
 

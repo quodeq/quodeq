@@ -8,13 +8,12 @@ from flask import Flask, Response, jsonify, request
 from quodeq.services.ports import list_runs, read_run_data
 from quodeq.services.dismissed import dismissed_keys as load_dismissed_keys
 from quodeq.services.rescore import rescore_dimensions
+from quodeq.shared.utils import get_evaluations_dir
 from quodeq.shared.validation import validate_path_segment
 
 
 def _eval_dir_from_app(app: Flask) -> str:
-    return app.config.get("EVALUATIONS_DIR") or __import__(
-        "quodeq.shared.utils", fromlist=["get_evaluations_dir"]
-    ).get_evaluations_dir()
+    return app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
 
 
 def register_rescore_routes(app: Flask) -> None:

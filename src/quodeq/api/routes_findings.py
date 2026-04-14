@@ -1,21 +1,20 @@
 """API routes for dismissing and restoring individual findings."""
 from __future__ import annotations
 
-import importlib
 from pathlib import Path
 
-from flask import Flask, Response, jsonify, request
+from flask import Flask, Response, abort, jsonify, request
 
 from quodeq.services.dismissed import dismiss_finding, load_dismissed, restore_finding, restore_all_findings
+from quodeq.shared.utils import get_evaluations_dir
+from quodeq.shared.validation import validate_path_segment
 
 
 def _project_dir(evaluations_dir: str, project: str) -> Path:
-    from quodeq.shared.validation import validate_path_segment
     validate_path_segment(project)
     base = Path(evaluations_dir).resolve()
     resolved = (base / project).resolve()
     if not resolved.is_relative_to(base):
-        from flask import abort
         abort(400, description="Invalid project path")
     return resolved
 
@@ -24,7 +23,7 @@ def register_findings_routes(app: Flask) -> None:
     """Register /api/findings/* routes."""
 
     def _eval_dir() -> str:
-        return app.config.get("EVALUATIONS_DIR") or importlib.import_module("quodeq.shared.utils").get_evaluations_dir()
+        return app.config.get("EVALUATIONS_DIR") or get_evaluations_dir()
 
     @app.get("/api/findings/dismissed")
     def list_dismissed() -> Response:

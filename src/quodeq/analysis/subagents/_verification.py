@@ -4,7 +4,19 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from copy import copy
+
 from quodeq.analysis._types import RunConfig
+from quodeq.analysis.fingerprint import find_previous_fingerprint
+from quodeq.analysis.subagents._verify_pool import run_verification_pool
+from quodeq.analysis.subagents.verify import (
+    load_previous_findings_for_dimension,
+    partition_findings_by_fingerprint,
+    write_carry_forward_findings,
+    _group_by_file,
+    _write_verify_manifest,
+)
+from quodeq.services.dismissed import dismissed_keys
 from quodeq.shared.logging import log_info, log_success
 
 
@@ -13,7 +25,6 @@ def _run_verification_pool(
     files_to_verify: list[str], manifest_path: Path,
 ) -> list[Any]:
     """Launch a fast verification pool to re-check previous findings."""
-    from quodeq.analysis.subagents._verify_pool import run_verification_pool  # deferred to avoid circular import
     return run_verification_pool(config, dim_id, evidence_dir, files_to_verify, manifest_path)
 
 
@@ -21,8 +32,6 @@ def _load_and_filter_previous(
     config: RunConfig, dim_id: str, evidence_dir: Path,
 ) -> list[dict]:
     """Load previous findings and apply incremental file filter if active."""
-    from quodeq.analysis.subagents.verify import load_previous_findings_for_dimension  # deferred to avoid circular import
-
     prev_findings = load_previous_findings_for_dimension(config, dim_id, evidence_dir)
     if not prev_findings:
         return []
@@ -30,7 +39,6 @@ def _load_and_filter_previous(
         filter_set = config.options.incremental_file_filter
         prev_findings = [f for f in prev_findings if f.get("file") in filter_set]
     # Filter out dismissed findings
-    from quodeq.services.dismissed import dismissed_keys  # deferred to avoid import at module level
     project_dir = evidence_dir.parent
     dkeys = dismissed_keys(project_dir)
     if dkeys:
@@ -45,8 +53,6 @@ def _dispatch_verification_pool(
     config: RunConfig, dim_id: str, evidence_dir: Path, needs_verify: list[dict],
 ) -> list:
     """Write manifest and launch the AI verification pool for changed-file findings."""
-    from quodeq.analysis.subagents.verify import _group_by_file, _write_verify_manifest  # deferred to avoid circular import
-
     grouped = _group_by_file(needs_verify)
     manifest_path = evidence_dir / f"{dim_id}_verify_manifest.json"
     _write_verify_manifest(grouped, manifest_path)
@@ -69,8 +75,6 @@ def _dispatch_mini_verify(
     if not findings:
         return []
 
-    from quodeq.analysis.subagents.verify import _group_by_file, _write_verify_manifest
-
     grouped = _group_by_file(findings)
     manifest_path = evidence_dir / f"{dim_id}_mini_verify_manifest.json"
     _write_verify_manifest(grouped, manifest_path)
@@ -81,7 +85,6 @@ def _dispatch_mini_verify(
 
     log_info(f"  [{dim_id}] [MINI-VERIFY] {len(findings)} findings across {n_files} changed files (not in analysis queue)")
 
-    from copy import copy
     mini_config = copy(config)
     mini_options = copy(config.options)
     mini_options.pool_budget = timeout
@@ -103,16 +106,11 @@ def _run_verification_step(
     their findings are carried forward directly to the evidence JSONL.
     Only changed-file findings are sent to the AI verification pool.
     """
-    from quodeq.analysis.subagents.verify import (  # deferred to avoid circular import
-        partition_findings_by_fingerprint, write_carry_forward_findings,
-    )
-
     prev_findings = _load_and_filter_previous(config, dim_id, evidence_dir)
     if not prev_findings:
         return []
 
     if prev_fingerprint is None:
-        from quodeq.analysis.fingerprint import find_previous_fingerprint  # deferred to avoid circular import
         prev_fingerprint, _ = find_previous_fingerprint(evidence_dir, dim_id)
         if prev_fingerprint is None:
             log_info(f"  [{dim_id}] No previous fingerprint — all findings need verification")

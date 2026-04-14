@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { browseDirectory, createDirectory } from '../../../api/index.js';
 
 function FileIcon() {
@@ -204,16 +204,16 @@ export default function FolderBrowser({ onSelect, onClose, title = 'Select Repos
   }
   const navigation = { setLoading, setNavError, updateNavState };
 
-  function navigate(path) {
+  const navigate = useCallback((path) => {
     // Prevent navigating above rootPath when rootPath is set
     if (rootPath && path && !path.startsWith(rootPath)) {
       setPathInput(rootPath);
       return;
     }
     navigateFolder(path, navigation, showFiles);
-  }
+  }, [rootPath, showFiles]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { navigate(rootPath || ''); }, [rootPath]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { navigate(rootPath || ''); }, [rootPath, navigate]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>

@@ -156,21 +156,27 @@ function PrincipleContext({ principleData }) {
   );
 }
 
-const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
-  const { principleData, principle, score, grade, dimension, project, runId } = evalPrincipal;
-  const [showAllCompliance, setShowAllCompliance] = useState(false);
+function filterBySeveritySelection(filteredBySeverity, activeSevFilter) {
+  if (!activeSevFilter || activeSevFilter === 'all') return filteredBySeverity;
+  const filtered = {};
+  for (const sev of Object.keys(filteredBySeverity)) {
+    filtered[sev] = sev === activeSevFilter ? filteredBySeverity[sev] : [];
+  }
+  return filtered;
+}
+
+function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
+  const { principle, dimension, project, runId } = evalPrincipal;
   const [dismissedSet, setDismissedSet] = useState(new Set());
   const [liveScore, setLiveScore] = useState(null);
   const [liveGrade, setLiveGrade] = useState(null);
   const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
-  const { violations, compliance, violationsBySeverity, sevCounts } = computeEvalPrincipleData(evalPrincipal);
-  const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
+  const { violations, compliance, violationsBySeverity } = computeEvalPrincipleData(evalPrincipal);
 
   const handleDismiss = useCallback((v) => {
     if (!onDismiss) return;
     onDismiss(v);
     setDismissedSet((prev) => new Set(prev).add(`${v.file}:${v.line}`));
-    // Fire rescore to update principle score/grade
     if (project && runId) {
       getRunScores(project, runId).then((rescored) => {
         const dimMap = new Map((rescored.dimensions || []).map((d) => [d.dimension, d]));
@@ -183,7 +189,6 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
     }
   }, [onDismiss, project, runId, dimension, principle]);
 
-  // Filter dismissed violations and recompute derived stats
   const { filteredBySeverity, filteredViolations, liveSevCounts } = useMemo(() => {
     const bySev = {};
     for (const sev of Object.keys(violationsBySeverity)) {
@@ -197,15 +202,29 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
     return { filteredBySeverity: bySev, filteredViolations: allFiltered, liveSevCounts: counts };
   }, [violationsBySeverity, dismissedSet]);
 
-  // Apply active severity filter
-  const displayedBySeverity = useMemo(() => {
-    if (!activeSevFilter || activeSevFilter === 'all') return filteredBySeverity;
-    const filtered = {};
-    for (const sev of Object.keys(filteredBySeverity)) {
-      filtered[sev] = sev === activeSevFilter ? filteredBySeverity[sev] : [];
-    }
-    return filtered;
-  }, [filteredBySeverity, activeSevFilter]);
+  const displayedBySeverity = useMemo(
+    () => filterBySeveritySelection(filteredBySeverity, activeSevFilter),
+    [filteredBySeverity, activeSevFilter]
+  );
+
+  return {
+    violations, compliance, violationsBySeverity,
+    liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
+    handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
+  };
+}
+
+const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
+  const { principleData, principle, score, grade } = evalPrincipal;
+  const [showAllCompliance, setShowAllCompliance] = useState(false);
+
+  const {
+    violations, compliance, violationsBySeverity,
+    liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
+    handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
+  } = usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss);
+
+  const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
 
   return (
     <>

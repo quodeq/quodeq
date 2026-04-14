@@ -1,6 +1,8 @@
+import { useState, useEffect, useRef } from 'react';
 import EvaluationForm from './EvaluationForm.jsx';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 const INITIAL_ANIM_DELAY = '0s';
 const CHIP_DELAY_1 = '0.55s';
@@ -38,8 +40,6 @@ function EvaluateHelpSection() {
     </div>
   );
 }
-
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 function ActiveProviderBadge() {
   const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
@@ -88,8 +88,6 @@ function EvaluateHeader({ isRunning }) {
     </header>
   );
 }
-
-import { useState, useEffect, useRef } from 'react';
 
 function ErrorToast({ message, onDismiss }) {
   useEffect(() => {

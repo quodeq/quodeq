@@ -1,3 +1,8 @@
+import { DEFAULT_POOL_BUDGET } from '../../../constants.js';
+
+const SECONDS_PER_MINUTE = 60;
+const DEFAULT_TIME_LIMIT_MINUTES = '10';
+
 export function TimeLimitSetting({ state, update }) {
   const poolBudget = parseInt(state['pool-budget'] || '0', 10);
   const unlimited = poolBudget === 0;
@@ -11,17 +16,17 @@ export function TimeLimitSetting({ state, update }) {
       <div className="settings-budget-control">
         <div className="theme-toggle">
           <button type="button" className={`theme-toggle-btn${unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', '0')}>Unlimited</button>
-          <button type="button" className={`theme-toggle-btn${!unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', '600')}>Limited</button>
+          <button type="button" className={`theme-toggle-btn${!unlimited ? ' active' : ''}`} onClick={() => update('pool-budget', String(DEFAULT_POOL_BUDGET))}>Limited</button>
         </div>
         <input
           type="number"
           className="settings-model-input"
           min={1}
-          max={60}
-          value={unlimited ? '' : Math.round(poolBudget / 60)}
+          max={SECONDS_PER_MINUTE}
+          value={unlimited ? '' : Math.round(poolBudget / SECONDS_PER_MINUTE)}
           placeholder={unlimited ? '\u221E' : 'min'}
           disabled={unlimited}
-          onChange={(e) => update('pool-budget', String(parseInt(e.target.value || '10', 10) * 60))}
+          onChange={(e) => update('pool-budget', String(parseInt(e.target.value || DEFAULT_TIME_LIMIT_MINUTES, 10) * SECONDS_PER_MINUTE))}
         />
       </div>
     </div>

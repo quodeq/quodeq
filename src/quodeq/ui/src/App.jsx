@@ -117,47 +117,49 @@ function buildEvalPrincipal(principleObj, principleGrade) {
   };
 }
 
+function ViolationsRoute({ params, props }) {
+  const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
+  const dims = acc?.dimensions || [];
+  const nav = props.navigation.handleNavigate;
+
+  const dimMap = new Map(dims.map(d => [d.dimension, d]));
+  function navigateToPrinciple(principleObj, severity) {
+    const dim = dimMap.get(principleObj.dimension);
+    const pg = (dim?.principles || []).find(p => (p.name || p.principle) === principleObj.principle);
+    nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
+  }
+
+  function navigateToDimension(row, severity) {
+    const dim = row.raw || dims.find(d => d.dimension === row.dimension);
+    if (!dim) return;
+    nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, severity, sourceTab: 'violations' });
+  }
+
+  return (
+    <ViolationsPage
+      data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
+      callbacks={{
+        onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
+        onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
+        onCellClick: ({ row, severity }) => {
+          if (row.type === 'principle' && row.principleObj) {
+            navigateToPrinciple(row.principleObj, severity);
+          } else {
+            navigateToDimension(row, severity);
+          }
+        },
+        onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
+        onRefresh: props.refreshDashboard,
+      }}
+      isDirectNav={props.navigation.navStackLength === 1}
+      tabKey={params._tabKey || 0}
+    />
+  );
+}
+
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
-  violations: (params, props) => {
-    const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
-    const dims = acc?.dimensions || [];
-    const nav = props.navigation.handleNavigate;
-
-    const dimMap = new Map(dims.map(d => [d.dimension, d]));
-    function navigateToPrinciple(principleObj, severity) {
-      const dim = dimMap.get(principleObj.dimension);
-      const pg = (dim?.principles || []).find(p => (p.name || p.principle) === principleObj.principle);
-      nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
-    }
-
-    function navigateToDimension(row, severity) {
-      const dim = row.raw || dims.find(d => d.dimension === row.dimension);
-      if (!dim) return;
-      nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, severity, sourceTab: 'violations' });
-    }
-
-    return (
-      <ViolationsPage
-        data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
-        callbacks={{
-          onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
-          onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
-          onCellClick: ({ row, severity }) => {
-            if (row.type === 'principle' && row.principleObj) {
-              navigateToPrinciple(row.principleObj, severity);
-            } else {
-              navigateToDimension(row, severity);
-            }
-          },
-          onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
-          onRefresh: props.refreshDashboard,
-        }}
-        isDirectNav={props.navigation.navStackLength === 1}
-        tabKey={params._tabKey || 0}
-      />
-    );
-  },
+  violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const isDirectNav = props.navigation.navStackLength === 1;

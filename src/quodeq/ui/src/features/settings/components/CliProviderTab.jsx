@@ -1,8 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { getKnownModels } from '../../../api/index.js';
+import { MIN_SUBAGENTS, MAX_SUBAGENTS, DEFAULT_SUBAGENTS } from '../../../constants.js';
 import PowerSelector from '../../evaluation/components/PowerSelector.jsx';
 import { STORAGE_KEY as POWER_KEY } from '../../evaluation/components/powerLevels.js';
 import { TimeLimitSetting, AdvancedAnalysisSettings } from './ProviderSettings.jsx';
+
+const DEFAULT_POWER_LEVEL = 2;
 
 function ModelSuggestInput({ label, value, suggestions, placeholder, onChange, required }) {
   return (
@@ -26,7 +29,7 @@ function ModelSuggestInput({ label, value, suggestions, placeholder, onChange, r
 export default function CliProviderTab({ providerId, state, update }) {
   const [suggestions, setSuggestions] = useState([]);
   const [power, setPower] = useState(() => {
-    try { return Number(localStorage.getItem(POWER_KEY)) || 2; } catch { return 2; }
+    try { return Number(localStorage.getItem(POWER_KEY)) || DEFAULT_POWER_LEVEL; } catch { return DEFAULT_POWER_LEVEL; }
   });
 
   function persistPower(level) {
@@ -70,10 +73,10 @@ export default function CliProviderTab({ providerId, state, update }) {
         <input
           type="number"
           className="settings-model-input"
-          min={1}
-          max={10}
-          value={parseInt(state.subagents || '5', 10)}
-          onBlur={(e) => update('subagents', Math.max(1, Math.min(10, parseInt(e.target.value, 10) || 5)))}
+          min={MIN_SUBAGENTS}
+          max={MAX_SUBAGENTS}
+          value={parseInt(state.subagents || String(DEFAULT_SUBAGENTS), 10)}
+          onBlur={(e) => update('subagents', Math.max(MIN_SUBAGENTS, Math.min(MAX_SUBAGENTS, parseInt(e.target.value, 10) || DEFAULT_SUBAGENTS)))}
           onChange={(e) => update('subagents', e.target.value)}
         />
       </div>

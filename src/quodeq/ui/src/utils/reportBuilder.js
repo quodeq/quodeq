@@ -2,6 +2,7 @@
 import { SEVERITY_ORDER } from './formatters.js';
 
 const SNIPPET_MAX_LINES = 5;
+const MAX_TOP_FILES = 15;
 
 function formatDate() {
   const d = new Date();
@@ -63,7 +64,46 @@ function groupBySeverity(violations) {
   return groups;
 }
 
-export function buildDimensionReport(evalData, principleGrades, allViolations, overallGrade, dateLabel, runId) {
+function buildViolationsSection(allViolations) {
+  const lines = [];
+  const bySeverity = groupBySeverity(allViolations);
+  lines.push(`## Violations (${allViolations.length})`);
+  lines.push('');
+  if (allViolations.length === 0) {
+    lines.push('No violations found.');
+    lines.push('');
+  } else {
+    for (const sev of SEVERITY_ORDER) {
+      const vs = bySeverity[sev];
+      if (!vs || vs.length === 0) continue;
+      lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
+      lines.push('');
+      for (const v of vs) lines.push(formatViolationEntry(v));
+    }
+  }
+  return lines;
+}
+
+function buildComplianceSection(compliance) {
+  const lines = [];
+  if (compliance.length === 0) return lines;
+  const byPrinciple = {};
+  for (const c of compliance) {
+    const p = c.principle || 'Other';
+    byPrinciple[p] = (byPrinciple[p] || 0) + 1;
+  }
+  lines.push(`## Compliance Summary (${compliance.length})`);
+  lines.push('');
+  lines.push('| Principle | Count |');
+  lines.push('|-----------|-------|');
+  for (const [p, count] of Object.entries(byPrinciple).sort((a, b) => b[1] - a[1])) {
+    lines.push(`| ${p} | ${count} |`);
+  }
+  lines.push('');
+  return lines;
+}
+
+export function buildDimensionReport({ evalData, principleGrades, allViolations, overallGrade, dateLabel, runId }) {
   const dim = evalData?.dimension || 'Unknown';
   const dimTitle = dim.charAt(0).toUpperCase() + dim.slice(1);
   const score = overallGrade?.score || '—';
@@ -85,37 +125,8 @@ export function buildDimensionReport(evalData, principleGrades, allViolations, o
     lines.push('');
   }
 
-  const bySeverity = groupBySeverity(allViolations);
-  lines.push(`## Violations (${allViolations.length})`);
-  lines.push('');
-  if (allViolations.length === 0) {
-    lines.push('No violations found.');
-    lines.push('');
-  } else {
-    for (const sev of SEVERITY_ORDER) {
-      const vs = bySeverity[sev];
-      if (!vs || vs.length === 0) continue;
-      lines.push(`### ${sev.charAt(0).toUpperCase() + sev.slice(1)} (${vs.length})`);
-      lines.push('');
-      for (const v of vs) lines.push(formatViolationEntry(v));
-    }
-  }
-
-  if (compliance.length > 0) {
-    const byPrinciple = {};
-    for (const c of compliance) {
-      const p = c.principle || 'Other';
-      byPrinciple[p] = (byPrinciple[p] || 0) + 1;
-    }
-    lines.push(`## Compliance Summary (${compliance.length})`);
-    lines.push('');
-    lines.push('| Principle | Count |');
-    lines.push('|-----------|-------|');
-    for (const [p, count] of Object.entries(byPrinciple).sort((a, b) => b[1] - a[1])) {
-      lines.push(`| ${p} | ${count} |`);
-    }
-    lines.push('');
-  }
+  lines.push(...buildViolationsSection(allViolations));
+  lines.push(...buildComplianceSection(compliance));
 
   if (evalData?.partial) {
     lines.push('> **Note:** Evaluation in progress — results may be incomplete.');
@@ -125,35 +136,26 @@ export function buildDimensionReport(evalData, principleGrades, allViolations, o
   return lines.join('\n');
 }
 
-export function buildOverviewReport(accumulated, accumulatedDimensions, projectName) {
-  const summary = accumulated?.summary || {};
-  const score = summary.numericAverage != null ? `${Math.round(summary.numericAverage * 10) / 10}/10` : '—';
-  const grade = summary.overallGrade || '—';
-  const date = formatDate();
-  const project = projectName || 'Project';
-
+function buildDimensionSummaryTable(accumulatedDimensions) {
   const lines = [];
-  lines.push(`# Code Quality Report — ${project}`);
+  if (accumulatedDimensions.length === 0) return lines;
+  lines.push('## Dimensions');
   lines.push('');
-  lines.push(`**Date:** ${date} · **Overall Score:** ${score} ${grade}`);
-  lines.push('');
-
-  if (accumulatedDimensions.length > 0) {
-    lines.push('## Dimensions');
-    lines.push('');
-    lines.push('| Dimension | Score | Grade | Violations | Compliance |');
-    lines.push('|-----------|-------|-------|------------|------------|');
-    for (const dim of accumulatedDimensions) {
-      const name = (dim.dimension || '—').charAt(0).toUpperCase() + (dim.dimension || '').slice(1);
-      const dScore = dim.overallScore || '—';
-      const dGrade = dim.overallGrade || '—';
-      const vCount = (dim.violations || []).length;
-      const cCount = (dim.compliance || []).length;
-      lines.push(`| ${name} | ${dScore} | ${dGrade} | ${vCount} | ${cCount} |`);
-    }
-    lines.push('');
+  lines.push('| Dimension | Score | Grade | Violations | Compliance |');
+  lines.push('|-----------|-------|-------|------------|------------|');
+  for (const dim of accumulatedDimensions) {
+    const name = (dim.dimension || '—').charAt(0).toUpperCase() + (dim.dimension || '').slice(1);
+    const dScore = dim.overallScore || '—';
+    const dGrade = dim.overallGrade || '—';
+    const vCount = (dim.violations || []).length;
+    const cCount = (dim.compliance || []).length;
+    lines.push(`| ${name} | ${dScore} | ${dGrade} | ${vCount} | ${cCount} |`);
   }
+  lines.push('');
+  return lines;
+}
 
+function buildTopOffendingFiles(accumulatedDimensions) {
   const fileMap = {};
   for (const dim of accumulatedDimensions) {
     for (const v of (dim.violations || [])) {
@@ -165,18 +167,22 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
       if (fileMap[f][s] !== undefined) fileMap[f][s]++;
     }
   }
-  const topFiles = Object.entries(fileMap).sort((a, b) => b[1].count - a[1].count).slice(0, 15);
-  if (topFiles.length > 0) {
-    lines.push('## Top Offending Files');
-    lines.push('');
-    lines.push('| File | Violations | Critical | Major | Minor |');
-    lines.push('|------|-----------|----------|-------|-------|');
-    for (const [file, stats] of topFiles) {
-      lines.push(`| \`${file}\` | ${stats.count} | ${stats.critical} | ${stats.major} | ${stats.minor} |`);
-    }
-    lines.push('');
+  const topFiles = Object.entries(fileMap).sort((a, b) => b[1].count - a[1].count).slice(0, MAX_TOP_FILES);
+  if (topFiles.length === 0) return [];
+  const lines = [];
+  lines.push('## Top Offending Files');
+  lines.push('');
+  lines.push('| File | Violations | Critical | Major | Minor |');
+  lines.push('|------|-----------|----------|-------|-------|');
+  for (const [file, stats] of topFiles) {
+    lines.push(`| \`${file}\` | ${stats.count} | ${stats.critical} | ${stats.major} | ${stats.minor} |`);
   }
+  lines.push('');
+  return lines;
+}
 
+function buildCritMajorSection(accumulatedDimensions) {
+  const lines = [];
   const critMajor = [];
   for (const dim of accumulatedDimensions) {
     const vs = (dim.violations || []).filter((v) => v.severity === 'critical' || v.severity === 'major');
@@ -198,8 +204,12 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
     lines.push('No critical or major violations found.');
     lines.push('');
   }
+  return lines;
+}
 
+function buildOverviewSummarySection(summary, accumulatedDimensions) {
   const sev = summary.severity || {};
+  const lines = [];
   lines.push('## Summary');
   lines.push('');
   lines.push(`- **${accumulatedDimensions.length}** dimensions evaluated`);
@@ -210,6 +220,26 @@ export function buildOverviewReport(accumulated, accumulatedDimensions, projectN
     : '—';
   lines.push(`- **Ratio:** ${ratio}`);
   lines.push('');
+  return lines;
+}
+
+export function buildOverviewReport(accumulated, accumulatedDimensions, projectName) {
+  const summary = accumulated?.summary || {};
+  const score = summary.numericAverage != null ? `${Math.round(summary.numericAverage * 10) / 10}/10` : '—';
+  const grade = summary.overallGrade || '—';
+  const date = formatDate();
+  const project = projectName || 'Project';
+
+  const lines = [];
+  lines.push(`# Code Quality Report — ${project}`);
+  lines.push('');
+  lines.push(`**Date:** ${date} · **Overall Score:** ${score} ${grade}`);
+  lines.push('');
+
+  lines.push(...buildDimensionSummaryTable(accumulatedDimensions));
+  lines.push(...buildTopOffendingFiles(accumulatedDimensions));
+  lines.push(...buildCritMajorSection(accumulatedDimensions));
+  lines.push(...buildOverviewSummarySection(summary, accumulatedDimensions));
 
   return lines.join('\n');
 }

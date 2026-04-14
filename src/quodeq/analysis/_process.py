@@ -26,7 +26,7 @@ def _kill_tree(pid: int, sig: int = signal.SIGTERM) -> None:
         # taskkill /T kills the entire process tree
         subprocess.run(
             ["taskkill", "/F", "/T", "/PID", str(pid)],
-            capture_output=True, timeout=10,
+            capture_output=True, timeout=_TERMINATE_TIMEOUT_S,
         )
     else:
         try:

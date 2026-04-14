@@ -1,124 +1,24 @@
 """PyWebView window process — launched as a subprocess by _server.py."""
 from __future__ import annotations
 
-import json
+import html as _html
 import os
 import signal
 import sys
 import threading
+import urllib.request
+import webbrowser
 from pathlib import Path
 
 import webview
 
 from quodeq.dashboard._build_npm import _quodeq_dir
 from quodeq.dashboard._instance import InstanceController
+from quodeq.dashboard._webview_html import INJECT_JS, CLOSING_OVERLAY_JS
 
-_CONTROLS_MAC = """\
-<style>
-  .qd-traffic {
-    position: fixed;
-    top: 0;
-    left: 0;
-    display: flex;
-    gap: 6px;
-    z-index: 99999;
-    padding: 12px 11px;
-    pointer-events: auto;
-  }
-  .qd-traffic::after {
-    content: "";
-    position: absolute;
-    top: 0; left: 0;
-    width: 64px; height: 100%;
-    z-index: -1;
-  }
-  .qd-dot {
-    width: 10px; height: 10px;
-    border-radius: 50%;
-    border: none;
-    cursor: pointer;
-    transition: background 0.2s;
-    padding: 0;
-    background: var(--color-text-muted, #484f58);
-    opacity: 0.4;
-  }
-  .qd-traffic:hover .qd-dot,
-  body:has(.sidebar:hover) .qd-dot { opacity: 1; }
-  .qd-traffic:hover .qd-dot--close,
-  body:has(.sidebar:hover) .qd-dot--close { background: #ff5f57; }
-  .qd-traffic:hover .qd-dot--minimize,
-  body:has(.sidebar:hover) .qd-dot--minimize { background: #febc2e; }
-  .qd-traffic:hover .qd-dot--maximize,
-  body:has(.sidebar:hover) .qd-dot--maximize { background: #28c840; }
-  .sidebar { padding-top: 26px !important; }
-  body:has(.qd-traffic:hover) .app-shell {
-    grid-template-columns: var(--sidebar-expanded-width) 1fr;
-  }
-  body:has(.qd-traffic:hover) .sidebar {
-    width: var(--sidebar-expanded-width);
-  }
-  body:has(.qd-traffic:hover) .sidebar-brand-text {
-    opacity: 1;
-  }
-  body:has(.qd-traffic:hover) .sidebar-nav-label {
-    opacity: 1;
-  }
-</style>
-<div class="qd-traffic">
-  <button class="qd-dot qd-dot--close" title="Close" onclick="pywebview.api.close()"></button>
-  <button class="qd-dot qd-dot--minimize" title="Minimize" onclick="pywebview.api.minimize()"></button>
-  <button class="qd-dot qd-dot--maximize" title="Fullscreen" onclick="pywebview.api.maximize()"></button>
-</div>"""
-
-_CONTROLS_WIN = """\
-<style>
-  .qd-winbtns {
-    position: fixed;
-    top: 0;
-    right: 0;
-    display: flex;
-    z-index: 99999;
-  }
-  .qd-winbtn {
-    width: 46px; height: 32px;
-    border: none;
-    background: transparent;
-    color: var(--color-text-muted, #888);
-    cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    transition: background 0.1s;
-  }
-  .qd-winbtn:hover { background: var(--color-surface-alt, rgba(255,255,255,0.1)); }
-  .qd-winbtn--close:hover { background: #e81123; color: #fff; }
-  body { padding-top: 32px !important; }
-</style>
-<div class="qd-winbtns">
-  <button class="qd-winbtn" title="Minimize" onclick="pywebview.api.minimize()">&#x2013;</button>
-  <button class="qd-winbtn" title="Maximize" onclick="pywebview.api.maximize()">&#x2610;</button>
-  <button class="qd-winbtn qd-winbtn--close" title="Close" onclick="pywebview.api.close()">&#x2715;</button>
-</div>"""
-
-_CONTROLS_HTML = _CONTROLS_WIN if sys.platform == "win32" else _CONTROLS_MAC
-
-_CONTROLS_JS = """\
-(function() {
-  if (document.querySelector('.qd-traffic')) return;
-  var d = document.createElement('div');
-  d.innerHTML = %s;
-  while (d.firstChild) document.body.insertBefore(d.firstChild, document.body.firstChild);
-
-  document.addEventListener('keydown', function(e) {
-    var mod = navigator.platform.indexOf('Mac') >= 0 ? e.metaKey : e.ctrlKey;
-    if (mod && e.key === '[') { e.preventDefault(); history.back(); }
-    if (mod && e.key === ']') { e.preventDefault(); history.forward(); }
-  });
-})();
-"""
-
-_INJECT_JS = _CONTROLS_JS % json.dumps(_CONTROLS_HTML)
+_WINDOW_WIDTH = 1280
+_WINDOW_HEIGHT = 800
+_WINDOW_BG_COLOR = '#0d1117'
 
 
 class _WindowApi:
@@ -138,21 +38,11 @@ class _WindowApi:
         self._instance = instance
         self._base_url = base_url.rstrip('/')
 
-    _CLOSING_OVERLAY_JS = """
-        (function() {
-            var d = document.createElement('div');
-            d.style.cssText = 'position:fixed;inset:0;z-index:999999;background:rgba(0,0,0,0.6);display:flex;align-items:center;justify-content:center;pointer-events:all';
-            d.innerHTML = '<div style="color:var(--color-text-muted,#8b949e);font-family:inherit;font-size:0.95rem;text-align:center">'
-                + '<div style="margin-bottom:10px;opacity:0.7">Closing...</div></div>';
-            document.body.appendChild(d);
-        })()
-    """
-
     def close(self) -> None:
         # Show closing overlay immediately so the user sees feedback
         if self._window:
             try:
-                self._window.evaluate_js(self._CLOSING_OVERLAY_JS)
+                self._window.evaluate_js(CLOSING_OVERLAY_JS)
             except Exception:
                 pass
 
@@ -182,13 +72,11 @@ class _WindowApi:
     def _get_running_evaluation(self) -> dict | None:
         """Return the first running evaluation job, or None."""
         try:
-            import urllib.request
-            import json as _json
             url = self._window.get_current_url().split("#")[0].rstrip("/")
             base = url.rsplit("/", 1)[0] if "/" in url.lstrip("http") else url
             req = urllib.request.Request(f"{base}/api/evaluations")
             with urllib.request.urlopen(req, timeout=0.5) as resp:
-                jobs = _json.loads(resp.read())
+                jobs = json.loads(resp.read())
                 for j in (jobs if isinstance(jobs, list) else []):
                     if j.get("status") == "running":
                         return j
@@ -199,7 +87,6 @@ class _WindowApi:
     @staticmethod
     def _build_close_dialog_js(job: dict) -> str:
         """Build JS for the close confirmation dialog with job info."""
-        import html as _html
         phase = _html.escape(job.get("phase", "analyzing"))
         dim = _html.escape(job.get("currentDimension", ""))
         repo = _html.escape(job.get("repo", ""))
@@ -239,7 +126,6 @@ class _WindowApi:
 
     def open_browser(self, path: str = '/') -> None:
         """Open a URL in the system default browser."""
-        import webbrowser
         url = self._base_url + path if self._base_url else path
         webbrowser.open(url)
 
@@ -259,7 +145,6 @@ class _WindowApi:
         if not save_path:
             return False
         try:
-            import urllib.request
             url = self._base_url + path
             with urllib.request.urlopen(url, timeout=120) as resp:
                 Path(save_path).write_bytes(resp.read())
@@ -366,9 +251,9 @@ def main() -> None:
     instance = InstanceController(sock_path)
     api = _WindowApi()
 
-    window = webview.create_window("quodeq", url, width=1280, height=800,
+    window = webview.create_window("quodeq", url, width=_WINDOW_WIDTH, height=_WINDOW_HEIGHT,
                                     frameless=True, easy_drag=True,
-                                    background_color='#0d1117', hidden=True,
+                                    background_color=_WINDOW_BG_COLOR, hidden=True,
                                     js_api=api)
     api.bind(window, api_pid=api_pid, instance=instance, base_url=url)
 
@@ -379,7 +264,7 @@ def main() -> None:
 
     def _on_loaded() -> None:
         window.show()
-        window.evaluate_js(_INJECT_JS)
+        window.evaluate_js(INJECT_JS)
 
     window.events.loaded += _on_loaded
 

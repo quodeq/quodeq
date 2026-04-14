@@ -13,10 +13,12 @@ _TYPE_BUILTIN = "builtin"
 
 
 def default_read_json(path: Path) -> dict:
+    """Read and parse a JSON file from disk."""
     return json.loads(path.read_text())
 
 
 def default_write_json(path: Path, data: dict) -> None:
+    """Serialize *data* as pretty-printed JSON and write it to *path*."""
     path.write_text(json.dumps(data, indent=2))
 
 
@@ -27,6 +29,7 @@ def count_principles_and_requirements(data: dict) -> tuple[int, int]:
 
 
 def build_detail(data: dict, *, type_default: str = _TYPE_CUSTOM) -> StandardDetail:
+    """Construct a StandardDetail from a raw JSON dict."""
     return StandardDetail(
         id=data["id"], name=data.get("name", data["id"]),
         description=data.get("description", ""),
@@ -49,6 +52,7 @@ def build_builtin_detail(data: dict, standard_id: str, weight: float) -> Standar
 
 
 def build_custom_meta(data: dict, p_count: int, r_count: int) -> StandardMeta:
+    """Build a StandardMeta for a user-created custom standard."""
     return StandardMeta(
         id=data["id"], name=data.get("name", data["id"]),
         description=data.get("description", ""),
@@ -60,6 +64,7 @@ def build_custom_meta(data: dict, p_count: int, r_count: int) -> StandardMeta:
 
 
 def build_builtin_meta(dim: dict, p_count: int, r_count: int) -> StandardMeta:
+    """Build a StandardMeta for a built-in dimension."""
     return StandardMeta(
         id=dim["id"], name=dim.get("iso_25010") or dim.get("name", dim["id"]),
         description=f'{dim.get("source", "Built-in")} standard',
@@ -71,6 +76,7 @@ def build_builtin_meta(dim: dict, p_count: int, r_count: int) -> StandardMeta:
 
 
 def get_builtin_weight(dimensions_data: dict, dimension_id: str) -> float:
+    """Return the weight of a built-in dimension, defaulting to 1.0."""
     for dim in dimensions_data.get("applies", []):
         if dim["id"] == dimension_id:
             return dim.get("weight", 1.0)
@@ -78,10 +84,12 @@ def get_builtin_weight(dimensions_data: dict, dimension_id: str) -> float:
 
 
 def is_builtin_id(dimensions_data: dict, standard_id: str) -> bool:
+    """Check whether *standard_id* corresponds to a built-in dimension."""
     return any(dim["id"] == standard_id for dim in dimensions_data.get("applies", []))
 
 
 def load_cwe_entries(entries: list) -> list[dict]:
+    """Normalize raw CWE entries into a list of slim dicts."""
     return [{"id": e["id"], "name": e["name"],
              "abstraction": e.get("abstraction", ""), "dimensions": e.get("dimensions", [])}
             for e in entries]

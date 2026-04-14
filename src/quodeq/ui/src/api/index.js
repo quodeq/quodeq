@@ -199,15 +199,18 @@ export function getClientModels(clientId) {
 
 // ── LLM Bridge ─────────────────────────────────────────────────────────
 
+/** @returns {Promise<Object>} Ollama connection status */
 export function getOllamaStatus() {
   return request('/ollama/status');
 }
 
+/** @returns {Promise<Object[]>} Available Ollama models */
 export async function getOllamaModels() {
   const data = await request('/ollama/models');
   return data?.models ?? [];
 }
 
+/** @returns {Promise<Object>} Concurrency test results for the given model */
 export function testOllamaConcurrency(model) {
   return request('/ollama/test-concurrency', {
     method: 'POST',
@@ -215,6 +218,7 @@ export function testOllamaConcurrency(model) {
   });
 }
 
+/** @returns {Promise<Object>} Connection test result for the provider */
 export function testProviderConnection({ apiBase, model, apiKey }) {
   return request('/provider/test', {
     method: 'POST',
@@ -222,14 +226,17 @@ export function testProviderConnection({ apiBase, model, apiKey }) {
   });
 }
 
+/** @returns {Promise<Object[]>} Known model definitions */
 export function getKnownModels() {
   return request('/known-models');
 }
 
+/** @returns {Promise<Object[]>} Saved provider configurations */
 export function getProviderConfigs() {
   return request('/provider-configs');
 }
 
+/** @returns {Promise<Object>} Scan results for the given directory path */
 export function scanPath(dirPath) {
   return request('/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: dirPath }) });
 }
