@@ -44,14 +44,15 @@ def _hash_file(path: Path) -> str | None:
 
 
 def _hash_standards(standards_dir: Path, dimension: str) -> str | None:
-    """SHA-256 of the compiled standards JSON for a dimension."""
+    """SHA-256 of the compiled standards JSON for a dimension.
+
+    Uses the same chunked hashing approach as ``_hash_file`` to avoid
+    reading the entire file into memory at once.
+    """
     compiled = standards_dir / "compiled" / f"{dimension}.json"
     if not compiled.exists():
         return None
-    try:
-        return hashlib.sha256(compiled.read_bytes()).hexdigest()
-    except OSError:
-        return None
+    return _hash_file(compiled)
 
 
 def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir: Path | None, *, analyzed_files: set[str] | None = None) -> dict:

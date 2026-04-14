@@ -171,7 +171,7 @@ function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
   const [liveScore, setLiveScore] = useState(null);
   const [liveGrade, setLiveGrade] = useState(null);
   const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
-  const { violations, compliance, violationsBySeverity } = computeEvalPrincipleData(evalPrincipal);
+  const { violations, compliance, violationsBySeverity } = useMemo(() => computeEvalPrincipleData(evalPrincipal), [evalPrincipal]);
 
   const handleDismiss = useCallback((v) => {
     if (!onDismiss) return;

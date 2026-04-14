@@ -62,11 +62,12 @@ function useDerivedExplorerStats(evalData, allViolations) {
 function mergeRescoreIntoEval(prev, dimData) {
   if (!prev || !dimData) return prev;
   const rescPrinciples = dimData.principles || [];
+  const rescMap = new Map(rescPrinciples.map(rp => [rp.principle, rp]));
   const updatedGrades = (prev.principleGrades || []).map((pg) => {
     if (pg.isOverall || pg.principle?.includes('Overall')) {
       return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
     }
-    const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
+    const match = rescMap.get(pg.principle);
     return match ? { ...pg, score: match.score, grade: match.grade } : pg;
   });
   // Build set of dismissed violation keys for filtering

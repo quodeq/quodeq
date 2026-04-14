@@ -30,11 +30,12 @@ export function layoutChildren(node) {
   const resolved = ch.map(c => unwrapLeaf(c));
   const folders = resolved.filter(c => !c.isFile && c.children && c.children.length > 0);
   const files = resolved.filter(c => c.isFile || !c.children || c.children.length === 0);
+  const folderSet = new Set(folders);
   const all = [...folders, ...files];
   const rng = seededRng(seedHash(fingerprint(node)));
   return all.map(child => ({
     child,
-    isFolder: folders.includes(child),
+    isFolder: folderSet.has(child),
     angle: rng() * TAU,
     dist: rng(),
   }));

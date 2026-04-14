@@ -83,11 +83,13 @@ function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick, tr
 }
 
 function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionClick, trendDeltas }) {
+  const sorted = useMemo(
+    () => [...dimensions].sort((a, b) => a.dimension.localeCompare(b.dimension)),
+    [dimensions]
+  );
   return (
     <div className="dimensions-grid">
-      {[...dimensions]
-        .sort((a, b) => a.dimension.localeCompare(b.dimension))
-        .map((item) => (
+      {sorted.map((item) => (
           <RunDimensionCard key={item.dimension} item={item} selectedRunId={selectedRunId} dateLabel={dateLabel} onDimensionClick={onDimensionClick} trendDelta={trendDeltas?.[(item.dimension || '').toLowerCase()]} />
         ))}
     </div>

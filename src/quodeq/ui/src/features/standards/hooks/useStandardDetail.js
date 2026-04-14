@@ -54,6 +54,10 @@ function useTreeMutations(setStandard, setDirty, setSelectedNode) {
 function useStandardMutations(standard, setStandard, setDirty, standardId, isNew) {
   const [selectedNode, setSelectedNode] = useState(null);
 
+  // Deep clone is required here to ensure React detects state changes via
+  // referential inequality across the entire nested standard tree (principles
+  // -> requirements). The tree is small (typically <50 nodes), so JSON
+  // round-trip cost is negligible.
   const updateField = useCallback((path, value) => {
     setStandard((prev) => {
       const next = deepClone(prev);

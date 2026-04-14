@@ -106,6 +106,8 @@ function BubbleGroup({ points, px, py, br, entered, showLabels, tip, setTip, onD
           const estW = child.name.length * fs * LABEL_CHAR_WIDTH_FACTOR;
           const estH = fs + 2;
           const box = { x: cx - estW / 2, y: labelY - estH, w: estW, h: estH };
+          // O(n^2) collision check is acceptable here: LABEL_PLACED_CAP limits
+          // placed labels to 100 entries, so worst case is ~5,000 comparisons.
           const overlaps = placed.some((p) =>
             box.x < p.x + p.w && box.x + box.w > p.x &&
             box.y < p.y + p.h && box.y + box.h > p.y

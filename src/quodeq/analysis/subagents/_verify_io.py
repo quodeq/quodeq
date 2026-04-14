@@ -44,10 +44,13 @@ def _parse_finding_line(line: str) -> dict | None:
 def _load_previous_findings(
     jsonl_path: Path,
     open_fn: Callable[[Path], Any] | None = None,
+    *,
+    limit: int = 0,
 ) -> list[dict]:
-    """Load all findings from a JSONL file.
+    """Load findings from a JSONL file.
 
     *open_fn* is an injectable file opener (defaults to ``open_text``).
+    *limit* caps the number of findings returned (0 = unlimited).
     """
     if not jsonl_path.exists():
         return []
@@ -59,6 +62,8 @@ def _load_previous_findings(
                 entry = _parse_finding_line(line)
                 if entry is not None:
                     findings.append(entry)
+                    if limit and len(findings) >= limit:
+                        break
         return findings
     except OSError as exc:
         log_debug(f"Cannot read findings JSONL {jsonl_path}: {exc}")

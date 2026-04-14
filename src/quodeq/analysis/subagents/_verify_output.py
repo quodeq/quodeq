@@ -26,8 +26,8 @@ def write_carry_forward_findings(
         return 0
     output = evidence_dir / f"{dim_id}_evidence.jsonl"
     if write_fn:
-        text = "".join(json.dumps(finding) + "\n" for finding in findings)
-        write_fn(output, text)
+        for finding in findings:
+            write_fn(output, json.dumps(finding) + "\n")
     else:
         output.parent.mkdir(parents=True, exist_ok=True)
         with open(output, "a") as f:

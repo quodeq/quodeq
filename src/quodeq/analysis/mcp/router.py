@@ -65,6 +65,10 @@ def _locked_write(fh: TextIO, line: str) -> None:
             use_lock = False
     try:
         fh.write(line)
+        # Per-line flush is intentional: sibling MCP server processes share
+        # the same JSONL output file.  Flushing while the exclusive lock is
+        # held guarantees that data reaches disk before the lock is released,
+        # preventing data loss on crash and partial-write interleaving.
         fh.flush()
     finally:
         if use_lock:

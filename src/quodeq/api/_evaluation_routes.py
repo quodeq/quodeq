@@ -27,7 +27,9 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
 
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
-        return jsonify([to_camel_dict(j) for j in provider.list_evaluations()])
+        limit = request.args.get("limit", 0, type=int)
+        items = provider.list_evaluations(limit=limit)
+        return jsonify([to_camel_dict(j) for j in items])
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:

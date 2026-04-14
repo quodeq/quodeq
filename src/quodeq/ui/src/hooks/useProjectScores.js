@@ -13,6 +13,7 @@ const REFRESH_DEBOUNCE_MS = 300;
 
 // Cache by (project, asOf) to avoid refetching on view changes.
 // Cleared by clearScoresCache() when mutations happen (dismiss/restore).
+const MAX_CACHE_SIZE = 100;
 const _cache = new Map();
 function _cacheKey(project, asOf) { return `${project}\0${asOf || 'all'}`; }
 
@@ -53,6 +54,7 @@ function fetchRunScoresEffect(selectedProject, selectedRun, setScores, setLoadin
   getProjectScores(selectedProject, asOf)
     .then((data) => {
       if (!active) return;
+      if (_cache.size >= MAX_CACHE_SIZE) _cache.delete(_cache.keys().next().value);
       _cache.set(key, data);
       setScores(data);
     })
@@ -74,6 +76,7 @@ function fetchLatestScoresEffect(selectedProject, setLatestScores) {
   getProjectScores(selectedProject)
     .then((data) => {
       if (!active) return;
+      if (_cache.size >= MAX_CACHE_SIZE) _cache.delete(_cache.keys().next().value);
       _cache.set(key, data);
       setLatestScores(data);
     })

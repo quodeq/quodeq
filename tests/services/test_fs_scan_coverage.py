@@ -21,12 +21,12 @@ from quodeq.core.types.scan import ScanData
 
 class TestWalkFiles:
     def test_empty_directory(self, tmp_path):
-        assert _walk_files(tmp_path) == []
+        assert list(_walk_files(tmp_path)) == []
 
     def test_flat_files(self, tmp_path):
         (tmp_path / "a.py").write_text("pass")
         (tmp_path / "b.py").write_text("pass")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         assert len(files) == 2
 
     def test_nested_files(self, tmp_path):
@@ -34,7 +34,7 @@ class TestWalkFiles:
         sub.mkdir()
         (tmp_path / "main.py").write_text("pass")
         (sub / "mod.py").write_text("pass")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         assert len(files) == 2
 
     def test_skips_git(self, tmp_path):
@@ -42,7 +42,7 @@ class TestWalkFiles:
         git_dir.mkdir()
         (git_dir / "config").write_text("x")
         (tmp_path / "app.py").write_text("pass")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         assert len(files) == 1
         assert all(".git" not in str(f) for f in files)
 
@@ -51,7 +51,7 @@ class TestWalkFiles:
         nm.mkdir()
         (nm / "pkg.js").write_text("x")
         (tmp_path / "index.js").write_text("x")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         assert len(files) == 1
 
     def test_skips_pycache(self, tmp_path):
@@ -59,7 +59,7 @@ class TestWalkFiles:
         pc.mkdir()
         (pc / "mod.pyc").write_text("x")
         (tmp_path / "mod.py").write_text("pass")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         assert len(files) == 1
 
     def test_skips_venv(self, tmp_path):
@@ -68,7 +68,7 @@ class TestWalkFiles:
             venv.mkdir()
             (venv / "activate").write_text("x")
         (tmp_path / "app.py").write_text("pass")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         assert len(files) == 1
 
     def test_skips_dotdirs(self, tmp_path):
@@ -76,7 +76,7 @@ class TestWalkFiles:
         hidden.mkdir()
         (hidden / "secret").write_text("x")
         (tmp_path / "visible.py").write_text("pass")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         assert len(files) == 1
 
     def test_skips_build_dirs(self, tmp_path):
@@ -85,14 +85,14 @@ class TestWalkFiles:
             bd.mkdir()
             (bd / "artifact").write_text("x")
         (tmp_path / "src.py").write_text("pass")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         assert len(files) == 1
 
     def test_sorted_output(self, tmp_path):
         (tmp_path / "z.py").write_text("pass")
         (tmp_path / "a.py").write_text("pass")
         (tmp_path / "m.py").write_text("pass")
-        files = _walk_files(tmp_path)
+        files = list(_walk_files(tmp_path))
         names = [f.name for f in files]
         assert names == sorted(names)
 
