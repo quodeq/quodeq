@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import threading
 import time
 from collections import deque
@@ -11,6 +12,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 import re
 from typing import Protocol, runtime_checkable
+
+from datetime import datetime, timezone
 
 from quodeq.core.types import JobSnapshot
 from quodeq.shared.constants import CC_MARKER_KEY
@@ -146,7 +149,9 @@ class InMemoryJobStore:
 
 _logger = logging.getLogger(__name__)
 
-_DEFAULT_PERSIST_DIR = Path.home() / ".quodeq" / "run" / "jobs"
+def _default_persist_dir() -> Path:
+    """Read persist dir from env at call time for lazy configuration."""
+    return Path(os.environ.get("QUODEQ_JOB_PERSIST_DIR", str(Path.home() / ".quodeq" / "run" / "jobs")))
 _STALE_JOB_AGE_S = 24 * 60 * 60  # 24 hours
 
 
@@ -196,8 +201,10 @@ class FileJobStore:
     """
 
     def __init__(self, persist_dir: Path | None = None) -> None:
-        self._persist_dir = persist_dir or _DEFAULT_PERSIST_DIR
+        self._persist_dir = persist_dir or _default_persist_dir()
         self._persist_dir.mkdir(parents=True, exist_ok=True)
+        # SECURITY: restrict directory to owner-only access
+        os.chmod(self._persist_dir, 0o700)
         self._jobs: dict[str, Job] = {}
         self._lock = threading.Lock()
         self._load_all()
@@ -212,7 +219,8 @@ class FileJobStore:
     def put(self, job: Job) -> None:
         with self._lock:
             self._jobs[job.job_id] = job
-            self._write(job)
+            job_data = _job_to_json(job)
+        self._write_data(job.job_id, job_data)
 
     def list(self) -> list[Job]:
         with self._lock:
@@ -228,13 +236,20 @@ class FileJobStore:
 
     def _write(self, job: Job) -> None:
         """Write a single job to disk. Caller must hold the lock."""
-        path = self._persist_dir / f"{job.job_id}.json"
+        self._write_data(job.job_id, _job_to_json(job))
+
+    def _write_data(self, job_id: str, data: dict) -> None:
+        """Write pre-serialized job data to disk. Does NOT require the lock."""
+        path = self._persist_dir / f"{job_id}.json"
         tmp = path.with_suffix(".tmp")
         try:
-            tmp.write_text(json.dumps(_job_to_json(job), indent=2), encoding="utf-8")
+            tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            # SECURITY: restrict job files to owner-only read/write
+            os.chmod(tmp, 0o600)
             tmp.replace(path)
+            os.chmod(path, 0o600)
         except OSError:
-            _logger.warning("Failed to persist job %s", job.job_id, exc_info=True)
+            _logger.warning("Failed to persist job %s", job_id, exc_info=True)
             tmp.unlink(missing_ok=True)
 
     def _load_all(self) -> None:
@@ -264,8 +279,6 @@ class FileJobStore:
             if not job.ended_at:
                 continue
             try:
-                from datetime import datetime, timezone
-
                 ended = datetime.fromisoformat(job.ended_at)
                 if ended.tzinfo is None:
                     ended = ended.replace(tzinfo=timezone.utc)

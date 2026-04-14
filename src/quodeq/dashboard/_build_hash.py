@@ -4,9 +4,11 @@ from __future__ import annotations
 import hashlib
 from pathlib import Path
 
+from quodeq import __version__
 from quodeq.shared.logging import log_debug
 
 _HASH_FILE = ".build_hash"
+_READ_CHUNK_SIZE = 1 << 16
 
 # Files and directories to sync from package source to build workdir
 _SYNC_ITEMS = ("src", "public", "package.json", "package-lock.json", ".npmrc", "vite.config.js", "index.html")
@@ -14,7 +16,6 @@ _SYNC_ITEMS = ("src", "public", "package.json", "package-lock.json", ".npmrc", "
 
 def compute_source_hash(source_dir: Path) -> str:
     """Compute a SHA-256 hash over all tracked source files and the package version."""
-    from quodeq import __version__
     h = hashlib.sha256()
     h.update(__version__.encode())
     files: list[Path] = []
@@ -29,7 +30,7 @@ def compute_source_hash(source_dir: Path) -> str:
         try:
             h.update(str(rel).encode())
             with open(f, "rb") as fh:
-                while chunk := fh.read(1 << 16):
+                while chunk := fh.read(_READ_CHUNK_SIZE):
                     h.update(chunk)
         except OSError as exc:
             log_debug(f"Skipping {f.name} in source hash: {exc}")

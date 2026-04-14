@@ -21,6 +21,7 @@ def _extract_totals(raw: dict[str, object]) -> Totals | None:
 
 
 def parse_principle_grade(raw: dict[str, object]) -> PrincipleGrade:
+    """Parse a raw dict into a PrincipleGrade dataclass."""
     return PrincipleGrade(
         principle=_opt_str(raw.get("name")) or _opt_str(raw.get("principle")),
         score=_opt_str(raw.get("score")),
@@ -29,6 +30,7 @@ def parse_principle_grade(raw: dict[str, object]) -> PrincipleGrade:
 
 
 def parse_parsed_report(raw: dict[str, object]) -> ParsedReport:
+    """Parse a raw dict into a ParsedReport dataclass."""
     principles_raw = raw.get("principles")
     principles: list[PrincipleGrade] = []
     if isinstance(principles_raw, list):

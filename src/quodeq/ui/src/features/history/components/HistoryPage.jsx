@@ -1,10 +1,11 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, lazy, Suspense } from 'react';
 import HistoryRunRow from './HistoryRunRow.jsx';
-import HistoryChartPanel from './HistoryChartPanel.jsx';
+const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
 import { useRunNavigator } from '../../../hooks/useRunNavigator.js';
-
+import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
+import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 const MAX_VISIBLE = 20;
 
 function computeDeltas(trend) {
@@ -34,7 +35,7 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunChange } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
-  const deltas = computeDeltas(trend);
+  const deltas = useMemo(() => computeDeltas(trend), [trend]);
   const visible = showAll ? trend : trend.slice(0, MAX_VISIBLE);
   const hasMore = trend.length > MAX_VISIBLE && !showAll;
 
@@ -45,11 +46,23 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
         <span className="page-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
         {availableRuns && availableRuns.length > 0 && (
           <div className="history-run-nav">
-            <RunNavigator currentRun={runNavLabel} isLatest={overviewRunIndex === 0} isOldest={overviewRunIndex >= availableRuns.length - 1} actions={{ onPrev: handleRunPrev, onNext: handleRunNext, onLatest: handleRunLatest, onView: () => { if (currentOverviewRun) onRunClick(currentOverviewRun); } }} />
+            <RunNavigator
+              currentRun={runNavLabel}
+              isLatest={overviewRunIndex === 0}
+              isOldest={overviewRunIndex >= availableRuns.length - 1}
+              actions={{
+                onPrev: handleRunPrev,
+                onNext: handleRunNext,
+                onLatest: handleRunLatest,
+                onView: () => { if (currentOverviewRun) onRunClick(currentOverviewRun); },
+              }}
+            />
           </div>
         )}
       </div>
-      <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
+      <Suspense fallback={null}>
+        <HistoryChartPanel trend={trend} selectedRunId={selectedRunId} onBarClick={(runId) => onRunChange(runId)} />
+      </Suspense>
       <div className="section-header"><h3 className="section-title">Evaluations</h3></div>
       <div className="history-list">
         {visible.map((entry, i) => (
@@ -65,10 +78,12 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   );
 }
 
-export default function HistoryPage({ trend, selection, availableRuns, dimensions, callbacks }) {
+export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks }) {
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
   const [showAll, setShowAll] = useState(false);
+  const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
+  const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
     selectedRun: selectedRunId || 'latest',
@@ -82,7 +97,7 @@ export default function HistoryPage({ trend, selection, availableRuns, dimension
     if (entry?.dateISO) {
       try {
         const d = new Date(entry.dateISO);
-        return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' }) + ' ' + d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
       } catch { return entry.dateISO || ''; }
     }
     return entry?.dateLabel || currentOverviewRun;

@@ -1,10 +1,14 @@
 """Incremental analysis context — dimension loading and resolution."""
 from __future__ import annotations
 
+import json as _json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.prompts.builder import load_template
+from quodeq.config.paths import default_paths
 from quodeq.shared.logging import log_warning
 
 
@@ -18,7 +22,6 @@ class IncrementalCoverage:
 
 def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[str]:
     """Load evaluator IDs from JSON files in *evaluators_dir* not already in *dims_data*."""
-    import json as _json
     result = list(dims_data)
     seen = set(result)
     for _p in evaluators_dir.glob("*.json"):
@@ -34,9 +37,6 @@ def _load_custom_dimensions(evaluators_dir: Path, dims_data: list[str]) -> list[
 
 def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisContext"]:
     """Load dimensions data and resolve which dimensions to analyze."""
-    from datetime import datetime, timezone
-    from quodeq.analysis.prompts.builder import load_template
-
     dims_data = config.dimensions_data
     if dims_data is None:
         raise ValueError("RunConfig.dimensions_data is required")
@@ -47,7 +47,6 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
     if config.options.dimensions:
         _evaluators_dir = getattr(config, 'evaluators_dir', None)
         if _evaluators_dir is None:
-            from quodeq.config.paths import default_paths
             _evaluators_dir = default_paths().evaluators_dir
     else:
         _evaluators_dir = None
@@ -60,7 +59,8 @@ def load_analysis_context(config: "RunConfig") -> tuple[list[str], "_AnalysisCon
         if unknown:
             log_warning(f"Unknown dimensions ignored: {', '.join(unknown)}. "
                         f"Available: {', '.join(all_dims_raw)}")
-        dimensions = [d for d in all_dims_raw if d in config.options.dimensions]
+        dims_set = set(config.options.dimensions)
+        dimensions = [d for d in all_dims_raw if d in dims_set]
         if not dimensions:
             raise ValueError(
                 f"No valid dimensions selected. "

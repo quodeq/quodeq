@@ -14,18 +14,22 @@ from quodeq.api._evaluation_helpers import (
 )
 from quodeq.api.helpers import error_response, validate_evaluation_payload
 from quodeq.core.types import to_camel_dict
+from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.api.routes import _reports_dir
 from quodeq.services.base import ActionProvider
+from quodeq.services.evaluation_mixin import _score_completed_evidence
 
 _logger = logging.getLogger(__name__)
 
 
 def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_rate_store: object | None = None) -> None:
     """Register evaluation listing and creation routes."""
-    from quodeq.api.routes import _reports_dir
 
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
-        return jsonify([to_camel_dict(j) for j in provider.list_evaluations()])
+        limit = request.args.get("limit", 0, type=int)
+        items = provider.list_evaluations(limit=limit)
+        return jsonify([to_camel_dict(j) for j in items])
 
     @app.post("/api/evaluations")
     def start_evaluation() -> Response | tuple[Response, int]:
@@ -43,11 +47,10 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             return ai_cmd_error
         # Require an explicit model for API-type providers (e.g. Ollama)
         if ai_cmd:
-            from quodeq.analysis._provider_cache import get_provider_configs
             ptype = get_provider_configs().get(ai_cmd, {}).get("type")
             if ptype == "api" and not payload.get("aiModel"):
                 body, status = error_response(
-                    "No model selected. Go to Settings and select an orchestrator model.",
+                    "No model selected. Go to Settings and select one.",
                     HTTPStatus.BAD_REQUEST, "MODEL_REQUIRED",
                 )
                 return jsonify(body), status
@@ -57,16 +60,24 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
             options = _build_evaluation_options(payload)
             job = provider.start_evaluation(repo=repo, reports_dir=_reports_dir(), options=options)
         except (FileNotFoundError, ValueError):
-            body, status = error_response("Invalid repository", HTTPStatus.BAD_REQUEST, "INVALID_INPUT")
+            body, status = error_response(
+                "Invalid repository. Provide a local path or a URL like https://github.com/owner/repo.",
+                HTTPStatus.BAD_REQUEST, "INVALID_INPUT",
+            )
             return jsonify(body), status
         return jsonify(to_camel_dict(job)), HTTPStatus.ACCEPTED
 
 
 def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> None:
     """Register single-evaluation status and cancel routes."""
-    from quodeq.api.routes import _reports_dir
 
     _scored_jobs: set[str] = set()
+
+    def reset_scored_jobs() -> None:
+        """Clear the scored-jobs set. Useful for test isolation."""
+        _scored_jobs.clear()
+
+    app.extensions["reset_scored_jobs"] = reset_scored_jobs
 
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
@@ -79,7 +90,6 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         if job_status in ("failed", "cancelled") and job_id not in _scored_jobs:
             _scored_jobs.add(job_id)
             try:
-                from quodeq.services.evaluation_mixin import _score_completed_evidence
                 _score_completed_evidence(_reports_dir(), {
                     "outputProject": job.output_project,
                     "outputRunId": job.output_run_id,

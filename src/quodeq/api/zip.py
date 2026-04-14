@@ -10,9 +10,9 @@ from pathlib import Path
 
 from flask import Response, after_this_request, jsonify, send_file
 
-_logger = logging.getLogger(__name__)
-
 from quodeq.api.helpers import error_response
+
+_logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_ZIP_SIZE_MB = 500
 
@@ -49,7 +49,10 @@ def _build_project_zip(project_path: Path) -> Path:
                     continue
                 total_size += file_entry.stat().st_size
                 if total_size > size_limit:
-                    raise ValueError("Project exceeds maximum export size")
+                    raise ValueError(
+                        f"Project exceeds maximum export size of {size_limit // (1024 * 1024)} MB. "
+                        f"Reduce the project size or increase QUODEQ_MAX_ZIP_SIZE_MB."
+                    )
                 zf.write(file_entry, file_entry.relative_to(project_path.parent))
     except (OSError, zipfile.BadZipFile, ValueError):
         os.unlink(tmp_path)
@@ -61,7 +64,10 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
     """Build and return a zip archive download response for a project directory."""
     project_path = (Path(reports_dir) / project).resolve()
     if not project_path.is_relative_to(Path(reports_dir).resolve()):
-        body, status = error_response("Invalid project name", HTTPStatus.BAD_REQUEST, "BAD_REQUEST")
+        body, status = error_response(
+            "Invalid project name. Use only alphanumeric characters, hyphens, and underscores (no path separators).",
+            HTTPStatus.BAD_REQUEST, "BAD_REQUEST",
+        )
         return jsonify(body), status
     if not project_path.exists() or not project_path.is_dir():
         body, status = error_response("Project not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -72,7 +78,10 @@ def export_project_zip(project: str, reports_dir: str) -> Response | tuple[Respo
         body, status = error_response("Project too large to export", HTTPStatus.REQUEST_ENTITY_TOO_LARGE, "TOO_LARGE")
         return jsonify(body), status
     except (OSError, zipfile.BadZipFile):
-        body, status = error_response("Failed to build project archive", HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR")
+        body, status = error_response(
+            "Failed to build project archive. Check disk space and file permissions, then try again.",
+            HTTPStatus.INTERNAL_SERVER_ERROR, "EXPORT_ERROR",
+        )
         return jsonify(body), status
 
     @after_this_request

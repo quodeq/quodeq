@@ -7,6 +7,7 @@ import logging
 import os
 import random
 import socket
+import ssl as _ssl
 import threading
 import time
 from http import HTTPStatus
@@ -138,7 +139,6 @@ class HttpClient:
         """Perform a single GET attempt."""
         req = request.Request(url, headers=headers)
         try:
-            import ssl as _ssl
             _ctx = _ssl.create_default_context()
             with request.urlopen(req, timeout=self._timeout, context=_ctx) as resp:
                 payload = json.loads(resp.read().decode("utf-8"))

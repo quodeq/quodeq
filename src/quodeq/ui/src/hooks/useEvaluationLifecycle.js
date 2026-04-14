@@ -3,7 +3,11 @@ import { useEvaluation } from '../features/evaluation/hooks/useEvaluation.js';
 import { getLevels, STORAGE_KEY as POWER_KEY } from '../features/evaluation/components/powerLevels.js';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../constants.js';
 
+// Providers that run inference locally via an API. Extensible via server-side
+// provider config (ai_providers.json) which can flag additional local providers.
 const LOCAL_API_PROVIDERS = ['ollama'];
+const TIER_NAMES = ['fast', 'balanced', 'thorough'];
+const DEFAULT_ANALYSIS_POWER = 2;
 
 /**
  * Manages the full evaluation lifecycle: start, poll, dismiss, cancel.
@@ -11,17 +15,18 @@ const LOCAL_API_PROVIDERS = ['ollama'];
  * Extracts evaluation-specific state and side effects from App so that
  * App only wires the hook's return values into the component tree.
  */
-export function useEvaluationLifecycle({ settings, navigation, projects }) {
+export function useEvaluationLifecycle({ settings, navigation, projects, storage: _storage }) {
+  const storage = _storage || localStorage;
   const { navTab, navReset } = navigation;
   const { loadProjects, setProjects, selectProjectAndRun } = projects;
   const { job, jobError, liveViolations, startEvaluation, clearJob, cancelEvaluation } = useEvaluation();
 
   const [analysisPower, setAnalysisPower] = useState(() => {
-    try { return Number(localStorage.getItem(POWER_KEY)) || 2; } catch (e) { console.warn('localStorage unavailable:', e); return 2; }
+    try { return Number(storage.getItem(POWER_KEY)) || DEFAULT_ANALYSIS_POWER; } catch (e) { console.warn('localStorage unavailable:', e); return DEFAULT_ANALYSIS_POWER; }
   });
 
   function persistAnalysisPower(level) {
-    try { localStorage.setItem(POWER_KEY, String(level)); } catch (e) { console.warn('localStorage unavailable:', e); }
+    try { storage.setItem(POWER_KEY, String(level)); } catch (e) { console.warn('localStorage unavailable:', e); }
   }
 
   const prevJobRef = useRef(null);
@@ -41,8 +46,8 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
   }, [job]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleStartEvaluation(payload) {
-    const activeProvider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
-    const get = (key) => localStorage.getItem(providerKey(activeProvider, key));
+    const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+    const get = (key) => storage.getItem(providerKey(activeProvider, key));
     // Ollama uses a single analysis model; CLI providers use tier-based selection.
     // Falls back to the orchestrator model if no analysis-specific model is set.
     const analysisModel = get('model-analysis');
@@ -50,8 +55,7 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
     if (analysisModel) {
       subagentModel = analysisModel;
     } else {
-      const tierNames = ['fast', 'balanced', 'thorough'];
-      subagentModel = get(`model-${tierNames[analysisPower - 1]}`) || get('model') || undefined;
+      subagentModel = get(`model-${TIER_NAMES[analysisPower - 1]}`) || get('model') || undefined;
     }
     startEvaluation({ ...payload, subagentModel });
   }
@@ -63,7 +67,7 @@ export function useEvaluationLifecycle({ settings, navigation, projects }) {
     clearJob();
   }
 
-  const activeProvider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const activeProvider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
   const isLocalApi = LOCAL_API_PROVIDERS.includes(activeProvider);
 
   return {

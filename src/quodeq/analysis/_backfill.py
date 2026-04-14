@@ -10,6 +10,8 @@ from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.incremental import identify_backfill_files
 from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
 # NOTE: logging in inner layer — tracked for middleware extraction
+from quodeq.analysis.subagents.file_queue import FileQueue
+from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
 from quodeq.shared.logging import log_debug, log_info
 
 
@@ -38,11 +40,11 @@ def extract_files_from_jsonl(jsonl_path: Path) -> set[str]:
     try:
         with open(jsonl_path) as f:
             for line in f:
-                line = line.strip()
-                if not line:
+                stripped = line.strip()
+                if not stripped:
                     continue
                 try:
-                    obj = _json.loads(line)
+                    obj = _json.loads(stripped)
                 except _json.JSONDecodeError:
                     continue
                 file_path = obj.get("file")
@@ -58,12 +60,10 @@ def _collect_backfill_taken(evidence_dir: Path, dimension: str, output_jsonl: Pa
     backfill_taken: set[str] = set()
     backfill_queue = evidence_dir / f"{dimension}_queue.json"
     if backfill_queue.exists():
-        from quodeq.analysis.subagents.file_queue import FileQueue
         try:
             backfill_taken = set(FileQueue(backfill_queue).all_taken_files())
         except (OSError, KeyError, ValueError, _json.JSONDecodeError) as exc:
             log_debug(f"Cannot read backfill queue {backfill_queue}: {exc}")
-    from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
     if output_jsonl.exists():
         deduplicate_jsonl(output_jsonl)
     return backfill_taken
@@ -77,9 +77,6 @@ def run_backfill_phase(
 
     Returns the set of backfill files actually taken.
     """
-    # Deferred import: breaks circular dependency between _backfill and runner.
-    from quodeq.analysis.runner import _process_single_dimension
-
     backfill_candidates = identify_backfill_files(backfill.files, list(backfill.prev_analyzed), backfill.phase1_files)
     output_jsonl = backfill.evidence_dir / f"{dimension}_evidence.jsonl"
     backfill_taken: set[str] = set()
@@ -111,6 +108,8 @@ def run_backfill_phase(
     config.options.incremental_file_filter = set(backfill_candidates)
     config.options.pool_budget = remaining_budget
     config.options.verify_findings = False
+    # Deferred import: circular dependency _dimension_ops → _incremental_evidence → _backfill
+    from quodeq.analysis._dimension_ops import _process_single_dimension
     try:
         _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
     finally:

@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
-import { listStandards, deleteStandard, duplicateStandard } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 export const STANDARD_TYPES = { BUILTIN: 'builtin', QUODEQ: 'quodeq', COMMUNITY: 'community', CUSTOM: 'custom' };
 
 export function useStandards() {
+  const { listStandards, deleteStandard, duplicateStandard } = useApi();
   const [standards, setStandards] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -18,8 +19,22 @@ export function useStandards() {
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  const handleDelete = useCallback(async (id) => { await deleteStandard(id); refresh(); }, [refresh]);
-  const handleDuplicate = useCallback(async (id, newId) => { await duplicateStandard(id, newId); refresh(); }, [refresh]);
+  const handleDelete = useCallback(async (id) => {
+    try {
+      await deleteStandard(id);
+      refresh();
+    } catch (err) {
+      setError(err.message || 'Failed to delete standard');
+    }
+  }, [refresh]);
+  const handleDuplicate = useCallback(async (id, newId) => {
+    try {
+      await duplicateStandard(id, newId);
+      refresh();
+    } catch (err) {
+      setError(err.message || 'Failed to duplicate standard');
+    }
+  }, [refresh]);
 
   const grouped = {
     [STANDARD_TYPES.BUILTIN]: [],

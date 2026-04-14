@@ -5,6 +5,8 @@ import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
 import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
+
+const HERO_SCORE_CIRCLE_SIZE = 120;
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { formatRunId, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
@@ -83,11 +85,13 @@ function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick, tr
 }
 
 function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionClick, trendDeltas }) {
+  const sorted = useMemo(
+    () => [...dimensions].sort((a, b) => a.dimension.localeCompare(b.dimension)),
+    [dimensions]
+  );
   return (
     <div className="dimensions-grid">
-      {[...dimensions]
-        .sort((a, b) => a.dimension.localeCompare(b.dimension))
-        .map((item) => (
+      {sorted.map((item) => (
           <RunDimensionCard key={item.dimension} item={item} selectedRunId={selectedRunId} dateLabel={dateLabel} onDimensionClick={onDimensionClick} trendDelta={trendDeltas?.[(item.dimension || '').toLowerCase()]} />
         ))}
     </div>
@@ -156,7 +160,7 @@ function RunHeroSection({ dashboard, selectedRunId, stats }) {
       </div>
       <div className="acc-eval-golden">
         <div className="acc-eval-circle-col">
-          <ScoreCircle score={runSummary.numericAverage} grade={runSummary.overallGrade} size={120} />
+          <ScoreCircle score={runSummary.numericAverage} grade={runSummary.overallGrade} size={HERO_SCORE_CIRCLE_SIZE} />
         </div>
         <div className="acc-eval-stats-col">
           <StatsGrid runSummary={runSummary} runTopFiles={runTopFiles} runUniquePrinciples={runUniquePrinciples} />

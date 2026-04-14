@@ -14,6 +14,7 @@ from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
 
 _TERMINATE_TIMEOUT_S = 10
+_KILL_WAIT_TIMEOUT_S = 5
 
 
 class AnalysisError(ProviderError):
@@ -26,7 +27,7 @@ def _kill_tree(pid: int, sig: int = signal.SIGTERM) -> None:
         # taskkill /T kills the entire process tree
         subprocess.run(
             ["taskkill", "/F", "/T", "/PID", str(pid)],
-            capture_output=True, timeout=10,
+            capture_output=True, timeout=_TERMINATE_TIMEOUT_S,
         )
     else:
         try:
@@ -46,7 +47,7 @@ def _terminate_process(process: subprocess.Popen) -> None:
     except subprocess.TimeoutExpired:
         _kill_tree(process.pid, getattr(signal, "SIGKILL", signal.SIGTERM))
         try:
-            process.wait(timeout=5)
+            process.wait(timeout=_KILL_WAIT_TIMEOUT_S)
         except subprocess.TimeoutExpired:
             process.kill()
 

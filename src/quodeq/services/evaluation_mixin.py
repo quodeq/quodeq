@@ -13,6 +13,10 @@ from quodeq.core.types import JobSnapshot
 from quodeq.services.base import EvaluationOptions, _DEFAULT_MAX_SUBAGENTS, _DEFAULT_POOL_BUDGET
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
 from quodeq.shared.repo_handler import is_valid_repo_url
+from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
+from quodeq.core.scoring.engine import score_evidence
+from quodeq.analysis.report import write_dimension_report
+from quodeq.services._fs_scan import scan_project
 from quodeq.shared.utils import get_ai_cmd, get_ai_model, is_repo_url, project_name_from_repo
 
 if TYPE_CHECKING:
@@ -67,7 +71,10 @@ def _build_evaluate_cmd(
     repo_path = Path(repo)
     repo_arg = repo if is_repo_url(repo) else str(repo_path.resolve())
 
-    cmd = [sys.executable, "-m", "quodeq.cli", "evaluate", repo_arg]
+    if getattr(sys, "frozen", False):
+        cmd = [sys.executable, "--_evaluate", "evaluate", repo_arg]
+    else:
+        cmd = [sys.executable, "-m", "quodeq.cli", "evaluate", repo_arg]
     cmd += ["-o", reports_abs]
     if options.dimensions:
         if isinstance(options.dimensions, list):
@@ -85,6 +92,19 @@ def _build_evaluate_cmd(
     if options.scope_path:
         cmd += ["--scope", options.scope_path]
     return cmd
+
+
+def _scan_parent_project(project_dir: Path, reports_path: Path, repo_path: Path) -> None:
+    """Scan the parent project directory if it lacks a scan.json."""
+    info_path = project_dir / "repository_info.json"
+    try:
+        parent_uuid = json.loads(info_path.read_text()).get("parent")
+        if parent_uuid:
+            parent_dir = reports_path / parent_uuid
+            if not (parent_dir / "scan.json").exists():
+                scan_project(repo_path, output_dir=parent_dir)
+    except (json.JSONDecodeError, OSError):
+        pass
 
 
 def _register_project(repo: str, discipline: str | None, reports_dir: str, scope_path: str | None = None) -> None:
@@ -105,23 +125,13 @@ def _register_project(repo: str, discipline: str | None, reports_dir: str, scope
 
     # Scan local projects so file lists are available immediately
     if location == _LOCATION_LOCAL:
-        from quodeq.services._fs_scan import scan_project
         repo_path = Path(repo_resolved)
         if repo_path.is_dir():
             project_dir = reports_path / project_uuid
             scan_project(repo_path, output_dir=project_dir)
             # For scoped projects, also scan the parent using the parent UUID from repo info
             if scope_path:
-                import json
-                info_path = project_dir / "repository_info.json"
-                try:
-                    parent_uuid = json.loads(info_path.read_text()).get("parent")
-                    if parent_uuid:
-                        parent_dir = reports_path / parent_uuid
-                        if not (parent_dir / "scan.json").exists():
-                            scan_project(repo_path, output_dir=parent_dir)
-                except (json.JSONDecodeError, OSError):
-                    pass
+                _scan_parent_project(project_dir, reports_path, repo_path)
 
 
 class FsEvaluationMixin:
@@ -172,11 +182,17 @@ class FsEvaluationMixin:
         """Start an asynchronous evaluation subprocess for a repository."""
         if is_repo_url(repo):
             if not is_valid_repo_url(repo):
-                raise ValueError(f"Invalid repository URL format: {repo}")
+                raise ValueError(
+                    f"Invalid repository URL format: {repo}. "
+                    f"Expected a URL like https://github.com/owner/repo or git@github.com:owner/repo.git"
+                )
         else:
             resolved = Path(repo).resolve()
             if not resolved.exists():
-                raise FileNotFoundError(f"Repository not found: {repo}")
+                raise FileNotFoundError(
+                    f"Repository not found: {repo}. "
+                    f"Check that the path exists and is accessible from this machine."
+                )
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
@@ -264,10 +280,6 @@ def _score_completed_evidence(reports_dir: str, job: dict) -> None:
             continue  # verification not completed for this dimension
 
         try:
-            from quodeq.core.evidence.parser import parse_jsonl_to_evidence, EvidenceContext
-            from quodeq.core.scoring.engine import score_evidence
-            from quodeq.analysis.report import write_dimension_report
-
             evidence = parse_jsonl_to_evidence(jsonl_path, EvidenceContext(
                 language="", repository="", date_str="",
                 source_file_count=0, files_read=0,

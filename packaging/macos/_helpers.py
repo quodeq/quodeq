@@ -4,14 +4,19 @@ from __future__ import annotations
 import functools
 import json
 import os
+import platform
 import subprocess
 import urllib.error
 import urllib.request
 
 _HEALTH_TIMEOUT = 1.0
 _CMD_DISCOVERY_TIMEOUT_S = 5
+# Standard Homebrew install paths (ARM64 Apple Silicon / Intel x86_64)
 _HOMEBREW_ARM64 = "/opt/homebrew/bin"
 _HOMEBREW_X86 = "/usr/local/bin"
+_API_HEALTH_PATH = "/api/health"
+_API_EVALUATIONS_PATH = "/api/evaluations"
+_LOCAL_BASE_URL = "http://127.0.0.1"
 
 
 def _homebrew_bin_dirs(
@@ -23,7 +28,6 @@ def _homebrew_bin_dirs(
     *arm64_path* and *x86_path* can be overridden for testing or
     non-standard Homebrew installations.
     """
-    import platform
     arch = platform.machine()
     if arch == "arm64":
         return arm64_path
@@ -31,20 +35,25 @@ def _homebrew_bin_dirs(
         return x86_path
     return f"{arm64_path}:{x86_path}"
 
-def source_user_path() -> None:
-    """Load the user's shell PATH since .app bundles don't inherit it."""
+def source_user_path(env: dict[str, str] | None = None) -> None:
+    """Load the user's shell PATH since .app bundles don't inherit it.
+
+    *env* defaults to ``os.environ`` and can be overridden for testing.
+    """
+    if env is None:
+        env = os.environ
     try:
         cmd = ('source ~/.zprofile 2>/dev/null; source ~/.zshrc 2>/dev/null; '
                'source ~/.bash_profile 2>/dev/null; echo $PATH')
-        shell = os.environ.get("SHELL", "/bin/zsh")
+        shell = env.get("SHELL", "/bin/zsh")
         result = subprocess.run([shell, "-c", cmd], capture_output=True, text=True, timeout=_CMD_DISCOVERY_TIMEOUT_S)
         if result.returncode == 0 and result.stdout.strip():
-            os.environ["PATH"] = result.stdout.strip()
+            env["PATH"] = result.stdout.strip()
             return
     except (subprocess.TimeoutExpired, OSError):
         pass
     extra = f"{os.path.expanduser('~/.local/bin')}:{_homebrew_bin_dirs()}"
-    os.environ["PATH"] = f"{os.environ.get('PATH', '')}:{extra}"
+    env["PATH"] = f"{env.get('PATH', '')}:{extra}"
 
 
 def find_icon(name: str) -> str | None:
@@ -97,7 +106,7 @@ def _find_commands_uncached(env: dict[str, str] | None) -> dict[str, str | None]
 def health_check(port: int) -> bool:
     """Check if the dashboard is responding on the given port."""
     try:
-        url = f"http://127.0.0.1:{port}/api/health"
+        url = f"{_LOCAL_BASE_URL}:{port}{_API_HEALTH_PATH}"
         with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
             return json.loads(r.read()).get("ok") is True
     except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):
@@ -105,9 +114,14 @@ def health_check(port: int) -> bool:
 
 
 def is_evaluating(port: int) -> bool:
-    """Check if any evaluation job is currently running."""
+    """Check if any evaluation job is currently running.
+
+    NOTE: The evaluations endpoint does not support server-side filtering
+    by status, so we fetch all jobs and filter client-side.  A ``limit=1``
+    query param is passed to reduce payload size when the endpoint supports it.
+    """
     try:
-        url = f"http://127.0.0.1:{port}/api/evaluations"
+        url = f"{_LOCAL_BASE_URL}:{port}{_API_EVALUATIONS_PATH}?limit=1&status=running"
         with urllib.request.urlopen(url, timeout=_HEALTH_TIMEOUT) as r:
             return any(j.get("status") == "running" for j in json.loads(r.read()))
     except (urllib.error.URLError, OSError, json.JSONDecodeError, ValueError):

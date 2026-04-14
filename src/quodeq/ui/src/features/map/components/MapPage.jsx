@@ -1,17 +1,27 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import {
-  buildFileTree, treeNodeToFileObj,
-  RiskMatrixView, ZoomablePackView, resetSavedFocus,
-  GalaxyView, GalaxyFolderView,
+  RiskMatrixView, ZoomablePackView,
+  GalaxyView, GalaxyFolderView, VizBreadcrumb,
 } from '../viz/index.js';
 import { complianceRatio } from '../../../utils/formatters.js';
-import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
-import { listStandards } from '../../../api/standards.js';
+import useMapPageState from './useMapPageState.js';
 
-let _savedMapPath = '';
-let _savedVizStyle = 'zoompack';
-let _savedViewMode = 'health';
-let _savedGalaxyMode = 'filesystem';
+function getAppThemeInfo() {
+  const attr = document.documentElement.getAttribute('data-theme') || '';
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark = attr.includes('dark') || (!attr.includes('light') && prefersDark);
+  const family = attr.replace(/-?(dark|light)$/, '') || 'daruma';
+  return { isDark, family, attr };
+}
+
+function isAppDark() {
+  return getAppThemeInfo().isDark;
+}
+
+function getDarkThemeAttr() {
+  const { family } = getAppThemeInfo();
+  return family === 'daruma' ? 'dark' : `${family}-dark`;
+}
 
 const VIEW_MODES = [
   { id: 'health', label: 'Health' },
@@ -67,14 +77,17 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
   );
 }
 
-function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, galaxyMode, setGalaxyMode, allDimensions, selectedDimensions, onToggleDimension }) {
+function MapControls({ viewState, galaxyState, dimensionState }) {
+  const { viewMode, setViewMode, vizStyle, setVizStyle } = viewState;
+  const { galaxyMode, setGalaxyMode } = galaxyState;
+  const { allDimensions, selectedDimensions, onToggleDimension } = dimensionState;
   return (
     <div className="map-controls">
       <DimensionFilter allDimensions={allDimensions} selectedDimensions={selectedDimensions} onToggle={onToggleDimension} />
       {vizStyle === 'zoompack' && (
         <div className="map-pill-group">
           {VIEW_MODES.map((m) => (
-            <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)}>
+            <button key={m.id} type="button" className={`map-pill${viewMode === m.id ? ' active' : ''}`} onClick={() => setViewMode(m.id)} aria-pressed={viewMode === m.id}>
               {m.label}
             </button>
           ))}
@@ -83,7 +96,7 @@ function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, galaxyMode,
       {vizStyle === 'galaxy' && (
         <div className="map-pill-group">
           {GALAXY_MODES.map((m) => (
-            <button key={m.id} type="button" className={`map-pill${galaxyMode === m.id ? ' active' : ''}`} onClick={() => setGalaxyMode(m.id)}>
+            <button key={m.id} type="button" className={`map-pill${galaxyMode === m.id ? ' active' : ''}`} onClick={() => setGalaxyMode(m.id)} aria-pressed={galaxyMode === m.id}>
               {m.label}
             </button>
           ))}
@@ -91,7 +104,7 @@ function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, galaxyMode,
       )}
       <div className="map-pill-group">
         {VIZ_STYLES.map((s) => (
-          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? 'Coming soon' : ''}>
+          <button key={s.id} type="button" className={`map-pill${vizStyle === s.id ? ' active' : ''}${!s.enabled ? ' disabled' : ''}`} onClick={() => s.enabled && setVizStyle(s.id)} title={!s.enabled ? 'Coming soon' : ''} aria-pressed={vizStyle === s.id}>
             {s.label}
           </button>
         ))}
@@ -100,209 +113,47 @@ function MapControls({ viewMode, setViewMode, vizStyle, setVizStyle, galaxyMode,
   );
 }
 
-function MapBreadcrumb({ path, onNavigate, onBack }) {
-  if (path.length === 0) return null;
-  const segments = [{ name: 'Root', path: '' }, ...path];
+function MapBreadcrumb({ path, onNavigate, projectName }) {
+  const segments = [{ name: projectName || 'Project', path: '' }, ...path];
   return (
-    <div className="map-breadcrumb">
-      <button type="button" className="map-breadcrumb-back" onClick={onBack} title="Go back">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
-      </button>
-      {segments.map((seg, i) => (
-        <span key={seg.path}>
-          {i > 0 && <span className="map-breadcrumb-sep">&rsaquo;</span>}
-          {i < segments.length - 1 ? (
-            <button type="button" className="map-breadcrumb-seg" onClick={() => onNavigate(seg.path)}>{seg.name}</button>
-          ) : (
-            <span className="map-breadcrumb-current">{seg.name}</span>
-          )}
-        </span>
-      ))}
-    </div>
+    <VizBreadcrumb
+      items={segments.map((seg, i) => ({ label: seg.name, onClick: i < segments.length - 1 ? () => onNavigate(seg.path) : undefined }))}
+    />
   );
 }
 
-function findSubtree(root, path) {
-  if (!path) return root;
-  function walk(node, depth = 0) {
-    if (depth > 64) return null;
-    if (node.path === path) return node;
-    for (const child of node.children) {
-      if (path === child.path || path.startsWith(child.path + '/')) {
-        const found = walk(child, depth + 1);
-        if (found) return found;
-      }
-    }
-    return null;
-  }
-  return walk(root) || root;
-}
-
-function findParentPath(root, currentPath) {
-  // Find the parent node's path in the (possibly collapsed) tree
-  if (!currentPath) return '';
-  function walk(node, depth = 0) {
-    if (depth > 64) return null;
-    for (const child of node.children) {
-      if (child.path === currentPath) return node.path;
-      if (currentPath.startsWith(child.path + '/')) {
-        const found = walk(child, depth + 1);
-        if (found !== null) return found;
-      }
-    }
-    return null;
-  }
-  return walk(root) ?? '';
-}
-
-function buildBreadcrumbPath(root, path) {
-  if (!path) return [];
-  // Walk the collapsed tree to build breadcrumb from actual node names
-  const crumbs = [];
-  let node = root;
-  while (node && node.path !== path) {
-    const child = node.children.find((c) => path === c.path || path.startsWith(c.path + '/'));
-    if (!child) break;
-    crumbs.push({ name: child.name, path: child.path });
-    node = child;
-  }
-  return crumbs;
-}
-
-function MapVizContainer({ vizStyle, viewMode, galaxyMode, setGalaxyMode, node, dimensions, onDrillDown, onFileClick, onNavigate, showLabels, setShowLabels, breadcrumb, onBreadcrumbNav, onBack, resetKey, projectName, standardTypes }) {
+function MapVizContainer({ vizState, treeState, dimensions, callbacks, display }) {
+  const { vizStyle, viewMode, galaxyMode, setGalaxyMode } = vizState;
+  const { node, fullTree, currentPath, onPathChange } = treeState;
+  const { onDrillDown, onFileClick, onNavigate, onBreadcrumbNav } = callbacks;
+  const { showLabels, setShowLabels, darkMode, setDarkMode, breadcrumb, resetKey, projectName, standardTypes } = display;
   return (
-    <div className="map-viz-container">
-      {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} onBack={onBack} />}
-      {vizStyle !== 'galaxy' && (
+    <div className="map-viz-container" {...(darkMode && !isAppDark() ? { 'data-theme': getDarkThemeAttr() } : {})}>
+      {vizStyle !== 'galaxy' && <MapBreadcrumb path={breadcrumb} onNavigate={onBreadcrumbNav} projectName={projectName} />}
+      <div className="map-viz-toggles">
         <label className="map-label-toggle">
           <input type="checkbox" checked={showLabels} onChange={(e) => setShowLabels(e.target.checked)} />
           Labels
         </label>
-      )}
+        {!isAppDark() && (
+          <label className="map-label-toggle">
+            <input type="checkbox" checked={!darkMode} onChange={(e) => setDarkMode(!e.target.checked)} />
+            Light
+          </label>
+        )}
+      </div>
       {vizStyle === 'riskmatrix' && <RiskMatrixView node={node} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} />}
-      {vizStyle === 'zoompack' && <ZoomablePackView node={node} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
-      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={node} onFileClick={onFileClick} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} resetKey={resetKey} projectName={projectName} />}
+      {vizStyle === 'zoompack' && <ZoomablePackView node={fullTree} viewMode={viewMode} onDrillDown={onDrillDown} onFileClick={onFileClick} showLabels={showLabels} resetKey={resetKey} currentPath={currentPath} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'standards' && <GalaxyView dimensions={dimensions} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} standardTypes={standardTypes} />}
+      {vizStyle === 'galaxy' && galaxyMode === 'filesystem' && <GalaxyFolderView node={fullTree} currentPath={currentPath} onPathChange={onPathChange} onFileClick={onFileClick} onNavigate={onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} darkMode={darkMode} resetKey={resetKey} projectName={projectName} />}
     </div>
   );
 }
 
-let _lastTabKey = null;
+export default function MapPage(props) {
+  const state = useMapPageState(props);
 
-function resetMapSavedState() {
-  _savedMapPath = '';
-  resetSavedFocus();
-}
-
-export default function MapPage({ data, callbacks, tabKey = 0 }) {
-  // Reset only on fresh tab click (tabKey changed), not on back from detail
-  const isFreshTabClick = _lastTabKey !== null && tabKey !== _lastTabKey;
-  _lastTabKey = tabKey;
-  if (isFreshTabClick) resetMapSavedState();
-
-  // Lock parent to viewport height while map is active
-  useEffect(() => {
-    const dashboard = document.querySelector('.dashboard');
-    if (dashboard) {
-      dashboard.classList.add('dashboard--fullheight');
-      return () => dashboard.classList.remove('dashboard--fullheight');
-    }
-  }, []);
-
-  // Refresh data on mount (ensures fresh data after returning from detail pages) and on tab re-click
-  useEffect(() => {
-    callbacks?.onRefresh?.();
-  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Fetch standard types for galaxy constellation grouping
-  const [standardTypes, setStandardTypes] = useState({});
-  useEffect(() => {
-    listStandards().then(stds => {
-      const map = {};
-      stds.forEach(s => { map[(s.id || '').toLowerCase()] = s.type || 'custom'; });
-      setStandardTypes(map);
-    }).catch(() => {});
-  }, []);
-
-  const allDimensions = data?.accumulated?.dimensions || data?.dashboard?.dimensions || [];
-  const [viewMode, _setViewMode] = useState(_savedViewMode);
-  const setViewMode = (v) => { _savedViewMode = v; _setViewMode(v); };
-  const [vizStyle, _setVizStyle] = useState(_savedVizStyle);
-  const setVizStyle = (v) => { _savedVizStyle = v; _setVizStyle(v); };
-  const [galaxyMode, _setGalaxyMode] = useState(_savedGalaxyMode);
-  const setGalaxyMode = (v) => { _savedGalaxyMode = v; _setGalaxyMode(v); };
-  const [showLabels, setShowLabels] = useState(false);
-  const [currentPath, _setCurrentPath] = useState(_savedMapPath);
-  const setCurrentPath = (p) => { _savedMapPath = p; _setCurrentPath(p); };
-
-  // Animate back to root when tab is re-clicked while already on map
-  const prevTabKey = useRef(tabKey);
-  useEffect(() => {
-    if (tabKey !== prevTabKey.current) {
-      prevTabKey.current = tabKey;
-      setCurrentPath('');
-      resetSavedFocus();
-      callbacks?.onRefresh?.();
-    }
-  }, [tabKey]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Get visible standards and available dimension names
-  const visibleIds = useMemo(() => new Set(readVisibleStandardIds()), [allDimensions]);
-  const visibleDimensions = useMemo(
-    () => allDimensions.filter((d) => visibleIds.has((d.dimension || '').toLowerCase())),
-    [allDimensions, visibleIds]
-  );
-  const dimensionNames = useMemo(
-    () => visibleDimensions.map((d) => d.dimension).filter(Boolean).sort(),
-    [visibleDimensions]
-  );
-
-  // Selected dimensions filter — defaults to all visible
-  const [selectedDimensions, setSelectedDimensions] = useState(() => new Set());
-  const effectiveSelected = useMemo(
-    () => selectedDimensions.size === 0 ? new Set(dimensionNames) : selectedDimensions,
-    [selectedDimensions, dimensionNames]
-  );
-
-  const handleToggleDimension = (dim) => {
-    setSelectedDimensions((prev) => {
-      // If nothing explicitly selected yet, start from all-selected and toggle off this one
-      const base = prev.size === 0 ? new Set(dimensionNames) : new Set(prev);
-      if (base.has(dim)) {
-        base.delete(dim);
-        // Don't allow empty — if last one, keep it
-        if (base.size === 0) return new Set();
-      } else {
-        base.add(dim);
-      }
-      // If all are selected, reset to empty (meaning "all")
-      if (base.size === dimensionNames.length) return new Set();
-      return base;
-    });
-  };
-
-  // Filter dimensions by selection
-  const filteredDimensions = useMemo(
-    () => visibleDimensions.filter((d) => effectiveSelected.has(d.dimension)),
-    [visibleDimensions, effectiveSelected]
-  );
-
-  const fullTree = useMemo(() => buildFileTree(filteredDimensions), [filteredDimensions]);
-  const currentNode = useMemo(() => findSubtree(fullTree, currentPath), [fullTree, currentPath]);
-  const breadcrumb = useMemo(() => buildBreadcrumbPath(fullTree, currentPath), [fullTree, currentPath]);
-
-  const handleDrillDown = (nodePath) => setCurrentPath(nodePath);
-  const handleFileClick = (treeNode) => {
-    if (!callbacks?.onNavigate) return;
-    callbacks.onNavigate('file', { file: treeNodeToFileObj(treeNode), sourceTab: 'map' });
-  };
-  const handleBreadcrumbNav = (path) => setCurrentPath(path);
-  const handleBack = () => {
-    if (!currentPath) return;
-    setCurrentPath(findParentPath(fullTree, currentPath));
-  };
-
-  if (allDimensions.length === 0) {
+  if (state.allDimensions.length === 0) {
     return (
       <div className="map-page">
         <div className="page-header"><h2 className="page-title">Map</h2></div>
@@ -316,11 +167,11 @@ export default function MapPage({ data, callbacks, tabKey = 0 }) {
       <div className="map-header">
         <h2 className="page-title">Map</h2>
         <span className="map-total-count">
-          <strong>{currentNode.violations}</strong> violation{currentNode.violations !== 1 ? 's' : ''} · <strong>{complianceRatio(currentNode.violations, currentNode.compliance)}</strong> ratio
+          <strong>{state.currentNode.violations}</strong> violation{state.currentNode.violations !== 1 ? 's' : ''} · <strong>{complianceRatio(state.currentNode.violations, state.currentNode.compliance)}</strong> ratio
         </span>
-        <MapControls viewMode={viewMode} setViewMode={setViewMode} vizStyle={vizStyle} setVizStyle={setVizStyle} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} allDimensions={dimensionNames} selectedDimensions={effectiveSelected} onToggleDimension={handleToggleDimension} />
+        <MapControls viewState={state.viewState} galaxyState={state.galaxyState} dimensionState={state.dimensionState} />
       </div>
-      <MapVizContainer vizStyle={vizStyle} viewMode={viewMode} galaxyMode={galaxyMode} setGalaxyMode={setGalaxyMode} node={currentNode} dimensions={filteredDimensions} onDrillDown={handleDrillDown} onFileClick={handleFileClick} onNavigate={callbacks?.onNavigate} showLabels={showLabels} setShowLabels={setShowLabels} breadcrumb={breadcrumb} onBreadcrumbNav={handleBreadcrumbNav} onBack={handleBack} resetKey={tabKey} projectName={data?.projectName} standardTypes={standardTypes} />
+      <MapVizContainer vizState={state.vizState} treeState={state.treeState} dimensions={state.dimensions} callbacks={state.callbacks} display={state.display} />
     </div>
   );
 }

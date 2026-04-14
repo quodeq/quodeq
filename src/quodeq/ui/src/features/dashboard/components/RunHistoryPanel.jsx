@@ -19,21 +19,30 @@ const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
+const CHART_MARGIN = { top: 12, right: 8, bottom: 0, left: -16 };
 
+// Module-level CSS variable cache. Cleared automatically by MutationObserver
+// when the data-theme attribute changes. Use clearCssVarCache() for test resets.
 const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
   if (_cssVarCache.has(name)) return _cssVarCache.get(name);
+  if (typeof document === 'undefined') return fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   const result = val || fallback;
   _cssVarCache.set(name, result);
   return result;
 };
 
+/** Clear the CSS variable cache. Called automatically by MutationObserver on theme change; exported for test resets. */
+export function clearCssVarCache() { _cssVarCache.clear(); }
+
 // Auto-clear cache when theme changes (data-theme attribute mutation)
-new MutationObserver(() => _cssVarCache.clear()).observe(
-  document.documentElement,
-  { attributes: true, attributeFilter: ['data-theme'] },
-);
+if (typeof document !== 'undefined') {
+  new MutationObserver(() => _cssVarCache.clear()).observe(
+    document.documentElement,
+    { attributes: true, attributeFilter: ['data-theme'] },
+  );
+}
 
 const GRADE_CSS_VARS = {
   'grade-top':    '--color-grade-top-text',
@@ -109,7 +118,7 @@ function ScoreHistoryChart({ data, interaction }) {
   const { hoveredIndex, setHoveredIndex, selectedRunId, onBarClick } = interaction;
   return (
     <ResponsiveContainer width="100%" height="100%" minHeight={CHART_HEIGHT}>
-      <ComposedChart data={data} margin={{ top: 12, right: 8, bottom: 0, left: -16 }}>
+      <ComposedChart data={data} margin={CHART_MARGIN}>
         <defs>
           <linearGradient id="scoreAreaGrad" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor={cssVar('--color-chart-line')} stopOpacity={0.1} />

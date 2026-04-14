@@ -17,7 +17,15 @@ export function useLibrary() {
     finally { setLoading(false); }
   }, []);
 
-  const importStandard = useCallback(async (filePath) => { await importFromLibrary(filePath); }, []);
+  const importStandard = useCallback(async (filePath) => {
+    try {
+      await importFromLibrary(filePath);
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Failed to import standard');
+      throw err;
+    }
+  }, []);
 
   return { libraryStandards, loading, error, fetchLibrary, importStandard };
 }

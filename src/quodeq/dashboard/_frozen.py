@@ -2,15 +2,26 @@
 from __future__ import annotations
 
 import os
+import platform
 import subprocess
 import sys
 
 _MODULE_MAP = {
     "api": "quodeq.api.app",
     "webview": "quodeq.dashboard._webview_window",
+    "evaluate": "quodeq.cli",
 }
 
 _CMD_DISCOVERY_TIMEOUT_S = 5
+
+# SECURITY: Only allow well-known shell paths to prevent execution of
+# arbitrary binaries via a crafted $SHELL environment variable.
+_ALLOWED_SHELLS = {
+    "/bin/bash", "/bin/zsh", "/bin/sh",
+    "/usr/bin/bash", "/usr/bin/zsh", "/usr/bin/sh",
+    "/usr/local/bin/bash", "/usr/local/bin/zsh",
+    "/opt/homebrew/bin/bash", "/opt/homebrew/bin/zsh",
+}
 
 
 def is_frozen() -> bool:
@@ -38,9 +49,13 @@ def source_user_path() -> None:
     if not is_frozen() or sys.platform == "win32":
         return
     try:
+        # macOS-standard shell profile paths. These cover the default zsh
+        # and bash configurations; exotic setups may need QUODEQ_PATH override.
         cmd = ('source ~/.zprofile 2>/dev/null; source ~/.zshrc 2>/dev/null; '
                'source ~/.bash_profile 2>/dev/null; echo $PATH')
         shell = os.environ.get("SHELL", "/bin/zsh")
+        if shell not in _ALLOWED_SHELLS:
+            shell = "/bin/zsh"
         result = subprocess.run(
             [shell, "-c", cmd], capture_output=True, text=True,
             timeout=_CMD_DISCOVERY_TIMEOUT_S,
@@ -51,7 +66,6 @@ def source_user_path() -> None:
     except (subprocess.TimeoutExpired, OSError):
         pass
     # Fallback: add common locations
-    import platform
     brew = "/opt/homebrew/bin" if platform.machine() == "arm64" else "/usr/local/bin"
     extra = f"{os.path.expanduser('~/.local/bin')}:{brew}"
     os.environ["PATH"] = f"{os.environ.get('PATH', '')}:{extra}"

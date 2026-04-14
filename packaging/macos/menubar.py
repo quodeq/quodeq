@@ -10,6 +10,8 @@ import webbrowser
 
 import rumps
 
+_PKILL_TIMEOUT_S = 5
+
 from _helpers import (
     find_commands as _find_commands,
     find_icon as _find_icon,
@@ -30,16 +32,17 @@ from _dashboard import (
     _ERROR_DISPLAY_MAX,
 )
 
-_POLL_INTERVAL = 5
+_DEFAULT_APP_PORT = 4173
+_POLL_INTERVAL = int(os.environ.get("QUODEQ_POLL_INTERVAL", "5"))
 _PROCESS_PATTERNS = ("quodeq.api.app", "quodeq.action_api", "quodeq dashboard")
-_AUTO_START_DELAY_S = 1.5
+_AUTO_START_DELAY_S = float(os.environ.get("QUODEQ_AUTO_START_DELAY_S", "1.5"))
 _DEFAULT_PORTS = "4173,4174,4175,4180,4181,4182,4183"
 
 
 def _load_config(env=None):
     """Read port configuration from the environment (or an injected mapping)."""
     env = env or os.environ
-    app_port = int(env.get("QUODEQ_PORT", "4173"))
+    app_port = int(env.get("QUODEQ_PORT", str(_DEFAULT_APP_PORT)))
     ports = tuple(int(p) for p in env.get("QUODEQ_PORTS", _DEFAULT_PORTS).split(","))
     return app_port, ports
 
@@ -211,7 +214,7 @@ class QuodeqApp(rumps.App):
         cmds = self._cached_cmds
         quodeq_cmd = cmds.get("quodeq")
         if not quodeq_cmd:
-            self._set_error("quodeq not in PATH")
+            self._set_error("quodeq not in PATH. Install with 'pip install quodeq' or add its location to your PATH.")
             self._status_item.title = "Stopped"
             return
         self._status_item.title = "Starting..."
@@ -229,7 +232,12 @@ class QuodeqApp(rumps.App):
                 err = f.read(_STDERR_READ_MAX).strip()
         except OSError:
             err = "unknown error"
-        self._set_error(f"Crashed (exit {self._process.returncode}): {err[:_ERROR_DISPLAY_MAX]}")
+        sanitized = err[:_ERROR_DISPLAY_MAX].replace("\n", " ").strip()
+        self._set_error(
+            f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). "
+            f"Try restarting. Details: {sanitized}" if sanitized else
+            f"Dashboard stopped unexpectedly (exit code {self._process.returncode}). Try restarting."
+        )
         self._status_item.title = "Stopped"
         self._cleanup_stderr_log()
 
@@ -269,7 +277,7 @@ class QuodeqApp(rumps.App):
             _kill_port_processes(port)
         for pattern in _PROCESS_PATTERNS:
             try:
-                subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=5)
+                subprocess.run(["pkill", "-f", pattern], capture_output=True, timeout=_PKILL_TIMEOUT_S)
             except (subprocess.TimeoutExpired, OSError):
                 pass
         with self._state_lock:

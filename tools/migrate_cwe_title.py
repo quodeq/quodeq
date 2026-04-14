@@ -18,6 +18,8 @@ import json
 import sys
 from pathlib import Path
 
+# Standalone script — add src/ to sys.path so quodeq imports resolve
+# without requiring the package to be installed.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from quodeq.shared.utils import TEXT_ENCODING as _TEXT_ENCODING

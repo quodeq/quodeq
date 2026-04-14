@@ -15,6 +15,9 @@ from quodeq.data.fs.report_parser.markdown_table import (
 from quodeq.core.scoring.internals import score_to_grade_label
 
 _GRADE_SCORE_RE = re.compile(r"^(\d+(?:\.\d+)?/10)(?:\s+(\w+))?$")
+_MIN_HEADER_COLS = 4
+_MIN_DATA_COLS = 3
+_SKIP_ROW_COLS = 2
 
 
 def _parse_grade_and_score(cells: list[str], is_four_col: bool) -> tuple[str | None, float | None]:
@@ -29,7 +32,7 @@ def _parse_grade_and_score(cells: list[str], is_four_col: bool) -> tuple[str | N
             grade = match.group(2)
         else:
             score = raw
-    elif len(cells) >= 3:
+    elif len(cells) >= _MIN_DATA_COLS:
         score = cells[1]
         grade = cells[2]
     else:
@@ -47,10 +50,10 @@ def parse_eval_markdown(markdown: str, project: str, run_id: str, dimension: str
     principle_grades: list[dict[str, Any]] = []
     if len(table_lines) >= 2:
         header_cells = [c for c in split_table_row(table_lines[0]) if c]
-        is_four_col = len(header_cells) >= 4
+        is_four_col = len(header_cells) >= _MIN_HEADER_COLS
         for line in table_lines[1:]:
             cells = [c for c in split_table_row(line) if c]
-            if len(cells) < 2:
+            if len(cells) < _SKIP_ROW_COLS:
                 continue
             principle = cells[0]
             grade, score = _parse_grade_and_score(cells, is_four_col)

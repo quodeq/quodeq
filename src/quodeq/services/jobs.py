@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 import json
+import os
 import threading
 import uuid
 from typing import Any, Callable, Iterable
@@ -14,6 +15,7 @@ import subprocess
 
 from quodeq.core.types import JobSnapshot
 
+from quodeq.analysis._process import _kill_tree
 from quodeq.services._job_model import (
     Job,
     JobStore,
@@ -44,6 +46,7 @@ _REPORT_PATH_MARKER = "Report path:"
 _PROCESS_WAIT_TIMEOUT_S = 30
 _EXIT_CODE_SPAWN_FAILURE = -1
 _EXIT_CODE_TIMEOUT = -9
+_DEFAULT_LIST_LIMIT = 100
 
 # Canonical job status strings.
 STATUS_RUNNING = "running"
@@ -125,7 +128,6 @@ class JobManager:
             job.ended_at = datetime.now(timezone.utc).isoformat()
             self._store.put(job)
         if process:
-            from quodeq.analysis._process import _kill_tree
             _kill_tree(process.pid)
         return True
 
@@ -134,7 +136,6 @@ class JobManager:
         with self._lock:
             for job_id, process in list(self._processes.items()):
                 try:
-                    from quodeq.analysis._process import _kill_tree
                     _kill_tree(process.pid)
                 except (ProcessLookupError, OSError):
                     pass
@@ -148,10 +149,15 @@ class JobManager:
                 return None
             return job.to_dict()
 
-    def list_jobs(self) -> list[JobSnapshot]:
-        """Return all tracked jobs as frozen snapshots."""
+    def list_jobs(self, *, limit: int = _DEFAULT_LIST_LIMIT, offset: int = 0) -> list[JobSnapshot]:
+        """Return tracked jobs as frozen snapshots with pagination.
+
+        When *limit* is 0 all jobs are returned (no cap).
+        """
         with self._lock:
-            return [job.to_dict() for job in self._store.list()]
+            all_jobs = [job.to_dict() for job in self._store.list()]
+        page = all_jobs[offset:] if offset else all_jobs
+        return page[:limit] if limit > 0 else page
 
     @staticmethod
     def _apply_marker(job: Job, line: str) -> None:
@@ -224,13 +230,16 @@ class JobManager:
             for jid in completed[:excess]:
                 self._store.delete(jid)
 
-    _JOB_TIMEOUT_S = 7200  # 2 hours max per evaluation job
+    @property
+    def _job_timeout_s(self) -> int:
+        """Job timeout in seconds — reads from env at call time for lazy configuration."""
+        return int(os.environ.get("QUODEQ_JOB_TIMEOUT_S", "7200"))
 
     def _monitor_process(self, job_id: str, process: subprocess.Popen) -> None:
         try:
-            exit_code = process.wait(timeout=self._JOB_TIMEOUT_S)
+            exit_code = process.wait(timeout=self._job_timeout_s)
         except subprocess.TimeoutExpired:
-            _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._JOB_TIMEOUT_S)
+            _logger.warning("Job %s exceeded %ds timeout — killing", job_id, self._job_timeout_s)
             process.kill()
             process.wait(timeout=_PROCESS_WAIT_TIMEOUT_S)
             exit_code = _EXIT_CODE_TIMEOUT

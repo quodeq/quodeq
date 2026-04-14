@@ -16,6 +16,7 @@ from ._mapper_helpers import (
 
 
 def parse_project_metadata(raw: dict[str, object]) -> ProjectMetadata:
+    """Parse a raw dict into a ProjectMetadata dataclass."""
     name = _require_str(raw, "name", "ProjectMetadata")
     return ProjectMetadata(
         name=name,
@@ -28,6 +29,7 @@ def parse_project_metadata(raw: dict[str, object]) -> ProjectMetadata:
 
 
 def parse_project_entry(raw: dict[str, object]) -> ProjectEntry:
+    """Parse a raw dict into a ProjectEntry dataclass."""
     pid = _require_str(raw, "id", "ProjectEntry")
     name = _require_str(raw, "name", "ProjectEntry")
     return ProjectEntry(
@@ -49,6 +51,7 @@ def parse_project_entry(raw: dict[str, object]) -> ProjectEntry:
 
 
 def parse_job_snapshot(raw: dict[str, object]) -> JobSnapshot:
+    """Parse a raw dict into a JobSnapshot dataclass."""
     job_id = _require_str(raw, "jobId", "JobSnapshot")
     status = _require_str(raw, "status", "JobSnapshot")
 

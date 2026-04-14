@@ -2,17 +2,27 @@
 from __future__ import annotations
 
 import logging
+import os
+import time as _time
 
-from flask import Flask, Response, jsonify
+from flask import Flask, Response, jsonify, request
 
 from quodeq.api.helpers import error_response
 from quodeq.core.types import to_camel_dict
 
 logger = logging.getLogger(__name__)
 
+# Module-level mutable cache — reset via reset_cwe_cache() for test isolation.
 _cwe_cache: list | None = None
 _cwe_cache_time: float = 0.0
-_CWE_CACHE_TTL = 3600  # 1 hour
+_CWE_CACHE_TTL = int(os.environ.get("QUODEQ_CWE_CACHE_TTL", "3600"))  # 1 hour
+
+
+def reset_cwe_cache() -> None:
+    """Clear the CWE cache. Useful for test isolation."""
+    global _cwe_cache, _cwe_cache_time
+    _cwe_cache = None
+    _cwe_cache_time = 0.0
 
 
 def register_read_routes(app: Flask, get_service, get_library_client) -> None:
@@ -26,7 +36,6 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
 
     @app.get("/api/standards/refs/cwe")
     def list_cwes() -> Response:
-        import time as _time
         global _cwe_cache, _cwe_cache_time
         now = _time.monotonic()
         if _cwe_cache is None or (now - _cwe_cache_time) > _CWE_CACHE_TTL:
@@ -36,8 +45,11 @@ def register_read_routes(app: Flask, get_service, get_library_client) -> None:
 
     @app.get("/api/standards")
     def list_standards() -> Response:
+        limit = request.args.get("limit", 500, type=int)
+        offset = request.args.get("offset", 0, type=int)
         svc = get_service(app)
-        return jsonify([to_camel_dict(s) for s in svc.list_standards()])
+        items = [to_camel_dict(s) for s in svc.list_standards()]
+        return jsonify(items[offset:offset + limit])
 
     @app.get("/api/standards/library")
     def list_library() -> Response:

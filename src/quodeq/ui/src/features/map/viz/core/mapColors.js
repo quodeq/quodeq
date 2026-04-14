@@ -1,3 +1,7 @@
+const RATE_HIGH = 0.9;
+const RATE_MEDIUM = 0.7;
+const RATE_LOW = 0.4;
+
 export function severityColor(severity) {
   switch (severity) {
     case 'critical': return 'var(--color-sev-critical-text)';
@@ -8,9 +12,9 @@ export function severityColor(severity) {
 }
 
 export function complianceRateColor(rate) {
-  if (rate >= 0.9) return 'var(--color-compliance)';
-  if (rate >= 0.7) return 'var(--color-sev-minor-text)';
-  if (rate >= 0.4) return 'var(--color-sev-major-text)';
+  if (rate >= RATE_HIGH) return 'var(--color-compliance)';
+  if (rate >= RATE_MEDIUM) return 'var(--color-sev-minor-text)';
+  if (rate >= RATE_LOW) return 'var(--color-sev-major-text)';
   return 'var(--color-sev-critical-text)';
 }
 
@@ -26,9 +30,9 @@ export function severityCellStyle(sev) {
 }
 
 export function complianceRateCellStyle(rate) {
-  if (rate >= 0.9) return SEV_STYLES.compliance;
-  if (rate >= 0.7) return SEV_STYLES.minor;
-  if (rate >= 0.4) return SEV_STYLES.major;
+  if (rate >= RATE_HIGH) return SEV_STYLES.compliance;
+  if (rate >= RATE_MEDIUM) return SEV_STYLES.minor;
+  if (rate >= RATE_LOW) return SEV_STYLES.major;
   return SEV_STYLES.critical;
 }
 
@@ -53,9 +57,9 @@ function severityBorderColor(severity) {
 }
 
 function complianceRateBorderColor(rate) {
-  if (rate >= 0.9) return 'var(--color-compliance-border)';
-  if (rate >= 0.7) return 'var(--color-sev-minor-border)';
-  if (rate >= 0.4) return 'var(--color-sev-major-border)';
+  if (rate >= RATE_HIGH) return 'var(--color-compliance-border)';
+  if (rate >= RATE_MEDIUM) return 'var(--color-sev-minor-border)';
+  if (rate >= RATE_LOW) return 'var(--color-sev-major-border)';
   return 'var(--color-sev-critical-border)';
 }
 

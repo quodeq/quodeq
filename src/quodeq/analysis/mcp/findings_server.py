@@ -77,7 +77,10 @@ def main() -> None:
                 try:
                     _dispatch(msg, router, queue, sa.agent_id)
                 except (KeyError, TypeError, ValueError, json.JSONDecodeError, OSError) as exc:
-                    sys.stderr.write(f"Dispatch error: {exc}\n")
+                    sys.stderr.write(
+                        f"Dispatch error: {exc}. "
+                        f"Check that the message format matches the expected MCP schema.\n"
+                    )
     except OSError as exc:
         sys.stderr.write(f"Cannot open findings file {sa.findings_file}: {exc}\n")
         sys.exit(1)

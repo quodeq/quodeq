@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import platform
 import subprocess
 import urllib.request
@@ -10,8 +11,12 @@ import urllib.error
 
 _log = logging.getLogger(__name__)
 
-_OLLAMA_BASE = "http://localhost:11434"
+_OLLAMA_BASE = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 _TIMEOUT_S = 3
+_MAX_PARALLEL_AGENTS = 5
+_SYSCTL_TIMEOUT_S = 3
+_NVIDIA_SMI_TIMEOUT_S = 5
+_MIB_TO_BYTES = 1024 * 1024
 
 
 def get_ollama_status(base_url: str = _OLLAMA_BASE) -> dict:
@@ -26,7 +31,8 @@ def get_ollama_status(base_url: str = _OLLAMA_BASE) -> dict:
                 "address": base_url.replace("http://", ""),
             }
     except (urllib.error.URLError, ConnectionRefusedError, OSError) as exc:
-        return {"running": False, "error": str(exc)}
+        _log.warning("Ollama status check failed: %s", exc)
+        return {"running": False, "error": "Connection failed"}
 
 
 def list_ollama_models(base_url: str = _OLLAMA_BASE) -> list[dict]:
@@ -80,7 +86,7 @@ def estimate_max_agents(
 
     effective_size = model_size * overhead_factor
     max_contexts = int(gpu_memory / effective_size)
-    estimate = max(1, min(max_contexts, 5))
+    estimate = max(1, min(max_contexts, _MAX_PARALLEL_AGENTS))
 
     return {
         "estimate": estimate,
@@ -89,31 +95,44 @@ def estimate_max_agents(
     }
 
 
-def _get_gpu_memory() -> float:
-    """Detect total GPU/unified memory in bytes. Returns 0 if unknown."""
+def _detect_memory() -> float:
+    """Detect total GPU/unified memory in bytes via platform dispatch.
+
+    Currently supports:
+    - **macOS (Darwin)**: reports unified memory via ``sysctl hw.memsize``.
+    - **Linux**: queries NVIDIA discrete GPU memory via ``nvidia-smi``.
+
+    Extension points: add branches for Windows (``wmic`` or WMI) and
+    AMD ROCm (``rocm-smi``) as needed.
+
+    Returns 0 if detection fails or the platform is unsupported.
+    """
     system = platform.system()
     try:
         if system == "Darwin":
             # macOS: unified memory — total system RAM is the GPU budget
-            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=3)
+            out = subprocess.check_output(["sysctl", "-n", "hw.memsize"], timeout=_SYSCTL_TIMEOUT_S)
             return float(out.strip())
         if system == "Linux":
             # Try nvidia-smi for discrete GPU
             out = subprocess.check_output(
                 ["nvidia-smi", "--query-gpu=memory.total", "--format=csv,noheader,nounits"],
-                timeout=5,
+                timeout=_NVIDIA_SMI_TIMEOUT_S,
             )
             # First GPU, value in MiB
             mib = float(out.decode().strip().split("\n")[0])
-            return mib * 1024 * 1024
+            return mib * _MIB_TO_BYTES
     except (subprocess.SubprocessError, FileNotFoundError, ValueError, OSError):
         pass
     return 0
 
 
+# Keep backward-compatible alias
+_get_gpu_memory = _detect_memory
+
+
 def run_concurrency_test(
     model: str,
-    max_agents: int = 5,
     base_url: str = _OLLAMA_BASE,
 ) -> dict:
     """Estimate max parallel agents based on VRAM usage.

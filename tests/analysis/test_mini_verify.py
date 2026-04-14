@@ -2,6 +2,9 @@ from unittest.mock import patch, MagicMock
 
 from quodeq.analysis.subagents._verification import _dispatch_mini_verify
 
+_TEST_MAX_SUBAGENTS = 10
+_TEST_POOL_BUDGET = 300
+
 
 @patch("quodeq.analysis.subagents._verification._run_verification_pool")
 def test_mini_verify_caps_agents(mock_pool, tmp_path):
@@ -9,9 +12,9 @@ def test_mini_verify_caps_agents(mock_pool, tmp_path):
     config = MagicMock()
     config.src = tmp_path
     config.standards_dir = None
-    config.options.max_subagents = 10
+    config.options.max_subagents = _TEST_MAX_SUBAGENTS
     config.options.ai_model = None
-    config.options.pool_budget = 300
+    config.options.pool_budget = _TEST_POOL_BUDGET
 
     findings = [
         {"file": f"f{i}.py", "p": "S", "t": "violation", "line": 1, "reason": "r"}

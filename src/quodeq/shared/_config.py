@@ -1,6 +1,7 @@
 """Config dataclass and lazy singleton loader."""
 from __future__ import annotations
 
+import os
 import threading
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -9,7 +10,7 @@ from typing import Any, Iterator
 
 from quodeq.shared._io import read_json
 
-_DEFAULTS_PATH = Path(__file__).resolve().parent / "defaults.json"
+_DEFAULTS_PATH = Path(os.environ.get("QUODEQ_DEFAULTS_PATH", str(Path(__file__).resolve().parent / "defaults.json")))
 
 # Derived constants (not URLs, safe to keep inline).
 ACTION_API_MODULE = "quodeq.api.app"

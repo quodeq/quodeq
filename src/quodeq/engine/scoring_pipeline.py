@@ -10,6 +10,7 @@ from quodeq.engine._runner_markers import cleanup_stream
 
 _NUMERICAL_MODE = "numerical"
 _NA_LABEL = "N/A"
+_MAX_SCORE = 10
 
 
 def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -> dict:
@@ -30,7 +31,7 @@ def run_full(config: RunConfig, output_dir: Path, mode: str = _NUMERICAL_MODE) -
         overall = scores.overall
         if mode == _NUMERICAL_MODE:
             val = overall.weighted_score if overall else None
-            results[dimension] = f"{val}/10" if val is not None else _NA_LABEL
+            results[dimension] = f"{val}/{_MAX_SCORE}" if val is not None else _NA_LABEL
         else:
             results[dimension] = (overall.weighted_grade if overall else None) or _NA_LABEL
 

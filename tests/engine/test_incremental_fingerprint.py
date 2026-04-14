@@ -91,7 +91,7 @@ class TestSaveDimensionFingerprintJsonlUnion:
 
 
 class TestBackfillSkipsVerification:
-    @patch("quodeq.analysis.runner._process_single_dimension")
+    @patch("quodeq.analysis._dimension_ops._process_single_dimension")
     def test_verify_findings_disabled_during_backfill(self, mock_process, tmp_path):
         """Backfill disables verify_findings before calling _process_single_dimension."""
         config = MagicMock()
@@ -125,7 +125,7 @@ class TestBackfillSkipsVerification:
         # verify_findings should be restored after
         assert config.options.verify_findings is True
 
-    @patch("quodeq.analysis.runner._process_single_dimension")
+    @patch("quodeq.analysis._dimension_ops._process_single_dimension")
     def test_verify_findings_restored_on_error(self, mock_process, tmp_path):
         """verify_findings is restored even if _process_single_dimension raises."""
         config = MagicMock()

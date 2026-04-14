@@ -246,12 +246,19 @@ class TestScanPath:
         assert resp.get_json()["code"] == "MISSING_PATH"
 
     def test_path_not_directory(self, client):
-        resp = client.post("/api/scan", json={"path": "/nonexistent/path/abc"})
+        # Use a path under home that doesn't exist to pass the allowlist check
+        fake = str(Path.home() / "nonexistent_quodeq_test_path_abc")
+        resp = client.post("/api/scan", json={"path": fake})
         assert resp.status_code == 400
         assert resp.get_json()["code"] == "NOT_DIR"
 
     def test_system_dir_blocked(self, client):
         resp = client.post("/api/scan", json={"path": "/etc"})
+        assert resp.status_code == 403
+        assert resp.get_json()["code"] == "FORBIDDEN"
+
+    def test_outside_home_blocked(self, client):
+        resp = client.post("/api/scan", json={"path": "/nonexistent/path/abc"})
         assert resp.status_code == 403
         assert resp.get_json()["code"] == "FORBIDDEN"
 
@@ -265,6 +272,7 @@ class TestScanPath:
             files: int = 5
             languages: list = None
 
-        with patch("quodeq.services._fs_scan.scan_project", return_value=FakeScanResult(files=5, languages=["py"])):
+        with patch("quodeq.services._fs_scan.scan_project", return_value=FakeScanResult(files=5, languages=["py"])), \
+             patch("pathlib.Path.home", return_value=tmp_path):
             resp = client.post("/api/scan", json={"path": str(target)})
             assert resp.status_code == 200

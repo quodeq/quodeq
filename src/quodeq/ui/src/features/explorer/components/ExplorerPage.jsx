@@ -1,5 +1,4 @@
-import { useState, useEffect, useMemo, useRef } from 'react';
-import { getDimensionEval, getRescore } from '../../../api/index.js';
+import { useState, useMemo } from 'react';
 import TopOffendingFilesTable from '../../dashboard/components/TopOffendingFilesTable.jsx';
 import ViolationsByPrincipleTable from '../../dashboard/components/ViolationsByPrincipleTable.jsx';
 import CopyButton, { SparkleIcon, FileTextIcon } from '../../../components/CopyButton.jsx';
@@ -8,40 +7,10 @@ import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
+import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
 
+const TOOLBAR_GAP = 8;
 const columnStyle = { display: 'flex', flexDirection: 'column', gap: 2 };
-
-function computeAllViolations(evalData) {
-  if (!evalData) return [];
-  if (evalData.violations?.length > 0) return evalData.violations;
-  return (evalData.principles || []).flatMap((p) =>
-    (p.violations || []).map((v) => ({
-      principle: p.name,
-      file: v.file ? v.file.split(':')[0] : null,
-      line: v.line || null,
-      severity: v.severity || 'minor',
-      reason: v.reason || v.code || '',
-    }))
-  );
-}
-
-function computeSeverityCounts(allViolations) {
-  const counts = { critical: 0, major: 0, minor: 0 };
-  allViolations.forEach((v) => {
-    const s = (v.severity || 'minor').toLowerCase();
-    if (counts[s] !== undefined) counts[s]++;
-  });
-  return counts;
-}
-
-function computeComplianceByPrinciple(evalData) {
-  const map = new Map();
-  for (const c of (evalData?.compliance || [])) {
-    if (!map.has(c.principle)) map.set(c.principle, []);
-    map.get(c.principle).push(c);
-  }
-  return map;
-}
 
 function DimensionOverview({ data, stats, onNavigate }) {
   const { evalData, runId, dateLabel, allViolations } = data;
@@ -53,12 +22,12 @@ function DimensionOverview({ data, stats, onNavigate }) {
           <span className="explorer-dimension-title">{evalData.dimension}</span>
           {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
         </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-start', gap: TOOLBAR_GAP }}>
           <CopyButton
             label="Report"
             className="fix-plan-btn-header"
             icon={<FileTextIcon />}
-            onClick={() => copyToClipboard(buildDimensionReport(evalData, principleGrades || [], allViolations, overallGrade, dateLabel, runId))}
+            onClick={() => copyToClipboard(buildDimensionReport({ evalData, principleGrades: principleGrades || [], allViolations, overallGrade, dateLabel, runId }))}
           />
           {allViolations.length > 0 && (
             <CopyButton
@@ -192,105 +161,31 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
   );
 }
 
-function buildEvalPrincipalFn(evalData, complianceByPrinciple, project, runId) {
-  const principlesByName = new Map((evalData.principles || []).map((p) => [p.name, p]));
-  const gradesByPrinciple = new Map((evalData.principleGrades || []).map((p) => [p.principle, p]));
-  return function buildEvalPrincipal(principleId) {
-    const principleData = principlesByName.get(principleId);
-    const pg = gradesByPrinciple.get(principleId);
-    return {
-      principle: principleId, score: pg?.score || null, grade: pg?.grade || null,
-      dimension: evalData.dimension || '',
-      project: project || '', runId: runId || '',
-      principleData, dimViolations: principleData?.violations || [],
-      dimCompliance: complianceByPrinciple.get(principleId) || [],
-    };
-  };
-}
-
-function useDerivedExplorerStats(evalData, allViolations) {
-  const topFiles = useMemo(() => evalData ? buildTopOffendingFiles([{ dimension: evalData.dimension, violations: allViolations }]) : [], [evalData, allViolations]);
-  const severityCounts = useMemo(() => computeSeverityCounts(allViolations), [allViolations]);
-  const uniquePrinciples = useMemo(() => new Set(allViolations.map((v) => v.principle).filter(Boolean)).size, [allViolations]);
-  const totalCompliant = useMemo(() => (evalData?.principles || []).reduce((sum, p) => sum + (p.compliance?.length || 0), 0), [evalData]);
-  const complianceByPrinciple = useMemo(() => computeComplianceByPrinciple(evalData), [evalData]);
-  return { topFiles, severityCounts, uniquePrinciples, totalCompliant, complianceByPrinciple };
-}
-
-function mergeRescoreIntoEval(prev, dimData) {
-  if (!prev || !dimData) return prev;
-  const rescPrinciples = dimData.principles || [];
-  const updatedGrades = (prev.principleGrades || []).map((pg) => {
-    if (pg.isOverall || pg.principle?.includes('Overall')) {
-      return { ...pg, score: dimData.overallScore ?? pg.score, grade: dimData.overallGrade ?? pg.grade };
-    }
-    const match = rescPrinciples.find((rp) => rp.principle === pg.principle);
-    return match ? { ...pg, score: match.score, grade: match.grade } : pg;
-  });
-  return {
-    ...prev,
-    principleGrades: updatedGrades,
-    overallScore: dimData.overallScore ?? prev.overallScore,
-    overallGrade: dimData.overallGrade ?? prev.overallGrade,
-  };
-}
-
-async function fetchAndRescore(project, runId, dimension) {
-  const [data, rescored] = await Promise.all([
-    getDimensionEval(project, runId, dimension),
-    getRescore(project, runId).catch(() => null),
-  ]);
-  if (rescored) {
-    const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
-    return dimData ? mergeRescoreIntoEval(data, dimData) : data;
-  }
-  return data;
-}
-
-function useExplorerData(project, dimension, runId, refreshSignal) {
-  const [evalData, setEvalData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  useEffect(() => {
-    setLoading(true);
-    fetchAndRescore(project, runId, dimension)
-      .then((data) => { setEvalData(data); setLoading(false); })
-      .catch((err) => { setError(err.message); setLoading(false); });
-  }, [project, dimension, runId]);
-
-  const initialRef = useRef(refreshSignal);
-  useEffect(() => {
-    if (refreshSignal === initialRef.current) return;
-    if (!evalData || !project || !runId) return;
-    getRescore(project, runId).then((rescored) => {
-      const dimData = (rescored.dimensions || []).find((d) => d.dimension === dimension);
-      if (dimData) setEvalData((prev) => mergeRescoreIntoEval(prev, dimData));
-    }).catch(() => {});
-  }, [refreshSignal]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const overallGrade = useMemo(() => (evalData?.principleGrades || []).find((pg) => pg.isOverall || pg.principle?.includes('Overall')), [evalData]);
-  const principleGrades = useMemo(() => (evalData?.principleGrades || []).filter((pg) => !pg.isOverall && !pg.principle?.includes('Overall')), [evalData]);
-  const allViolations = useMemo(() => computeAllViolations(evalData), [evalData]);
-  const stats = useDerivedExplorerStats(evalData, allViolations);
-  return { evalData, loading, error, overallGrade, principleGrades, allViolations, ...stats };
-}
-
 export default function ExplorerPage({ project, dimension, runId, dateLabel, severityFilter, onNavigate, refreshSignal }) {
   const d = useExplorerData(project, dimension, runId, refreshSignal);
   const [activeSevFilter, setActiveSevFilter] = useState(severityFilter || null);
+
+  // All hooks must run before any early returns (React hooks rules)
+  const buildEvalPrincipal = useMemo(
+    () => d.evalData ? buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId) : () => ({}),
+    [d.evalData, d.complianceByPrinciple, project, runId]
+  );
+  const filteredViolations = useMemo(
+    () => activeSevFilter
+      ? d.allViolations.filter(v => (v.severity || 'minor') === activeSevFilter)
+      : d.allViolations,
+    [d.allViolations, activeSevFilter]
+  );
+  const filteredTopFiles = useMemo(
+    () => activeSevFilter
+      ? buildTopOffendingFiles(filteredViolations)
+      : d.topFiles,
+    [filteredViolations, activeSevFilter, d.topFiles]
+  );
+
   if (d.loading) return <div className="loading" role="status" aria-live="polite">Loading…</div>;
   if (d.error) return <div className="inline-error">Failed to load evaluation data. Please try again or check the console for details.</div>;
   if (!d.evalData) return <div className="empty-state"><h2>No data found</h2></div>;
-  const buildEvalPrincipal = buildEvalPrincipalFn(d.evalData, d.complianceByPrinciple, project, runId);
-
-  // Apply severity filter
-  const filteredViolations = activeSevFilter
-    ? d.allViolations.filter(v => (v.severity || 'minor') === activeSevFilter)
-    : d.allViolations;
-  const filteredTopFiles = activeSevFilter
-    ? buildTopOffendingFiles(filteredViolations)
-    : d.topFiles;
 
   return (
     <>

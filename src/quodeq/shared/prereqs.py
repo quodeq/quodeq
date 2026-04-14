@@ -1,9 +1,13 @@
 """Prerequisite checks for external tool dependencies."""
 from __future__ import annotations
 
+import os
 import subprocess
+import urllib.error
+import urllib.request
 
-from quodeq.shared.utils import IS_WIN32 as _IS_WIN32
+from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_ai_cmd
 
 _INSTALL_HINT_NODE = (
     "Install it from https://nodejs.org/ or via your package manager:\n"
@@ -11,25 +15,49 @@ _INSTALL_HINT_NODE = (
     "  apt install nodejs       # Ubuntu/Debian"
 )
 
-_INSTALL_HINT_CLAUDE = (
-    "Install it from https://docs.anthropic.com/en/docs/claude-code/overview\n"
-    "  npm install -g @anthropic-ai/claude-code"
+_CLI_INSTALL_HINTS: dict[str, str] = {
+    "claude": (
+        "Install Claude Code:\n"
+        "  npm install -g @anthropic-ai/claude-code\n"
+        "  https://docs.anthropic.com/en/docs/claude-code/overview"
+    ),
+    "codex": (
+        "Install Codex CLI:\n"
+        "  npm install -g @openai/codex\n"
+        "  https://developers.openai.com/codex/quickstart"
+    ),
+    "gemini": (
+        "Install Gemini CLI:\n"
+        "  npm install -g @anthropic-ai/gemini-cli\n"
+        "  https://geminicli.com/docs/get-started/installation/"
+    ),
+}
+
+_SETTINGS_HINT = (
+    "Open the dashboard and go to Settings to select your AI provider:\n"
+    "  quodeq"
 )
 
-
 _VERSION_CMD_TIMEOUT_S = 30
+_API_CHECK_TIMEOUT_S = 5
 
 
 def _run_version_cmd(cmd: list[str]) -> str:
     """Run a command and return its stdout, or raise FileNotFoundError.
 
     ``shell=True`` is required on Windows so that ``where`` and other
-    shell built-ins resolve correctly.  The *cmd* list is always
-    hard-coded by callers in this module (never user-influenced),
-    so the shell injection risk does not apply.
+    shell built-ins resolve correctly and executables installed via npm
+    (which are .cmd shims) can be found on PATH.  The *cmd* parameter
+    is always a ``list[str]`` hard-coded by callers in this module
+    (never user-influenced), so the shell injection risk does not apply.
 
     SECURITY: Do not pass user-controlled strings into *cmd*.
+    All callers in this module construct *cmd* from string literals
+    (e.g. ``["node", "--version"]``).  If this function is ever
+    exposed to external input, ``shell=True`` MUST be removed.
     """
+    if not isinstance(cmd, list):
+        raise TypeError("cmd must be a list of strings, not a raw string")
     result = subprocess.run(
         cmd, capture_output=True, text=True, check=True, shell=_IS_WIN32,
         timeout=_VERSION_CMD_TIMEOUT_S,
@@ -72,14 +100,39 @@ def check_npm(min_major: int = 9) -> None:
     _check_tool_version(["npm", "--version"], "npm", min_major, _INSTALL_HINT_NODE)
 
 
-def check_claude_code() -> None:
-    """Raise RuntimeError if Claude Code CLI is not available."""
+def _is_provider_explicitly_configured() -> bool:
+    """Return True if the user has explicitly set a provider via env or config."""
+    return "AI_PROVIDER" in os.environ or "AI_CMD" in os.environ
+
+
+def _check_cli_provider(provider: str) -> None:
+    """Check that a CLI provider binary is available on PATH."""
     try:
-        _run_version_cmd(["claude", "--version"])
+        _run_version_cmd([provider, "--version"])
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
+        hint = _CLI_INSTALL_HINTS.get(provider, f"Install {provider} and make sure it is on your PATH.")
         raise RuntimeError(
-            f"Claude Code is required but not found.\n{_INSTALL_HINT_CLAUDE}"
+            f"'{provider}' is configured as your AI provider but was not found.\n\n"
+            f"{hint}\n\n"
+            f"Or choose a different provider in the dashboard Settings:\n"
+            f"  quodeq"
         ) from exc
+
+
+def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> None:
+    """Check that an API provider has basic connectivity (Ollama: server running)."""
+    _env = env or os.environ
+    if provider == "ollama":
+        try:
+            _ollama_base = _env.get("OLLAMA_BASE_URL", "http://localhost:11434")
+            urllib.request.urlopen(f"{_ollama_base}/api/tags", timeout=_API_CHECK_TIMEOUT_S)
+        except (urllib.error.URLError, OSError) as exc:
+            raise RuntimeError(
+                "Ollama is configured as your AI provider but the server is not running.\n\n"
+                "Start it with:\n"
+                "  ollama serve\n\n"
+                "Or install Ollama from https://ollama.com/download"
+            ) from exc
 
 
 def check_dashboard_prereqs() -> None:
@@ -89,5 +142,26 @@ def check_dashboard_prereqs() -> None:
 
 
 def check_evaluate_prereqs() -> None:
-    """Check all prerequisites for the evaluate command."""
-    check_claude_code()
+    """Check all prerequisites for the evaluate command.
+
+    Checks the configured AI provider instead of always assuming Claude.
+    If no provider is configured, tells the user to select one.
+    """
+    if not _is_provider_explicitly_configured():
+        raise RuntimeError(
+            "No AI provider configured.\n\n"
+            "Quodeq needs an AI provider to evaluate your code. You can use:\n\n"
+            "  Local (free, private):  Ollama with Gemma 4\n"
+            "  Cloud (faster):         Claude Code, Codex CLI, or Gemini CLI\n\n"
+            f"{_SETTINGS_HINT}"
+        )
+
+    provider = get_ai_cmd()
+    configs = get_provider_configs()
+    provider_cfg = configs.get(provider, {})
+    provider_type = provider_cfg.get("type", "cli")
+
+    if provider_type == "cli":
+        _check_cli_provider(provider)
+    elif provider_type == "api":
+        _check_api_provider(provider)

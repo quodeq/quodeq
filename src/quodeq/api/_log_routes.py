@@ -5,6 +5,8 @@ from flask import Flask, Response, jsonify, request
 
 from quodeq.api._log_buffer import LogBuffer
 
+_LOG_POLL_INTERVAL_MS = 2000
+
 
 def register_log_routes(app: Flask, log_buffer: LogBuffer) -> None:
     """Register the /api/logs endpoint."""
@@ -56,20 +58,20 @@ async function poll() {
       data.lines.forEach(e => {
         const line = document.createElement('div');
         const ts = e.timestamp ? e.timestamp.slice(11, 19) : '';
-        const ets = ts.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        const ets = ts.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         line.innerHTML = '<span class="ts">[' + ets + ']</span> ' +
-          e.line.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+          e.line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
         frag.appendChild(line);
         since = e.index;
       });
       el.appendChild(frag);
       window.scrollTo(0, document.body.scrollHeight);
     }
-  } catch {}
+  } catch (e) { console.warn('poll error', e); }
 }
 poll();
-setInterval(poll, 2000);
+setInterval(poll, %d);
 </script>
 </body>
-</html>"""
+</html>""" % _LOG_POLL_INTERVAL_MS
         return Response(html, content_type="text/html")

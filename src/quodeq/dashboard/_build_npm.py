@@ -10,8 +10,8 @@ from quodeq.shared.logging import log_info
 
 from quodeq.dashboard._build_hash import _SYNC_ITEMS
 
-_NPM_INSTALL_TIMEOUT_S = 300
-_NPM_BUILD_TIMEOUT_S = 600
+_NPM_INSTALL_TIMEOUT_S = int(os.environ.get("QUODEQ_NPM_INSTALL_TIMEOUT_S", "300"))
+_NPM_BUILD_TIMEOUT_S = int(os.environ.get("QUODEQ_NPM_BUILD_TIMEOUT_S", "600"))
 
 
 def _quodeq_dir(env: dict[str, str] | None = None) -> Path:
@@ -63,7 +63,9 @@ def run_npm_build(workdir: Path, static_dir: Path) -> None:
     """Run npm install (if needed) and npm run build."""
     npm = shutil.which("npm")
     if npm is None:
-        raise FileNotFoundError("npm not found on PATH")
+        raise FileNotFoundError(
+            "npm not found on PATH. Install Node.js from https://nodejs.org/ or via your package manager."
+        )
 
     if not (workdir / "node_modules").is_dir():
         log_info("Installing npm dependencies...")

@@ -18,17 +18,28 @@ def _is_date_line(line: str) -> bool:
     return len(line) >= 10 and line[4:5] == "-" and line[7:8] == "-" and " " in line
 
 
+def _has_git(src: Path) -> bool:
+    """Check if *src* (or a parent) is inside a git repository."""
+    if (src / ".git").exists():
+        return True
+    check = src
+    while check != check.parent:
+        if (check / ".git").exists():
+            return True
+        check = check.parent
+    return False
+
+
 def _run_git_log(src: Path, months: int = 3) -> str | None:
-    """Run git log and return raw output, or None if git unavailable."""
-    if not (src / ".git").exists():
-        # Check parent directories too (we might be in a subdirectory)
-        check = src
-        while check != check.parent:
-            if (check / ".git").exists():
-                break
-            check = check.parent
-        else:
-            return None
+    """Run git log and return raw output, or None if git unavailable.
+
+    This function (together with ``_iter_git_log``) is the git abstraction
+    layer: all git subprocess calls are funnelled through these two helpers,
+    making it straightforward to swap in a different git backend or mock
+    git access in tests.
+    """
+    if not _has_git(src):
+        return None
     try:
         result = subprocess.run(
             ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
@@ -39,20 +50,42 @@ def _run_git_log(src: Path, months: int = 3) -> str | None:
         return None
 
 
+def _iter_git_log(src: Path, months: int = 3):
+    """Yield git log lines one at a time via streaming Popen, avoiding full materialization."""
+    if not _has_git(src):
+        return
+    try:
+        proc = subprocess.Popen(
+            ["git", "log", f"--since={months} months ago", "--name-only", "--format=%H%n%ai"],
+            cwd=str(src), stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
+        )
+    except OSError:
+        return
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            yield line
+    finally:
+        proc.stdout.close()  # type: ignore[union-attr]
+        try:
+            proc.wait(timeout=_GIT_LOG_TIMEOUT_S)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+
 def compute_git_scores(files: list[str], src: Path, config: dict | None = None) -> dict[str, float]:
     """Layer 4: git churn and recency scoring."""
     cfg = config or {}
-    raw = _run_git_log(src, cfg.get("git_lookback_months", 3))
-    if not raw:
-        return {}
-
     file_set = set(files)
     churn: dict[str, int] = {}
     last_date: dict[str, str] = {}
 
     current_date = ""
-    for line in raw.splitlines():
-        line = line.strip()
+    has_lines = False
+    for raw_line in _iter_git_log(src, cfg.get("git_lookback_months", 3)):
+        has_lines = True
+        line = raw_line.strip()
         if not line:
             continue
         # 40-char hex = commit hash, skip
@@ -67,6 +100,9 @@ def compute_git_scores(files: list[str], src: Path, config: dict | None = None) 
             churn[line] = churn.get(line, 0) + 1
             if line not in last_date or current_date > last_date[line]:
                 last_date[line] = current_date
+
+    if not has_lines:
+        return {}
 
     divisor = cfg.get("git_churn_divisor", _DEFAULT_CHURN_DIVISOR)
     max_score = cfg.get("git_churn_max", _DEFAULT_CHURN_MAX)

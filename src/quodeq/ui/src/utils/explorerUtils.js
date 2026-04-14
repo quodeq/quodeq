@@ -10,8 +10,7 @@ export {
   buildGroupPlanText,
   buildSingleViolationPlanText,
 } from './planBuilder.js';
-
-const KNOWN_SEVERITIES = ['critical', 'major', 'minor', 'unknown'];
+import { KNOWN_SEVERITIES } from './constants.js';
 
 function normalizeSeverity(value) {
   const normalized = String(value || 'unknown').toLowerCase();
@@ -88,7 +87,9 @@ function aggregateViolationEntry(bucket, dimension, entry) {
   bucket.set(file, current);
 }
 
-export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = 500) {
+const DEFAULT_TOP_FILES_LIMIT = 500;
+
+export function buildTopOffendingFiles(dimensions = [], filters = {}, limit = DEFAULT_TOP_FILES_LIMIT) {
   const bucket = new Map();
 
   dimensions.forEach((dimension) => {

@@ -1,6 +1,11 @@
 """Queue state persistence: atomic JSON read/write with file locking.
 
 Internal module — use ``FileQueue`` from ``file_queue.py`` instead.
+
+The filesystem implementation below satisfies ``QueueStateProtocol``.
+To swap in a different backend (e.g. Redis, database), implement that
+protocol and pass your instance where ``read_state``/``write_state`` are
+called.
 """
 from __future__ import annotations
 
@@ -10,11 +15,28 @@ import os
 import tempfile
 from contextlib import contextmanager
 from pathlib import Path
+from typing import Protocol, runtime_checkable
+
+import time as _time
 
 from quodeq.analysis.subagents._file_lock import lock_file, unlock_file
 
+
+@runtime_checkable
+class QueueStateProtocol(Protocol):
+    """Abstraction for queue state storage.
+
+    The default implementation uses the filesystem (``read_state`` /
+    ``write_state`` module functions).  Implement this protocol to back
+    the queue with a different storage layer.
+    """
+
+    def read(self, path: Path) -> dict: ...
+    def write(self, state: dict, path: Path) -> None: ...
+
 _QUEUE_VERSION = 1
 
+_LOCK_FILE_MODE = 0o600
 _STALE_LOCK_THRESHOLD_SECS = 60
 
 _log = logging.getLogger(__name__)
@@ -36,14 +58,13 @@ def cleanup_stale_lock(lock_path: Path, threshold: float = _STALE_LOCK_THRESHOLD
     except FileNotFoundError:
         return False
 
-    import time as _time
     age = _time.time() - stat.st_mtime
     if age > threshold:
         try:
             lock_path.unlink()
         except FileNotFoundError:
             pass  # another process already cleaned it up
-        _log.warning(
+        _log.debug(
             "Removed stale lock file %s (age=%.1fs, threshold=%.0fs)",
             lock_path, age, threshold,
         )
@@ -58,7 +79,7 @@ def locked(lock_path: Path):
     The lock file is never deleted — it's harmless and avoids races
     where one process unlinks it while another is about to lock it.
     """
-    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, 0o600)
+    fd = os.open(str(lock_path), os.O_CREAT | os.O_WRONLY, _LOCK_FILE_MODE)
     try:
         lock_file(fd)
         yield

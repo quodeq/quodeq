@@ -1,6 +1,7 @@
 """Project listing, mutation, and export routes."""
 from __future__ import annotations
 
+import dataclasses
 import json
 import logging
 from http import HTTPStatus
@@ -11,9 +12,12 @@ from flask import Flask, Response, jsonify, request
 from quodeq.api.helpers import error_response
 from quodeq.api.routes_common import reports_dir
 from quodeq.api.zip import export_project_zip
+from quodeq.services._fs_scan import scan_project
 from quodeq.services.base import ActionProvider
+from quodeq.shared.validation import validate_path_segment
 
 _logger = logging.getLogger(__name__)
+_BLOCKED_SCAN_PATHS = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
 
 
 def _handle_delete_project(provider: ActionProvider) -> Response | tuple[Response, int]:
@@ -95,18 +99,22 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.patch("/api/projects/<project>/path")
     def update_project_path(project: str) -> Response | tuple[Response, int]:
+        """Update the local filesystem path for a project."""
         return _handle_update_project_path(provider)
 
     @app.get("/api/projects/<project>/export")
     def export_project(project: str) -> Response | tuple[Response, int]:
+        """Export a project as a ZIP archive."""
         return export_project_zip(project, reports_dir())
 
     @app.delete("/api/projects/<project>")
     def delete_project(project: str) -> Response | tuple[Response, int]:
+        """Delete a project and all its run data."""
         return _handle_delete_project(provider)
 
     @app.get("/api/projects/<project>/info")
     def project_info(project: str) -> Response | tuple[Response, int]:
+        """Return repository metadata for a project."""
         info = provider.get_project_info(reports_dir(), project)
         if not info:
             body, status = error_response("Project info not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
@@ -115,12 +123,12 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
 
     @app.post("/api/projects/<project>/clone-local")
     def clone_project_local(project: str) -> Response | tuple[Response, int]:
+        """Clone an online project to a local directory."""
         return _handle_clone_project_local(provider)
 
     @app.get("/api/projects/<project>/scan")
     def project_scan(project: str) -> Response | tuple[Response, int]:
         """Return scan data for a project. Triggers scan if needed for local projects."""
-        from quodeq.shared.validation import validate_path_segment
         validate_path_segment(project)
 
         project_dir = Path(reports_dir()) / project
@@ -157,15 +165,12 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             body, status = error_response("Project path not found on disk", HTTPStatus.NOT_FOUND, "PATH_MISSING")
             return jsonify(body), status
 
-        from quodeq.services._fs_scan import scan_project
         result = scan_project(project_path, output_dir=project_dir)
-
-        import dataclasses
         return jsonify(dataclasses.asdict(result))
 
     @app.post("/api/scan")
     def scan_path() -> Response | tuple[Response, int]:
-        """Scan a local path directly (no project required)."""
+        """Scan a local directory path directly (no registered project required)."""
         data = request.get_json(silent=True) or {}
         target = data.get("path", "").strip()
         if not target:
@@ -173,16 +178,22 @@ def register_project_list_routes(app: Flask, provider: ActionProvider) -> None:
             return jsonify(body), status
 
         target_path = Path(target).resolve()
+        # Allowlist: only permit paths under user home or the evaluations directory
+        _home = Path.home().resolve()
+        _eval_dir = Path(reports_dir()).resolve()
+        _allowed_roots = (_home, _eval_dir)
+        if not any(target_path == root or target_path.is_relative_to(root) for root in _allowed_roots):
+            body, status = error_response(
+                "Scan path must be under home directory", HTTPStatus.FORBIDDEN, "FORBIDDEN",
+            )
+            return jsonify(body), status
         # Block scanning system directories to prevent information disclosure
-        _blocked = ("/proc", "/sys", "/dev", "/etc", "/var/run", "/private/etc", "/private/var/run")
-        if any(str(target_path).startswith(b) for b in _blocked):
+        if any(str(target_path).startswith(b) for b in _BLOCKED_SCAN_PATHS):
             body, status = error_response("Cannot scan system directories", HTTPStatus.FORBIDDEN, "FORBIDDEN")
             return jsonify(body), status
         if not target_path.is_dir():
             body, status = error_response("Path is not a directory", HTTPStatus.BAD_REQUEST, "NOT_DIR")
             return jsonify(body), status
 
-        from quodeq.services._fs_scan import scan_project
-        import dataclasses
         result = scan_project(target_path)
         return jsonify(dataclasses.asdict(result))

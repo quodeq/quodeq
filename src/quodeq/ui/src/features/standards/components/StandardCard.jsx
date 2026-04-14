@@ -125,7 +125,14 @@ function EyeToggle({ isVisible, standardId, onToggleVisibility }) {
 
 async function downloadStandard(standardId) {
   const { data, fileName } = await exportStandard(standardId);
-  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const content = JSON.stringify(data, null, 2);
+  // PyWebView: native Save dialog
+  if (window.pywebview?.api?.save_file) {
+    window.pywebview.api.save_file(content, fileName);
+    return;
+  }
+  // Regular browser: blob download
+  const blob = new Blob([content], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;

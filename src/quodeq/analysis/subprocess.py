@@ -14,14 +14,6 @@ import logging
 import os
 from pathlib import Path
 
-
-def _safe_int(value: str, default: int = 0) -> int:
-    """Convert string to int, returning *default* on failure."""
-    try:
-        return int(value)
-    except (ValueError, TypeError):
-        return default
-
 from quodeq.analysis._command import (
     _build_ai_cmd,
     _build_analysis_env,
@@ -31,8 +23,18 @@ from quodeq.analysis._command import (
 from quodeq.analysis._config import AnalysisConfig, HeartbeatCallback, _SpawnPaths
 from quodeq.analysis._process import AnalysisError, _check_process_result, _spawn_and_monitor
 from quodeq.analysis._provider_cache import get_provider_configs
+from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
 from quodeq.analysis.stream.counters import count_files_in_stream
+from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.shared.utils import get_ai_cmd
+
+
+def _safe_int(value: str, default: int = 0) -> int:
+    """Convert string to int, returning *default* on failure."""
+    try:
+        return int(value)
+    except (ValueError, TypeError):
+        return default
 
 _log = logging.getLogger(__name__)
 
@@ -97,8 +99,8 @@ def _run_cli_analysis(
         _check_process_result(process, stream_err)
 
 
-_MAX_API_PROMPT_CHARS = 30_000  # Target prompt size for local models (~8K tokens)
-_MAX_API_FILE_SIZE = 15_000  # Skip files larger than 15KB
+_MAX_API_PROMPT_CHARS = int(os.environ.get("QUODEQ_MAX_API_PROMPT_CHARS", "30000"))  # Target prompt size for local models (~8K tokens)
+_MAX_API_FILE_SIZE = int(os.environ.get("QUODEQ_MAX_API_FILE_SIZE", "15000"))  # Skip files larger than 15KB
 
 
 def _load_skip_dirs() -> frozenset[str]:
@@ -127,25 +129,34 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     all_files: list[Path] = [
         f for f in work_dir.rglob("*") if f.is_file() and f.suffix in _ALL_EXTS
     ]
+    # Cache stat results to avoid repeated syscalls on the same files
+    stat_cache: dict[Path, int] = {}
+    for f in all_files:
+        try:
+            stat_cache[f] = f.stat().st_size
+        except OSError:
+            pass
+
     # Filter out non-source dirs, dotdirs, empty files, and oversized files
     filtered = [
         f for f in all_files
-        if not any(p in f.parts for p in _SKIP_DIRS)
+        if f in stat_cache
+        and not any(p in f.parts for p in _SKIP_DIRS)
         and not any(p.startswith(".") for p in f.relative_to(work_dir).parts)
-        and 0 < f.stat().st_size < _MAX_API_FILE_SIZE
+        and 0 < stat_cache[f] < _MAX_API_FILE_SIZE
     ]
     # Prioritize code files over markup
     code_files = [f for f in filtered if f.suffix in _CODE_EXTS]
     markup_files = [f for f in filtered if f.suffix in _MARKUP_EXTS]
     # Within each group, sort by size (moderate files first — not too small, not too big)
-    code_files.sort(key=lambda f: f.stat().st_size, reverse=True)
-    markup_files.sort(key=lambda f: f.stat().st_size, reverse=True)
+    code_files.sort(key=lambda f: stat_cache[f], reverse=True)
+    markup_files.sort(key=lambda f: stat_cache[f], reverse=True)
 
     # Fill up to the prompt char budget
     selected: list[Path] = []
     total_chars = 0
     for f in code_files + markup_files:
-        size = f.stat().st_size
+        size = stat_cache[f]
         if total_chars + size > _MAX_API_PROMPT_CHARS:
             continue
         selected.append(f)
@@ -156,7 +167,7 @@ def _gather_source_files(work_dir: Path) -> list[Path]:
     return selected
 
 
-_MAX_STANDARDS_CHARS = 50_000  # Allow full standards for models with large context
+_MAX_STANDARDS_CHARS = int(os.environ.get("QUODEQ_MAX_STANDARDS_CHARS", "50000"))  # Allow full standards for models with large context
 
 
 def _load_standards_text(compiled_dir: Path | None, dimension: str | None) -> str:
@@ -216,17 +227,11 @@ def _render_standards_grouped(data: dict) -> str:
     return _json.dumps(checklist, separators=(",", ":"))
 
 
-def _run_api_analysis_bridge(
-    work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
-) -> None:
-    """Run analysis via direct API call (new behavior).
+def _resolve_provider_config(cfg: AnalysisConfig) -> tuple[str, str, str]:
+    """Look up model, api_base, and api_key from provider config.
 
-    Builds its own prompt using assemble_api_prompt() instead of the CLI
-    prompt, which contains MCP tool-use instructions that confuse API models.
+    Raises AnalysisError if model or api_base are missing.
     """
-    from quodeq.analysis.api_prompt_assembly import assemble_api_prompt
-    from quodeq.analysis._api_runner import run_api_analysis, ApiRunnerConfig
-
     ai_cmd = cfg.ai_cmd or get_ai_cmd()
     configs = get_provider_configs()
     provider_cfg = configs.get(ai_cmd, {})
@@ -237,17 +242,26 @@ def _run_api_analysis_bridge(
     api_key = os.environ.get(api_key_env, "") if api_key_env else ""
 
     if not model:
-        raise AnalysisError(f"No model configured for API provider '{ai_cmd}'")
+        raise AnalysisError(
+            f"No model configured for provider '{ai_cmd}'. "
+            f"Go to Settings in the dashboard to select a model, or set AI_MODEL in your environment."
+        )
     if not api_base:
-        raise AnalysisError(f"No api_base configured for API provider '{ai_cmd}'")
+        raise AnalysisError(
+            f"No API base URL configured for provider '{ai_cmd}'. "
+            f"Go to Settings in the dashboard to configure it, or set the URL in ai_providers.json."
+        )
+    return model, api_base, api_key
 
-    jsonl_file = cfg.jsonl_file
-    if jsonl_file is None:
-        jsonl_file = Path(str(stream_file).replace(".stream", "_evidence.jsonl"))
 
-    # Get source files: from queue (subagent mode) or by scanning (single-pass mode)
+def _gather_api_source_files(
+    work_dir: Path, cfg: AnalysisConfig, jsonl_file: Path, stream_file: Path,
+) -> list[Path] | None:
+    """Gather source files from queue or by scanning.
+
+    Returns None (and writes empty output) when the queue is exhausted.
+    """
     if cfg.queue_path and cfg.queue_path.exists():
-        from quodeq.analysis.subagents.file_queue import FileQueue
         queue = FileQueue(cfg.queue_path)
         taken = queue.take(count=min(cfg.max_files_per_agent or 10, 3), agent_id=cfg.agent_id)
         source_files = [
@@ -256,12 +270,32 @@ def _run_api_analysis_bridge(
         ]
         _log.debug("Took %d files from queue for API analysis", len(source_files))
         if not source_files:
-            # No more files — write empty evidence and return
             jsonl_file.write_text("")
             stream_file.write_text('{"type":"api_runner","status":"complete"}\n')
-            return
-    else:
-        source_files = _gather_source_files(work_dir)
+            return None
+        return source_files
+    return _gather_source_files(work_dir)
+
+
+def _run_api_analysis_bridge(
+    work_dir: Path, prompt: str, stream_file: Path, cfg: AnalysisConfig,
+) -> None:
+    """Run analysis via direct API call (new behavior).
+
+    Builds its own prompt using assemble_api_prompt() instead of the CLI
+    prompt, which contains MCP tool-use instructions that confuse API models.
+    """
+    from quodeq.analysis._api_runner import run_api_analysis, ApiRunnerConfig
+
+    model, api_base, api_key = _resolve_provider_config(cfg)
+
+    jsonl_file = cfg.jsonl_file
+    if jsonl_file is None:
+        jsonl_file = Path(str(stream_file).replace(".stream", "_evidence.jsonl"))
+
+    source_files = _gather_api_source_files(work_dir, cfg, jsonl_file, stream_file)
+    if source_files is None:
+        return
 
     standards_text = _load_standards_text(cfg.compiled_dir, cfg.dimension)
     api_prompt = assemble_api_prompt(
@@ -272,9 +306,7 @@ def _run_api_analysis_bridge(
         repo_root=work_dir,
     )
 
-    # Pass relative paths so the runner can resolve short filenames from model output
     rel_paths = [str(f.relative_to(work_dir)) for f in source_files]
-
     run_api_analysis(
         prompt=api_prompt,
         jsonl_file=jsonl_file,
@@ -282,7 +314,7 @@ def _run_api_analysis_bridge(
             model=model,
             api_base=api_base,
             api_key=api_key,
-            context_size=_safe_int(os.environ.get("QUODEQ_CONTEXT_SIZE", "0")),
+            context_size=cfg.context_size,
         ),
         compiled_dir=cfg.compiled_dir,
         dimension=cfg.dimension,
@@ -290,7 +322,6 @@ def _run_api_analysis_bridge(
         source_file_paths=rel_paths,
     )
 
-    # Write a minimal stream file so downstream checks (is_stream_valid) pass
     stream_file.write_text('{"type":"api_runner","status":"complete"}\n')
     _log.debug("API analysis complete, evidence written to %s", jsonl_file)
 

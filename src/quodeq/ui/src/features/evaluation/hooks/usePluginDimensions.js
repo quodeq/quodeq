@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { listPlugins, listStandards } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { STANDARD_TYPES } from '../../standards/hooks/useStandards.js';
 
@@ -32,15 +32,14 @@ function deduplicateDimensions(plugins, standards) {
 let _cachedDimensions = null;
 let _cachePromise = null;
 
-function _loadDimensions() {
+function _loadDimensions(listPlugins, listStandards) {
   if (_cachePromise) return _cachePromise;
   _cachePromise = Promise.all([
     listPlugins().catch(() => []),
     listStandards().catch(() => []),
   ]).then(([plugins, standards]) => {
     const seen = deduplicateDimensions(plugins, standards);
-    const visibleSet = new Set(readVisibleStandardIds());
-    _cachedDimensions = [...seen.values()].filter((d) => visibleSet.has(d.id));
+    _cachedDimensions = [...seen.values()];
     return _cachedDimensions;
   }).catch((err) => {
     console.warn('Failed to load dimensions:', err);
@@ -55,20 +54,30 @@ export function invalidateDimensionCache() {
   _cachePromise = null;
 }
 
+function _filterVisible(dims) {
+  const visibleSet = new Set(readVisibleStandardIds());
+  return dims.filter((d) => visibleSet.has(d.id));
+}
+
+/**
+ * Loads and caches all plugin dimensions, filtering by visible standard IDs.
+ * @returns {{ allDimensions: Array, dimLoadError: string|null }}
+ */
 export function usePluginDimensions() {
-  const [allDimensions, setAllDimensions] = useState(_cachedDimensions || []);
+  const { listPlugins, listStandards } = useApi();
+  const [allDimensions, setAllDimensions] = useState(() => _cachedDimensions ? _filterVisible(_cachedDimensions) : []);
   const [dimLoadError, setDimLoadError] = useState(null);
 
   useEffect(() => {
     if (_cachedDimensions) {
-      setAllDimensions(_cachedDimensions);
+      setAllDimensions(_filterVisible(_cachedDimensions));
       return;
     }
-    _loadDimensions().then((dims) => {
-      setAllDimensions(dims);
+    _loadDimensions(listPlugins, listStandards).then((dims) => {
+      setAllDimensions(_filterVisible(dims));
       setDimLoadError(null);
     }).catch(() => {
-      setDimLoadError('Failed to load dimensions.');
+      setDimLoadError('Failed to load dimensions. Try refreshing the page or check that the server is running.');
     });
   }, []);
 

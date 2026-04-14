@@ -1,14 +1,19 @@
 """Analysis configuration dataclasses and type aliases."""
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Callable
 
+from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
+
 HeartbeatCallback = Callable[[int, dict], None]
 
-_DEFAULT_MAX_TURNS = 200
-_DEFAULT_MAX_DURATION = 1800  # 30 minutes
+_DEFAULT_MAX_FILES_PER_AGENT = 30
+
+_DEFAULT_MAX_TURNS = int(os.environ.get("QUODEQ_DEFAULT_MAX_TURNS", "200"))
+_DEFAULT_MAX_DURATION = int(os.environ.get("QUODEQ_DEFAULT_MAX_DURATION", "1800"))  # 30 minutes
 _MCP_TOOL_REPORT_FINDING = "mcp__findings__report_finding"
 _MCP_TOOL_GET_NEXT_FILES = "mcp__findings__get_next_files"
 
@@ -24,13 +29,14 @@ class AnalysisConfig:
     ai_model: str | None = None
     max_turns: int | None = _DEFAULT_MAX_TURNS
     max_duration: int | None = _DEFAULT_MAX_DURATION
-    pool_budget: int = 600
+    pool_budget: int = _DEFAULT_POOL_BUDGET
     compiled_dir: Path | None = None
     dimension: str | None = None
     queue_path: Path | None = None
     agent_id: str = ""
-    max_files_per_agent: int = 30
+    max_files_per_agent: int = _DEFAULT_MAX_FILES_PER_AGENT
     work_dir: Path | None = None
+    context_size: int = 0
 
 
 @dataclass(frozen=True)

@@ -2,6 +2,8 @@ import logging
 
 from quodeq.api._log_buffer import LogBuffer
 
+_TEST_MAX_LINES = 3
+
 
 def test_append_and_get_lines():
     buf = LogBuffer(max_lines=10)
@@ -15,11 +17,11 @@ def test_append_and_get_lines():
 
 
 def test_ring_buffer_overflow():
-    buf = LogBuffer(max_lines=3)
+    buf = LogBuffer(max_lines=_TEST_MAX_LINES)
     for i in range(5):
         buf.append(f"line {i}")
     result = buf.get_lines()
-    assert len(result["lines"]) == 3
+    assert len(result["lines"]) == _TEST_MAX_LINES
     assert result["lines"][0]["line"] == "line 2"
     assert result["lines"][2]["line"] == "line 4"
 
@@ -43,7 +45,7 @@ def test_since_out_of_range_returns_all():
 
 
 def test_monotonic_index():
-    buf = LogBuffer(max_lines=3)
+    buf = LogBuffer(max_lines=_TEST_MAX_LINES)
     for i in range(5):
         buf.append(f"line {i}")
     result = buf.get_lines()

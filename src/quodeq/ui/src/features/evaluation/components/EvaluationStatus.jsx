@@ -2,8 +2,12 @@ import { useEffect, useRef, useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
+import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 const STATUS = { RUNNING: 'running', DONE: 'done', FAILED: 'failed', LOST: 'lost' };
+const DOT_OFFSET_TOP = -2;
+const DOT_OFFSET_RIGHT = -4;
 
 function deriveProjectName(repo) {
   if (!repo) return null;
@@ -48,13 +52,16 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isFailed = job.status === STATUS.FAILED;
   const isLost = job.status === STATUS.LOST;
+  const [showDot, setShowDot] = useState(() => {
+    try { return !localStorage.getItem(CONSOLE_DOT_DISMISSED_KEY); } catch { return true; }
+  });
   return (
     <>
       <div
         className="eval-status-row eval-status-row--clickable"
         role="button"
         tabIndex={0}
-        onClick={() => setConsoleOpen(o => !o)}
+        onClick={() => { setConsoleOpen(o => !o); if (showDot) { setShowDot(false); try { localStorage.setItem(CONSOLE_DOT_DISMISSED_KEY, '1'); } catch {} } }}
         onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setConsoleOpen(o => !o); } }}
         aria-label={consoleOpen ? 'Hide console' : 'Show console'}
       >
@@ -68,13 +75,14 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
             ))}
           </span>
         )}
-        <span className="eval-console-indicator">
+        <span className="eval-console-indicator" style={{ position: 'relative' }}>
           <svg className="eval-console-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
             <rect x="1" y="2" width="14" height="12" rx="2" />
             <polyline points="4.5,6.5 7,9 4.5,11.5" />
             <line x1="9" y1="11" x2="12" y2="11" />
           </svg>
           {consoleOpen ? '▾' : '▸'}
+          {showDot && !consoleOpen && <span className="sidebar-nav-dot" style={{ top: DOT_OFFSET_TOP, right: DOT_OFFSET_RIGHT }} />}
         </span>
       </div>
       {consoleOpen && (
@@ -105,8 +113,6 @@ function JobHeader({ job, onDismiss, onCancel }) {
     </div>
   );
 }
-
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 function JobProviderBadge() {
   const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';

@@ -6,8 +6,11 @@ from copy import copy
 from dataclasses import replace
 from collections.abc import Callable
 
+from quodeq.analysis._incremental_orchestrator import run_dimension_incremental
 from quodeq.analysis._types import RunConfig, _AnalysisContext
+from quodeq.analysis.errors import EvaluationError
 from quodeq.core.evidence.model import Evidence
+from quodeq.engine._runner_markers import emit_marker
 # NOTE: logging in inner layer — tracked for middleware extraction
 from quodeq.shared.logging import log_info, log_warning
 
@@ -16,8 +19,6 @@ def check_zero_findings(
     result: dict[str, Evidence], source_file_count: int, skipped_count: int = 0,
 ) -> None:
     """Raise EvaluationError if all dimensions produced zero findings."""
-    from quodeq.analysis.errors import EvaluationError
-
     if not result or source_file_count <= 0:
         return
     total_findings = sum(
@@ -49,9 +50,6 @@ def run_incremental_loop(
             ``(config, dimension, idx, ctx) -> Evidence | None``).
         log_result_fn: Callback to log a completed dimension result.
     """
-    from quodeq.analysis._incremental import run_dimension_incremental
-    from quodeq.engine._runner_markers import emit_marker
-
     result: dict[str, Evidence] = {}
     for idx, dimension in enumerate(dimensions, 1):
         emit_marker("analyzing", dimension=dimension)

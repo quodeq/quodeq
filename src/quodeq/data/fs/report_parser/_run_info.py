@@ -27,8 +27,10 @@ class RunInfo:
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:
     """List directory entries, returning an empty list on OS errors.
 
-    Materializes entries lazily via scandir; the resulting list is typically
-    small (per-run directory) so full materialization is acceptable here.
+    Materializes entries via scandir into a list.  This is intentional:
+    callers iterate entries multiple times (e.g. markdown-backed pass then
+    JSON-only pass in ``_evaluations.py``) and the entry count per directory
+    is small, so full materialization is the correct trade-off here.
 
     Example::
 

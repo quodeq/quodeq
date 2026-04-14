@@ -20,9 +20,16 @@ import instructor
 import openai
 from pydantic import BaseModel, Field
 
+from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
+from quodeq.core.standards.refs import load_compiled_requirements
+from quodeq.engine._ref_utils import load_compiled_refs
+from quodeq.shared.url_validation import validate_url_safe
+
 _log = logging.getLogger(__name__)
 
 _MAX_RETRIES = 2
+_OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
+_OLLAMA_DEFAULT_API_KEY = "ollama"
 
 
 # ---------------------------------------------------------------------------
@@ -75,6 +82,11 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
 
     Local models sometimes drop a brace in long arrays, producing invalid
     JSON. We try to parse each object individually.
+
+    Note: the regex ``r'\\{[^{}]*\\}'`` is intentionally shallow — it matches
+    single-level (non-nested) JSON objects only.  This is sufficient for
+    salvaging malformed local-model output where each finding is a flat
+    object, and avoids the complexity of nested-brace matching.
     """
     objects = re.findall(r'\{[^{}]*\}', raw_json)
     findings = []
@@ -89,8 +101,10 @@ def _salvage_partial_findings(raw_json: str) -> list[dict]:
 
 def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
     """Call LLM via Instructor — returns validated finding dicts."""
+    if config.api_base and config.api_base != _OLLAMA_DEFAULT_BASE:
+        validate_url_safe(config.api_base, allow_private=True)
     client = instructor.from_openai(
-        openai.OpenAI(base_url=config.api_base, api_key=config.api_key or "ollama"),
+        openai.OpenAI(base_url=config.api_base, api_key=config.api_key or _OLLAMA_DEFAULT_API_KEY),
         mode=instructor.Mode.JSON,
     )
 
@@ -142,10 +156,6 @@ def _enrich_findings(
     if not compiled_dir:
         return findings
     try:
-        from quodeq.analysis.mcp.router import CompiledContext, FindingsRouter
-        from quodeq.engine._ref_utils import load_compiled_refs
-        from quodeq.core.standards.refs import load_compiled_requirements
-
         compiled_refs = load_compiled_refs(compiled_dir, dimension) or {}
         compiled_reqs = load_compiled_requirements(compiled_dir, dimension) or {}
         ctx = CompiledContext(

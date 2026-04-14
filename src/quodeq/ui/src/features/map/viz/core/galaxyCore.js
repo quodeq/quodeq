@@ -1,6 +1,12 @@
 /**
  * galaxyCore.js — Shared rendering engine for Galaxy visualizations.
  * Extracted from GalaxyView.jsx proven patterns.
+ *
+ * NOTE: This module requires a DOM environment (document.createElement,
+ * getComputedStyle, MutationObserver). It is browser-only by design and
+ * should not be imported in non-browser contexts (e.g. Node/SSR).
+ * getThemeColors() accepts an optional sourceEl and cache parameter to
+ * allow injection for testing.
  */
 
 export const TAU = Math.PI * 2;
@@ -21,11 +27,23 @@ export function parseCSSColor(cssColor) {
   return { r, g, b };
 }
 
+// Intentional module-level cache: stores parsed CSS theme colors to avoid
+// repeated DOM reads on every frame. getThemeColors(sourceEl, { cache })
+// provides an injection point for tests — pass a cache object to bypass
+// the module-level singleton entirely.
 let _themeColors = null;
+let _themeSourceEl = null;
 let _themeObserver = null;
-export function getThemeColors() {
-  if (_themeColors) return _themeColors;
-  const style = getComputedStyle(document.documentElement);
+export function getThemeColors(sourceEl, { cache } = {}) {
+  // When an injectable cache is provided (e.g. for testing), use it directly.
+  if (cache) return cache;
+  // Prefer previously-set source element (the .map-viz-container) so that
+  // callers without an explicit element (scoreRGB, sevRGB) still read the
+  // correct scoped CSS variables (e.g. .map-viz-dark overrides).
+  const el = sourceEl || _themeSourceEl || document.documentElement;
+  if (_themeColors && _themeSourceEl === el) return _themeColors;
+  _themeSourceEl = el;
+  const style = getComputedStyle(el);
   const get = (v) => parseCSSColor(style.getPropertyValue(v).trim() || '#888');
   const raw = (v) => style.getPropertyValue(v).trim();
   _themeColors = {
@@ -49,8 +67,15 @@ export function getThemeColors() {
     _themeObserver = new MutationObserver(() => { _themeColors = null; });
     _themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] });
   }
+  // Also watch the source element itself for class changes (e.g. map-viz-dark toggle)
+  if (el !== document.documentElement && el._themeObs === undefined) {
+    el._themeObs = new MutationObserver(() => { _themeColors = null; });
+    el._themeObs.observe(el, { attributes: true, attributeFilter: ['class'] });
+  }
   return _themeColors;
 }
+
+export function invalidateThemeColors() { _themeColors = null; }
 
 // score is 0-10 scale (matching the app's grading system)
 export function scoreRGB(score) {
@@ -72,21 +97,27 @@ export function rgba(c, a) { return `rgba(${c.r},${c.g},${c.b},${a})`; }
 
 /* ── Drawing helpers ── */
 
-export function drawGlow(ctx, x, y, r, col, alpha) {
+const GLOW_INNER_RATIO = 0.4;
+const GLOW_OUTER_RATIO = 3;
+const GLOW_CENTER_ALPHA = 0.15;
+const GLOW_MID_ALPHA = 0.9;
+const GLOW_EDGE_ALPHA = 0.6;
+
+export function drawGlow(ctx, { x, y, r, col, alpha }) {
   if (r < 0.3 || alpha < 0.01) return;
   const { r: cr, g, b } = col;
-  const gl = ctx.createRadialGradient(x, y, r * 0.4, x, y, r * 3);
-  gl.addColorStop(0, `rgba(${cr},${g},${b},${0.15 * alpha})`);
+  const gl = ctx.createRadialGradient(x, y, r * GLOW_INNER_RATIO, x, y, r * GLOW_OUTER_RATIO);
+  gl.addColorStop(0, `rgba(${cr},${g},${b},${GLOW_CENTER_ALPHA * alpha})`);
   gl.addColorStop(1, `rgba(${cr},${g},${b},0)`);
-  ctx.beginPath(); ctx.arc(x, y, r * 3, 0, TAU); ctx.fillStyle = gl; ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, r * GLOW_OUTER_RATIO, 0, TAU); ctx.fillStyle = gl; ctx.fill();
   const co = ctx.createRadialGradient(x, y, 0, x, y, r);
-  co.addColorStop(0, `rgba(${Math.min(255, cr + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)},${0.9 * alpha})`);
-  co.addColorStop(0.6, `rgba(${cr},${g},${b},${0.6 * alpha})`);
-  co.addColorStop(1, `rgba(${cr},${g},${b},${0.15 * alpha})`);
+  co.addColorStop(0, `rgba(${Math.min(255, cr + 60)},${Math.min(255, g + 60)},${Math.min(255, b + 60)},${GLOW_MID_ALPHA * alpha})`);
+  co.addColorStop(GLOW_EDGE_ALPHA, `rgba(${cr},${g},${b},${GLOW_EDGE_ALPHA * alpha})`);
+  co.addColorStop(1, `rgba(${cr},${g},${b},${GLOW_CENTER_ALPHA * alpha})`);
   ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fillStyle = co; ctx.fill();
 }
 
-export function drawParticles(ctx, cx, cy, particles, scale, alpha, t, drawScale) {
+export function drawParticles(ctx, particles, { cx, cy, scale, alpha, t, drawScale }) {
   const ds = drawScale ?? scale;
   particles.forEach(p => {
     const a = t * p.os + p.op;
@@ -105,18 +136,32 @@ export function drawParticles(ctx, cx, cy, particles, scale, alpha, t, drawScale
 
 /* ── Particles builder ── */
 
+const MAX_PARTICLES_PER_SEV = 10;
+const PARTICLE_ORBIT_OFFSET = 22;
+const PARTICLE_ORBIT_RANGE = 28;
+const PARTICLE_SPEED_BASE = 0.03;
+const PARTICLE_SPEED_RANGE = 0.07;
+const PARTICLE_SIZE_CRITICAL = 3.2;
+const PARTICLE_SIZE_CRITICAL_RANGE = 0.8;
+const PARTICLE_SIZE_MAJOR = 2.6;
+const PARTICLE_SIZE_MAJOR_RANGE = 0.5;
+const PARTICLE_SIZE_MINOR = 1.8;
+const PARTICLE_SIZE_MINOR_RANGE = 0.5;
+const PARTICLE_ECCENTRICITY_BASE = 0.65;
+const PARTICLE_ECCENTRICITY_RANGE = 0.35;
+
 export function mkParticles(critical, major, minor, baseRadius) {
   const ps = [];
   const add = (n, sev) => {
     const col = sevRGB(sev);
-    for (let i = 0; i < Math.min(n, 10); i++) {
+    for (let i = 0; i < Math.min(n, MAX_PARTICLES_PER_SEV); i++) {
       ps.push({
         col, sev,
-        or: baseRadius + 22 + Math.random() * 28,
-        os: (0.03 + Math.random() * 0.07) * (Math.random() > 0.5 ? 1 : -1),
+        or: baseRadius + PARTICLE_ORBIT_OFFSET + Math.random() * PARTICLE_ORBIT_RANGE,
+        os: (PARTICLE_SPEED_BASE + Math.random() * PARTICLE_SPEED_RANGE) * (Math.random() > 0.5 ? 1 : -1),
         op: Math.random() * TAU,
-        sz: sev === 'critical' ? 3.2 + Math.random() * 0.8 : sev === 'major' ? 2.6 + Math.random() * 0.5 : 1.8 + Math.random() * 0.5,
-        ec: 0.65 + Math.random() * 0.35,
+        sz: sev === 'critical' ? PARTICLE_SIZE_CRITICAL + Math.random() * PARTICLE_SIZE_CRITICAL_RANGE : sev === 'major' ? PARTICLE_SIZE_MAJOR + Math.random() * PARTICLE_SIZE_MAJOR_RANGE : PARTICLE_SIZE_MINOR + Math.random() * PARTICLE_SIZE_MINOR_RANGE,
+        ec: PARTICLE_ECCENTRICITY_BASE + Math.random() * PARTICLE_ECCENTRICITY_RANGE,
         tp: Math.random() * TAU,
       });
     }
@@ -137,11 +182,15 @@ export function seedHash(str) {
   return h;
 }
 
+const LCG_MULTIPLIER = 1664525;
+const LCG_INCREMENT = 1013904223;
+const LCG_MODULUS = 4294967296;
+
 export function seededRng(seed) {
   let s = seed | 0;
   return () => {
-    s = (s * 1664525 + 1013904223) | 0;
-    return ((s >>> 0) / 4294967296);
+    s = (s * LCG_MULTIPLIER + LCG_INCREMENT) | 0;
+    return ((s >>> 0) / LCG_MODULUS);
   };
 }
 

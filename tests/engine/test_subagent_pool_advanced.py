@@ -14,6 +14,8 @@ from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool,
 
 from tests.engine.conftest import _fake_run_analysis  # noqa: F401 — shared helper
 
+_TEST_DIMENSION = "security"
+
 
 class TestComputeScaleUp:
     def _make_pool(self, n_agents, tmp_path, max_files=30):
@@ -21,7 +23,7 @@ class TestComputeScaleUp:
         FileQueue(queue_path, ["f.py"])
         return SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=n_agents, prompt="test", dimension="security"),
+            options=PoolOptions(n_agents=n_agents, prompt="test", dimension=_TEST_DIMENSION),
             config=AnalysisConfig(max_files_per_agent=max_files),
         )
 
@@ -53,10 +55,10 @@ class TestMultiDimensionPool:
         FileQueue(queue_path, ["a.py"])
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=1, prompt="test", dimension="security"),
+            options=PoolOptions(n_agents=1, prompt="test", dimension=_TEST_DIMENSION),
         )
-        assert pool._dimension == "security"
-        assert pool._dimension_key == "security"
+        assert pool._dimension == _TEST_DIMENSION
+        assert pool._dimension_key == _TEST_DIMENSION
 
     def test_multi_dimension_list(self, tmp_path):
         """List of dimensions uses 'consolidated' key for file naming."""
@@ -64,18 +66,18 @@ class TestMultiDimensionPool:
         FileQueue(queue_path, ["a.py"])
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=1, prompt="test", dimension=["security", "maintainability"]),
+            options=PoolOptions(n_agents=1, prompt="test", dimension=[_TEST_DIMENSION, "maintainability"]),
         )
-        assert pool._dimension == "security,maintainability"
+        assert pool._dimension == f"{_TEST_DIMENSION},maintainability"
         assert pool._dimension_key == "consolidated"
-        assert pool._dimensions == ["security", "maintainability"]
+        assert pool._dimensions == [_TEST_DIMENSION, "maintainability"]
 
     def test_multi_dimension_jsonl_path(self, tmp_path):
         queue_path = tmp_path / "queue.json"
         FileQueue(queue_path, ["a.py"])
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=1, prompt="test", dimension=["security", "maintainability"]),
+            options=PoolOptions(n_agents=1, prompt="test", dimension=[_TEST_DIMENSION, "maintainability"]),
         )
         assert "consolidated_evidence.jsonl" in str(pool._shared_jsonl_path())
 
@@ -88,7 +90,7 @@ class TestScoutThenScale:
 
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=5, prompt="analyse", dimension="security"),
+            options=PoolOptions(n_agents=5, prompt="analyse", dimension=_TEST_DIMENSION),
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
@@ -105,7 +107,7 @@ class TestScoutThenScale:
 
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=5, prompt="analyse", dimension="security"),
+            options=PoolOptions(n_agents=5, prompt="analyse", dimension=_TEST_DIMENSION),
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
@@ -122,7 +124,7 @@ class TestScoutThenScale:
 
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=3, prompt="verify", dimension="security", scout_first=False),
+            options=PoolOptions(n_agents=3, prompt="verify", dimension=_TEST_DIMENSION, scout_first=False),
             config=AnalysisConfig(max_files_per_agent=30),
         )
 
@@ -143,7 +145,7 @@ class TestPoolBudget:
         ac = AnalysisConfig(pool_budget=60, max_duration=1800, max_files_per_agent=30)
         pool = SubagentPool(
             paths=PoolPaths(work_dir=tmp_path, evidence_dir=tmp_path, queue_path=queue_path),
-            options=PoolOptions(n_agents=1, prompt="test", dimension="security"),
+            options=PoolOptions(n_agents=1, prompt="test", dimension=_TEST_DIMENSION),
             config=ac,
         )
         assert pool._base_config.pool_budget == 60

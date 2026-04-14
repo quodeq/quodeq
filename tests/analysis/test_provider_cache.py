@@ -9,6 +9,8 @@ import pytest
 
 from quodeq.analysis._provider_cache import _ProviderConfigCache, get_provider_configs
 
+_OPENROUTER_API_KEY_ENV = "OPENROUTER_API_KEY"
+
 
 class TestProviderConfigType:
     """Provider configs must include a 'type' field (cli or api)."""
@@ -31,7 +33,7 @@ class TestProviderConfigType:
     def test_openrouter_is_api_type(self):
         configs = get_provider_configs()
         assert configs["openrouter"]["type"] == "api"
-        assert configs["openrouter"]["api_key_env"] == "OPENROUTER_API_KEY"
+        assert configs["openrouter"]["api_key_env"] == _OPENROUTER_API_KEY_ENV
 
     def test_custom_provider_has_env_interpolation_fields(self):
         configs = get_provider_configs()

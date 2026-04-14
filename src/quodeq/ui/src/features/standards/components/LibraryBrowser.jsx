@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLibrary } from '../hooks/useLibrary.js';
 
 function LibraryCard({ standard, onImport, importing }) {
@@ -41,13 +41,17 @@ export default function LibraryBrowser({ onClose, onImported }) {
 
   useEffect(() => { fetchLibrary(); }, [fetchLibrary]);
 
+  const [importError, setImportError] = useState(null);
+
   const handleImport = async (file) => {
     try {
+      setImportError(null);
       await importStandard(file);
       if (onImported) onImported();
       onClose();
     } catch (err) {
       console.error('Import failed:', err);
+      setImportError(err.message || 'Import failed. Check the standard file and try again.');
     }
   };
 
@@ -68,7 +72,7 @@ export default function LibraryBrowser({ onClose, onImported }) {
         </p>
 
         {loading && <div className="library-loading">Loading library...</div>}
-        {error && <p className="inline-error">{error}</p>}
+        {(error || importError) && <p className="inline-error">{importError || error}</p>}
 
         {!loading && !error && libraryStandards.length === 0 && (
           <p className="library-empty">No community standards available.</p>

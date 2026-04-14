@@ -10,10 +10,10 @@ from quodeq.analysis.subprocess import AnalysisConfig
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 
-_VERIFY_MAX_FILES_PER_AGENT = 40
-_VERIFY_MAX_TURNS = 100
-_VERIFY_MAX_DURATION = 600
-_VERIFY_N_AGENTS = 5
+_VERIFY_MAX_FILES_PER_AGENT = int(os.environ.get("QUODEQ_VERIFY_MAX_FILES_PER_AGENT", "40"))
+_VERIFY_MAX_TURNS = int(os.environ.get("QUODEQ_VERIFY_MAX_TURNS", "100"))
+_VERIFY_MAX_DURATION = int(os.environ.get("QUODEQ_VERIFY_MAX_DURATION", "600"))
+_VERIFY_N_AGENTS = int(os.environ.get("QUODEQ_VERIFY_N_AGENTS", "5"))
 _DEFAULT_FAST_MODEL = "haiku"
 
 
@@ -64,6 +64,28 @@ def build_verify_prompt(manifest_path: Path, dimension: str) -> str:
     return _VERIFY_PROMPT_TEMPLATE.format(manifest_path=manifest_path, dimension=dimension)
 
 
+def _resolve_model_and_agents(
+    config: "RunConfig", files_count: int,
+) -> tuple[str, int]:
+    """Determine verification model and agent count based on provider type.
+
+    For local providers (e.g. Ollama), uses the configured model with no caps.
+    For cloud/CLI providers, uses the fast model with capped agents.
+    """
+    fast = _fast_model()
+    if config.options.ai_model and fast == _DEFAULT_FAST_MODEL:
+        # Local provider: use configured model, all agents
+        return config.options.ai_model, config.options.max_subagents
+
+    # Cloud/CLI: cap agents based on file count and max pool size
+    n_agents = min(
+        _VERIFY_N_AGENTS,
+        config.options.max_subagents,
+        (files_count + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
+    )
+    return fast, n_agents
+
+
 def run_verification_pool(
     config: "RunConfig", dim_id: str, evidence_dir: Path,
     files_to_verify: list[str], manifest_path: Path,
@@ -75,24 +97,7 @@ def run_verification_pool(
     """
     prompt = build_verify_prompt(manifest_path, dim_id)
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
-    fast = _fast_model()
-    # For non-CLI providers (e.g. Ollama), treat verification the same as
-    # analysis — no caps on agents or files-per-agent, no model swapping.
-    is_local = False
-    if config.options.ai_model and fast == _DEFAULT_FAST_MODEL:
-        fast = config.options.ai_model
-        is_local = True
-
-    if is_local:
-        # Local: use all configured agents, no file-count-based cap
-        n_agents = config.options.max_subagents
-    else:
-        # Cloud/CLI: cap agents based on file count and max pool size
-        n_agents = min(
-            _VERIFY_N_AGENTS,
-            config.options.max_subagents,
-            (len(files_to_verify) + _VERIFY_MAX_FILES_PER_AGENT - 1) // _VERIFY_MAX_FILES_PER_AGENT,
-        )
+    model, n_agents = _resolve_model_and_agents(config, len(files_to_verify))
 
     queue_path = evidence_dir / f"{dim_id}_verify_queue.json"
     FileQueue(queue_path, files_to_verify, max_files_per_agent=_VERIFY_MAX_FILES_PER_AGENT)
@@ -101,7 +106,7 @@ def run_verification_pool(
         compiled_dir=compiled_dir,
         max_turns=_VERIFY_MAX_TURNS,
         max_duration=_VERIFY_MAX_DURATION,
-        ai_model=fast,
+        ai_model=model,
         dimension=dim_id,
         pool_budget=config.options.pool_budget,
     )

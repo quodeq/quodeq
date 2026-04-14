@@ -17,6 +17,10 @@ from quodeq.analysis.subagents._queue_state import (
 )
 from quodeq.analysis.subagents.types import WorkQueue  # noqa: F401 — re-export
 
+_KEY_FILES = "files"
+_KEY_AGENT = "agent"
+_KEY_TS = "ts"
+
 
 class FileQueue:
     """Distributes files across N subagent processes via a locked JSON file.
@@ -39,14 +43,23 @@ class FileQueue:
                 state["max_files_per_agent"] = max_files_per_agent
             write_state(state, self._path)
         elif not self._path.exists():
-            raise FileQueueError(f"Queue file not found: {self._path}")
+            raise FileQueueError(
+                f"Queue file not found: {self._path}. "
+                f"Initialize the queue by passing a file list to the FileQueue constructor."
+            )
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
 
     def take(self, count: int = 5, agent_id: str = "") -> list[str]:
-        """Atomically remove and return the next *count* files."""
+        """Atomically remove and return the next *count* files.
+
+        Example::
+
+            queue = FileQueue(Path("/tmp/queue.json"), files=["a.py", "b.py"])
+            batch = queue.take(count=2, agent_id="agent-1")
+        """
         if count < 1:
             return []
         with locked(self._lock_path):
@@ -67,7 +80,7 @@ class FileQueue:
                 return []
             state["pending"] = pending[count:]
             state["taken"].append({
-                "files": batch, "agent": agent_id, "ts": time.time(),
+                _KEY_FILES: batch, _KEY_AGENT: agent_id, _KEY_TS: time.time(),
             })
             if agent_id:
                 totals = state.setdefault("agent_totals", {})
@@ -76,24 +89,44 @@ class FileQueue:
         return batch
 
     def remaining(self) -> int:
-        """Number of files still pending in the queue."""
+        """Number of files still pending in the queue.
+
+        Example::
+
+            remaining = queue.remaining()  # e.g. 42
+        """
         with locked(self._lock_path):
             return len(read_state(self._path)["pending"])
 
     def stats(self) -> tuple[int, int]:
-        """Return (remaining, taken) counts in a single file read."""
+        """Return (remaining, taken) counts in a single file read.
+
+        Example::
+
+            remaining, taken = queue.stats()
+        """
         with locked(self._lock_path):
             state = read_state(self._path)
-        taken = sum(len(e["files"]) for e in state["taken"])
+        taken = sum(len(e[_KEY_FILES]) for e in state["taken"])
         return len(state["pending"]), taken
 
     def taken_log(self) -> list[dict]:
-        """Return the full take log for audit / crash recovery."""
+        """Return the full take log for audit / crash recovery.
+
+        Example::
+
+            log = queue.taken_log()  # [{"files": [...], "agent": "a1", "ts": ...}, ...]
+        """
         with locked(self._lock_path):
             return list(read_state(self._path)["taken"])
 
     def all_taken_files(self) -> list[str]:
-        """Return flat list of every file that was taken, in order."""
+        """Return flat list of every file that was taken, in order.
+
+        Example::
+
+            files = queue.all_taken_files()  # ["a.py", "b.py", ...]
+        """
         result: list[str] = []
         for entry in self.taken_log():
             result.extend(entry["files"])

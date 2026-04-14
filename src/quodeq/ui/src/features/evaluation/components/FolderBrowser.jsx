@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { browseDirectory, createDirectory } from '../../../api/index.js';
+import { useCallback, useEffect, useState } from 'react';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 function FileIcon() {
   return (
@@ -116,7 +116,7 @@ function FolderFooter({ selectedFolder, onClose, onConfirm, confirmText = 'Use T
   );
 }
 
-async function navigateFolder(path, navigation, showFiles) {
+async function navigateFolder(path, navigation, showFiles, browseDirectory) {
   const { setLoading, setNavError, updateNavState } = navigation;
   setLoading(true);
   setNavError(null);
@@ -131,6 +131,7 @@ async function navigateFolder(path, navigation, showFiles) {
 }
 
 function NewFolderInput({ currentPath, navigate, onClose }) {
+  const { createDirectory } = useApi();
   const [name, setName] = useState('');
   const [error, setError] = useState(null);
 
@@ -156,7 +157,7 @@ function NewFolderInput({ currentPath, navigate, onClose }) {
       />
       <button className="folder-nav-btn" onClick={handleCreate} disabled={!name.trim()}>Create</button>
       <button className="folder-nav-btn" onClick={onClose}>✕</button>
-      {error && <span className="inline-error">{error}</span>}
+      {error && <span className="inline-error" role="alert">{error}</span>}
     </div>
   );
 }
@@ -189,6 +190,7 @@ function FolderBrowserDialog({ state, actions, navigation, selection, title, con
 }
 
 export default function FolderBrowser({ onSelect, onClose, title = 'Select Repository Folder', confirmText = 'Use This Folder', showFiles = false, rootPath = null }) {
+  const { browseDirectory } = useApi();
   const [currentPath, setCurrentPath] = useState('');
   const [pathInput, setPathInput] = useState('');
   const [data, setData] = useState(null);
@@ -204,16 +206,16 @@ export default function FolderBrowser({ onSelect, onClose, title = 'Select Repos
   }
   const navigation = { setLoading, setNavError, updateNavState };
 
-  function navigate(path) {
+  const navigate = useCallback((path) => {
     // Prevent navigating above rootPath when rootPath is set
     if (rootPath && path && !path.startsWith(rootPath)) {
       setPathInput(rootPath);
       return;
     }
-    navigateFolder(path, navigation, showFiles);
-  }
+    navigateFolder(path, navigation, showFiles, browseDirectory);
+  }, [rootPath, showFiles, browseDirectory]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  useEffect(() => { navigate(rootPath || ''); }, [rootPath]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { navigate(rootPath || ''); }, [rootPath, navigate]);
 
   return (
     <div className="modal-overlay" onClick={onClose}>

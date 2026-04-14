@@ -12,7 +12,12 @@ from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.parser import EvidenceContext, parse_jsonl_to_evidence_by_dimension
 from quodeq.analysis.subagents.file_queue import FileQueue
 from quodeq.analysis.prompts.builder import PromptContext, build_consolidated_prompt
+from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
+from quodeq.analysis.stream.counters import count_files_in_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
+from quodeq.analysis.subagents._pool_launcher import _default_subagent_model, _compute_files_per_agent
+from quodeq.analysis.subagents._source_files import _list_source_files
+from quodeq.engine._runner_markers import cleanup_stream
 from quodeq.shared.logging import log_info, log_warning
 
 
@@ -23,14 +28,20 @@ class _ConsolidatedPaths:
     compiled_dir: "Path | None" = None
 
 
+@dataclass(frozen=True)
+class _ConsolidatedRunContext:
+    """Grouped context for consolidated result collection."""
+    dimensions: list[str]
+    ctx: Any
+    results: list[Any]
+    files: list[str]
+
+
 def _build_consolidated_config(
     config: "RunConfig", dimensions: list[str], files_per_agent: int,
     compiled_dir: "Path | None" = None,
 ) -> AnalysisConfig:
     """Build AnalysisConfig for consolidated mode."""
-    # Deferred import: breaks circular dependency between _consolidated and runner.
-    from quodeq.analysis.subagents.runner import _default_subagent_model
-
     subagent_model = config.options.subagent_model or _default_subagent_model() or config.options.ai_model
     pool_budget_val = config.options.pool_budget
     return AnalysisConfig(
@@ -46,19 +57,14 @@ def _build_consolidated_config(
 
 
 def _collect_consolidated_results(
-    config: "RunConfig", dimensions: list[str], ctx: Any,
-    results: list[Any], paths: _ConsolidatedPaths, files: list[str],
+    config: "RunConfig", run_ctx: _ConsolidatedRunContext, paths: _ConsolidatedPaths,
 ) -> dict[str, Evidence]:
     """Deduplicate and parse consolidated results into per-dimension Evidence."""
-    from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
-    from quodeq.analysis.stream.counters import count_files_in_stream
-    from quodeq.engine._runner_markers import cleanup_stream
-
     merged_jsonl = paths.evidence_dir / "consolidated_evidence.jsonl"
     SubagentPool.deduplicate_jsonl(merged_jsonl)
 
     total_files_read = 0
-    for r in results:
+    for r in run_ctx.results:
         if r.stream_file.exists():
             total_files_read += len(count_files_in_stream(r.stream_file))
             cleanup_stream(r.stream_file)
@@ -73,14 +79,14 @@ def _collect_consolidated_results(
             pass
 
     # Save per-dimension fingerprints so incremental works after consolidated runs
-    for dim in dimensions:
-        fp = build_fingerprint(config.src, files, dim, config.standards_dir, analyzed_files=analyzed or None)
+    for dim in run_ctx.dimensions:
+        fp = build_fingerprint(config.src, run_ctx.files, dim, config.standards_dir, analyzed_files=analyzed or None)
         save_fingerprint(fp, paths.evidence_dir)
 
     ev_ctx = EvidenceContext(
         language=config.language,
         repository=str(config.src),
-        date_str=ctx.date_str,
+        date_str=run_ctx.ctx.date_str,
         source_file_count=config.source_file_count,
         files_read=total_files_read,
         module=config.target.name if config.target else "",
@@ -116,8 +122,6 @@ def process_consolidated_dimensions(
     config: "RunConfig", dimensions: list[str], ctx: Any,
 ) -> dict[str, Evidence]:
     """Run all dimensions in a single pass -- files read once, not per dimension."""
-    from quodeq.analysis.subagents.runner import _list_source_files, _compute_files_per_agent
-
     compiled_dir = (config.standards_dir / "compiled") if config.standards_dir else None
     evidence_dir = config.work_dir or config.src
 
@@ -148,4 +152,5 @@ def process_consolidated_dimensions(
     results = pool.run()
 
     # 4. Collect and return per-dimension evidence
-    return _collect_consolidated_results(config, dimensions, ctx, results, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir), files)
+    run_context = _ConsolidatedRunContext(dimensions=dimensions, ctx=ctx, results=results, files=files)
+    return _collect_consolidated_results(config, run_context, _ConsolidatedPaths(evidence_dir=evidence_dir, compiled_dir=compiled_dir))

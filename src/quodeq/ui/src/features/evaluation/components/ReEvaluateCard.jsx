@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getProjectInfo, relocateProject, cloneToLocal } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 import { usePluginDimensions } from '../hooks/usePluginDimensions.js';
 import { useScanData } from '../hooks/useScanData.js';
 import BranchScopeSelector from './BranchScopeSelector.jsx';
@@ -7,10 +7,12 @@ import DimensionSelector from './DimensionSelector.jsx';
 import FolderBrowser from './FolderBrowser.jsx';
 
 
-const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: '8px', alignItems: 'center' };
+const BUTTON_ROW_GAP = '8px';
+const REPO_URL_PLACEHOLDER = 'https://github.com/org/repo';
+const buttonRowStyle = { display: 'flex', flexDirection: 'row', gap: BUTTON_ROW_GAP, alignItems: 'center' };
 const flexButtonStyle = { flex: 1 };
 
-function useReEvalInfo(project, initialInfo) {
+function useReEvalInfo(project, initialInfo, { getProjectInfo, relocateProject }) {
   const [info, setInfo] = useState(initialInfo || null);
   const [error, setError] = useState(null);
   const [urlInput, setUrlInput] = useState('');
@@ -50,22 +52,8 @@ function useReEvalInfo(project, initialInfo) {
   return { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore };
 }
 
-function useReEvaluateCard(project, onStart, projectInfo) {
-  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo);
-  const { allDimensions } = usePluginDimensions();
+function useDimensionSelection(allDimensions, info, branch, scopePath, onStart) {
   const [selectedDims, setSelectedDims] = useState(new Set());
-  const [branch, setBranch] = useState(null);
-  const [scopePath, setScopePath] = useState(null);
-
-  // Reset scope when project changes
-  useEffect(() => { setScopePath(null); setBranch(null); }, [project]);
-  const [cloneBrowserOpen, setCloneBrowserOpen] = useState(false);
-  const [cloning, setCloning] = useState(false);
-  const [cloneDest, setCloneDest] = useState('');
-  const [cloneError, setCloneError] = useState(null);
-
-  const isLocal = info?.location === 'local';
-  const { scanData } = useScanData(isLocal ? project : null);
 
   const toggleDim = (id) => {
     setSelectedDims((prev) => {
@@ -79,13 +67,36 @@ function useReEvaluateCard(project, onStart, projectInfo) {
   const clearAll = () => setSelectedDims(new Set());
   const buildPayload = (extra) => {
     const payload = { repo: info.path, ...extra };
-    if (selectedDims.size > 0) payload.dimensions = [...selectedDims];
+    payload.dimensions = [...selectedDims];
     if (branch) payload.branch = branch;
     if (scopePath) payload.scopePath = scopePath;
     return payload;
   };
   const handleStart = () => onStart(buildPayload());
   const handleIncremental = () => onStart(buildPayload({ incremental: true }));
+
+  return { selectedDims, toggleDim, selectAll, clearAll, handleStart, handleIncremental };
+}
+
+function useReEvaluateCard(project, onStart, projectInfo) {
+  const api = useApi();
+  const { getProjectInfo, relocateProject, cloneToLocal } = api;
+  const { info, setInfo, error, urlInput, setUrlInput, urlError, urlSaving, handleUrlRestore } = useReEvalInfo(project, projectInfo, { getProjectInfo, relocateProject });
+  const { allDimensions } = usePluginDimensions();
+  const [branch, setBranch] = useState(null);
+  const [scopePath, setScopePath] = useState(null);
+
+  useEffect(() => { setScopePath(null); setBranch(null); }, [project]);
+  const [cloneBrowserOpen, setCloneBrowserOpen] = useState(false);
+  const [cloning, setCloning] = useState(false);
+  const [cloneDest, setCloneDest] = useState('');
+  const [cloneError, setCloneError] = useState(null);
+
+  const isLocal = info?.location === 'local';
+  const { scanData } = useScanData(isLocal ? project : null);
+
+  const { selectedDims, toggleDim, selectAll, clearAll, handleStart, handleIncremental } =
+    useDimensionSelection(allDimensions, info, branch, scopePath, onStart);
 
   async function handleCloneToLocal(destination) {
     setCloneBrowserOpen(false);
@@ -115,15 +126,16 @@ function UrlRestoreSection({ urlInput, setUrlInput, urlError, urlSaving, handleU
   return (
     <div className="re-eval-stale-warning">
       <p>This project was evaluated from a remote repo but the original URL was not saved. Enter the URL to restore reevaluation.</p>
-      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+      <div style={{ display: 'flex', gap: BUTTON_ROW_GAP, alignItems: 'center' }}>
         <input
           type="text"
           value={urlInput}
           onChange={(e) => setUrlInput(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') handleUrlRestore(); }}
-          placeholder="https://github.com/org/repo"
+          placeholder={REPO_URL_PLACEHOLDER}
           className="re-eval-url-input"
           disabled={urlSaving}
+          aria-label="Repository URL for reevaluation"
         />
         <button
           type="button"
@@ -184,7 +196,7 @@ function ActionButtons({ info, project, disabled, canStart, cloning, handleIncre
         onClick={handleIncremental}
         title="Only analyze files changed since last evaluation"
       >
-        {disabled ? 'Running...' : 'Scan changes'}
+        {disabled ? 'Running...' : 'Scan incremental'}
       </button>
       <button
         type="button"
@@ -194,7 +206,7 @@ function ActionButtons({ info, project, disabled, canStart, cloning, handleIncre
         onClick={handleStart}
         title="Fresh re-evaluation of all selected dimensions"
       >
-        Full scan
+        Clean scan
       </button>
     </div>
   );
@@ -208,7 +220,7 @@ function ReEvaluateCardView({ info, project, disabled, dimensions, actions, scop
     cloneBrowserOpen, setCloneBrowserOpen, cloning, cloneDest, cloneError, handleCloneToLocal,
   } = actions;
 
-  const canStart = !disabled && !cloning && selectedDims.size > 0 && !info.pathMissing;
+  const canStart = !disabled && !cloning && !info.pathMissing;
 
   return (
     <div className="panel evaluate-panel">

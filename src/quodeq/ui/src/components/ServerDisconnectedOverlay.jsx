@@ -1,6 +1,7 @@
-import { getHealth } from '../api/index.js';
+import { useApi } from '../api/ApiContext.jsx';
 
 export default function ServerDisconnectedOverlay({ onReconnect }) {
+  const { getHealth } = useApi();
   return (
     <div className="server-disconnected-overlay">
       <div className="server-disconnected-card">

@@ -81,7 +81,10 @@ function RequirementNode({ req, position, selectedNode, actions, confirmFn = win
   const hasContent = req.text || req.description || (req.refs && req.refs.length > 0);
   const handleRemoveReq = () => {
     if (hasContent) {
-      if (!confirmFn(`Delete requirement "${req.text ? (req.text.length > MAX_LABEL_DISPLAY_LENGTH ? req.text.slice(0, MAX_LABEL_DISPLAY_LENGTH) + '...' : req.text) : 'Untitled'}"?`)) return;
+      const label = req.text
+        ? (req.text.length > MAX_LABEL_DISPLAY_LENGTH ? req.text.slice(0, MAX_LABEL_DISPLAY_LENGTH) + '...' : req.text)
+        : 'Untitled';
+      if (!confirmFn(`Delete requirement "${label}"?`)) return;
     }
     onRemoveRequirement(pi, ri);
   };

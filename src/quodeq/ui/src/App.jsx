@@ -13,12 +13,13 @@ import ViolationsPage from './features/violations/components/ViolationsPage.jsx'
 import MapPage from './features/map/components/MapPage.jsx';
 import HelpPage from './features/help/components/HelpPage.jsx';
 import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.jsx';
-import { dismissFinding } from './api/index.js';
+import { useApi } from './api/ApiContext.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
 
+const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
 
 /**
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
@@ -90,7 +91,7 @@ function renderEvalPrincipleDetail(params, props) {
       evalPrincipal={evalPrincipal}
       severityFilter={params.severity || null}
       onDismiss={(v) => {
-        dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
+        props.dismissFinding(selectedProject, buildDismissPayload(v, evalPrincipal.dimension))
           .then(() => props.refreshDashboard?.())
           .catch((e) => console.error('[Dismiss] failed:', e));
       }}
@@ -117,47 +118,52 @@ function buildEvalPrincipal(principleObj, principleGrade) {
   };
 }
 
+function ViolationsRoute({ params, props }) {
+  const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
+  const dims = acc?.dimensions || [];
+  const nav = props.navigation.handleNavigate;
+
+  const dimMap = new Map(dims.map(d => [d.dimension, d]));
+  const principleMap = new Map(
+    dims.flatMap(d => (d.principles || []).map(p => [`${d.dimension}\0${p.name || p.principle}`, p]))
+  );
+  function navigateToPrinciple(principleObj, severity) {
+    const dim = dimMap.get(principleObj.dimension);
+    const pg = principleMap.get(`${principleObj.dimension}\0${principleObj.principle}`);
+    nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
+  }
+
+  function navigateToDimension(row, severity) {
+    const dim = row.raw || dimMap.get(row.dimension);
+    if (!dim) return;
+    nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, severity, sourceTab: 'violations' });
+  }
+
+  return (
+    <ViolationsPage
+      data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
+      callbacks={{
+        onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
+        onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
+        onCellClick: ({ row, severity }) => {
+          if (row.type === 'principle' && row.principleObj) {
+            navigateToPrinciple(row.principleObj, severity);
+          } else {
+            navigateToDimension(row, severity);
+          }
+        },
+        onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
+        onRefresh: props.refreshDashboard,
+      }}
+      isDirectNav={props.navigation.navStackLength === 1}
+      tabKey={params._tabKey || 0}
+    />
+  );
+}
+
 const ROUTE_RENDERERS = {
   overview: (params, props) => <DashboardPage data={props.dashboardData} callbacks={{ onNavigate: props.navigation.handleNavigate, onRunSelect: props.navigation.handleRunSelect }} runMode={false} />,
-  violations: (params, props) => {
-    const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
-    const dims = acc?.dimensions || [];
-    const nav = props.navigation.handleNavigate;
-
-    const dimMap = new Map(dims.map(d => [d.dimension, d]));
-    function navigateToPrinciple(principleObj, severity) {
-      const dim = dimMap.get(principleObj.dimension);
-      const pg = (dim?.principles || []).find(p => (p.name || p.principle) === principleObj.principle);
-      nav('evalprinciple', { evalPrincipal: buildEvalPrincipal(principleObj, pg), severity, sourceTab: 'violations' });
-    }
-
-    function navigateToDimension(row, severity) {
-      const dim = row.raw || dims.find(d => d.dimension === row.dimension);
-      if (!dim) return;
-      nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, severity, sourceTab: 'violations' });
-    }
-
-    return (
-      <ViolationsPage
-        data={{ accumulated: acc, accumulatedDimensions: dims, selectedProject: props.navigation.selectedProject }}
-        callbacks={{
-          onDimensionClick: (dim) => nav('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject, sourceTab: 'violations' }),
-          onFileClick: (fileObj) => nav('file', { file: fileObj, sourceTab: 'violations' }),
-          onCellClick: ({ row, severity }) => {
-            if (row.type === 'principle' && row.principleObj) {
-              navigateToPrinciple(row.principleObj, severity);
-            } else {
-              navigateToDimension(row, severity);
-            }
-          },
-          onPrincipleClick: (principleObj) => navigateToPrinciple(principleObj),
-          onRefresh: props.refreshDashboard,
-        }}
-        isDirectNav={props.navigation.navStackLength === 1}
-        tabKey={params._tabKey || 0}
-      />
-    );
-  },
+  violations: (params, props) => <ViolationsRoute params={params} props={props} />,
   map: (params, props) => {
     const acc = props.dashboardData.latestAccumulated || props.dashboardData.accumulated;
     const isDirectNav = props.navigation.navStackLength === 1;
@@ -207,8 +213,7 @@ const ROUTE_RENDERERS = {
  */
 function MainContent({ activePage, props }) {
   const { page, ...params } = activePage;
-  const noProjectTabs = ['evaluate', 'standards', 'settings', 'help'];
-  if (!noProjectTabs.includes(page)) {
+  if (!NO_PROJECT_TABS.includes(page)) {
     const projects = props.navigation?.projects;
     if (!projects || projects.length === 0) {
       if (!props.navigation?.projectsLoaded) return <LoadingScreen />;
@@ -238,6 +243,7 @@ function AppShell({ sidebar, header, breadcrumb, content }) {
 }
 
 export default function App() {
+  const { dismissFinding } = useApi();
   const state = useAppState();
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
 
@@ -249,7 +255,7 @@ export default function App() {
   const contentProps = {
     dashboardData: {
       selectedProject: state.selectedProject, selectedRun: state.selectedRun, projects: state.projects,
-      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, rescoreLookup: state.rescoreLookup, loading: state.loading, error: state.error,
+      dashboard: state.dashboard, accumulated: state.accumulated, latestAccumulated: state.latestAccumulated, loading: state.loading, error: state.error,
       availableRuns: state.availableRuns, dailyRuns: state.dailyRuns, overviewRunIndex: state.overviewRunIndex,
       selectedDisplayName: state.selectedDisplayName,
     },
@@ -265,6 +271,7 @@ export default function App() {
     serverHealth: { connected: state.serverConnected, setConnected: state.setServerConnected },
     settings: state.settings,
     refreshDashboard: state.refreshDashboard,
+    dismissFinding,
   };
 
   return (

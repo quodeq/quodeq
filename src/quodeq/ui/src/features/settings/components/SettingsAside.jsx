@@ -107,6 +107,7 @@ function useKeyNav(stopAuto, stepPhrase) {
       if (e.key === 'ArrowLeft') { stopAuto(); stepPhrase(-1); }
       if (e.key === 'ArrowRight') { stopAuto(); stepPhrase(1); }
     }
+    // Browser-only: keyboard navigation for settings phrases
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [stopAuto, stepPhrase]);

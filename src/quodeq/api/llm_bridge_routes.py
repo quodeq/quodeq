@@ -10,8 +10,9 @@ from quodeq.llm_bridge import (
     run_concurrency_test,
     get_known_models,
     get_provider_configs,
+    check_cloud_connection,
 )
-from quodeq.llm_bridge._cloud import check_cloud_connection
+from quodeq.shared.url_validation import validate_url_safe
 
 
 def register_llm_bridge_routes(app: Flask) -> None:
@@ -30,9 +31,9 @@ def register_llm_bridge_routes(app: Flask) -> None:
         data = request.get_json() or {}
         model = data.get("model", "")
         if not model or not isinstance(model, str):
-            return jsonify({"error": "model is required"}), 400
+            return jsonify({"error": "model is required", "code": "MISSING_PARAM"}), 400
         if "\\" in model or ".." in model or "\0" in model:
-            return jsonify({"error": "Invalid model name"}), 400
+            return jsonify({"error": "Invalid model name", "code": "INVALID_PARAM"}), 400
         result = run_concurrency_test(model)
         return jsonify(result)
 
@@ -46,8 +47,14 @@ def register_llm_bridge_routes(app: Flask) -> None:
     @app.post("/api/provider/test")
     def provider_test() -> Response:
         data = request.get_json() or {}
+        api_base = data.get("api_base", "")
+        if api_base:
+            try:
+                validate_url_safe(api_base, allow_private=True)
+            except ValueError as exc:
+                return jsonify({"error": str(exc), "code": "INVALID_URL"}), 400
         result = check_cloud_connection(
-            api_base=data.get("api_base", ""),
+            api_base=api_base,
             model=data.get("model", ""),
             api_key=data.get("api_key", ""),
         )

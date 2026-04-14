@@ -21,6 +21,9 @@ from quodeq.analysis.subagents._pool_scaling import (
     should_respawn,
 )
 from quodeq.analysis.subagents.file_queue import WorkQueue
+from quodeq.shared.logging import log_warning as _log_warn
+
+_SCOUT_BUDGET_FRACTION = 0.5
 
 
 @dataclass
@@ -44,7 +47,7 @@ class LoopContext:
 
 def scout_loop(ctx: LoopContext) -> None:
     """Run scout-then-scale loop: launch one agent, scale up when it finishes."""
-    scout_timeout = _SCOUT_TIMEOUT_S if ctx.max_duration <= 0 else min(_SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * 0.5)
+    scout_timeout = _SCOUT_TIMEOUT_S if ctx.max_duration <= 0 else min(_SCOUT_TIMEOUT_S, ctx.max_duration / max(ctx.n_agents, 1) * _SCOUT_BUDGET_FRACTION)
     state = ScaleUpState(
         pool_start=ctx.pool_start, max_duration=ctx.max_duration, scout_timeout=scout_timeout,
     )
@@ -68,8 +71,6 @@ def scout_loop(ctx: LoopContext) -> None:
 
 def immediate_loop(ctx: LoopContext) -> None:
     """Launch all agents immediately, respawning as they complete."""
-    from quodeq.shared.logging import log_warning as _log_warn
-
     ev_paths = EvidencePaths(ctx.shared_jsonl_path, ctx.evidence_dir, ctx.dimension_key)
     for _ in range(ctx.n_agents):
         ctx.submit_fn()

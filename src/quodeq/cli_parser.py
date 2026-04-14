@@ -81,7 +81,7 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
 def build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with all subcommands."""
     parser = argparse.ArgumentParser(prog="quodeq")
-    subparsers = parser.add_subparsers(dest="command", required=True)
+    subparsers = parser.add_subparsers(dest="command")
 
     dashboard_parser = subparsers.add_parser("dashboard", help="Run the dashboard")
     dashboard_parser.set_defaults(handler_command="dashboard")

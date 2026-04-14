@@ -7,11 +7,13 @@ from pathlib import Path
 
 from quodeq.core.types.scan import ScanData
 
+_GIT_INIT_CMD = ["git", "init"]
+
 
 def _make_git_repo(path: Path) -> None:
     """Create a minimal git repo with two branches."""
     import subprocess
-    subprocess.run(["git", "init", str(path)], capture_output=True, check=True)
+    subprocess.run([*_GIT_INIT_CMD, str(path)], capture_output=True, check=True)
     subprocess.run(["git", "-C", str(path), "checkout", "-b", "main"], capture_output=True, check=True)
     (path / "README.md").write_text("# test")
     subprocess.run(["git", "-C", str(path), "add", "."], capture_output=True, check=True)

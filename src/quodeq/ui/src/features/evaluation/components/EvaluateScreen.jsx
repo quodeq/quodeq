@@ -1,10 +1,13 @@
+import { useState, useEffect, useRef } from 'react';
 import EvaluationForm from './EvaluationForm.jsx';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
+import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
 
 const INITIAL_ANIM_DELAY = '0s';
 const CHIP_DELAY_1 = '0.55s';
 const CHIP_DELAY_2 = '1.1s';
+const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
 function EvaluateHelpSection() {
   return (
@@ -39,11 +42,9 @@ function EvaluateHelpSection() {
   );
 }
 
-import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
-
-function ActiveProviderBadge() {
-  const provider = localStorage.getItem(ACTIVE_PROVIDER_KEY) || '';
-  const model = localStorage.getItem(providerKey(provider, 'model')) || '';
+function ActiveProviderBadge({ storage = localStorage }) {
+  const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
+  const model = storage.getItem(providerKey(provider, 'model')) || '';
   if (!provider) return null;
   return (
     <div className="eval-provider-badge">
@@ -55,7 +56,7 @@ function ActiveProviderBadge() {
 
 function MagnifierIcon({ className }) {
   return (
-    <svg className={className} width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <svg className={className} width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <circle cx="11" cy="11" r="7" />
       <line x1="16.5" y1="16.5" x2="21" y2="21" />
       <line x1="8" y1="11" x2="14" y2="11" />
@@ -89,10 +90,44 @@ function EvaluateHeader({ isRunning }) {
   );
 }
 
+function sanitizeErrorMessage(message) {
+  if (typeof message !== 'string') return 'An error occurred';
+  if (message.includes('\n') || /[/\\](?:usr|home|tmp|var|etc|src|node_modules)/.test(message) || message.length > 120) {
+    console.error('Raw error:', message);
+    return 'An error occurred. Check the console for details.';
+  }
+  return message;
+}
+
+function ErrorToast({ message, onDismiss }) {
+  useEffect(() => {
+    const timer = setTimeout(onDismiss, TOAST_DISMISS_TIMEOUT_MS);
+    return () => clearTimeout(timer);
+  }, [message, onDismiss]);
+
+  return (
+    <div className="job-error-toast" onClick={onDismiss}>
+      {sanitizeErrorMessage(message)}
+    </div>
+  );
+}
+
 export default function EvaluateScreen({ evaluation, context, actions }) {
   const { job, jobError, liveViolations } = evaluation;
   const { selectedProject, projectInfo } = context;
   const { onStart: onStartEvaluation, onDismiss, onCancel } = actions;
+  const [toastKey, setToastKey] = useState(0);
+  const [toastVisible, setToastVisible] = useState(false);
+
+  useEffect(() => {
+    if (jobError) setToastVisible(true);
+  }, [jobError, toastKey]);
+
+  const wrappedOnStart = (payload) => {
+    setToastVisible(false);
+    setToastKey(k => k + 1);
+    onStartEvaluation(payload);
+  };
 
   return (
     <section className="evaluate-screen">
@@ -100,7 +135,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
       <div className="evaluate-content">
         {!job && selectedProject && (
-          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={onStartEvaluation} disabled={false} />
+          <ReEvaluateCard project={selectedProject} projectInfo={projectInfo} onStart={wrappedOnStart} disabled={false} />
         )}
 
         {!job && (
@@ -108,15 +143,18 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
             <div className="panel-header">
               <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
             </div>
-            <EvaluationForm onStart={onStartEvaluation} disabled={false} selectedProject={projectInfo} />
+            <EvaluationForm onStart={wrappedOnStart} disabled={false} selectedProject={projectInfo} />
           </div>
         )}
 
-        {jobError && <div className="job-error-banner">{typeof jobError === 'string' ? jobError.slice(0, 200) : 'An error occurred'}</div>}
         <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
 
         {!job && <EvaluateHelpSection />}
       </div>
+
+      {jobError && toastVisible && (
+        <ErrorToast key={toastKey} message={jobError} onDismiss={() => setToastVisible(false)} />
+      )}
     </section>
   );
 }

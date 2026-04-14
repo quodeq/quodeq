@@ -8,6 +8,8 @@ const OLD_THEME_KEY = 'cc-theme';
 const VALID_MODES = ['system', 'light', 'dark'];
 const VALID_FAMILIES = ['daruma', 'neo', 'galadriel', 'ifrit', 'deckard'];
 
+const FAMILY_RENAMES = { 'default': 'daruma', 'midnight': 'daruma', 'flynn': 'daruma', 'forest': 'galadriel', 'ember': 'ifrit', 'cyber': 'deckard' };
+
 const MIGRATION_MAP = {
   system:   { mode: 'system', family: 'daruma' },
   light:    { mode: 'light',  family: 'daruma' },
@@ -25,9 +27,8 @@ function migrateOldTheme() {
     if (old === null) {
       // Migrate old family names to character names
       const currentFamily = localStorage.getItem(FAMILY_KEY);
-      const familyRenames = { 'default': 'daruma', 'midnight': 'daruma', 'flynn': 'daruma', 'forest': 'galadriel', 'ember': 'ifrit', 'cyber': 'deckard' };
-      if (currentFamily && familyRenames[currentFamily]) {
-        localStorage.setItem(FAMILY_KEY, familyRenames[currentFamily]);
+      if (currentFamily && FAMILY_RENAMES[currentFamily]) {
+        localStorage.setItem(FAMILY_KEY, FAMILY_RENAMES[currentFamily]);
       }
       return;
     }
@@ -73,18 +74,18 @@ export function useAppSettings() {
     return () => mql.removeEventListener('change', handler);
   }, [themeMode, themeFamily]);
 
-  function applyMode(value) {
+  function applyMode(value, storage = localStorage) {
     if (!VALID_MODES.includes(value)) return;
     setThemeMode(value);
-    localStorage.setItem(MODE_KEY, value);
+    storage.setItem(MODE_KEY, value);
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     applyDataTheme(resolveDataTheme(value, themeFamily, prefersDark));
   }
 
-  function applyFamily(value) {
+  function applyFamily(value, storage = localStorage) {
     if (!VALID_FAMILIES.includes(value)) return;
     setThemeFamily(value);
-    localStorage.setItem(FAMILY_KEY, value);
+    storage.setItem(FAMILY_KEY, value);
     const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
     applyDataTheme(resolveDataTheme(themeMode, value, prefersDark));
   }

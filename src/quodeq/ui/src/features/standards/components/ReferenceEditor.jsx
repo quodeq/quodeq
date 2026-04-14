@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { listCwes } from '../../../api/index.js';
+import { useApi } from '../../../api/ApiContext.jsx';
 
 const EDITABLE_REF_TYPES = ['cwe', 'book', 'url', 'other'];
 const BUILTIN_REF_TYPES = ['cwe', 'asvs', 'cert', 'cisq', 'wcag22'];
@@ -67,12 +67,14 @@ function CweFilterBar({ searchRef, query, setQuery, filterAbstraction, setFilter
 }
 
 function CweBrowserModal({ onSelect, onClose }) {
+  const { listCwes } = useApi();
   const [cwes, setCwes] = useState([]);
+  const [cweError, setCweError] = useState(null);
   const [query, setQuery] = useState('');
   const [filterAbstraction, setFilterAbstraction] = useState('');
   const searchRef = useRef(null);
 
-  useEffect(() => { listCwes().then(setCwes).catch(() => setCwes([])); }, []);
+  useEffect(() => { listCwes().then((data) => { setCwes(data); setCweError(null); }).catch(() => { setCwes([]); setCweError('Failed to load CWE list. Check your connection and try again.'); }); }, [listCwes]);
   useEffect(() => { if (searchRef.current) searchRef.current.focus(); }, []);
 
   const filtered = useMemo(() => cwes.filter((c) => {
@@ -89,6 +91,7 @@ function CweBrowserModal({ onSelect, onClose }) {
           <button type="button" className="modal-close-btn" onClick={onClose}>&times;</button>
         </div>
         <CweFilterBar searchRef={searchRef} query={query} setQuery={setQuery} filterAbstraction={filterAbstraction} setFilterAbstraction={setFilterAbstraction} />
+        {cweError && <div className="error-banner">{cweError}</div>}
         <div className="cwe-browser-count">{filtered.length} of {cwes.length} CWEs</div>
         <CweList filtered={filtered} onSelect={onSelect} onClose={onClose} />
       </div>
@@ -146,6 +149,30 @@ function GenericRefInputs({ refData, onFieldChange, disabled }) {
   );
 }
 
+function RefTypeSelect({ refData, typeOptions, onTypeChange, disabled }) {
+  return (
+    <select
+      className="ref-type-select"
+      value={typeOptions.includes(refData.type) ? refData.type : 'other'}
+      onChange={(e) => onTypeChange(e.target.value)}
+      disabled={disabled}
+      aria-label="Reference type"
+    >
+      {typeOptions.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}
+    </select>
+  );
+}
+
+function RefRemoveButton({ index, onRemove }) {
+  return (
+    <button type="button" className="ref-remove-btn" onClick={() => onRemove(index)} aria-label="Remove reference" title="Remove">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+        <path d="M18 6L6 18M6 6l12 12" />
+      </svg>
+    </button>
+  );
+}
+
 function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   const ref = normalizeRef(refData);
   const isCwe = ref.type === 'cwe';
@@ -156,32 +183,20 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
   const handleTypeChange = (newType) => {
     onChange(index, { ...ref, type: newType, refId: '', name: '', url: '' });
   };
-
   const handleCweSelect = (cwe) => {
     onChange(index, { type: 'cwe', refId: String(cwe.id), name: cwe.name, url: URL_TEMPLATES.cwe(cwe.id) });
   };
-
   const handleFieldChange = (field, value) => {
     onChange(index, { ...ref, [field]: value });
   };
 
   return (
     <div className="ref-row">
-      <select
-        className="ref-type-select"
-        value={typeOptions.includes(ref.type) ? ref.type : 'other'}
-        onChange={(e) => handleTypeChange(e.target.value)}
-        disabled={disabled}
-        aria-label="Reference type"
-      >
-        {typeOptions.map((t) => <option key={t} value={t}>{t.toUpperCase()}</option>)}
-      </select>
-
+      <RefTypeSelect refData={ref} typeOptions={typeOptions} onTypeChange={handleTypeChange} disabled={disabled} />
       {isCwe
         ? <CweRefInputs refData={ref} onSelect={handleCweSelect} disabled={disabled} />
         : <GenericRefInputs refData={ref} onFieldChange={handleFieldChange} disabled={disabled} />
       }
-
       <input
         className="ref-url-input"
         placeholder="URL (optional)"
@@ -190,14 +205,7 @@ function ReferenceRow({ refData, index, onChange, onRemove, disabled }) {
         disabled={disabled}
         aria-label="Reference URL"
       />
-
-      {!disabled && (
-        <button type="button" className="ref-remove-btn" onClick={() => onRemove(index)} aria-label="Remove reference" title="Remove">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M18 6L6 18M6 6l12 12" />
-          </svg>
-        </button>
-      )}
+      {!disabled && <RefRemoveButton index={index} onRemove={onRemove} />}
     </div>
   );
 }

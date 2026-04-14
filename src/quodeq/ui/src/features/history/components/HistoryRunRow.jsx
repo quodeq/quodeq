@@ -4,7 +4,7 @@ function formatDate(dateISO) {
   if (!dateISO) return '';
   try {
     const d = new Date(dateISO);
-    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' });
   } catch { return ''; }
 }
 
@@ -65,11 +65,7 @@ export default function HistoryRunRow({ entry, delta, isSelected, onClick }) {
             <span key={d.dimension} className="history-dim-tag">
               {capitalize(d.dimension)}
               {d.score != null && <span className="history-dim-score">{d.score.toFixed(1)}</span>}
-              {d.delta != null && (
-                <span className={`history-dim-trend ${d.delta > 0 ? 'trend-up' : d.delta < 0 ? 'trend-down' : ''}`}>
-                  {d.delta > 0 ? '▲' : d.delta < 0 ? '▼' : '—'}{d.delta !== 0 ? Math.abs(d.delta).toFixed(1) : ''}
-                </span>
-              )}
+              {d.delta != null && <TrendBadge delta={d.delta} />}
             </span>
           ))}
         </div>

@@ -6,6 +6,7 @@ import {
   GROUP_PLAN_OUTPUT,
   FIX_HINTS,
 } from './planConstants.js';
+import { KNOWN_SEVERITIES } from './constants.js';
 
 const PLAN_SNIPPET_MAX_LINES = 5;
 
@@ -37,6 +38,15 @@ export const PLAN_COMPLETION_CHECKLIST = [
   '- [ ] **No violations were skipped.** If a violation cannot be fixed, state why explicitly — do not silently omit it.',
   '- [ ] **Tests pass.** Run the full test suite after all changes.',
   '- [ ] **Verify metrics.** For each function-length or file-length violation, confirm the result is within limits (e.g., `wc -l`, AST line count).',
+  '',
+  '## Risk analysis (before commit)', '',
+  'After all fixes are applied and tests pass, perform a production-safety audit:', '',
+  '1. **New files committed?** Run `git ls-files --others --exclude-standard` — all new files must be staged.',
+  '2. **Default behavior preserved?** For any changed defaults (limits, timeouts, URLs), verify all callers still work without explicit config.',
+  '3. **Caller compatibility?** For changed function signatures, imports, or module paths — grep for all call sites and confirm they match.',
+  '4. **Non-standard setups?** Consider users with LAN-hosted services, custom ports, external drives, or non-default paths.',
+  '5. **Build verification?** Run both the test suite and the production build — test pass alone doesn\'t catch missing JS/asset files.',
+  '6. **Report findings** to the user before committing. Do not silently commit known risks.',
 ].join('\n');
 
 export { FIX_HINTS };
@@ -47,12 +57,6 @@ export function getFixHint(req) {
   const prefix = req.replace(/-\d+$/, '');
   return FIX_HINTS[prefix] || null;
 }
-
-// ---------------------------------------------------------------------------
-// Internal constants used by plan builders
-// ---------------------------------------------------------------------------
-
-const KNOWN_SEVERITIES = ['critical', 'major', 'minor', 'unknown'];
 
 // ---------------------------------------------------------------------------
 // Helpers

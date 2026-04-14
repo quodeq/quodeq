@@ -1,53 +1,34 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { getDashboard, getAccumulated, getRescore } from '../../../api/index.js';
-import { createDimension } from '../../../models/dimension.js';
+import { useApi } from '../../../api/ApiContext.jsx';
+import { useProjectScores, clearScoresCache } from '../../../hooks/useProjectScores.js';
 
 const REFRESH_DEBOUNCE_MS = 300;
 
-function dimKey(d) { return (d.dimension || '').toLowerCase(); }
-
-const RESCORE_CONCURRENCY = 5;
-
-/** Rescore multiple runs with bounded concurrency, returning { [runId]: rescoreData } */
-async function fetchRescores(project, runIds) {
-  const byRun = {};
-  for (let i = 0; i < runIds.length; i += RESCORE_CONCURRENCY) {
-    const batch = runIds.slice(i, i + RESCORE_CONCURRENCY);
-    const results = await Promise.all(
-      batch.map(rid => getRescore(project, rid).then(r => ({ rid, ...r })).catch(() => null))
-    );
-    for (const r of results) { if (r) byRun[r.rid] = r; }
-  }
-  return byRun;
-}
-
-// Run data is static — cache by (project, runId) to avoid refetching on date switch.
-// Cleared by clearDashboardCache() when mutations happen.
+// Run data cache — only for the per-run dashboard view (dimensions/summary).
+// The unified scores endpoint handles accumulated + rescore + trend.
+// Shared mutable state; use clearDashboardCache() for test resets.
+const MAX_RUN_CACHE_SIZE = 100;
 const _runCache = new Map();
-
 function _runCacheKey(project, run) { return `${project}\0${run || 'latest'}`; }
 
 export function clearDashboardCache(project) {
+  clearScoresCache(project);
   if (project) {
     for (const key of [..._runCache.keys()]) {
       if (key.startsWith(project + '\0')) _runCache.delete(key);
     }
-    for (const key of [..._accCache.keys()]) {
-      if (key.startsWith(project + '\0')) _accCache.delete(key);
-    }
   } else {
     _runCache.clear();
-    _accCache.clear();
   }
 }
 
-function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError) {
+function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError, getDashboard) {
   if (!selectedProject) { setDashboard(null); setError(null); return; }
 
   const cacheKey = _runCacheKey(selectedProject, selectedRun);
   const cached = _runCache.get(cacheKey);
   if (cached) {
-    setDashboard(prev => ({ ...cached, trend: prev?.trend || cached.trend }));
+    setDashboard(cached);
     setLoading(false);
     return undefined;
   }
@@ -56,221 +37,81 @@ function fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoa
   setError(null);
 
   getDashboard(selectedProject, selectedRun)
-    .then(async (payload) => {
+    .then((payload) => {
       if (!active) return;
-      const runId = payload?.selectedRun?.runId || selectedRun;
-      let dimensions = payload.dimensions;
-      let summary = payload.summary;
-      try {
-        const rescored = await getRescore(selectedProject, runId);
-        if (!active) return;
-        dimensions = (rescored.dimensions || []).map(createDimension);
-        summary = { ...payload.summary, ...rescored.summary };
-      } catch { /* non-fatal */ }
-      const result = { ...payload, dimensions, summary };
-      _runCache.set(cacheKey, result);
-      if (active) setDashboard(prev => ({ ...result, trend: prev?.trend || result.trend }));
+      if (_runCache.size >= MAX_RUN_CACHE_SIZE) _runCache.delete(_runCache.keys().next().value);
+      _runCache.set(cacheKey, payload);
+      if (active) setDashboard(payload);
     })
-    .catch(() => { if (active) setError('Failed to load dashboard data.'); })
+    .catch(() => { if (active) setError('Failed to load dashboard data. Check your connection and try refreshing.'); })
     .finally(() => { if (active) setLoading(false); });
 
   return () => { active = false; };
 }
 
-function fetchTrendEffect(selectedProject, setDashboard) {
-  if (!selectedProject) return;
-  let active = true;
-
-  getDashboard(selectedProject, 'latest')
-    .then(async (payload) => {
-      if (!active) return;
-      const trend = payload.trend || [];
-      const runIds = [...new Set(trend.map(t => t.runId).filter(Boolean))];
-      if (runIds.length === 0) { if (active) setDashboard(prev => ({ ...prev, trend })); return; }
-      try {
-        const byRun = await fetchRescores(selectedProject, runIds);
-        if (!active) return;
-        const rescoredTrend = trend.map(t => {
-          const r = byRun[t.runId];
-          if (!r) return t;
-          const dl = {};
-          for (const d of (r.dimensions || [])) dl[dimKey(d)] = d;
-          const details = (t.dimensionDetails || []).map(dd => {
-            const rd = dl[dimKey(dd)];
-            if (!rd) return dd;
-            return {
-              ...dd,
-              score: rd.overallScore ? parseFloat(rd.overallScore) : dd.score,
-              overallGrade: rd.overallGrade || dd.overallGrade,
-            };
-          });
-          return {
-            ...t,
-            dimensionDetails: details,
-            numericAverage: r.summary?.numericAverage ?? t.numericAverage,
-            runNumericAverage: r.summary?.numericAverage ?? t.runNumericAverage,
-            overallGrade: r.summary?.overallGrade ?? t.overallGrade,
-            runOverallGrade: r.summary?.overallGrade ?? t.runOverallGrade,
-          };
-        });
-        if (active) setDashboard(prev => ({ ...prev, trend: rescoredTrend }));
-      } catch {
-        if (active) setDashboard(prev => ({ ...prev, trend }));
-      }
-    })
-    .catch(() => {});
-
-  return () => { active = false; };
-}
-
-const _accCache = new Map();
-
-function fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError, rescore = false) {
-  if (!selectedProject) { setAccumulated(null); return; }
-
-  const asOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
-  const accCacheKey = _runCacheKey(selectedProject, `acc-${asOf || 'latest'}${rescore ? '-r' : ''}`);
-  const cached = _accCache.get(accCacheKey);
-  if (cached) {
-    setAccumulated(cached);
-    return undefined;
-  }
-
-  let active = true;
-
-  getAccumulated(selectedProject, asOf)
-    .then(async (data) => {
-      if (!active) return;
-      let patched = data;
-      if (rescore && data?.dimensions?.length > 0) {
-        try {
-          // Group runs by source project — parent dimensions may reference child projects
-          const runsByProject = {};
-          for (const d of data.dimensions) {
-            const proj = d.fromProject || selectedProject;
-            const rid = d.fromRunId || d.runId;
-            if (rid) {
-              if (!runsByProject[proj]) runsByProject[proj] = new Set();
-              runsByProject[proj].add(rid);
-            }
-          }
-          const lookup = {};
-          for (const [proj, rids] of Object.entries(runsByProject)) {
-            const byRun = await fetchRescores(proj, [...rids]);
-            if (!active) return;
-            for (const [, r] of Object.entries(byRun)) {
-              for (const d of (r.dimensions || []).map(createDimension)) {
-                lookup[dimKey(d)] = d;
-              }
-            }
-          }
-          patched = {
-            ...data,
-            dimensions: data.dimensions.map(dim => {
-              const rescored = lookup[dimKey(dim)];
-              return rescored ? { ...dim, ...rescored } : dim;
-            }),
-          };
-        } catch { /* non-fatal */ }
-      }
-      const final = patched ? { ...patched, _rescored: true } : patched;
-      _accCache.set(accCacheKey, final);
-      if (active) setAccumulated(final);
-    })
-    .catch((err) => {
-      console.error('Dashboard load failed:', err);
-      if (active) setError('Failed to load accumulated data');
-    });
-
-  return () => { active = false; };
-}
-
-function rescoreAllRunsEffect(project, accumulated, setRescoreLookup) {
-  if (!project || !accumulated?.dimensions) return;
-  if (accumulated._rescored) return;
-  const dimToRun = {};
-  for (const d of accumulated.dimensions) {
-    const key = dimKey(d);
-    const rid = d.fromRunId || d.runId;
-    if (key && rid) dimToRun[key] = rid;
-  }
-  const runIds = [...new Set(Object.values(dimToRun))];
-  if (runIds.length === 0) return;
-
-  let active = true;
-  fetchRescores(project, runIds)
-    .then((byRun) => {
-      if (!active) return;
-      const lookup = {};
-      for (const [rid, r] of Object.entries(byRun)) {
-        for (const d of (r.dimensions || [])) {
-          const key = dimKey(d);
-          if (dimToRun[key] === rid) lookup[key] = d;
-        }
-      }
-      setRescoreLookup(lookup);
-    });
-  return () => { active = false; };
-}
-
-function buildAvailableRuns(dashboard) {
-  const trendRows = dashboard?.trend || [];
-  if (trendRows.length === 0) return [];
-  return trendRows.map((row) => ({
-    runId: row.runId,
-    dateLabel: row.dateLabel || row.runId,
-  }));
-}
-
-export function useDashboard({ selectedProject, selectedRun }) {
-  const [dashboard, setDashboard] = useState(null);
-  const [accumulated, setAccumulated] = useState(null);
-  const [latestAccumulated, setLatestAccumulated] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [rescoreLookup, setRescoreLookup] = useState({});
-
-  // Clear stale data immediately when project or run changes to prevent rendering old data
-  const prevProjectRef = useRef(selectedProject);
-  const prevRunRef = useRef(selectedRun);
+function syncProjectState(prevProjectRef, prevRunRef, selectedProject, selectedRun, setDashboard, setError) {
   if (prevProjectRef.current !== selectedProject) {
     prevProjectRef.current = selectedProject;
     prevRunRef.current = selectedRun;
     setDashboard(null);
-    setAccumulated(null);
-    setLatestAccumulated(null);
-    setRescoreLookup({});
     setError(null);
   } else if (prevRunRef.current !== selectedRun) {
     prevRunRef.current = selectedRun;
-    // Apply cached data synchronously to avoid multi-render flash
     const dashKey = _runCacheKey(selectedProject, selectedRun);
-    const accAsOf = selectedRun && selectedRun !== 'latest' ? selectedRun : null;
-    const accKey = _runCacheKey(selectedProject, `acc-${accAsOf || 'latest'}-r`);
     const cachedDash = _runCache.get(dashKey);
-    const cachedAcc = _accCache.get(accKey);
-    if (cachedDash) setDashboard(prev => ({ ...cachedDash, trend: prev?.trend || cachedDash.trend }));
-    if (cachedAcc) setAccumulated(cachedAcc);
+    if (cachedDash) setDashboard(cachedDash);
   }
+}
 
-  // Trend: loads once per project, rescored once — stable across run changes
-  useEffect(() => fetchTrendEffect(selectedProject, setDashboard), [selectedProject, refreshKey]);
-  // Dashboard (dimensions/summary): loads per run
-  useEffect(() => { setLoading(true); return fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError); }, [selectedProject, selectedRun, refreshKey]);
-  useEffect(() => fetchAccumulatedEffect(selectedProject, selectedRun, setAccumulated, setError, true), [selectedProject, selectedRun, refreshKey]);
-  useEffect(() => fetchAccumulatedEffect(selectedProject, 'latest', setLatestAccumulated, setError, true), [selectedProject, selectedRun, refreshKey]);
-  useEffect(() => rescoreAllRunsEffect(selectedProject, accumulated, setRescoreLookup), [selectedProject, accumulated]);
-  const availableRuns = useMemo(() => buildAvailableRuns(dashboard), [dashboard]);
-
+function useDebouncedRefresh(selectedProject, refreshScores, setRefreshKey) {
   const refreshTimerRef = useRef(null);
   const refreshDashboard = useCallback(() => {
     clearDashboardCache(selectedProject);
+    refreshScores();
     if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
     refreshTimerRef.current = setTimeout(() => setRefreshKey((k) => k + 1), REFRESH_DEBOUNCE_MS);
-  }, [selectedProject]);
+  }, [selectedProject, refreshScores, setRefreshKey]);
 
   useEffect(() => () => { if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current); }, []);
+  return refreshDashboard;
+}
 
-  return { dashboard, accumulated, latestAccumulated, rescoreLookup, loading, error, availableRuns, refreshDashboard };
+export function useDashboard({ selectedProject, selectedRun }) {
+  const { getDashboard } = useApi();
+  const [dashboard, setDashboard] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const { scores, latestScores, loading: scoresLoading, error: scoresError, availableRuns, refreshScores } = useProjectScores({ selectedProject, selectedRun });
+
+  const prevProjectRef = useRef(selectedProject);
+  const prevRunRef = useRef(selectedRun);
+  syncProjectState(prevProjectRef, prevRunRef, selectedProject, selectedRun, setDashboard, setError);
+
+  useEffect(() => {
+    setLoading(true);
+    return fetchDashboardEffect(selectedProject, selectedRun, setDashboard, setLoading, setError, getDashboard);
+  }, [selectedProject, selectedRun, refreshKey, getDashboard]);
+
+  const dashboardWithTrend = useMemo(() => {
+    if (!dashboard) return null;
+    const trend = scores?.trend || latestScores?.trend || dashboard.trend || [];
+    return { ...dashboard, trend };
+  }, [dashboard, scores, latestScores]);
+
+  const accumulated = scores?.accumulated || null;
+  const latestAccumulated = latestScores?.accumulated || null;
+  const refreshDashboard = useDebouncedRefresh(selectedProject, refreshScores, setRefreshKey);
+
+  return {
+    dashboard: dashboardWithTrend,
+    accumulated,
+    latestAccumulated,
+    rescoreLookup: {},
+    loading: loading || scoresLoading,
+    error: error || scoresError,
+    availableRuns,
+    refreshDashboard,
+  };
 }

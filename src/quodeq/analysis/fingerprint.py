@@ -11,15 +11,24 @@ import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
+from quodeq.analysis.subagents.verify import resolve_evidence_paths
 from quodeq.data.fs.report_parser.runs import list_runs
+from quodeq.shared.validation import validate_path_segment
+
+_GIT_TIMEOUT_S = 5
 
 
 def _get_git_commit(src: Path) -> str | None:
-    """Get current HEAD commit hash, or None if not a git repo."""
+    """Get current HEAD commit hash, or None if not a git repo.
+
+    This is the single git abstraction point for fingerprinting: all git
+    subprocess access is funnelled through this helper, making it easy to
+    mock or replace in tests.
+    """
     try:
         result = subprocess.run(
             ["git", "rev-parse", "HEAD"],
-            cwd=str(src), capture_output=True, text=True, timeout=5,
+            cwd=str(src), capture_output=True, text=True, timeout=_GIT_TIMEOUT_S,
         )
         return result.stdout.strip() if result.returncode == 0 else None
     except (OSError, subprocess.TimeoutExpired):
@@ -42,14 +51,15 @@ def _hash_file(path: Path) -> str | None:
 
 
 def _hash_standards(standards_dir: Path, dimension: str) -> str | None:
-    """SHA-256 of the compiled standards JSON for a dimension."""
+    """SHA-256 of the compiled standards JSON for a dimension.
+
+    Uses the same chunked hashing approach as ``_hash_file`` to avoid
+    reading the entire file into memory at once.
+    """
     compiled = standards_dir / "compiled" / f"{dimension}.json"
     if not compiled.exists():
         return None
-    try:
-        return hashlib.sha256(compiled.read_bytes()).hexdigest()
-    except OSError:
-        return None
+    return _hash_file(compiled)
 
 
 def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir: Path | None, *, analyzed_files: set[str] | None = None) -> dict:
@@ -71,7 +81,6 @@ def build_fingerprint(src: Path, files: list[str], dimension: str, standards_dir
 
 def save_fingerprint(fingerprint: dict, evidence_dir: Path) -> Path:
     """Save fingerprint to the evidence directory."""
-    from quodeq.shared.validation import validate_path_segment
     dim = fingerprint["dimension"]
     validate_path_segment(dim)
     path = evidence_dir / f"{dim}_fingerprint.json"
@@ -98,8 +107,6 @@ def find_previous_fingerprint(
     Walks the run history to find the latest run (other than the current one)
     that has a fingerprint for the given dimension.
     """
-    from quodeq.analysis.subagents.verify import resolve_evidence_paths
-
     paths_info = resolve_evidence_paths(evidence_dir)
     if not paths_info:
         return None, None

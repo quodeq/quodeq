@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from copy import copy
+from dataclasses import replace
 from pathlib import Path
 
 from quodeq.analysis._incremental_context import IncrementalCoverage
@@ -9,7 +10,8 @@ from quodeq.analysis._incremental_evidence import parse_evidence_from_jsonl, sav
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis.fingerprint import build_fingerprint, save_fingerprint
 from quodeq.analysis.incremental import carry_forward_findings
-from quodeq.analysis.subagents.runner import _list_source_files
+from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
+from quodeq.analysis.subagents._source_files import _list_source_files
 from quodeq.core.evidence.model import Evidence
 from quodeq.shared.logging import log_info
 
@@ -19,7 +21,6 @@ def _run_phase1_analysis(
     classification: object,
 ) -> Evidence | None:
     """Phase 1: analyze changed files or use cached findings only."""
-    from quodeq.analysis.runner import _process_single_dimension
 
     evidence_dir = config.work_dir or config.src
     if not classification.to_analyze:
@@ -28,16 +29,14 @@ def _run_phase1_analysis(
         return parse_evidence_from_jsonl(config, dimension, ctx, jsonl_file, len(classification.unchanged))
 
     log_info(f"  [{dimension}] Analyzing {len(classification.to_analyze)} changed files ({len(classification.unchanged)} cached)")
-    original_options = config.options
-    config.options = copy(original_options)
-    config.options.incremental_file_filter = set(classification.to_analyze)
-    try:
-        ev = _process_single_dimension(config, dimension, idx, ctx, emit_log=False)
-    finally:
-        config.options = original_options
+    # Deferred import: circular dependency _dimension_ops → _incremental_orchestrator → _incremental_phases → _dimension_ops
+    from quodeq.analysis._dimension_ops import _process_single_dimension
+    modified_options = copy(config.options)
+    modified_options.incremental_file_filter = set(classification.to_analyze)
+    modified_config = replace(config, options=modified_options)
+    ev = _process_single_dimension(modified_config, dimension, idx, ctx, emit_log=False)
 
     # Dedup: carried-forward + new findings may overlap
-    from quodeq.analysis.subagents.jsonl_utils import deduplicate_jsonl
     output_jsonl = evidence_dir / f"{dimension}_evidence.jsonl"
     if output_jsonl.exists():
         deduplicate_jsonl(output_jsonl)

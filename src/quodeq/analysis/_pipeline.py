@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from quodeq.analysis._incremental_context import load_analysis_context as _load_ctx
+from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
 from quodeq.analysis._types import RunConfig, _AnalysisContext
 from quodeq.analysis._dimension_ops import (
     _build_dimension_prompt,
@@ -12,18 +14,18 @@ from quodeq.analysis._dimension_ops import (
     _run_dimension_analysis,
     _save_dimension_fingerprint,
 )
+from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
+from quodeq.analysis.subagents.runner import process_consolidated_dimensions
+from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.logging import log_warning
-
-
-from quodeq.analysis.errors import EvaluationError as EvaluationError  # re-export
+from quodeq.shared.utils import get_ai_cmd
 
 
 def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContext]:
     """Load dimensions data and resolve which dimensions to analyze."""
-    from quodeq.analysis._incremental import load_analysis_context as _load_ctx
     return _load_ctx(config)
 
 
@@ -32,10 +34,6 @@ def _run_dimensions(
     on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
 ) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
-    from quodeq.analysis._incremental import (
-        run_incremental_loop, run_per_dimension_loop,
-    )
-
     dimensions, ctx = load_analysis_context(config)
 
     if config.options.incremental:
@@ -52,14 +50,11 @@ def _run_dimensions(
     # Consolidated mode: evaluate all dimensions in one pass.
     # Disabled for API providers — per-dimension gives better coverage
     # since local models struggle with 8 dimensions in one prompt.
-    from quodeq.analysis.subprocess import _get_provider_type
-    from quodeq.shared.utils import get_ai_cmd
     _provider_type = _get_provider_type(get_ai_cmd())
     if (config.options.consolidated
             and len(dimensions) > 1
             and config.options.max_subagents > 1
             and _provider_type != "api"):
-        from quodeq.analysis.subagents.runner import process_consolidated_dimensions
         try:
             result = process_consolidated_dimensions(config, dimensions, ctx)
             if result:

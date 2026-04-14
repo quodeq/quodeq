@@ -452,7 +452,7 @@
    choice overrides the OS preference.
    ──────────────────────────────────────────────────────── */
 
-html[data-theme="dark"]:root {
+html[data-theme="dark"]:root, [data-theme="dark"] {
   --color-bg:           var(--primitive-flynn-950);
   --color-surface:      var(--primitive-flynn-900);
   --color-surface-alt:  var(--primitive-flynn-800);
@@ -537,7 +537,7 @@ html[data-theme="dark"]:root {
   --logo-needle-dark:    var(--primitive-flynn-accent-dark);
 }
 
-html[data-theme="light"]:root {
+html[data-theme="light"]:root, [data-theme="light"] {
   --color-bg:           var(--primitive-sand-50);
   --color-surface:      #ffffff;
   --color-surface-alt:  var(--primitive-sand-100);
@@ -625,7 +625,7 @@ html[data-theme="light"]:root {
 
 /* ── Ifrit Dark — glowing coals ────────────────────────── */
 
-html[data-theme="ifrit-dark"]:root {
+html[data-theme="ifrit-dark"]:root, [data-theme="ifrit-dark"] {
   --color-bg:           var(--primitive-ifrit-950);
   --color-surface:      var(--primitive-ifrit-900);
   --color-surface-alt:  var(--primitive-ifrit-800);
@@ -713,7 +713,7 @@ html[data-theme="ifrit-dark"]:root {
 
 /* ── Galadriel Light — mossy greens ────────────────────────── */
 
-html[data-theme="galadriel-light"]:root {
+html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-bg:           #f0f5ef;
   --color-surface:      #ffffff;
   --color-surface-alt:  #e0eadf;
@@ -796,7 +796,7 @@ html[data-theme="galadriel-light"]:root {
 
 /* ── Neo Dark — Matrix terminal ─────────────────────────── */
 
-html[data-theme="neo-dark"]:root {
+html[data-theme="neo-dark"]:root, [data-theme="neo-dark"] {
   --color-bg:           var(--primitive-neo-950);
   --color-surface:      var(--primitive-neo-900);
   --color-surface-alt:  var(--primitive-neo-800);
@@ -871,7 +871,7 @@ html[data-theme="neo-dark"]:root {
 
 /* ── Neo Light — white hat, mint-tinted ────────────────── */
 
-html[data-theme="neo-light"]:root {
+html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-bg:           var(--primitive-neo-50);
   --color-surface:      #ffffff;
   --color-surface-alt:  var(--primitive-neo-100);
@@ -943,7 +943,7 @@ html[data-theme="neo-light"]:root {
 
 /* ── Galadriel Dark — deep woodland ───────────────────────── */
 
-html[data-theme="galadriel-dark"]:root {
+html[data-theme="galadriel-dark"]:root, [data-theme="galadriel-dark"] {
   --color-bg:           var(--primitive-galadriel-950);
   --color-surface:      var(--primitive-galadriel-900-dark);
   --color-surface-alt:  var(--primitive-galadriel-800-dark);
@@ -1018,7 +1018,7 @@ html[data-theme="galadriel-dark"]:root {
 
 /* ── Ifrit Light — warm parchment ──────────────────────── */
 
-html[data-theme="ifrit-light"]:root {
+html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
   --color-bg:           var(--primitive-ifrit-50);
   --color-surface:      #ffffff;
   --color-surface-alt:  var(--primitive-ifrit-100);
@@ -1102,7 +1102,7 @@ html[data-theme="ifrit-light"]:root {
 
 /* ── Deckard Dark — neon magenta, purple-chrome ──────────── */
 
-html[data-theme="deckard-dark"]:root {
+html[data-theme="deckard-dark"]:root, [data-theme="deckard-dark"] {
   --color-bg:           var(--primitive-deckard-950);
   --color-surface:      var(--primitive-deckard-900);
   --color-surface-alt:  var(--primitive-deckard-800);
@@ -1190,7 +1190,7 @@ html[data-theme="deckard-dark"]:root {
 
 /* ── Deckard Light — frosted lavender, neon magenta ──────── */
 
-html[data-theme="deckard-light"]:root {
+html[data-theme="deckard-light"]:root, [data-theme="deckard-light"] {
   --color-bg:           var(--primitive-deckard-50);
   --color-surface:      #ffffff;
   --color-surface-alt:  var(--primitive-deckard-100);

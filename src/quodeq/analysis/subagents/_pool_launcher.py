@@ -10,9 +10,11 @@ from quodeq.analysis._types import RunConfig
 from quodeq.analysis.subprocess import AnalysisConfig, count_files_from_stream
 from quodeq.analysis.subagents.pool import PoolOptions, PoolPaths, SubagentPool
 from quodeq.shared.constants import _DEFAULT_POOL_BUDGET
+from quodeq.shared.utils import get_ai_cmd
 
 _MAX_FILES_PER_AGENT = 30
 _MAX_FILES_PER_AGENT_CAP = 50
+_NON_SCOUT_PROVIDERS = tuple(os.environ.get("QUODEQ_NON_SCOUT_PROVIDERS", "codex,gemini").split(","))
 
 
 def _compute_files_per_agent(total_files: int) -> int:
@@ -59,9 +61,8 @@ def _launch_pool(
 
     # Skip scout mode for providers without per-token billing (e.g. Codex with
     # ChatGPT subscription).  Launch all agents immediately for faster results.
-    from quodeq.shared.utils import get_ai_cmd
     ai_cmd = get_ai_cmd()
-    use_scout = ai_cmd not in ("codex", "gemini")
+    use_scout = ai_cmd not in _NON_SCOUT_PROVIDERS
 
     pool = SubagentPool(
         paths=PoolPaths(work_dir=config.src, evidence_dir=params.evidence_dir, queue_path=params.queue_path,

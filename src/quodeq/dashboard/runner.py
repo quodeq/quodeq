@@ -114,8 +114,12 @@ def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) ->
     config = _resolve_paths_and_build(config)
     validate_paths(config)
 
+    if env is not None:
+        environ = env.copy()
+    else:
+        environ = os.environ
     if config.build.verbose:
-        os.environ["QUODEQ_VERBOSE"] = "1"
+        environ["QUODEQ_VERBOSE"] = "1"
 
     log_info("Starting dashboard...")
     log_info(f"Reports: {config.reports_dir}")
@@ -127,5 +131,5 @@ def run_dashboard(config: DashboardConfig, env: dict[str, str] | None = None) ->
     api_config = ApiConfig(static_dist=config.static_dist, evaluations_dir=str(config.reports_dir))
     action_api_url, action_api_process = _start_action_api(config, action_api_host, action_api_port, api_config)
 
-    _server_mod._serve_and_wait(action_api_url, action_api_process, config)
+    _server_mod.serve_and_wait(action_api_url, action_api_process, config)
     return 0

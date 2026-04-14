@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { formatShortDate, angleFromDelta, scoreTierLabel, gradeLetter } from '../../../utils/formatters.js';
 import {
   ComposedChart,
@@ -19,13 +19,30 @@ const CHART_HEIGHT = 160;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
-const _cssVarCache = {};
+const DESELECTED_BAR_OPACITY = 0.55;
+const CHART_MARGIN = { top: 32, right: 8, bottom: 0, left: -16 };
+const LABEL_DELTA_FONT_SIZE = 9;
+const LABEL_DELTA_Y_OFFSET = 25;
+const LABEL_ARROW_FONT_SIZE = 11;
+const LABEL_ARROW_Y_OFFSET = 14;
+const LABEL_TIER_FONT_SIZE = 9;
+const LABEL_TIER_MAX_OFFSET = 9;
+const HOVER_STROKE_WIDTH = 1.5;
+const TREND_LINE_STROKE_WIDTH = 2.5;
+const TREND_LINE_OPACITY = 0.55;
+const _cssVarCache = new Map();
 const cssVar = (name, fallback) => {
-  if (name in _cssVarCache) return _cssVarCache[name] || fallback;
+  if (_cssVarCache.has(name)) return _cssVarCache.get(name) || fallback;
+  if (typeof document === 'undefined') return fallback;
   const val = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-  _cssVarCache[name] = val;
+  _cssVarCache.set(name, val);
   return val || fallback;
 };
+if (typeof document !== 'undefined') {
+  new MutationObserver(() => _cssVarCache.clear()).observe(
+    document.documentElement, { attributes: true, attributeFilter: ['class', 'data-theme'] },
+  );
+}
 
 const SCORE_EXEMPLARY = 9;
 const SCORE_GOOD = 7;
@@ -93,22 +110,22 @@ function TrendBarLabel({ x, y, width, height, index, data }) {
     <g>
       {hasDelta && (
         <>
-          <text x={cx} y={y - 25} textAnchor="middle" fontSize={9} fill={color}>
+          <text x={cx} y={y - LABEL_DELTA_Y_OFFSET} textAnchor="middle" fontSize={LABEL_DELTA_FONT_SIZE} fill={color}>
             {d > 0 ? `+${d.toFixed(1)}` : d.toFixed(1)}
           </text>
           <text
-            x={cx} y={y - 14}
+            x={cx} y={y - LABEL_ARROW_Y_OFFSET}
             textAnchor="middle" dominantBaseline="central"
-            fontSize={11} fill={color}
-            transform={`rotate(${Math.round(angleFromDelta(d))}, ${cx}, ${y - 14})`}
+            fontSize={LABEL_ARROW_FONT_SIZE} fill={color}
+            transform={`rotate(${Math.round(angleFromDelta(d))}, ${cx}, ${y - LABEL_ARROW_Y_OFFSET})`}
           >↑</text>
         </>
       )}
       {tier && height > 12 && (
         <text
-          x={cx} y={y + Math.min(height / 2, 9)}
+          x={cx} y={y + Math.min(height / 2, LABEL_TIER_MAX_OFFSET)}
           textAnchor="middle" dominantBaseline="central"
-          fontSize={9} fill="white" fillOpacity={0.85}
+          fontSize={LABEL_TIER_FONT_SIZE} fill="white" fillOpacity={0.85}
         >{tier}</text>
       )}
     </g>
@@ -148,7 +165,7 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
   const axisTick = buildAxisTick();
   return (
     <ResponsiveContainer width="100%" height={CHART_HEIGHT}>
-      <ComposedChart data={data} margin={{ top: 32, right: 8, bottom: 0, left: -16 }}>
+      <ComposedChart data={data} margin={CHART_MARGIN}>
         <CartesianGrid vertical={false} stroke={cssVar('--color-chart-grid')} />
         <XAxis dataKey="dateLabel" tickFormatter={formatShortDate} tick={axisTick} axisLine={false} tickLine={false} />
         <YAxis domain={[0, 10]} ticks={[0, REF_LINE_LOW, REF_LINE_MID, REF_LINE_HIGH, 10]} tick={axisTick} axisLine={false} tickLine={false} />
@@ -156,10 +173,10 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
         <ReferenceLines />
         <Bar dataKey="numericAverage" radius={[3, 3, 0, 0]} maxBarSize={40} label={renderTrendLabel} isAnimationActive={false} cursor={onBarClick ? 'pointer' : 'default'} onMouseEnter={(_, index) => setHoveredIndex(index)} onMouseLeave={() => setHoveredIndex(null)} onClick={(entry) => onBarClick?.(entry.runId)}>
           {data.map((entry, i) => (
-            <Cell key={entry.runId ?? i} fill={scoreBarColor(entry.numericAverage)} opacity={entry.runId === selectedRunId ? 1 : 0.55} stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'} strokeWidth={hoveredIndex === i ? 1.5 : 0} />
+            <Cell key={entry.runId ?? i} fill={scoreBarColor(entry.numericAverage)} opacity={entry.runId === selectedRunId ? 1 : DESELECTED_BAR_OPACITY} stroke={hoveredIndex === i ? cssVar('--color-chart-stroke') : 'none'} strokeWidth={hoveredIndex === i ? HOVER_STROKE_WIDTH : 0} />
           ))}
         </Bar>
-        <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-chart-line')} strokeOpacity={0.55} strokeWidth={2.5} dot={false} activeDot={false} />
+        <Line isAnimationActive={false} dataKey="numericAverage" type="monotone" stroke={cssVar('--color-chart-line')} strokeOpacity={TREND_LINE_OPACITY} strokeWidth={TREND_LINE_STROKE_WIDTH} dot={false} activeDot={false} />
       </ComposedChart>
     </ResponsiveContainer>
   );
@@ -167,6 +184,13 @@ function ScoreHistoryChart({ data, interaction, renderTrendLabel }) {
 
 export default function RunHistoryPanel({ trend = [], selectedRunId = null, onBarClick }) {
   const [hoveredIndex, setHoveredIndex] = useState(null);
+  // Force re-render when theme changes so bar colors update
+  const [, setThemeVersion] = useState(0);
+  useEffect(() => {
+    const obs = new MutationObserver(() => setThemeVersion(v => v + 1));
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => obs.disconnect();
+  }, []);
 
   if (!trend || trend.length < 2) return null;
 

@@ -1,3 +1,4 @@
+import { useMemo } from 'react';
 import { DEFAULT_MODELS, MODEL_STORAGE_PREFIX } from '../../evaluation/components/powerLevels.js';
 import { AI_CMD_STORAGE_KEY } from '../../../constants.js';
 
@@ -22,8 +23,8 @@ function ClientSelector({ aiCmd, availableClients }) {
     );
   }
 
-  const cliClients = availableClients.filter((c) => c.type === 'cli' || !c.type);
-  const apiClients = availableClients.filter((c) => c.type === 'api');
+  const cliClients = useMemo(() => availableClients.filter((c) => c.type === 'cli' || !c.type), [availableClients]);
+  const apiClients = useMemo(() => availableClients.filter((c) => c.type === 'api'), [availableClients]);
 
   return (
     <>
@@ -69,21 +70,23 @@ function ClientSelector({ aiCmd, availableClients }) {
   );
 }
 
-function handleModelChange(level, value, setter) {
+function handleModelChange(level, value, setter, storageKey = `${MODEL_STORAGE_PREFIX}${level}`, storage = localStorage) {
   setter(value);
   if (value) {
-    localStorage.setItem(`${MODEL_STORAGE_PREFIX}${level}`, value);
+    storage.setItem(storageKey, value);
   } else {
-    localStorage.removeItem(`${MODEL_STORAGE_PREFIX}${level}`);
+    storage.removeItem(storageKey);
   }
 }
 
 function ModelOverrideInput({ label, value, setter, level, placeholder }) {
+  const inputId = `model-override-${level}`;
   return (
     <div className="settings-model-field">
-      <label className="settings-model-label">{label}</label>
+      <label className="settings-model-label" htmlFor={inputId}>{label}</label>
       <input
         type="text"
+        id={inputId}
         className="settings-model-input"
         value={value}
         placeholder={placeholder}
@@ -111,12 +114,8 @@ function ModelSettings({ aiCmd, models }) {
           className="settings-model-input"
           value={aiModel}
           placeholder="default"
-          onChange={(e) => {
-            const v = e.target.value;
-            onAiModelChange(v);
-            if (v) localStorage.setItem(AI_MODEL_STORAGE_KEY, v);
-            else localStorage.removeItem(AI_MODEL_STORAGE_KEY);
-          }}
+          onChange={(e) => handleModelChange(null, e.target.value, onAiModelChange, AI_MODEL_STORAGE_KEY)}
+          aria-label="Model override"
         />
       </div>
       <div className="settings-row">

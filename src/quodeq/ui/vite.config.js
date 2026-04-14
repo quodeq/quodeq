@@ -11,6 +11,14 @@ export default defineConfig({
   build: {
     outDir: process.env.QUODEQ_BUILD_OUTDIR || '../static',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-d3': ['d3-hierarchy'],
+        },
+      },
+    },
   },
   server: {
     port: Number(process.env.VITE_PORT) || DEFAULT_DEV_PORT,

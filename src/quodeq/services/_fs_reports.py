@@ -10,12 +10,14 @@ from quodeq.config.paths import default_paths
 from quodeq.core.types import ViolationResponse, ViolationSummary, to_camel_dict
 from quodeq.services.accumulated import compute_accumulated
 from quodeq.services.dashboard import build_dashboard
-from quodeq.services.violations import aggregate_violations, resolve_dimension_eval
+from quodeq.services.violations import _ResolveOptions, aggregate_violations, resolve_dimension_eval
+
+_SCAN_FILENAME = "scan.json"
 
 
 def _enrich_with_coverage(reports_dir: str, project: str, payload: dict[str, Any]) -> dict[str, Any]:
     """Add coverage fields from scan.json if available."""
-    scan_path = Path(reports_dir) / project / "scan.json"
+    scan_path = Path(reports_dir) / project / _SCAN_FILENAME
     if not scan_path.exists():
         return payload
     try:
@@ -59,7 +61,6 @@ def get_dimension_eval(
     if not base.is_relative_to(Path(reports_dir).resolve()):
         return None
     effective_compiled = compiled_dir or default_paths().standards_dir / "compiled"
-    from quodeq.services.violations import _ResolveOptions
     result = resolve_dimension_eval(
         base, project, run_id, dimension,
         options=_ResolveOptions(compiled_dir=effective_compiled if effective_compiled.exists() else None),

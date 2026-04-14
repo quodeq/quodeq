@@ -8,6 +8,8 @@ from tests.conftest import DummyProcess
 
 _TEST_PORT = 8001
 _TEST_HOST = "127.0.0.1"
+_TEST_DASHBOARD_PORT = 3000
+_TEST_API_PORT = 9000
 
 
 def test_spawn_action_api_sets_env(monkeypatch, tmp_path):
@@ -60,9 +62,9 @@ def test_force_action_api_host_port(monkeypatch):
 
     config = runner.DashboardConfig(
         server=runner.ServerConfig(
-            port=3000,
+            port=_TEST_DASHBOARD_PORT,
             api_host="0.0.0.0",
-            api_port=9000,
+            api_port=_TEST_API_PORT,
             api_forced=True,
         ),
         build=runner.BuildConfig(

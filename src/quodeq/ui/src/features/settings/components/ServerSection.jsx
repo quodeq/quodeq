@@ -2,6 +2,24 @@ import { useState, useEffect, useRef } from 'react';
 
 const HEALTH_POLL_MS = 10000;
 const LOG_POLL_MS = 2000;
+const MAX_LOG_LINES = 500;
+const CONSOLE_POPUP_WIDTH = 800;
+const CONSOLE_POPUP_HEIGHT = 500;
+const ISO_TIME_START = 11;
+const ISO_TIME_END = 19;
+
+/**
+ * Open a path in either pywebview's native browser or a regular browser popup.
+ * Centralises the pywebview branch so callers don't need to check manually.
+ */
+function openUrl(path, { width, height } = {}) {
+  if (window.pywebview?.api?.open_browser) {
+    window.pywebview.api.open_browser(path);
+  } else {
+    const features = width && height ? `width=${width},height=${height}` : '';
+    window.open(window.location.origin + path, '_blank', features);
+  }
+}
 
 function ping() {
   return fetch('/api/health?_t=' + Date.now())
@@ -24,6 +42,7 @@ export default function ServerSection() {
   const [health, setHealth] = useState(null);
   const [status, setStatus] = useState('checking');
   const [consoleOpen, setConsoleOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [logLines, setLogLines] = useState([]);
   const sinceRef = useRef(-1);
   const logRef = useRef(null);
@@ -66,7 +85,7 @@ export default function ServerSection() {
           if (data.lines.length) {
             setLogLines((prev) => {
               const next = [...prev, ...data.lines];
-              return next.length > 500 ? next.slice(-500) : next;
+              return next.length > MAX_LOG_LINES ? next.slice(-MAX_LOG_LINES) : next;
             });
             sinceRef.current = data.lines[data.lines.length - 1].index;
           }
@@ -89,7 +108,7 @@ export default function ServerSection() {
   }, [logLines]);
 
   function handlePopOut() {
-    window.open('/logs', '_blank', 'width=800,height=500');
+    openUrl('/logs', { width: CONSOLE_POPUP_WIDTH, height: CONSOLE_POPUP_HEIGHT });
   }
 
   function handleClear() {
@@ -112,13 +131,27 @@ export default function ServerSection() {
         {status === 'online' && health?.address && <span className="server-address">{health.address}</span>}
       </div>
 
+      {/* Server details (port, PID, version) are intentionally available
+          for this local-only development tool to aid debugging. They are
+          hidden by default behind a toggle to avoid casual disclosure. */}
       {status === 'online' && health && (
         <div className="settings-row">
           <div className="settings-row-label">
-            <span className="settings-label">Details</span>
-            <span className="settings-description">
-              Port <strong>{health.port}</strong> &middot; PID <strong>{health.pid}</strong> &middot; v{health.version}
+            <span
+              className="settings-label"
+              role="button"
+              tabIndex={0}
+              style={{ cursor: 'pointer' }}
+              onClick={() => setDetailsOpen((o) => !o)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setDetailsOpen((o) => !o); } }}
+            >
+              Details {detailsOpen ? '\u25BE' : '\u25B8'}
             </span>
+            {detailsOpen && (
+              <span className="settings-description">
+                Port <strong>{health.port}</strong> &middot; PID <strong>{health.pid}</strong> &middot; v{health.version}
+              </span>
+            )}
           </div>
         </div>
       )}
@@ -144,7 +177,7 @@ export default function ServerSection() {
                 <pre>
                   {logLines.length
                     ? logLines.map((e) => {
-                        const ts = e.timestamp ? e.timestamp.slice(11, 19) : '';
+                        const ts = e.timestamp ? e.timestamp.slice(ISO_TIME_START, ISO_TIME_END) : '';
                         return `[${ts}] ${e.line}`;
                       }).join('\n')
                     : 'No logs yet\u2026'}
