@@ -67,11 +67,8 @@ def run_npm_build(workdir: Path, static_dir: Path) -> None:
             "npm not found on PATH. Install Node.js from https://nodejs.org/ or via your package manager."
         )
 
-    if not (workdir / "node_modules").is_dir():
-        log_info("Installing npm dependencies...")
-        subprocess.run([npm, "install"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
-    else:
-        log_info("npm dependencies up to date, skipping install.")
+    log_info("Installing npm dependencies...")
+    subprocess.run([npm, "install"], cwd=str(workdir), check=True, timeout=_NPM_INSTALL_TIMEOUT_S)
 
     log_info("Building web UI...")
     env = {**os.environ, "QUODEQ_BUILD_OUTDIR": str(static_dir)}
