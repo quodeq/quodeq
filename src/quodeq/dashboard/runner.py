@@ -60,7 +60,7 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
     if config.build.dev:
         check_dashboard_prereqs()
         static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall, dev=True)
-    else:
+    elif not config.static_dist_defaulted:
         user_provided_dist = resolve_path(str(config.static_dist))
         if (user_provided_dist / "index.html").exists():
             static_dist = user_provided_dist
@@ -68,6 +68,10 @@ def _resolve_paths_and_build(config: DashboardConfig) -> DashboardConfig:
             if not config.build.no_build:
                 check_dashboard_prereqs()
             static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
+    else:
+        if not config.build.no_build:
+            check_dashboard_prereqs()
+        static_dist = maybe_build_ui(config.build.no_build, config.build.reinstall)
 
     return DashboardConfig(
         server=ServerConfig(
