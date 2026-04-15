@@ -1,0 +1,195 @@
+name: Quodeq Evaluation
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [develop, main]
+
+  schedule:
+    # Nightly at 3:00 AM
+    - cron: "0 3 * * *"
+
+  workflow_dispatch:
+    inputs:
+      dimensions:
+        description: "Dimensions to evaluate (comma-separated, or 'all')"
+        default: "all"
+      budget:
+        description: "Pool budget in seconds"
+        default: "600"
+      dry_run:
+        description: "Skip AI calls (test pipeline only)"
+        type: boolean
+        default: false
+
+  issue_comment:
+    types: [created]
+
+env:
+  AI_PROVIDER: ${{ vars.QUODEQ_AI_PROVIDER || 'ollama' }}
+  AI_MODEL: ${{ vars.QUODEQ_AI_MODEL || 'gemma3:27b' }}
+  AI_API_KEY: ${{ secrets.AI_API_KEY }}
+  EVAL_OUTPUT: .quodeq-ci/evaluations
+
+jobs:
+  evaluate:
+    # Skip issue_comment unless it's "/quodeq" on a PR
+    if: >-
+      github.event_name != 'issue_comment' ||
+      (github.event.issue.pull_request && contains(github.event.comment.body, '/quodeq'))
+    runs-on: [self-hosted, quodeq]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # For PR comment trigger, checkout the PR head
+          ref: ${{ github.event_name == 'issue_comment' && format('refs/pull/{0}/head', github.event.issue.number) || '' }}
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install quodeq
+        run: uv sync
+
+      # --- Determine mode ---
+      - name: Set evaluation parameters
+        id: params
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" || "${{ github.event_name }}" == "issue_comment" ]]; then
+            echo "mode=pr" >> "$GITHUB_OUTPUT"
+            echo "dimensions=security" >> "$GITHUB_OUTPUT"
+            echo "budget=180" >> "$GITHUB_OUTPUT"
+            echo "max_duration=120" >> "$GITHUB_OUTPUT"
+          elif [[ "${{ github.event_name }}" == "schedule" ]]; then
+            echo "mode=nightly" >> "$GITHUB_OUTPUT"
+            echo "dimensions=" >> "$GITHUB_OUTPUT"
+            echo "budget=600" >> "$GITHUB_OUTPUT"
+            echo "max_duration=300" >> "$GITHUB_OUTPUT"
+          else
+            # workflow_dispatch
+            DIMS="${{ github.event.inputs.dimensions }}"
+            echo "mode=manual" >> "$GITHUB_OUTPUT"
+            echo "dimensions=$([[ "$DIMS" == "all" ]] && echo '' || echo "$DIMS")" >> "$GITHUB_OUTPUT"
+            echo "budget=${{ github.event.inputs.budget }}" >> "$GITHUB_OUTPUT"
+            echo "max_duration=300" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --- Restore cache ---
+      - name: Restore baseline cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.EVAL_OUTPUT }}
+          key: quodeq-baseline-develop
+          restore-keys: |
+            quodeq-baseline-
+
+      - name: Restore PR cache
+        if: steps.params.outputs.mode == 'pr'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.EVAL_OUTPUT }}
+          key: quodeq-pr-${{ github.event.pull_request.number || github.event.issue.number }}
+
+      # --- Check for changes (nightly only) ---
+      - name: Check for changes since last nightly
+        if: steps.params.outputs.mode == 'nightly'
+        id: changes
+        run: |
+          LAST_SHA_FILE="${{ env.EVAL_OUTPUT }}/.last-nightly-sha"
+          CURRENT_SHA=$(git rev-parse HEAD)
+          if [[ -f "$LAST_SHA_FILE" ]] && [[ "$(cat "$LAST_SHA_FILE")" == "$CURRENT_SHA" ]]; then
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            echo "No changes since last nightly run, skipping."
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # --- Run evaluation ---
+      - name: Run evaluation
+        if: steps.changes.outputs.skip != 'true'
+        id: eval
+        run: |
+          START=$(date +%s)
+
+          ARGS="evaluate . --incremental --output ${{ env.EVAL_OUTPUT }}"
+          ARGS="$ARGS --pool-budget ${{ steps.params.outputs.budget }}"
+          ARGS="$ARGS --max-duration ${{ steps.params.outputs.max_duration }}"
+
+          DIMS="${{ steps.params.outputs.dimensions }}"
+          if [[ -n "$DIMS" ]]; then
+            ARGS="$ARGS --dimensions $DIMS"
+          fi
+
+          if [[ "${{ github.event.inputs.dry_run }}" == "true" ]]; then
+            ARGS="$ARGS --dry-run"
+          fi
+
+          uv run quodeq $ARGS || true
+
+          END=$(date +%s)
+          echo "duration=$((END - START))" >> "$GITHUB_OUTPUT"
+
+      # --- Save nightly SHA ---
+      - name: Record nightly SHA
+        if: steps.params.outputs.mode == 'nightly' && steps.changes.outputs.skip != 'true'
+        run: |
+          mkdir -p "${{ env.EVAL_OUTPUT }}"
+          git rev-parse HEAD > "${{ env.EVAL_OUTPUT }}/.last-nightly-sha"
+
+      # --- Save caches ---
+      - name: Save baseline cache
+        if: steps.params.outputs.mode == 'nightly' && steps.changes.outputs.skip != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.EVAL_OUTPUT }}
+          key: quodeq-baseline-develop-${{ github.sha }}
+
+      - name: Save PR cache
+        if: steps.params.outputs.mode == 'pr'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.EVAL_OUTPUT }}
+          key: quodeq-pr-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.sha }}
+
+      # --- Upload artifact ---
+      - name: Upload evaluation artifact
+        if: steps.changes.outputs.skip != 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: quodeq-evaluation-${{ github.sha }}
+          path: ${{ env.EVAL_OUTPUT }}
+          retention-days: 30
+
+      # --- Post PR review ---
+      - name: Determine PR number
+        if: steps.params.outputs.mode == 'pr'
+        id: pr
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "number=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "number=${{ github.event.issue.number }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Post PR review
+        if: steps.params.outputs.mode == 'pr'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          EVAL_DIR=$(find "${{ env.EVAL_OUTPUT }}" -path "*/evaluation" -type d | head -1)
+          if [[ -z "$EVAL_DIR" ]]; then
+            echo "No evaluation directory found, skipping review."
+            exit 0
+          fi
+
+          uv run quodeq ci report \
+            --evaluation-dir "$EVAL_DIR" \
+            --owner "${{ github.repository_owner }}" \
+            --repo "${{ github.event.repository.name }}" \
+            --pr "${{ steps.pr.outputs.number }}" \
+            --duration "${{ steps.eval.outputs.duration }}"
