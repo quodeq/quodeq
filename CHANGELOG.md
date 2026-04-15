@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.0.6] — 2026-04-15
+
+### Fixes
+- **Stale UI after upgrade** — dashboard now detects version changes and rebuilds the UI cache automatically via npm
+- **Leaner package** — excluded pre-built static files and node_modules from the wheel (27MB → 847KB); UI builds from source on first launch
+- **npm install on rebuild** — always runs npm install before build to catch new dependencies after upgrades
+- **Onboarding dots** — hide Settings, Evaluate, and console dot indicators when evaluations already exist
+
 ## [1.0.5] — 2026-04-14
 
 ### Features
