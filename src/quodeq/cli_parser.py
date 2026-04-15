@@ -76,6 +76,11 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         "--scope", default=None,
         help="Subdirectory to analyze (relative to repo root)",
     )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Skip AI calls and generate placeholder findings (for CI pipeline testing)",
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

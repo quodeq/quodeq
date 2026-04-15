@@ -76,3 +76,13 @@ class TestEvaluateEdgeCases:
         parser = build_parser()
         args = parser.parse_args(["evaluate", _TEST_REPO, "--evidence-only"])
         assert args.evidence_only is True
+
+    def test_dry_run_flag_parsed(self):
+        parser = build_parser()
+        args = parser.parse_args(["evaluate", _TEST_REPO, "--dry-run"])
+        assert args.dry_run is True
+
+    def test_dry_run_flag_default_false(self):
+        parser = build_parser()
+        args = parser.parse_args(["evaluate", _TEST_REPO])
+        assert args.dry_run is False
