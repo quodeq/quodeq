@@ -39,6 +39,7 @@ def _run_dry_run(
     emit_marker("setup", dimensions=dimensions)
     result: dict[str, Evidence] = {}
     date_str = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    evidence_dir = config.work_dir or config.src
     for idx, dimension in enumerate(dimensions, 1):
         log_info(f"→ [{idx}/{ctx.total}] Dry-run: skipping AI call for {dimension}")
         emit_marker("analyzing", dimension=dimension)
@@ -51,6 +52,10 @@ def _run_dry_run(
             coverage_pct=0.0,
         )
         _save_dimension_fingerprint(config, dimension, files=[], analyzed_files=set())
+        jsonl_path = evidence_dir / f"{dimension}_evidence.jsonl"
+        jsonl_path.parent.mkdir(parents=True, exist_ok=True)
+        if not jsonl_path.exists():
+            jsonl_path.touch()
         emit_marker("scoring", dimension=dimension)
         result[dimension] = ev
         if on_dimension_done:

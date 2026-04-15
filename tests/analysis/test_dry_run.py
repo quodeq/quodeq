@@ -294,6 +294,26 @@ class TestDryRunPipeline:
 
         assert list(result.keys()) == ["security"]
 
+    def test_evidence_files_created_per_dimension(self, tmp_path):
+        """Dry-run creates an empty evidence JSONL file for each dimension."""
+        config = self._make_config(tmp_path)
+
+        with patch("quodeq.analysis._pipeline._save_dimension_fingerprint"), \
+             patch("quodeq.analysis._pipeline.emit_marker"), \
+             patch("quodeq.analysis._pipeline.load_analysis_context") as mock_ctx:
+            dims = ["security", "reliability"]
+            ctx = MagicMock()
+            ctx.total = 2
+            mock_ctx.return_value = (dims, ctx)
+
+            from quodeq.analysis._pipeline import run_per_dimension
+            run_per_dimension(config)
+
+        evidence_dir = tmp_path / "evidence"
+        for dim in ["security", "reliability"]:
+            jsonl_path = evidence_dir / f"{dim}_evidence.jsonl"
+            assert jsonl_path.exists(), f"Expected evidence file {jsonl_path} to exist"
+
     def test_does_not_raise_zero_findings_error(self, tmp_path):
         """Dry-run with source files present must not raise zero-findings EvaluationError."""
         config = RunConfig(
