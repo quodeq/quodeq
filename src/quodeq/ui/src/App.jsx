@@ -276,7 +276,7 @@ export default function App() {
 
   return (
     <AppShell
-      sidebar={<Sidebar activeTab={activeTab} onNavTab={navTab} />}
+      sidebar={<Sidebar activeTab={activeTab} onNavTab={navTab} hasEvaluations={state.projects.length > 0} />}
       header={state.showProjectHeader ? (
         <ProjectHeader
           project={{ displayName: state.selectedDisplayName, parent: state.selectedProjectParent, parentId: state.selectedProjectParentId, meta: state.headerMeta }}

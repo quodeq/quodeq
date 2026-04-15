@@ -55,6 +55,7 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
     args = parser.parse_args(argv)
     raw_argv = argv if argv is not None else sys.argv[1:]
     reports_defaulted = "--evaluations" not in raw_argv
+    static_dist_defaulted = "--static-dist" not in raw_argv
     api_forced = "--api-host" in raw_argv or "--api-port" in raw_argv
     return DashboardConfig(
         server=ServerConfig(
@@ -75,6 +76,7 @@ def parse_args(argv: list[str] | None = None) -> DashboardConfig:
         static_dist=Path(args.static_dist),
         repo_root=Path(args.repo_root),
         reports_defaulted=reports_defaulted,
+        static_dist_defaulted=static_dist_defaulted,
     )
 
 

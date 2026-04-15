@@ -147,7 +147,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
           </div>
         )}
 
-        <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} />
+        <EvaluationStatus job={job} liveViolations={liveViolations} onDismiss={onDismiss} onCancel={onCancel} hasEvaluations={!!selectedProject} />
 
         {!job && <EvaluateHelpSection />}
       </div>
