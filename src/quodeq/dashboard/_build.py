@@ -5,6 +5,7 @@ This module is the public entry point; implementation is split across
 """
 from __future__ import annotations
 
+import shutil
 from pathlib import Path
 
 from quodeq.shared.logging import log_info
@@ -52,6 +53,17 @@ def maybe_build_ui(no_build: bool, reinstall: bool, dev: bool = False) -> Path:
     if not dev and not needs_rebuild(source_dir, static_dir, reinstall):
         log_info("Web UI is up to date, skipping build.")
         return static_dir
+
+    if not dev:
+        bundled_static = source_dir.parent / "static"
+        if (bundled_static / "index.html").exists():
+            log_info("Updating cached UI from bundled build...")
+            if static_dir.exists():
+                shutil.rmtree(static_dir)
+            shutil.copytree(bundled_static, static_dir)
+            current_hash = compute_source_hash(source_dir)
+            (static_dir / _HASH_FILE).write_text(current_hash)
+            return static_dir
 
     log_info("Building web UI (source changed)...")
     if dev:
