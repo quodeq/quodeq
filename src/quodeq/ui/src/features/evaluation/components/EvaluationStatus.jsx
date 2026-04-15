@@ -48,11 +48,12 @@ function lastRelevantLog(logs) {
   return null;
 }
 
-function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef }) {
+function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvaluations }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isFailed = job.status === STATUS.FAILED;
   const isLost = job.status === STATUS.LOST;
   const [showDot, setShowDot] = useState(() => {
+    if (hasEvaluations) return false;
     try { return !localStorage.getItem(CONSOLE_DOT_DISMISSED_KEY); } catch { return true; }
   });
   return (
@@ -153,7 +154,7 @@ function JobMeta({ job, projectName }) {
   );
 }
 
-export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel }) {
+export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
   const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
 
@@ -167,7 +168,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     <div className="panel evaluate-job-panel">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobMeta job={job} projectName={deriveProjectName(job.repo)} />
-      <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} logViewerRef={logViewerRef} />
+      <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} logViewerRef={logViewerRef} hasEvaluations={hasEvaluations} />
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
   );
