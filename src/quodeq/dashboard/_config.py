@@ -34,4 +34,5 @@ class DashboardConfig:
     static_dist: Path
     repo_root: Path
     reports_defaulted: bool = False
+    static_dist_defaulted: bool = False
 

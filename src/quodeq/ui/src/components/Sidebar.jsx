@@ -4,11 +4,15 @@ import { ACTIVE_PROVIDER_KEY, providerKey, SETTINGS_DOT_DISMISSED_KEY, EVALUATE_
 
 const SETUP_POLL_INTERVAL_MS = 2000;
 
-function useSetupStatus(storage = localStorage) {
+function useSetupStatus(hasEvaluations, storage = localStorage) {
   const [status, setStatus] = useState({ needsSettings: false, readyToEvaluate: false });
 
   useEffect(() => {
     function check() {
+      if (hasEvaluations) {
+        setStatus({ needsSettings: false, readyToEvaluate: false });
+        return;
+      }
       const settingsDismissed = storage.getItem(SETTINGS_DOT_DISMISSED_KEY);
       const evaluateDismissed = storage.getItem(EVALUATE_DOT_DISMISSED_KEY);
       const provider = storage.getItem(ACTIVE_PROVIDER_KEY) || '';
@@ -25,7 +29,7 @@ function useSetupStatus(storage = localStorage) {
     window.addEventListener('storage', check);
     const interval = setInterval(check, SETUP_POLL_INTERVAL_MS);
     return () => { window.removeEventListener('storage', check); clearInterval(interval); };
-  }, []);
+  }, [hasEvaluations]);
 
   return status;
 }
@@ -68,8 +72,8 @@ function NavButton({ id, label, icon, activeTab, onNavTab, showDot }) {
   );
 }
 
-export default function Sidebar({ activeTab, onNavTab }) {
-  const { needsSettings, readyToEvaluate } = useSetupStatus();
+export default function Sidebar({ activeTab, onNavTab, hasEvaluations }) {
+  const { needsSettings, readyToEvaluate } = useSetupStatus(hasEvaluations);
 
   return (
     <aside className="sidebar">
