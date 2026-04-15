@@ -59,6 +59,9 @@ def main(argv: list[str] | None = None) -> int:
         return dashboard_main(argv[1:] if argv is not None else sys.argv[1:])
     if command == "evaluate":
         return run_evaluate(args)
+    if command == "ci":
+        from quodeq.ci.cli import handle_ci
+        sys.exit(handle_ci(args))
     handler = _COMMAND_HANDLERS.get(command)
     if handler:
         return handler(argv)

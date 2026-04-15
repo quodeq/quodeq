@@ -97,4 +97,14 @@ def build_parser() -> argparse.ArgumentParser:
     _add_evaluate_args(evaluate_parser)
     evaluate_parser.set_defaults(handler_command="evaluate")
 
+    ci_parser = subparsers.add_parser("ci", help="CI integration commands")
+    ci_sub = ci_parser.add_subparsers(dest="ci_action")
+    report_parser = ci_sub.add_parser("report", help="Post evaluation results as PR review")
+    report_parser.add_argument("--evaluation-dir", required=True, help="Path to evaluation output directory")
+    report_parser.add_argument("--owner", required=True, help="GitHub repository owner")
+    report_parser.add_argument("--repo", required=True, help="GitHub repository name")
+    report_parser.add_argument("--pr", type=int, required=True, help="Pull request number")
+    report_parser.add_argument("--token", help="GitHub token (default: GITHUB_TOKEN env var)")
+    report_parser.add_argument("--duration", type=int, help="Evaluation duration in seconds")
+
     return parser
