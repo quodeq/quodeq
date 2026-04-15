@@ -201,11 +201,12 @@ def _run_pipeline_with_cleanup(
 
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
-    try:
-        check_evaluate_prereqs()
-    except RuntimeError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+    if not getattr(args, "dry_run", False):
+        try:
+            check_evaluate_prereqs()
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
 
     inputs = _resolve_evaluation_inputs(args)
     if inputs is None:
