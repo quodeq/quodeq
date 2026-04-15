@@ -33,10 +33,12 @@ env:
 
 jobs:
   evaluate:
-    # Skip issue_comment unless it's "/quodeq" on a PR
+    # Skip issue_comment unless it's "/quodeq" on a PR from a trusted author
     if: >-
       github.event_name != 'issue_comment' ||
-      (github.event.issue.pull_request && contains(github.event.comment.body, '/quodeq'))
+      (github.event.issue.pull_request &&
+       contains(github.event.comment.body, '/quodeq') &&
+       contains(fromJSON('["MEMBER","OWNER","COLLABORATOR"]'), github.event.comment.author_association))
     runs-on: [self-hosted, quodeq]
 
     steps:

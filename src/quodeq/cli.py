@@ -61,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
         return run_evaluate(args)
     if command == "ci":
         from quodeq.ci.cli import handle_ci
-        sys.exit(handle_ci(args))
+        return handle_ci(args)
     handler = _COMMAND_HANDLERS.get(command)
     if handler:
         return handler(argv)

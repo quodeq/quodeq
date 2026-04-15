@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import logging
 from pathlib import Path
+import urllib.error
 from urllib.request import Request, urlopen
 
 from quodeq.ci.review_builder import (
@@ -72,5 +73,12 @@ def _github_request(url: str, payload: dict, token: str) -> dict:
     req.add_header("Content-Type", "application/json")
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
 
-    with urlopen(req) as resp:
-        return json.loads(resp.read())
+    try:
+        with urlopen(req) as resp:
+            return json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        body = exc.read().decode(errors="replace")
+        _logger.error("GitHub API request failed: HTTP %s %s – %s", exc.code, exc.reason, body)
+        raise RuntimeError(
+            f"GitHub API returned HTTP {exc.code} ({exc.reason}): {body}"
+        ) from exc
