@@ -171,6 +171,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             consolidated=consolidated,
             pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
             incremental=args.incremental,
+            dry_run=getattr(args, "dry_run", False),
         ),
     )
 

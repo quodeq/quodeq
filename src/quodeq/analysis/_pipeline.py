@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import datetime, timezone
 
 from quodeq.analysis._incremental_context import load_analysis_context as _load_ctx
 from quodeq.analysis._loops import run_incremental_loop, run_per_dimension_loop
@@ -20,7 +21,7 @@ from quodeq.analysis.subprocess import _get_provider_type
 from quodeq.core.evidence.model import Evidence
 from quodeq.core.evidence.merge import merge_evidence
 from quodeq.engine._runner_markers import emit_marker
-from quodeq.shared.logging import log_warning
+from quodeq.shared.logging import log_info, log_warning
 from quodeq.shared.utils import get_ai_cmd
 
 
@@ -29,11 +30,42 @@ def load_analysis_context(config: RunConfig) -> tuple[list[str], _AnalysisContex
     return _load_ctx(config)
 
 
+def _run_dry_run(
+    config: RunConfig,
+    on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
+) -> dict[str, Evidence]:
+    """Return empty Evidence per dimension without making any AI calls."""
+    dimensions, ctx = load_analysis_context(config)
+    emit_marker("setup", dimensions=dimensions)
+    result: dict[str, Evidence] = {}
+    date_str = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    for idx, dimension in enumerate(dimensions, 1):
+        log_info(f"→ [{idx}/{ctx.total}] Dry-run: skipping AI call for {dimension}")
+        emit_marker("analyzing", dimension=dimension)
+        ev = Evidence(
+            repository=str(config.src),
+            language=config.language,
+            date=date_str,
+            source_file_count=config.source_file_count,
+            files_read=0,
+            coverage_pct=0.0,
+        )
+        _save_dimension_fingerprint(config, dimension, files=[], analyzed_files=set())
+        emit_marker("scoring", dimension=dimension)
+        result[dimension] = ev
+        if on_dimension_done:
+            on_dimension_done(dimension, ev)
+    return result
+
+
 def _run_dimensions(
     config: RunConfig,
     on_dimension_done: "Callable[[str, Evidence], None] | None" = None,
 ) -> dict[str, Evidence]:
     """Run AI analysis for each dimension and return per-dimension Evidence."""
+    if config.options.dry_run:
+        return _run_dry_run(config, on_dimension_done=on_dimension_done)
+
     dimensions, ctx = load_analysis_context(config)
 
     if config.options.incremental:

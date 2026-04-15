@@ -32,6 +32,7 @@ class AnalysisOptions:
     pool_budget: int | None = None
     incremental: bool = False
     incremental_file_filter: set[str] | None = None
+    dry_run: bool = False
 
 
 @dataclass
