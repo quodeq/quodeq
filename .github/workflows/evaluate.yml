@@ -90,13 +90,6 @@ jobs:
           restore-keys: |
             quodeq-baseline-
 
-      - name: Restore PR cache
-        if: steps.params.outputs.mode == 'pr'
-        uses: actions/cache/restore@v4
-        with:
-          path: ${{ env.EVAL_OUTPUT }}
-          key: quodeq-pr-${{ github.event.pull_request.number || github.event.issue.number }}
-
       # --- Check for changes (nightly only) ---
       - name: Check for changes since last nightly
         if: steps.params.outputs.mode == 'nightly'
@@ -112,6 +105,12 @@ jobs:
           fi
 
       # --- Run evaluation ---
+      - name: Snapshot baseline runs (PR mode only)
+        if: steps.params.outputs.mode == 'pr'
+        run: |
+          mkdir -p "${{ env.EVAL_OUTPUT }}"
+          find "${{ env.EVAL_OUTPUT }}" -name "evaluation" -type d 2>/dev/null | sort > /tmp/baseline-runs.txt || : > /tmp/baseline-runs.txt
+
       - name: Run evaluation
         if: steps.changes.outputs.skip != 'true'
         id: eval
@@ -131,10 +130,28 @@ jobs:
             ARGS="$ARGS --dry-run"
           fi
 
-          uv run quodeq $ARGS || true
+          uv run quodeq $ARGS
 
           END=$(date +%s)
           echo "duration=$((END - START))" >> "$GITHUB_OUTPUT"
+
+      - name: Identify current and baseline evaluation paths (PR mode only)
+        if: steps.params.outputs.mode == 'pr' && steps.changes.outputs.skip != 'true'
+        id: paths
+        run: |
+          find "${{ env.EVAL_OUTPUT }}" -name "evaluation" -type d 2>/dev/null | sort > /tmp/all-runs.txt || : > /tmp/all-runs.txt
+          # Current run = the new evaluation directory that did not exist before the run
+          CURRENT_DIR=$(comm -13 /tmp/baseline-runs.txt /tmp/all-runs.txt | head -1)
+          # Baseline = the latest pre-existing evaluation directory (if any)
+          BASELINE_DIR=$(tail -1 /tmp/baseline-runs.txt)
+          # If baseline exists and equals current (empty baseline case), blank it
+          if [[ "$BASELINE_DIR" == "$CURRENT_DIR" ]]; then
+            BASELINE_DIR=""
+          fi
+          echo "current=$CURRENT_DIR" >> "$GITHUB_OUTPUT"
+          echo "baseline=$BASELINE_DIR" >> "$GITHUB_OUTPUT"
+          echo "Current:  $CURRENT_DIR"
+          echo "Baseline: ${BASELINE_DIR:-<none>}"
 
       # --- Save nightly SHA ---
       - name: Record nightly SHA
@@ -150,13 +167,6 @@ jobs:
         with:
           path: ${{ env.EVAL_OUTPUT }}
           key: quodeq-baseline-develop-${{ github.sha }}
-
-      - name: Save PR cache
-        if: steps.params.outputs.mode == 'pr'
-        uses: actions/cache/save@v4
-        with:
-          path: ${{ env.EVAL_OUTPUT }}
-          key: quodeq-pr-${{ github.event.pull_request.number || github.event.issue.number }}-${{ github.sha }}
 
       # --- Upload artifact ---
       - name: Upload evaluation artifact
@@ -179,19 +189,26 @@ jobs:
           fi
 
       - name: Post PR review
-        if: steps.params.outputs.mode == 'pr'
+        if: steps.params.outputs.mode == 'pr' && steps.changes.outputs.skip != 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          EVAL_DIR=$(find "${{ env.EVAL_OUTPUT }}" -path "*/evaluation" -type d | head -1)
-          if [[ -z "$EVAL_DIR" ]]; then
-            echo "No evaluation directory found, skipping review."
+          CURRENT_DIR="${{ steps.paths.outputs.current }}"
+          BASELINE_DIR="${{ steps.paths.outputs.baseline }}"
+
+          if [[ -z "$CURRENT_DIR" ]]; then
+            echo "No current evaluation directory found, skipping review."
             exit 0
           fi
 
-          uv run quodeq ci report \
-            --evaluation-dir "$EVAL_DIR" \
-            --owner "${{ github.repository_owner }}" \
-            --repo "${{ github.event.repository.name }}" \
-            --pr "${{ steps.pr.outputs.number }}" \
-            --duration "${{ steps.eval.outputs.duration }}"
+          ARGS="ci report --evaluation-dir $CURRENT_DIR"
+          ARGS="$ARGS --owner ${{ github.repository_owner }}"
+          ARGS="$ARGS --repo ${{ github.event.repository.name }}"
+          ARGS="$ARGS --pr ${{ steps.pr.outputs.number }}"
+          ARGS="$ARGS --duration ${{ steps.eval.outputs.duration }}"
+
+          if [[ -n "$BASELINE_DIR" ]]; then
+            ARGS="$ARGS --baseline-dir $BASELINE_DIR"
+          fi
+
+          uv run quodeq $ARGS
