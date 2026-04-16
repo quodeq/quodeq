@@ -17,6 +17,7 @@ def handle_ci(args) -> int:
 def _handle_report(args) -> int:
     """Post evaluation results as a GitHub PR review."""
     from quodeq.ci.reporter import build_review_payload, load_evaluation_reports, post_review
+    from quodeq.ci.review_builder import classify_violations
 
     token = args.token or os.environ.get("GITHUB_TOKEN")
     if not token:
@@ -33,7 +34,21 @@ def _handle_report(args) -> int:
         print("No evaluation reports found, skipping review.", file=sys.stderr)
         return 0
 
-    payload = build_review_payload(reports, duration_seconds=args.duration)
+    baseline_violations: list[dict] = []
+    if args.baseline_dir:
+        baseline_dir = Path(args.baseline_dir)
+        if baseline_dir.is_dir():
+            baseline_reports = load_evaluation_reports(baseline_dir)
+            for r in baseline_reports:
+                baseline_violations.extend(r.get("violations", []))
+        else:
+            print(f"Warning: baseline directory not found: {baseline_dir}", file=sys.stderr)
+
+    payload = build_review_payload(
+        reports,
+        baseline_violations=baseline_violations,
+        duration_seconds=args.duration,
+    )
     post_review(
         owner=args.owner,
         repo=args.repo,
@@ -42,6 +57,9 @@ def _handle_report(args) -> int:
         token=token,
     )
 
-    violation_count = sum(len(r.get("violations", [])) for r in reports)
-    print(f"Posted review with {violation_count} violation(s) to PR #{args.pr}")
+    all_current: list[dict] = []
+    for r in reports:
+        all_current.extend(r.get("violations", []))
+    new_v, existing_v = classify_violations(all_current, baseline_violations)
+    print(f"Posted review to PR #{args.pr}: {len(new_v)} new, {len(existing_v)} pre-existing")
     return 0

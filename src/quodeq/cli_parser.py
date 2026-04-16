@@ -106,5 +106,9 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument("--pr", type=int, required=True, help="Pull request number")
     report_parser.add_argument("--token", help="GitHub token (default: GITHUB_TOKEN env var)")
     report_parser.add_argument("--duration", type=int, help="Evaluation duration in seconds")
+    report_parser.add_argument(
+        "--baseline-dir",
+        help="Path to baseline evaluation directory for new vs. existing classification (optional)",
+    )
 
     return parser
