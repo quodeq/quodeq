@@ -9,6 +9,7 @@ from urllib.request import Request, urlopen
 
 from quodeq.ci.review_builder import (
     build_review_summary,
+    classify_violations,
     determine_verdict,
     violation_to_comment,
 )
@@ -34,16 +35,29 @@ def load_evaluation_reports(evaluation_dir: Path) -> list[dict]:
 
 def build_review_payload(
     reports: list[dict],
+    baseline_violations: list[dict] | None = None,
     duration_seconds: int | None = None,
 ) -> dict:
-    """Build the full GitHub PR review API payload from evaluation reports."""
-    all_violations = []
+    """Build the full GitHub PR review API payload from evaluation reports.
+
+    baseline_violations: violations from the last nightly evaluation on the base
+    branch. When provided, current violations are classified as NEW or EXISTING.
+    When omitted, all violations are treated as NEW.
+    """
+    all_violations: list[dict] = []
     for report in reports:
         all_violations.extend(report.get("violations", []))
 
-    comments = [violation_to_comment(v) for v in all_violations]
-    summary = build_review_summary(reports, duration_seconds=duration_seconds)
-    verdict = determine_verdict(all_violations)
+    new_violations, existing_violations = classify_violations(
+        all_violations, baseline_violations or []
+    )
+
+    comments = [violation_to_comment(v, status="new") for v in new_violations]
+    comments += [violation_to_comment(v, status="existing") for v in existing_violations]
+    summary = build_review_summary(
+        reports, new_violations, existing_violations, duration_seconds=duration_seconds
+    )
+    verdict = determine_verdict(new_violations)
 
     return {
         "body": summary,

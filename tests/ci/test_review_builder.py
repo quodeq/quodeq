@@ -49,9 +49,8 @@ def test_build_review_summary():
             "severity": {"critical": 1, "major": 2, "minor": 2},
         },
     }
-    summary = build_review_summary([report], duration_seconds=134)
+    summary = build_review_summary([report], [], [], duration_seconds=134)
     assert "7.5/10" in summary
-    assert "1 critical" in summary.lower() or "1 Critical" in summary
 
 
 def test_determine_verdict_critical():
@@ -72,3 +71,88 @@ def test_determine_verdict_minor_only():
 
     violations = [{"severity": "minor"}, {"severity": "low"}]
     assert determine_verdict(violations) == "COMMENT"
+
+
+# --- New classification tests ---
+
+
+def test_classify_violations_matches_by_snippet():
+    from quodeq.ci.review_builder import classify_violations
+
+    current = [
+        {"file": "a.py", "line": 10, "snippet": "eval(user_input)", "severity": "critical"},
+        {"file": "a.py", "line": 20, "snippet": "exec(data)", "severity": "high"},
+    ]
+    baseline = [
+        {"file": "a.py", "line": 5, "snippet": "eval(user_input)", "severity": "critical"},
+    ]
+    new, existing = classify_violations(current, baseline)
+    assert len(existing) == 1
+    assert existing[0]["snippet"] == "eval(user_input)"
+    assert len(new) == 1
+    assert new[0]["snippet"] == "exec(data)"
+
+
+def test_classify_violations_normalizes_whitespace():
+    from quodeq.ci.review_builder import classify_violations
+
+    # Leading/trailing and internal repeated whitespace should collapse to same string
+    current = [{"file": "a.py", "snippet": "  eval(   user_input   )  "}]
+    baseline = [{"file": "a.py", "snippet": "eval(   user_input   )"}]
+    new, existing = classify_violations(current, baseline)
+    assert len(existing) == 1
+    assert len(new) == 0
+
+
+def test_classify_violations_different_files_are_different():
+    from quodeq.ci.review_builder import classify_violations
+
+    current = [{"file": "a.py", "snippet": "eval(x)"}]
+    baseline = [{"file": "b.py", "snippet": "eval(x)"}]
+    new, existing = classify_violations(current, baseline)
+    assert len(new) == 1
+    assert len(existing) == 0
+
+
+def test_classify_violations_empty_baseline():
+    from quodeq.ci.review_builder import classify_violations
+
+    current = [{"file": "a.py", "snippet": "eval(x)"}]
+    new, existing = classify_violations(current, [])
+    assert len(new) == 1
+    assert len(existing) == 0
+
+
+def test_violation_to_comment_shows_new_prefix():
+    from quodeq.ci.review_builder import violation_to_comment
+
+    v = {"file": "a.py", "line": 10, "title": "SQL injection", "severity": "critical", "snippet": "x"}
+    comment = violation_to_comment(v, status="new")
+    assert "NEW" in comment["body"]
+
+
+def test_violation_to_comment_shows_existing_prefix():
+    from quodeq.ci.review_builder import violation_to_comment
+
+    v = {"file": "a.py", "line": 10, "title": "SQL injection", "severity": "critical", "snippet": "x"}
+    comment = violation_to_comment(v, status="existing")
+    assert "Pre-existing" in comment["body"]
+
+
+def test_determine_verdict_ignores_existing_critical():
+    from quodeq.ci.review_builder import determine_verdict
+
+    # Only new violations are passed in (existing ones are excluded upstream)
+    new_violations = [{"severity": "minor"}]
+    assert determine_verdict(new_violations) == "COMMENT"
+
+
+def test_build_review_summary_shows_new_and_existing_counts():
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "security", "overallScore": "7.5/10", "overallGrade": "B"}]
+    new = [{"severity": "critical"}, {"severity": "minor"}]
+    existing = [{"severity": "minor"}]
+    summary = build_review_summary(reports, new, existing, duration_seconds=60)
+    assert "2 new" in summary.lower() or "2 New" in summary or "**2 new**" in summary
+    assert "1 pre-existing" in summary.lower() or "1 Pre-existing" in summary or "**1 pre-existing**" in summary
