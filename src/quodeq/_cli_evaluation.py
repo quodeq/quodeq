@@ -23,6 +23,7 @@ from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_rep
 from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.prereqs import check_evaluate_prereqs
+from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 
 # Re-export resolution helpers — keep the public API stable
 from quodeq._cli_resolution import (  # noqa: F401
@@ -138,7 +139,8 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     """Assemble a RunConfig from CLI args and resolved inputs."""
     _env = env or os.environ
     standards_dir = default_paths().standards_dir
-    dimensions_filter = [d.strip() for d in args.dimensions.split(",") if d.strip()] if args.dimensions else None
+    expanded_dimensions = expand_dimension_aliases(args.dimensions)
+    dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
     print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
 
     is_single_file = getattr(args, '_single_file', False)
@@ -171,6 +173,7 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             consolidated=consolidated,
             pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
             incremental=args.incremental,
+            dry_run=getattr(args, "dry_run", False),
         ),
     )
 
@@ -200,11 +203,12 @@ def _run_pipeline_with_cleanup(
 
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
-    try:
-        check_evaluate_prereqs()
-    except RuntimeError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
-        return 1
+    if not getattr(args, "dry_run", False):
+        try:
+            check_evaluate_prereqs()
+        except RuntimeError as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
 
     inputs = _resolve_evaluation_inputs(args)
     if inputs is None:
