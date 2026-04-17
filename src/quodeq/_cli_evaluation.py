@@ -86,7 +86,18 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
     project_name = project_name_from_repo(args.repo)
     location = "online" if is_repo_url(args.repo) else "local"
     scope = getattr(args, "scope", None)
-    project_uuid = resolve_project_uuid(reports_root, ProjectIdentity(project_name, str(src), None, location, scope_path=scope))
+
+    # Detect the git 'origin' remote so two clones of the same repo in
+    # different local paths share a single project identity.
+    remote_url = None
+    if location == "local":
+        from quodeq.shared._repo import git_remote_url
+        remote_url = git_remote_url(str(src))
+
+    project_uuid = resolve_project_uuid(
+        reports_root,
+        ProjectIdentity(project_name, str(src), None, location, scope_path=scope, remote_url=remote_url),
+    )
 
     run_id = str(uuid.uuid4())
     evidence_dir = reports_root / project_uuid / run_id / "evidence"

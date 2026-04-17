@@ -32,6 +32,7 @@ def _resolve_scoped(
     """Resolve a scoped project: ensure parent exists, then resolve child."""
     parent_identity = ProjectIdentity(
         identity.project_name, resolved_path, identity.discipline, identity.location,
+        remote_url=identity.remote_url,
     )
     parent_uuid = _find_existing_project(reports_dir, parent_identity, load_fn, save_fn)
     if not parent_uuid:
@@ -40,7 +41,7 @@ def _resolve_scoped(
     child_name = f"{identity.project_name}/{identity.scope_path}"
     child_identity = ProjectIdentity(
         child_name, resolved_path, identity.discipline, identity.location,
-        scope_path=identity.scope_path,
+        scope_path=identity.scope_path, remote_url=identity.remote_url,
     )
     existing = _find_existing_project(reports_dir, child_identity, load_fn, save_fn)
     if existing:
@@ -57,6 +58,7 @@ def _resolve_unscoped(
     """Resolve an unscoped project, creating a dot-child if children exist."""
     resolved = ProjectIdentity(
         identity.project_name, resolved_path, identity.discipline, identity.location,
+        remote_url=identity.remote_url,
     )
     existing = _find_existing_project(reports_dir, resolved, load_fn, save_fn)
     if existing:
@@ -64,6 +66,7 @@ def _resolve_unscoped(
             dot_identity = ProjectIdentity(
                 f"{identity.project_name}/.", resolved_path,
                 identity.discipline, identity.location, scope_path=".",
+                remote_url=identity.remote_url,
             )
             dot_existing = _find_existing_project(reports_dir, dot_identity, load_fn, save_fn)
             if dot_existing:

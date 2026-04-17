@@ -31,3 +31,4 @@ class ProjectIdentity:
     discipline: str | None = None
     location: str = "local"
     scope_path: str | None = None
+    remote_url: str | None = None
