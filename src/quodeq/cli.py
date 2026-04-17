@@ -62,6 +62,9 @@ def main(argv: list[str] | None = None) -> int:
     if command == "ci":
         from quodeq.ci.cli import handle_ci
         return handle_ci(args)
+    if command == "check":
+        from quodeq.ci.check import handle_check
+        return handle_check(args)
     handler = _COMMAND_HANDLERS.get(command)
     if handler:
         return handler(argv)

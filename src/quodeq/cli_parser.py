@@ -115,4 +115,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="URL to the workflow run page where the evaluation artifact can be downloaded (optional)",
     )
 
+    check_parser = subparsers.add_parser(
+        "check",
+        help="Run Quodeq locally and post findings as a PR review (uses gh CLI)",
+    )
+    check_parser.add_argument(
+        "--pr",
+        type=int,
+        help="PR number to post to (default: auto-detect from current branch)",
+    )
+    check_parser.add_argument(
+        "--dimensions",
+        help="Dimensions to evaluate (comma-separated). Default: security",
+    )
+    check_parser.add_argument(
+        "--pool-budget",
+        type=int,
+        dest="pool_budget",
+        help="Total time budget in seconds for the evaluation (default: 300)",
+    )
+    check_parser.add_argument(
+        "--output",
+        help="Evaluation output directory (default: ~/.quodeq/evaluations)",
+    )
+    check_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        dest="dry_run",
+        help="Build the review but do not post it",
+    )
+
     return parser
