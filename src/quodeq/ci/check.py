@@ -9,6 +9,7 @@ import sys
 import time
 from pathlib import Path
 
+from quodeq.analysis._dimension_aliases import expand_dimension_aliases
 from quodeq.ci.reporter import build_review_payload, load_evaluation_reports, post_review
 from quodeq.shared.utils import get_evaluations_dir
 
@@ -132,10 +133,7 @@ def handle_check(args) -> int:
     ]
     dims = getattr(args, "dimensions", None)
     if dims:
-        eval_parser_argv.extend(["--dimensions", dims])
-    else:
-        # Default for check: security only
-        eval_parser_argv.extend(["--dimensions", "security"])
+        eval_parser_argv.extend(["--dimensions", expand_dimension_aliases(dims)])
     # Pool budget default (short for local dev)
     pool_budget = getattr(args, "pool_budget", None) or 300
     eval_parser_argv.extend(["--pool-budget", str(pool_budget)])
@@ -143,7 +141,8 @@ def handle_check(args) -> int:
     parser = build_parser()
     eval_args = parser.parse_args(eval_parser_argv)
 
-    print(f"Running evaluation ({eval_args.dimensions})...")
+    dims_label = eval_args.dimensions if eval_args.dimensions else "all"
+    print(f"Running evaluation ({dims_label})...")
     start = time.time()
     from quodeq._cli_evaluation import run_evaluate
     exit_code = run_evaluate(eval_args)

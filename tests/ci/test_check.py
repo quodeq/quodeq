@@ -100,5 +100,122 @@ def test_check_subcommand_defaults():
     args = parser.parse_args(["check"])
     assert args.command == "check"
     assert args.pr is None
-    assert args.dimensions is None
+    assert args.dimensions is None  # default is all dimensions (no --dimensions flag)
     assert args.dry_run is False
+
+
+def test_handle_check_default_does_not_pass_dimensions(tmp_path):
+    """When no --dimensions flag is given, handle_check must NOT pass --dimensions
+    to the evaluate sub-parser, so the evaluate command defaults to all dimensions."""
+    from unittest.mock import MagicMock, patch
+    import json
+    import argparse
+
+    args = argparse.Namespace(
+        pr=None,
+        dimensions=None,
+        pool_budget=None,
+        output=str(tmp_path),
+        dry_run=True,
+    )
+
+    pr_result = MagicMock()
+    pr_result.stdout = json.dumps({"number": 7, "baseRefName": "main"})
+    repo_result = MagicMock()
+    repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
+
+    captured_argv = []
+
+    def fake_parse_args(argv):
+        captured_argv.extend(argv)
+        # Return a minimal Namespace so handle_check can continue
+        ns = argparse.Namespace(
+            dimensions=None,
+            repo=".",
+            incremental=True,
+            output=str(tmp_path),
+            pool_budget=300,
+            mode=None,
+            max_turns=None,
+            max_duration=None,
+            n_subagents=1,
+            no_verify=False,
+            no_consolidated=False,
+            dry_run=True,
+            evidence_only=False,
+            no_prescan=False,
+            language=None,
+            branch=None,
+            scope=None,
+        )
+        return ns
+
+    with patch("quodeq.ci.check.subprocess.run", side_effect=[pr_result, repo_result]), \
+         patch("quodeq.cli_parser.build_parser") as mock_build_parser, \
+         patch("quodeq._cli_evaluation.run_evaluate", return_value=0):
+        mock_parser = MagicMock()
+        mock_parser.parse_args.side_effect = fake_parse_args
+        mock_build_parser.return_value = mock_parser
+
+        from quodeq.ci.check import handle_check
+        handle_check(args)
+
+    assert "--dimensions" not in captured_argv
+
+
+def test_handle_check_expands_dimension_alias(tmp_path):
+    """When --dimensions sec is given, handle_check expands it to 'security'."""
+    from unittest.mock import MagicMock, patch
+    import json
+    import argparse
+
+    args = argparse.Namespace(
+        pr=None,
+        dimensions="sec",
+        pool_budget=None,
+        output=str(tmp_path),
+        dry_run=True,
+    )
+
+    pr_result = MagicMock()
+    pr_result.stdout = json.dumps({"number": 7, "baseRefName": "main"})
+    repo_result = MagicMock()
+    repo_result.stdout = json.dumps({"owner": {"login": "org"}, "name": "repo"})
+
+    captured_argv = []
+
+    def fake_parse_args(argv):
+        captured_argv.extend(argv)
+        ns = argparse.Namespace(
+            dimensions="security",
+            repo=".",
+            incremental=True,
+            output=str(tmp_path),
+            pool_budget=300,
+            mode=None,
+            max_turns=None,
+            max_duration=None,
+            n_subagents=1,
+            no_verify=False,
+            no_consolidated=False,
+            dry_run=True,
+            evidence_only=False,
+            no_prescan=False,
+            language=None,
+            branch=None,
+            scope=None,
+        )
+        return ns
+
+    with patch("quodeq.ci.check.subprocess.run", side_effect=[pr_result, repo_result]), \
+         patch("quodeq.cli_parser.build_parser") as mock_build_parser, \
+         patch("quodeq._cli_evaluation.run_evaluate", return_value=0):
+        mock_parser = MagicMock()
+        mock_parser.parse_args.side_effect = fake_parse_args
+        mock_build_parser.return_value = mock_parser
+
+        from quodeq.ci.check import handle_check
+        handle_check(args)
+
+    idx = captured_argv.index("--dimensions")
+    assert captured_argv[idx + 1] == "security"

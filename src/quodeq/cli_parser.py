@@ -126,7 +126,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     check_parser.add_argument(
         "--dimensions",
-        help="Dimensions to evaluate (comma-separated). Default: security",
+        help=(
+            "Dimensions to evaluate (comma-separated). Accepts full names or aliases: "
+            "sec, rel, mnt, perf, flex, ux. Default: all dimensions."
+        ),
     )
     check_parser.add_argument(
         "--pool-budget",
