@@ -35,19 +35,25 @@ def _handle_report(args) -> int:
         return 0
 
     baseline_violations: list[dict] = []
+    baseline_available = False
     if args.baseline_dir:
         baseline_dir = Path(args.baseline_dir)
         if baseline_dir.is_dir():
             baseline_reports = load_evaluation_reports(baseline_dir)
             for r in baseline_reports:
                 baseline_violations.extend(r.get("violations", []))
+            baseline_available = True
         else:
             print(f"Warning: baseline directory not found: {baseline_dir}", file=sys.stderr)
+
+    artifact_url: str | None = getattr(args, "artifact_url", None)
 
     payload = build_review_payload(
         reports,
         baseline_violations=baseline_violations,
         duration_seconds=args.duration,
+        baseline_available=baseline_available,
+        artifact_url=artifact_url,
     )
     post_review(
         owner=args.owner,

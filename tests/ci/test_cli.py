@@ -48,6 +48,35 @@ def test_ci_report_baseline_dir_optional():
     assert args.baseline_dir is None
 
 
+def test_ci_report_artifact_url_parsed():
+    from quodeq.cli_parser import build_parser
+
+    parser = build_parser()
+    args = parser.parse_args([
+        "ci", "report",
+        "--evaluation-dir", "/tmp/eval",
+        "--owner", "quodeq",
+        "--repo", "quodeq",
+        "--pr", "42",
+        "--artifact-url", "https://example.com/run/123",
+    ])
+    assert args.artifact_url == "https://example.com/run/123"
+
+
+def test_ci_report_artifact_url_optional():
+    from quodeq.cli_parser import build_parser
+
+    parser = build_parser()
+    args = parser.parse_args([
+        "ci", "report",
+        "--evaluation-dir", "/tmp/eval",
+        "--owner", "quodeq",
+        "--repo", "quodeq",
+        "--pr", "42",
+    ])
+    assert args.artifact_url is None
+
+
 def test_handle_report_loads_baseline(tmp_path):
     """Verify that _handle_report loads baseline violations when --baseline-dir is provided."""
     import json
@@ -90,6 +119,7 @@ def test_handle_report_loads_baseline(tmp_path):
     args.pr = 1
     args.token = "fake"
     args.duration = 10
+    args.artifact_url = None
 
     captured_payload = {}
 

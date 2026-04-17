@@ -110,5 +110,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--baseline-dir",
         help="Path to baseline evaluation directory for new vs. existing classification (optional)",
     )
+    report_parser.add_argument(
+        "--artifact-url",
+        help="URL to the workflow run page where the evaluation artifact can be downloaded (optional)",
+    )
 
     return parser

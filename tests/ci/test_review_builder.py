@@ -156,3 +156,38 @@ def test_build_review_summary_shows_new_and_existing_counts():
     summary = build_review_summary(reports, new, existing, duration_seconds=60)
     assert "2 new" in summary.lower() or "2 New" in summary or "**2 new**" in summary
     assert "1 pre-existing" in summary.lower() or "1 Pre-existing" in summary or "**1 pre-existing**" in summary
+
+
+def test_build_review_summary_shows_no_baseline_note_when_unavailable():
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
+    summary = build_review_summary(reports, [], [], baseline_available=False)
+    summary_lower = summary.lower()
+    assert "no baseline" in summary_lower or "baseline not available" in summary_lower
+
+
+def test_build_review_summary_no_baseline_note_when_available():
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
+    summary = build_review_summary(reports, [], [], baseline_available=True)
+    assert "no baseline" not in summary.lower()
+
+
+def test_build_review_summary_includes_artifact_link():
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
+    url = "https://example.com/run/123"
+    summary = build_review_summary(reports, [], [], artifact_url=url)
+    assert url in summary
+    assert "Download full report" in summary
+
+
+def test_build_review_summary_no_artifact_link_when_not_provided():
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
+    summary = build_review_summary(reports, [], [])
+    assert "Download full report" not in summary

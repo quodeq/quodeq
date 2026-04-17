@@ -37,12 +37,17 @@ def build_review_payload(
     reports: list[dict],
     baseline_violations: list[dict] | None = None,
     duration_seconds: int | None = None,
+    baseline_available: bool = True,
+    artifact_url: str | None = None,
 ) -> dict:
     """Build the full GitHub PR review API payload from evaluation reports.
 
     baseline_violations: violations from the last nightly evaluation on the base
     branch. When provided, current violations are classified as NEW or EXISTING.
     When omitted, all violations are treated as NEW.
+    baseline_available: when False, a note is added to the summary explaining
+    that no baseline comparison was made (first-run scenario).
+    artifact_url: when provided, a download link is appended to the summary.
     """
     all_violations: list[dict] = []
     for report in reports:
@@ -55,7 +60,12 @@ def build_review_payload(
     comments = [violation_to_comment(v, status="new") for v in new_violations]
     comments += [violation_to_comment(v, status="existing") for v in existing_violations]
     summary = build_review_summary(
-        reports, new_violations, existing_violations, duration_seconds=duration_seconds
+        reports,
+        new_violations,
+        existing_violations,
+        duration_seconds=duration_seconds,
+        baseline_available=baseline_available,
+        artifact_url=artifact_url,
     )
     verdict = determine_verdict(new_violations)
 

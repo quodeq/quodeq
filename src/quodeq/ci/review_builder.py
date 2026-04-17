@@ -74,9 +74,18 @@ def build_review_summary(
     new_violations: list[dict],
     existing_violations: list[dict],
     duration_seconds: int | None = None,
+    baseline_available: bool = True,
+    artifact_url: str | None = None,
 ) -> str:
     """Build the review body summarizing all dimension results."""
     lines = ["## Quodeq Evaluation", ""]
+
+    if not baseline_available:
+        lines.append(
+            "> **Note:** No baseline available — this is the first run. "
+            "All violations are shown as new; no baseline comparison was made."
+        )
+        lines.append("")
 
     # Per-dimension scores
     for report in reports:
@@ -109,6 +118,10 @@ def build_review_summary(
         minutes = duration_seconds // 60
         seconds = duration_seconds % 60
         lines.append(f"_Evaluation completed in {minutes}m {seconds}s_")
+
+    if artifact_url is not None:
+        lines.append("")
+        lines.append(f"[Download full report]({artifact_url})")
 
     return "\n".join(lines)
 

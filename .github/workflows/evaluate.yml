@@ -17,6 +17,9 @@ on:
       budget:
         description: "Pool budget in seconds"
         default: "600"
+      max_duration:
+        description: "Max seconds per dimension"
+        default: "300"
       dry_run:
         description: "Skip AI calls (test pipeline only)"
         type: boolean
@@ -78,7 +81,7 @@ jobs:
             echo "mode=manual" >> "$GITHUB_OUTPUT"
             echo "dimensions=$([[ "$DIMS" == "all" ]] && echo '' || echo "$DIMS")" >> "$GITHUB_OUTPUT"
             echo "budget=${{ github.event.inputs.budget }}" >> "$GITHUB_OUTPUT"
-            echo "max_duration=300" >> "$GITHUB_OUTPUT"
+            echo "max_duration=${{ github.event.inputs.max_duration }}" >> "$GITHUB_OUTPUT"
           fi
 
       # --- Restore cache ---
@@ -110,6 +113,19 @@ jobs:
         run: |
           mkdir -p "${{ env.EVAL_OUTPUT }}"
           find "${{ env.EVAL_OUTPUT }}" -name "evaluation" -type d 2>/dev/null | sort > /tmp/baseline-runs.txt || : > /tmp/baseline-runs.txt
+
+      - name: Verify AI provider availability
+        if: steps.changes.outputs.skip != 'true'
+        run: |
+          if [[ "${{ env.AI_PROVIDER }}" == "ollama" ]]; then
+            OLLAMA_URL="${OLLAMA_HOST:-http://localhost:11434}"
+            if ! curl -f -s -m 5 "$OLLAMA_URL/api/tags" > /dev/null; then
+              echo "::error::Ollama is not responding at $OLLAMA_URL."
+              echo "::error::On a self-hosted runner, start Ollama with 'ollama serve' before running this workflow."
+              exit 1
+            fi
+            echo "Ollama is reachable at $OLLAMA_URL"
+          fi
 
       - name: Run evaluation
         if: steps.changes.outputs.skip != 'true'
@@ -206,6 +222,7 @@ jobs:
           ARGS="$ARGS --repo ${{ github.event.repository.name }}"
           ARGS="$ARGS --pr ${{ steps.pr.outputs.number }}"
           ARGS="$ARGS --duration ${{ steps.eval.outputs.duration }}"
+          ARGS="$ARGS --artifact-url ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
           if [[ -n "$BASELINE_DIR" ]]; then
             ARGS="$ARGS --baseline-dir $BASELINE_DIR"

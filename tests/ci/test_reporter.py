@@ -45,6 +45,35 @@ def test_build_review_payload():
     assert "body" in payload  # review summary
 
 
+def test_build_review_payload_passes_through_artifact_url():
+    from quodeq.ci.reporter import build_review_payload
+
+    reports = [{
+        "dimension": "security",
+        "overallScore": "9/10",
+        "overallGrade": "A",
+        "violations": [],
+        "totals": {"violationCount": 0, "severity": {}},
+    }]
+    url = "https://x"
+    payload = build_review_payload(reports, artifact_url=url)
+    assert url in payload["body"]
+
+
+def test_build_review_payload_passes_through_baseline_available_false():
+    from quodeq.ci.reporter import build_review_payload
+
+    reports = [{
+        "dimension": "security",
+        "overallScore": "9/10",
+        "overallGrade": "A",
+        "violations": [],
+        "totals": {"violationCount": 0, "severity": {}},
+    }]
+    payload = build_review_payload(reports, baseline_available=False)
+    assert "no baseline" in payload["body"].lower()
+
+
 def test_post_review_calls_github_api():
     from quodeq.ci.reporter import post_review
 
