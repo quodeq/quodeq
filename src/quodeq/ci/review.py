@@ -16,14 +16,14 @@ from quodeq.shared.utils import get_evaluations_dir
 _logger = logging.getLogger(__name__)
 
 
-class CheckError(RuntimeError):
-    """Raised when the check command cannot proceed."""
+class ReviewError(RuntimeError):
+    """Raised when the review command cannot proceed."""
 
 
 def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
     """Detect the open PR for the current branch. Returns (pr_number, base_branch).
 
-    Raises CheckError with a clear message if no PR is found or gh is unavailable.
+    Raises ReviewError with a clear message if no PR is found or gh is unavailable.
     """
     if pr_override is not None:
         # Still need baseRefName — query gh for this PR
@@ -33,9 +33,9 @@ def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
                 capture_output=True, text=True, check=True,
             )
         except FileNotFoundError:
-            raise CheckError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+            raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
         except subprocess.CalledProcessError as exc:
-            raise CheckError(f"Could not find PR #{pr_override}: {exc.stderr.strip()}")
+            raise ReviewError(f"Could not find PR #{pr_override}: {exc.stderr.strip()}")
         data = json.loads(result.stdout)
         return data["number"], data["baseRefName"]
 
@@ -45,15 +45,15 @@ def detect_pr(pr_override: int | None = None) -> tuple[int, str]:
             capture_output=True, text=True, check=True,
         )
     except FileNotFoundError:
-        raise CheckError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+        raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
     except subprocess.CalledProcessError as exc:
         stderr = (exc.stderr or "").strip()
         if "no pull requests found" in stderr.lower():
-            raise CheckError(
+            raise ReviewError(
                 "No open PR found for the current branch. "
                 "Open a PR first, or pass --pr <number>."
             )
-        raise CheckError(f"gh pr view failed: {stderr}")
+        raise ReviewError(f"gh pr view failed: {stderr}")
 
     data = json.loads(result.stdout)
     return data["number"], data["baseRefName"]
@@ -67,14 +67,14 @@ def get_github_token() -> str:
             capture_output=True, text=True, check=True,
         )
     except FileNotFoundError:
-        raise CheckError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
+        raise ReviewError("gh CLI not found. Install with 'brew install gh' and run 'gh auth login'.")
     except subprocess.CalledProcessError as exc:
-        raise CheckError(
+        raise ReviewError(
             "Not authenticated with GitHub. Run 'gh auth login' first."
         )
     token = result.stdout.strip()
     if not token:
-        raise CheckError("gh auth token returned empty. Run 'gh auth login'.")
+        raise ReviewError("gh auth token returned empty. Run 'gh auth login'.")
     return token
 
 
@@ -86,7 +86,7 @@ def get_repo_info() -> tuple[str, str]:
             capture_output=True, text=True, check=True,
         )
     except (FileNotFoundError, subprocess.CalledProcessError) as exc:
-        raise CheckError(
+        raise ReviewError(
             "Could not determine GitHub repo. "
             "Run from inside a GitHub-connected git repo, or use 'gh repo set-default'."
         )
@@ -101,11 +101,11 @@ def snapshot_run_dirs(output_dir: Path) -> set[Path]:
     return {p for p in output_dir.rglob("evaluation") if p.is_dir()}
 
 
-def handle_check(args) -> int:
-    """Entry point for `quodeq check`."""
+def handle_review(args) -> int:
+    """Entry point for `quodeq review`."""
     try:
         pr_number, base_branch = detect_pr(pr_override=getattr(args, "pr", None))
-    except CheckError as exc:
+    except ReviewError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
@@ -113,7 +113,7 @@ def handle_check(args) -> int:
 
     try:
         owner, repo = get_repo_info()
-    except CheckError as exc:
+    except ReviewError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
@@ -200,7 +200,7 @@ def handle_check(args) -> int:
     # Get token and post
     try:
         token = get_github_token()
-    except CheckError as exc:
+    except ReviewError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
