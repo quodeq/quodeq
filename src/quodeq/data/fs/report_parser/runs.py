@@ -80,7 +80,17 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         if not manifest_exists:
             continue
         scan_exists = (run_dir / "scan.json").exists()
-        status = "complete" if scan_exists else "in_progress"
+        if scan_exists:
+            status = "complete"
+        else:
+            # Avoid circular import: import locally
+            from quodeq.services._external_jobs import resolve_external_pid  # noqa: PLC0415
+            # resolve_external_pid expects (project_uuid, run_id, reports_root)
+            pid = resolve_external_pid(project_dir.name, entry.name, reports_root)
+            if pid is None:
+                # No live process — abandoned run, skip entirely
+                continue
+            status = "in_progress"
         date_iso, date_label = parse_run_date(reports_root, project, entry.name)
         run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label, status=status))
     run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)
