@@ -23,6 +23,12 @@ on:
         description: "Pool budget in seconds"
         default: "180"
 
+# GITHUB_TOKEN permissions — needed to post PR reviews via the GitHub API.
+# Default token is read-only; pull-requests:write enables review creation.
+permissions:
+  contents: read
+  pull-requests: write
+
 jobs:
   review:
     # SECURITY: skip PRs opened from forks. Self-hosted runner on a public repo
