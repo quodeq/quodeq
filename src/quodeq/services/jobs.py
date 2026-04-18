@@ -6,6 +6,7 @@ from dataclasses import replace
 from datetime import datetime, timezone
 import json
 import os
+from pathlib import Path
 import threading
 import uuid
 from typing import Any, Callable, Iterable
@@ -117,8 +118,18 @@ class JobManager:
 
         return job.to_dict()
 
-    def cancel_job(self, job_id: str) -> bool:
-        """Terminate a running job. Return True if cancelled successfully."""
+    def cancel_job(self, job_id: str, reports_root: Path | None = None) -> bool:
+        """Terminate a running job. Return True if cancelled successfully.
+
+        For external jobs (``ext-`` prefix), sends SIGTERM to the process that
+        owns the run.  For internal jobs, kills the tracked subprocess.
+        """
+        if job_id.startswith("ext-") and reports_root is not None:
+            return self._cancel_external(job_id, reports_root)
+        return self._cancel_internal(job_id)
+
+    def _cancel_internal(self, job_id: str) -> bool:
+        """Kill an internal tracked subprocess."""
         with self._lock:
             job = self._store.get(job_id)
             process = self._processes.get(job_id)
@@ -131,6 +142,17 @@ class JobManager:
             _kill_tree(process.pid)
         return True
 
+    def _cancel_external(self, job_id: str, reports_root: Path) -> bool:
+        """Send SIGTERM to an external run's process."""
+        from quodeq.services._external_jobs import cancel_external_run
+        run_id = job_id[len("ext-"):]
+        for project_dir in reports_root.iterdir():
+            if not project_dir.is_dir():
+                continue
+            if (project_dir / run_id).is_dir():
+                return cancel_external_run(project_dir.name, run_id, reports_root)
+        return False
+
     def shutdown(self) -> None:
         """Kill all running job subprocesses. Called on server shutdown."""
         with self._lock:
@@ -141,22 +163,68 @@ class JobManager:
                     pass
             self._processes.clear()
 
-    def get_job(self, job_id: str) -> JobSnapshot | None:
-        """Return the current state of a job, or None if not found."""
+    def get_job(self, job_id: str, reports_root: Path | None = None) -> JobSnapshot | None:
+        """Return the current state of a job, or None if not found.
+
+        For external jobs (``ext-`` prefix), reconstructs the snapshot from
+        the filesystem instead of the in-process store.
+        """
+        if job_id.startswith("ext-") and reports_root is not None:
+            return self._get_external(job_id, reports_root)
         with self._lock:
             job = self._store.get(job_id)
             if not job:
                 return None
             return job.to_dict()
 
-    def list_jobs(self, *, limit: int = _DEFAULT_LIST_LIMIT, offset: int = 0) -> list[JobSnapshot]:
+    def _get_external(self, job_id: str, reports_root: Path) -> JobSnapshot | None:
+        """Reconstruct a JobSnapshot for an external run from its run directory."""
+        from quodeq.services._external_jobs import _run_dir_to_snapshot
+        run_id = job_id[len("ext-"):]
+        for project_dir in reports_root.iterdir():
+            if not project_dir.is_dir():
+                continue
+            run_dir = project_dir / run_id
+            if run_dir.is_dir():
+                return _run_dir_to_snapshot(project_dir.name, run_dir)
+        return None
+
+    def list_jobs(
+        self,
+        *,
+        limit: int = _DEFAULT_LIST_LIMIT,
+        offset: int = 0,
+        reports_root: Path | None = None,
+    ) -> list[JobSnapshot]:
         """Return tracked jobs as frozen snapshots with pagination.
+
+        When *reports_root* is provided, external in-progress runs are merged
+        in.  Internal jobs take priority: if both share the same
+        (output_project, output_run_id), the internal entry wins.
 
         When *limit* is 0 all jobs are returned (no cap).
         """
         with self._lock:
-            all_jobs = [job.to_dict() for job in self._store.list()]
-        page = all_jobs[offset:] if offset else all_jobs
+            internal = [job.to_dict() for job in self._store.list()]
+
+        merged: list[JobSnapshot] = list(internal)
+
+        if reports_root is not None and reports_root.is_dir():
+            from quodeq.services._external_jobs import find_external_runs
+            externals = find_external_runs(reports_root)
+            internal_keys = {
+                (j.output_project, j.output_run_id)
+                for j in internal
+                if j.output_project and j.output_run_id
+            }
+            for ext in externals:
+                key = (ext.output_project, ext.output_run_id)
+                if key not in internal_keys:
+                    merged.append(ext)
+
+        # Sort newest-first, then paginate
+        merged.sort(key=lambda j: j.started_at or "", reverse=True)
+        page = merged[offset:] if offset else merged
         return page[:limit] if limit > 0 else page
 
     @staticmethod

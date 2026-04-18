@@ -175,7 +175,7 @@ def get_project_scores(
 
     # Build available runs list
     available_runs = [
-        {"runId": r.run_id, "dateLabel": r.date_label}
+        {"runId": r.run_id, "dateLabel": r.date_label, "status": r.status}
         for r in all_runs
     ]
 

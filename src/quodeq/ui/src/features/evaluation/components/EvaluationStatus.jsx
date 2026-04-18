@@ -48,10 +48,20 @@ function lastRelevantLog(logs) {
   return null;
 }
 
+function ExternalRunBadge() {
+  return (
+    <div className="job-meta-item">
+      <span className="job-meta-label">Source</span>
+      <span className="job-meta-value">Running outside the dashboard</span>
+    </div>
+  );
+}
+
 function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvaluations }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isFailed = job.status === STATUS.FAILED;
   const isLost = job.status === STATUS.LOST;
+  const isExternal = job.source === 'external';
   const [showDot, setShowDot] = useState(() => {
     if (hasEvaluations) return false;
     try { return !localStorage.getItem(CONSOLE_DOT_DISMISSED_KEY); } catch { return true; }
@@ -89,7 +99,9 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvalu
       {consoleOpen && (
         <div className="console-output">
           <pre ref={logViewerRef}>
-            {job.logs?.length ? job.logs.join('\n') : 'Waiting for output\u2026'}
+            {isExternal
+              ? 'Live logs unavailable for external runs \u2014 progress inferred from filesystem'
+              : (job.logs?.length ? job.logs.join('\n') : 'Waiting for output\u2026')}
           </pre>
         </div>
       )}
@@ -128,6 +140,7 @@ function JobProviderBadge() {
 }
 
 function JobMeta({ job, projectName }) {
+  const isExternal = job.source === 'external';
   return (
     <div className="job-meta">
       {projectName && (
@@ -136,7 +149,7 @@ function JobMeta({ job, projectName }) {
           <span className="job-meta-value">{projectName}</span>
         </div>
       )}
-      <JobProviderBadge />
+      {isExternal ? <ExternalRunBadge /> : <JobProviderBadge />}
       <div className="job-meta-item">
         <span className="job-meta-label">Job ID</span>
         <div className="job-meta-id-row">

@@ -15,6 +15,7 @@
  * @property {string|null}   endedAt
  * @property {number|null}   exitCode
  * @property {string|null}   error
+ * @property {'internal'|'external'} source  - 'internal' = launched from dashboard; 'external' = CLI/CI
  */
 
 /**
@@ -39,5 +40,6 @@ export function createJob(raw) {
     endedAt:          raw.endedAt ?? null,
     exitCode:         raw.exitCode ?? null,
     error:            raw.error ?? null,
+    source:           raw.source ?? 'internal',
   };
 }

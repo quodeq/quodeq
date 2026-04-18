@@ -82,7 +82,7 @@ class EvaluationActions(Protocol):
         """Start an asynchronous evaluation job and return job metadata."""
         ...
 
-    def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:
+    def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
         """Return current status of an evaluation job."""
         ...
 
@@ -90,7 +90,7 @@ class EvaluationActions(Protocol):
         """Cancel a running evaluation job. Return True on success."""
         ...
 
-    def list_evaluations(self) -> list[JobSnapshot]:
+    def list_evaluations(self, *, limit: int = 0, reports_dir: str | None = None) -> list[JobSnapshot]:
         """Return all evaluation jobs (running, done, failed, cancelled)."""
         ...
 

@@ -140,7 +140,7 @@ def _build_dashboard_result(
     return {
         "project": project,
         "availableRuns": [
-            {"runId": item.run_id, "dateISO": item.date_iso, "dateLabel": item.date_label}
+            {"runId": item.run_id, "dateISO": item.date_iso, "dateLabel": item.date_label, "status": item.status}
             for item in runs
         ],
         "selectedRun": {
