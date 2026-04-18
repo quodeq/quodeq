@@ -31,19 +31,28 @@ function HistoryEmpty() {
   );
 }
 
+function buildInProgressStubs(availableRuns, trend) {
+  const trendIds = new Set((trend || []).map((e) => e.runId));
+  return (availableRuns || [])
+    .filter((r) => r.status === 'in_progress' && !trendIds.has(r.runId))
+    .map((r) => ({ runId: r.runId, dateLabel: r.dateLabel, dateISO: null, status: 'in_progress' }));
+}
+
 function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunChange } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   const deltas = useMemo(() => computeDeltas(trend), [trend]);
-  const visible = showAll ? trend : trend.slice(0, MAX_VISIBLE);
-  const hasMore = trend.length > MAX_VISIBLE && !showAll;
+  const inProgressStubs = useMemo(() => buildInProgressStubs(availableRuns, trend), [availableRuns, trend]);
+  const allEntries = useMemo(() => [...inProgressStubs, ...trend], [inProgressStubs, trend]);
+  const visible = showAll ? allEntries : allEntries.slice(0, MAX_VISIBLE);
+  const hasMore = allEntries.length > MAX_VISIBLE && !showAll;
 
   return (
     <div className="history-page">
       <div className="page-header">
         <h2 className="page-title">History</h2>
-        <span className="page-count">{trend.length} evaluation{trend.length !== 1 ? 's' : ''}</span>
+        <span className="page-count">{allEntries.length} evaluation{allEntries.length !== 1 ? 's' : ''}</span>
         {availableRuns && availableRuns.length > 0 && (
           <div className="history-run-nav">
             <RunNavigator
@@ -66,12 +75,12 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav }) {
       <div className="section-header"><h3 className="section-title">Evaluations</h3></div>
       <div className="history-list">
         {visible.map((entry, i) => (
-          <HistoryRunRow key={entry.runId} entry={entry} delta={deltas[i]} isSelected={entry.runId === selectedRunId} onClick={onRunClick} />
+          <HistoryRunRow key={entry.runId} entry={entry} delta={deltas[i - inProgressStubs.length]} isSelected={entry.runId === selectedRunId} onClick={onRunClick} />
         ))}
       </div>
       {hasMore && (
         <div className="history-load-more">
-          <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>Load all {trend.length} evaluations</button>
+          <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>Load all {allEntries.length} evaluations</button>
         </div>
       )}
     </div>
