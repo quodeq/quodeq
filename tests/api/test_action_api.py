@@ -37,15 +37,15 @@ class StubProvider(ActionProvider):
     def start_evaluation(self, repo: str, reports_dir: str, options: EvaluationOptions) -> dict:
         return {"jobId": "job-1", "status": "running", "logs": []}
 
-    def get_evaluation_status(self, job_id: str):
+    def get_evaluation_status(self, job_id: str, reports_dir: str | None = None):
         if job_id == "job-1":
             return {"jobId": "job-1", "status": "done", "logs": []}
         return None
 
-    def cancel_evaluation(self, job_id: str) -> bool:
+    def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
         return False
 
-    def list_evaluations(self) -> list[dict]:
+    def list_evaluations(self, *, limit: int = 0, reports_dir: str | None = None) -> list[dict]:
         return []
 
     def delete_project(self, reports_dir: str, project: str) -> bool:
