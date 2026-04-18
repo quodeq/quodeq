@@ -55,11 +55,16 @@ def _setup_child(reports_root: Path, child_id: str, parent_id: str, dims: list[D
     """Create a child project directory with a single run containing the given dimensions."""
     child_dir = reports_root / child_id
     _write_repo_info(child_dir, parent=parent_id)
+    run_dir = child_dir / run_id
     for dim in dims:
-        eval_dir = child_dir / run_id / "evaluation"
+        eval_dir = run_dir / "evaluation"
         _write_eval(eval_dir, dim.dimension, dim.overall_score or "7.5", dim.overall_grade or "B")
-        evidence_dir = child_dir / run_id / "evidence"
+        evidence_dir = run_dir / "evidence"
         _write_evidence(evidence_dir, dim.dimension)
+    evidence_dir = run_dir / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    (evidence_dir / "manifest.json").write_text("{}")
+    (run_dir / "scan.json").write_text("{}")
 
 
 # ---------------------------------------------------------------------------

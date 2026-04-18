@@ -75,8 +75,14 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
     for entry in safe_read_dir(project_dir):
         if not entry.is_dir() or entry.name.startswith("."):
             continue
+        run_dir = Path(entry.path)
+        manifest_exists = (run_dir / "evidence" / "manifest.json").exists()
+        if not manifest_exists:
+            continue
+        scan_exists = (run_dir / "scan.json").exists()
+        status = "complete" if scan_exists else "in_progress"
         date_iso, date_label = parse_run_date(reports_root, project, entry.name)
-        run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label))
+        run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label, status=status))
     run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)
     if limit > 0:
         return run_infos[:limit]

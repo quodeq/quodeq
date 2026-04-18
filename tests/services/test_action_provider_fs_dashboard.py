@@ -40,9 +40,13 @@ def _write_eval(eval_dir: Path, dimension: str, score: str, grade: str, date: st
 
 def _setup_run(reports_root: Path, project: str, run_id: str, dims: list[tuple[str, str, str]], date: str = "2026-03-01") -> None:
     """Create a run directory with evaluation files for given dimensions."""
-    eval_dir = reports_root / project / run_id / "evaluation"
+    run_dir = reports_root / project / run_id
+    eval_dir = run_dir / "evaluation"
     eval_dir.mkdir(parents=True, exist_ok=True)
-    (reports_root / project / run_id / "evidence").mkdir(parents=True, exist_ok=True)
+    evidence_dir = run_dir / "evidence"
+    evidence_dir.mkdir(parents=True, exist_ok=True)
+    (evidence_dir / "manifest.json").write_text("{}")
+    (run_dir / "scan.json").write_text("{}")
     for dim_name, score, grade in dims:
         _write_eval(eval_dir, dim_name, score, grade, date)
 
