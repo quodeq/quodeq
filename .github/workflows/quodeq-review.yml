@@ -1,0 +1,147 @@
+name: Quodeq Review
+
+# Runs a security-focused Quodeq evaluation on PR creation and posts findings
+# as a GitHub pull request review.
+#
+# Requires a self-hosted runner labeled "quodeq" with Ollama running locally.
+
+on:
+  pull_request:
+    types: [opened]
+    branches: [develop, main]
+
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: "PR number to review"
+        required: true
+        type: number
+      dimensions:
+        description: "Dimensions (comma-separated, aliases allowed)"
+        default: "sec"
+      pool_budget:
+        description: "Pool budget in seconds"
+        default: "180"
+
+jobs:
+  review:
+    # SECURITY: skip PRs opened from forks. Self-hosted runner on a public repo
+    # would otherwise run arbitrary attacker code via a malicious fork PR.
+    # Manual dispatch (workflow_dispatch) always runs.
+    if: >-
+      github.event_name != 'pull_request' ||
+      github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, quodeq]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Load Quodeq CI config
+        run: |
+          if [[ -f .quodeq/workflow.env ]]; then
+            grep -Ev '^(#|$)' .quodeq/workflow.env >> "$GITHUB_ENV"
+          else
+            echo "AI_PROVIDER=ollama" >> "$GITHUB_ENV"
+            echo "AI_MODEL=gemma4-26b-32k:latest" >> "$GITHUB_ENV"
+            echo "EVAL_DIR=$HOME/.quodeq/evaluations" >> "$GITHUB_ENV"
+          fi
+
+      - name: Expand EVAL_DIR (~ → $HOME)
+        run: |
+          # GITHUB_ENV is loaded into env for subsequent steps.
+          DIR="${EVAL_DIR:-$HOME/.quodeq/evaluations}"
+          DIR="${DIR/#\~/$HOME}"
+          mkdir -p "$DIR"
+          echo "EVAL_DIR=$DIR" >> "$GITHUB_ENV"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+
+      - name: Set up Python
+        run: uv python install 3.13
+
+      - name: Install quodeq
+        run: uv sync
+
+      - name: Determine parameters
+        id: params
+        run: |
+          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+            echo "pr=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
+            echo "dimensions=sec" >> "$GITHUB_OUTPUT"
+            echo "pool_budget=180" >> "$GITHUB_OUTPUT"
+          else
+            echo "pr=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
+            echo "dimensions=${{ github.event.inputs.dimensions }}" >> "$GITHUB_OUTPUT"
+            echo "pool_budget=${{ github.event.inputs.pool_budget }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Snapshot evaluation dirs (for latest-run detection)
+        run: |
+          find "$EVAL_DIR" -path "*/evaluation" -type d 2>/dev/null | sort > /tmp/eval-dirs-before.txt || : > /tmp/eval-dirs-before.txt
+
+      - name: Run evaluation
+        id: eval
+        run: |
+          START=$(date +%s)
+
+          # Heartbeat: keep GitHub's result-server websocket alive during long
+          # evaluations. Without stdout output, the runner can lose its
+          # connection to GitHub (~30 min) and the job gets killed.
+          (while :; do date -u +"[heartbeat %H:%M:%SZ]"; sleep 30; done) &
+          HEART=$!
+          trap 'kill $HEART 2>/dev/null || true' EXIT
+
+          uv run quodeq evaluate . \
+            --incremental \
+            --dimensions "${{ steps.params.outputs.dimensions }}" \
+            --pool-budget "${{ steps.params.outputs.pool_budget }}" \
+            --max-duration 120 \
+            --n-subagents "${N_SUBAGENTS:-3}" \
+            --output "$EVAL_DIR"
+          echo "duration=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
+
+      - name: Locate this run's evaluation output
+        id: eval_dir
+        run: |
+          find "$EVAL_DIR" -path "*/evaluation" -type d 2>/dev/null | sort > /tmp/eval-dirs-after.txt || : > /tmp/eval-dirs-after.txt
+          # The new eval dir = in "after" but not "before"
+          NEW_DIR=$(comm -13 /tmp/eval-dirs-before.txt /tmp/eval-dirs-after.txt | head -1)
+          if [[ -z "$NEW_DIR" ]]; then
+            echo "No new evaluation directory produced" >&2
+            exit 1
+          fi
+          echo "path=$NEW_DIR" >> "$GITHUB_OUTPUT"
+          # For the baseline: pick the latest pre-existing evaluation dir in the
+          # same project as NEW_DIR (one level up is the run id, two levels up is project)
+          PROJECT_DIR=$(dirname "$(dirname "$NEW_DIR")")
+          BASELINE=$(find "$PROJECT_DIR" -path "*/evaluation" -type d ! -path "$NEW_DIR" 2>/dev/null | sort | tail -1)
+          echo "baseline=$BASELINE" >> "$GITHUB_OUTPUT"
+          echo "Current:  $NEW_DIR"
+          echo "Baseline: ${BASELINE:-<none>}"
+
+      - name: Post PR review
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ARGS="ci report --evaluation-dir ${{ steps.eval_dir.outputs.path }}"
+          ARGS="$ARGS --owner ${{ github.repository_owner }}"
+          ARGS="$ARGS --repo ${{ github.event.repository.name }}"
+          ARGS="$ARGS --pr ${{ steps.params.outputs.pr }}"
+          ARGS="$ARGS --duration ${{ steps.eval.outputs.duration }}"
+          BASELINE="${{ steps.eval_dir.outputs.baseline }}"
+          if [[ -n "$BASELINE" ]]; then
+            ARGS="$ARGS --baseline-dir $BASELINE"
+          fi
+          uv run quodeq $ARGS
+
+      - name: Upload evaluation artifact
+        if: always() && steps.eval_dir.outputs.path != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: quodeq-review-${{ github.sha }}
+          path: ${{ steps.eval_dir.outputs.path }}
+          retention-days: 14
