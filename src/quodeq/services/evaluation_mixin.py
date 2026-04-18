@@ -214,15 +214,21 @@ class FsEvaluationMixin:
                 cwd = str(resolved)
         return self.dispatcher.dispatch(cmd, cwd=cwd, env=env)
 
-    def get_evaluation_status(self, job_id: str) -> JobSnapshot | None:
-        """Return the current status of an evaluation job."""
-        return self._jobs.get_job(job_id)
+    def get_evaluation_status(self, job_id: str, reports_dir: str | None = None) -> JobSnapshot | None:
+        """Return the current status of an evaluation job.
+
+        Passes *reports_dir* to ``JobManager.get_job`` so that external jobs
+        (``ext-`` prefix) can be looked up from the filesystem.
+        """
+        reports_root = Path(reports_dir) if reports_dir else None
+        return self._jobs.get_job(job_id, reports_root=reports_root)
 
     def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
         """Cancel a running evaluation job and score any completed dimensions."""
-        # Get job info before cancellation
-        job = self._jobs.get_job(job_id)
-        ok = self._jobs.cancel_job(job_id)
+        reports_root = Path(reports_dir) if reports_dir else None
+        # Get job info before cancellation (supports ext- prefix)
+        job = self._jobs.get_job(job_id, reports_root=reports_root)
+        ok = self._jobs.cancel_job(job_id, reports_root=reports_root)
         if ok and reports_dir and job:
             _score_completed_evidence(reports_dir, {
                 "outputProject": job.output_project,
@@ -238,12 +244,14 @@ class FsEvaluationMixin:
         _score_completed_evidence(reports_dir, job)
         return True
 
-    def list_evaluations(self, *, limit: int = 0) -> list[JobSnapshot]:
+    def list_evaluations(self, *, limit: int = 0, reports_dir: str | None = None) -> list[JobSnapshot]:
         """Return evaluation jobs (running, done, failed, cancelled).
 
         When *limit* > 0 only the most recent *limit* jobs are returned.
+        When *reports_dir* is provided, external in-progress runs are merged in.
         """
-        jobs = self._jobs.list_jobs()
+        reports_root = Path(reports_dir) if reports_dir else None
+        jobs = self._jobs.list_jobs(reports_root=reports_root)
         return jobs[:limit] if limit > 0 else jobs
 
 

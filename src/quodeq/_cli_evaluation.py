@@ -195,15 +195,28 @@ def _run_pipeline_with_cleanup(
     """Set up directories, build config, run the pipeline, and clean up cloned repos."""
     _reports_root, evidence_dir, evaluation_dir = paths
     print(f"Report path: {evaluation_dir}", file=sys.stderr)
-    run_id = evaluation_dir.parent.name
-    project_uuid = evaluation_dir.parent.parent.name
+    run_dir = evaluation_dir.parent
+    run_id = run_dir.name
+    project_uuid = run_dir.parent.name
     emit_marker("report_path", project=project_uuid, runId=run_id)
     _save_manifest(inputs.manifest, evidence_dir)
+
+    # Write a .pid file so the dashboard can detect and cancel this external run
+    pid_file = run_dir / ".pid"
+    try:
+        pid_file.write_text(str(os.getpid()))
+    except OSError:
+        pass  # non-fatal; cancel-by-filesystem just won't work for this run
 
     config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
     try:
         return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
     finally:
+        # Clean up .pid file on exit so we don't leave stale PIDs
+        try:
+            pid_file.unlink(missing_ok=True)
+        except OSError:
+            pass
         if is_repo_url(args.repo):
             cleanup_cloned_repo(str(inputs.src))
         worktree_dir = getattr(args, "_worktree_dir", None)

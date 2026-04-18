@@ -18,3 +18,4 @@ class JobSnapshot:
     current_dimension: str | None = None
     dimensions: list[str] | None = None
     error: str | None = None
+    source: str = "internal"  # "internal" | "external"

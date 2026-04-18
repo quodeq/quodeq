@@ -28,7 +28,7 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
         limit = request.args.get("limit", 0, type=int)
-        items = provider.list_evaluations(limit=limit)
+        items = provider.list_evaluations(limit=limit, reports_dir=_reports_dir())
         return jsonify([to_camel_dict(j) for j in items])
 
     @app.post("/api/evaluations")
@@ -81,7 +81,7 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
 
     @app.get("/api/evaluations/<job_id>")
     def get_evaluation(job_id: str) -> Response | tuple[Response, int]:
-        job = provider.get_evaluation_status(job_id)
+        job = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
         if not job:
             body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
