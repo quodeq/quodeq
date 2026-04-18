@@ -8,8 +8,10 @@ name: Quodeq Nightly
 
 on:
   schedule:
-    # 03:07 UTC — slightly off :00 to avoid cron thundering herd.
-    - cron: "7 3 * * *"
+    # 22:01 UTC — corresponds to 00:01 in the maintainer's local timezone (CEST,
+    # UTC+2). Note: GitHub Actions cron is UTC-only with no DST handling, so
+    # after October's DST transition this fires at 23:01 local until next March.
+    - cron: "1 22 * * *"
 
   workflow_dispatch:
     inputs:
