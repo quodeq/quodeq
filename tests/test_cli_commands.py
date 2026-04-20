@@ -86,6 +86,10 @@ class TestExecutePipeline:
 
     @patch("quodeq._cli_evaluation.run_full")
     def test_pipeline_analysis_error(self, mock_run_full, tmp_path, capsys):
+        # AnalysisError propagates from _execute_pipeline so that the outer
+        # RunLifecycleContext can write state=failed.  The caller
+        # (_run_pipeline_with_cleanup) is responsible for mapping it to exit 1.
+        import pytest
         from quodeq.cli import _execute_pipeline
         from quodeq.analysis.subprocess import AnalysisError
         evidence_dir = tmp_path / "evidence"
@@ -95,9 +99,8 @@ class TestExecutePipeline:
         args = argparse.Namespace(evidence_only=False, mode="numerical")
         mock_run_full.side_effect = AnalysisError("AI failed")
         config = MagicMock()
-        result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-        assert result == 1
-        assert "AI failed" in capsys.readouterr().err
+        with pytest.raises(AnalysisError, match="AI failed"):
+            _execute_pipeline(args, config, evidence_dir, evaluation_dir)
 
 
 # ---------------------------------------------------------------------------

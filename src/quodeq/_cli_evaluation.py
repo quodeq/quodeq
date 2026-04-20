@@ -113,28 +113,30 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
 # ---------------------------------------------------------------------------
 
 def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
-    """Execute the evidence/scoring pipeline and print results."""
-    try:
-        if args.evidence_only:
-            print("Starting evidence collection (this may take several minutes per dimension)...", file=sys.stderr)
-            evidence = run(config)
-            out_file = evidence_dir / f"{config.language}_evidence.json"
-            try:
-                write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
-            except OSError as exc:
-                print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
-                return 1
-            print(f"Evidence written to {out_file}", file=sys.stderr)
-        else:
-            print("Starting evaluation (this may take several minutes per dimension)...", file=sys.stderr)
-            scores = run_full(config, evaluation_dir, mode=args.mode)
-            print(f"Report path: {evaluation_dir}/", file=sys.stderr)
-            print(f"Reports written to {evaluation_dir}/", file=sys.stderr)
-            for dim, score in scores.items():
-                print(f"  {dim}: {score}")
-    except (AnalysisError, EvaluationError) as exc:
-        print(f"\nError: {exc}", file=sys.stderr)
-        return 1
+    """Execute the evidence/scoring pipeline and print results.
+
+    Domain errors (AnalysisError, EvaluationError) are intentionally *not*
+    caught here — they propagate to _run_pipeline_with_cleanup so that
+    RunLifecycleContext.__exit__ can write state=failed before the error is
+    mapped to exit code 1.
+    """
+    if args.evidence_only:
+        print("Starting evidence collection (this may take several minutes per dimension)...", file=sys.stderr)
+        evidence = run(config)
+        out_file = evidence_dir / f"{config.language}_evidence.json"
+        try:
+            write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
+        except OSError as exc:
+            print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
+            return 1
+        print(f"Evidence written to {out_file}", file=sys.stderr)
+    else:
+        print("Starting evaluation (this may take several minutes per dimension)...", file=sys.stderr)
+        scores = run_full(config, evaluation_dir, mode=args.mode)
+        print(f"Report path: {evaluation_dir}/", file=sys.stderr)
+        print(f"Reports written to {evaluation_dir}/", file=sys.stderr)
+        for dim, score in scores.items():
+            print(f"  {dim}: {score}")
     return 0
 
 
@@ -218,27 +220,33 @@ def _run_pipeline_with_cleanup(
 
     # Lifecycle context: pending → running on enter, done on clean exit,
     # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
-    with RunLifecycleContext(
-        run_dir=run_dir,
-        job_id=f"ext-{run_id}",
-        dimensions=dimensions_list,
-    ) as lifecycle:
-        try:
-            result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-            lifecycle.transition_to_finalizing()
-            return result
-        finally:
-            # Clean up .pid file on exit so we don't leave stale PIDs
+    try:
+        with RunLifecycleContext(
+            run_dir=run_dir,
+            job_id=f"ext-{run_id}",
+            dimensions=dimensions_list,
+        ) as lifecycle:
             try:
-                pid_file.unlink(missing_ok=True)
-            except OSError:
-                pass
-            if is_repo_url(args.repo):
-                cleanup_cloned_repo(str(inputs.src))
-            worktree_dir = getattr(args, "_worktree_dir", None)
-            worktree_origin = getattr(args, "_worktree_origin", None)
-            if worktree_dir and worktree_origin:
-                _cleanup_worktree(worktree_origin, worktree_dir)
+                result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+                lifecycle.transition_to_finalizing()
+                return result
+            finally:
+                # Clean up .pid file on exit so we don't leave stale PIDs
+                try:
+                    pid_file.unlink(missing_ok=True)
+                except OSError:
+                    pass
+                if is_repo_url(args.repo):
+                    cleanup_cloned_repo(str(inputs.src))
+                worktree_dir = getattr(args, "_worktree_dir", None)
+                worktree_origin = getattr(args, "_worktree_origin", None)
+                if worktree_dir and worktree_origin:
+                    _cleanup_worktree(worktree_origin, worktree_dir)
+    except (AnalysisError, EvaluationError) as exc:
+        # RunLifecycleContext.__exit__ has already written state=failed.
+        # Map the domain error to exit code 1.
+        print(f"\nError: {exc}", file=sys.stderr)
+        return 1
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
