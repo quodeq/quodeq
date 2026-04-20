@@ -84,3 +84,58 @@ def test_plain_logs_partial_line_stripped(tmp_path, app) -> None:
     data = resp.get_json()
     assert data["lines"] == ["complete"]
     assert data["nextOffset"] == len("complete\n")
+
+
+def _collect_sse(resp, max_events: int = 50) -> list[dict]:
+    """Parse an SSE response body into a list of {id, event, data} dicts."""
+    events: list[dict] = []
+    current: dict = {}
+    for raw in resp.response:  # Flask test-client yields bytes chunks
+        chunk = raw.decode("utf-8")
+        for line in chunk.splitlines():
+            if line.startswith("id:"):
+                current["id"] = line[3:].strip()
+            elif line.startswith("event:"):
+                current["event"] = line[6:].strip()
+            elif line.startswith("data:"):
+                current["data"] = line[5:].strip()
+            elif line == "":
+                if current:
+                    events.append(current)
+                    current = {}
+                    if len(events) >= max_events:
+                        return events
+    if current:
+        events.append(current)
+    return events
+
+
+def test_sse_replays_existing_content(tmp_path, app) -> None:
+    _seed_run(tmp_path, app, "job-sse-1-done", "alpha\nbeta\n")
+    client = app.test_client()
+    resp = client.get("/api/jobs/job-sse-1-done/logs/stream")
+    assert resp.status_code == HTTPStatus.OK
+    assert resp.content_type.startswith("text/event-stream")
+    events = _collect_sse(resp)
+    data_events = [e for e in events if "data" in e]
+    assert [e["data"] for e in data_events] == ["alpha", "beta"]
+    assert any(e.get("event") == "done" for e in events)
+
+
+def test_sse_respects_last_event_id(tmp_path, app) -> None:
+    _seed_run(tmp_path, app, "job-sse-2-done", "alpha\nbeta\ngamma\n")
+    client = app.test_client()
+    resp = client.get("/api/jobs/job-sse-2-done/logs/stream",
+                      headers={"Last-Event-ID": str(len("alpha\n"))})
+    events = _collect_sse(resp)
+    data_events = [e for e in events if "data" in e]
+    assert [e["data"] for e in data_events] == ["beta", "gamma"]
+
+
+def test_sse_404_on_missing_log(tmp_path, app) -> None:
+    run_dir = tmp_path / "empty"
+    run_dir.mkdir()
+    app.config["_provider"].map["job-sse-3"] = run_dir
+    client = app.test_client()
+    resp = client.get("/api/jobs/job-sse-3/logs/stream")
+    assert resp.status_code == HTTPStatus.NOT_FOUND
