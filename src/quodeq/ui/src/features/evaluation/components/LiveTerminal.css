@@ -1,0 +1,22 @@
+.live-terminal {
+  margin-top: 12px;
+  border-top: 1px solid var(--color-border, #21262d);
+  padding-top: 8px;
+}
+.live-terminal__toggle {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #8b949e);
+  cursor: pointer;
+  font-size: 13px;
+  padding: 4px 0;
+}
+.live-terminal__body {
+  height: 320px;
+  margin-top: 8px;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.live-terminal__body--collapsed {
+  display: none;
+}
