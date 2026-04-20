@@ -38,9 +38,11 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         job_manager: JobManager | None = None,
         compiled_dir: Path | None = None,
         index_db_path: Path | None = None,
+        reports_root: Path | None = None,
     ) -> None:
         super().__init__()
-        self._jobs = job_manager or JobManager()
+        self._reports_root = reports_root
+        self._jobs = job_manager or JobManager(reports_root=reports_root)
         self._compiled_dir = compiled_dir
         self._index_db_path = Path(index_db_path) if index_db_path is not None else None
         self._model_fetchers: dict[str, Callable] = {
