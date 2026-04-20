@@ -24,6 +24,7 @@ from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
+from quodeq.shared.run_lifecycle import RunLifecycleContext
 
 # Re-export resolution helpers — keep the public API stable
 from quodeq._cli_resolution import (  # noqa: F401
@@ -209,20 +210,35 @@ def _run_pipeline_with_cleanup(
         pass  # non-fatal; cancel-by-filesystem just won't work for this run
 
     config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
-    try:
-        return _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-    finally:
-        # Clean up .pid file on exit so we don't leave stale PIDs
+
+    # Resolve dimensions list for status.json metadata.
+    # Defensively coerce to a real list — config may be a Mock in tests.
+    _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
+    dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
+
+    # Lifecycle context: pending → running on enter, done on clean exit,
+    # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
+    with RunLifecycleContext(
+        run_dir=run_dir,
+        job_id=f"ext-{run_id}",
+        dimensions=dimensions_list,
+    ) as lifecycle:
         try:
-            pid_file.unlink(missing_ok=True)
-        except OSError:
-            pass
-        if is_repo_url(args.repo):
-            cleanup_cloned_repo(str(inputs.src))
-        worktree_dir = getattr(args, "_worktree_dir", None)
-        worktree_origin = getattr(args, "_worktree_origin", None)
-        if worktree_dir and worktree_origin:
-            _cleanup_worktree(worktree_origin, worktree_dir)
+            result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+            lifecycle.transition_to_finalizing()
+            return result
+        finally:
+            # Clean up .pid file on exit so we don't leave stale PIDs
+            try:
+                pid_file.unlink(missing_ok=True)
+            except OSError:
+                pass
+            if is_repo_url(args.repo):
+                cleanup_cloned_repo(str(inputs.src))
+            worktree_dir = getattr(args, "_worktree_dir", None)
+            worktree_origin = getattr(args, "_worktree_origin", None)
+            if worktree_dir and worktree_origin:
+                _cleanup_worktree(worktree_origin, worktree_dir)
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
