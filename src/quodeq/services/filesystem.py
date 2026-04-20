@@ -206,3 +206,37 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         return _fs_reports.get_violations(reports_dir, project, run_id)
+
+    def get_log_run_dir(self, job_id: str) -> Path | None:
+        """Return the run_dir for *job_id*, or None if unknown.
+
+        Handles both internal JobManager ids and 'ext-<run_id>' external ids.
+        """
+        if job_id.startswith("ext-"):
+            run_id = job_id[len("ext-"):]
+            reports_root = self._reports_root
+            if reports_root is None or not Path(reports_root).is_dir():
+                return None
+            for project_dir in Path(reports_root).iterdir():
+                if not project_dir.is_dir():
+                    continue
+                candidate = project_dir / run_id
+                if candidate.is_dir():
+                    return candidate
+            return None
+        # Internal: look up job in the store (returns Job with output fields)
+        job = self._jobs._store.get(job_id)
+        if job is None or job.output_project is None or job.output_run_id is None:
+            return None
+        reports_root = self._reports_root
+        if reports_root is None:
+            return None
+        return Path(reports_root) / job.output_project / job.output_run_id
+
+    def is_job_complete(self, job_id: str) -> bool:
+        """Return True if *job_id* has reached a terminal state."""
+        if job_id.startswith("ext-"):
+            run_dir = self.get_log_run_dir(job_id)
+            return run_dir is not None and (run_dir / "scan.json").exists()
+        job = self._jobs._store.get(job_id)
+        return job is not None and job.status in {"done", "failed", "cancelled"}
