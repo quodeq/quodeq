@@ -253,6 +253,12 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         """Return True if *job_id* has reached a terminal state."""
         if job_id.startswith("ext-"):
             run_dir = self.get_log_run_dir(job_id)
-            return run_dir is not None and (run_dir / "scan.json").exists()
+            if run_dir is None:
+                return False
+            if (run_dir / "scan.json").exists():
+                return True
+            # Stale detection: no scan.json AND no live PID -> treat as complete.
+            from quodeq.services._external_jobs import _pid_liveness
+            return not _pid_liveness(run_dir)
         job = self._jobs._store.get(job_id)
         return job is not None and job.status in {"done", "failed", "cancelled"}

@@ -27,6 +27,31 @@ _MANIFEST_PATH = "evidence/manifest.json"
 _SCAN_FILENAME = "scan.json"
 
 
+def _is_pid_alive(pid: int) -> bool:
+    """Return True if *pid* corresponds to a live process.
+
+    Uses ``os.kill(pid, 0)``: signal 0 is a no-op that still raises OSError
+    if the process does not exist. Works on both POSIX and Windows.
+    """
+    try:
+        os.kill(pid, 0)
+    except (OSError, ProcessLookupError):
+        return False
+    return True
+
+
+def _pid_liveness(run_dir: Path) -> bool:
+    """Return True if the run appears genuinely in-progress (.pid exists + PID is alive)."""
+    pid_path = run_dir / _PID_FILENAME
+    if not pid_path.exists():
+        return False  # no evidence of liveness -> treat as stale
+    try:
+        pid = int(pid_path.read_text().strip())
+    except (OSError, ValueError):
+        return False
+    return _is_pid_alive(pid)
+
+
 def find_external_runs(reports_root: Path) -> list[JobSnapshot]:
     """Scan all projects for in-progress runs not tracked by any JobStore.
 
@@ -50,7 +75,14 @@ def find_external_runs(reports_root: Path) -> list[JobSnapshot]:
 
 
 def _run_dir_to_snapshot(project_uuid: str, run_dir: Path) -> JobSnapshot | None:
-    """Convert a run directory to a JobSnapshot if it's an in-progress external run."""
+    """Convert a run directory to a JobSnapshot.
+
+    Returns:
+        - ``None`` if the directory isn't an evaluation run.
+        - A snapshot with ``status="running"`` if the .pid file points at a live process.
+        - A snapshot with ``status="cancelled"`` if the run appears stale
+          (scan.json absent AND no live PID -- force-exit, crash, or abnormal shutdown).
+    """
     manifest_path = run_dir / _MANIFEST_PATH
     scan_path = run_dir / _SCAN_FILENAME
 
@@ -64,13 +96,16 @@ def _run_dir_to_snapshot(project_uuid: str, run_dir: Path) -> JobSnapshot | None
     evidence_dir = run_dir / "evidence"
     dimensions, current_dimension, phase = _infer_progress(eval_dir, evidence_dir)
 
+    # Liveness check: alive PID -> running; missing/stale PID -> cancelled (stale).
+    status = "running" if _pid_liveness(run_dir) else "cancelled"
+
     # External job_id is prefixed so the frontend/backend can distinguish it
     job_id = f"{_EXTERNAL_JOB_ID_PREFIX}{run_dir.name}"
     started_at_iso = _manifest_started_at(manifest_path)
 
     return JobSnapshot(
         job_id=job_id,
-        status="running",
+        status=status,
         phase=phase,
         current_dimension=current_dimension,
         dimensions=dimensions if dimensions else None,
