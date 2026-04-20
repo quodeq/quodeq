@@ -170,6 +170,7 @@ Each EventSource connection is independent — own file handle, own poll loop. N
 | Reader reads mid-line (no `\n` yet) | Server holds partial tail in local buffer; appends on next poll. Client sees whole lines only. |
 | EventSource reconnect after network hiccup | Browser sends `Last-Event-ID: <byte-offset>`; server seeks to `offset + 1`, resumes. No duplicates or gaps. |
 | Concurrent writers (defensive) | `O_APPEND` — kernel serializes writes. Never corruption, at worst interleaved lines. |
+| Historical run predates this feature (no `run.log`) | 404 on the SSE endpoint; UI renders a placeholder row inside the terminal pane: "No terminal output captured for this run." Component still mounts (user can collapse it). |
 
 ## Configuration
 
