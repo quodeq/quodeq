@@ -213,40 +213,52 @@ def _run_pipeline_with_cleanup(
 
     config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
 
+    # Install a per-run log handler so every log_info lands in run.log.
+    from quodeq.shared.run_log import RunLogHandler, RunLogWriter
+    writer = RunLogWriter(run_dir)
+    handler = RunLogHandler(writer)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    _logger_root = logging.getLogger("quodeq")
+    _logger_root.addHandler(handler)
+
     # Resolve dimensions list for status.json metadata.
     # Defensively coerce to a real list — config may be a Mock in tests.
     _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
     dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
 
-    # Lifecycle context: pending → running on enter, done on clean exit,
-    # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
     try:
-        with RunLifecycleContext(
-            run_dir=run_dir,
-            job_id=f"ext-{run_id}",
-            dimensions=dimensions_list,
-        ) as lifecycle:
-            try:
-                result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-                lifecycle.transition_to_finalizing()
-                return result
-            finally:
-                # Clean up .pid file on exit so we don't leave stale PIDs
+        # Lifecycle context: pending → running on enter, done on clean exit,
+        # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
+        try:
+            with RunLifecycleContext(
+                run_dir=run_dir,
+                job_id=f"ext-{run_id}",
+                dimensions=dimensions_list,
+            ) as lifecycle:
                 try:
-                    pid_file.unlink(missing_ok=True)
-                except OSError:
-                    pass
-                if is_repo_url(args.repo):
-                    cleanup_cloned_repo(str(inputs.src))
-                worktree_dir = getattr(args, "_worktree_dir", None)
-                worktree_origin = getattr(args, "_worktree_origin", None)
-                if worktree_dir and worktree_origin:
-                    _cleanup_worktree(worktree_origin, worktree_dir)
-    except (AnalysisError, EvaluationError) as exc:
-        # RunLifecycleContext.__exit__ has already written state=failed.
-        # Map the domain error to exit code 1.
-        log_error(f"{exc}")
-        return 1
+                    result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+                    lifecycle.transition_to_finalizing()
+                    return result
+                finally:
+                    # Clean up .pid file on exit so we don't leave stale PIDs
+                    try:
+                        pid_file.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    if is_repo_url(args.repo):
+                        cleanup_cloned_repo(str(inputs.src))
+                    worktree_dir = getattr(args, "_worktree_dir", None)
+                    worktree_origin = getattr(args, "_worktree_origin", None)
+                    if worktree_dir and worktree_origin:
+                        _cleanup_worktree(worktree_origin, worktree_dir)
+        except (AnalysisError, EvaluationError) as exc:
+            # RunLifecycleContext.__exit__ has already written state=failed.
+            # Map the domain error to exit code 1.
+            log_error(f"{exc}")
+            return 1
+    finally:
+        _logger_root.removeHandler(handler)
+        writer.close()
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
