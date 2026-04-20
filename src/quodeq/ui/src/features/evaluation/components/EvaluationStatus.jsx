@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
+import LiveTerminal from './LiveTerminal.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
@@ -182,6 +183,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobMeta job={job} projectName={deriveProjectName(job.repo)} />
       <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} logViewerRef={logViewerRef} hasEvaluations={hasEvaluations} />
+      {job.jobId ? <LiveTerminal jobId={job.jobId} /> : null}
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
   );
