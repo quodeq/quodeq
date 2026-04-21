@@ -49,6 +49,7 @@ class TestExecutePipeline:
         mock_run.return_value = mock_evidence
         config = MagicMock()
         config.language = "python"
+        config.options.skip_scoring = False
         result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
         assert result == 0
         mock_run.assert_called_once_with(config)
@@ -67,6 +68,7 @@ class TestExecutePipeline:
         mock_run.return_value = mock_evidence
         config = MagicMock()
         config.language = "python"
+        config.options.skip_scoring = False
         result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
         assert result == 1
         assert "Failed to write" in capsys.readouterr().err
@@ -81,6 +83,7 @@ class TestExecutePipeline:
         args = argparse.Namespace(evidence_only=False, mode="numerical")
         mock_run_full.return_value = {"security": 8.5, "reliability": 7.0}
         config = MagicMock()
+        config.options.skip_scoring = False
         result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
         assert result == 0
 
@@ -99,6 +102,7 @@ class TestExecutePipeline:
         args = argparse.Namespace(evidence_only=False, mode="numerical")
         mock_run_full.side_effect = AnalysisError("AI failed")
         config = MagicMock()
+        config.options.skip_scoring = False
         with pytest.raises(AnalysisError, match="AI failed"):
             _execute_pipeline(args, config, evidence_dir, evaluation_dir)
 

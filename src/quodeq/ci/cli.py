@@ -16,6 +16,7 @@ def handle_ci(args) -> int:
 
 def _handle_report(args) -> int:
     """Post evaluation results as a GitHub PR review."""
+    from quodeq.ci._evidence_reader import load_violations_from_evidence
     from quodeq.ci.reporter import (
         build_review_payload,
         fetch_pr_changed_lines,
@@ -34,22 +35,38 @@ def _handle_report(args) -> int:
         print(f"Error: evaluation directory not found: {evaluation_dir}", file=sys.stderr)
         return 1
 
-    reports = load_evaluation_reports(evaluation_dir)
-    if not reports:
-        print("No evaluation reports found, skipping review.", file=sys.stderr)
-        return 0
+    from_evidence = getattr(args, "from_evidence", False)
 
-    baseline_violations: list[dict] = []
-    baseline_available = False
-    if args.baseline_dir:
-        baseline_dir = Path(args.baseline_dir)
-        if baseline_dir.is_dir():
-            baseline_reports = load_evaluation_reports(baseline_dir)
-            for r in baseline_reports:
-                baseline_violations.extend(r.get("violations", []))
-            baseline_available = True
-        else:
-            print(f"Warning: baseline directory not found: {baseline_dir}", file=sys.stderr)
+    if from_evidence:
+        # Evidence mode: read raw JSONL, no scored reports, no baseline.
+        # Always produce a report tuple — even with zero violations, we post
+        # an approving review so the PR shows "Quodeq ran and found nothing"
+        # rather than silence (which CI cannot distinguish from "job broken").
+        violations = load_violations_from_evidence(evaluation_dir / "evidence")
+        reports = [{
+            "dimension": "pr-diff",
+            "violations": violations,
+            "overallScore": "N/A",
+            "overallGrade": "N/A",
+        }]
+        baseline_violations: list[dict] = []
+        baseline_available = False
+    else:
+        reports = load_evaluation_reports(evaluation_dir)
+        if not reports:
+            print("No evaluation reports found, skipping review.", file=sys.stderr)
+            return 0
+        baseline_violations = []
+        baseline_available = False
+        if args.baseline_dir:
+            baseline_dir = Path(args.baseline_dir)
+            if baseline_dir.is_dir():
+                baseline_reports = load_evaluation_reports(baseline_dir)
+                for r in baseline_reports:
+                    baseline_violations.extend(r.get("violations", []))
+                baseline_available = True
+            else:
+                print(f"Warning: baseline directory not found: {baseline_dir}", file=sys.stderr)
 
     artifact_url: str | None = getattr(args, "artifact_url", None)
 

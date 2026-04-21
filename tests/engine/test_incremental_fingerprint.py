@@ -41,6 +41,7 @@ class TestSaveDimensionFingerprintJsonlUnion:
         config.work_dir = evidence_dir
         config.src = tmp_path
         config.options.incremental_file_filter = None
+        config.options.skip_scoring = False  # MagicMock would auto-truthy, triggering the diff-mode skip.
         config.standards_dir = None
 
         save_dimension_fingerprint(config, "security")
@@ -81,6 +82,7 @@ class TestSaveDimensionFingerprintJsonlUnion:
         config.work_dir = evidence_dir
         config.src = tmp_path
         config.options.incremental_file_filter = None
+        config.options.skip_scoring = False  # MagicMock would auto-truthy, triggering the diff-mode skip.
         config.standards_dir = None
 
         save_dimension_fingerprint(config, "security")

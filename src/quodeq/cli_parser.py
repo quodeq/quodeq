@@ -81,6 +81,16 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Skip AI calls and generate placeholder findings (for CI pipeline testing)",
     )
+    parser.add_argument(
+        "--diff-from",
+        default=None,
+        metavar="REF",
+        help=(
+            "PR mode: analyze only files changed since <ref> (e.g., "
+            "origin/develop). Mutually exclusive with --incremental. "
+            "Produces evidence only — no scored evaluation reports."
+        ),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -113,6 +123,16 @@ def build_parser() -> argparse.ArgumentParser:
     report_parser.add_argument(
         "--artifact-url",
         help="URL to the workflow run page where the evaluation artifact can be downloaded (optional)",
+    )
+    report_parser.add_argument(
+        "--from-evidence",
+        action="store_true",
+        dest="from_evidence",
+        help=(
+            "Read violations from <evaluation-dir>/evidence/<dim>_evidence.jsonl "
+            "instead of scored evaluation/<dim>.json reports. Use for PR diff "
+            "mode runs that skip the scoring phase."
+        ),
     )
 
     review_parser = subparsers.add_parser(

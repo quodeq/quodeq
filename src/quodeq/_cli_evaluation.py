@@ -24,6 +24,7 @@ from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
+from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
 from quodeq.shared.run_lifecycle import RunLifecycleContext
 
 # Re-export resolution helpers — keep the public API stable
@@ -115,28 +116,42 @@ def _setup_run_dirs(args: argparse.Namespace, src: Path) -> tuple[Path, Path, Pa
 def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir: Path, evaluation_dir: Path) -> int:
     """Execute the evidence/scoring pipeline and print results.
 
+    Three modes:
+    - scoring (default): run_full → scored evaluation/<dim>.json reports
+    - --evidence-only: run() → merged <language>_evidence.json, no scoring
+    - PR diff (skip_scoring): run() → per-dimension JSONL only, no merged json, no scoring
+
     Domain errors (AnalysisError, EvaluationError) are intentionally *not*
     caught here — they propagate to _run_pipeline_with_cleanup so that
     RunLifecycleContext.__exit__ can write state=failed before the error is
     mapped to exit code 1.
     """
-    if args.evidence_only:
-        log_info("Starting evidence collection (this may take several minutes per dimension)...")
+    if args.evidence_only or config.options.skip_scoring:
+        label = "PR diff" if config.options.skip_scoring else "evidence collection"
+        log_info(f"Starting {label} (this may take several minutes per dimension)...")
         evidence = run(config)
-        out_file = evidence_dir / f"{config.language}_evidence.json"
-        try:
-            write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
-        except OSError as exc:
-            log_error(f"Failed to write evidence file {out_file}: {exc}")
-            return 1
-        log_info(f"Evidence written to {out_file}")
-    else:
-        log_info("Starting evaluation (this may take several minutes per dimension)...")
-        scores = run_full(config, evaluation_dir, mode=args.mode)
-        log_info(f"Report path: {evaluation_dir}/")
-        log_info(f"Reports written to {evaluation_dir}/")
-        for dim, score in scores.items():
-            print(f"  {dim}: {score}")
+        if config.options.skip_scoring:
+            # PR diff mode: per-dimension JSONL is already written by the
+            # pipeline. No merged whole-repo artifact — PR reviews consume
+            # the JSONL directly via `ci report --from-evidence`.
+            log_info(f"PR diff evaluation complete — evidence written to {evidence_dir}/")
+        else:
+            # --evidence-only: write the merged whole-repo Evidence JSON.
+            out_file = evidence_dir / f"{config.language}_evidence.json"
+            try:
+                write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
+            except OSError as exc:
+                log_error(f"Failed to write evidence file {out_file}: {exc}")
+                return 1
+            log_info(f"Evidence written to {out_file}")
+        return 0
+
+    log_info("Starting evaluation (this may take several minutes per dimension)...")
+    scores = run_full(config, evaluation_dir, mode=args.mode)
+    log_info(f"Report path: {evaluation_dir}/")
+    log_info(f"Reports written to {evaluation_dir}/")
+    for dim, score in scores.items():
+        print(f"  {dim}: {score}")
     return 0
 
 
@@ -168,6 +183,11 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     subagent_model_val = _subagent_model(env=env)
     effective_ai_model = ai_model or subagent_model_val
 
+    diff_from = getattr(args, "diff_from", None)
+    diff_files: set[str] | None = getattr(args, "_diff_files", None)
+    incremental_file_filter: set[str] | None = diff_files
+    skip_scoring = diff_from is not None
+
     return RunConfig(
         src=inputs.src,
         language=inputs.language,
@@ -187,7 +207,10 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             consolidated=consolidated,
             pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
             incremental=args.incremental,
+            incremental_file_filter=incremental_file_filter,
             dry_run=getattr(args, "dry_run", False),
+            diff_from=diff_from,
+            skip_scoring=skip_scoring,
         ),
     )
 
@@ -263,6 +286,14 @@ def _run_pipeline_with_cleanup(
 
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
+    if getattr(args, "incremental", False) and getattr(args, "diff_from", None):
+        log_error(
+            "Error: --incremental and --diff-from are mutually exclusive. "
+            "--incremental is for nightly whole-repo runs; --diff-from is for "
+            "PR-scoped analysis."
+        )
+        return 1
+
     if not getattr(args, "dry_run", False):
         try:
             check_evaluate_prereqs()
@@ -273,6 +304,21 @@ def run_evaluate(args: argparse.Namespace) -> int:
     inputs = _resolve_evaluation_inputs(args)
     if inputs is None:
         return 1
+
+    # Resolve --diff-from here (not inside _build_run_config) so a
+    # DiffResolveError fails fast before any run directory is created.
+    # This keeps the lifecycle contract: once a run dir exists, its state
+    # is always written by RunLifecycleContext.
+    diff_from = getattr(args, "diff_from", None)
+    if diff_from:
+        try:
+            args._diff_files = set(resolve_diff_files(inputs.src, diff_from))
+        except DiffResolveError as exc:
+            log_error(f"Error: could not resolve --diff-from {diff_from!r}: {exc}")
+            return 1
+        log_info(f"PR diff mode: {len(args._diff_files)} changed file(s) vs {diff_from}")
+    else:
+        args._diff_files = None
 
     try:
         paths = _setup_run_dirs(args, inputs.src)
