@@ -178,30 +178,20 @@ class JobManager:
             self._processes.clear()
 
     def get_job(self, job_id: str, reports_root: Path | None = None) -> JobSnapshot | None:
-        """Return the current state of a job, or None if not found.
+        """Return the current state of an in-memory job, or None if not found.
 
-        For external jobs (``ext-`` prefix), reconstructs the snapshot from
-        the filesystem instead of the in-process store.
+        External runs (``ext-`` prefix) are not tracked in-memory — they are
+        served by ``FilesystemActionProvider.get_evaluation_status`` via the
+        SQLite index. Callers that encounter an ``ext-`` id here should route
+        through the provider instead.
         """
-        if job_id.startswith("ext-") and reports_root is not None:
-            return self._get_external(job_id, reports_root)
+        if job_id.startswith("ext-"):
+            return None
         with self._lock:
             job = self._store.get(job_id)
             if not job:
                 return None
             return job.to_dict()
-
-    def _get_external(self, job_id: str, reports_root: Path) -> JobSnapshot | None:
-        """Reconstruct a JobSnapshot for an external run from its run directory."""
-        from quodeq.services._external_jobs import _run_dir_to_snapshot
-        run_id = job_id[len("ext-"):]
-        for project_dir in reports_root.iterdir():
-            if not project_dir.is_dir():
-                continue
-            run_dir = project_dir / run_id
-            if run_dir.is_dir():
-                return _run_dir_to_snapshot(project_dir.name, run_dir)
-        return None
 
     def list_jobs(
         self,
@@ -210,36 +200,20 @@ class JobManager:
         offset: int = 0,
         reports_root: Path | None = None,
     ) -> list[JobSnapshot]:
-        """Return tracked jobs as frozen snapshots with pagination.
+        """Return tracked in-memory jobs as frozen snapshots with pagination.
 
-        When *reports_root* is provided, external in-progress runs are merged
-        in.  Internal jobs take priority: if both share the same
-        (output_project, output_run_id), the internal entry wins.
-
-        When *limit* is 0 all jobs are returned (no cap).
+        External runs are served via the SQLite index, not JobManager. The
+        ``reports_root`` kwarg is retained for signature compatibility with
+        callers that still pass it; it is ignored here.
         """
+        _ = reports_root  # intentional: retained for compat, not used
         with self._lock:
             internal = [job.to_dict() for job in self._store.list()]
-
-        merged: list[JobSnapshot] = list(internal)
-
-        if reports_root is not None and reports_root.is_dir():
-            from quodeq.services._external_jobs import find_external_runs
-            externals = find_external_runs(reports_root)
-            internal_keys = {
-                (j.output_project, j.output_run_id)
-                for j in internal
-                if j.output_project and j.output_run_id
-            }
-            for ext in externals:
-                key = (ext.output_project, ext.output_run_id)
-                if key not in internal_keys:
-                    merged.append(ext)
-
-        # Sort newest-first, then paginate
-        merged.sort(key=lambda j: j.started_at or "", reverse=True)
-        page = merged[offset:] if offset else merged
-        return page[:limit] if limit > 0 else page
+        # Preserve existing ordering (newest first).
+        internal.sort(key=lambda s: s.started_at or "", reverse=True)
+        if limit == 0:
+            return internal[offset:]
+        return internal[offset:offset + limit]
 
     @staticmethod
     def _apply_marker(job: Job, line: str) -> None:

@@ -260,6 +260,12 @@
   color: var(--color-text-muted);
 }
 
+.job-status-badge--stale {
+  background: var(--color-warning-bg);
+  color: var(--color-warning-text);
+  border-color: color-mix(in srgb, var(--color-warning) 35%, transparent);
+}
+
 @keyframes pulse {
   0%, 100% { opacity: 1; }
   50% { opacity: 0.55; }

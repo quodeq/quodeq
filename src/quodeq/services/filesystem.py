@@ -151,6 +151,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             dimensions=None,
             error=row.exit_reason,
             source="external" if row.job_id.startswith("ext-") else "internal",
+            exit_reason=row.exit_reason,
         )
 
     # -- helpers --------------------------------------------------------
@@ -258,7 +259,13 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             if (run_dir / "scan.json").exists():
                 return True
             # Stale detection: no scan.json AND no live PID -> treat as complete.
-            from quodeq.services._external_jobs import _pid_liveness
-            return not _pid_liveness(run_dir)
+            from quodeq.services._external_jobs import resolve_external_pid
+            pid_file = run_dir / ".pid"
+            if not pid_file.exists():
+                return True  # no PID file -> stale/crashed -> complete
+            project_uuid = run_dir.parent.name
+            run_id = run_dir.name
+            reports_root = run_dir.parent.parent
+            return resolve_external_pid(project_uuid, run_id, reports_root) is None
         job = self._jobs._store.get(job_id)
         return job is not None and job.status in {"done", "failed", "cancelled"}
