@@ -45,6 +45,39 @@ def test_provider_get_evaluation_status_returns_row(tmp_path, monkeypatch) -> No
     assert snapshot.status == "running"
 
 
+def test_get_evaluation_status_promotes_stale_ext_run(tmp_path, monkeypatch) -> None:
+    """An ext- run with stale heartbeat + dead PID must be promoted to cancelled
+    when the single-run endpoint is hit. Verifies index path is used (not JobManager's
+    old filesystem heuristic)."""
+    import os
+    import time
+    from quodeq.shared.run_status import RunState, read_status, write_status
+
+    reports = tmp_path / "reports"
+    run = reports / "p" / "stale-run"
+    (run / "evidence").mkdir(parents=True)
+    (run / "evidence" / "manifest.json").write_text("{}")
+    # status.json says running but PID is dead
+    write_status(run, state=RunState.RUNNING, job_id="ext-stale-run",
+                 started_at="2026-04-20T00:00:00+00:00", dimensions=[], pid=999999999)
+    # Heartbeat is 60s old
+    heartbeat = run / ".heartbeat"
+    heartbeat.touch()
+    old = time.time() - 60
+    os.utime(heartbeat, (old, old))
+
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(reports))
+
+    from quodeq.services.filesystem import FilesystemActionProvider
+    provider = FilesystemActionProvider(index_db_path=tmp_path / "idx.db")
+    snapshot = provider.get_evaluation_status("ext-stale-run", reports_dir=reports)
+    assert snapshot is not None
+    assert snapshot.status == "cancelled", f"expected cancelled after stale promotion, got {snapshot.status}"
+    # Disk status.json should also be updated.
+    disk = read_status(run)
+    assert disk["state"] == "cancelled"
+
+
 def test_provider_list_repeated_call_works(tmp_path, monkeypatch) -> None:
     reports = tmp_path / "reports"
     _seed_run(reports, "p", "rA", RunState.DONE)

@@ -87,15 +87,23 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         return merged[:limit] if limit and limit > 0 else merged
 
     def get_evaluation_status(self, job_id: str, reports_dir: Path | None = None) -> JobSnapshot | None:
-        """Return a single run's snapshot from JobManager (if live) or the index."""
-        # In-memory JobManager wins for live dashboard-spawned jobs.
-        try:
-            reports_root = Path(reports_dir) if reports_dir is not None else None
-            internal = self._jobs.get_job(job_id, reports_root=reports_root) if hasattr(self._jobs, "get_job") else None
-        except TypeError:
-            internal = None
-        if internal is not None:
-            return internal
+        """Return a single run's snapshot.
+
+        For internal (non-ext) job_ids, JobManager is the authoritative in-memory
+        store. For ext- job_ids (external/CLI runs), the SQLite index is
+        authoritative — route there directly and run the scoped sync so stale
+        runs get promoted to cancelled on this request.
+        """
+        # Internal job_ids: live dashboard-spawned — JobManager's in-memory state wins.
+        if not job_id.startswith("ext-"):
+            try:
+                internal = self._jobs.get_job(job_id, reports_root=None) if hasattr(self._jobs, "get_job") else None
+            except TypeError:
+                internal = None
+            if internal is not None:
+                return internal
+
+        # ext- job_ids (and any internal ID we didn't find in memory): go to the index.
         if reports_dir is None:
             from quodeq.shared._env import get_evaluations_dir
             reports_dir = Path(get_evaluations_dir())
@@ -103,7 +111,20 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             reports_dir = Path(reports_dir)
         db = self._open_index()
         try:
-            _run_index.sync_index(db, reports_dir)
+            # Scoped sync: only walk the target run_dir if we can resolve it.
+            if job_id.startswith("ext-"):
+                run_id = job_id[len("ext-"):]
+                # Search for this run across all projects (same pattern as legacy code).
+                for project_dir in (reports_dir.iterdir() if reports_dir.is_dir() else []):
+                    candidate = project_dir / run_id
+                    if candidate.is_dir():
+                        _run_index.sync_index_for_run(db, candidate)
+                        break
+                else:
+                    # Fall back to full sync so legacy runs are synthesized too.
+                    _run_index.sync_index(db, reports_dir)
+            else:
+                _run_index.sync_index(db, reports_dir)
             row = _run_index.get_run(db, job_id)
         finally:
             db.close()
