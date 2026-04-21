@@ -275,9 +275,13 @@ class JobManager:
                         if not self._flush_batch(job_id, batch):
                             return
                         batch.clear()
-                    # Tee after flush so the marker is already applied to the job
-                    # before we try to resolve run_dir.
-                    self._tee_run_log(job_id, stripped)
+                    # Tee after flush so the marker is already applied to the
+                    # job before we try to resolve run_dir. Skip _cc JSON
+                    # markers — they are structured IPC, not user-facing
+                    # terminal output, and leaking them makes the xterm pane
+                    # in the dashboard noisy.
+                    if not stripped.startswith(_CC_MARKER_PREFIX):
+                        self._tee_run_log(job_id, stripped)
             except (IOError, BrokenPipeError) as exc:
                 _logger.warning("Stream read error for job %s: %s", job_id, exc)
             if batch:

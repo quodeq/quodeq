@@ -54,6 +54,72 @@ def test_consume_stream_no_run_dir_silent(tmp_path: Path) -> None:
     # No run.log anywhere — nothing to assert beyond "did not raise".
 
 
+def test_consume_stream_filters_cc_markers_from_run_log(tmp_path: Path) -> None:
+    """_cc JSON markers are structured IPC — they must NOT leak into run.log.
+
+    Without filtering, the xterm pane in the dashboard shows raw JSON lines
+    mixed into the terminal output (e.g. `{"_cc": "analyzing", "dimension": "security"}`).
+    The marker is still applied to the job's phase/current_dimension state via
+    _append_log; only the visible terminal output is cleaned up.
+    """
+    project = "proj-uuid"
+    run_id = "run-CC"
+    run_dir = tmp_path / project / run_id
+    run_dir.mkdir(parents=True)
+
+    jm = JobManager(reports_root=tmp_path)
+    jm._store.put(_make_job("job-cc"))
+
+    report_marker = json.dumps({"_cc": "report_path", "project": project, "runId": run_id})
+    analyzing_marker = json.dumps({"_cc": "analyzing", "dimension": "security"})
+    scoring_marker = json.dumps({"_cc": "scoring", "dimension": "reliability"})
+    stream = iter([
+        report_marker + "\n",
+        "Starting evaluation...\n",
+        analyzing_marker + "\n",
+        "→ [1/3] Analyzing security\n",
+        scoring_marker + "\n",
+        "Scoring complete\n",
+    ])
+    jm._consume_stream("job-cc", stream)
+
+    contents = (run_dir / "run.log").read_text()
+    # Human-readable lines survive.
+    assert "Starting evaluation..." in contents
+    assert "\u2192 [1/3] Analyzing security" in contents
+    assert "Scoring complete" in contents
+    # Marker JSON lines are filtered out — no raw {"_cc": ...} in the terminal.
+    assert '"_cc"' not in contents
+    assert "report_path" not in contents
+    assert "analyzing" not in contents.lower() or "analyzing security" in contents.lower()
+
+
+def test_consume_stream_marker_still_updates_job_state(tmp_path: Path) -> None:
+    """Filtering markers from run.log must NOT break their IPC role.
+
+    _append_log still parses and applies the marker to the job (phase,
+    current_dimension, output_project, output_run_id). Only the literal
+    JSON line is skipped from the run.log tee.
+    """
+    project = "proj-state"
+    run_id = "run-state"
+    run_dir = tmp_path / project / run_id
+    run_dir.mkdir(parents=True)
+
+    jm = JobManager(reports_root=tmp_path)
+    jm._store.put(_make_job("job-state"))
+
+    report_marker = json.dumps({"_cc": "report_path", "project": project, "runId": run_id})
+    analyzing_marker = json.dumps({"_cc": "analyzing", "dimension": "security"})
+    jm._consume_stream("job-state", iter([report_marker + "\n", analyzing_marker + "\n"]))
+
+    job = jm._store.get("job-state")
+    assert job.output_project == project
+    assert job.output_run_id == run_id
+    assert job.phase == "analyzing"
+    assert job.current_dimension == "security"
+
+
 # ---------------------------------------------------------------------------
 # Fix 1: Production wiring — provider instantiated with reports_root
 # ---------------------------------------------------------------------------
