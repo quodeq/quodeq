@@ -10,7 +10,6 @@ import time
 from pathlib import Path
 
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
-from quodeq.ci.reporter import build_review_payload, load_evaluation_reports, post_review
 from quodeq.shared.utils import get_evaluations_dir
 
 _logger = logging.getLogger(__name__)
@@ -95,10 +94,16 @@ def get_repo_info() -> tuple[str, str]:
 
 
 def snapshot_run_dirs(output_dir: Path) -> set[Path]:
-    """Snapshot existing evaluation run directories."""
+    """Snapshot existing run directories (those containing an evidence/ subdir).
+
+    Both full/incremental runs and diff-mode runs write ``evidence/``, so
+    globbing on it catches every run shape. Diff-mode runs do not write
+    ``evaluation/``, so the old "glob on evaluation" approach would miss
+    them.
+    """
     if not output_dir.exists():
         return set()
-    return {p for p in output_dir.rglob("evaluation") if p.is_dir()}
+    return {p.parent for p in output_dir.rglob("evidence") if p.is_dir()}
 
 
 def handle_review(args) -> int:
@@ -117,32 +122,27 @@ def handle_review(args) -> int:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
-    # Determine output dir (use default or user-specified)
     output_dir = Path(getattr(args, "output", None) or get_evaluations_dir())
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    # Snapshot existing runs before evaluation
     baseline_runs = snapshot_run_dirs(output_dir)
 
-    # Build evaluate args and call run_evaluate directly
     from quodeq.cli_parser import build_parser
     eval_parser_argv = [
         "evaluate", ".",
-        "--incremental",
+        "--diff-from", f"origin/{base_branch}",
         "--output", str(output_dir),
     ]
     dims = getattr(args, "dimensions", None)
     if dims:
         eval_parser_argv.extend(["--dimensions", expand_dimension_aliases(dims)])
-    # Pool budget default (short for local dev)
     pool_budget = getattr(args, "pool_budget", None) or 300
     eval_parser_argv.extend(["--pool-budget", str(pool_budget)])
 
     parser = build_parser()
     eval_args = parser.parse_args(eval_parser_argv)
 
-    dims_label = eval_args.dimensions if eval_args.dimensions else "all"
-    print(f"Running evaluation ({dims_label})...")
+    print(f"Running PR diff evaluation (base: origin/{base_branch})...")
     start = time.time()
     from quodeq._cli_evaluation import run_evaluate
     exit_code = run_evaluate(eval_args)
@@ -152,43 +152,34 @@ def handle_review(args) -> int:
         print(f"Evaluation failed with exit code {exit_code}", file=sys.stderr)
         return exit_code
 
-    # Find the new run (set difference)
     all_runs = snapshot_run_dirs(output_dir)
     new_runs = all_runs - baseline_runs
     if not new_runs:
         print("Error: no new evaluation directory produced.", file=sys.stderr)
         return 1
-    # Latest new run by mtime
-    current_eval_dir = max(new_runs, key=lambda p: p.stat().st_mtime)
+    current_run_dir = max(new_runs, key=lambda p: p.stat().st_mtime)
+    evidence_dir = current_run_dir / "evidence"
 
-    # Baseline: latest pre-existing run (if any)
-    baseline_eval_dir = None
-    baseline_available = False
-    if baseline_runs:
-        baseline_eval_dir = max(baseline_runs, key=lambda p: p.stat().st_mtime)
-        baseline_available = True
+    from quodeq.ci._evidence_reader import load_violations_from_evidence
+    violations = load_violations_from_evidence(evidence_dir)
 
-    # Load reports
-    current_reports = load_evaluation_reports(current_eval_dir)
-    baseline_violations: list[dict] = []
-    if baseline_eval_dir:
-        for r in load_evaluation_reports(baseline_eval_dir):
-            baseline_violations.extend(r.get("violations", []))
+    reports = [{
+        "dimension": "pr-diff",
+        "violations": violations,
+        "overallScore": "N/A",
+        "overallGrade": "N/A",
+    }]
 
-    # Build payload
+    from quodeq.ci.reporter import build_review_payload
     payload = build_review_payload(
-        current_reports,
-        baseline_violations=baseline_violations,
+        reports,
+        baseline_violations=[],
         duration_seconds=duration,
-        baseline_available=baseline_available,
+        baseline_available=False,
     )
 
-    # Summarize findings
-    total_violations = sum(len(r.get("violations", [])) for r in current_reports)
-    new_count = sum(1 for c in payload.get("comments", []) if "NEW" in c.get("body", ""))
-    existing_count = len(payload.get("comments", [])) - new_count
-    print(f"Evaluation complete: {total_violations} violation(s) total "
-          f"({new_count} new, {existing_count} pre-existing)")
+    total_violations = len(violations)
+    print(f"Evaluation complete: {total_violations} violation(s) found in diff")
     print(f"Verdict: {payload['event']}")
 
     if getattr(args, "dry_run", False):
@@ -197,13 +188,13 @@ def handle_review(args) -> int:
         print("--- end review body ---")
         return 0
 
-    # Get token and post
     try:
         token = get_github_token()
     except ReviewError as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
+    from quodeq.ci.reporter import post_review
     print(f"Posting review to {owner}/{repo} PR #{pr_number}...")
     post_review(owner=owner, repo=repo, pr_number=pr_number, payload=payload, token=token)
     print(f"Review posted to https://github.com/{owner}/{repo}/pull/{pr_number}")

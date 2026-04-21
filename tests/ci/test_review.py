@@ -73,15 +73,17 @@ def test_snapshot_run_dirs_empty_when_nonexistent(tmp_path):
     assert result == set()
 
 
-def test_snapshot_run_dirs_finds_evaluation_dirs(tmp_path):
+def test_snapshot_run_dirs_finds_run_dirs_by_evidence(tmp_path):
     from quodeq.ci.review import snapshot_run_dirs
-    # Create a fake structure
-    (tmp_path / "project-a" / "run-1" / "evaluation").mkdir(parents=True)
-    (tmp_path / "project-a" / "run-2" / "evaluation").mkdir(parents=True)
-    (tmp_path / "project-a" / "run-1" / "evidence").mkdir(parents=True)  # not counted
+
+    (tmp_path / "project-a" / "run-1" / "evidence").mkdir(parents=True)
+    (tmp_path / "project-a" / "run-2" / "evidence").mkdir(parents=True)
+
     result = snapshot_run_dirs(tmp_path)
     assert len(result) == 2
-    assert all(p.name == "evaluation" for p in result)
+    # snapshot returns run dirs (parents of evidence/), not evidence dirs themselves
+    assert all(p.parent.name == "project-a" for p in result)
+    assert {p.name for p in result} == {"run-1", "run-2"}
 
 
 def test_review_subcommand_parses(tmp_path):
@@ -219,3 +221,51 @@ def test_handle_review_expands_dimension_alias(tmp_path):
 
     idx = captured_argv.index("--dimensions")
     assert captured_argv[idx + 1] == "security"
+
+
+def test_review_invokes_evaluate_with_diff_from_not_incremental(tmp_path, monkeypatch):
+    """quodeq review must call evaluate --diff-from origin/<base>, not --incremental."""
+    import argparse
+    from quodeq.ci.review import handle_review
+
+    captured_argv: list[list[str]] = []
+
+    def fake_parse_args(argv):
+        captured_argv.append(list(argv))
+        # Return a minimal namespace; run_evaluate is mocked separately.
+        return argparse.Namespace()
+
+    monkeypatch.setattr("quodeq.ci.review.detect_pr", lambda pr_override=None: (42, "develop"))
+    monkeypatch.setattr("quodeq.ci.review.get_repo_info", lambda: ("owner", "repo"))
+    monkeypatch.setattr("quodeq.ci.review.get_github_token", lambda: "t")
+    monkeypatch.setattr("quodeq.ci.review.snapshot_run_dirs", lambda d: set())
+    # run_evaluate and build_parser are imported INSIDE handle_review; patch
+    # them at their source modules so the in-function imports pick up the
+    # patches.
+    monkeypatch.setattr("quodeq._cli_evaluation.run_evaluate", lambda args: 0)
+    monkeypatch.setattr(
+        "quodeq.cli_parser.build_parser",
+        lambda: type("P", (), {"parse_args": staticmethod(fake_parse_args)})(),
+    )
+    # short-circuit the post/report stage for this test. load_violations_from_evidence
+    # is imported inside handle_review, so patch at its source.
+    monkeypatch.setattr(
+        "quodeq.ci._evidence_reader.load_violations_from_evidence",
+        lambda d: [],
+    )
+
+    args = argparse.Namespace(
+        pr=42, dimensions=None, pool_budget=None,
+        output=str(tmp_path / "out"), dry_run=True,
+    )
+
+    rc = handle_review(args)
+    # handle_review may exit 1 if no new runs are found (expected — we mock
+    # snapshot_run_dirs to return empty both before and after). We don't care
+    # about the exit code for this test; we care about the argv built for
+    # evaluate.
+    assert captured_argv, "review did not build an evaluate argv"
+    argv = captured_argv[0]
+    assert "--diff-from" in argv
+    assert "origin/develop" in argv
+    assert "--incremental" not in argv
