@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import json
 import os
+import signal
 import sqlite3
+import subprocess
+import sys
 import time
 from pathlib import Path
 
@@ -158,6 +161,60 @@ def test_stale_promotion_live_pid_not_promoted(tmp_path: Path) -> None:
         row = db.execute("SELECT state FROM runs WHERE job_id = ?", ("ext-r8",)).fetchone()
         assert row[0] == "running"
     finally:
+        db.close()
+
+
+def test_stale_promotion_after_sigkill_real_subprocess(tmp_path: Path) -> None:
+    """SIGKILL leaves status.json as RUNNING — stale-promote must recover it.
+
+    Spawns a real subprocess so we get a PID that is genuinely alive, records
+    it in status.json, then `kill -9`s the process without any cleanup hook
+    running. After the heartbeat ages out, `_check_stale_and_promote` must
+    mark the run CANCELLED with exit_reason="stale_detected".
+    """
+    db = open_index(tmp_path / "idx.db")
+    proc = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    try:
+        run = _make_run_dir(tmp_path, "p", "r10")
+        write_status(
+            run,
+            state=RunState.RUNNING,
+            job_id="ext-r10",
+            started_at="2026-04-20T00:00:00+00:00",
+            dimensions=[],
+            pid=proc.pid,
+        )
+        _upsert_from_status(db, run, project_uuid="p", run_id="r10")
+        heartbeat = run / ".heartbeat"
+        heartbeat.touch()
+
+        proc.send_signal(signal.SIGKILL)
+        proc.wait(timeout=5)
+        deadline = time.time() + 2
+        while _is_pid_alive(proc.pid) and time.time() < deadline:
+            time.sleep(0.05)
+        assert not _is_pid_alive(proc.pid), "subprocess PID still alive after kill -9"
+
+        old = time.time() - 120
+        os.utime(heartbeat, (old, old))
+
+        promoted = _check_stale_and_promote(
+            db, run, project_uuid="p", run_id="r10", stale_seconds=30,
+        )
+        assert promoted is True
+        row = db.execute(
+            "SELECT state, exit_reason FROM runs WHERE job_id = ?",
+            ("ext-r10",),
+        ).fetchone()
+        assert row == ("cancelled", "stale_detected")
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait(timeout=5)
         db.close()
 
 

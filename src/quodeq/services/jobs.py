@@ -78,8 +78,11 @@ class JobManager:
         self._lock = threading.Lock()
         self._on_job_complete = on_job_complete
         self._reports_root: Path | None = reports_root
+        # _run_log_writers and _pre_marker_buffer are owned exclusively by the
+        # per-job _consume_stream thread started in start_job(). No other code
+        # path may read or mutate these dicts — doing so reintroduces the
+        # use-after-close race that self._lock does not protect against.
         self._run_log_writers: dict[str, RunLogWriter] = {}
-        # Buffer of pre-marker lines per job, flushed once run_dir is known.
         self._pre_marker_buffer: dict[str, list[str]] = {}
 
     def set_reports_root(self, path: Path) -> None:

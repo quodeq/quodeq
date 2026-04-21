@@ -20,6 +20,7 @@ _logger = logging.getLogger(__name__)
 _GITHUB_API = "https://api.github.com"
 _FILES_PAGE_SIZE = 100
 _HUNK_HEADER_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
+_REQUEST_TIMEOUT_SECONDS = 30.0
 
 
 def _parse_hunks(patch: str | None) -> set[int]:
@@ -65,7 +66,7 @@ def _github_get(url: str, token: str) -> list | dict:
     req.add_header("Authorization", f"Bearer {token}")
     req.add_header("Accept", "application/vnd.github+json")
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
-    with urlopen(req) as resp:
+    with urlopen(req, timeout=_REQUEST_TIMEOUT_SECONDS) as resp:
         return json.loads(resp.read())
 
 
@@ -215,7 +216,7 @@ def _github_request(url: str, payload: dict, token: str) -> dict:
     req.add_header("X-GitHub-Api-Version", "2022-11-28")
 
     try:
-        with urlopen(req) as resp:
+        with urlopen(req, timeout=_REQUEST_TIMEOUT_SECONDS) as resp:
             return json.loads(resp.read())
     except urllib.error.HTTPError as exc:
         body = exc.read().decode(errors="replace")

@@ -52,20 +52,20 @@ def load_violations_from_evidence(evidence_dir: Path) -> list[dict]:
     violations: list[dict] = []
     for path in sorted(evidence_dir.glob("*_evidence.jsonl")):
         try:
-            raw = path.read_text()
+            with path.open(encoding="utf-8") as fh:
+                for raw in fh:
+                    line = raw.strip()
+                    if not line:
+                        continue
+                    try:
+                        obj = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        _logger.debug("Skipping malformed line in %s: %s", path, exc)
+                        continue
+                    v = _judgment_to_violation(obj)
+                    if v is not None:
+                        violations.append(v)
         except OSError as exc:
             _logger.debug("Could not read %s: %s", path, exc)
             continue
-        for line in raw.splitlines():
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                obj = json.loads(line)
-            except json.JSONDecodeError as exc:
-                _logger.debug("Skipping malformed line in %s: %s", path, exc)
-                continue
-            v = _judgment_to_violation(obj)
-            if v is not None:
-                violations.append(v)
     return violations
