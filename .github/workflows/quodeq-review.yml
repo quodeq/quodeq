@@ -22,6 +22,9 @@ on:
       pool_budget:
         description: "Pool budget in seconds"
         default: "180"
+      base_ref:
+        description: "Base ref to diff against (for workflow_dispatch)"
+        default: "origin/develop"
 
 # GITHUB_TOKEN permissions — needed to post PR reviews via the GitHub API.
 # Default token is read-only; pull-requests:write enables review creation.
@@ -59,26 +62,13 @@ jobs:
 
       - name: Set up ephemeral PR eval directory
         run: |
-          # PR reviews MUST NOT pollute the dashboard store. The dashboard's
-          # source of truth is nightly evaluations in $DASHBOARD_EVAL_DIR.
-          # PR runs write to a runner-temp dir that vanishes with the job —
-          # this also guarantees that if the PR run crashes, no stale entry
-          # leaks into the dashboard.
-          DASHBOARD_EVAL_DIR="${EVAL_DIR:-$HOME/.quodeq/evaluations}"
-          DASHBOARD_EVAL_DIR="${DASHBOARD_EVAL_DIR/#\~/$HOME}"
-          echo "DASHBOARD_EVAL_DIR=$DASHBOARD_EVAL_DIR" >> "$GITHUB_ENV"
-
+          # PR evaluations are ephemeral — they write to a runner-temp dir
+          # that vanishes with the job. Diff mode doesn't use the dashboard
+          # store for baselines, so we no longer copy project_index.json.
           PR_EVAL_DIR="$RUNNER_TEMP/quodeq-pr-eval"
           rm -rf "$PR_EVAL_DIR"  # guard against leftovers from prior invocations
           mkdir -p "$PR_EVAL_DIR"
           echo "PR_EVAL_DIR=$PR_EVAL_DIR" >> "$GITHUB_ENV"
-
-          # Copy the project_index.json from the dashboard store so quodeq
-          # resolves the PR run to the SAME project UUID the nightlies use.
-          # This lets us find the nightly baseline by UUID below.
-          if [[ -f "$DASHBOARD_EVAL_DIR/project_index.json" ]]; then
-            cp "$DASHBOARD_EVAL_DIR/project_index.json" "$PR_EVAL_DIR/project_index.json"
-          fi
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -91,23 +81,37 @@ jobs:
 
       - name: Determine parameters
         id: params
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_NUMBER_INPUT: ${{ github.event.inputs.pr_number }}
+          PR_NUMBER_EVENT: ${{ github.event.pull_request.number }}
+          DIMS_INPUT: ${{ github.event.inputs.dimensions }}
+          POOL_INPUT: ${{ github.event.inputs.pool_budget }}
+          BASE_REF_INPUT: ${{ github.event.inputs.base_ref }}
+          PR_BASE_REF: ${{ github.event.pull_request.base.ref }}
         run: |
-          if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
             {
-              echo "pr=${{ github.event.pull_request.number }}"
+              echo "pr=$PR_NUMBER_EVENT"
               echo "dimensions=sec"
               echo "pool_budget=180"
+              echo "base_ref=origin/$PR_BASE_REF"
             } >> "$GITHUB_OUTPUT"
           else
             {
-              echo "pr=${{ github.event.inputs.pr_number }}"
-              echo "dimensions=${{ github.event.inputs.dimensions }}"
-              echo "pool_budget=${{ github.event.inputs.pool_budget }}"
+              echo "pr=$PR_NUMBER_INPUT"
+              echo "dimensions=$DIMS_INPUT"
+              echo "pool_budget=$POOL_INPUT"
+              echo "base_ref=${BASE_REF_INPUT:-origin/develop}"
             } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run evaluation
         id: eval
+        env:
+          BASE_REF: ${{ steps.params.outputs.base_ref }}
+          DIMS: ${{ steps.params.outputs.dimensions }}
+          POOL_BUDGET: ${{ steps.params.outputs.pool_budget }}
         run: |
           START=$(date +%s)
 
@@ -119,9 +123,9 @@ jobs:
           trap 'kill $HEART 2>/dev/null || true' EXIT
 
           uv run quodeq evaluate . \
-            --incremental \
-            --dimensions "${{ steps.params.outputs.dimensions }}" \
-            --pool-budget "${{ steps.params.outputs.pool_budget }}" \
+            --diff-from "$BASE_REF" \
+            --dimensions "$DIMS" \
+            --pool-budget "$POOL_BUDGET" \
             --max-duration 120 \
             --n-subagents "${N_SUBAGENTS:-3}" \
             --output "$PR_EVAL_DIR"
@@ -130,46 +134,35 @@ jobs:
       - name: Locate this runs evaluation output
         id: eval_dir
         run: |
-          # PR_EVAL_DIR is ephemeral and starts empty; the single freshly-
-          # written evaluation dir is the output of this workflow run.
-          NEW_DIR=$(find "$PR_EVAL_DIR" -path "*/evaluation" -type d 2>/dev/null | head -1)
-          if [[ -z "$NEW_DIR" ]]; then
-            echo "No evaluation directory produced in $PR_EVAL_DIR" >&2
+          # Diff-mode runs write evidence/ only (no evaluation/). Find the
+          # run dir = parent of the freshly-written evidence/ directory.
+          EVIDENCE_DIR=$(find "$PR_EVAL_DIR" -path "*/evidence" -type d 2>/dev/null | head -1)
+          if [[ -z "$EVIDENCE_DIR" ]]; then
+            echo "No evidence directory produced in $PR_EVAL_DIR" >&2
             exit 1
           fi
-          echo "path=$NEW_DIR" >> "$GITHUB_OUTPUT"
-
-          # Baseline source of truth: the nightly evaluations in the dashboard
-          # store. We derive the project UUID from the current run_dir (the
-          # project_index.json copy ensures it matches the dashboard UUID)
-          # and look up the latest evaluation for that project.
-          PROJECT_UUID=$(basename "$(dirname "$(dirname "$NEW_DIR")")")
-          BASELINE=$(find "$DASHBOARD_EVAL_DIR/$PROJECT_UUID" -path "*/evaluation" -type d 2>/dev/null | sort | tail -1)
-          echo "baseline=$BASELINE" >> "$GITHUB_OUTPUT"
-          echo "Current:  $NEW_DIR"
-          if [[ -n "$BASELINE" ]]; then
-            echo "Baseline: $BASELINE"
-          else
-            echo "Baseline: <none - no nightly has run yet for this project>"
-          fi
+          RUN_DIR=$(dirname "$EVIDENCE_DIR")
+          echo "path=$RUN_DIR" >> "$GITHUB_OUTPUT"
+          echo "Run dir: $RUN_DIR"
 
       - name: Post PR review
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVAL_PATH: ${{ steps.eval_dir.outputs.path }}
+          OWNER: ${{ github.repository_owner }}
+          REPO_NAME: ${{ github.event.repository.name }}
+          PR_NUM: ${{ steps.params.outputs.pr }}
+          DURATION: ${{ steps.eval.outputs.duration }}
         run: |
-          # Use an array so each flag+value is a discrete argv entry
-          # (avoids SC2086 word-splitting issues with unquoted $ARGS).
-          ARGS=(ci report
-                --evaluation-dir "${{ steps.eval_dir.outputs.path }}"
-                --owner "${{ github.repository_owner }}"
-                --repo "${{ github.event.repository.name }}"
-                --pr "${{ steps.params.outputs.pr }}"
-                --duration "${{ steps.eval.outputs.duration }}")
-          BASELINE="${{ steps.eval_dir.outputs.baseline }}"
-          if [[ -n "$BASELINE" ]]; then
-            ARGS+=(--baseline-dir "$BASELINE")
-          fi
-          uv run quodeq "${ARGS[@]}"
+          # --from-evidence: read violations from evidence JSONL (diff-mode
+          # runs skip the scoring phase, so no scored reports exist).
+          uv run quodeq ci report \
+            --evaluation-dir "$EVAL_PATH" \
+            --from-evidence \
+            --owner "$OWNER" \
+            --repo "$REPO_NAME" \
+            --pr "$PR_NUM" \
+            --duration "$DURATION"
 
       - name: Upload evaluation artifact
         if: always() && steps.eval_dir.outputs.path != ''
