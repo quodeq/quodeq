@@ -84,30 +84,41 @@ def build_review_summary(
     the PR's changed lines. They can't be posted as line-anchored comments
     (GitHub would 422); this count is surfaced in the body so reviewers know.
     """
+    # Diff mode is signaled by reports with unscored ("N/A") dimensions —
+    # PR diff runs skip scoring, so the per-dimension score table and the
+    # "no baseline" note (which frames absence-of-baseline as a scoring
+    # concern) don't apply. Detect from the data the caller already passes.
+    is_diff_mode = bool(reports) and all(
+        r.get("overallScore") == "N/A" for r in reports
+    )
+
     lines = ["## Quodeq Evaluation", ""]
 
-    if not baseline_available:
+    if not baseline_available and not is_diff_mode:
         lines.append(
             "> **Note:** No baseline available — this is the first run. "
             "All violations are shown as new; no baseline comparison was made."
         )
         lines.append("")
 
-    # Per-dimension scores
-    for report in reports:
-        dimension = report.get("dimension", "unknown")
-        score = report.get("overallScore", "N/A")
-        grade = report.get("overallGrade", "N/A")
-        lines.append(f"**{dimension.title()}**: {score} ({grade})")
-
-    lines.append("")
+    # Per-dimension scores (skipped in diff mode — nothing was scored).
+    if not is_diff_mode:
+        for report in reports:
+            dimension = report.get("dimension", "unknown")
+            score = report.get("overallScore", "N/A")
+            grade = report.get("overallGrade", "N/A")
+            lines.append(f"**{dimension.title()}**: {score} ({grade})")
+        lines.append("")
 
     # Violation breakdown
     new_count = len(new_violations)
     existing_count = len(existing_violations)
-    lines.append(f"🆕 **{new_count} new** violation(s) introduced by this PR")
-    if existing_count > 0:
-        lines.append(f"⚠️ **{existing_count} pre-existing** issue(s) in changed files (not introduced by this PR)")
+    if is_diff_mode:
+        lines.append(f"🔍 **{new_count} violation(s) found in PR diff**")
+    else:
+        lines.append(f"🆕 **{new_count} new** violation(s) introduced by this PR")
+        if existing_count > 0:
+            lines.append(f"⚠️ **{existing_count} pre-existing** issue(s) in changed files (not introduced by this PR)")
     lines.append("")
 
     if new_count > 0:

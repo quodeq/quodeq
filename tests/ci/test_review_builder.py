@@ -191,3 +191,61 @@ def test_build_review_summary_no_artifact_link_when_not_provided():
     reports = [{"dimension": "security", "overallScore": "8/10", "overallGrade": "A"}]
     summary = build_review_summary(reports, [], [])
     assert "Download full report" not in summary
+
+
+# --- PR diff mode summary framing --------------------------------------------
+# Diff mode reports carry overallScore="N/A" — the sentinel synthesized by
+# `ci report --from-evidence` / `quodeq review`. `build_review_summary` reads
+# that to suppress two pieces of cruft that don't apply in diff mode:
+# 1. The per-dimension score line ("Pr-Diff: N/A (N/A)") — nothing was scored.
+# 2. The "No baseline available" note — baseline is not a concept in diff
+#    mode; the scope IS the diff.
+
+
+def test_diff_mode_suppresses_per_dimension_score_line():
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "pr-diff", "violations": [],
+                "overallScore": "N/A", "overallGrade": "N/A"}]
+    summary = build_review_summary(reports, [], [], baseline_available=False)
+    # The confusing "Pr-Diff: N/A (N/A)" line must not appear.
+    assert "Pr-Diff: N/A" not in summary
+    assert "N/A (N/A)" not in summary
+
+
+def test_diff_mode_suppresses_no_baseline_note():
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "pr-diff", "violations": [],
+                "overallScore": "N/A", "overallGrade": "N/A"}]
+    summary = build_review_summary(reports, [], [], baseline_available=False)
+    # The "No baseline available" note is wrong-framed in diff mode.
+    assert "No baseline available" not in summary
+
+
+def test_diff_mode_uses_diff_phrasing_for_violation_count():
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "pr-diff", "violations": [],
+                "overallScore": "N/A", "overallGrade": "N/A"}]
+    new = [{"severity": "high"}, {"severity": "minor"}]
+    summary = build_review_summary(reports, new, [], baseline_available=False)
+    # In diff mode there's no baseline, so "NEW vs. PR" framing is meaningless.
+    # Use "found in PR diff" phrasing instead.
+    assert "found in PR diff" in summary
+    assert "introduced by this PR" not in summary
+
+
+def test_scored_mode_preserves_existing_summary_shape():
+    """Regression guard: scored reports still get the old framing."""
+    from quodeq.ci.review_builder import build_review_summary
+
+    reports = [{"dimension": "security", "overallScore": "7.5/10", "overallGrade": "B"}]
+    summary = build_review_summary(reports, [{"severity": "high"}], [],
+                                   baseline_available=False)
+    # Per-dimension score line present
+    assert "Security" in summary and "7.5/10" in summary
+    # "No baseline" note present (it's a genuine signal in scored mode)
+    assert "No baseline available" in summary
+    # Old phrasing
+    assert "introduced by this PR" in summary
