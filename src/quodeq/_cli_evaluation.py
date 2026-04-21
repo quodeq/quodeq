@@ -170,17 +170,9 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     effective_ai_model = ai_model or subagent_model_val
 
     diff_from = getattr(args, "diff_from", None)
-    incremental_file_filter: set[str] | None = None
-    skip_scoring = False
-    if diff_from:
-        try:
-            diff_files = resolve_diff_files(inputs.src, diff_from)
-        except DiffResolveError as exc:
-            log_error(f"Error: could not resolve --diff-from {diff_from!r}: {exc}")
-            raise
-        incremental_file_filter = set(diff_files)
-        skip_scoring = True
-        log_info(f"PR diff mode: {len(diff_files)} changed file(s) vs {diff_from}")
+    diff_files: set[str] | None = getattr(args, "_diff_files", None)
+    incremental_file_filter: set[str] | None = diff_files
+    skip_scoring = diff_from is not None
 
     return RunConfig(
         src=inputs.src,
@@ -298,6 +290,21 @@ def run_evaluate(args: argparse.Namespace) -> int:
     inputs = _resolve_evaluation_inputs(args)
     if inputs is None:
         return 1
+
+    # Resolve --diff-from here (not inside _build_run_config) so a
+    # DiffResolveError fails fast before any run directory is created.
+    # This keeps the lifecycle contract: once a run dir exists, its state
+    # is always written by RunLifecycleContext.
+    diff_from = getattr(args, "diff_from", None)
+    if diff_from:
+        try:
+            args._diff_files = set(resolve_diff_files(inputs.src, diff_from))
+        except DiffResolveError as exc:
+            log_error(f"Error: could not resolve --diff-from {diff_from!r}: {exc}")
+            return 1
+        log_info(f"PR diff mode: {len(args._diff_files)} changed file(s) vs {diff_from}")
+    else:
+        args._diff_files = None
 
     try:
         paths = _setup_run_dirs(args, inputs.src)

@@ -68,6 +68,7 @@ def _inputs(repo: Path) -> ResolvedInputs:
 def test_diff_from_populates_file_filter_and_skip_scoring(tmp_path: Path) -> None:
     repo = _make_repo_with_diff(tmp_path)
     args = _args(repo, diff_from="main")
+    args._diff_files = {"changed.py"}  # normally set by run_evaluate
     config = _build_run_config(args, inputs=_inputs(repo), evidence_dir=repo / "evi")
     assert config.options.diff_from == "main"
     assert config.options.skip_scoring is True
@@ -81,3 +82,37 @@ def test_no_diff_from_leaves_file_filter_unset(tmp_path: Path) -> None:
     assert config.options.diff_from is None
     assert config.options.skip_scoring is False
     assert config.options.incremental_file_filter is None
+
+
+def test_run_evaluate_fails_fast_on_unknown_diff_ref(tmp_path: Path, capsys) -> None:
+    """An unresolvable --diff-from must return 1 BEFORE any run dir is created."""
+    from quodeq._cli_evaluation import run_evaluate
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    import subprocess
+    def run(cmd: list[str]) -> None:
+        subprocess.run(cmd, cwd=str(repo), check=True, capture_output=True)
+    run(["git", "init", "-q", "-b", "main"])
+    run(["git", "config", "user.email", "t@t"])
+    run(["git", "config", "user.name", "t"])
+    (repo / "f.py").write_text("x = 1\n")
+    run(["git", "add", "."])
+    run(["git", "commit", "-q", "-m", "c"])
+
+    output = tmp_path / "out"
+    args = _args(repo, diff_from="does-not-exist", output=str(output))
+    # run_evaluate also needs a few more default attrs that _args doesn't set
+    args.no_prescan = False
+    args.branch = None
+    args.scope = None
+    # Skip AI-provider prereqs so the test exercises diff-from fail-fast,
+    # not the unrelated "no AI provider configured" check.
+    args.dry_run = True
+
+    exit_code = run_evaluate(args)
+    assert exit_code == 1
+    err = capsys.readouterr().err
+    assert "diff-from" in err or "does-not-exist" in err
+    # No run dir should have been created
+    assert not output.exists() or not any(output.rglob("evidence"))
