@@ -1,0 +1,9 @@
+# actionlint configuration.
+# See: https://github.com/rhysd/actionlint/blob/main/docs/config.md
+
+# Register our self-hosted runner label so actionlint doesn't report it as
+# unknown. The runner is a self-hosted Mac tagged "quodeq" (see
+# .github/workflows/quodeq-nightly.yml / quodeq-review.yml).
+self-hosted-runner:
+  labels:
+    - quodeq

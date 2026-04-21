@@ -50,9 +50,11 @@ jobs:
           if [[ -f .quodeq/workflow.env ]]; then
             grep -Ev '^(#|$)' .quodeq/workflow.env >> "$GITHUB_ENV"
           else
-            echo "AI_PROVIDER=ollama" >> "$GITHUB_ENV"
-            echo "AI_MODEL=gemma4-26b-32k:latest" >> "$GITHUB_ENV"
-            echo "EVAL_DIR=$HOME/.quodeq/evaluations" >> "$GITHUB_ENV"
+            {
+              echo "AI_PROVIDER=ollama"
+              echo "AI_MODEL=gemma4-26b-32k:latest"
+              echo "EVAL_DIR=$HOME/.quodeq/evaluations"
+            } >> "$GITHUB_ENV"
           fi
 
       - name: Set up ephemeral PR eval directory
@@ -91,13 +93,17 @@ jobs:
         id: params
         run: |
           if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-            echo "pr=${{ github.event.pull_request.number }}" >> "$GITHUB_OUTPUT"
-            echo "dimensions=sec" >> "$GITHUB_OUTPUT"
-            echo "pool_budget=180" >> "$GITHUB_OUTPUT"
+            {
+              echo "pr=${{ github.event.pull_request.number }}"
+              echo "dimensions=sec"
+              echo "pool_budget=180"
+            } >> "$GITHUB_OUTPUT"
           else
-            echo "pr=${{ github.event.inputs.pr_number }}" >> "$GITHUB_OUTPUT"
-            echo "dimensions=${{ github.event.inputs.dimensions }}" >> "$GITHUB_OUTPUT"
-            echo "pool_budget=${{ github.event.inputs.pool_budget }}" >> "$GITHUB_OUTPUT"
+            {
+              echo "pr=${{ github.event.inputs.pr_number }}"
+              echo "dimensions=${{ github.event.inputs.dimensions }}"
+              echo "pool_budget=${{ github.event.inputs.pool_budget }}"
+            } >> "$GITHUB_OUTPUT"
           fi
 
       - name: Run evaluation
@@ -151,16 +157,19 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ARGS="ci report --evaluation-dir ${{ steps.eval_dir.outputs.path }}"
-          ARGS="$ARGS --owner ${{ github.repository_owner }}"
-          ARGS="$ARGS --repo ${{ github.event.repository.name }}"
-          ARGS="$ARGS --pr ${{ steps.params.outputs.pr }}"
-          ARGS="$ARGS --duration ${{ steps.eval.outputs.duration }}"
+          # Use an array so each flag+value is a discrete argv entry
+          # (avoids SC2086 word-splitting issues with unquoted $ARGS).
+          ARGS=(ci report
+                --evaluation-dir "${{ steps.eval_dir.outputs.path }}"
+                --owner "${{ github.repository_owner }}"
+                --repo "${{ github.event.repository.name }}"
+                --pr "${{ steps.params.outputs.pr }}"
+                --duration "${{ steps.eval.outputs.duration }}")
           BASELINE="${{ steps.eval_dir.outputs.baseline }}"
           if [[ -n "$BASELINE" ]]; then
-            ARGS="$ARGS --baseline-dir $BASELINE"
+            ARGS+=(--baseline-dir "$BASELINE")
           fi
-          uv run quodeq $ARGS
+          uv run quodeq "${ARGS[@]}"
 
       - name: Upload evaluation artifact
         if: always() && steps.eval_dir.outputs.path != ''
