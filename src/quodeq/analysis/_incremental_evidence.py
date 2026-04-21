@@ -25,7 +25,7 @@ def save_dimension_fingerprint(
     Skipped in PR diff mode (skip_scoring=True) — PR runs don't persist any
     artifacts that would be consumed by future incremental runs.
     """
-    if getattr(config.options, "skip_scoring", False):
+    if config.options.skip_scoring:
         return
     try:
         evidence_dir = config.work_dir or config.src

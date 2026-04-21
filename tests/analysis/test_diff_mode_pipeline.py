@@ -73,7 +73,9 @@ def test_save_dimension_fingerprint_is_noop_when_skip_scoring(tmp_path: Path) ->
     """
     from quodeq.analysis._incremental_evidence import save_dimension_fingerprint
 
-    config = _minimal_config(diff_from="main", skip_scoring=True)
+    # Isolate on skip_scoring specifically: leave diff_from=None so the gate
+    # can only be reading skip_scoring, not diff_from.
+    config = _minimal_config(diff_from=None, skip_scoring=True)
     config.work_dir = tmp_path
     # With skip_scoring True, no fingerprint file should be written.
     save_dimension_fingerprint(config, "security")
