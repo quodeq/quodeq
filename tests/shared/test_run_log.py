@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from pathlib import Path
 
 from quodeq.shared.run_log import RunLogWriter, RunLogHandler
@@ -68,3 +70,80 @@ def test_handler_never_raises_on_format_error(
     logger.info("%d", "not-an-int")
     logger.removeHandler(handler)
     writer.close()
+
+
+def test_write_after_close_is_silent_noop(tmp_path: Path) -> None:
+    """Closing the writer then calling write() must not raise AttributeError.
+
+    Before the fix, the pre-lock ``if self._fh is None`` caught the serial
+    case, but a write() racing with close() could acquire the lock after
+    close() nulled out _fh, then hit ``None.write(text)`` and raise.
+    After the fix, the None-check lives INSIDE the lock.
+    """
+    writer = RunLogWriter(tmp_path)
+    writer.close()
+    # Serial case — always worked. Kept for regression coverage.
+    writer.write("after close")
+    # After the in-lock check, simulate the race: _fh already non-None in
+    # the pre-lock read (stale view), but None by the time we acquire the
+    # lock. Force that state directly.
+    writer2 = RunLogWriter(tmp_path)
+    # Monkey-set _fh to None WITHOUT going through close() — this mimics the
+    # race where another thread has nulled _fh while we were queued on the lock.
+    writer2._fh = None  # type: ignore[assignment]
+    # Must not raise.
+    writer2.write("racy write")
+
+
+def test_concurrent_write_and_close_does_not_raise(tmp_path: Path) -> None:
+    """Stress test the check-then-act race: one thread writes in a hot loop
+    while another closes. With the fix, no thread raises; without it,
+    AttributeError would eventually surface on None.write()."""
+    writer = RunLogWriter(tmp_path)
+
+    errors: list[BaseException] = []
+    stop = threading.Event()
+
+    def writer_loop() -> None:
+        # Keep writing until told to stop; record any exception.
+        while not stop.is_set():
+            try:
+                writer.write("hot-loop line")
+            except BaseException as e:  # noqa: BLE001 — we WANT to catch everything here
+                errors.append(e)
+                return
+
+    t = threading.Thread(target=writer_loop, daemon=True)
+    t.start()
+    # Give the writer thread a moment to ramp up, then close from main thread.
+    time.sleep(0.01)
+    writer.close()
+    stop.set()
+    t.join(timeout=2.0)
+
+    assert errors == [], f"concurrent write/close raised: {errors!r}"
+
+
+def test_context_manager_closes_on_exit(tmp_path: Path) -> None:
+    """RunLogWriter supports the context-manager protocol for safe cleanup."""
+    with RunLogWriter(tmp_path) as writer:
+        writer.write("inside context")
+        # Internal handle is open during the block.
+        assert writer._fh is not None  # type: ignore[attr-defined]
+    # After exit, the handle is closed.
+    assert writer._fh is None  # type: ignore[attr-defined]
+    # File contents survive.
+    assert "inside context" in (tmp_path / "run.log").read_text()
+
+
+def test_context_manager_closes_on_exception(tmp_path: Path) -> None:
+    """If the with-body raises, the writer still closes."""
+    writer = RunLogWriter(tmp_path)
+    try:
+        with writer:
+            writer.write("before raise")
+            raise RuntimeError("boom")
+    except RuntimeError:
+        pass
+    assert writer._fh is None  # type: ignore[attr-defined]
+    assert "before raise" in (tmp_path / "run.log").read_text()
