@@ -254,6 +254,7 @@ def test_cli_handle_report_falls_back_on_fetch_failure(tmp_path, capsys) -> None
     args.token = "fake"
     args.duration = 5
     args.artifact_url = None
+    args.from_evidence = False
 
     captured = {}
 

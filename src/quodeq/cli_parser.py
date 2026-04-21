@@ -124,6 +124,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--artifact-url",
         help="URL to the workflow run page where the evaluation artifact can be downloaded (optional)",
     )
+    report_parser.add_argument(
+        "--from-evidence",
+        action="store_true",
+        dest="from_evidence",
+        help=(
+            "Read violations from <evaluation-dir>/evidence/<dim>_evidence.jsonl "
+            "instead of scored evaluation/<dim>.json reports. Use for PR diff "
+            "mode runs that skip the scoring phase."
+        ),
+    )
 
     review_parser = subparsers.add_parser(
         "review",

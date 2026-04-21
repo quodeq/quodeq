@@ -120,6 +120,7 @@ def test_handle_report_loads_baseline(tmp_path):
     args.token = "fake"
     args.duration = 10
     args.artifact_url = None
+    args.from_evidence = False
 
     captured_payload = {}
 
