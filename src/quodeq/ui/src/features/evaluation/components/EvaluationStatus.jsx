@@ -53,7 +53,7 @@ function ExternalRunBadge() {
   return (
     <div className="job-meta-item">
       <span className="job-meta-label">Source</span>
-      <span className="job-meta-value">Running outside the dashboard</span>
+      <span className="job-meta-value">External</span>
     </div>
   );
 }
@@ -107,6 +107,17 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvalu
   );
 }
 
+function StatusChip({ status, exitReason }) {
+  const isStale = status === 'cancelled' && typeof exitReason === 'string' && exitReason.startsWith('stale_');
+  const text = isStale ? 'cancelled (stale)' : status;
+  const className = `job-status-badge ${status}${isStale ? ' job-status-badge--stale' : ''}`;
+  return (
+    <span className={className} title={exitReason ?? ''}>
+      {text}
+    </span>
+  );
+}
+
 function JobHeader({ job, onDismiss, onCancel }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isDone = job.status === STATUS.DONE;
@@ -119,7 +130,7 @@ function JobHeader({ job, onDismiss, onCancel }) {
         {isRunning && <button type="button" className="job-cancel-inline" onClick={onCancel}>Cancel</button>}
         {!isRunning && isDone && <button type="button" className="job-header-view-btn" onClick={() => onDismiss('view')}>View Results</button>}
         {!isRunning && <button type="button" className="job-header-dismiss-btn" onClick={() => onDismiss('close')}>{isDone ? 'Dismiss' : 'Close'}</button>}
-        <span className={`job-status-badge ${job.status}`}>{job.status}</span>
+        <StatusChip status={job.status} exitReason={job.exitReason} />
       </div>
     </div>
   );
