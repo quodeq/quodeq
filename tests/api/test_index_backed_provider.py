@@ -89,3 +89,65 @@ def test_provider_list_repeated_call_works(tmp_path, monkeypatch) -> None:
     jobs = provider.list_evaluations(limit=0, reports_dir=reports)
     assert len(jobs) >= 1
     assert any(j.job_id == "ext-rA" for j in jobs)
+
+
+def test_list_evaluations_internal_job_overrides_index_row(tmp_path, monkeypatch) -> None:
+    """When JobManager has an in-memory job with the same job_id as an index
+    row, the in-memory version wins. Covers the Plan B1 precedence rule that
+    had no explicit test before.
+
+    Scenario: a dashboard-spawned job is running live (fresh `status="running"`,
+    live logs in JobManager). Separately, the SQLite index has a stale row for
+    the same job_id (e.g., from an earlier sync that picked up the run_dir).
+    The authoritative live state must come from JobManager, not the index.
+    """
+    from unittest.mock import MagicMock
+    from quodeq.shared.run_status import RunState, write_status
+    from quodeq.services.filesystem import FilesystemActionProvider
+    from quodeq.core.types.job import JobSnapshot
+
+    reports = tmp_path / "reports"
+    # Seed an index row for job-id "internal-42" — as if the index already
+    # knew about this run from a prior sync.
+    run = reports / "p" / "internal-42"
+    (run / "evidence").mkdir(parents=True)
+    (run / "evidence" / "manifest.json").write_text("{}")
+    write_status(
+        run, state=RunState.RUNNING, job_id="internal-42",
+        started_at="2026-04-20T00:00:00+00:00", dimensions=[],
+    )
+
+    monkeypatch.setenv("QUODEQ_EVALUATIONS_DIR", str(reports))
+
+    # Stub JobManager.list_jobs to return the authoritative in-memory snapshot
+    # with RICHER data (phase="analyzing", current_dimension="security") — the
+    # index-synced row wouldn't have those because sync_index reads status.json
+    # which is stale.
+    live_snapshot = JobSnapshot(
+        job_id="internal-42",
+        status="running",
+        started_at="2026-04-20T00:00:00+00:00",
+        phase="analyzing",
+        current_dimension="security",
+        source="internal",
+    )
+    fake_jobs = MagicMock()
+    fake_jobs.list_jobs.return_value = [live_snapshot]
+
+    provider = FilesystemActionProvider(
+        job_manager=fake_jobs,
+        index_db_path=tmp_path / "idx.db",
+    )
+    jobs = provider.list_evaluations(limit=0, reports_dir=reports)
+
+    by_id = {j.job_id: j for j in jobs}
+    result = by_id.get("internal-42")
+    assert result is not None, f"internal-42 missing from merged list: {by_id.keys()}"
+    # The in-memory snapshot won — phase/current_dimension carry through.
+    assert result.phase == "analyzing"
+    assert result.current_dimension == "security"
+    assert result.source == "internal"
+    # And JobManager.list_jobs was called with reports_root=None (new contract
+    # after the deprecation warning).
+    fake_jobs.list_jobs.assert_called_once()
+    assert fake_jobs.list_jobs.call_args.kwargs.get("reports_root") is None
