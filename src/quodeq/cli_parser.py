@@ -81,6 +81,16 @@ def _add_evaluate_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Skip AI calls and generate placeholder findings (for CI pipeline testing)",
     )
+    parser.add_argument(
+        "--diff-from",
+        default=None,
+        metavar="REF",
+        help=(
+            "PR mode: analyze only files changed since <ref> (e.g., "
+            "origin/develop). Mutually exclusive with --incremental. "
+            "Produces evidence only — no scored evaluation reports."
+        ),
+    )
 
 
 def build_parser() -> argparse.ArgumentParser:

@@ -263,6 +263,14 @@ def _run_pipeline_with_cleanup(
 
 def run_evaluate(args: argparse.Namespace) -> int:
     """Run the evaluation pipeline."""
+    if getattr(args, "incremental", False) and getattr(args, "diff_from", None):
+        log_error(
+            "Error: --incremental and --diff-from are mutually exclusive. "
+            "--incremental is for nightly whole-repo runs; --diff-from is for "
+            "PR-scoped analysis."
+        )
+        return 1
+
     if not getattr(args, "dry_run", False):
         try:
             check_evaluate_prereqs()
