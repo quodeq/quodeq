@@ -10,8 +10,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Verify PR source is develop or release
+        # SOURCE is passed via env (not ${{ }} interpolation) so bash treats
+        # the branch name as data — prevents script injection if a branch
+        # name contains shell metacharacters.
+        env:
+          SOURCE: ${{ github.head_ref }}
         run: |
-          SOURCE="${{ github.head_ref }}"
           if [ "$SOURCE" = "develop" ] || [[ "$SOURCE" == release/* ]]; then
             echo "Source branch '$SOURCE' is allowed. OK."
           else
