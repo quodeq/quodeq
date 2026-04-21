@@ -20,7 +20,13 @@ def save_dimension_fingerprint(
     config: RunConfig, dimension: str, files: list[str] | None = None,
     analyzed_files: set[str] | None = None,
 ) -> None:
-    """Save a fingerprint after any successful dimension analysis."""
+    """Save a fingerprint after any successful dimension analysis.
+
+    Skipped in PR diff mode (skip_scoring=True) — PR runs don't persist any
+    artifacts that would be consumed by future incremental runs.
+    """
+    if getattr(config.options, "skip_scoring", False):
+        return
     try:
         evidence_dir = config.work_dir or config.src
         if files is None:

@@ -73,6 +73,14 @@ def _run_dimensions(
 
     dimensions, ctx = load_analysis_context(config)
 
+    if config.options.diff_from:
+        emit_marker("setup", dimensions=dimensions)
+        return run_per_dimension_loop(
+            config, dimensions, ctx,
+            process_fn=_process_single_dimension,
+            on_dimension_done=on_dimension_done,
+        )
+
     if config.options.incremental:
         emit_marker("setup", dimensions=dimensions)
         return run_incremental_loop(
