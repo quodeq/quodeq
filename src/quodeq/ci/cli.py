@@ -39,10 +39,10 @@ def _handle_report(args) -> int:
 
     if from_evidence:
         # Evidence mode: read raw JSONL, no scored reports, no baseline.
+        # Always produce a report tuple — even with zero violations, we post
+        # an approving review so the PR shows "Quodeq ran and found nothing"
+        # rather than silence (which CI cannot distinguish from "job broken").
         violations = load_violations_from_evidence(evaluation_dir / "evidence")
-        if not violations:
-            print("No findings from evidence; posting no review.", file=sys.stderr)
-            return 0
         reports = [{
             "dimension": "pr-diff",
             "violations": violations,
