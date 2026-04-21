@@ -19,7 +19,8 @@ def test_find_external_runs_identifies_in_progress(tmp_path):
     (run / "evidence").mkdir(parents=True)
     (run / "evidence" / "manifest.json").write_text("{}")
     (run / "evaluation").mkdir()
-    # No scan.json -> in-progress
+    # No scan.json, but live .pid -> in-progress
+    (run / ".pid").write_text(str(os.getpid()))
 
     results = find_external_runs(tmp_path)
     assert len(results) == 1
@@ -258,3 +259,70 @@ def test_get_job_ext_prefix_requires_reports_root():
     jm = JobManager()
     # Without reports_root, falls through to internal store -> None
     assert jm.get_job("ext-anything") is None
+
+
+# ---------------------------------------------------------------------------
+# PID liveness — find_external_runs status
+# ---------------------------------------------------------------------------
+
+def _seed_in_progress_run(
+    tmp_path: Path,
+    project: str = "p",
+    run_id: str = "r",
+    pid_content: str | None = None,
+) -> Path:
+    """Create a run_dir with manifest.json (no scan.json). Optionally write a .pid file."""
+    run_dir = tmp_path / project / run_id
+    (run_dir / "evidence").mkdir(parents=True)
+    (run_dir / "evidence" / "manifest.json").write_text("{}")
+    (run_dir / "evaluation").mkdir()
+    if pid_content is not None:
+        (run_dir / ".pid").write_text(pid_content)
+    return run_dir
+
+
+def test_live_pid_is_reported_as_running(tmp_path: Path) -> None:
+    """Run with .pid pointing at a live process -> status='running'."""
+    from quodeq.services._external_jobs import find_external_runs
+
+    _seed_in_progress_run(tmp_path, pid_content=str(os.getpid()))
+    runs = find_external_runs(tmp_path)
+    assert len(runs) == 1
+    assert runs[0].status == "running"
+
+
+def test_dead_pid_is_reported_as_cancelled(tmp_path: Path) -> None:
+    """Run with .pid pointing at a dead process -> status='cancelled' (stale)."""
+    from quodeq.services._external_jobs import find_external_runs
+
+    # A PID of 999999999 is virtually guaranteed to be absent on modern systems.
+    _seed_in_progress_run(tmp_path, pid_content="999999999")
+    runs = find_external_runs(tmp_path)
+    assert len(runs) == 1
+    assert runs[0].status == "cancelled"
+
+
+def test_missing_pid_defaults_to_cancelled(tmp_path: Path) -> None:
+    """Run with manifest but no .pid file -> treat as stale (status='cancelled').
+
+    A healthy run writes .pid early and unlinks it in the finally block only
+    *after* scan.json is written. If scan.json is absent AND .pid is absent,
+    the process died before writing .pid OR finished abnormally -- in either
+    case we have no evidence of liveness and should not block the UI.
+    """
+    from quodeq.services._external_jobs import find_external_runs
+
+    _seed_in_progress_run(tmp_path, pid_content=None)
+    runs = find_external_runs(tmp_path)
+    assert len(runs) == 1
+    assert runs[0].status == "cancelled"
+
+
+def test_malformed_pid_is_reported_as_cancelled(tmp_path: Path) -> None:
+    """Run with a non-numeric .pid file -> status='cancelled' (treat as stale)."""
+    from quodeq.services._external_jobs import find_external_runs
+
+    _seed_in_progress_run(tmp_path, pid_content="not-a-pid")
+    runs = find_external_runs(tmp_path)
+    assert len(runs) == 1
+    assert runs[0].status == "cancelled"

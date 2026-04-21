@@ -38,9 +38,11 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         job_manager: JobManager | None = None,
         compiled_dir: Path | None = None,
         index_db_path: Path | None = None,
+        reports_root: Path | None = None,
     ) -> None:
         super().__init__()
-        self._jobs = job_manager or JobManager()
+        self._reports_root = reports_root
+        self._jobs = job_manager or JobManager(reports_root=reports_root)
         self._compiled_dir = compiled_dir
         self._index_db_path = Path(index_db_path) if index_db_path is not None else None
         self._model_fetchers: dict[str, Callable] = {
@@ -204,3 +206,59 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
 
     def get_violations(self, reports_dir: str, project: str, run_id: str) -> ViolationSummary:
         return _fs_reports.get_violations(reports_dir, project, run_id)
+
+    def _resolve_reports_root(self) -> Path | None:
+        """Return the active reports directory.
+
+        Prefers the per-instance root set at construction time; falls back to
+        the ``QUODEQ_EVALUATIONS_DIR`` environment variable so that the default
+        provider (constructed with no arguments) still resolves paths correctly
+        at runtime.
+        """
+        if self._reports_root is not None:
+            return Path(self._reports_root)
+        try:
+            from quodeq.shared.utils import get_evaluations_dir
+            return Path(get_evaluations_dir())
+        except Exception:
+            return None
+
+    def get_log_run_dir(self, job_id: str) -> Path | None:
+        """Return the run_dir for *job_id*, or None if unknown.
+
+        Handles both internal JobManager ids and 'ext-<run_id>' external ids.
+        """
+        if job_id.startswith("ext-"):
+            run_id = job_id[len("ext-"):]
+            reports_root = self._resolve_reports_root()
+            if reports_root is None or not reports_root.is_dir():
+                return None
+            for project_dir in reports_root.iterdir():
+                if not project_dir.is_dir():
+                    continue
+                candidate = project_dir / run_id
+                if candidate.is_dir():
+                    return candidate
+            return None
+        # Internal: look up job in the store (returns Job with output fields)
+        job = self._jobs._store.get(job_id)
+        if job is None or job.output_project is None or job.output_run_id is None:
+            return None
+        reports_root = self._resolve_reports_root()
+        if reports_root is None:
+            return None
+        return reports_root / job.output_project / job.output_run_id
+
+    def is_job_complete(self, job_id: str) -> bool:
+        """Return True if *job_id* has reached a terminal state."""
+        if job_id.startswith("ext-"):
+            run_dir = self.get_log_run_dir(job_id)
+            if run_dir is None:
+                return False
+            if (run_dir / "scan.json").exists():
+                return True
+            # Stale detection: no scan.json AND no live PID -> treat as complete.
+            from quodeq.services._external_jobs import _pid_liveness
+            return not _pid_liveness(run_dir)
+        job = self._jobs._store.get(job_id)
+        return job is not None and job.status in {"done", "failed", "cancelled"}

@@ -11,7 +11,6 @@ import argparse
 import json
 import logging
 import os
-import sys
 from pathlib import Path
 
 from quodeq.config.paths import default_paths
@@ -19,6 +18,7 @@ from quodeq.analysis.subprocess import AnalysisError
 from quodeq.analysis.runner import AnalysisOptions, EvaluationError, RunConfig, run
 from quodeq.engine.scoring_pipeline import run_full
 from quodeq.shared.project_resolver import ProjectIdentity, resolve_project_uuid
+from quodeq.shared.logging import log_error, log_info
 from quodeq.shared.utils import get_ai_model, is_repo_url, project_name_from_repo, write_text
 from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
@@ -121,20 +121,20 @@ def _execute_pipeline(args: argparse.Namespace, config: RunConfig, evidence_dir:
     mapped to exit code 1.
     """
     if args.evidence_only:
-        print("Starting evidence collection (this may take several minutes per dimension)...", file=sys.stderr)
+        log_info("Starting evidence collection (this may take several minutes per dimension)...")
         evidence = run(config)
         out_file = evidence_dir / f"{config.language}_evidence.json"
         try:
             write_text(out_file, json.dumps(evidence.to_evidence_dict(), indent=2))
         except OSError as exc:
-            print(f"Failed to write evidence file {out_file}: {exc}", file=sys.stderr)
+            log_error(f"Failed to write evidence file {out_file}: {exc}")
             return 1
-        print(f"Evidence written to {out_file}", file=sys.stderr)
+        log_info(f"Evidence written to {out_file}")
     else:
-        print("Starting evaluation (this may take several minutes per dimension)...", file=sys.stderr)
+        log_info("Starting evaluation (this may take several minutes per dimension)...")
         scores = run_full(config, evaluation_dir, mode=args.mode)
-        print(f"Report path: {evaluation_dir}/", file=sys.stderr)
-        print(f"Reports written to {evaluation_dir}/", file=sys.stderr)
+        log_info(f"Report path: {evaluation_dir}/")
+        log_info(f"Reports written to {evaluation_dir}/")
         for dim, score in scores.items():
             print(f"  {dim}: {score}")
     return 0
@@ -155,14 +155,14 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     standards_dir = default_paths().standards_dir
     expanded_dimensions = expand_dimension_aliases(args.dimensions)
     dimensions_filter = [d.strip() for d in expanded_dimensions.split(",") if d.strip()] if expanded_dimensions else None
-    print(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all", file=sys.stderr)
+    log_info(f"Dimensions: {', '.join(dimensions_filter)}" if dimensions_filter else "Dimensions: all")
 
     is_single_file = getattr(args, '_single_file', False)
 
     consolidated = not getattr(args, 'no_consolidated', False) and not bool(_env.get("QUODEQ_NO_CONSOLIDATE"))
     if is_single_file:
         consolidated = False
-        print("Single-file mode: per-dimension analysis for deeper coverage", file=sys.stderr)
+        log_info("Single-file mode: per-dimension analysis for deeper coverage")
 
     ai_model = get_ai_model(env=env)
     subagent_model_val = _subagent_model(env=env)
@@ -197,7 +197,7 @@ def _run_pipeline_with_cleanup(
 ) -> int:
     """Set up directories, build config, run the pipeline, and clean up cloned repos."""
     _reports_root, evidence_dir, evaluation_dir = paths
-    print(f"Report path: {evaluation_dir}", file=sys.stderr)
+    log_info(f"Report path: {evaluation_dir}")
     run_dir = evaluation_dir.parent
     run_id = run_dir.name
     project_uuid = run_dir.parent.name
@@ -213,40 +213,52 @@ def _run_pipeline_with_cleanup(
 
     config = _build_run_config(args, inputs=inputs, evidence_dir=evidence_dir)
 
+    # Install a per-run log handler so every log_info lands in run.log.
+    from quodeq.shared.run_log import RunLogHandler, RunLogWriter
+    writer = RunLogWriter(run_dir)
+    handler = RunLogHandler(writer)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    _logger_root = logging.getLogger("quodeq")
+    _logger_root.addHandler(handler)
+
     # Resolve dimensions list for status.json metadata.
     # Defensively coerce to a real list — config may be a Mock in tests.
     _raw_dims = getattr(getattr(config, "options", None), "dimensions", None)
     dimensions_list: list[str] = list(_raw_dims) if isinstance(_raw_dims, list) else []
 
-    # Lifecycle context: pending → running on enter, done on clean exit,
-    # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
     try:
-        with RunLifecycleContext(
-            run_dir=run_dir,
-            job_id=f"ext-{run_id}",
-            dimensions=dimensions_list,
-        ) as lifecycle:
-            try:
-                result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
-                lifecycle.transition_to_finalizing()
-                return result
-            finally:
-                # Clean up .pid file on exit so we don't leave stale PIDs
+        # Lifecycle context: pending → running on enter, done on clean exit,
+        # failed on exception, cancelled on SIGINT/SIGTERM/SIGHUP or atexit.
+        try:
+            with RunLifecycleContext(
+                run_dir=run_dir,
+                job_id=f"ext-{run_id}",
+                dimensions=dimensions_list,
+            ) as lifecycle:
                 try:
-                    pid_file.unlink(missing_ok=True)
-                except OSError:
-                    pass
-                if is_repo_url(args.repo):
-                    cleanup_cloned_repo(str(inputs.src))
-                worktree_dir = getattr(args, "_worktree_dir", None)
-                worktree_origin = getattr(args, "_worktree_origin", None)
-                if worktree_dir and worktree_origin:
-                    _cleanup_worktree(worktree_origin, worktree_dir)
-    except (AnalysisError, EvaluationError) as exc:
-        # RunLifecycleContext.__exit__ has already written state=failed.
-        # Map the domain error to exit code 1.
-        print(f"\nError: {exc}", file=sys.stderr)
-        return 1
+                    result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+                    lifecycle.transition_to_finalizing()
+                    return result
+                finally:
+                    # Clean up .pid file on exit so we don't leave stale PIDs
+                    try:
+                        pid_file.unlink(missing_ok=True)
+                    except OSError:
+                        pass
+                    if is_repo_url(args.repo):
+                        cleanup_cloned_repo(str(inputs.src))
+                    worktree_dir = getattr(args, "_worktree_dir", None)
+                    worktree_origin = getattr(args, "_worktree_origin", None)
+                    if worktree_dir and worktree_origin:
+                        _cleanup_worktree(worktree_origin, worktree_dir)
+        except (AnalysisError, EvaluationError) as exc:
+            # RunLifecycleContext.__exit__ has already written state=failed.
+            # Map the domain error to exit code 1.
+            log_error(f"{exc}")
+            return 1
+    finally:
+        _logger_root.removeHandler(handler)
+        writer.close()
 
 
 def run_evaluate(args: argparse.Namespace) -> int:
@@ -255,7 +267,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
         try:
             check_evaluate_prereqs()
         except RuntimeError as exc:
-            print(f"Error: {exc}", file=sys.stderr)
+            log_error(f"Error: {exc}")
             return 1
 
     inputs = _resolve_evaluation_inputs(args)

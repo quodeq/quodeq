@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
+import LiveTerminal from './LiveTerminal.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
@@ -61,7 +62,6 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvalu
   const isRunning = job.status === STATUS.RUNNING;
   const isFailed = job.status === STATUS.FAILED;
   const isLost = job.status === STATUS.LOST;
-  const isExternal = job.source === 'external';
   const [showDot, setShowDot] = useState(() => {
     if (hasEvaluations) return false;
     try { return !localStorage.getItem(CONSOLE_DOT_DISMISSED_KEY); } catch { return true; }
@@ -99,9 +99,7 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvalu
       {consoleOpen && (
         <div className="console-output">
           <pre ref={logViewerRef}>
-            {isExternal
-              ? 'Live logs unavailable for external runs \u2014 progress inferred from filesystem'
-              : (job.logs?.length ? job.logs.join('\n') : 'Waiting for output\u2026')}
+            {job.logs?.length ? job.logs.join('\n') : 'Waiting for output\u2026'}
           </pre>
         </div>
       )}
@@ -182,6 +180,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobMeta job={job} projectName={deriveProjectName(job.repo)} />
       <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} logViewerRef={logViewerRef} hasEvaluations={hasEvaluations} />
+      {job.jobId ? <LiveTerminal jobId={job.jobId} /> : null}
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
   );

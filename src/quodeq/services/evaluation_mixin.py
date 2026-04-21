@@ -196,6 +196,11 @@ class FsEvaluationMixin:
 
         cmd = _build_evaluate_cmd(repo, options, reports_dir)
         _register_project(repo, options.discipline, reports_dir, scope_path=options.scope_path)
+        # Keep JobManager aware of the current reports root so _tee_run_log
+        # can resolve run.log paths for dashboard-spawned evaluations.
+        # Guard with hasattr so custom/stub job managers remain compatible.
+        if hasattr(self._jobs, "set_reports_root"):
+            self._jobs.set_reports_root(Path(reports_dir))
         env = self._build_eval_env(repo, options)
         if is_repo_url(repo):
             cwd = str(Path.cwd())
