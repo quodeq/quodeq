@@ -121,11 +121,11 @@ jobs:
             --output "$PR_EVAL_DIR"
           echo "duration=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
 
-      - name: Locate this run's evaluation output
+      - name: Locate this runs evaluation output
         id: eval_dir
         run: |
           # PR_EVAL_DIR is ephemeral and starts empty; the single freshly-
-          # written evaluation dir is this run's output.
+          # written evaluation dir is the output of this workflow run.
           NEW_DIR=$(find "$PR_EVAL_DIR" -path "*/evaluation" -type d 2>/dev/null | head -1)
           if [[ -z "$NEW_DIR" ]]; then
             echo "No evaluation directory produced in $PR_EVAL_DIR" >&2
@@ -141,7 +141,11 @@ jobs:
           BASELINE=$(find "$DASHBOARD_EVAL_DIR/$PROJECT_UUID" -path "*/evaluation" -type d 2>/dev/null | sort | tail -1)
           echo "baseline=$BASELINE" >> "$GITHUB_OUTPUT"
           echo "Current:  $NEW_DIR"
-          echo "Baseline: ${BASELINE:-<none (nightly hasn't run yet for this project)>}"
+          if [[ -n "$BASELINE" ]]; then
+            echo "Baseline: $BASELINE"
+          else
+            echo "Baseline: <none - no nightly has run yet for this project>"
+          fi
 
       - name: Post PR review
         env:
