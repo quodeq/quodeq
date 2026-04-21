@@ -229,10 +229,19 @@ class FsEvaluationMixin:
         return self._jobs.get_job(job_id, reports_root=reports_root)
 
     def cancel_evaluation(self, job_id: str, reports_dir: str | None = None) -> bool:
-        """Cancel a running evaluation job and score any completed dimensions."""
+        """Cancel a running evaluation job and score any completed dimensions.
+
+        Uses ``self.get_evaluation_status`` rather than a bare
+        ``self._jobs.get_job`` so that external runs (``ext-`` prefix) also
+        resolve correctly via the SQLite index (Plan B1 override on
+        ``FilesystemActionProvider``). Before this, ``get_job`` returned
+        ``None`` for ``ext-`` ids and the scoring block was dead for them.
+        ``_score_completed_evidence`` is idempotent (skips dimensions whose
+        report file already exists), so double-firing with the route-level
+        scoring in ``_evaluation_routes`` is a no-op.
+        """
         reports_root = Path(reports_dir) if reports_dir else None
-        # Get job info before cancellation (supports ext- prefix)
-        job = self._jobs.get_job(job_id, reports_root=reports_root)
+        job = self.get_evaluation_status(job_id, reports_dir=reports_dir)
         ok = self._jobs.cancel_job(job_id, reports_root=reports_root)
         if ok and reports_dir and job:
             _score_completed_evidence(reports_dir, {

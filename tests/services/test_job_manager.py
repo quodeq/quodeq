@@ -389,3 +389,31 @@ class TestMonitorProcess:
         mgr._monitor_process("j1", proc)
         assert job.exit_code == _EXIT_CODE_TIMEOUT
         assert job.status == STATUS_FAILED
+
+
+def test_list_jobs_warns_on_deprecated_reports_root_kwarg(tmp_path):
+    """Passing reports_root= to list_jobs emits DeprecationWarning and is ignored.
+
+    External runs have been served via the SQLite index since Plan B1/B2;
+    this kwarg was left for transitional compat and should stop being used.
+    """
+    import warnings
+    from quodeq.services.jobs import JobManager, InMemoryJobStore
+
+    mgr = JobManager(job_store=InMemoryJobStore())
+
+    # No warning when kwarg is omitted.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        mgr.list_jobs()  # must not raise
+
+    # DeprecationWarning when kwarg is passed — ignored value is safe (empty list).
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        result = mgr.list_jobs(reports_root=tmp_path)
+    assert result == []
+    assert any(
+        issubclass(w.category, DeprecationWarning)
+        and "reports_root" in str(w.message)
+        for w in caught
+    ), f"expected DeprecationWarning about reports_root, got: {[str(w.message) for w in caught]}"

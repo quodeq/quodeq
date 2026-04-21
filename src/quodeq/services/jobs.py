@@ -204,9 +204,17 @@ class JobManager:
 
         External runs are served via the SQLite index, not JobManager. The
         ``reports_root`` kwarg is retained for signature compatibility with
-        callers that still pass it; it is ignored here.
+        callers that still pass it; it is deprecated and ignored.
         """
-        _ = reports_root  # intentional: retained for compat, not used
+        if reports_root is not None:
+            import warnings
+            warnings.warn(
+                "JobManager.list_jobs(reports_root=...) is deprecated and ignored. "
+                "External runs are now served via FilesystemActionProvider + the "
+                "SQLite index; pass reports_root=None (or omit the kwarg).",
+                DeprecationWarning,
+                stacklevel=2,
+            )
         with self._lock:
             internal = [job.to_dict() for job in self._store.list()]
         # Preserve existing ordering (newest first).
