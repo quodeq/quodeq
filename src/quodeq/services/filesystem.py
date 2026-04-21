@@ -151,6 +151,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             dimensions=None,
             error=row.exit_reason,
             source="external" if row.job_id.startswith("ext-") else "internal",
+            exit_reason=row.exit_reason,
         )
 
     # -- helpers --------------------------------------------------------
