@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import Any, Callable
 
 from quodeq.core.types import ProjectEntry, ViolationSummary, to_camel_dict
+from quodeq.core.types.job import JobSnapshot
 from quodeq.services import _fs_clone, _fs_projects, _fs_reports
+from quodeq.services import run_index as _run_index
 from quodeq.services.base import ActionProvider
 from quodeq.services.evaluation_mixin import FsEvaluationMixin
 from quodeq.services.jobs import JobManager
@@ -31,15 +33,102 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
     purely for composition.
     """
 
-    def __init__(self, job_manager: JobManager | None = None, compiled_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        job_manager: JobManager | None = None,
+        compiled_dir: Path | None = None,
+        index_db_path: Path | None = None,
+    ) -> None:
         super().__init__()
         self._jobs = job_manager or JobManager()
         self._compiled_dir = compiled_dir
+        self._index_db_path = Path(index_db_path) if index_db_path is not None else None
         self._model_fetchers: dict[str, Callable] = {
             "claude": self._get_claude_models,
         }
         self._project_cache: dict[str, Any] | None = None
         self._project_cache_time: float = 0
+
+    # -- index helpers --------------------------------------------------
+
+    def _open_index(self):
+        """Open (lazily) the index DB. Resolved from init kwarg or env."""
+        if self._index_db_path is None:
+            from quodeq.shared._env import get_index_db_path
+            self._index_db_path = Path(get_index_db_path())
+        return _run_index.open_index(self._index_db_path)
+
+    def list_evaluations(self, limit: int = 0, reports_dir: Path | None = None) -> list[JobSnapshot]:
+        """Return runs from the SQLite index merged with in-memory JobManager jobs."""
+        if reports_dir is None:
+            from quodeq.shared._env import get_evaluations_dir
+            reports_dir = Path(get_evaluations_dir())
+        else:
+            reports_dir = Path(reports_dir)
+        db = self._open_index()
+        try:
+            _run_index.sync_index(db, reports_dir)
+            rows = _run_index.list_runs(db, limit=0)  # fetch all, merge, then limit
+        finally:
+            db.close()
+        snapshots = [self._run_row_to_snapshot(r) for r in rows]
+        # Merge in-memory dashboard-spawned jobs (JobManager).
+        # Only non-external (internally spawned) jobs override the index; external
+        # heuristics from find_external_runs may be stale and the index wins there.
+        try:
+            internal_jobs = self._jobs.list_jobs(reports_root=None)  # no external heuristic
+        except (AttributeError, TypeError):
+            internal_jobs = []
+        by_id = {s.job_id: s for s in snapshots}
+        for j in internal_jobs:
+            by_id[j.job_id] = j  # internal dashboard-spawned jobs always take priority
+        merged = list(by_id.values())
+        merged.sort(key=lambda s: s.started_at or "", reverse=True)
+        return merged[:limit] if limit and limit > 0 else merged
+
+    def get_evaluation_status(self, job_id: str, reports_dir: Path | None = None) -> JobSnapshot | None:
+        """Return a single run's snapshot from JobManager (if live) or the index."""
+        # In-memory JobManager wins for live dashboard-spawned jobs.
+        try:
+            reports_root = Path(reports_dir) if reports_dir is not None else None
+            internal = self._jobs.get_job(job_id, reports_root=reports_root) if hasattr(self._jobs, "get_job") else None
+        except TypeError:
+            internal = None
+        if internal is not None:
+            return internal
+        if reports_dir is None:
+            from quodeq.shared._env import get_evaluations_dir
+            reports_dir = Path(get_evaluations_dir())
+        else:
+            reports_dir = Path(reports_dir)
+        db = self._open_index()
+        try:
+            _run_index.sync_index(db, reports_dir)
+            row = _run_index.get_run(db, job_id)
+        finally:
+            db.close()
+        if row is None:
+            return None
+        return self._run_row_to_snapshot(row)
+
+    @staticmethod
+    def _run_row_to_snapshot(row: "_run_index.RunRow") -> JobSnapshot:
+        return JobSnapshot(
+            job_id=row.job_id,
+            status=row.state,
+            command="",
+            started_at=row.started_at,
+            ended_at=row.finalized_at,
+            exit_code=None,
+            logs=[],
+            output_project=row.project_uuid,
+            output_run_id=row.run_id,
+            phase=row.phase,
+            current_dimension=row.current_dimension,
+            dimensions=None,
+            error=row.exit_reason,
+            source="external" if row.job_id.startswith("ext-") else "internal",
+        )
 
     # -- helpers --------------------------------------------------------
 
