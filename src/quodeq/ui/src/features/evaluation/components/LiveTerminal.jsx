@@ -4,6 +4,16 @@ import { FitAddon } from 'xterm-addon-fit';
 import 'xterm/css/xterm.css';
 import './LiveTerminal.css';
 
+// Muted foreground so placeholder lines don't shout.
+const PLACEHOLDER_COLOR = '\x1b[38;5;246m';
+const COLOR_RESET = '\x1b[0m';
+
+function placeholderFor(status) {
+  if (status === 404) return 'No terminal output captured for this run.';
+  if (status === 410) return 'Run artifacts removed.';
+  return `Log unavailable (HTTP ${status}).`;
+}
+
 export default function LiveTerminal({ jobId }) {
   const containerRef = useRef(null);
   const termRef = useRef(null);
@@ -27,25 +37,52 @@ export default function LiveTerminal({ jobId }) {
     fit.fit();
     termRef.current = term;
 
-    const es = new EventSource(`/api/jobs/${encodeURIComponent(jobId)}/logs/stream`);
-    esRef.current = es;
+    let cancelled = false;
+    let es = null;
 
-    const onMessage = (ev) => {
-      term.writeln(ev.data ?? '');
-      setLineCount((n) => n + 1);
+    const writePlaceholder = (text) => {
+      term.writeln(`${PLACEHOLDER_COLOR}${text}${COLOR_RESET}`);
+      setLineCount(1);
     };
-    const onDone = () => { es.close(); };
-    const onError = () => { /* EventSource auto-reconnects; no-op */ };
-    es.addEventListener('message', onMessage);
-    es.addEventListener('done', onDone);
-    es.addEventListener('error', onError);
+
+    const openStream = () => {
+      es = new EventSource(`/api/jobs/${encodeURIComponent(jobId)}/logs/stream`);
+      esRef.current = es;
+      const onMessage = (ev) => {
+        term.writeln(ev.data ?? '');
+        setLineCount((n) => n + 1);
+      };
+      const onDone = () => { es.close(); };
+      const onError = () => { /* EventSource auto-reconnects while the endpoint is live */ };
+      es.addEventListener('message', onMessage);
+      es.addEventListener('done', onDone);
+      es.addEventListener('error', onError);
+    };
+
+    // Probe the plain endpoint first. The SSE endpoint would auto-reconnect
+    // forever on 404 (pre-feature runs without run.log), so we short-circuit
+    // and show a placeholder instead of opening EventSource.
+    fetch(`/api/jobs/${encodeURIComponent(jobId)}/logs?since=0`)
+      .then((resp) => {
+        if (cancelled) return;
+        if (resp.ok) {
+          openStream();
+          return;
+        }
+        writePlaceholder(placeholderFor(resp.status));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        writePlaceholder(`Log probe failed: ${err?.message ?? err}`);
+      });
 
     const onResize = () => { try { fit.fit(); } catch { /* ignore */ } };
     window.addEventListener('resize', onResize);
 
     return () => {
+      cancelled = true;
       window.removeEventListener('resize', onResize);
-      es.close();
+      if (es) es.close();
       term.dispose();
       termRef.current = null;
       esRef.current = null;
