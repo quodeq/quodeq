@@ -55,13 +55,28 @@ jobs:
             echo "EVAL_DIR=$HOME/.quodeq/evaluations" >> "$GITHUB_ENV"
           fi
 
-      - name: Expand EVAL_DIR (~ → $HOME)
+      - name: Set up ephemeral PR eval directory
         run: |
-          # GITHUB_ENV is loaded into env for subsequent steps.
-          DIR="${EVAL_DIR:-$HOME/.quodeq/evaluations}"
-          DIR="${DIR/#\~/$HOME}"
-          mkdir -p "$DIR"
-          echo "EVAL_DIR=$DIR" >> "$GITHUB_ENV"
+          # PR reviews MUST NOT pollute the dashboard store. The dashboard's
+          # source of truth is nightly evaluations in $DASHBOARD_EVAL_DIR.
+          # PR runs write to a runner-temp dir that vanishes with the job —
+          # this also guarantees that if the PR run crashes, no stale entry
+          # leaks into the dashboard.
+          DASHBOARD_EVAL_DIR="${EVAL_DIR:-$HOME/.quodeq/evaluations}"
+          DASHBOARD_EVAL_DIR="${DASHBOARD_EVAL_DIR/#\~/$HOME}"
+          echo "DASHBOARD_EVAL_DIR=$DASHBOARD_EVAL_DIR" >> "$GITHUB_ENV"
+
+          PR_EVAL_DIR="$RUNNER_TEMP/quodeq-pr-eval"
+          rm -rf "$PR_EVAL_DIR"  # guard against leftovers from prior invocations
+          mkdir -p "$PR_EVAL_DIR"
+          echo "PR_EVAL_DIR=$PR_EVAL_DIR" >> "$GITHUB_ENV"
+
+          # Copy the project_index.json from the dashboard store so quodeq
+          # resolves the PR run to the SAME project UUID the nightlies use.
+          # This lets us find the nightly baseline by UUID below.
+          if [[ -f "$DASHBOARD_EVAL_DIR/project_index.json" ]]; then
+            cp "$DASHBOARD_EVAL_DIR/project_index.json" "$PR_EVAL_DIR/project_index.json"
+          fi
 
       - name: Install uv
         uses: astral-sh/setup-uv@v7
@@ -85,10 +100,6 @@ jobs:
             echo "pool_budget=${{ github.event.inputs.pool_budget }}" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Snapshot evaluation dirs (for latest-run detection)
-        run: |
-          find "$EVAL_DIR" -path "*/evaluation" -type d 2>/dev/null | sort > /tmp/eval-dirs-before.txt || : > /tmp/eval-dirs-before.txt
-
       - name: Run evaluation
         id: eval
         run: |
@@ -107,27 +118,30 @@ jobs:
             --pool-budget "${{ steps.params.outputs.pool_budget }}" \
             --max-duration 120 \
             --n-subagents "${N_SUBAGENTS:-3}" \
-            --output "$EVAL_DIR"
+            --output "$PR_EVAL_DIR"
           echo "duration=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
 
       - name: Locate this run's evaluation output
         id: eval_dir
         run: |
-          find "$EVAL_DIR" -path "*/evaluation" -type d 2>/dev/null | sort > /tmp/eval-dirs-after.txt || : > /tmp/eval-dirs-after.txt
-          # The new eval dir = in "after" but not "before"
-          NEW_DIR=$(comm -13 /tmp/eval-dirs-before.txt /tmp/eval-dirs-after.txt | head -1)
+          # PR_EVAL_DIR is ephemeral and starts empty; the single freshly-
+          # written evaluation dir is this run's output.
+          NEW_DIR=$(find "$PR_EVAL_DIR" -path "*/evaluation" -type d 2>/dev/null | head -1)
           if [[ -z "$NEW_DIR" ]]; then
-            echo "No new evaluation directory produced" >&2
+            echo "No evaluation directory produced in $PR_EVAL_DIR" >&2
             exit 1
           fi
           echo "path=$NEW_DIR" >> "$GITHUB_OUTPUT"
-          # For the baseline: pick the latest pre-existing evaluation dir in the
-          # same project as NEW_DIR (one level up is the run id, two levels up is project)
-          PROJECT_DIR=$(dirname "$(dirname "$NEW_DIR")")
-          BASELINE=$(find "$PROJECT_DIR" -path "*/evaluation" -type d ! -path "$NEW_DIR" 2>/dev/null | sort | tail -1)
+
+          # Baseline source of truth: the nightly evaluations in the dashboard
+          # store. We derive the project UUID from the current run_dir (the
+          # project_index.json copy ensures it matches the dashboard UUID)
+          # and look up the latest evaluation for that project.
+          PROJECT_UUID=$(basename "$(dirname "$(dirname "$NEW_DIR")")")
+          BASELINE=$(find "$DASHBOARD_EVAL_DIR/$PROJECT_UUID" -path "*/evaluation" -type d 2>/dev/null | sort | tail -1)
           echo "baseline=$BASELINE" >> "$GITHUB_OUTPUT"
           echo "Current:  $NEW_DIR"
-          echo "Baseline: ${BASELINE:-<none>}"
+          echo "Baseline: ${BASELINE:-<none (nightly hasn't run yet for this project)>}"
 
       - name: Post PR review
         env:
