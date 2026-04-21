@@ -5,6 +5,7 @@ from __future__ import annotations
 from flask import Flask
 
 from quodeq.api._log_buffer import LogBuffer
+from quodeq.api._index_routes import register_index_routes
 from quodeq.api._log_routes import register_log_routes
 from quodeq.api._rate_limit import RateLimitStore
 from quodeq.api.routes import (
@@ -48,4 +49,5 @@ def register_all_routes(
     register_llm_bridge_routes(app)
     if log_buffer:
         register_log_routes(app, log_buffer)
+    register_index_routes(app)
     register_static_routes(app, static_dist)
