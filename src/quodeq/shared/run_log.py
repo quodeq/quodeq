@@ -36,14 +36,22 @@ class RunLogWriter:
         return self._path
 
     def write(self, line: str) -> None:
-        """Append *line* to run.log. Adds a trailing newline if missing."""
-        if self._disabled or self._fh is None:
+        """Append *line* to run.log. Adds a trailing newline if missing.
+
+        Safe under concurrent close(): the ``_fh is None`` check lives INSIDE
+        the lock, so a close() that races with this call cannot leave us
+        calling ``None.write(...)``.
+        """
+        if self._disabled:
             return
         text = line if line.endswith("\n") else line + "\n"
         with self._lock:
+            fh = self._fh
+            if fh is None:
+                return  # closed (serially or concurrently) — silently drop
             try:
-                self._fh.write(text)
-                self._fh.flush()
+                fh.write(text)
+                fh.flush()
             except OSError:
                 self._disabled = True
 
@@ -54,6 +62,14 @@ class RunLogWriter:
                     self._fh.close()
                 finally:
                     self._fh = None
+
+    # Context-manager protocol — lets callers write `with RunLogWriter(d) as w:`
+    # for guaranteed cleanup on any exit path.
+    def __enter__(self) -> "RunLogWriter":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, tb: object) -> None:
+        self.close()
 
 
 class RunLogHandler(logging.Handler):
