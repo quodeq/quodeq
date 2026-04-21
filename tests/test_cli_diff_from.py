@@ -1,10 +1,6 @@
 """Parser and mutex tests for --diff-from."""
 from __future__ import annotations
 
-import argparse
-
-import pytest
-
 from quodeq.cli_parser import build_parser
 
 
