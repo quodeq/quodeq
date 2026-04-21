@@ -24,6 +24,7 @@ from quodeq.shared.repo_handler import cleanup_cloned_repo
 from quodeq.engine._runner_markers import emit_marker
 from quodeq.shared.prereqs import check_evaluate_prereqs
 from quodeq.analysis._dimension_aliases import expand_dimension_aliases
+from quodeq.analysis._diff_resolver import DiffResolveError, resolve_diff_files
 from quodeq.shared.run_lifecycle import RunLifecycleContext
 
 # Re-export resolution helpers — keep the public API stable
@@ -168,6 +169,19 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
     subagent_model_val = _subagent_model(env=env)
     effective_ai_model = ai_model or subagent_model_val
 
+    diff_from = getattr(args, "diff_from", None)
+    incremental_file_filter: set[str] | None = None
+    skip_scoring = False
+    if diff_from:
+        try:
+            diff_files = resolve_diff_files(inputs.src, diff_from)
+        except DiffResolveError as exc:
+            log_error(f"Error: could not resolve --diff-from {diff_from!r}: {exc}")
+            raise
+        incremental_file_filter = set(diff_files)
+        skip_scoring = True
+        log_info(f"PR diff mode: {len(diff_files)} changed file(s) vs {diff_from}")
+
     return RunConfig(
         src=inputs.src,
         language=inputs.language,
@@ -187,7 +201,10 @@ def _build_run_config(args: argparse.Namespace, *, inputs: ResolvedInputs, evide
             consolidated=consolidated,
             pool_budget=args.pool_budget if args.pool_budget is not None else _env_int(_ENV_POOL_BUDGET, None, env=env),
             incremental=args.incremental,
+            incremental_file_filter=incremental_file_filter,
             dry_run=getattr(args, "dry_run", False),
+            diff_from=diff_from,
+            skip_scoring=skip_scoring,
         ),
     )
 
