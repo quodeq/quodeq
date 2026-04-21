@@ -42,9 +42,11 @@ jobs:
           if [[ -f .quodeq/workflow.env ]]; then
             grep -Ev '^(#|$)' .quodeq/workflow.env >> "$GITHUB_ENV"
           else
-            echo "AI_PROVIDER=ollama" >> "$GITHUB_ENV"
-            echo "AI_MODEL=gemma4-26b-32k:latest" >> "$GITHUB_ENV"
-            echo "EVAL_DIR=$HOME/.quodeq/evaluations" >> "$GITHUB_ENV"
+            {
+              echo "AI_PROVIDER=ollama"
+              echo "AI_MODEL=gemma4-26b-32k:latest"
+              echo "EVAL_DIR=$HOME/.quodeq/evaluations"
+            } >> "$GITHUB_ENV"
           fi
 
       - name: Expand EVAL_DIR (~ → $HOME)
@@ -90,9 +92,15 @@ jobs:
           DIMS="${DIMS:-$NIGHTLY_DIMENSIONS}"
           BUDGET="${{ github.event.inputs.pool_budget }}"
           BUDGET="${BUDGET:-600}"
-          ARGS="evaluate . --incremental --pool-budget $BUDGET --max-duration 300 --n-subagents ${N_SUBAGENTS:-3} --output $EVAL_DIR"
+          # Use an array so flag values are passed as proper argv entries
+          # (avoids SC2086 word-splitting issues with unquoted $ARGS).
+          ARGS=(evaluate . --incremental
+                --pool-budget "$BUDGET"
+                --max-duration 300
+                --n-subagents "${N_SUBAGENTS:-3}"
+                --output "$EVAL_DIR")
           if [[ -n "$DIMS" ]]; then
-            ARGS="$ARGS --dimensions $DIMS"
+            ARGS+=(--dimensions "$DIMS")
           fi
 
           # Heartbeat: keep GitHub's result-server websocket alive during long
@@ -102,7 +110,7 @@ jobs:
           HEART=$!
           trap 'kill $HEART 2>/dev/null || true' EXIT
 
-          uv run quodeq $ARGS
+          uv run quodeq "${ARGS[@]}"
           echo "duration=$(( $(date +%s) - START ))" >> "$GITHUB_OUTPUT"
 
       - name: Record nightly SHA
