@@ -12,8 +12,16 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import time as _time
 from dataclasses import dataclass
 from pathlib import Path
+
+from quodeq.services._index_sync import (
+    _check_stale_and_promote,
+    _sync_legacy_run,
+    _upsert_from_status,
+    _status_mtime_ns,
+)
 
 _logger = logging.getLogger(__name__)
 
@@ -115,3 +123,112 @@ def open_index(db_path: Path) -> sqlite3.Connection:
             f"index schema_version={version} newer than supported ({SCHEMA_VERSION})"
         )
     return db
+
+
+# ---------------------------------------------------------------------------
+# Internal helpers
+# ---------------------------------------------------------------------------
+
+def _walk_run_dirs(evaluations_root: Path):
+    """Yield (project_uuid, run_id, run_dir) for every run on disk."""
+    if not evaluations_root.is_dir():
+        return
+    for project_dir in evaluations_root.iterdir():
+        if not project_dir.is_dir() or project_dir.name.startswith("."):
+            continue
+        for run_dir in project_dir.iterdir():
+            if not run_dir.is_dir() or run_dir.name.startswith("."):
+                continue
+            yield project_dir.name, run_dir.name, run_dir
+
+
+def _sync_one_run(
+    db: sqlite3.Connection, run_dir: Path, *, project_uuid: str, run_id: str,
+) -> None:
+    status_path = run_dir / "status.json"
+    if status_path.exists():
+        disk_mtime = _status_mtime_ns(run_dir)
+        job_id = f"ext-{run_id}"
+        cached = db.execute(
+            "SELECT status_mtime FROM runs WHERE job_id = ?", (job_id,),
+        ).fetchone()
+        if cached is None or cached[0] != disk_mtime:
+            try:
+                _upsert_from_status(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+            except Exception as exc:
+                _logger.warning("skipping run %s: %s", run_dir, exc)
+                return
+        # Always check staleness, even on mtime-unchanged runs.
+        try:
+            _check_stale_and_promote(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        except Exception as exc:
+            _logger.warning("stale-check failed for %s: %s", run_dir, exc)
+    else:
+        try:
+            _sync_legacy_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+        except Exception as exc:
+            _logger.warning("legacy sync failed for %s: %s", run_dir, exc)
+
+
+# ---------------------------------------------------------------------------
+# Public sync API
+# ---------------------------------------------------------------------------
+
+def sync_index(db: sqlite3.Connection, evaluations_root: Path) -> None:
+    """Lazy upsert: walk *evaluations_root*, sync any run whose status.json
+    changed since last seen OR that lacks an index row entirely. Promote
+    stale non-terminal runs.
+    """
+    for project_uuid, run_id, run_dir in _walk_run_dirs(evaluations_root):
+        _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+
+
+def sync_index_for_run(db: sqlite3.Connection, run_dir: Path) -> None:
+    """Sync only the given run_dir (used by /api/evaluations/<id>)."""
+    if not run_dir.is_dir():
+        return
+    project_uuid = run_dir.parent.name
+    run_id = run_dir.name
+    _sync_one_run(db, run_dir, project_uuid=project_uuid, run_id=run_id)
+
+
+# ---------------------------------------------------------------------------
+# Public query API
+# ---------------------------------------------------------------------------
+
+_LIST_COLS = (
+    "job_id, project_uuid, run_id, run_dir, state, phase, current_dimension, "
+    "started_at, updated_at, finalized_at, heartbeat_at, pid, exit_reason, status_mtime"
+)
+
+
+def _row_to_runrow(row: tuple) -> RunRow:
+    return RunRow(*row)
+
+
+def list_runs(db: sqlite3.Connection, *, limit: int = 0) -> list[RunRow]:
+    """Return runs ordered by started_at DESC. limit=0 means no limit."""
+    sql = f"SELECT {_LIST_COLS} FROM runs ORDER BY started_at DESC"
+    if limit > 0:
+        sql += f" LIMIT {int(limit)}"
+    return [_row_to_runrow(r) for r in db.execute(sql).fetchall()]
+
+
+def get_run(db: sqlite3.Connection, job_id: str) -> RunRow | None:
+    row = db.execute(
+        f"SELECT {_LIST_COLS} FROM runs WHERE job_id = ?", (job_id,),
+    ).fetchone()
+    return _row_to_runrow(row) if row else None
+
+
+def rebuild_index(
+    db: sqlite3.Connection, evaluations_root: Path,
+) -> tuple[int, int]:
+    """Drop all rows, re-sync from filesystem. Returns (count, elapsed_ms)."""
+    start = _time.monotonic()
+    with db:
+        db.execute("DELETE FROM runs")
+    sync_index(db, evaluations_root)
+    count = db.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
+    elapsed_ms = int((_time.monotonic() - start) * 1000)
+    return count, elapsed_ms
