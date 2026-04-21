@@ -31,8 +31,10 @@ _EVALUATION_RATE_LIMIT_MAX = int(os.environ.get("QUODEQ_RATE_LIMIT_MAX", "10"))
 
 def _default_provider() -> ActionProvider:
     """Create the default filesystem-based provider (lazy import)."""
+    from pathlib import Path
     from quodeq.services.filesystem import FilesystemActionProvider
-    return FilesystemActionProvider()
+    from quodeq.shared._env import get_index_db_path
+    return FilesystemActionProvider(index_db_path=Path(get_index_db_path()))
 
 
 def _configure_logging(app: Flask) -> tuple[LogBuffer, bool]:
