@@ -84,7 +84,7 @@ def test_handle_report_loads_baseline(tmp_path):
 
     from quodeq.ci.cli import _handle_report
 
-    # Create fake current report
+    # Create fake current report. Line numbers match the mocked PR diff below.
     current_eval = tmp_path / "current"
     current_eval.mkdir()
     (current_eval / "security.json").write_text(json.dumps({
@@ -92,8 +92,8 @@ def test_handle_report_loads_baseline(tmp_path):
         "overallScore": "7.5/10",
         "overallGrade": "B",
         "violations": [
-            {"file": "a.py", "snippet": "eval(x)", "severity": "critical", "title": "Eval", "reason": "Bad"},
-            {"file": "a.py", "snippet": "exec(y)", "severity": "high", "title": "Exec", "reason": "Bad"},
+            {"file": "a.py", "line": 1, "snippet": "eval(x)", "severity": "critical", "title": "Eval", "reason": "Bad"},
+            {"file": "a.py", "line": 2, "snippet": "exec(y)", "severity": "high", "title": "Exec", "reason": "Bad"},
         ],
         "totals": {"violationCount": 2, "severity": {"critical": 1, "major": 1, "minor": 0}},
     }))
@@ -106,7 +106,7 @@ def test_handle_report_loads_baseline(tmp_path):
         "overallScore": "7.5/10",
         "overallGrade": "B",
         "violations": [
-            {"file": "a.py", "snippet": "eval(x)", "severity": "critical", "title": "Eval", "reason": "Bad"},
+            {"file": "a.py", "line": 1, "snippet": "eval(x)", "severity": "critical", "title": "Eval", "reason": "Bad"},
         ],
         "totals": {"violationCount": 1, "severity": {"critical": 1, "major": 0, "minor": 0}},
     }))
@@ -127,7 +127,9 @@ def test_handle_report_loads_baseline(tmp_path):
         captured_payload.update(kwargs["payload"])
         return {"id": 1}
 
-    with patch("quodeq.ci.reporter.post_review", side_effect=fake_post):
+    # Mock the PR-diff fetch so both violation lines are in-scope for comments.
+    with patch("quodeq.ci.reporter.post_review", side_effect=fake_post), \
+         patch("quodeq.ci.reporter.fetch_pr_changed_lines", return_value={"a.py": {1, 2}}):
         exit_code = _handle_report(args)
 
     assert exit_code == 0

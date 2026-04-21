@@ -16,7 +16,12 @@ def handle_ci(args) -> int:
 
 def _handle_report(args) -> int:
     """Post evaluation results as a GitHub PR review."""
-    from quodeq.ci.reporter import build_review_payload, load_evaluation_reports, post_review
+    from quodeq.ci.reporter import (
+        build_review_payload,
+        fetch_pr_changed_lines,
+        load_evaluation_reports,
+        post_review,
+    )
     from quodeq.ci.review_builder import classify_violations
 
     token = args.token or os.environ.get("GITHUB_TOKEN")
@@ -48,12 +53,30 @@ def _handle_report(args) -> int:
 
     artifact_url: str | None = getattr(args, "artifact_url", None)
 
+    # Fetch the PR's changed lines so we only post comments GitHub will accept.
+    # GitHub rejects the WHOLE review with HTTP 422 if any comment references
+    # a path or line outside the PR's diff. On fetch failure, fall back to a
+    # summary-only review (comments=[]) rather than crashing the action.
+    changed_lines: dict[str, set[int]] | None
+    try:
+        changed_lines = fetch_pr_changed_lines(
+            owner=args.owner, repo=args.repo, pr_number=args.pr, token=token,
+        )
+    except Exception as exc:
+        print(
+            f"Warning: could not fetch PR diff to scope comments ({exc.__class__.__name__}: {exc}); "
+            "posting summary-only review.",
+            file=sys.stderr,
+        )
+        changed_lines = {}  # empty dict → all comments filtered out; summary still posts
+
     payload = build_review_payload(
         reports,
         baseline_violations=baseline_violations,
         duration_seconds=args.duration,
         baseline_available=baseline_available,
         artifact_url=artifact_url,
+        changed_lines=changed_lines,
     )
     post_review(
         owner=args.owner,
@@ -67,5 +90,9 @@ def _handle_report(args) -> int:
     for r in reports:
         all_current.extend(r.get("violations", []))
     new_v, existing_v = classify_violations(all_current, baseline_violations)
-    print(f"Posted review to PR #{args.pr}: {len(new_v)} new, {len(existing_v)} pre-existing")
+    in_diff = len(payload["comments"])
+    print(
+        f"Posted review to PR #{args.pr}: {len(new_v)} new, {len(existing_v)} pre-existing "
+        f"({in_diff} inline comment(s) in diff scope)"
+    )
     return 0
