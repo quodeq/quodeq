@@ -1,0 +1,32 @@
+name: Workflow Lint
+
+# Catches bash mistakes in GitHub Actions workflows BEFORE they ship.
+# actionlint validates GH Actions YAML and shellchecks inline `run:` blocks
+# natively — it would have caught the apostrophe-in-parameter-default bug
+# from #260 (line 18: unexpected EOF while looking for matching `'`).
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  push:
+    branches: [develop, main]
+    paths:
+      - '.github/workflows/**'
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install actionlint
+        run: |
+          bash <(curl -sfL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash) latest .
+          ./actionlint -version
+
+      - name: Run actionlint on all workflows
+        run: ./actionlint -color -verbose
