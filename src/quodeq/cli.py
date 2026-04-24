@@ -48,8 +48,41 @@ _COMMAND_HANDLERS: dict[str, Callable] = {
 }
 
 
+def _install_broken_pipe_guard() -> None:
+    """Silently redirect stdout/stderr to /dev/null after a BrokenPipeError.
+
+    When the CLI runs as a subprocess of the dashboard API and the API
+    dies (e.g., the user restarted the dashboard mid-scan), the child's
+    inherited stdout pipe closes. Subsequent `print()` calls raise
+    BrokenPipeError and take down the analysis with `exit_reason:
+    exception: BrokenPipeError` even though the scan finished and the
+    evidence is already on disk.
+
+    Install a sys.excepthook that, on BrokenPipeError, swaps stdout/
+    stderr to os.devnull and swallows the exception so the lifecycle
+    context can complete its normal transition to DONE.
+    """
+    import os as _os  # noqa: PLC0415
+    import sys as _sys  # noqa: PLC0415
+    previous_hook = _sys.excepthook
+
+    def _hook(exc_type, exc_value, traceback):
+        if issubclass(exc_type, BrokenPipeError):
+            try:
+                devnull = _os.open(_os.devnull, _os.O_WRONLY)
+                _os.dup2(devnull, _sys.stdout.fileno())
+                _os.dup2(devnull, _sys.stderr.fileno())
+            except OSError:
+                pass
+            return  # swallow
+        previous_hook(exc_type, exc_value, traceback)
+
+    _sys.excepthook = _hook
+
+
 def main(argv: list[str] | None = None) -> int:
     """Parse arguments and dispatch to the appropriate subcommand handler."""
+    _install_broken_pipe_guard()
     load_env_file(default_paths())
     parser = build_parser()
     args, remaining = parser.parse_known_args(argv)
