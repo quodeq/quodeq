@@ -337,8 +337,8 @@
 }
 
 .heat-grid-file {
-  padding: 6px 8px;
-  font-size: var(--text-xs);
+  padding: 5px 8px;
+  font-size: 11px;
   color: var(--color-text);
   word-break: break-word;
 }
@@ -537,7 +537,8 @@
 
 .heat-grid-dim-row td:first-child .heat-grid-file {
   font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-medium);
+  color: var(--color-text-muted);
   text-transform: capitalize;
 }
 

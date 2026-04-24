@@ -487,8 +487,9 @@
    ------------------------------------------------------------ */
 .standards-page--terminal .standards-page-header--terminal {
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--term-space-3);
   margin: 0 0 var(--term-space-4);
 }

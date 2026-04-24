@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStandards } from './hooks/useStandards.js';
 import { useVisibleStandards } from './hooks/useVisibleStandards.js';
-import StandardsList from './components/StandardsList.jsx';
+import StandardsTable from './components/StandardsTable.jsx';
 import StandardEditor from './components/StandardEditor.jsx';
 import ImportModal from './components/ImportModal.jsx';
 import { TermHeader } from '../../components/terminal/index.js';
@@ -31,7 +31,7 @@ function StandardsListView({ grouped, loading, error, actions }) {
       {loading ? (
         <div className="standards-loading">Loading standards...</div>
       ) : (
-        <StandardsList grouped={grouped} actions={actions} />
+        <StandardsTable grouped={grouped} actions={actions} />
       )}
     </>
   );

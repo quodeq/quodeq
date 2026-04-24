@@ -1,5 +1,6 @@
 import { useRef, useEffect } from 'react';
 import ReferenceEditor from './ReferenceEditor.jsx';
+import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 export default function RequirementForm({ requirement, principleIndex, reqIndex, onUpdateField, editable }) {
   const basePath = ['principles', principleIndex, 'requirements', reqIndex];
@@ -11,7 +12,7 @@ export default function RequirementForm({ requirement, principleIndex, reqIndex,
 
   return (
     <div className="requirement-form">
-      <h3 className="detail-form-title">Requirement</h3>
+      <SectionLabel marker="▶">Requirement</SectionLabel>
 
       <div className="form-group">
         <label htmlFor={`req-text-${principleIndex}-${reqIndex}`}>Rule</label>
