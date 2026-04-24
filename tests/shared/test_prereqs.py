@@ -94,6 +94,27 @@ class TestCompositeChecks:
         with patch("subprocess.run", side_effect=[node_result, npm_result]):
             check_dashboard_prereqs()
 
+    def test_dashboard_prereqs_reports_both_missing_in_one_error(self):
+        """Both node and npm missing — user should see both in a single message."""
+        with patch("subprocess.run", side_effect=FileNotFoundError):
+            with pytest.raises(RuntimeError) as excinfo:
+                check_dashboard_prereqs()
+        msg = str(excinfo.value)
+        assert "Node.js" in msg
+        assert "npm" in msg
+        # Ubuntu/Debian hint must include both packages in one apt command
+        assert "apt install -y nodejs npm" in msg
+
+    def test_dashboard_prereqs_reports_only_npm_when_only_npm_missing(self):
+        """Node OK, npm missing — error should mention npm but not falsely claim Node is missing."""
+        node_result = subprocess.CompletedProcess([], 0, stdout="v20.11.0\n")
+        with patch("subprocess.run", side_effect=[node_result, FileNotFoundError()]):
+            with pytest.raises(RuntimeError) as excinfo:
+                check_dashboard_prereqs()
+        msg = str(excinfo.value)
+        assert "npm" in msg
+        assert "Node.js 18+ not found" not in msg  # don't falsely claim node is missing
+
     def test_evaluate_no_provider_configured_raises(self):
         with patch.dict("os.environ", {}, clear=True):
             with pytest.raises(RuntimeError, match="No AI provider configured"):

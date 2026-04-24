@@ -10,9 +10,11 @@ from quodeq.analysis._provider_cache import get_provider_configs
 from quodeq.shared.utils import IS_WIN32 as _IS_WIN32, get_ai_cmd
 
 _INSTALL_HINT_NODE = (
-    "Install it from https://nodejs.org/ or via your package manager:\n"
-    "  brew install node        # macOS\n"
-    "  apt install nodejs       # Ubuntu/Debian"
+    "Install Node.js + npm from https://nodejs.org/ or via your package manager:\n"
+    "  brew install node                    # macOS (installs both)\n"
+    "  sudo apt install -y nodejs npm       # Ubuntu/Debian (two packages)\n"
+    "  sudo dnf install -y nodejs npm       # Fedora/RHEL\n"
+    "  pacman -S nodejs npm                 # Arch"
 )
 
 _CLI_INSTALL_HINTS: dict[str, str] = {
@@ -135,10 +137,46 @@ def _check_api_provider(provider: str, *, env: dict[str, str] | None = None) -> 
             ) from exc
 
 
+def _collect_tool_issue(cmd: list[str], tool_name: str, min_major: int) -> str | None:
+    """Return a one-line description of a tool problem, or None if OK.
+
+    Used by aggregators that want to report every missing/outdated tool in
+    a single error instead of failing fast on the first one.
+    """
+    try:
+        version_str = _run_version_cmd(cmd)
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return f"{tool_name} {min_major}+ not found on PATH"
+    try:
+        major = _parse_major(version_str)
+    except (ValueError, IndexError):
+        return None
+    if major < min_major:
+        return f"{tool_name} {version_str} is below the minimum required version {min_major}.x"
+    return None
+
+
 def check_dashboard_prereqs() -> None:
-    """Check all prerequisites for the dashboard command."""
-    check_node()
-    check_npm()
+    """Check all prerequisites for the dashboard command in one pass.
+
+    Runs every tool check, collects any issues, and raises a single
+    RuntimeError that lists them all — so a user missing both Node.js and
+    npm (common on fresh Debian/Ubuntu systems where they're separate
+    packages) gets the full story in one message, with one install command.
+    """
+    issues: list[str] = []
+    node_issue = _collect_tool_issue(["node", "--version"], "Node.js", 18)
+    if node_issue is not None:
+        issues.append(node_issue)
+    npm_issue = _collect_tool_issue(["npm", "--version"], "npm", 9)
+    if npm_issue is not None:
+        issues.append(npm_issue)
+    if not issues:
+        return
+    bullets = "\n".join(f"  - {issue}" for issue in issues)
+    raise RuntimeError(
+        f"Missing or outdated prerequisites:\n{bullets}\n\n{_INSTALL_HINT_NODE}"
+    )
 
 
 def check_evaluate_prereqs() -> None:
