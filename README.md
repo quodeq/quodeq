@@ -178,11 +178,18 @@ By default, Quodeq evaluates the six ISO 25010 dimensions. It also ships with **
 
 ## Development
 
+Run from a fresh checkout:
+
 ```bash
 git clone https://github.com/quodeq/quodeq.git && cd quodeq
-uv sync
-uv run pytest
+uv sync                   # install Python deps into .venv/
+uv run quodeq             # launch the dashboard
+uv run pytest             # run the test suite
 ```
+
+Same OS prerequisites apply as for the pipx install — Node.js 18+ + npm for the dashboard UI, and a configured LLM provider (Ollama or Claude Code / Codex CLI / Gemini CLI) before you can actually scan anything.
+
+If the dashboard window doesn't appear on Linux, run `uv run quodeq --browser` (the native window needs `python3-gi` + `gir1.2-webkit2-4.1`, which aren't pulled in by the pip wheel).
 
 ## Changelog
 
