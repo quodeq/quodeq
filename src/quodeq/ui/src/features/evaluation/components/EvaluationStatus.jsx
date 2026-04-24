@@ -1,6 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import LiveViolationsFeed from './LiveViolationsFeed.jsx';
-import LiveTerminal from './LiveTerminal.jsx';
+import ConsoleLogViewer from './ConsoleLogViewer.jsx';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { CONSOLE_DOT_DISMISSED_KEY } from '../../../constants.js';
@@ -58,7 +58,7 @@ function ExternalRunBadge() {
   );
 }
 
-function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvaluations }) {
+function ConsolePanel({ job, consoleOpen, setConsoleOpen, hasEvaluations }) {
   const isRunning = job.status === STATUS.RUNNING;
   const isFailed = job.status === STATUS.FAILED;
   const isLost = job.status === STATUS.LOST;
@@ -96,13 +96,7 @@ function ConsolePanel({ job, consoleOpen, setConsoleOpen, logViewerRef, hasEvalu
           {showDot && !consoleOpen && <span className="sidebar-nav-dot" style={{ top: DOT_OFFSET_TOP, right: DOT_OFFSET_RIGHT }} />}
         </span>
       </div>
-      {consoleOpen && (
-        <div className="console-output">
-          <pre ref={logViewerRef}>
-            {job.logs?.length ? job.logs.join('\n') : 'Waiting for output\u2026'}
-          </pre>
-        </div>
-      )}
+      {consoleOpen && <ConsoleLogViewer logs={job.logs} />}
     </>
   );
 }
@@ -177,12 +171,7 @@ function JobMeta({ job, projectName }) {
 }
 
 export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, onCancel, hasEvaluations }) {
-  const logViewerRef = useRef(null);
   const [consoleOpen, setConsoleOpen] = useState(false);
-
-  useEffect(() => {
-    if (logViewerRef.current) logViewerRef.current.scrollTop = logViewerRef.current.scrollHeight;
-  }, [job?.logs]);
 
   if (!job) return null;
 
@@ -190,8 +179,7 @@ export default function EvaluationStatus({ job, liveViolations = {}, onDismiss, 
     <div className="panel evaluate-job-panel">
       <JobHeader job={job} onDismiss={onDismiss} onCancel={onCancel} />
       <JobMeta job={job} projectName={deriveProjectName(job.repo)} />
-      <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} logViewerRef={logViewerRef} hasEvaluations={hasEvaluations} />
-      {job.jobId ? <LiveTerminal jobId={job.jobId} /> : null}
+      <ConsolePanel job={job} consoleOpen={consoleOpen} setConsoleOpen={setConsoleOpen} hasEvaluations={hasEvaluations} />
       <LiveViolationsFeed liveViolations={liveViolations} />
     </div>
   );

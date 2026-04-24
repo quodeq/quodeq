@@ -3,7 +3,6 @@ import { describe, it, expect, vi } from 'vitest';
 import EvaluationStatus from './EvaluationStatus.jsx';
 
 // Mock child components so we isolate what we care about.
-vi.mock('./LiveTerminal.jsx', () => ({ default: () => null }));
 vi.mock('./LiveViolationsFeed.jsx', () => ({ default: () => null }));
 
 const baseJob = {
