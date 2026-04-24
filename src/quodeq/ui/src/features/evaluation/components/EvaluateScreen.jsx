@@ -1,20 +1,16 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import EvaluationForm from './EvaluationForm.jsx';
 import EvaluationStatus from './EvaluationStatus.jsx';
 import ReEvaluateCard from './ReEvaluateCard.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey } from '../../../constants.js';
+import { TermHeader, SectionLabel } from '../../../components/terminal/index.js';
 
-const INITIAL_ANIM_DELAY = '0s';
-const CHIP_DELAY_1 = '0.55s';
-const CHIP_DELAY_2 = '1.1s';
 const TOAST_DISMISS_TIMEOUT_MS = 5000;
 
 function EvaluateHelpSection() {
   return (
     <div className="panel evaluate-help-panel">
-      <div className="panel-header">
-        <h3>How It Works</h3>
-      </div>
+      <SectionLabel>how_it_works</SectionLabel>
       <div className="help-steps">
         <div className="help-step">
           <div className="step-number">1</div>
@@ -54,36 +50,14 @@ function ActiveProviderBadge({ storage = localStorage }) {
   );
 }
 
-function MagnifierIcon({ className }) {
-  return (
-    <svg className={className} width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-      <circle cx="11" cy="11" r="7" />
-      <line x1="16.5" y1="16.5" x2="21" y2="21" />
-      <line x1="8" y1="11" x2="14" y2="11" />
-      <line x1="11" y1="8" x2="11" y2="14" />
-    </svg>
-  );
-}
-
 function EvaluateHeader({ isRunning }) {
   return (
-    <header className="evaluate-header">
-      <div className="evaluate-header-content">
-        <div className={`evaluate-icon${isRunning ? ' running' : ''}`}>
-          <div className="eval-icon-static">
-            <MagnifierIcon />
-          </div>
-          <div className="eval-icon-animated">
-            <span className="eval-file-chip" style={{animationDelay: INITIAL_ANIM_DELAY}} />
-            <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_1}} />
-            <span className="eval-file-chip" style={{animationDelay: CHIP_DELAY_2}} />
-            <MagnifierIcon className="eval-glass-sweep" />
-          </div>
-        </div>
-        <div>
-          <h1>Evaluate Repository</h1>
-          <p className="evaluate-subtitle">Run a comprehensive code quality evaluation on any repository</p>
-        </div>
+    <header className="evaluate-header evaluate-header--terminal">
+      <div className="evaluate-header__left">
+        <TermHeader
+          name={`evaluate${isRunning ? ' · running' : ''}`}
+          sub="run a comprehensive code quality evaluation on any repository"
+        />
       </div>
       <ActiveProviderBadge />
     </header>
@@ -140,9 +114,7 @@ export default function EvaluateScreen({ evaluation, context, actions }) {
 
         {!job && (
           <div className="panel evaluate-panel">
-            <div className="panel-header">
-              <h3>{selectedProject ? 'Evaluate a new repository' : 'Evaluate a Repository'}</h3>
-            </div>
+            <SectionLabel>{selectedProject ? 'evaluate_new_repository' : 'evaluate_repository'}</SectionLabel>
             <EvaluationForm onStart={wrappedOnStart} disabled={false} selectedProject={projectInfo} />
           </div>
         )}

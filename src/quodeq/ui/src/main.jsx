@@ -54,6 +54,18 @@ function applyInitialTheme(storage = localStorage, mediaQuery = window.matchMedi
 
 applyInitialTheme();
 
+// Tag <html> with the host platform so CSS can reserve space for native
+// chrome that overlays the window (e.g. the macOS traffic-light buttons
+// in the pywebview frameless app shell).
+try {
+  const ua = navigator.userAgent || '';
+  const platform = navigator.platform || '';
+  const isMac = /Mac|iPhone|iPad|iPod/.test(platform) || /Mac OS X/.test(ua);
+  if (isMac) document.documentElement.classList.add('platform-mac');
+} catch {
+  // ignore — platform detection is a progressive enhancement
+}
+
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found in DOM');
 createRoot(rootEl).render(

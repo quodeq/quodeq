@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import NavBreadcrumb from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
 import FileDetailPage from './features/explorer/components/FileDetailPage.jsx';
 import PrincipleDetailPage from './features/explorer/components/PrincipleDetailPage.jsx';
+import FindingDetailPage from './features/explorer/components/FindingDetailPage.jsx';
 import ProjectsPage from './features/dashboard/components/ProjectsPage.jsx';
 import HistoryPage from './features/history/components/HistoryPage.jsx';
 import EvaluateScreen from './features/evaluation/components/EvaluateScreen.jsx';
@@ -16,8 +17,12 @@ import ServerDisconnectedOverlay from './components/ServerDisconnectedOverlay.js
 import { useApi } from './api/ApiContext.jsx';
 import LoadingScreen from './components/LoadingScreen.jsx';
 import Sidebar from './components/Sidebar.jsx';
+import TopBar from './components/TopBar.jsx';
+import { ACTIVE_PROVIDER_KEY, providerKey } from './constants.js';
 import ProjectHeader from './components/ProjectHeader.jsx';
 import { useAppState, formatDayLabel } from './hooks/useAppState.js';
+import { readVisibleStandardIds } from './utils/visibleStandards.js';
+import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 
 const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
 
@@ -192,6 +197,7 @@ const ROUTE_RENDERERS = {
           onNavigate: props.navigation.handleNavigate,
           onRunChange: props.navigation.setHistorySelectedRun,
         }}
+        projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
       />
     );
   },
@@ -201,6 +207,18 @@ const ROUTE_RENDERERS = {
   file: (params) => <FileDetailPage file={params.file} />,
   evalprinciple: renderEvalPrincipleDetail,
   'eval-principle-detail': renderEvalPrincipleDetail,
+  finding: (params, props) => (
+    <FindingDetailPage
+      finding={params.finding}
+      principle={params.principle}
+      dimension={params.dimension}
+      onDismiss={(v) => {
+        props.dismissFinding(props.navigation.selectedProject, buildDismissPayload(v, params.dimension))
+          .then(() => props.refreshDashboard?.())
+          .catch((e) => console.error('[Dismiss] failed:', e));
+      }}
+    />
+  ),
   settings: (params, props) => <SettingsCase settings={props.settings} />,
   projects: (params, props) => <ProjectsPage projects={props.navigation.projects} selectedProject={props.navigation.selectedProject} actions={{ onSelect: (id) => { props.navigation.handleProjectChange(id); props.navigation.navTab('overview'); }, onDelete: props.navigation.handleDeleteProject, onExport: props.navigation.handleExportProject, onRelocate: props.navigation.handleRelocateProject }} />,
   standards: () => <StandardsPage />,
@@ -231,13 +249,17 @@ function MainContent({ activePage, props }) {
  */
 function AppShell({ sidebar, header, breadcrumb, content }) {
   return (
-    <div className="app-shell">
-      {sidebar}
-      <main className="dashboard">
-        {header}
-        {breadcrumb}
-        {content}
-      </main>
+    <div className={`app-shell${header ? ' app-shell--with-topbar' : ''}`}>
+      {header && <div className="app-shell__topbar">{header}</div>}
+      <div className="app-shell__body">
+        {sidebar}
+        <div className="app-shell__main-column">
+          <main className="dashboard">
+            {breadcrumb}
+            {content}
+          </main>
+        </div>
+      </div>
     </div>
   );
 }
@@ -245,11 +267,30 @@ function AppShell({ sidebar, header, breadcrumb, content }) {
 export default function App() {
   const { dismissFinding } = useApi();
   const state = useAppState();
+  const APP_VERSION = '1.0.6';
+  const selectedProjectInfo = state.projects?.find((p) => (p.id || p.name) === state.selectedProject) || null;
+  const [sidebarPinned, setSidebarPinned] = useState(false);
+  const sidebarProvider = (typeof localStorage !== 'undefined' && localStorage.getItem(ACTIVE_PROVIDER_KEY)) || null;
+  const sidebarModel = sidebarProvider && typeof localStorage !== 'undefined'
+    ? localStorage.getItem(providerKey(sidebarProvider, 'model'))
+    : null;
   const { activePage, navStack, navPop, navGoTo, navTab, activeTab } = state;
 
   const currentDayLabel = useMemo(
     () => formatDayLabel(state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex),
     [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
+  );
+
+  // Sidebar counts should respect the user's currently-visible standards so
+  // they match the numbers shown on the Violations and History pages.
+  const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
+  const filteredTrend = useMemo(
+    () => filterTrendByVisibleStandards(state.dashboard?.trend || [], visibleSet),
+    [state.dashboard?.trend, visibleSet]
+  );
+  const filteredAccumulated = useMemo(
+    () => filterAccumulatedByVisibleStandards(state.accumulated, visibleSet, filteredTrend, null),
+    [state.accumulated, visibleSet, filteredTrend]
   );
 
   const contentProps = {
@@ -274,22 +315,65 @@ export default function App() {
     dismissFinding,
   };
 
+  // Resolve the project's friendly name. Until the /api/projects response
+  // has populated the projects array, selectedDisplayName falls back to the
+  // raw project id (a UUID) — we explicitly filter that case out so the
+  // sidebar and topbar show nothing rather than flashing the UUID.
+  const resolvedDisplayName =
+    selectedProjectInfo?.displayName
+    || selectedProjectInfo?.name
+    || (state.selectedDisplayName && state.selectedDisplayName !== state.selectedProject
+          ? state.selectedDisplayName
+          : null);
+
   return (
     <AppShell
-      sidebar={<Sidebar activeTab={activeTab} onNavTab={navTab} hasEvaluations={state.projects.length > 0} />}
-      header={state.showProjectHeader ? (
-        <ProjectHeader
-          project={{ displayName: state.selectedDisplayName, parent: state.selectedProjectParent, parentId: state.selectedProjectParentId, meta: state.headerMeta }}
-          navigation={{
-            onProjectChange: state.handleProjectChange, showRunNav: state.showRunNav,
-            runNavProps: {
-              currentOverviewRun: state.currentOverviewRun, overviewRunIndex: state.overviewRunIndex, availableRuns: state.dailyRuns,
-              currentDayLabel,
-              onRunPrev: state.handleRunPrev, onRunNext: state.handleRunNext, onRunLatest: state.handleRunLatest,
-            },
+      sidebar={
+        <Sidebar
+          activeTab={activeTab}
+          onNavTab={navTab}
+          hasEvaluations={state.projects.length > 0}
+          projectInfo={{
+            displayName: resolvedDisplayName,
+            meta: state.headerMeta,
           }}
+          version={APP_VERSION}
+          violationsCount={filteredAccumulated?.summary?.totalViolations ?? state.accumulated?.summary?.totalViolations ?? null}
+          historyCount={filteredTrend.length || state.dashboard?.trend?.length || null}
+          lastEvalAt={state.accumulated?.summary?.lastEvaluatedAt || state.accumulated?.summary?.createdAt || null}
+          serverConnected={state.serverConnected}
+          isPinned={sidebarPinned}
+          onPinChange={setSidebarPinned}
+          mobileExtras={(
+            <div className="sidebar-mobile-extras__grid">
+              {(sidebarProvider || sidebarModel) && (
+                <div className="sidebar-status-row">
+                  <span className="sidebar-status-label">Provider</span>
+                  <span className="sidebar-status-value">
+                    {sidebarProvider || '\u2014'}
+                    {sidebarModel && <>&nbsp;·&nbsp;<span style={{ opacity: 0.7 }}>{sidebarModel}</span></>}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         />
-      ) : null}
+      }
+      header={
+        <TopBar
+          projectName={resolvedDisplayName}
+          activeTab={activeTab}
+          serverConnected={state.serverConnected}
+          serverUrl={state.serverHealth?.url || null}
+          provider={sidebarProvider}
+          model={sidebarModel}
+          onReport={null}
+          onEvaluate={state.projects?.length > 0 ? (() => navTab('evaluate')) : null}
+          evaluating={state.evalLifecycle?.job?.status === 'running'}
+          onProviderClick={() => navTab('settings')}
+          onMenuToggle={() => setSidebarPinned((v) => !v)}
+        />
+      }
       breadcrumb={navStack.length > 1 ? <NavBreadcrumb stack={navStack} onBack={navPop} onGoTo={navGoTo} /> : null}
       content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
     />

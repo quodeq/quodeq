@@ -8,21 +8,28 @@ import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../
 import { buildDimensionReport } from '../../../utils/reportBuilder.js';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { useExplorerData, buildEvalPrincipalFn } from './explorerDataHooks.js';
-
-const TOOLBAR_GAP = 8;
-const columnStyle = { display: 'flex', flexDirection: 'column', gap: 2 };
+import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
 
 function DimensionOverview({ data, stats, onNavigate }) {
   const { evalData, runId, dateLabel, allViolations } = data;
   const { overallGrade, severityCounts, totalCompliant, topFiles, uniquePrinciples, principleGrades } = stats;
+  const scoreDisplay = overallGrade?.score?.replace('/10', '') || '—';
+  const sevBadges = (severityCounts.critical || severityCounts.major || severityCounts.minor) ? (
+    <span className="principle-detail-sev-row">
+      {severityCounts.critical > 0 && <SevBadge level="critical" count={severityCounts.critical} />}
+      {severityCounts.major > 0    && <SevBadge level="major" count={severityCounts.major} />}
+      {severityCounts.minor > 0    && <SevBadge level="minor" count={severityCounts.minor} />}
+    </span>
+  ) : null;
+
   return (
-    <section className="acc-eval-panel acc-eval-panel--compact panel">
-      <div className="acc-eval-top">
-        <div style={columnStyle}>
-          <span className="explorer-dimension-title">{evalData.dimension}</span>
-          {runId && <span className="acc-eval-date">{dateLabel || runId}</span>}
-        </div>
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'flex-start', gap: TOOLBAR_GAP }}>
+    <section className="dimension-overview dimension-overview--terminal">
+      <div className="dimension-overview__top">
+        <TermHeader
+          name={`${evalData.dimension}.overview`}
+          sub={dateLabel || runId || null}
+        />
+        <div className="dimension-overview__actions">
           <CopyButton
             label="Report"
             className="fix-plan-btn-header"
@@ -39,39 +46,14 @@ function DimensionOverview({ data, stats, onNavigate }) {
           )}
         </div>
       </div>
-      <div className="compact-stats-row">
-        <div className="compact-score-col">
-          <span className="compact-score-value">{overallGrade?.score?.replace('/10', '') || '—'}</span>
-          <span className="compact-score-grade">{overallGrade?.grade || ''}</span>
-        </div>
-        <div className="acc-eval-stats-divider" />
-        <div className="compact-metrics-col">
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Viol</span>
-            <span className="acc-eval-stat-value">{allViolations.length}</span>
-            <div className="acc-eval-tags">
-              {severityCounts.critical > 0 && <span className="severity-tag critical">{severityCounts.critical} crit</span>}
-              {severityCounts.major > 0 && <span className="severity-tag major">{severityCounts.major} maj</span>}
-              {severityCounts.minor > 0 && <span className="severity-tag minor">{severityCounts.minor} min</span>}
-            </div>
-          </div>
-          <div className="acc-eval-stats-divider" />
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Ratio</span>
-            <span className="acc-eval-stat-value">{complianceRatio(allViolations.length, totalCompliant)}</span>
-          </div>
-          <div className="acc-eval-stats-divider" />
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Files</span>
-            <span className="acc-eval-stat-value">{topFiles.length}</span>
-          </div>
-          <div className="acc-eval-stats-divider" />
-          <div className="acc-eval-stat-block">
-            <span className="acc-eval-stat-label">Principles</span>
-            <span className="acc-eval-stat-value">{uniquePrinciples}</span>
-          </div>
-        </div>
-      </div>
+      <StatStrip bordered>
+        <Stat label="SCORE"      value={scoreDisplay}                                      hint={overallGrade?.grade || null} />
+        <Stat label="VIOLATIONS" value={allViolations.length}                              hint={sevBadges} />
+        <Stat label="COMPLIANCE" value={totalCompliant} />
+        <Stat label="RATIO"      value={complianceRatio(allViolations.length, totalCompliant)} />
+        <Stat label="FILES"      value={topFiles.length} />
+        <Stat label="PRINCIPLES" value={uniquePrinciples} />
+      </StatStrip>
     </section>
   );
 }
@@ -107,13 +89,10 @@ function PrincipleGradeRow({ pg, onNavigate, buildEvalPrincipal }) {
 
 function PrinciplesList({ evalData, principleGrades, onNavigate, buildEvalPrincipal }) {
   if (principleGrades.length === 0) return null;
+  const dim = (evalData.dimension || '').toLowerCase();
   return (
     <>
-      <div className="section-header">
-        <h3 className="section-title">
-          {evalData.dimension.charAt(0).toUpperCase() + evalData.dimension.slice(1).toLowerCase()} Principles
-        </h3>
-      </div>
+      <SectionLabel>{`principles.${dim} · ${principleGrades.length}`}</SectionLabel>
       <section className="panel eval-summary-panel">
         <ul className="exec-summary-list">
           {principleGrades.map((pg) => (
@@ -129,10 +108,7 @@ function ViolationsByPrincipleSection({ allViolations, onNavigate, buildEvalPrin
   if (allViolations.length === 0) return null;
   return (
     <>
-      <div className="section-header">
-        <h3 className="section-title">Violations by Principle</h3>
-        <span className="section-count">{allViolations.length} violations</span>
-      </div>
+      <SectionLabel>violations_by_principle · {allViolations.length}</SectionLabel>
       <section className="panel wide-panel offending-panel">
         <ViolationsByPrincipleTable
           violations={allViolations}
@@ -147,10 +123,7 @@ function ViolationsByFileSection({ topFiles, onNavigate }) {
   if (topFiles.length === 0) return null;
   return (
     <>
-      <div className="section-header">
-        <h3 className="section-title">Violations by File</h3>
-        <span className="section-count">{topFiles.length} files</span>
-      </div>
+      <SectionLabel>violations_by_file · {topFiles.length}</SectionLabel>
       <section className="panel wide-panel offending-panel">
         <TopOffendingFilesTable
           files={topFiles}

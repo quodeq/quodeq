@@ -556,11 +556,7 @@
 }
 
 .dimensions-panel {
-  padding: 16px;
   margin-bottom: 28px;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-lg);
-  background: var(--card-bg);
 }
 
 /* ── Dimension cards ──────────────────────────────────── */
@@ -574,7 +570,7 @@
 .dimensions-grid {
   display: grid;
   gap: var(--space-3);
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
 }
 
 .dimension-card {

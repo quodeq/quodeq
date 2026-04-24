@@ -1,88 +1,21 @@
 import { useMemo } from 'react';
 import LoadingScreen from '../../../components/LoadingScreen.jsx';
-import DimensionViolationsRow from './DimensionViolationsRow.jsx';
 import TopOffendingFilesTable from './TopOffendingFilesTable.jsx';
-import TrendBadge from '../../../components/TrendBadge.jsx';
 import CopyButton, { SparkleIcon } from '../../../components/CopyButton.jsx';
 import ScoreCircle from '../../../components/ScoreCircle.jsx';
+import DimensionGaugeCard from './DimensionGaugeCard.jsx';
+import { SectionLabel } from '../../../components/terminal/index.js';
 
 const HERO_SCORE_CIRCLE_SIZE = 120;
 import { copyToClipboard } from '../../../utils/clipboard.js';
 import { buildTopOffendingFiles, buildDimensionPlanFromViolations } from '../../../utils/explorerUtils.js';
-import { formatRunId, scoreColorClass, splitScore, complianceRatio } from '../../../utils/formatters.js';
-import { withDimensionsStr, sortDimensionsByViolationSeverity } from '../../../utils/dimensionUtils.js';
+import { formatRunId, complianceRatio } from '../../../utils/formatters.js';
+import { withDimensionsStr } from '../../../utils/dimensionUtils.js';
 import buildRunSummary from '../buildRunSummary.js';
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-
-
-function ViolationsByDimension({ dimensionsWithViolations, onDimensionClick, selectedRunId }) {
-  if (dimensionsWithViolations.length === 0) return null;
-  return (
-    <>
-      <div className="section-header">
-        <h3 className="section-title">Violations by Dimension</h3>
-        <span className="section-count">
-          {dimensionsWithViolations.length} dimensions analyzed
-        </span>
-      </div>
-      <section className="panel violations-panel expandable">
-        <div className="dimension-violations-list">
-          {dimensionsWithViolations.map((dim) => (
-            <DimensionViolationsRow
-              key={dim.dimension}
-              dimension={dim}
-              onClick={() => onDimensionClick(dim, selectedRunId)}
-            />
-          ))}
-        </div>
-      </section>
-    </>
-  );
-}
-
-function RunDimensionCard({ item, selectedRunId, dateLabel, onDimensionClick, trendDelta }) {
-  const delta = trendDelta ?? null;
-  const currScore = parseFloat(item.overallScore);
-  const scored = splitScore(item.overallScore);
-  const gradeClass = scoreColorClass(currScore);
-  return (
-    <article
-      key={item.dimension}
-      className={`qd-card ${gradeClass}`}
-      onClick={() => onDimensionClick(item, selectedRunId)}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onDimensionClick(item, selectedRunId); } }}
-    >
-      <div className="qd-card-header">
-        <span className="qd-card-name">{item.dimension}</span>
-        <TrendBadge delta={delta} />
-      </div>
-      <div className="qd-card-columns">
-        <div className="qd-card-col">
-          <span className="qd-card-col-score">{scored.value}</span>
-        </div>
-        <div className="qd-card-col-divider" />
-        <div className="qd-card-col">
-          <span className="qd-card-col-label">Viol</span>
-          <span className="qd-card-col-value">{item.totals?.violationCount ?? 0}</span>
-        </div>
-        <div className="qd-card-col-divider" />
-        <div className="qd-card-col">
-          <span className="qd-card-col-label">Ratio</span>
-          <span className="qd-card-col-value">{complianceRatio(item.totals?.violationCount ?? 0, item.totals?.complianceCount ?? 0)}</span>
-        </div>
-      </div>
-      <div className="qd-card-footer">
-        <span className="qd-card-date">{item.fromDateLabel || dateLabel || formatRunId(item.fromRunId || selectedRunId)}</span>
-      </div>
-      <div className="qd-card-grade-bar" />
-    </article>
-  );
-}
 
 function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionClick, trendDeltas }) {
   const sorted = useMemo(
@@ -92,8 +25,15 @@ function RunDimensionsGrid({ dimensions, selectedRunId, dateLabel, onDimensionCl
   return (
     <div className="dimensions-grid">
       {sorted.map((item) => (
-          <RunDimensionCard key={item.dimension} item={item} selectedRunId={selectedRunId} dateLabel={dateLabel} onDimensionClick={onDimensionClick} trendDelta={trendDeltas?.[(item.dimension || '').toLowerCase()]} />
-        ))}
+        <DimensionGaugeCard
+          key={item.dimension}
+          item={item}
+          delta={trendDeltas?.[(item.dimension || '').toLowerCase()] ?? null}
+          onDimensionClick={onDimensionClick}
+          selectedRunId={selectedRunId}
+          dateLabel={dateLabel}
+        />
+      ))}
     </div>
   );
 }
@@ -190,16 +130,15 @@ function RunFileViolations({ runTopFiles, onFileClick }) {
 export default function RunOverviewPanel({ dashboard, selectedRunId, onDimensionClick, onFileClick }) {
   const runSummary = useMemo(() => buildRunSummary(dashboard?.dimensions), [dashboard]);
   const runTopFiles = useMemo(() => withDimensionsStr(buildTopOffendingFiles(dashboard?.dimensions || [])), [dashboard]);
-  const dimensionsWithViolations = useMemo(() => sortDimensionsByViolationSeverity(dashboard?.dimensions || []), [dashboard]);
   const runUniquePrinciples = useMemo(() => {
     const violations = (dashboard?.dimensions || []).flatMap((d) => d.violations || []);
     return new Set(violations.map((v) => v.principle).filter(Boolean)).size;
   }, [dashboard]);
 
-  // Build per-dimension deltas from the trend entry (same source as history rows)
+  // Per-dimension deltas from the trend entry (same source the history rows use)
   const trendDeltas = useMemo(() => {
     const currentRunId = dashboard?.selectedRun?.runId;
-    const entry = (dashboard?.trend || []).find(t => t.runId === currentRunId);
+    const entry = (dashboard?.trend || []).find((t) => t.runId === currentRunId);
     if (!entry?.dimensionDetails) return {};
     const lookup = {};
     for (const d of entry.dimensionDetails) {
@@ -209,6 +148,7 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
   }, [dashboard]);
 
   const isLoading = !dashboard || !dashboard.dimensions;
+  const dimCount = (dashboard?.dimensions || []).length;
 
   return (
     <div className={`run-overview-fade ${isLoading ? 'run-overview-loading' : 'run-overview-ready'}`}>
@@ -217,13 +157,10 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
       ) : (
         <>
           <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runTopFiles, runUniquePrinciples }} />
-          <div className="section-header">
-            <h3 className="section-title">Dimensions Analyzed</h3>
-          </div>
+          <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
           <div className="dimensions-panel">
             <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
           </div>
-          <ViolationsByDimension dimensionsWithViolations={dimensionsWithViolations} onDimensionClick={onDimensionClick} selectedRunId={selectedRunId} />
           <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
         </>
       )}

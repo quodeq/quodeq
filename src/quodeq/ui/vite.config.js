@@ -8,6 +8,9 @@ const DEFAULT_DEV_PORT = 5173;
 
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: ['@chenglou/pretext'],
+  },
   build: {
     outDir: process.env.QUODEQ_BUILD_OUTDIR || '../static',
     emptyOutDir: true,
