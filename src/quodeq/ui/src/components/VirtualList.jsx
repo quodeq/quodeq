@@ -30,6 +30,32 @@ function normaliseScrollParent(parent) {
   return parent;
 }
 
+/**
+ * Walk up the DOM from `el` and return the nearest ancestor whose `overflow-y`
+ * is `auto` or `scroll` (i.e. the element that actually scrolls this subtree).
+ * Fall back to `window` if no such ancestor exists — that matches the classic
+ * full-page-scroll layout.
+ *
+ * Needed because the dashboard's terminal-style restyle put the main scroll
+ * inside an inner element, not on the document. With VirtualList defaulting
+ * to `window`, it never saw scroll events and collapsed to rendering only
+ * the top overscan rows — leaving a huge reserved-but-empty scroll area.
+ */
+function findScrollParent(el) {
+  if (typeof window === 'undefined' || !el) return null;
+  let node = el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = window.getComputedStyle(node);
+    const overflowY = style.overflowY;
+    if ((overflowY === 'auto' || overflowY === 'scroll')
+        && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return window;
+}
+
 function getScrollTop(scrollEl) {
   if (!scrollEl || scrollEl === window) {
     return window.scrollY || document.documentElement.scrollTop || 0;
@@ -58,8 +84,18 @@ export default function VirtualList({
   const [scrollTop, setScrollTop] = useState(0);
   const [containerTop, setContainerTop] = useState(0);
   const [viewport, setViewport] = useState(() => (typeof window === 'undefined' ? 0 : window.innerHeight));
+  const [autoScrollEl, setAutoScrollEl] = useState(null);
 
-  const scrollEl = useMemo(() => normaliseScrollParent(scrollParent) || (typeof window !== 'undefined' ? window : null), [scrollParent]);
+  // Explicit scrollParent prop wins; otherwise walk up from the container
+  // looking for a scrollable ancestor (computed after mount). Falling back
+  // to `window` silently caused the empty-rows regression on the restyled
+  // terminal layout.
+  const scrollEl = useMemo(() => {
+    const explicit = normaliseScrollParent(scrollParent);
+    if (explicit) return explicit;
+    if (autoScrollEl) return autoScrollEl;
+    return typeof window !== 'undefined' ? window : null;
+  }, [scrollParent, autoScrollEl]);
 
   // ── offsets & total height, derived from measured-or-estimated per row ──
   const { offsets, totalHeight } = useMemo(() => {
@@ -89,6 +125,18 @@ export default function VirtualList({
   }, [scrollEl]);
 
   useLayoutEffect(() => { syncGeometry(); }, [syncGeometry, items.length]);
+
+  // Detect the nearest scrollable ancestor once the container is mounted.
+  // Re-run only if the explicit scrollParent prop changes — the DOM
+  // ancestor chain is stable for the lifetime of the component.
+  useLayoutEffect(() => {
+    if (normaliseScrollParent(scrollParent)) return;
+    const detected = findScrollParent(containerRef.current);
+    if (detected && detected !== autoScrollEl) {
+      setAutoScrollEl(detected === window ? null : detected);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scrollParent]);
 
   useEffect(() => {
     if (!scrollEl) return undefined;
