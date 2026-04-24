@@ -188,7 +188,7 @@ body {
   border-radius: var(--radius-md);
   border: none;
   background: transparent;
-  color: var(--color-text-muted);
+  color: var(--color-text-subtle, var(--color-text-muted));
   font-family: var(--font-sans);
   font-size: var(--text-sm);
   font-weight: var(--weight-medium);
@@ -197,12 +197,14 @@ body {
   white-space: nowrap;
   overflow: hidden;
   min-height: 40px;
-  transition: background 120ms ease, color 120ms ease;
+  opacity: 0.7;
+  transition: background 120ms ease, color 120ms ease, opacity 120ms ease;
 }
 
 .sidebar-nav-item:hover {
   background: var(--color-surface-alt);
   color: var(--color-text);
+  opacity: 1;
 }
 
 .sidebar-nav-dot {
@@ -219,6 +221,7 @@ body {
 .sidebar-nav-item.active {
   background: var(--color-accent-soft);
   color: var(--color-accent);
+  opacity: 1;
 }
 
 .sidebar-nav-item:focus-visible {
