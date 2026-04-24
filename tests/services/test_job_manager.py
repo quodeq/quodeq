@@ -127,12 +127,19 @@ class TestShutdown:
         assert mock_kill.call_count == 2
         assert mgr._processes == {}
 
-    @patch("quodeq.analysis._process._kill_tree", side_effect=ProcessLookupError)
+    @patch("quodeq.services.jobs._kill_tree", side_effect=ProcessLookupError)
     def test_shutdown_ignores_dead_process(self, mock_kill):
+        # Patch target must match the name used inside jobs.py (which did
+        # `from quodeq.analysis._process import _kill_tree` at import time).
+        # Patching the source module's attribute does not intercept the
+        # already-bound reference here, and the real _kill_tree would run
+        # os.killpg on PID 999 — which on Linux CI can be a live process,
+        # sending SIGTERM to the test runner's process group.
         mgr = JobManager(job_store=InMemoryJobStore())
         mgr._processes["j1"] = MagicMock(pid=999)
         mgr.shutdown()  # should not raise
         assert mgr._processes == {}
+        assert mock_kill.call_count == 1
 
 
 # ---------------------------------------------------------------------------
