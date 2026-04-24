@@ -2120,10 +2120,24 @@
   text-decoration-style: solid;
 }
 
-/* Detail rows (explorer detail pages) */
+/* Detail rows (explorer detail pages)
+ *
+ * `content-visibility: auto` tells the browser to skip layout + paint for
+ * rows outside the viewport — same idea as Android's LazyColumn, but
+ * handled natively without JS virtualization. `contain-intrinsic-size`
+ * gives each skipped row a height estimate so the scrollbar stays
+ * accurate before the row has ever been measured; the `auto` keyword
+ * makes the browser remember real sizes once a row has rendered.
+ *
+ * Works in WebKit 18+ (pywebview on macOS 15+), Chromium 85+, Firefox
+ * 125+. Silently no-ops on older engines — the property is ignored and
+ * the list renders eagerly, which is still correct, just not lazy.
+ */
 .vdetail-row {
   animation: vlive-enter 200ms ease-out both;
   margin-bottom: var(--space-3);
+  content-visibility: auto;
+  contain-intrinsic-size: auto 180px;
 }
 
 .vdetail-row-main {

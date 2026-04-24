@@ -1,4 +1,4 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useMemo, lazy, Suspense } from 'react';
 import { gradeLabel, scoreColorClass } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
@@ -12,8 +12,6 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import FittedText from '../../../components/FittedText.jsx';
 
 const HIDDEN_STATUSES = new Set(['cancelled', 'failed']);
-
-const MAX_VISIBLE = 20;
 
 function formatDateParts(dateISO, fallbackLabel) {
   if (!dateISO) return { date: fallbackLabel || '', time: '' };
@@ -173,7 +171,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick, onDelete
   );
 }
 
-function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, languageSub }) {
+function HistoryContent({ data, callbacks, runNav, languageSub }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
@@ -185,12 +183,13 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, language
     return map;
   }, [availableRuns]);
   const isHiddenStatus = (runId) => HIDDEN_STATUSES.has(statusByRunId.get(runId));
-  const allEntries = useMemo(() => {
+  // Show every non-hidden run; off-screen rows are lazy-painted via CSS
+  // `content-visibility: auto` on `.history-row` (see styles/history.css),
+  // so there's no need for a "Load all" pagination toggle.
+  const visible = useMemo(() => {
     const combined = [...inProgressStubs, ...trend];
     return combined.filter((entry) => !isHiddenStatus(entry.runId));
   }, [inProgressStubs, trend, statusByRunId]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const visible = showAll ? allEntries : allEntries.slice(0, MAX_VISIBLE);
-  const hasMore = allEntries.length > MAX_VISIBLE && !showAll;
 
   return (
     <div className="history-page history-page--terminal">
@@ -227,12 +226,6 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, language
         onRunClick={onRunClick}
         onDeleteRun={onDeleteRun}
       />
-
-      {hasMore && (
-        <div className="history-load-more">
-          <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>Load all {allEntries.length} evaluations</button>
-        </div>
-      )}
     </div>
   );
 }
@@ -241,7 +234,6 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
-  const [showAll, setShowAll] = useState(false);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
@@ -297,7 +289,6 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     <HistoryContent
       data={{ trend, selectedRunId, availableRuns }}
       callbacks={{ onRunClick, onRunChange, onDeleteRun: handleDeleteRun }}
-      showAll={showAll} setShowAll={setShowAll}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}
     />
