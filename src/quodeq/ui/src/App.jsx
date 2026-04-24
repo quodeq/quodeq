@@ -219,6 +219,7 @@ const ROUTE_RENDERERS = {
           onDimensionClick: (dim) => props.navigation.handleNavigate('explorer', { dimension: dim.dimension, runId: dim.fromRunId, dateLabel: dim.fromDateLabel, fromProject: dim.fromProject }),
           onNavigate: props.navigation.handleNavigate,
           onRunChange: props.navigation.setHistorySelectedRun,
+          onRunDeleted: () => props.refreshDashboard?.(),
         }}
         projectInfo={props.navigation.projects?.find((p) => (p.id || p.name) === props.navigation.selectedProject) || null}
       />

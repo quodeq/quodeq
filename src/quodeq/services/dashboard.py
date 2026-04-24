@@ -190,7 +190,10 @@ def _compute_dashboard_payload(
 ) -> _DashboardPayload:
     """Compute history-dependent parts of the dashboard response."""
     selected_dim_names = {d.dimension for d in ctx.dimensions}
-    history_runs = runs[:max(_MAX_HISTORY_RUNS, ctx.index + 1)]
+    # Exclude cancelled/failed runs — they produce misleading points on the
+    # history chart. They remain visible in availableRuns for the UI.
+    scoreable_runs = [r for r in runs if r.status not in ("cancelled", "failed")]
+    history_runs = scoreable_runs[:max(_MAX_HISTORY_RUNS, ctx.index + 1)]
     get_run_dimensions = _make_run_dimension_fetcher(
         reports_root, project, cache=cc.cache, lock=cc.lock, max_size=cc.max_size,
     )

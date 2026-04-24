@@ -7,6 +7,7 @@ import os
 import signal
 import sys
 import threading
+import urllib.parse
 import urllib.request
 import webbrowser
 from pathlib import Path
@@ -51,22 +52,21 @@ class _WindowApi:
         self._base_url = base_url.rstrip('/')
 
     def close(self) -> None:
-        # Show closing overlay immediately so the user sees feedback
+        # Check for running evaluation FIRST. Don't render the closing
+        # overlay yet — it covers the screen and would hide the dialog.
+        job = self._get_running_evaluation() if self._window else None
+        if job and self._window:
+            choice = self._await_close_dialog(job)
+            if choice == 'back':
+                return
+            if choice == 'cancel':
+                self._cancel_evaluation(job.get("jobId") or job.get("job_id"))
+            # Any other value (including 'keep') falls through to the exit path.
+
+        # Show closing overlay (only reached when user actually closes).
         if self._window:
             try:
                 self._window.evaluate_js(CLOSING_OVERLAY_JS)
-            except Exception:
-                pass
-
-        # Check for running evaluation — fast path (0.5s timeout)
-        job = self._get_running_evaluation() if self._window else None
-        if job:
-            try:
-                choice = self._window.evaluate_js(self._build_close_dialog_js(job))
-                if choice == 'back':
-                    return
-                if choice == 'keep':
-                    os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
             except Exception:
                 pass
 
@@ -81,12 +81,57 @@ class _WindowApi:
         t.join(timeout=_CLEANUP_JOIN_TIMEOUT_S)
         os._exit(0)  # bypass cleanup — webview event loop would deadlock sys.exit
 
+    def _await_close_dialog(self, job: dict, timeout_s: float = 300.0) -> str | None:
+        """Render the close dialog and poll a JS global for the user's choice.
+
+        pywebview's evaluate_js does NOT await Promises — it returns None
+        immediately when given Promise-returning JS. That made the existing
+        `choice = evaluate_js(dialog_js)` call return None every time, skip
+        every if-branch, and fall through to os._exit. Instead, stash the
+        Promise result on a global and poll until it's set.
+        """
+        if not self._window:
+            return None
+        try:
+            self._window.evaluate_js(
+                "window._qd_close_result = null; "
+                "(" + self._build_close_dialog_js(job) + ")"
+                ".then(function(r){ window._qd_close_result = r; });"
+            )
+        except Exception:
+            return None
+        import time as _time  # noqa: PLC0415
+        deadline = _time.monotonic() + timeout_s
+        while _time.monotonic() < deadline:
+            try:
+                result = self._window.evaluate_js("window._qd_close_result")
+            except Exception:
+                result = None
+            if result:
+                return str(result)
+            _time.sleep(0.1)
+        return None
+
+    def _cancel_evaluation(self, job_id: str | None) -> None:
+        """Issue DELETE /api/evaluations/<job_id> to stop a running scan."""
+        if not job_id or not self._base_url:
+            return
+        try:
+            req = urllib.request.Request(
+                f"{self._base_url}/api/evaluations/{urllib.parse.quote(job_id)}",
+                method="DELETE",
+            )
+            with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S):
+                pass
+        except Exception:
+            pass
+
     def _get_running_evaluation(self) -> dict | None:
         """Return the first running evaluation job, or None."""
+        if not self._base_url:
+            return None
         try:
-            url = self._window.get_current_url().split("#")[0].rstrip("/")
-            base = url.rsplit("/", 1)[0] if "/" in url.lstrip("http") else url
-            req = urllib.request.Request(f"{base}/api/evaluations")
+            req = urllib.request.Request(f"{self._base_url}/api/evaluations")
             with urllib.request.urlopen(req, timeout=_EVAL_CHECK_TIMEOUT_S) as resp:
                 jobs = json.loads(resp.read())
                 for j in (jobs if isinstance(jobs, list) else []):
@@ -122,7 +167,7 @@ class _WindowApi:
                     + '<h3 style="margin:0 0 12px;font-size:1rem">Evaluation in progress</h3>'
                     + '<div style="margin:0 0 16px;padding:10px 14px;background:var(--color-surface-alt,#161b22);border-radius:{_BUTTON_BORDER_RADIUS};font-size:{_DIALOG_FONT_SIZE};line-height:1.6;color:var(--color-text-muted,#8b949e)">{info_html}</div>'
                     + '<div style="display:flex;flex-direction:column;gap:8px">'
-                    + '<button id="_qd_close_keep" style="padding:{_BUTTON_PADDING};border:1px solid var(--color-border,#333);border-radius:{_BUTTON_BORDER_RADIUS};background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Close window (evaluation continues in background)</button>'
+                    + '<button id="_qd_close_keep" style="padding:{_BUTTON_PADDING};border:1px solid var(--color-border,#333);border-radius:{_BUTTON_BORDER_RADIUS};background:var(--color-surface-alt,#161b22);color:var(--color-text,#e6edf3);cursor:pointer;font-size:{_BUTTON_FONT_SIZE};line-height:1.5">Close window<br><span style="opacity:0.7;font-size:0.85em">evaluation continues in background</span></button>'
                     + '<button id="_qd_close_cancel" style="padding:{_BUTTON_PADDING};border:1px solid #da3633;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:#f85149;cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Cancel evaluation and close</button>'
                     + '<button id="_qd_close_back" style="padding:{_BUTTON_PADDING};border:none;border-radius:{_BUTTON_BORDER_RADIUS};background:transparent;color:var(--color-text-muted,#8b949e);cursor:pointer;font-size:{_BUTTON_FONT_SIZE}">Go back</button>'
                     + '</div></div>';
@@ -278,7 +323,31 @@ def main() -> None:
         window.show()
         window.evaluate_js(INJECT_JS)
 
+    def _on_closing() -> bool:
+        """Intercept native close (Cmd+Q, red button, window manager).
+
+        Runs on pywebview's main thread. If a scan is running, render the
+        close dialog synchronously and branch on the user's choice:
+          - 'back'   → block the native close (return False)
+          - 'keep'   → allow close; scan continues in background
+          - 'cancel' → issue cancel API call, then allow close
+        If no scan is running, allow the close without prompting.
+        """
+        try:
+            job = api._get_running_evaluation()
+        except Exception:
+            job = None
+        if not job:
+            return True
+        choice = api._await_close_dialog(job)
+        if choice == 'back':
+            return False
+        if choice == 'cancel':
+            api._cancel_evaluation(job.get("jobId") or job.get("job_id"))
+        return True
+
     window.events.loaded += _on_loaded
+    window.events.closing += _on_closing
 
     instance.start_listening(on_reload=_on_reload)
 

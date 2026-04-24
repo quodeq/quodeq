@@ -129,7 +129,7 @@ class TestRunApiAnalysis:
             run_api_analysis(prompt="test", jsonl_file=jsonl_file, config=api_config)
 
             call_kwargs = mock_client.chat.completions.create.call_args.kwargs
-            assert call_kwargs["max_retries"] == 2
+            assert call_kwargs["max_retries"] == 1
 
 
 class TestApiRunnerConfig:

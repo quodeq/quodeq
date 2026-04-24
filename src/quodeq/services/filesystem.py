@@ -60,7 +60,12 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             self._index_db_path = Path(get_index_db_path())
         return _run_index.open_index(self._index_db_path)
 
-    def list_evaluations(self, limit: int = 0, reports_dir: Path | None = None) -> list[JobSnapshot]:
+    def list_evaluations(
+        self,
+        limit: int = 0,
+        reports_dir: Path | None = None,
+        states: set[str] | None = None,
+    ) -> list[JobSnapshot]:
         """Return runs from the SQLite index merged with in-memory JobManager jobs."""
         if reports_dir is None:
             from quodeq.shared._env import get_evaluations_dir
@@ -85,8 +90,49 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         for j in internal_jobs:
             by_id[j.job_id] = j  # internal dashboard-spawned jobs always take priority
         merged = list(by_id.values())
+        if states:
+            merged = [s for s in merged if s.status in states]
         merged.sort(key=lambda s: s.started_at or "", reverse=True)
         return merged[:limit] if limit and limit > 0 else merged
+
+    def delete_evaluation(self, job_id: str, reports_dir: Path | None = None) -> bool:
+        """Delete a run's on-disk dir and index row. Refuses to delete a running job."""
+        import shutil
+
+        snapshot = self.get_evaluation_status(job_id, reports_dir=reports_dir)
+        if snapshot is None:
+            return False
+        if snapshot.status == "running":
+            return False
+        if reports_dir is None:
+            from quodeq.shared._env import get_evaluations_dir
+            reports_dir = Path(get_evaluations_dir())
+        else:
+            reports_dir = Path(reports_dir)
+        # Job IDs of form "ext-<run_uuid>"; run_uuid is also the run directory name.
+        run_uuid = job_id[len("ext-"):] if job_id.startswith("ext-") else job_id
+        # Scan all project dirs for the run directory (runs are nested by project).
+        removed_dir = False
+        if reports_dir.is_dir():
+            for project_dir in reports_dir.iterdir():
+                candidate = project_dir / run_uuid
+                if candidate.is_dir():
+                    shutil.rmtree(candidate, ignore_errors=True)
+                    removed_dir = True
+                    break
+        # Remove from index regardless so stale rows get cleaned up.
+        db = self._open_index()
+        try:
+            _run_index.delete_run(db, job_id)
+        finally:
+            db.close()
+        # Also drop any in-memory JobManager entry.
+        try:
+            if hasattr(self._jobs, "delete"):
+                self._jobs.delete(job_id)
+        except (KeyError, AttributeError):
+            pass
+        return removed_dir
 
     def get_evaluation_status(self, job_id: str, reports_dir: Path | None = None) -> JobSnapshot | None:
         """Return a single run's snapshot.
@@ -135,7 +181,26 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         return self._run_row_to_snapshot(row)
 
     @staticmethod
-    def _run_row_to_snapshot(row: "_run_index.RunRow") -> JobSnapshot:
+    def _tail_run_log(run_dir: Path, max_lines: int = 500) -> list[str]:
+        """Return the last *max_lines* lines from run.log. Cheap for normal logs."""
+        log_path = run_dir / "run.log"
+        if not log_path.is_file():
+            return []
+        try:
+            with log_path.open("r", encoding="utf-8", errors="replace") as fp:
+                lines = fp.readlines()
+        except OSError:
+            return []
+        tail = lines[-max_lines:] if len(lines) > max_lines else lines
+        return [line.rstrip("\n") for line in tail]
+
+    def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
+        logs: list[str] = []
+        if row.run_dir:
+            try:
+                logs = self._tail_run_log(Path(row.run_dir))
+            except (OSError, ValueError):
+                logs = []
         return JobSnapshot(
             job_id=row.job_id,
             status=row.state,
@@ -143,7 +208,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             started_at=row.started_at,
             ended_at=row.finalized_at,
             exit_code=None,
-            logs=[],
+            logs=logs,
             output_project=row.project_uuid,
             output_run_id=row.run_id,
             phase=row.phase,
