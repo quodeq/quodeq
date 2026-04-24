@@ -10,7 +10,7 @@ jobs:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     steps:
       - uses: actions/checkout@v6
         with:
@@ -42,23 +42,6 @@ jobs:
           VERSION="${{ steps.version.outputs.version }}"
           SHA=$(curl -sL "https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz" | shasum -a 256 | cut -d' ' -f1)
           echo "sha256=$SHA" >> "$GITHUB_OUTPUT"
-
-      - name: Update local formula
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          SHA="${{ steps.sha.outputs.sha256 }}"
-          sed -i "s|url \".*\"|url \"https://files.pythonhosted.org/packages/source/q/quodeq/quodeq-${VERSION}.tar.gz\"|" Formula/quodeq.rb
-          sed -i "s|sha256 \".*\"|sha256 \"${SHA}\"|" Formula/quodeq.rb
-
-      - name: Commit and push local formula
-        run: |
-          VERSION="${{ steps.version.outputs.version }}"
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Formula/quodeq.rb
-          git diff --cached --quiet && echo "No changes" && exit 0
-          git commit -m "chore: update Homebrew formula to v${VERSION}"
-          git push
 
       - name: Update homebrew-tap repo
         env:
