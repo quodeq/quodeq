@@ -31,6 +31,12 @@ For compliance — use the same severity to indicate the importance of what's do
 - **major** — Significant quality pattern properly followed
 - **minor** — Good style, naming, or minor best practice followed
 
+## Test file severity ceiling
+
+If the file being analyzed is a test file, `minor` is the maximum allowed severity — never report `critical` or `major` on a test file. Use your judgment to decide: if the file's purpose is to test or describe behavior of other code (test fixtures, mock setups, test configs, spec files in any language), cap it at `minor`.
+
+Why: test files routinely contain patterns that look vulnerable (`eval(x)`, hardcoded secrets, path-traversal payloads, SQL strings) *on purpose* — they exist to verify the scanner catches those patterns. Flagging the fixture itself as critical produces noise, not signal. A genuine exploitable issue in a test still shows up as `minor`, which is enough for a reviewer to investigate.
+
 ## Severity self-check
 
 Before finalizing ANY violation, verify:
