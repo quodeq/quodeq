@@ -1,4 +1,5 @@
 import { memo, useState, useCallback, useMemo } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
 import { SEVERITY_ORDER as EVAL_SEVERITY_ORDER, gradeColorClass } from '../../../utils/formatters.js';
@@ -8,42 +9,29 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
-import VirtualList from '../../../components/VirtualList.jsx';
 
 const PAGE_SIZE = 20;
-
-// Pretext-fed estimate for VirtualList. Counts wrap-able characters so the
-// initial scroll geometry is close to the final measured height; a post-mount
-// ResizeObserver inside VirtualList corrects any drift as cards render.
-const VIRTUAL_OVERHEAD = 140;   // header row + labels + padding + scope bar
-const CHARS_PER_LINE = 90;      // rough chars that fit at typical container width
-const LINE_HEIGHT = 20;
-
-function estimateFindingHeight(v) {
-  const titleLines = v?.title ? Math.max(1, Math.ceil(v.title.length / CHARS_PER_LINE)) : 0;
-  const reasonLines = v?.reason ? Math.max(1, Math.ceil(v.reason.length / CHARS_PER_LINE)) : 0;
-  return VIRTUAL_OVERHEAD + (titleLines + reasonLines) * LINE_HEIGHT;
-}
-
-const VIRTUALIZE_THRESHOLD = 20; // only virtualize groups this long
+const VIRTUALIZE_THRESHOLD = 20;     // only virtualize groups this long
+const VIRTUALIZED_LIST_MAX_HEIGHT = 'min(70vh, 900px)';  // scroll locally so page scroll stays clean
 
 function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
   return EVAL_SEVERITY_ORDER.map((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return null;
-    const renderCard = (v, idx) => (
+    const itemContent = (idx, v) => (
       <EvalViolationCard v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
     );
     return (
       <div key={sev}>
         <SectionLabel>{sev.toUpperCase()} · {vs.length}</SectionLabel>
         {vs.length >= VIRTUALIZE_THRESHOLD ? (
-          <VirtualList
+          <Virtuoso
             className="vlive-violations-group vlive-violations-group--virtual"
-            items={vs}
-            getEstimatedHeight={estimateFindingHeight}
-            getItemKey={(v, i) => `${v.file || 'nofile'}:${v.line ?? 'noline'}:${i}`}
-            renderItem={renderCard}
+            style={{ height: VIRTUALIZED_LIST_MAX_HEIGHT }}
+            data={vs}
+            computeItemKey={(i, v) => `${v.file || 'nofile'}:${v.line ?? 'noline'}:${i}`}
+            itemContent={itemContent}
+            increaseViewportBy={{ top: 600, bottom: 600 }}
           />
         ) : (
           <div className="vlive-violations-group">
