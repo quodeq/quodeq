@@ -157,10 +157,14 @@ export default function RunOverviewPanel({ dashboard, selectedRunId, onDimension
       ) : (
         <>
           <RunHeroSection dashboard={dashboard} selectedRunId={selectedRunId} stats={{ runSummary, runTopFiles, runUniquePrinciples }} />
-          <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
-          <div className="dimensions-panel">
-            <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
-          </div>
+          <section className="quality-dimensions" aria-label="Quality dimensions">
+            <div className="quality-dimensions__head">
+              <SectionLabel>quality_dimensions · {dimCount}</SectionLabel>
+            </div>
+            <div className="dimensions-panel">
+              <RunDimensionsGrid dimensions={dashboard?.dimensions || []} selectedRunId={selectedRunId} dateLabel={dashboard?.selectedRun?.dateLabel} onDimensionClick={onDimensionClick} trendDeltas={trendDeltas} />
+            </div>
+          </section>
           <RunFileViolations runTopFiles={runTopFiles} onFileClick={onFileClick} />
         </>
       )}

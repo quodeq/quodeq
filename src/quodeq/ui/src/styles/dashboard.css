@@ -558,6 +558,12 @@
 .dimensions-panel {
   margin-bottom: 28px;
 }
+/* Inside the terminal-style quality_dimensions panel the wrapping panel
+   itself provides the surrounding rhythm; kill the legacy margin so the
+   grid doesn't add extra whitespace to the panel's bottom. */
+.quality-dimensions .dimensions-panel {
+  margin-bottom: 0;
+}
 
 /* ── Dimension cards ──────────────────────────────────── */
 
