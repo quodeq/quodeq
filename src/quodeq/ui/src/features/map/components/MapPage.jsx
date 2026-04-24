@@ -53,16 +53,22 @@ function DimensionFilter({ allDimensions, selectedDimensions, onToggle }) {
 
   if (allDimensions.length <= 1) return null;
 
-  const activeCount = selectedDimensions.size === allDimensions.length ? allDimensions.length : selectedDimensions.size;
-  const label = activeCount === allDimensions.length ? 'All dimensions' : `${activeCount} of ${allDimensions.length}`;
+  const isFiltered = selectedDimensions.size !== allDimensions.length;
 
   return (
     <div className="map-filter-wrap" ref={ref}>
-      <button type="button" className="map-pill map-filter-btn" onClick={() => setOpen((v) => !v)}>
+      <button
+        type="button"
+        className={`map-pill map-filter-btn${isFiltered ? ' is-filtered' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        title={isFiltered ? `${selectedDimensions.size} of ${allDimensions.length} dimensions` : 'All dimensions'}
+        aria-label={isFiltered ? `Dimensions (${selectedDimensions.size} of ${allDimensions.length} active)` : 'Dimensions'}
+      >
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
           <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3" />
         </svg>
-        {label}
+        Dimensions
+        {isFiltered && <span className="map-filter-btn__dot" aria-hidden="true" />}
       </button>
       {open && (
         <div className="map-filter-dropdown">
@@ -168,11 +174,11 @@ export default function MapPage(props) {
 
   return (
     <div className="map-page map-page--terminal">
-      <TermHeader
-        name="map"
-        sub={`${viol} violation${viol !== 1 ? 's' : ''} · ratio ${ratio}`}
-      />
-      <div className="map-header map-header--terminal">
+      <div className="map-page__top">
+        <TermHeader
+          name="map"
+          sub={`${viol} violation${viol !== 1 ? 's' : ''} · ratio ${ratio}`}
+        />
         <MapControls viewState={state.viewState} galaxyState={state.galaxyState} dimensionState={state.dimensionState} />
       </div>
       <MapVizContainer vizState={state.vizState} treeState={state.treeState} dimensions={state.dimensions} callbacks={state.callbacks} display={state.display} />

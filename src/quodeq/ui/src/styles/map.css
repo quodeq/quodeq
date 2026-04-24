@@ -31,6 +31,27 @@
   margin-left: auto;
 }
 
+/* Header row: TermHeader on the left, controls on the right.
+   Controls gravitate to the bottom of the row so they baseline-align
+   with the sub line rather than floating up by the page title.
+   Wraps onto a second row on narrow viewports via flex-wrap. */
+.map-page__top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.map-page__top > .term-header {
+  margin: 0;
+}
+
+.map-page__top > .map-controls {
+  flex: 0 1 auto;
+}
+
 .map-total-count {
   font-size: 1rem;
   color: var(--color-text-muted);
@@ -47,7 +68,7 @@
 .map-controls {
   display: flex;
   align-items: center;
-  gap: var(--space-6);
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 
@@ -57,7 +78,6 @@
   background: var(--color-surface-alt);
   border-radius: 6px;
   padding: 2px;
-  margin-bottom: 32px;
 }
 
 .map-pill {
@@ -109,10 +129,37 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* Match the pill's padding/shape so the filter reads as part of the
+     same control strip instead of a floating button. */
+  background: var(--color-surface-alt);
+  border: none;
+  border-radius: 6px;
+  padding: 5px 10px;
+  position: relative;
+}
+
+.map-filter-btn:hover {
+  background: color-mix(in srgb, var(--color-surface-alt) 65%, var(--color-surface));
+  color: var(--color-text);
 }
 
 .map-filter-btn svg {
   opacity: 0.6;
+}
+
+/* Active-state dot: floats in the top-right corner of the button
+   when a subset of dimensions is active (standard notification dot
+   pattern — does not affect the button's width). */
+.map-filter-btn__dot {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--color-accent);
+  box-shadow: 0 0 0 2px var(--color-surface);
+  pointer-events: none;
 }
 
 .map-filter-dropdown {
@@ -324,6 +371,72 @@
   border: 1px solid transparent;
   transition: opacity 150ms ease;
 }
+
+/* -------------------------------------------------------------------
+   Flat variant — used by the Violations > by-dimension table.
+   Strips the "heat-map" fills down to colored text on a plain table,
+   matching the monospace/minimal aesthetic used across the rest of the
+   terminal restyle. The filled-cell default still applies to the Map
+   page's file tree view via the base .heat-grid rules above.
+   ------------------------------------------------------------------- */
+.heat-grid--flat {
+  border-collapse: collapse;
+  border-spacing: 0;
+  font-family: var(--term-font-mono, var(--font-sans));
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.heat-grid--flat th {
+  padding: 10px 12px;
+  position: static;
+  background: transparent;
+  font-family: var(--term-font-mono, var(--font-sans));
+  font-size: 11px;
+  font-weight: var(--weight-medium);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--color-text-subtle);
+  text-align: right;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 30%, transparent);
+}
+.heat-grid--flat th.left { text-align: left; }
+
+.heat-grid--flat td {
+  padding: 10px 12px;
+  border-bottom: 1px solid color-mix(in srgb, var(--color-border) 18%, transparent);
+  text-align: right;
+}
+.heat-grid--flat tbody tr:last-child td { border-bottom: 0; }
+.heat-grid--flat td:first-child { text-align: left; }
+
+.heat-grid--flat .heat-grid-file { padding: 0; font-size: 13px; }
+.heat-grid--flat .heat-grid-num {
+  padding: 0;
+  font-weight: var(--weight-bold);
+  text-align: right;
+  display: block;
+}
+
+/* Severity/health cells in the flat variant: no fill, no border, just
+   colored text (color comes from inline style in HeatGridCells). */
+.heat-grid--flat .heat-grid-cell {
+  display: inline-block;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border: 0;
+  background: none !important;
+  box-shadow: none;
+  font-weight: var(--weight-medium);
+  font-size: 13px;
+  transition: color 120ms ease;
+}
+.heat-grid--flat .heat-grid-cell.empty {
+  color: var(--color-text-subtle);
+  font-weight: var(--weight-regular);
+}
+.heat-grid--flat .heat-grid-cell.clickable:hover { text-decoration: underline; }
 
 .heat-grid-cell:hover {
   opacity: 0.8;
