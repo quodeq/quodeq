@@ -281,22 +281,30 @@ def _icon_path(ext: str) -> str | None:
 _APP_DISPLAY_NAME = "quodeq"
 
 
+_macos_app_icon: object | None = None  # cache the NSImage across _set calls
+
+
 def _set_macos_app_identity() -> None:
-    """Set dock icon + menu-bar app name on macOS.
+    """Set dock icon, menu-bar app name, and About-panel icon on macOS.
 
     Called both at startup (early) and after pywebview is shown — pywebview
     spins up its own NSApplication when start() runs, which overrides the
-    early-set icon. Calling this from the `shown` event ensures the icon is
-    applied on the NSApp instance that actually renders the dock tile.
+    early-set icon. Re-applying from the `loaded` event ensures the icon
+    lands on the NSApp instance that actually renders the dock tile.
+
+    The About panel (Apple menu → About quodeq) draws from the bundle info
+    dict, not the runtime icon image, so we also write NSApplicationIcon
+    into the info dict and register a swizzled action on the menu item.
     """
+    global _macos_app_icon
     try:
         from AppKit import NSApplication, NSBundle, NSImage  # type: ignore[import-untyped]
     except ImportError:
         return
-    # Patch the bundle name so the menu bar reads "Quodeq" instead of "python3".
-    # This is a runtime mutation of the NSBundle info dict; it works as long as
-    # we do it before NSApp caches its name (i.e. before webview.start() draws
-    # the menu bar). Calling it again from the `shown` event is harmless.
+    # Patch the bundle name so the menu bar reads "quodeq" instead of "python3".
+    # Runtime mutation of the NSBundle info dict; works as long as NSApp
+    # hasn't cached the name (i.e. before webview.start draws the menu bar).
+    # Repeat calls are harmless.
     try:
         info = NSBundle.mainBundle().infoDictionary()
         if info is not None:
@@ -305,13 +313,62 @@ def _set_macos_app_identity() -> None:
     except (AttributeError, TypeError):
         pass
     path = _icon_path(".icns")
-    if path:
-        try:
-            icon = NSImage.alloc().initWithContentsOfFile_(path)
-            if icon:
-                NSApplication.sharedApplication().setApplicationIconImage_(icon)
-        except (AttributeError, ValueError):
-            pass
+    if not path:
+        return
+    try:
+        icon = NSImage.alloc().initWithContentsOfFile_(path)
+    except (AttributeError, ValueError):
+        icon = None
+    if not icon:
+        return
+    _macos_app_icon = icon  # keep a live reference for the About-panel override
+    try:
+        NSApplication.sharedApplication().setApplicationIconImage_(icon)
+    except (AttributeError, ValueError):
+        pass
+    # Override the default About panel so it shows our icon + name. The
+    # standard panel reads from Info.plist and ignores setApplicationIconImage_
+    # for non-bundled apps, so we wire a custom action on the first-responder
+    # chain using orderFrontStandardAboutPanelWithOptions_.
+    _install_about_panel_override()
+
+
+_about_target: object | None = None  # keep delegate alive for the menu item's weak ref
+
+
+def _install_about_panel_override() -> None:
+    """Point the Apple-menu 'About …' at a handler that passes our icon."""
+    global _about_target
+    try:
+        from AppKit import NSApplication, NSObject  # type: ignore[import-untyped]
+    except ImportError:
+        return
+
+    class _AboutHandler(NSObject):
+        def showAbout_(self, sender):  # noqa: ARG002 — ObjC selector signature
+            if _macos_app_icon is None:
+                NSApplication.sharedApplication().orderFrontStandardAboutPanel_(sender)
+                return
+            opts = {
+                "ApplicationIcon": _macos_app_icon,
+                "ApplicationName": _APP_DISPLAY_NAME,
+            }
+            NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(opts)
+
+    try:
+        app = NSApplication.sharedApplication()
+        main_menu = app.mainMenu()
+        if main_menu is None or main_menu.numberOfItems() == 0:
+            return
+        app_menu = main_menu.itemAtIndex_(0).submenu()
+        if app_menu is None or app_menu.numberOfItems() == 0:
+            return
+        about_item = app_menu.itemAtIndex_(0)  # convention: "About …" is first
+        _about_target = _AboutHandler.alloc().init()
+        about_item.setTarget_(_about_target)
+        about_item.setAction_("showAbout:")
+    except (AttributeError, IndexError, ValueError):
+        pass
 
 
 def _set_app_icon() -> None:
