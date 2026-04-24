@@ -98,6 +98,17 @@ class RunLifecycleContext:
             # SystemExit raised by our signal handler; state already written there.
             if self._current_state not in TERMINAL_STATES:
                 self._transition(RunState.CANCELLED, exit_reason="systemexit")
+        elif issubclass(exc_type, BrokenPipeError):
+            # BrokenPipeError fires when the child's inherited stdout pipe
+            # closes — typically because our parent (the dashboard API) was
+            # restarted mid-scan and the pipe it was reading is gone. The
+            # analysis itself already ran (we got here because the pipeline
+            # tried to print a trailing status line after the work was done);
+            # the evidence is on disk. Transition to DONE rather than FAILED.
+            if self._current_state not in TERMINAL_STATES:
+                if self._current_state != RunState.FINALIZING:
+                    self._transition(RunState.FINALIZING)
+                self._transition(RunState.DONE)
         else:
             # Any other exception → failed.
             if self._current_state not in TERMINAL_STATES:
