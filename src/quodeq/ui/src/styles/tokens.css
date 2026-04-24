@@ -551,6 +551,7 @@ html[data-theme="light"]:root, [data-theme="light"] {
   --color-accent:       var(--primitive-crimson-500);
   --color-accent-hover: var(--primitive-crimson-600);
   --color-accent-soft:  color-mix(in srgb, var(--primitive-crimson-500) 6%, transparent);
+  --color-on-accent:    #ffffff;
 
   --color-danger:  var(--primitive-red-600);
   --color-success: var(--primitive-green-700);
@@ -727,6 +728,10 @@ html[data-theme="galadriel-light"]:root, [data-theme="galadriel-light"] {
   --color-accent:       #1b6b3a;
   --color-accent-hover: #145228;
   --color-accent-soft:  color-mix(in srgb, #1b6b3a 8%, transparent);
+  /* Light mode on dark-green accent — explicit white for AA contrast
+     (#1b6b3a vs #ffffff ≈ 8.5:1). Without this the base fallback can
+     get shadowed by other theme blocks, leaving dark-on-dark text. */
+  --color-on-accent:    #ffffff;
 
   --color-danger:  #c0392b;
   --color-success: #2d7a4f;
@@ -883,6 +888,7 @@ html[data-theme="neo-light"]:root, [data-theme="neo-light"] {
   --color-accent:       var(--primitive-neo-accent-dark);
   --color-accent-hover: #006622;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-neo-accent-dark) 8%, transparent);
+  --color-on-accent:    #ffffff;
   --color-danger:  #c0392b;
   --color-success: #2d7a4f;
   --color-sev-critical-text:   var(--primitive-neo-sev-critical-light);
@@ -1032,6 +1038,7 @@ html[data-theme="ifrit-light"]:root, [data-theme="ifrit-light"] {
   --color-accent:       var(--primitive-ifrit-accent-light);
   --color-accent-hover: #a84a08;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-ifrit-accent-light) 8%, transparent);
+  --color-on-accent:    #ffffff;
 
   --color-danger:  #b82010;
   --color-success: #2a8a40;
@@ -1204,6 +1211,7 @@ html[data-theme="deckard-light"]:root, [data-theme="deckard-light"] {
   --color-accent:       var(--primitive-deckard-accent-light);
   --color-accent-hover: #b01888;
   --color-accent-soft:  color-mix(in srgb, var(--primitive-deckard-accent-light) 8%, transparent);
+  --color-on-accent:    #ffffff;
 
   --color-danger:  #e02050;
   --color-success: #0098a8;
