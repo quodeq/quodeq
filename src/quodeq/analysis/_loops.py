@@ -17,9 +17,17 @@ from quodeq.shared.logging import log_info, log_warning
 
 def check_zero_findings(
     result: dict[str, Evidence], source_file_count: int, skipped_count: int = 0,
+    *, incremental_filter_active: bool = False,
 ) -> None:
-    """Raise EvaluationError if all dimensions produced zero findings."""
-    if not result or source_file_count <= 0:
+    """Raise EvaluationError if all dimensions produced zero findings.
+
+    When *incremental_filter_active* is True, zero findings is a legitimate
+    outcome (PR-diff / incremental mode deliberately narrows the scan to a
+    changed-file set that may contain none of the dimension's language) —
+    skip the check. Otherwise a genuinely empty result is almost always a
+    symptom of a broken AI CLI tool loop, not a clean codebase.
+    """
+    if not result or source_file_count <= 0 or incremental_filter_active:
         return
     total_findings = sum(
         sum(len(pe.violations) + len(pe.compliance) for pe in ev.principles.values())
@@ -67,7 +75,11 @@ def run_incremental_loop(
             result[dimension] = ev
             if on_dimension_done:
                 on_dimension_done(dimension, ev)
-    check_zero_findings(result, config.source_file_count)
+    check_zero_findings(
+        result, config.source_file_count,
+        incremental_filter_active=config.options.incremental_file_filter is not None
+            or config.options.skip_scoring,
+    )
     return result
 
 
@@ -100,5 +112,9 @@ def run_per_dimension_loop(
         result[dimension] = ev
         if on_dimension_done:
             on_dimension_done(dimension, ev)
-    check_zero_findings(result, config.source_file_count, skipped_count)
+    check_zero_findings(
+        result, config.source_file_count, skipped_count,
+        incremental_filter_active=config.options.incremental_file_filter is not None
+            or config.options.skip_scoring,
+    )
     return result
