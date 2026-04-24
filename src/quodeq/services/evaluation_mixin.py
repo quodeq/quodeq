@@ -258,14 +258,23 @@ class FsEvaluationMixin:
         _score_completed_evidence(reports_dir, job)
         return True
 
-    def list_evaluations(self, *, limit: int = 0, reports_dir: str | None = None) -> list[JobSnapshot]:
+    def list_evaluations(
+        self,
+        *,
+        limit: int = 0,
+        reports_dir: str | None = None,
+        states: set[str] | None = None,
+    ) -> list[JobSnapshot]:
         """Return evaluation jobs (running, done, failed, cancelled).
 
         When *limit* > 0 only the most recent *limit* jobs are returned.
         When *reports_dir* is provided, external in-progress runs are merged in.
+        When *states* is provided, only jobs with status in the set are returned.
         """
         reports_root = Path(reports_dir) if reports_dir else None
         jobs = self._jobs.list_jobs(reports_root=reports_root)
+        if states:
+            jobs = [j for j in jobs if j.status in states]
         return jobs[:limit] if limit > 0 else jobs
 
 

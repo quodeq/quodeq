@@ -22,7 +22,7 @@ class RunInfo:
     date_label: str
     branch: str | None = None
     scope_path: str | None = None
-    status: str = "complete"  # "complete" | "in_progress"
+    status: str = "complete"  # "complete" | "in_progress" | "cancelled" | "failed"
 
 
 def safe_read_dir(path: Path) -> list[os.DirEntry[str]]:

@@ -232,3 +232,10 @@ def rebuild_index(
     count = db.execute("SELECT COUNT(*) FROM runs").fetchone()[0]
     elapsed_ms = int((_time.monotonic() - start) * 1000)
     return count, elapsed_ms
+
+
+def delete_run(db: sqlite3.Connection, job_id: str) -> bool:
+    """Remove a run from the index. Returns True if a row was deleted."""
+    with db:
+        cur = db.execute("DELETE FROM runs WHERE job_id = ?", (job_id,))
+    return cur.rowcount > 0

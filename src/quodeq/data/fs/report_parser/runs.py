@@ -60,6 +60,21 @@ def read_run_data(reports_root: Path, project: str, run_id: str) -> list[Dimensi
     return dimensions
 
 
+def _read_run_status(run_dir: Path) -> str | None:
+    """Read state from status.json if present. Returns the state string or None."""
+    import json as _json  # noqa: PLC0415
+    status_path = run_dir / "status.json"
+    if not status_path.is_file():
+        return None
+    try:
+        with status_path.open("r", encoding="utf-8") as fp:
+            data = _json.load(fp)
+    except (OSError, ValueError):
+        return None
+    state = data.get("state")
+    return state if isinstance(state, str) else None
+
+
 def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIMIT) -> list[RunInfo]:
     """Return runs for a project, sorted newest-first by date.
 
@@ -79,15 +94,17 @@ def list_runs(reports_root: Path, project: str, *, limit: int = _DEFAULT_RUN_LIM
         manifest_exists = (run_dir / "evidence" / "manifest.json").exists()
         if not manifest_exists:
             continue
-        # Status is "in_progress" only when a live process has its PID registered
-        # in the run directory (via .pid file written by `quodeq evaluate`). All
-        # other runs — historical, crashed, pre-.pid-era — are treated as
-        # "complete" so they remain visible in History with their normal
-        # score/grade rendering. Runs with live PIDs get the dimmed "Running…"
-        # treatment instead.
+        # Status precedence:
+        #   1. Live process holding the PID → "in_progress" (dimmed "Running…" in UI)
+        #   2. status.json state in {cancelled, failed} → pass through
+        #   3. Otherwise → "complete" (historical, crashed, pre-.pid-era runs)
         from quodeq.services._external_jobs import resolve_external_pid  # noqa: PLC0415
         pid = resolve_external_pid(project_dir.name, entry.name, reports_root)
-        status = "in_progress" if pid is not None else "complete"
+        if pid is not None:
+            status = "in_progress"
+        else:
+            raw_state = _read_run_status(run_dir)
+            status = raw_state if raw_state in ("cancelled", "failed") else "complete"
         date_iso, date_label = parse_run_date(reports_root, project, entry.name)
         run_infos.append(RunInfo(run_id=entry.name, date_iso=date_iso, date_label=date_label, status=status))
     run_infos.sort(key=lambda r: (r.date_iso or "", r.run_id), reverse=True)

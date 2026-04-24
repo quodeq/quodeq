@@ -222,6 +222,15 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
 
   async function cancelEvaluationJob(jobId) {
     if (!jobId) return;
+    const { confirmDialog } = await import('../../../utils/confirmDialog.js');
+    const ok = await confirmDialog({
+      title: 'Cancel evaluation?',
+      message: 'Stop the running scan. Any findings collected so far will still be saved.',
+      confirmLabel: 'Cancel evaluation',
+      cancelLabel: 'Keep running',
+      variant: 'danger',
+    });
+    if (!ok) return;
     try {
       await cancelEvaluation(jobId);
       clearJob();

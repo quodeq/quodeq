@@ -1,5 +1,7 @@
 import { useState, useMemo, lazy, Suspense } from 'react';
 import { gradeLabel, scoreColorClass } from '../../../utils/formatters.js';
+import { useApi } from '../../../api/ApiContext.jsx';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 const HistoryChartPanel = lazy(() => import('./HistoryChartPanel.jsx'));
 
 import RunNavigator from '../../dashboard/components/RunNavigator.jsx';
@@ -8,6 +10,8 @@ import { readVisibleStandardIds } from '../../../utils/visibleStandards.js';
 import { filterTrendByVisibleStandards } from '../../../utils/scoreFiltering.js';
 import { TermHeader } from '../../../components/terminal/index.js';
 import FittedText from '../../../components/FittedText.jsx';
+
+const HIDDEN_STATUSES = new Set(['cancelled', 'failed']);
 
 const MAX_VISIBLE = 20;
 
@@ -83,9 +87,13 @@ function buildInProgressStubs(availableRuns, trend) {
  *
  *   [ DATE ][ TIME ][ GRADE ][ SCORE ][ Δ ][ DIMENSIONS (flex) ]
  */
-function HistoryRow({ className = '', onClick, cells }) {
+function HistoryRow({ className = '', onClick, cells, onDelete }) {
   const common = `history-row ${className}`.trim();
   const isHeader = className.includes('history-row--header');
+  function handleDeleteClick(e) {
+    e.stopPropagation();
+    onDelete?.();
+  }
   return (
     <div className={common} onClick={onClick} role={onClick ? 'button' : 'row'} tabIndex={onClick ? 0 : undefined}>
       <div className="history-row__col history-row__col--date">{cells.date}</div>
@@ -94,12 +102,29 @@ function HistoryRow({ className = '', onClick, cells }) {
       <div className="history-row__col history-row__col--score">{cells.score}</div>
       <div className="history-row__col history-row__col--delta">{cells.delta}</div>
       <div className="history-row__col history-row__col--dims">{cells.dims}</div>
-      <div className="history-row__col history-row__col--chevron" aria-hidden="true">{isHeader ? '' : '›'}</div>
+      <div className="history-row__col history-row__col--chevron" aria-hidden="true">
+        {isHeader ? '' : (
+          <>
+            {onDelete && (
+              <button
+                type="button"
+                className="history-row__delete"
+                aria-label="Delete run"
+                title="Delete run"
+                onClick={handleDeleteClick}
+              >
+                ×
+              </button>
+            )}
+            <span>›</span>
+          </>
+        )}
+      </div>
     </div>
   );
 }
 
-function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick }) {
+function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick, onDeleteRun }) {
   return (
     <section className="history-evaluations panel">
       <div className="history-evaluations__header">
@@ -127,6 +152,7 @@ function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick }) {
               key={entry.runId}
               className={isSelected ? 'history-row--selected' : ''}
               onClick={() => onRunClick(entry.runId, entry.dateLabel)}
+              onDelete={onDeleteRun ? () => onDeleteRun(entry.runId, entry.dateLabel || date) : undefined}
               cells={{
                 date,
                 time: <span className="history-row__muted">{time}</span>,
@@ -149,11 +175,20 @@ function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick }) {
 
 function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, languageSub }) {
   const { trend, selectedRunId, availableRuns } = data;
-  const { onRunClick, onRunChange } = callbacks;
+  const { onRunClick, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
   const deltas = useMemo(() => computeDeltas(trend), [trend]);
   const inProgressStubs = useMemo(() => buildInProgressStubs(availableRuns, trend), [availableRuns, trend]);
-  const allEntries = useMemo(() => [...inProgressStubs, ...trend], [inProgressStubs, trend]);
+  const statusByRunId = useMemo(() => {
+    const map = new Map();
+    (availableRuns || []).forEach((r) => { if (r.runId) map.set(r.runId, r.status); });
+    return map;
+  }, [availableRuns]);
+  const isHiddenStatus = (runId) => HIDDEN_STATUSES.has(statusByRunId.get(runId));
+  const allEntries = useMemo(() => {
+    const combined = [...inProgressStubs, ...trend];
+    return combined.filter((entry) => !isHiddenStatus(entry.runId));
+  }, [inProgressStubs, trend, statusByRunId]);  // eslint-disable-line react-hooks/exhaustive-deps
   const visible = showAll ? allEntries : allEntries.slice(0, MAX_VISIBLE);
   const hasMore = allEntries.length > MAX_VISIBLE && !showAll;
 
@@ -190,6 +225,7 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, language
         selectedRunId={selectedRunId}
         deltas={deltas}
         onRunClick={onRunClick}
+        onDeleteRun={onDeleteRun}
       />
 
       {hasMore && (
@@ -203,10 +239,31 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, language
 
 export default function HistoryPage({ trend: rawTrend, selection, availableRuns, dimensions, callbacks, projectInfo }) {
   const { selectedRunId } = selection;
-  const { onRunClick, onDimensionClick, onNavigate, onRunChange } = callbacks;
+  const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
+  const { deleteEvaluation } = useApi();
   const [showAll, setShowAll] = useState(false);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
+
+  async function handleDeleteRun(runId, dateLabel) {
+    const label = dateLabel || runId;
+    const ok = await confirmDialog({
+      title: 'Delete run?',
+      message: `Remove the run "${label}" from history. This cannot be undone.`,
+      confirmLabel: 'Delete',
+      cancelLabel: 'Keep',
+      variant: 'danger',
+    });
+    if (!ok) return;
+    const jobId = runId.startsWith('ext-') ? runId : `ext-${runId}`;
+    try {
+      await deleteEvaluation(jobId);
+    } catch (err) {
+      alert(`Failed to delete run: ${err.message || 'unknown error'}`);
+      return;
+    }
+    onRunDeleted?.(runId);
+  }
 
   const { overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = useRunNavigator({
     selectedRun: selectedRunId || 'latest',
@@ -239,7 +296,7 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   return (
     <HistoryContent
       data={{ trend, selectedRunId, availableRuns }}
-      callbacks={{ onRunClick, onRunChange }}
+      callbacks={{ onRunClick, onRunChange, onDeleteRun: handleDeleteRun }}
       showAll={showAll} setShowAll={setShowAll}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}

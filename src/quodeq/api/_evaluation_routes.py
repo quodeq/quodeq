@@ -28,7 +28,9 @@ def register_evaluation_list_routes(app: Flask, provider: ActionProvider, eval_r
     @app.get("/api/evaluations")
     def list_evaluations() -> Response:
         limit = request.args.get("limit", 0, type=int)
-        items = provider.list_evaluations(limit=limit, reports_dir=_reports_dir())
+        state_arg = request.args.get("state", "").strip()
+        states = {s for s in (v.strip() for v in state_arg.split(",")) if s} or None
+        items = provider.list_evaluations(limit=limit, reports_dir=_reports_dir(), states=states)
         return jsonify([to_camel_dict(j) for j in items])
 
     @app.post("/api/evaluations")
@@ -99,10 +101,22 @@ def register_evaluation_item_routes(app: Flask, provider: ActionProvider) -> Non
         return jsonify(to_camel_dict(job))
 
     @app.delete("/api/evaluations/<job_id>")
-    def cancel_evaluation(job_id: str) -> Response | tuple[Response, int]:
-        _logger.info("cancel_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
-        ok = provider.cancel_evaluation(job_id, reports_dir=_reports_dir())
-        if not ok:
-            body, status = error_response("Job not found or not running", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+    def cancel_or_delete_evaluation(job_id: str) -> Response | tuple[Response, int]:
+        """DELETE on a running job cancels it. DELETE on a finished job removes it from history."""
+        snapshot = provider.get_evaluation_status(job_id, reports_dir=_reports_dir())
+        if snapshot is None:
+            body, status = error_response("Job not found", HTTPStatus.NOT_FOUND, "NOT_FOUND")
             return jsonify(body), status
-        return jsonify({"ok": True})
+        if snapshot.status == "running":
+            _logger.info("cancel_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
+            ok = provider.cancel_evaluation(job_id, reports_dir=_reports_dir())
+            if not ok:
+                body, status = error_response("Could not cancel job", HTTPStatus.CONFLICT, "CONFLICT")
+                return jsonify(body), status
+            return jsonify({"ok": True, "action": "cancelled"})
+        _logger.info("delete_evaluation: job_id=%s, remote_addr=%s", job_id, request.remote_addr)
+        ok = provider.delete_evaluation(job_id, reports_dir=_reports_dir())
+        if not ok:
+            body, status = error_response("Job could not be deleted", HTTPStatus.NOT_FOUND, "NOT_FOUND")
+            return jsonify(body), status
+        return jsonify({"ok": True, "action": "deleted"})

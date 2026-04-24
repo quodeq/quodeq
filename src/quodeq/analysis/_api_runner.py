@@ -11,6 +11,7 @@ from __future__ import annotations
 import io
 import json
 import logging
+import os
 import re
 from dataclasses import dataclass
 from enum import Enum as _Enum
@@ -27,7 +28,7 @@ from quodeq.shared.url_validation import validate_url_safe
 
 _log = logging.getLogger(__name__)
 
-_MAX_RETRIES = 2
+_MAX_RETRIES = 1
 _OLLAMA_DEFAULT_BASE = "http://localhost:11434/v1"
 _OLLAMA_DEFAULT_API_KEY = "ollama"
 
@@ -109,8 +110,13 @@ def _call_api(prompt: str, config: ApiRunnerConfig) -> list[dict]:
     )
 
     extra_body: dict = {"reasoning_effort": "none"}
-    if config.context_size > 0:
-        extra_body["num_ctx"] = config.context_size
+    ctx_size = config.context_size
+    if ctx_size <= 0:
+        env_val = os.environ.get("QUODEQ_CONTEXT_SIZE", "").strip()
+        if env_val.isdigit():
+            ctx_size = int(env_val)
+    if ctx_size > 0:
+        extra_body["num_ctx"] = ctx_size
 
     create_kwargs: dict = dict(
         model=config.model,

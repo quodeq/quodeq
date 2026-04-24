@@ -112,10 +112,16 @@ export async function getAccumulated(projectId, asOfRun = null) {
 
 // ── Evaluations / Jobs ──────────────────────────────────────────────────
 
-/** @returns {Promise<import('../models/job.js').Job[]>} */
-export async function listEvaluations({ limit } = {}) {
-  const params = limit ? `?limit=${limit}` : '';
-  const data = await request(`/evaluations${params}`);
+/**
+ * @param {{ limit?: number, states?: string[] }} [options]
+ * @returns {Promise<import('../models/job.js').Job[]>}
+ */
+export async function listEvaluations({ limit, states } = {}) {
+  const params = new URLSearchParams();
+  if (limit) params.set('limit', String(limit));
+  if (states && states.length) params.set('state', states.join(','));
+  const qs = params.toString();
+  const data = await request(`/evaluations${qs ? `?${qs}` : ''}`);
   return (data || []).map(createJob);
 }
 
@@ -139,6 +145,17 @@ export async function getEvaluation(jobId) {
  * @returns {Promise<Object>}
  */
 export function cancelEvaluation(jobId) {
+  return request(`/evaluations/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
+}
+
+/**
+ * Permanently delete a non-running evaluation from history (removes scan dir + index row).
+ * The server DELETE endpoint routes running jobs to cancel and finished jobs to purge —
+ * this helper is the semantic alias UI callers use when they want the purge path.
+ * @param {string} jobId
+ * @returns {Promise<Object>}
+ */
+export function deleteEvaluation(jobId) {
   return request(`/evaluations/${encodeURIComponent(jobId)}`, { method: 'DELETE' });
 }
 

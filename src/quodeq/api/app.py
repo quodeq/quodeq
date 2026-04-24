@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import atexit
 import logging
 import os
 import signal
@@ -115,15 +114,13 @@ def main(env: dict[str, str] | None = None) -> None:
     # consider a secrets manager or platform keychain instead.
     app = create_app(static_dist=get_static_dist(), api_key=_env.get("QUODEQ_API_KEY"))
 
-    # Kill running evaluation subprocesses on shutdown
-    def _cleanup_jobs():
-        provider = app.config.get("_provider")
-        if provider and hasattr(provider, "_jobs"):
-            provider._jobs.shutdown()
-    atexit.register(_cleanup_jobs)
-
+    # Evaluation subprocesses are spawned with start_new_session=True so they
+    # survive the API process dying. Intentionally do NOT kill them on API
+    # shutdown — otherwise launching a second dashboard (which calls
+    # _kill_stale_action_api on the first) would cascade and kill any scan in
+    # flight. Scans have their own lifecycle; use the UI cancel button or the
+    # DELETE endpoint for explicit stops.
     def _handle_shutdown(signum: int, frame: object) -> None:
-        _cleanup_jobs()
         raise SystemExit(0)
 
     if hasattr(signal, "SIGTERM"):

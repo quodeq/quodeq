@@ -259,7 +259,18 @@ def _run_pipeline_with_cleanup(
                 dimensions=dimensions_list,
             ) as lifecycle:
                 try:
+                    # Mark the pipeline as actively analyzing so dashboard
+                    # clients begin polling per-dimension partial results
+                    # (the UI gates dim-polling on phase in
+                    # {analyzing, scoring}).
+                    lifecycle.set_phase("analyzing")
                     result = _execute_pipeline(args, config, evidence_dir, evaluation_dir)
+                    # run_full writes per-dimension reports as each dimension
+                    # completes, so by the time it returns scoring is already
+                    # done. Record the last pre-finalize phase as "scoring"
+                    # so the UI shows a sensible state even if the process
+                    # lingers briefly before transition_to_finalizing.
+                    lifecycle.set_phase("scoring")
                     lifecycle.transition_to_finalizing()
                     return result
                 finally:
