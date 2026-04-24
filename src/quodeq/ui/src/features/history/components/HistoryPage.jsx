@@ -1,4 +1,5 @@
-import { useState, useMemo, lazy, Suspense } from 'react';
+import { useMemo, useRef, useEffect, useState, lazy, Suspense } from 'react';
+import { Virtuoso } from 'react-virtuoso';
 import { gradeLabel, scoreColorClass } from '../../../utils/formatters.js';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { confirmDialog } from '../../../utils/confirmDialog.js';
@@ -12,8 +13,21 @@ import { TermHeader } from '../../../components/terminal/index.js';
 import FittedText from '../../../components/FittedText.jsx';
 
 const HIDDEN_STATUSES = new Set(['cancelled', 'failed']);
+const VIRTUALIZE_THRESHOLD = 20;  // use virtuoso lazy-render above this many rows
 
-const MAX_VISIBLE = 20;
+function findAppScrollParent(el) {
+  if (typeof window === 'undefined' || !el) return null;
+  let node = el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = window.getComputedStyle(node);
+    if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
+        && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
+}
 
 function formatDateParts(dateISO, fallbackLabel) {
   if (!dateISO) return { date: fallbackLabel || '', time: '' };
@@ -124,56 +138,102 @@ function HistoryRow({ className = '', onClick, cells, onDelete }) {
   );
 }
 
+function EvaluationRow({ entry, index, selectedRunId, deltas, onRunClick, onDeleteRun }) {
+  const { date, time } = formatDateParts(entry.dateISO, entry.dateLabel);
+  const runScore = parseFloat(entry.runNumericAverage ?? entry.numericAverage);
+  const grade = gradeLabel(entry.runOverallGrade || entry.overallGrade) || '—';
+  const isSelected = entry.runId === selectedRunId;
+  return (
+    <HistoryRow
+      className={isSelected ? 'history-row--selected' : ''}
+      onClick={() => onRunClick(entry.runId, entry.dateLabel)}
+      onDelete={onDeleteRun ? () => onDeleteRun(entry.runId, entry.dateLabel || date) : undefined}
+      cells={{
+        date,
+        time: <span className="history-row__muted">{time}</span>,
+        grade: <span className={`chip small ${scoreColorClass(runScore)}`}>{grade}</span>,
+        score: <strong>{Number.isNaN(runScore) ? '—' : trimTrailingZero(runScore)}</strong>,
+        delta: <DeltaText delta={deltas[index]} />,
+        dims: (
+          <span className="history-row__muted">
+            <FittedText text={formatDimSummary(entry)} mode="end" />
+          </span>
+        ),
+      }}
+    />
+  );
+}
+
 function EvaluationsTable({ visible, selectedRunId, deltas, onRunClick, onDeleteRun }) {
+  // Reuse the app's existing scroll container — adding a second scrollbar
+  // just for this list would be bad UX. Discover it once on mount.
+  const probeRef = useRef(null);
+  const [scrollParent, setScrollParent] = useState(null);
+  useEffect(() => {
+    setScrollParent(findAppScrollParent(probeRef.current));
+  }, []);
+
+  const headerRow = (
+    <HistoryRow
+      className="history-row--header"
+      cells={{
+        date: 'DATE',
+        time: 'TIME',
+        grade: 'GRADE',
+        score: 'SCORE',
+        delta: 'Δ',
+        dims: 'DIMENSIONS CHANGED',
+      }}
+    />
+  );
+
+  const useVirtual = visible.length >= VIRTUALIZE_THRESHOLD;
+
   return (
     <section className="history-evaluations panel">
+      <span ref={probeRef} aria-hidden="true" style={{ display: 'none' }} />
       <div className="history-evaluations__header">
         <span className="term-section-label__text">EVALUATIONS</span>
       </div>
       <div className="history-table">
-        <HistoryRow
-          className="history-row--header"
-          cells={{
-            date: 'DATE',
-            time: 'TIME',
-            grade: 'GRADE',
-            score: 'SCORE',
-            delta: 'Δ',
-            dims: 'DIMENSIONS CHANGED',
-          }}
-        />
-        {visible.map((entry, i) => {
-          const { date, time } = formatDateParts(entry.dateISO, entry.dateLabel);
-          const runScore = parseFloat(entry.runNumericAverage ?? entry.numericAverage);
-          const grade = gradeLabel(entry.runOverallGrade || entry.overallGrade) || '—';
-          const isSelected = entry.runId === selectedRunId;
-          return (
-            <HistoryRow
+        {headerRow}
+        {useVirtual ? (
+          <Virtuoso
+            data={visible}
+            computeItemKey={(_i, entry) => entry.runId}
+            customScrollParent={scrollParent || undefined}
+            useWindowScroll={!scrollParent}
+            increaseViewportBy={{ top: 400, bottom: 400 }}
+            itemContent={(i, entry) => (
+              <EvaluationRow
+                entry={entry}
+                index={i}
+                selectedRunId={selectedRunId}
+                deltas={deltas}
+                onRunClick={onRunClick}
+                onDeleteRun={onDeleteRun}
+              />
+            )}
+          />
+        ) : (
+          visible.map((entry, i) => (
+            <EvaluationRow
               key={entry.runId}
-              className={isSelected ? 'history-row--selected' : ''}
-              onClick={() => onRunClick(entry.runId, entry.dateLabel)}
-              onDelete={onDeleteRun ? () => onDeleteRun(entry.runId, entry.dateLabel || date) : undefined}
-              cells={{
-                date,
-                time: <span className="history-row__muted">{time}</span>,
-                grade: <span className={`chip small ${scoreColorClass(runScore)}`}>{grade}</span>,
-                score: <strong>{Number.isNaN(runScore) ? '—' : trimTrailingZero(runScore)}</strong>,
-                delta: <DeltaText delta={deltas[i]} />,
-                dims: (
-                  <span className="history-row__muted">
-                    <FittedText text={formatDimSummary(entry)} mode="end" />
-                  </span>
-                ),
-              }}
+              entry={entry}
+              index={i}
+              selectedRunId={selectedRunId}
+              deltas={deltas}
+              onRunClick={onRunClick}
+              onDeleteRun={onDeleteRun}
             />
-          );
-        })}
+          ))
+        )}
       </div>
     </section>
   );
 }
 
-function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, languageSub }) {
+function HistoryContent({ data, callbacks, runNav, languageSub }) {
   const { trend, selectedRunId, availableRuns } = data;
   const { onRunClick, onRunChange, onDeleteRun } = callbacks;
   const { runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest } = runNav;
@@ -185,12 +245,10 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, language
     return map;
   }, [availableRuns]);
   const isHiddenStatus = (runId) => HIDDEN_STATUSES.has(statusByRunId.get(runId));
-  const allEntries = useMemo(() => {
+  const visible = useMemo(() => {
     const combined = [...inProgressStubs, ...trend];
     return combined.filter((entry) => !isHiddenStatus(entry.runId));
   }, [inProgressStubs, trend, statusByRunId]);  // eslint-disable-line react-hooks/exhaustive-deps
-  const visible = showAll ? allEntries : allEntries.slice(0, MAX_VISIBLE);
-  const hasMore = allEntries.length > MAX_VISIBLE && !showAll;
 
   return (
     <div className="history-page history-page--terminal">
@@ -227,12 +285,6 @@ function HistoryContent({ data, callbacks, showAll, setShowAll, runNav, language
         onRunClick={onRunClick}
         onDeleteRun={onDeleteRun}
       />
-
-      {hasMore && (
-        <div className="history-load-more">
-          <button type="button" className="history-load-more-btn" onClick={() => setShowAll(true)}>Load all {allEntries.length} evaluations</button>
-        </div>
-      )}
     </div>
   );
 }
@@ -241,7 +293,6 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
   const { selectedRunId } = selection;
   const { onRunClick, onDimensionClick, onNavigate, onRunChange, onRunDeleted } = callbacks;
   const { deleteEvaluation } = useApi();
-  const [showAll, setShowAll] = useState(false);
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
   const trend = useMemo(() => filterTrendByVisibleStandards(rawTrend || [], visibleSet), [rawTrend, visibleSet]);
 
@@ -297,7 +348,6 @@ export default function HistoryPage({ trend: rawTrend, selection, availableRuns,
     <HistoryContent
       data={{ trend, selectedRunId, availableRuns }}
       callbacks={{ onRunClick, onRunChange, onDeleteRun: handleDeleteRun }}
-      showAll={showAll} setShowAll={setShowAll}
       runNav={{ runNavLabel, overviewRunIndex, currentOverviewRun, handleRunPrev, handleRunNext, handleRunLatest }}
       languageSub={languageSub}
     />

@@ -1,4 +1,4 @@
-import { memo, useState, useCallback, useMemo } from 'react';
+import { memo, useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import { Virtuoso } from 'react-virtuoso';
 import { buildSingleViolationPlanText } from '../../../utils/planBuilder.js';
 import { buildPrinciplePlanText } from '../../../utils/planTextBuilders.js';
@@ -12,58 +12,99 @@ import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../co
 
 const PAGE_SIZE = 20;
 const VIRTUALIZE_THRESHOLD = 20;     // only virtualize groups this long
-const VIRTUALIZED_LIST_MAX_HEIGHT = 'min(70vh, 900px)';  // scroll locally so page scroll stays clean
 
-function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
-  return EVAL_SEVERITY_ORDER.map((sev) => {
-    const vs = violationsBySeverity[sev];
-    if (!vs || vs.length === 0) return null;
-    const itemContent = (idx, v) => (
-      <EvalViolationCard v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
-    );
-    return (
-      <div key={sev}>
-        <SectionLabel>{sev.toUpperCase()} · {vs.length}</SectionLabel>
-        {vs.length >= VIRTUALIZE_THRESHOLD ? (
-          <Virtuoso
-            className="vlive-violations-group vlive-violations-group--virtual"
-            style={{ height: VIRTUALIZED_LIST_MAX_HEIGHT }}
-            data={vs}
-            computeItemKey={(i, v) => `${v.file || 'nofile'}:${v.line ?? 'noline'}:${i}`}
-            itemContent={itemContent}
-            increaseViewportBy={{ top: 600, bottom: 600 }}
-          />
-        ) : (
-          <div className="vlive-violations-group">
-            {vs.map((v, idx) => (
-              <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
-            ))}
-          </div>
-        )}
-      </div>
-    );
-  });
+/**
+ * Walk up from `el` to the nearest ancestor that already scrolls (css
+ * overflow-y: auto | scroll + real overflow). That's the app's main scroll
+ * container; we reuse it instead of creating a second scrollbar inside
+ * the list. Returns null if nothing scrollable is above — Virtuoso then
+ * falls back to window scroll via its default behaviour.
+ */
+function findAppScrollParent(el) {
+  if (typeof window === 'undefined' || !el) return null;
+  let node = el.parentElement;
+  while (node && node !== document.body && node !== document.documentElement) {
+    const style = window.getComputedStyle(node);
+    if ((style.overflowY === 'auto' || style.overflowY === 'scroll')
+        && node.scrollHeight > node.clientHeight) {
+      return node;
+    }
+    node = node.parentElement;
+  }
+  return null;
 }
 
-function ComplianceListSection({ data, controls }) {
-  const { compliance, displayedCompliance, principle } = data;
-  const { hasMore, showAll, setShowAll } = controls;
+function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
+  // All virtualized groups on this page share the app's existing scroll
+  // container. Discover it once on mount and hand the element to each
+  // <Virtuoso>, so there's still only one scrollbar on the screen.
+  const probeRef = useRef(null);
+  const [scrollParent, setScrollParent] = useState(null);
+  useEffect(() => {
+    setScrollParent(findAppScrollParent(probeRef.current));
+  }, []);
+
+  return (
+    <>
+      <span ref={probeRef} aria-hidden="true" style={{ display: 'none' }} />
+      {EVAL_SEVERITY_ORDER.map((sev) => {
+        const vs = violationsBySeverity[sev];
+        if (!vs || vs.length === 0) return null;
+        const itemContent = (idx, v) => (
+          <EvalViolationCard v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
+        );
+        return (
+          <div key={sev}>
+            <SectionLabel>{sev.toUpperCase()} · {vs.length}</SectionLabel>
+            {vs.length >= VIRTUALIZE_THRESHOLD ? (
+              <Virtuoso
+                className="vlive-violations-group vlive-violations-group--virtual"
+                data={vs}
+                computeItemKey={(i, v) => `${v.file || 'nofile'}:${v.line ?? 'noline'}:${i}`}
+                itemContent={itemContent}
+                customScrollParent={scrollParent || undefined}
+                useWindowScroll={!scrollParent}
+                increaseViewportBy={{ top: 600, bottom: 600 }}
+              />
+            ) : (
+              <div className="vlive-violations-group">
+                {vs.map((v, idx) => (
+                  <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+function ComplianceListSection({ data }) {
+  const { compliance, principle, scrollParent } = data;
   if (compliance.length === 0) return null;
+  const itemContent = (idx, c) => (
+    <ComplianceCard c={c} principle={principle} index={idx} />
+  );
   return (
     <div>
       <SectionLabel>COMPLIANCE · {compliance.length}</SectionLabel>
-      <div className="vlive-violations-group">
-        {displayedCompliance.map((c, idx) => (
-          <ComplianceCard key={idx} c={c} principle={principle} index={idx} />
-        ))}
-      </div>
-      {hasMore && (
-        <button
-          className="offending-show-more"
-          onClick={() => setShowAll((v) => !v)}
-        >
-          {showAll ? 'Show less' : `Show all ${compliance.length} compliance items`}
-        </button>
+      {compliance.length >= VIRTUALIZE_THRESHOLD ? (
+        <Virtuoso
+          className="vlive-violations-group vlive-violations-group--virtual"
+          data={compliance}
+          computeItemKey={(i, c) => `${c.file || 'nofile'}:${c.line ?? 'noline'}:${i}`}
+          itemContent={itemContent}
+          customScrollParent={scrollParent || undefined}
+          useWindowScroll={!scrollParent}
+          increaseViewportBy={{ top: 600, bottom: 600 }}
+        />
+      ) : (
+        <div className="vlive-violations-group">
+          {compliance.map((c, idx) => (
+            <ComplianceCard key={idx} c={c} principle={principle} index={idx} />
+          ))}
+        </div>
       )}
     </div>
   );
