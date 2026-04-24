@@ -337,8 +337,8 @@
 }
 
 .heat-grid-file {
-  padding: 6px 8px;
-  font-size: var(--text-xs);
+  padding: 5px 8px;
+  font-size: 9px;
   color: var(--color-text);
   word-break: break-word;
 }
@@ -410,15 +410,14 @@
 .heat-grid--flat tbody tr:last-child td { border-bottom: 0; }
 .heat-grid--flat td:first-child { text-align: left; }
 
-.heat-grid--flat .heat-grid-file,
-.heat-grid--flat .heat-grid-dim-row td:first-child .heat-grid-file {
+.heat-grid--flat .heat-grid-file {
   padding: 0;
-  font-size: 13px;
-  /* Match the mono/lowercase aesthetic used elsewhere in the terminal
-     restyle. The second selector explicitly targets dimension header
-     rows (Maintainability, Flexibility, …) since their existing rule
-     has higher specificity than the plain `.heat-grid-file` override. */
+  font-size: 12px;
   text-transform: lowercase;
+}
+
+.heat-grid--flat .heat-grid-dim-row td:first-child .heat-grid-file {
+  font-size: 13px;
 }
 .heat-grid--flat .heat-grid-num {
   padding: 0;
@@ -537,8 +536,9 @@
 
 .heat-grid-dim-row td:first-child .heat-grid-file {
   font-size: var(--text-sm);
-  font-weight: var(--weight-semibold);
-  text-transform: capitalize;
+  font-weight: var(--weight-medium);
+  color: var(--color-text);
+  text-transform: lowercase;
 }
 
 .map-dim-filter {

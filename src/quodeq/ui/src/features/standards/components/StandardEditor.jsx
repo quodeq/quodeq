@@ -3,8 +3,9 @@ import { useStandardDetail } from '../hooks/useStandardDetail.js';
 import StandardTree from './StandardTree.jsx';
 import StandardDetail from './StandardDetail.jsx';
 import { STANDARD_TYPES } from '../hooks/useStandards.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 
-const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: 'ISO-25010', [STANDARD_TYPES.QUODEQ]: 'Quodeq', [STANDARD_TYPES.COMMUNITY]: 'Community', [STANDARD_TYPES.CUSTOM]: 'Custom' };
+const TYPE_LABELS = { [STANDARD_TYPES.BUILTIN]: 'iso-25010', [STANDARD_TYPES.QUODEQ]: 'quodeq', [STANDARD_TYPES.COMMUNITY]: 'community', [STANDARD_TYPES.CUSTOM]: 'custom' };
 
 const MIN_TREE_WIDTH = 180;
 const MAX_TREE_WIDTH = 600;
@@ -53,40 +54,32 @@ function useResizable(defaultWidth) {
   return { width, onMouseDown };
 }
 
-function EditorToolbar({ meta, dirty, editable, onBack, onSave }) {
-  const { isNew, standard, standardId } = meta;
-  return (
-    <div className="standard-editor-toolbar">
-      <div className="editor-toolbar-top">
-        <button type="button" className="editor-back-btn" onClick={onBack}>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-            <path d="M19 12H5M12 5l-7 7 7 7" />
-          </svg>
-          Back
-        </button>
-        <div className="editor-toolbar-center">
-          <h2 className="editor-title">
-            {isNew ? 'New Standard' : (standard?.name || standardId)}
-            {dirty && <span className="editor-dirty-indicator" title="Unsaved changes">*</span>}
-          </h2>
-        </div>
-        <div className="editor-toolbar-actions">
-          {editable && <button type="button" className="btn-primary" onClick={onSave} disabled={!dirty}>Save</button>}
-        </div>
-      </div>
-      <EditorStatsRow standard={standard} />
-    </div>
-  );
+function buildSubLine({ standard, dirty }) {
+  const principles = standard?.principles?.length || 0;
+  const requirements = (standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0);
+  const type = TYPE_LABELS[standard?.type] || 'custom';
+  const dirtyMark = dirty ? ' · unsaved' : '';
+  return `${principles} principle${principles === 1 ? '' : 's'} · ${requirements} requirement${requirements === 1 ? '' : 's'} · ${type}${dirtyMark}`;
 }
 
-function EditorStatsRow({ standard }) {
+function EditorToolbar({ meta, dirty, editable, onBack, onSave }) {
+  const { isNew, standard, standardId } = meta;
+  const title = isNew ? 'new standard' : (standard?.name || standardId || 'standard').toLowerCase();
+  const sub = buildSubLine({ standard, dirty });
   return (
-    <div className="editor-toolbar-stats">
-      <span className="editor-stat"><strong>{standard?.principles?.length || 0}</strong> principles</span>
-      <span className="editor-stat-dot" />
-      <span className="editor-stat"><strong>{(standard?.principles || []).reduce((sum, p) => sum + (p.requirements?.length || 0), 0)}</strong> requirements</span>
-      <span className="editor-stat-dot" />
-      <span className={`editor-stat-type editor-stat-type--${standard?.type || STANDARD_TYPES.CUSTOM}`}>{TYPE_LABELS[standard?.type] || 'Custom'}</span>
+    <div className="standard-editor-toolbar">
+      <TermHeader name={title} sub={sub} />
+      <div className="standard-editor-actions">
+        <button type="button" className="settings-pill" onClick={onBack}>← back</button>
+        {editable && (
+          <button
+            type="button"
+            className={`settings-pill${dirty ? ' settings-pill--active' : ''}`}
+            onClick={onSave}
+            disabled={!dirty}
+          >save</button>
+        )}
+      </div>
     </div>
   );
 }
@@ -108,12 +101,12 @@ function EditorBody({ treeProps, detailProps, treeWidth, onDividerMouseDown }) {
 }
 
 function EditorLoadingOrError({ loading, error, standard, onBack }) {
-  if (loading) return <div className="standard-editor-loading">Loading standard...</div>;
+  if (loading) return <div className="standard-editor-loading">Loading standard…</div>;
   if (error && !standard) {
     return (
       <div className="standard-editor-error">
         <p className="inline-error">{error}</p>
-        <button type="button" className="btn-secondary" onClick={onBack}>Back</button>
+        <button type="button" className="settings-pill" onClick={onBack}>← back</button>
       </div>
     );
   }
@@ -141,7 +134,7 @@ export default function StandardEditor({ standardId, isNew, onBack, onSaved }) {
   const treeActions = buildTreeActions({ addPrinciple, removePrinciple, addRequirement, removeRequirement, setSelectedNode, editable });
 
   return (
-    <div className="standard-editor">
+    <div className="standard-editor standard-editor--terminal">
       <EditorToolbar
         meta={{ isNew, standard, standardId }}
         dirty={dirty} editable={editable}

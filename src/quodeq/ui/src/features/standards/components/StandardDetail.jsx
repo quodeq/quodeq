@@ -1,5 +1,6 @@
 import PrincipleForm from './PrincipleForm.jsx';
 import RequirementForm from './RequirementForm.jsx';
+import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 function slugify(text) {
   return text.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -7,15 +8,9 @@ function slugify(text) {
 
 function EmptyState() {
   return (
-    <div className="detail-empty-state">
-      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12" r="10" />
-        <line x1="12" y1="8" x2="12" y2="16" />
-        <line x1="8" y1="12" x2="16" y2="12" />
-      </svg>
-      <h4>Start building your evaluator</h4>
-      <p>Add your first principle from the tree panel, then define requirements for each one.</p>
-    </div>
+    <p className="detail-empty-state">
+      Add your first principle from the tree on the left, then define requirements for each one.
+    </p>
   );
 }
 
@@ -56,12 +51,12 @@ function SourceField({ standard, editable, onUpdateField }) {
 function RootDetail({ standard, onUpdateField, editable, isNew }) {
   return (
     <div className="standard-root-detail">
-      <h3 className="detail-form-title">Standard Details</h3>
+      <SectionLabel marker="▶">Standard</SectionLabel>
       <NameField standard={standard} editable={editable} isNew={isNew} onUpdateField={onUpdateField} />
       <input type="hidden" value={standard.id || ''} />
       <DescriptionField standard={standard} editable={editable} onUpdateField={onUpdateField} />
       <SourceField standard={standard} editable={editable} onUpdateField={onUpdateField} />
-      {standard.managed && <p className="detail-managed-notice">This is a managed standard. Fields are read-only to preserve upstream compatibility.</p>}
+      {standard.managed && <p className="detail-managed-notice">Managed standard. Fields are read-only to preserve upstream compatibility.</p>}
       {editable && (!standard.principles || standard.principles.length === 0) && <EmptyState />}
     </div>
   );

@@ -338,6 +338,22 @@
 }
 
 /* Console */
+.console-shell {
+  position: relative;
+  background: var(--color-console-bg);
+  border: 1px solid color-mix(in srgb, var(--color-console-text) 18%, var(--color-console-bg));
+  border-radius: var(--radius-lg);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--color-accent) 8%, transparent);
+}
+
+.console-scroll {
+  padding: 16px;
+  max-height: 420px;
+  overflow-y: auto;
+}
+
+/* Keep the older .console-output class working for the read-only server
+   console panel in Settings, which still uses it directly. */
 .console-output {
   background: var(--color-console-bg);
   border: 1px solid color-mix(in srgb, var(--color-console-text) 18%, var(--color-console-bg));
@@ -346,6 +362,48 @@
   padding: 16px;
   max-height: 420px;
   overflow-y: auto;
+}
+
+.console-follow-btn {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  font-family: var(--term-font-mono);
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: color-mix(in srgb, var(--color-console-text) 65%, transparent);
+  background: color-mix(in srgb, var(--color-console-bg) 92%, transparent);
+  backdrop-filter: blur(4px);
+  border: 1px solid color-mix(in srgb, var(--color-console-text) 22%, transparent);
+  border-radius: var(--term-radius);
+  cursor: pointer;
+  transition: color 120ms ease, border-color 120ms ease, background 120ms ease;
+  z-index: 2;
+}
+
+.console-follow-btn:hover {
+  color: var(--color-console-text);
+  border-color: color-mix(in srgb, var(--color-console-text) 45%, transparent);
+}
+
+.console-follow-btn--active {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+  background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+}
+
+.console-follow-btn--active:hover {
+  color: var(--color-accent);
+  border-color: var(--color-accent);
+}
+
+.console-follow-btn svg {
+  flex-shrink: 0;
 }
 
 .console-output::-webkit-scrollbar {
@@ -369,6 +427,22 @@
   color: var(--color-console-text);
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+.console-log-line {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.65;
+  color: var(--color-console-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.console-log-empty {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-style: italic;
+  color: color-mix(in srgb, var(--color-console-text) 60%, transparent);
 }
 
 /* Slim status row */

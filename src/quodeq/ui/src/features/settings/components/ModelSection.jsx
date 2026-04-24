@@ -33,12 +33,12 @@ function ClientSelector({ aiCmd, availableClients }) {
           <span className="settings-label">Client</span>
           <span className="settings-description">CLI tool or API provider for analysis</span>
         </div>
-        <div className="theme-toggle">
+        <div className="settings-pill-group">
           {cliClients.map(({ id, label }) => (
             <button
               key={id}
               type="button"
-              className={`theme-toggle-btn${value === id ? ' active' : ''}`}
+              className={`settings-pill${value === id ? ' settings-pill--active' : ''}`}
               onClick={() => onApply(id)}
             >
               {label}
@@ -48,7 +48,7 @@ function ClientSelector({ aiCmd, availableClients }) {
             <button
               key={id}
               type="button"
-              className={`theme-toggle-btn${value === id ? ' active' : ''}`}
+              className={`settings-pill${value === id ? ' settings-pill--active' : ''}`}
               onClick={() => onApply(id)}
             >
               {label}

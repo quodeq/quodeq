@@ -1,8 +1,10 @@
+import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
+
 export default function AboutSection({ appVersion, settingsPhrase }) {
   return (
     <section className="panel settings-section">
       <div className="panel-header">
-        <h2 className="settings-section-title">About</h2>
+        <SectionLabel marker="▶">About</SectionLabel>
       </div>
       <div className="settings-about-rows">
         <div className="settings-about-row">
