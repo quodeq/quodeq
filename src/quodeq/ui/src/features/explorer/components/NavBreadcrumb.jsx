@@ -1,45 +1,73 @@
 import { Fragment } from 'react';
 
-export default function NavBreadcrumb({ stack, onBack, onGoTo }) {
-  if (stack.length <= 1) return null;
+const PAGE_LABELS = {
+  overview: 'overview',
+  violations: 'violations',
+  map: 'map',
+  history: 'history',
+  evaluate: 'evaluate',
+  standards: 'standards',
+  settings: 'settings',
+  projects: 'projects',
+  help: 'help',
+};
 
-  const segments = stack.map((entry, i) => {
-    let label;
-    switch (entry.page) {
-      case 'overview':      label = 'Overview'; break;
-      case 'run':           label = entry.label || entry.runId || 'Run'; break;
-      case 'explorer':      label = entry.dimension
-        ? entry.dimension.charAt(0).toUpperCase() + entry.dimension.slice(1)
-        : 'Dimension'; break;
-      case 'violation':     label = entry.label || entry.principle?.name || 'Violation'; break;
-      case 'evaluate':      label = 'Evaluate'; break;
-      case 'file':          label = entry.label || 'File Detail'; break;
-      case 'principle':     label = entry.label || 'Principle Detail'; break;
-      case 'evalprinciple': label = entry.label || entry.principleName || 'Principle'; break;
-      default:              label = entry.label || entry.page;
-    }
-    return { label, index: i };
-  });
+export function labelFor(entry) {
+  if (PAGE_LABELS[entry.page]) return PAGE_LABELS[entry.page];
+  switch (entry.page) {
+    case 'run':           return entry.label || entry.runId || 'run';
+    case 'history-run':   return entry.dateLabel || entry.runId || 'run';
+    case 'explorer':      return entry.dimension
+      ? entry.dimension.toLowerCase()
+      : 'dimension';
+    case 'violation':     return entry.label || entry.principle?.name || 'violation';
+    case 'file':          return entry.label || entry.file?.path || 'file';
+    case 'principle':     return entry.label || 'principle';
+    case 'evalprinciple': return entry.label || entry.principleName || 'principle';
+    case 'finding':       return entry.label || 'finding';
+    default:              return entry.label || entry.page;
+  }
+}
+
+/**
+ * NavBreadcrumb — the app's single breadcrumb bar.
+ *
+ * Renders as a thin strip under the topbar / right of the sidebar (the
+ * AppShell places it directly above page content). Always visible while
+ * navigating in a project; falls back to showing just the project root +
+ * current tab when the user hasn't drilled in yet.
+ *
+ * Style: slash-separated plain text, monospace, muted. Intermediate
+ * segments are clickable to pop the nav stack; the current segment is
+ * accent-colored and non-interactive.
+ */
+export default function NavBreadcrumb({ stack, onGoTo, projectName }) {
+  const crumbs = [];
+  if (projectName) crumbs.push({ label: projectName, index: -1 });
+  stack.forEach((entry, i) => crumbs.push({ label: labelFor(entry), index: i }));
+
+  if (crumbs.length === 0) return null;
 
   return (
-    <nav className="nav-breadcrumb">
-      <button className="nav-back-btn" onClick={onBack} title="Go back">
-        ‹
-      </button>
-      <div className="nav-crumbs">
-        {segments.map((seg, i) => (
-          <Fragment key={i}>
-            {i > 0 && <span className="nav-crumb-sep">›</span>}
-            <button
-              className={`nav-crumb-btn${i === segments.length - 1 ? ' active' : ''}`}
-              onClick={() => onGoTo(seg.index)}
-              disabled={i === segments.length - 1}
-            >
-              {seg.label}
-            </button>
-          </Fragment>
-        ))}
-      </div>
+    <nav className="nav-breadcrumb" aria-label="Breadcrumb">
+      <ol className="nav-breadcrumb__crumbs">
+        {crumbs.map((seg, i) => {
+          const isLast = i === crumbs.length - 1;
+          const isClickable = !isLast && seg.index >= 0;
+          return (
+            <Fragment key={`${seg.label}-${i}`}>
+              {i > 0 && <li className="nav-breadcrumb__sep" aria-hidden="true">/</li>}
+              <li className={`nav-breadcrumb__crumb${isLast ? ' is-current' : ''}`}>
+                {isClickable ? (
+                  <button type="button" onClick={() => onGoTo(seg.index)}>{seg.label}</button>
+                ) : (
+                  <span>{seg.label}</span>
+                )}
+              </li>
+            </Fragment>
+          );
+        })}
+      </ol>
     </nav>
   );
 }

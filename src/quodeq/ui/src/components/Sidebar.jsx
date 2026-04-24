@@ -177,25 +177,25 @@ export default function Sidebar({
       </nav>
 
         <nav className="sidebar-nav sidebar-block">
-          <NavButton id="overview"   label="Overview"   icon={ICON_OVERVIEW}   activeTab={activeTab} onNavTab={handleNav} />
-          <NavButton id="violations" label="Violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
-          <NavButton id="map"        label="Map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
-          <NavButton id="history"    label="History"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
+          <NavButton id="overview"   label="overview"   icon={ICON_OVERVIEW}   activeTab={activeTab} onNavTab={handleNav} />
+          <NavButton id="violations" label="violations" icon={ICON_VIOLATIONS} activeTab={activeTab} onNavTab={handleNav} count={violationsCount} />
+          <NavButton id="map"        label="map"        icon={ICON_MAP}        activeTab={activeTab} onNavTab={handleNav} />
+          <NavButton id="history"    label="history"    icon={ICON_HISTORY}    activeTab={activeTab} onNavTab={handleNav} count={historyCount} />
         </nav>
 
         <nav className="sidebar-nav sidebar-block">
           <NavButton
             id="evaluate"
-            label="Evaluate"
+            label="evaluate"
             icon={ICON_EVALUATE}
             activeTab={activeTab}
             onNavTab={(id) => { try { localStorage.setItem(EVALUATE_DOT_DISMISSED_KEY, '1'); } catch {} handleNav(id); }}
             showDot={readyToEvaluate}
           />
-          <NavButton id="standards" label="Standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
+          <NavButton id="standards" label="standards" icon={ICON_STANDARDS} activeTab={activeTab} onNavTab={handleNav} count={standardsCount} />
           <NavButton
             id="settings"
-            label="Settings"
+            label="settings"
             icon={ICON_SETTINGS}
             activeTab={activeTab}
             onNavTab={(id) => { try { localStorage.setItem(SETTINGS_DOT_DISMISSED_KEY, '1'); } catch {} handleNav(id); }}
@@ -227,7 +227,7 @@ export default function Sidebar({
             )}
           </div>
           <div className="sidebar-nav sidebar-block sidebar-block--flush">
-            <NavButton id="help" label="Help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
+            <NavButton id="help" label="help" icon={ICON_HELP} activeTab={activeTab} onNavTab={handleNav} />
           </div>
         </div>
       </aside>

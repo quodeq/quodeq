@@ -17,6 +17,8 @@ const CHART_HEIGHT = 220;
 const REF_LINE_LOW = 2.5;
 const REF_LINE_MID = 5;
 const REF_LINE_HIGH = 7.5;
+const REF_LINE_FLOOR = 0;
+const REF_LINE_CEIL = 10;
 const DESELECTED_BAR_OPACITY = 0.62;
 const CHART_MARGIN = { top: 8, right: 0, bottom: 0, left: 0 };
 const HOVER_STROKE_WIDTH = 1.5;
@@ -98,9 +100,11 @@ function ScoreHistoryChart({ data, interaction }) {
         <XAxis dataKey="dateLabel" hide />
         <YAxis domain={[0, 10]} hide />
         <Tooltip cursor={false} isAnimationActive={false} offset={20} content={({ active }) => <RunHistoryTooltip active={active} hoveredIndex={hoveredIndex} data={data} />} />
-        <ReferenceLine y={REF_LINE_LOW}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
-        <ReferenceLine y={REF_LINE_MID}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
-        <ReferenceLine y={REF_LINE_HIGH} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
+        <ReferenceLine y={REF_LINE_FLOOR} stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.6} />
+        <ReferenceLine y={REF_LINE_LOW}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
+        <ReferenceLine y={REF_LINE_MID}   stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
+        <ReferenceLine y={REF_LINE_HIGH}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.45} />
+        <ReferenceLine y={REF_LINE_CEIL}  stroke={cssVar('--color-chart-axis')} strokeDasharray="4 4" strokeOpacity={0.6} />
         <Bar
           dataKey="numericAverage"
           radius={[0, 0, 0, 0]}

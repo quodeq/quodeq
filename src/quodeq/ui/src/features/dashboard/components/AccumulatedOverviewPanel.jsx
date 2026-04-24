@@ -129,8 +129,10 @@ function AccumulatedHeroSection({ accumulated, scoreDelta, lastDate, accumulated
 
 function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, selectedDayDimNames }) {
   return (
-    <>
-      <SectionLabel>quality_dimensions · {sortedDimensions.length}</SectionLabel>
+    <section className="quality-dimensions" aria-label="Quality dimensions">
+      <div className="quality-dimensions__head">
+        <SectionLabel>quality_dimensions · {sortedDimensions.length}</SectionLabel>
+      </div>
       <div className="dimensions-panel">
         <DimensionCardsGrid
           sortedDimensions={sortedDimensions}
@@ -138,7 +140,7 @@ function AccumulatedDimensionsSection({ sortedDimensions, onDimensionClick, sele
           selectedDayDimNames={selectedDayDimNames}
         />
       </div>
-    </>
+    </section>
   );
 }
 

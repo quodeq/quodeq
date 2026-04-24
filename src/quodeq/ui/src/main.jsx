@@ -56,7 +56,10 @@ applyInitialTheme();
 
 // Tag <html> with the host platform so CSS can reserve space for native
 // chrome that overlays the window (e.g. the macOS traffic-light buttons
-// in the pywebview frameless app shell).
+// in the pywebview frameless app shell). A separate `in-webview` class
+// gates chrome-reservation rules to the native shell only — in a regular
+// browser the OS draws its own chrome outside the viewport, so we
+// shouldn't leave a gap for it.
 try {
   const ua = navigator.userAgent || '';
   const platform = navigator.platform || '';
@@ -65,6 +68,15 @@ try {
 } catch {
   // ignore — platform detection is a progressive enhancement
 }
+
+// pywebview injects `window.pywebview` before `pywebviewready` fires.
+// Listen for that event AND probe once on load in case the script
+// loaded after the injection.
+function markWebview() {
+  if (window.pywebview) document.documentElement.classList.add('in-webview');
+}
+markWebview();
+window.addEventListener('pywebviewready', markWebview);
 
 const rootEl = document.getElementById('root');
 if (!rootEl) throw new Error('Root element #root not found in DOM');

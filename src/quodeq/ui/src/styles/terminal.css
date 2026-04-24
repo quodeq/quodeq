@@ -425,12 +425,36 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--term-space-2);
-  margin: 0 0 var(--term-space-3);
+  margin: 0;
 }
 .violations-sev-row {
   display: inline-flex;
   gap: var(--term-space-1);
   align-items: center;
+  margin-left: var(--term-space-2);
+}
+
+/* Violations title row: TermHeader on the left, flag pills on the right.
+   Controls gravity-bottom to align with the sub line; wraps onto a new
+   row on narrow viewports. Mirrors the Map page pattern. */
+.violations-page--terminal .violations-page__top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--term-space-3);
+  margin-bottom: var(--term-space-4);
+}
+.violations-page--terminal .violations-page__top > .term-header {
+  margin: 0;
+}
+
+/* Inline severity badges next to the sub text */
+.violations-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  flex-wrap: wrap;
 }
 
 /* ------------------------------------------------------------
@@ -688,7 +712,9 @@
    untouched above the breakpoint.
    ------------------------------------------------------------ */
 
-/* Tablet: 900px is the existing breakpoint used elsewhere. */
+/* Single breakpoint for the "compact" layout: sidebar becomes a drawer,
+   topbar flips to back + title + burger. Desktop shows the full rail
+   sidebar and the full breadcrumb above this width. */
 @media (max-width: 900px) {
   /* Mobile: the sidebar disappears entirely from the flow. The TopBar burger
      is the only way to open it, and when open it floats over the content as
@@ -704,17 +730,18 @@
   }
   /* Mobile: the sidebar is ALWAYS mounted as a fixed overlay. It translates
      off-screen when closed and back when pinned, so the close animation
-     mirrors the open animation. */
+     mirrors the open animation. The burger lives on the top-right, so the
+     drawer slides in from the right edge. */
   .sidebar.sidebar--expanded {
     position: fixed !important;
-    left: 0;
+    right: 0;
     top: 0;
     bottom: 0;
     width: min(280px, 85vw) !important;
     z-index: 50;
     display: flex !important;
     box-shadow: 0 0 32px rgba(0, 0, 0, 0.35);
-    transform: translateX(-100%);
+    transform: translateX(100%);
     transition: transform 200ms ease !important;
     animation: none !important;
     pointer-events: none;
@@ -724,11 +751,27 @@
     pointer-events: auto;
   }
 
-  /* TopBar: show the burger, hide desktop-only pills and the primary
-     `+ Evaluate` button (the sidebar already has an Evaluate nav item). */
+  /* TopBar compact layout: back + (centered title) + burger.
+     The title is absolutely centered relative to the topbar so it
+     stays in the optical middle regardless of back-button width.
+     `!important` overrides the default desktop rules later in the file. */
+  .topbar { position: relative; }
   .topbar-menu-btn { display: inline-flex !important; }
+  .topbar-back-btn { display: inline-flex !important; }
+  .topbar-mobile-title {
+    display: inline-flex !important;
+    align-items: center;
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    max-width: calc(100% - 160px);
+    pointer-events: none;
+  }
+  .topbar-breadcrumb-slot { display: none !important; }
   .topbar-pill,
-  .topbar-btn--evaluate { display: none !important; }
+  .topbar-btn--evaluate,
+  .topbar-btn--theme { display: none !important; }
   .topbar-actions { gap: var(--term-space-1); }
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-brand-text,
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-version,
@@ -808,6 +851,7 @@
   }
 }
 
+
 /* ------------------------------------------------------------
    Responsive .history-panels-row — wrap chart + dimensions onto
    two rows once combined min width is no longer available.
@@ -836,7 +880,8 @@
    ------------------------------------------------------------ */
 .run-history-panel--terminal,
 .dim-score-panel--terminal,
-.top-findings {
+.top-findings,
+.quality-dimensions {
   border: 1px solid var(--color-border) !important;
   border-radius: var(--term-radius) !important;
   box-shadow: none !important;
@@ -849,6 +894,7 @@
    contrast tint, and a bottom divider. Used in all three overview panels. */
 .run-history-panel--terminal .run-history-panel__header,
 .top-findings__head,
+.quality-dimensions__head,
 .dim-score-panel--terminal .dim-score-panel__header {
   display: flex;
   align-items: baseline;
@@ -865,13 +911,15 @@
   text-transform: uppercase;
 }
 .run-history-panel--terminal .run-history-panel__header .term-section-label,
-.top-findings__head .term-section-label {
+.top-findings__head .term-section-label,
+.quality-dimensions__head .term-section-label {
   padding: 0;
 }
 
 /* Panel body padding — all content under the banner uses consistent padding */
 .run-history-panel--terminal > *:not(.run-history-panel__header),
 .top-findings > *:not(.top-findings__head),
+.quality-dimensions > *:not(.quality-dimensions__head),
 .dim-score-panel--terminal > *:not(.dim-score-panel__header) {
   padding: var(--term-space-3);
 }
@@ -1153,8 +1201,14 @@
   overflow-y: auto;
 }
 /* Full-width topbar: align breadcrumb with dashboard content below.
-   sidebar-width (64px) + dashboard padding (32px) = 96px left-inset. */
+   Only reserve 96px (traffic-light chrome + sidebar rail) when we're
+   running inside the pywebview native shell on macOS. In a regular
+   browser the OS draws its own chrome outside the viewport, so the
+   topbar can start flush-left against the sidebar rail. */
 .app-shell--with-topbar .topbar {
+  padding-left: var(--term-space-3);
+}
+.platform-mac.in-webview .app-shell--with-topbar .topbar {
   padding-left: 96px;
 }
 
@@ -1413,23 +1467,56 @@
   font-family: var(--term-font-mono);
   font-size: 13px;
 }
-.topbar-breadcrumb {
+/* --------------------------------------------------------------
+   TopBar breadcrumb zone. Desktop shows the full NavBreadcrumb
+   chain; mobile swaps it for a back button on the left, the
+   last segment as a title, and pushes the burger to the right.
+   -------------------------------------------------------------- */
+.topbar-spacer { flex: 1; }
+
+.topbar-breadcrumb-slot {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.topbar-back-btn {
+  display: none; /* shown in compact mode (topbar--compact) and on mobile */
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-right: var(--term-space-2);
+  border: 0;
+  background: transparent;
   color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background 120ms ease, color 120ms ease;
 }
-.topbar-breadcrumb-parent {
-  color: var(--color-text-muted);
-}
-.topbar-breadcrumb-sep {
-  color: var(--color-text-subtle, var(--color-text-muted));
-  opacity: 0.55;
-}
-.topbar-breadcrumb-current {
+.topbar-back-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-text-muted) 12%, transparent);
   color: var(--color-text);
-  font-weight: 500;
 }
+.topbar-back-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.topbar-mobile-title {
+  display: none; /* shown in compact mode (topbar--compact) and on mobile */
+  font-family: var(--term-font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-text);
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 
 .topbar-actions {
   display: inline-flex;
@@ -1439,17 +1526,22 @@
   justify-content: flex-end;
 }
 .topbar-pill {
+  /* Matched footprint with .topbar-btn (Evaluate / Report) so the
+     provider pill reads as part of the same control row: same height,
+     corner radius, font size, and padding. */
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--term-radius);
+  font-size: 12px;
+  font-weight: 500;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
   background: transparent;
   font-family: inherit;
+  line-height: 1.4;
 }
 /* Clickable provider pill — same visuals as the span variant plus hover */
 .topbar-pill--button {
@@ -1503,6 +1595,22 @@
 .topbar-btn:hover {
   background: var(--color-surface-alt);
   border-color: var(--color-text-muted);
+}
+
+/* Icon-only variant — square-ish, same height as .topbar-btn for a
+   consistent row. Used by the theme toggle. Matches Report's neutral
+   text color so it reads as a secondary action rather than picking up
+   the theme accent. */
+.topbar-btn--icon {
+  padding: 4px 7px;
+  color: var(--color-text);
+}
+.topbar-btn--icon:hover {
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+.topbar-btn--icon svg {
+  display: block;
 }
 /* Evaluate button: same footprint as Report, with an accent-tinted
    border + text so it still reads as the primary action without
