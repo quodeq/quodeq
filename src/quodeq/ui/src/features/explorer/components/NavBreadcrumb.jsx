@@ -8,7 +8,7 @@ const PAGE_LABELS = {
   evaluate: 'evaluate',
   standards: 'standards',
   settings: 'settings',
-  projects: 'projects',
+  projects: 'repositories',
   help: 'help',
 };
 

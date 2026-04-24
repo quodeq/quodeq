@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import CopyButton from '../../../components/CopyButton.jsx';
 import { gradeLabel, gradeLetter, extDisplayName } from '../../../utils/formatters.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 
 const DISCIPLINE_LABEL = {
   frontend_nextjs: 'Next.js',
@@ -251,10 +252,11 @@ export default function ProjectsPage({ projects = [], selectedProject, actions }
   const relocateActions = useRelocateDialog(onRelocate);
 
   return (
-    <section className="projects-page">
-      <div className="projects-header">
-        <h1 className="projects-title">Projects</h1>
-      </div>
+    <section className="projects-page projects-page--terminal">
+      <TermHeader
+        name="repositories"
+        sub={`${projects.length} ${projects.length === 1 ? 'repository' : 'repositories'} evaluated`}
+      />
       {projects.length === 0 ? (
         <div className="projects-empty"><p>No projects yet. Run an evaluation to get started.</p></div>
       ) : (

@@ -2551,34 +2551,17 @@
 /* ── Projects page ─────────────────────────────────────── */
 
 .projects-page {
-  padding: var(--space-6);
   display: flex;
   flex-direction: column;
-  align-items: center;
-}
-
-.projects-page > * {
+  gap: var(--space-4);
   width: 100%;
-  max-width: 680px;
-}
-
-.projects-header {
-  margin-bottom: var(--space-6);
-}
-
-.projects-title {
-  font-size: var(--text-xl);
-  font-weight: var(--weight-semibold);
-  color: var(--color-text);
-  margin: 0;
 }
 
 .projects-cards {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  max-width: 680px;
-  margin: 0 auto;
+  width: 100%;
 }
 
 /* ── Project card ── */
@@ -2634,8 +2617,9 @@
 }
 
 .project-card-name {
+  font-family: var(--term-font-mono);
   font-size: var(--text-base);
-  font-weight: var(--weight-semibold);
+  font-weight: var(--weight-medium);
   color: var(--color-text);
   line-height: 1.3;
 }
