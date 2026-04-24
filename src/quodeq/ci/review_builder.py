@@ -156,10 +156,16 @@ def determine_verdict(new_violations: list[dict]) -> str:
     Existing (pre-existing baseline) violations do not influence the verdict —
     this PR is only responsible for what it introduces.
 
-    Returns: 'APPROVE', 'COMMENT', or 'REQUEST_CHANGES'.
+    Returns: 'COMMENT' or 'REQUEST_CHANGES'.
+
+    Note: GitHub Actions' default token is **not permitted to approve pull
+    requests** — submitting a review with event=APPROVE returns HTTP 422
+    ("GitHub Actions is not permitted to approve pull requests"). So clean
+    runs post a COMMENT review instead; the summary body carries the "no
+    new violations" message and no blocking changes are requested.
     """
     if not new_violations:
-        return "APPROVE"
+        return "COMMENT"
 
     severities = {v.get("severity", "minor") for v in new_violations}
     if severities & {"critical", "high"}:

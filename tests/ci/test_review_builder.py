@@ -61,9 +61,12 @@ def test_determine_verdict_critical():
 
 
 def test_determine_verdict_no_violations():
+    # GitHub Actions' default token cannot submit APPROVE reviews
+    # (HTTP 422 "not permitted to approve"), so zero-violation runs
+    # post a COMMENT review instead.
     from quodeq.ci.review_builder import determine_verdict
 
-    assert determine_verdict([]) == "APPROVE"
+    assert determine_verdict([]) == "COMMENT"
 
 
 def test_determine_verdict_minor_only():
