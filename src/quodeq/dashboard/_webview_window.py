@@ -388,10 +388,17 @@ def _build_about_credits() -> object | None:
 
 
 def _install_about_panel_override() -> None:
-    """Point the Apple-menu 'About …' at a handler that shows a rich panel."""
+    """Point the Apple-menu 'About …' at a handler that shows a rich panel.
+
+    The app main menu is built lazily by NSApp during the Cocoa run loop.
+    On the first call from the `loaded` event it's typically still nil, so
+    schedule a repeating NSTimer that retries until the About item exists
+    (or we give up after ~5s).
+    """
     global _about_target
     try:
         from AppKit import NSApplication, NSObject  # type: ignore[import-untyped]
+        from Foundation import NSTimer  # type: ignore[import-untyped]
     except ImportError:
         return
 
@@ -414,37 +421,57 @@ def _install_about_panel_override() -> None:
                 opts["Credits"] = credits
             NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(opts)
 
-    try:
-        app = NSApplication.sharedApplication()
-        main_menu = app.mainMenu()
-        if main_menu is None or main_menu.numberOfItems() == 0:
-            print("[quodeq-about] no main menu yet", file=_diag, flush=True)
-            return
-        # Scan every menu + submenu for items whose title contains "About".
-        # pywebview's menu layout isn't strictly [0] = About, and on some
-        # macOS versions the Apple menu is merged/injected out of order.
-        about_items = []
-        for mi in range(main_menu.numberOfItems()):
-            sub = main_menu.itemAtIndex_(mi).submenu()
-            if sub is None:
-                continue
-            for i in range(sub.numberOfItems()):
-                item = sub.itemAtIndex_(i)
-                title = str(item.title() or "")
-                if title.lower().startswith("about"):
-                    about_items.append(item)
-        if not about_items:
-            print("[quodeq-about] no About item found in any submenu",
+    _about_target = _AboutHandler.alloc().init()
+    state = {"attempts": 0, "timer": None}
+    max_attempts = 25  # ~5 seconds at 200ms
+
+    class _InstallPoller(NSObject):
+        def tryInstall_(self, timer):  # noqa: ARG002
+            state["attempts"] += 1
+            app = NSApplication.sharedApplication()
+            main_menu = app.mainMenu()
+            if main_menu is None or main_menu.numberOfItems() == 0:
+                if state["attempts"] >= max_attempts:
+                    print(f"[quodeq-about] gave up after {state['attempts']} attempts — no main menu",
+                          file=_diag, flush=True)
+                    if state["timer"]:
+                        state["timer"].invalidate()
+                return
+            about_items = []
+            for mi in range(main_menu.numberOfItems()):
+                sub = main_menu.itemAtIndex_(mi).submenu()
+                if sub is None:
+                    continue
+                for i in range(sub.numberOfItems()):
+                    item = sub.itemAtIndex_(i)
+                    title = str(item.title() or "")
+                    if title.lower().startswith("about"):
+                        about_items.append(item)
+            if not about_items:
+                if state["attempts"] >= max_attempts:
+                    print(f"[quodeq-about] gave up — no About item found after {state['attempts']} attempts",
+                          file=_diag, flush=True)
+                    if state["timer"]:
+                        state["timer"].invalidate()
+                return
+            for item in about_items:
+                item.setTarget_(_about_target)
+                item.setAction_("showAbout:")
+            print(f"[quodeq-about] retargeted {len(about_items)} About item(s) on attempt {state['attempts']}",
                   file=_diag, flush=True)
-            return
-        _about_target = _AboutHandler.alloc().init()
-        for item in about_items:
-            item.setTarget_(_about_target)
-            item.setAction_("showAbout:")
-        print(f"[quodeq-about] retargeted {len(about_items)} About item(s)",
-              file=_diag, flush=True)
-    except (AttributeError, IndexError, ValueError) as exc:
-        print(f"[quodeq-about] install failed: {exc}", file=_diag, flush=True)
+            if state["timer"]:
+                state["timer"].invalidate()
+
+    poller = _InstallPoller.alloc().init()
+    # Retain the poller so it isn't GC'd while the timer holds a weak ref
+    state["poller"] = poller
+    try:
+        timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            0.2, poller, "tryInstall:", None, True,
+        )
+        state["timer"] = timer
+    except (AttributeError, ValueError) as exc:
+        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
 
 
 def _set_app_icon() -> None:
