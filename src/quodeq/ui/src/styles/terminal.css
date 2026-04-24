@@ -770,7 +770,8 @@
   }
   .topbar-breadcrumb-slot { display: none !important; }
   .topbar-pill,
-  .topbar-btn--evaluate { display: none !important; }
+  .topbar-btn--evaluate,
+  .topbar-btn--theme { display: none !important; }
   .topbar-actions { gap: var(--term-space-1); }
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-brand-text,
   .sidebar.sidebar--expanded.sidebar--pinned .sidebar-version,
@@ -1525,17 +1526,22 @@
   justify-content: flex-end;
 }
 .topbar-pill {
+  /* Matched footprint with .topbar-btn (Evaluate / Report) so the
+     provider pill reads as part of the same control row: same height,
+     corner radius, font size, and padding. */
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 5px 10px;
+  padding: 4px 10px;
   border: 1px solid var(--color-border);
-  border-radius: 999px;
-  font-size: 11px;
+  border-radius: var(--term-radius);
+  font-size: 12px;
+  font-weight: 500;
   color: var(--color-text-muted);
   font-variant-numeric: tabular-nums;
   background: transparent;
   font-family: inherit;
+  line-height: 1.4;
 }
 /* Clickable provider pill — same visuals as the span variant plus hover */
 .topbar-pill--button {
@@ -1589,6 +1595,22 @@
 .topbar-btn:hover {
   background: var(--color-surface-alt);
   border-color: var(--color-text-muted);
+}
+
+/* Icon-only variant — square-ish, same height as .topbar-btn for a
+   consistent row. Used by the theme toggle. Matches Report's neutral
+   text color so it reads as a secondary action rather than picking up
+   the theme accent. */
+.topbar-btn--icon {
+  padding: 4px 7px;
+  color: var(--color-text);
+}
+.topbar-btn--icon:hover {
+  color: var(--color-text);
+  background: var(--color-surface-alt);
+}
+.topbar-btn--icon svg {
+  display: block;
 }
 /* Evaluate button: same footprint as Report, with an accent-tinted
    border + text so it still reads as the primary action without

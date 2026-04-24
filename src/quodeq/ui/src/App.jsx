@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import DashboardPage from './features/dashboard/components/DashboardPage.jsx';
 import NavBreadcrumb, { labelFor as navLabelFor } from './features/explorer/components/NavBreadcrumb.jsx';
 import ExplorerPage from './features/explorer/components/ExplorerPage.jsx';
@@ -25,6 +25,29 @@ import { readVisibleStandardIds } from './utils/visibleStandards.js';
 import { filterTrendByVisibleStandards, filterAccumulatedByVisibleStandards } from './utils/scoreFiltering.js';
 
 const NO_PROJECT_TABS = ['evaluate', 'standards', 'settings', 'help'];
+
+/**
+ * Returns whether the app is currently rendering dark, taking the saved
+ * theme mode and — when it's 'system' — the OS preference into account.
+ * Kept in App so the topbar's theme toggle reflects what's on screen
+ * rather than the mode literal.
+ */
+function useEffectiveDark(themeMode) {
+  const [prefersDark, setPrefersDark] = useState(() =>
+    typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-color-scheme: dark)').matches
+  );
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mql = window.matchMedia('(prefers-color-scheme: dark)');
+    const handler = (e) => setPrefersDark(e.matches);
+    mql.addEventListener('change', handler);
+    return () => mql.removeEventListener('change', handler);
+  }, []);
+  if (themeMode === 'dark') return true;
+  if (themeMode === 'light') return false;
+  return prefersDark;
+}
 
 /**
  * @param {{ serverHealth: Object, evaluation: Object, selectedProject: string }} props
@@ -280,6 +303,14 @@ export default function App() {
     [state.dashboard?.trend, state.currentOverviewRun, state.dailyRuns, state.overviewRunIndex]
   );
 
+  // Resolve whether the UI is currently rendering dark. Used by the
+  // topbar's moon/sun toggle so the icon reflects what's on-screen,
+  // not just the saved mode preference.
+  const effectiveDark = useEffectiveDark(state.settings.themeMode);
+  const toggleTheme = () => {
+    state.settings.applyMode(effectiveDark ? 'light' : 'dark');
+  };
+
   // Sidebar counts should respect the user's currently-visible standards so
   // they match the numbers shown on the Violations and History pages.
   const visibleSet = useMemo(() => new Set(readVisibleStandardIds()), []);
@@ -381,6 +412,8 @@ export default function App() {
           mobileTitle={navStack.length ? navLabelFor(navStack[navStack.length - 1]) : (activeTab || '')}
           canGoBack={navStack.length > 1}
           onBack={navPop}
+          effectiveDark={effectiveDark}
+          onToggleTheme={toggleTheme}
         />
       }
       content={<div className="tab-fade" key={activeTab}><MainContent activePage={activePage} props={contentProps} /></div>}
