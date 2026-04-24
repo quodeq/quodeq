@@ -410,7 +410,16 @@
 .heat-grid--flat tbody tr:last-child td { border-bottom: 0; }
 .heat-grid--flat td:first-child { text-align: left; }
 
-.heat-grid--flat .heat-grid-file { padding: 0; font-size: 13px; }
+.heat-grid--flat .heat-grid-file,
+.heat-grid--flat .heat-grid-dim-row td:first-child .heat-grid-file {
+  padding: 0;
+  font-size: 13px;
+  /* Match the mono/lowercase aesthetic used elsewhere in the terminal
+     restyle. The second selector explicitly targets dimension header
+     rows (Maintainability, Flexibility, …) since their existing rule
+     has higher specificity than the plain `.heat-grid-file` override. */
+  text-transform: lowercase;
+}
 .heat-grid--flat .heat-grid-num {
   padding: 0;
   font-weight: var(--weight-bold);

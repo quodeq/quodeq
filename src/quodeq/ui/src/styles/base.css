@@ -235,6 +235,9 @@ body {
 .sidebar-nav-label {
   opacity: 0;
   transition: opacity 150ms ease;
+  /* Labels are authored lowercase to match the mono breadcrumb style;
+     explicit `lowercase` neutralises any inherited `capitalize` rules. */
+  text-transform: lowercase;
 }
 
 .sidebar:hover .sidebar-nav-label {
