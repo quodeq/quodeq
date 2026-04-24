@@ -278,18 +278,206 @@ def _icon_path(ext: str) -> str | None:
     return str(p) if p.exists() else None
 
 
+_APP_DISPLAY_NAME = "quodeq"
+
+
+_macos_app_icon: object | None = None  # cache the NSImage across _set calls
+
+
+def _set_macos_app_identity() -> None:
+    """Set dock icon, menu-bar app name, and About-panel icon on macOS.
+
+    Called both at startup (early) and after pywebview is shown — pywebview
+    spins up its own NSApplication when start() runs, which overrides the
+    early-set icon. Re-applying from the `loaded` event ensures the icon
+    lands on the NSApp instance that actually renders the dock tile.
+
+    The About panel (Apple menu → About quodeq) draws from the bundle info
+    dict, not the runtime icon image, so we also write NSApplicationIcon
+    into the info dict and register a swizzled action on the menu item.
+    """
+    global _macos_app_icon
+    try:
+        from AppKit import NSApplication, NSBundle, NSImage  # type: ignore[import-untyped]
+    except ImportError:
+        return
+    # Patch the bundle name so the menu bar reads "quodeq" instead of "python3".
+    # Runtime mutation of the NSBundle info dict; works as long as NSApp
+    # hasn't cached the name (i.e. before webview.start draws the menu bar).
+    # Repeat calls are harmless.
+    try:
+        info = NSBundle.mainBundle().infoDictionary()
+        if info is not None:
+            info["CFBundleName"] = _APP_DISPLAY_NAME
+            info["CFBundleDisplayName"] = _APP_DISPLAY_NAME
+    except (AttributeError, TypeError):
+        pass
+    path = _icon_path(".icns")
+    if not path:
+        return
+    try:
+        icon = NSImage.alloc().initWithContentsOfFile_(path)
+    except (AttributeError, ValueError):
+        icon = None
+    if not icon:
+        return
+    _macos_app_icon = icon  # keep a live reference for the About-panel override
+    try:
+        NSApplication.sharedApplication().setApplicationIconImage_(icon)
+    except (AttributeError, ValueError):
+        pass
+    # Override the default About panel so it shows our icon + name. The
+    # standard panel reads from Info.plist and ignores setApplicationIconImage_
+    # for non-bundled apps, so we wire a custom action on the first-responder
+    # chain using orderFrontStandardAboutPanelWithOptions_.
+    _install_about_panel_override()
+
+
+_about_target: object | None = None  # keep delegate alive for the menu item's weak ref
+
+
+def _diag_path() -> Path:
+    return Path.home() / ".quodeq" / "run" / "webview_debug.log"
+
+
+try:
+    _diag_path().parent.mkdir(parents=True, exist_ok=True)
+    _diag = _diag_path().open("a", encoding="utf-8")  # noqa: SIM115 — lives for the process
+except OSError:
+    _diag = sys.stderr
+
+_QUODEQ_WEBSITE = "https://quodeq.com"
+_QUODEQ_REPO = "https://github.com/quodeq/quodeq"
+
+
+def _quodeq_version() -> str:
+    try:
+        from importlib.metadata import version  # noqa: PLC0415
+        return version("quodeq")
+    except Exception:  # noqa: BLE001 — metadata may be missing in dev
+        return "dev"
+
+
+def _build_about_credits() -> object | None:
+    """Build a clickable NSAttributedString with website + repo links."""
+    try:
+        from AppKit import (  # type: ignore[import-untyped]
+            NSAttributedString,
+            NSMutableAttributedString,
+            NSURL,
+        )
+        from Foundation import NSRange  # type: ignore[import-untyped]  # noqa: F401
+    except ImportError:
+        return None
+    try:
+        body = NSMutableAttributedString.alloc().init()
+        def _append(text: str, link: str | None = None) -> None:
+            attrs = {}
+            if link:
+                url = NSURL.URLWithString_(link)
+                if url is not None:
+                    attrs = {"NSLink": url}
+            fragment = NSAttributedString.alloc().initWithString_attributes_(text, attrs)
+            body.appendAttributedString_(fragment)
+        _append(_QUODEQ_WEBSITE, _QUODEQ_WEBSITE)
+        _append("\n")
+        _append(_QUODEQ_REPO, _QUODEQ_REPO)
+        return body
+    except (AttributeError, ValueError):
+        return None
+
+
+def _install_about_panel_override() -> None:
+    """Point the Apple-menu 'About …' at a handler that shows a rich panel.
+
+    The app main menu is built lazily by NSApp during the Cocoa run loop.
+    On the first call from the `loaded` event it's typically still nil, so
+    schedule a repeating NSTimer that retries until the About item exists
+    (or we give up after ~5s).
+    """
+    global _about_target
+    try:
+        from AppKit import NSApplication, NSObject  # type: ignore[import-untyped]
+        from Foundation import NSTimer  # type: ignore[import-untyped]
+    except ImportError:
+        return
+
+    import datetime as _dt  # noqa: PLC0415
+    version = _quodeq_version()
+    copyright_line = f"© {_dt.date.today().year} quodeq"
+
+    class _AboutHandler(NSObject):
+        def showAbout_(self, sender):  # noqa: ARG002 — ObjC selector signature
+            opts: dict[str, object] = {
+                "ApplicationName": _APP_DISPLAY_NAME,
+                "ApplicationVersion": version,
+                "Version": "",  # hide the "Build" line Apple renders by default
+                "Copyright": copyright_line,
+            }
+            if _macos_app_icon is not None:
+                opts["ApplicationIcon"] = _macos_app_icon
+            credits = _build_about_credits()
+            if credits is not None:
+                opts["Credits"] = credits
+            NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(opts)
+
+    _about_target = _AboutHandler.alloc().init()
+    state = {"attempts": 0, "timer": None}
+    max_attempts = 25  # ~5 seconds at 200ms
+
+    class _InstallPoller(NSObject):
+        def tryInstall_(self, timer):  # noqa: ARG002
+            state["attempts"] += 1
+            app = NSApplication.sharedApplication()
+            main_menu = app.mainMenu()
+            if main_menu is None or main_menu.numberOfItems() == 0:
+                if state["attempts"] >= max_attempts:
+                    print(f"[quodeq-about] gave up after {state['attempts']} attempts — no main menu",
+                          file=_diag, flush=True)
+                    if state["timer"]:
+                        state["timer"].invalidate()
+                return
+            about_items = []
+            for mi in range(main_menu.numberOfItems()):
+                sub = main_menu.itemAtIndex_(mi).submenu()
+                if sub is None:
+                    continue
+                for i in range(sub.numberOfItems()):
+                    item = sub.itemAtIndex_(i)
+                    title = str(item.title() or "")
+                    if title.lower().startswith("about"):
+                        about_items.append(item)
+            if not about_items:
+                if state["attempts"] >= max_attempts:
+                    print(f"[quodeq-about] gave up — no About item found after {state['attempts']} attempts",
+                          file=_diag, flush=True)
+                    if state["timer"]:
+                        state["timer"].invalidate()
+                return
+            for item in about_items:
+                item.setTarget_(_about_target)
+                item.setAction_("showAbout:")
+            print(f"[quodeq-about] retargeted {len(about_items)} About item(s) on attempt {state['attempts']}",
+                  file=_diag, flush=True)
+            if state["timer"]:
+                state["timer"].invalidate()
+
+    poller = _InstallPoller.alloc().init()
+    # Retain the poller so it isn't GC'd while the timer holds a weak ref
+    state["poller"] = poller
+    try:
+        timer = NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
+            0.2, poller, "tryInstall:", None, True,
+        )
+        state["timer"] = timer
+    except (AttributeError, ValueError) as exc:
+        print(f"[quodeq-about] NSTimer schedule failed: {exc}", file=_diag, flush=True)
+
+
 def _set_app_icon() -> None:
     """Set the application icon (dock on macOS, taskbar on Windows)."""
     if sys.platform == "darwin":
-        try:
-            from AppKit import NSApplication, NSImage  # type: ignore[import-untyped]
-            path = _icon_path(".icns")
-            if path:
-                icon = NSImage.alloc().initWithContentsOfFile_(path)
-                if icon:
-                    NSApplication.sharedApplication().setApplicationIconImage_(icon)
-        except ImportError:
-            pass
+        _set_macos_app_identity()
     elif sys.platform == "win32":
         try:
             import ctypes
@@ -330,6 +518,11 @@ def main() -> None:
     def _on_loaded() -> None:
         window.show()
         window.evaluate_js(INJECT_JS)
+        # Re-apply the dock icon + bundle name now that pywebview's
+        # NSApplication instance is live. Calling this earlier in main()
+        # targets the pre-pywebview NSApp and gets overridden.
+        if sys.platform == "darwin":
+            _set_macos_app_identity()
 
     def _on_closing() -> bool:
         """Intercept native close (Cmd+Q, red button, window manager).
