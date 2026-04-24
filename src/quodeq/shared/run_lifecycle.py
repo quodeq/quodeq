@@ -24,6 +24,7 @@ from pathlib import Path
 from types import TracebackType
 from typing import Any
 
+from quodeq.shared import cancellation
 from quodeq.shared.run_heartbeat import HeartbeatThread
 from quodeq.shared.run_status import (
     RunState,
@@ -70,6 +71,7 @@ class RunLifecycleContext:
     # ---- Context protocol --------------------------------------------------
 
     def __enter__(self) -> "RunLifecycleContext":
+        cancellation.reset()
         self._write(RunState.PENDING)
         self._install_signal_handlers()
         atexit.register(self._finalize_on_atexit)
@@ -140,6 +142,9 @@ class RunLifecycleContext:
                 name = signal.Signals(signum).name
             except ValueError:
                 name = f"signal_{signum}"
+            # Signal worker threads (subagent pool, AI CLI subprocess monitors)
+            # to stop waiting on long-running operations and terminate promptly.
+            cancellation.request_cancel()
             # Avoid using the transition-validating path — we may be mid-state.
             self._heartbeat.stop()
             write_status(

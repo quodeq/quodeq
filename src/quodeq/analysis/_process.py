@@ -10,6 +10,7 @@ from pathlib import Path
 from quodeq.analysis._config import AnalysisConfig, _SpawnPaths
 from quodeq.analysis.errors import ProviderError
 from quodeq.analysis.stream.progress_reader import _IncrementalProgressReader
+from quodeq.shared import cancellation
 from quodeq.shared.logging import log_warning
 from quodeq.shared.utils import sanitize_sensitive as _sanitize_stderr
 
@@ -70,6 +71,9 @@ def _run_with_heartbeat(
         try:
             process.wait(timeout=config.heartbeat_interval)
         except subprocess.TimeoutExpired:
+            if cancellation.is_cancelled():
+                _terminate_process(process)
+                return timed_out
             elapsed += config.heartbeat_interval
             if config.heartbeat_callback:
                 config.heartbeat_callback(elapsed, reader.read_progress())
