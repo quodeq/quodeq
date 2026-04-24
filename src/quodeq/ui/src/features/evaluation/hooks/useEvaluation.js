@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useApi } from '../../../api/ApiContext.jsx';
 import { ACTIVE_PROVIDER_KEY, providerKey, DEFAULT_MAX_SUBAGENTS, DEFAULT_POOL_BUDGET } from '../../../constants.js';
+import { confirmDialog } from '../../../utils/confirmDialog.js';
 
 const DIMENSION_POLL_INITIAL_MS = 2000;
 const DIMENSION_POLL_MAX_MS = 8000;
@@ -239,7 +240,6 @@ function useJobLifecycle(refs, setJob, setJobError, setLiveViolations, startPoll
 
   async function cancelEvaluationJob(jobId) {
     if (!jobId) return;
-    const { confirmDialog } = await import('../../../utils/confirmDialog.js');
     const ok = await confirmDialog({
       title: 'Cancel evaluation?',
       message: 'Stop the running scan. Any findings collected so far will still be saved.',

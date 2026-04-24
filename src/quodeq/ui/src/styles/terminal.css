@@ -1001,6 +1001,12 @@
 .history-row * {
   font-family: var(--term-font-mono);
 }
+/* Lazy-render off-screen history rows natively — see the long-form
+   comment on `.vdetail-row` in evaluation.css. */
+.history-row:not(.history-row--header) {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 36px;
+}
 .history-row__col--date { color: var(--color-text); }
 .history-row__col--time { color: var(--color-text-muted); }
 /* DIMENSIONS CHANGED is secondary info — match row font-size for clarity */

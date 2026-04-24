@@ -8,75 +8,51 @@ import { useApi } from '../../../api/ApiContext.jsx';
 import { EvalViolationCard, ComplianceCard } from './EvalCards.jsx';
 import SeverityFilterPills from '../../../components/SeverityFilterPills.jsx';
 import { TermHeader, StatStrip, Stat, SevBadge, SectionLabel } from '../../../components/terminal/index.js';
-import VirtualList from '../../../components/VirtualList.jsx';
 
-const PAGE_SIZE = 20;
-
-// Pretext-fed estimate for VirtualList. Counts wrap-able characters so the
-// initial scroll geometry is close to the final measured height; a post-mount
-// ResizeObserver inside VirtualList corrects any drift as cards render.
-const VIRTUAL_OVERHEAD = 140;   // header row + labels + padding + scope bar
-const CHARS_PER_LINE = 90;      // rough chars that fit at typical container width
-const LINE_HEIGHT = 20;
-
-function estimateFindingHeight(v) {
-  const titleLines = v?.title ? Math.max(1, Math.ceil(v.title.length / CHARS_PER_LINE)) : 0;
-  const reasonLines = v?.reason ? Math.max(1, Math.ceil(v.reason.length / CHARS_PER_LINE)) : 0;
-  return VIRTUAL_OVERHEAD + (titleLines + reasonLines) * LINE_HEIGHT;
-}
-
-const VIRTUALIZE_THRESHOLD = 20; // only virtualize groups this long
+// Off-screen rows skip layout/paint via CSS `content-visibility: auto` on
+// `.vdetail-row` (see styles/explorer.css), so no JS virtualizer or
+// "Show all" pagination is needed. Rows render naturally inside the app's
+// existing scroll container.
 
 function ViolationListSection({ violationsBySeverity, principle, buildViolationPlanText, onDismiss }) {
   return EVAL_SEVERITY_ORDER.map((sev) => {
     const vs = violationsBySeverity[sev];
     if (!vs || vs.length === 0) return null;
-    const renderCard = (v, idx) => (
-      <EvalViolationCard v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
-    );
     return (
       <div key={sev}>
         <SectionLabel>{sev.toUpperCase()} · {vs.length}</SectionLabel>
-        {vs.length >= VIRTUALIZE_THRESHOLD ? (
-          <VirtualList
-            className="vlive-violations-group vlive-violations-group--virtual"
-            items={vs}
-            getEstimatedHeight={estimateFindingHeight}
-            getItemKey={(v, i) => `${v.file || 'nofile'}:${v.line ?? 'noline'}:${i}`}
-            renderItem={renderCard}
-          />
-        ) : (
-          <div className="vlive-violations-group">
-            {vs.map((v, idx) => (
-              <EvalViolationCard key={idx} v={v} principle={principle} buildViolationPlanText={buildViolationPlanText} index={idx} onDismiss={onDismiss} />
-            ))}
-          </div>
-        )}
+        <div className="vlive-violations-group">
+          {vs.map((v, idx) => (
+            <EvalViolationCard
+              key={`${v.file || 'nofile'}:${v.line ?? 'noline'}:${idx}`}
+              v={v}
+              principle={principle}
+              buildViolationPlanText={buildViolationPlanText}
+              index={idx}
+              onDismiss={onDismiss}
+            />
+          ))}
+        </div>
       </div>
     );
   });
 }
 
-function ComplianceListSection({ data, controls }) {
-  const { compliance, displayedCompliance, principle } = data;
-  const { hasMore, showAll, setShowAll } = controls;
+function ComplianceListSection({ compliance, principle }) {
   if (compliance.length === 0) return null;
   return (
     <div>
       <SectionLabel>COMPLIANCE · {compliance.length}</SectionLabel>
       <div className="vlive-violations-group">
-        {displayedCompliance.map((c, idx) => (
-          <ComplianceCard key={idx} c={c} principle={principle} index={idx} />
+        {compliance.map((c, idx) => (
+          <ComplianceCard
+            key={`${c.file || 'nofile'}:${c.line ?? 'noline'}:${idx}`}
+            c={c}
+            principle={principle}
+            index={idx}
+          />
         ))}
       </div>
-      {hasMore && (
-        <button
-          className="offending-show-more"
-          onClick={() => setShowAll((v) => !v)}
-        >
-          {showAll ? 'Show less' : `Show all ${compliance.length} compliance items`}
-        </button>
-      )}
     </div>
   );
 }
@@ -222,15 +198,12 @@ function usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss) {
 
 const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, severityFilter, onDismiss }) {
   const { principleData, principle, score, grade } = evalPrincipal;
-  const [showAllCompliance, setShowAllCompliance] = useState(false);
 
   const {
     violations, compliance, violationsBySeverity,
     liveScore, liveGrade, activeSevFilter, setActiveSevFilter,
     handleDismiss, filteredViolations, liveSevCounts, displayedBySeverity,
   } = usePrincipleFiltering(evalPrincipal, severityFilter, onDismiss);
-
-  const displayedCompliance = showAllCompliance ? compliance : compliance.slice(0, PAGE_SIZE);
 
   return (
     <>
@@ -242,11 +215,13 @@ const PrincipleDetailPage = memo(function PrincipleDetailPage({ evalPrincipal, s
       {filteredViolations.length > 0 && (
         <SeverityFilterPills counts={liveSevCounts} activeFilter={activeSevFilter} onFilterChange={setActiveSevFilter} />
       )}
-      <ViolationListSection violationsBySeverity={displayedBySeverity} principle={principle} buildViolationPlanText={(v) => buildViolationPlanText(v, principle)} onDismiss={handleDismiss} />
-      <ComplianceListSection
-        data={{ compliance, displayedCompliance, principle }}
-        controls={{ hasMore: compliance.length > PAGE_SIZE, showAll: showAllCompliance, setShowAll: setShowAllCompliance }}
+      <ViolationListSection
+        violationsBySeverity={displayedBySeverity}
+        principle={principle}
+        buildViolationPlanText={(v) => buildViolationPlanText(v, principle)}
+        onDismiss={handleDismiss}
       />
+      <ComplianceListSection compliance={compliance} principle={principle} />
     </>
   );
 });
