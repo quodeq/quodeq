@@ -6,6 +6,7 @@ import { classifyProvider } from './providerUtils.js';
 import OllamaTab from './OllamaTab.jsx';
 import CliProviderTab from './CliProviderTab.jsx';
 import CloudProviderTab from './CloudProviderTab.jsx';
+import SectionLabel from '../../../components/terminal/SectionLabel.jsx';
 
 const CLI_DEFAULTS = { 'subagents': String(DEFAULT_MAX_SUBAGENTS), 'pool-budget': String(DEFAULT_POOL_BUDGET) };
 const DEFAULT_PROVIDER_ORDER = 50;
@@ -85,7 +86,7 @@ export default function ProviderTabs({ providerConfigs }) {
   return (
     <section className="panel settings-section">
       <div className="panel-header">
-        <h2 className="settings-section-title">Analysis</h2>
+        <SectionLabel marker="▶">Analysis</SectionLabel>
       </div>
       {clientsError && <div className="settings-row"><span className="settings-error">{clientsError}</span></div>}
       <div className="settings-row">
@@ -93,14 +94,14 @@ export default function ProviderTabs({ providerConfigs }) {
           <span className="settings-label">AI Provider</span>
           <span className="settings-description">Select the AI provider used when running evaluations</span>
         </div>
-        <div className="provider-tab-bar" role="tablist">
+        <div className="settings-pill-group" role="tablist">
           {clients.map((c) => (
             <button
               key={c.id}
               type="button"
               role="tab"
               aria-selected={c.id === activeTab}
-              className={`provider-tab${c.id === activeTab ? ' provider-tab--active' : ''}`}
+              className={`settings-pill${c.id === activeTab ? ' settings-pill--active' : ''}`}
               onClick={() => selectTab(c.id)}
             >
               {c.label}
