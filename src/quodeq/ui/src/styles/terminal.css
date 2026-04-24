@@ -425,12 +425,36 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--term-space-2);
-  margin: 0 0 var(--term-space-3);
+  margin: 0;
 }
 .violations-sev-row {
   display: inline-flex;
   gap: var(--term-space-1);
   align-items: center;
+  margin-left: var(--term-space-2);
+}
+
+/* Violations title row: TermHeader on the left, flag pills on the right.
+   Controls gravity-bottom to align with the sub line; wraps onto a new
+   row on narrow viewports. Mirrors the Map page pattern. */
+.violations-page--terminal .violations-page__top {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--term-space-3);
+  margin-bottom: var(--term-space-4);
+}
+.violations-page--terminal .violations-page__top > .term-header {
+  margin: 0;
+}
+
+/* Inline severity badges next to the sub text */
+.violations-sub {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--term-space-2);
+  flex-wrap: wrap;
 }
 
 /* ------------------------------------------------------------
