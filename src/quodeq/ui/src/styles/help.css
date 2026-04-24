@@ -2,7 +2,7 @@
 
 .help-page {
   padding: var(--space-6);
-  max-width: 1040px;
+  max-width: 1280px;
 }
 
 .help-page .page-subtitle {
@@ -61,6 +61,16 @@
 .help-content {
   flex: 1;
   min-width: 0;
+}
+
+/* ── Right aside (brand + tips) ──────────────────────── */
+
+.help-aside {
+  width: 260px;
+  flex-shrink: 0;
+  position: sticky;
+  top: var(--space-4);
+  align-self: flex-start;
 }
 
 .help-section {
@@ -238,7 +248,7 @@
 
 /* ── Responsive ──────────────────────────────────────── */
 
-@media (max-width: 720px) {
+@media (max-width: 900px) {
   .help-layout {
     flex-direction: column;
   }
@@ -248,5 +258,9 @@
     flex-direction: row;
     flex-wrap: wrap;
     min-width: auto;
+  }
+
+  .help-aside {
+    display: none;
   }
 }

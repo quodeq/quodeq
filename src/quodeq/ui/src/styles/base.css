@@ -1062,26 +1062,6 @@ textarea:focus {
   border-bottom: 1px solid var(--color-border);
 }
 
-.settings-header-content {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-}
-
-.settings-header-left {
-  display: flex;
-  align-items: center;
-  gap: var(--space-4);
-  flex-shrink: 0;
-}
-
-.settings-header-center {
-  flex: 1;
-  display: flex;
-  justify-content: flex-end;
-  min-width: 0;
-}
-
 .settings-page-icon {
   display: flex;
   align-items: center;
@@ -1122,7 +1102,7 @@ textarea:focus {
   flex-shrink: 0;
 }
 
-.settings-aside {
+.brand-carousel {
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -1148,6 +1128,18 @@ textarea:focus {
 @media (max-width: 900px) {
   .settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .settings-header {
+    padding: var(--space-5) var(--space-5) var(--space-4);
+  }
+
+  .settings-body {
+    padding: var(--space-5);
+  }
+
+  .theme-family-picker {
+    grid-template-columns: repeat(3, 1fr);
   }
 }
 
@@ -1749,6 +1741,9 @@ textarea:focus {
 .provider-tab-bar {
   display: flex;
   gap: 8px;
+  overflow-x: auto;
+  flex-wrap: nowrap;
+  scrollbar-width: thin;
 }
 
 .provider-tab {
@@ -1765,6 +1760,7 @@ textarea:focus {
   align-items: center;
   gap: var(--space-2);
   transition: background 120ms ease, color 120ms ease, border-color 120ms ease;
+  flex-shrink: 0;
 }
 
 .provider-tab--active {

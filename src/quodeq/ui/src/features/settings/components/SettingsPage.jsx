@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { getHealth, getProviderConfigs } from '../../../api/index.js';
-import SettingsAside from './SettingsAside.jsx';
 import AboutSection from './AboutSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
 import ServerSection from './ServerSection.jsx';
@@ -80,17 +79,10 @@ function ThemeSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
 function SettingsHeader() {
   return (
     <div className="settings-header settings-header--terminal">
-      <div className="settings-header-content">
-        <div className="settings-header-left">
-          <TermHeader
-            name="settings"
-            sub="manage your quodeq preferences"
-          />
-        </div>
-        <div className="settings-header-center">
-          <SettingsAside />
-        </div>
-      </div>
+      <TermHeader
+        name="settings"
+        sub="manage your quodeq preferences"
+      />
     </div>
   );
 }

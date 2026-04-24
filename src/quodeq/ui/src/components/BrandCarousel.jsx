@@ -107,7 +107,7 @@ function useKeyNav(stopAuto, stepPhrase) {
       if (e.key === 'ArrowLeft') { stopAuto(); stepPhrase(-1); }
       if (e.key === 'ArrowRight') { stopAuto(); stepPhrase(1); }
     }
-    // Browser-only: keyboard navigation for settings phrases
+    // Browser-only: keyboard navigation for rotating phrases
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [stopAuto, stepPhrase]);
@@ -173,11 +173,11 @@ function useCarousel() {
   return { index, changing, leftPress, setLeftPress, rightPress, setRightPress, needleWobble, leftCls, rightCls, handleLeft, handleRight };
 }
 
-export default function SettingsAside() {
+export default function BrandCarousel() {
   const c = useCarousel();
 
   return (
-    <div className="settings-aside" aria-hidden="true">
+    <div className="brand-carousel" aria-hidden="true">
       <div className="sa-brand">
         <LogoShell
           press={{ left: c.leftPress, setLeft: c.setLeftPress, right: c.rightPress, setRight: c.setRightPress }}

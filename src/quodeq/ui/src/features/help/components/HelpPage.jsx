@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Dimensions, Violations, CodeMap, Standards, Settings, SubProjects } from './HelpSections.jsx';
 import { TermHeader } from '../../../components/terminal/index.js';
+import BrandCarousel from '../../../components/BrandCarousel.jsx';
 
 const SECTIONS = [
   { id: 'philosophy', label: 'Philosophy' },
@@ -207,6 +208,9 @@ export default function HelpPage() {
         <div className="help-content">
           <Section />
         </div>
+        <aside className="help-aside">
+          <BrandCarousel />
+        </aside>
       </div>
     </div>
   );
