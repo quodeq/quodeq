@@ -39,7 +39,11 @@ jobs:
 
       - name: Load Quodeq CI config
         run: |
-          if [[ -f .quodeq/workflow.env ]]; then
+          # Prefer the new root-level path; fall back to the legacy .quodeq/
+          # folder for repos that haven't migrated yet.
+          if [[ -f quodeq.env ]]; then
+            grep -Ev '^(#|$)' quodeq.env >> "$GITHUB_ENV"
+          elif [[ -f .quodeq/workflow.env ]]; then
             grep -Ev '^(#|$)' .quodeq/workflow.env >> "$GITHUB_ENV"
           else
             {
@@ -87,7 +91,7 @@ jobs:
         id: eval
         run: |
           START=$(date +%s)
-          # Precedence: workflow_dispatch input > NIGHTLY_DIMENSIONS from workflow.env > all
+          # Precedence: workflow_dispatch input > NIGHTLY_DIMENSIONS from quodeq.env > all
           DIMS="${{ github.event.inputs.dimensions }}"
           DIMS="${DIMS:-$NIGHTLY_DIMENSIONS}"
           BUDGET="${{ github.event.inputs.pool_budget }}"
