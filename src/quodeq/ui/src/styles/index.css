@@ -1,5 +1,7 @@
 @import './tokens.css';
 @import './base.css';
+@import './terminal.css';
+@import './dim-gauge-card.css';
 @import './dashboard.css';
 @import './evaluation.css';
 @import './explorer.css';
