@@ -194,13 +194,33 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
         tail = lines[-max_lines:] if len(lines) > max_lines else lines
         return [line.rstrip("\n") for line in tail]
 
+    @staticmethod
+    def _read_dimensions_from_status(run_dir: Path) -> list[str] | None:
+        """Read the `dimensions` list from status.json, or None if unavailable."""
+        import json as _json  # noqa: PLC0415
+        status_path = run_dir / "status.json"
+        if not status_path.is_file():
+            return None
+        try:
+            data = _json.loads(status_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return None
+        dims = data.get("dimensions")
+        return dims if isinstance(dims, list) else None
+
     def _run_row_to_snapshot(self, row: "_run_index.RunRow") -> JobSnapshot:
         logs: list[str] = []
+        dimensions: list[str] | None = None
         if row.run_dir:
+            run_dir_path = Path(row.run_dir)
             try:
-                logs = self._tail_run_log(Path(row.run_dir))
+                logs = self._tail_run_log(run_dir_path)
             except (OSError, ValueError):
                 logs = []
+            try:
+                dimensions = self._read_dimensions_from_status(run_dir_path)
+            except (OSError, ValueError):
+                dimensions = None
         return JobSnapshot(
             job_id=row.job_id,
             status=row.state,
@@ -213,7 +233,7 @@ class FilesystemActionProvider(FsEvaluationMixin, FsToolingMixin, ActionProvider
             output_run_id=row.run_id,
             phase=row.phase,
             current_dimension=row.current_dimension,
-            dimensions=None,
+            dimensions=dimensions,
             error=row.exit_reason,
             source="external" if row.job_id.startswith("ext-") else "internal",
             exit_reason=row.exit_reason,
