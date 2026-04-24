@@ -5,6 +5,7 @@ import {
 } from '../viz/index.js';
 import { complianceRatio } from '../../../utils/formatters.js';
 import useMapPageState from './useMapPageState.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 
 function getAppThemeInfo() {
   const attr = document.documentElement.getAttribute('data-theme') || '';
@@ -155,20 +156,23 @@ export default function MapPage(props) {
 
   if (state.allDimensions.length === 0) {
     return (
-      <div className="map-page">
-        <div className="page-header"><h2 className="page-title">Map</h2></div>
+      <div className="map-page map-page--terminal">
+        <TermHeader name="map" sub="no evaluation data · run an evaluation to populate" />
         <div className="empty-state"><p>No evaluation data yet. Run an evaluation from the Evaluate tab.</p></div>
       </div>
     );
   }
 
+  const viol = state.currentNode.violations;
+  const ratio = complianceRatio(viol, state.currentNode.compliance);
+
   return (
-    <div className="map-page">
-      <div className="map-header">
-        <h2 className="page-title">Map</h2>
-        <span className="map-total-count">
-          <strong>{state.currentNode.violations}</strong> violation{state.currentNode.violations !== 1 ? 's' : ''} · <strong>{complianceRatio(state.currentNode.violations, state.currentNode.compliance)}</strong> ratio
-        </span>
+    <div className="map-page map-page--terminal">
+      <TermHeader
+        name="map"
+        sub={`${viol} violation${viol !== 1 ? 's' : ''} · ratio ${ratio}`}
+      />
+      <div className="map-header map-header--terminal">
         <MapControls viewState={state.viewState} galaxyState={state.galaxyState} dimensionState={state.dimensionState} />
       </div>
       <MapVizContainer vizState={state.vizState} treeState={state.treeState} dimensions={state.dimensions} callbacks={state.callbacks} display={state.display} />

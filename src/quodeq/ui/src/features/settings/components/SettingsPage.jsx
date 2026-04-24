@@ -5,6 +5,7 @@ import AboutSection from './AboutSection.jsx';
 import ProviderTabs from './ProviderTabs.jsx';
 import ServerSection from './ServerSection.jsx';
 import { SETTINGS_TOAST_SEEN_KEY } from '../../../constants.js';
+import { TermHeader } from '../../../components/terminal/index.js';
 
 const MODE_OPTIONS = [
   { value: 'system',   label: 'System' },
@@ -78,19 +79,13 @@ function ThemeSection({ themeMode, themeFamily, onApplyMode, onApplyFamily }) {
 
 function SettingsHeader() {
   return (
-    <div className="settings-header">
+    <div className="settings-header settings-header--terminal">
       <div className="settings-header-content">
         <div className="settings-header-left">
-          <div className="settings-page-icon">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 2v2.5M12 19.5V22M4.93 4.93l1.77 1.77M17.3 17.3l1.77 1.77M2 12h2.5M19.5 12H22M4.93 19.07l1.77-1.77M17.3 6.7l1.77-1.77" />
-            </svg>
-          </div>
-          <div>
-            <h1 className="settings-title">Settings</h1>
-            <p className="settings-subtitle">Manage your Quodeq preferences</p>
-          </div>
+          <TermHeader
+            name="settings"
+            sub="manage your quodeq preferences"
+          />
         </div>
         <div className="settings-header-center">
           <SettingsAside />

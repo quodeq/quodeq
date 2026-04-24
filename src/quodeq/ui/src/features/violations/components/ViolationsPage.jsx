@@ -5,6 +5,7 @@ import { complianceRatio } from '../../../utils/formatters.js';
 import { buildFileTree, treeNodeToFileObj, HeatGridView } from '../../map/viz/index.js';
 import DimensionHeatGridView from './DimensionHeatGridView.jsx';
 import DismissedSubTab from './DismissedSubTab.jsx';
+import { TermHeader, StatStrip, Stat, SevBadge, FlagPill } from '../../../components/terminal/index.js';
 
 const MAX_TREE_DEPTH = 64;
 
@@ -160,40 +161,23 @@ function useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, 
 }
 
 function ViolationsStatsGrid({ summary, topFilesCount, uniquePrinciples, dimensionCount }) {
+  const sev = summary.severity || {};
+  const sevBadges = (sev.critical || sev.major || sev.minor) ? (
+    <span className="violations-sev-row">
+      {sev.critical > 0 && <SevBadge level="critical" count={sev.critical} />}
+      {sev.major > 0    && <SevBadge level="major" count={sev.major} />}
+      {sev.minor > 0    && <SevBadge level="minor" count={sev.minor} />}
+    </span>
+  ) : null;
   return (
-    <section className="panel violations-stats-panel">
-      <div className="violations-stats-grid">
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Violations</span>
-          <span className="acc-eval-stat-value">{summary.totalViolations || 0}</span>
-          <div className="acc-eval-tags">
-            {(summary.severity?.critical || 0) > 0 && <span className="severity-tag critical">{summary.severity.critical} critical</span>}
-            {(summary.severity?.major || 0) > 0 && <span className="severity-tag major">{summary.severity.major} major</span>}
-            {(summary.severity?.minor || 0) > 0 && <span className="severity-tag minor">{summary.severity.minor} minor</span>}
-          </div>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Compliance</span>
-          <span className="acc-eval-stat-value">{summary.totalCompliance || 0}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Ratio</span>
-          <span className="acc-eval-stat-value">{complianceRatio(summary.totalViolations || 0, summary.totalCompliance || 0)}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Files</span>
-          <span className="acc-eval-stat-value">{topFilesCount}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Principles</span>
-          <span className="acc-eval-stat-value">{uniquePrinciples}</span>
-        </div>
-        <div className="acc-eval-stat-block">
-          <span className="acc-eval-stat-label">Dimensions</span>
-          <span className="acc-eval-stat-value">{dimensionCount}</span>
-        </div>
-      </div>
-    </section>
+    <StatStrip bordered>
+      <Stat label="VIOLATIONS" value={summary.totalViolations || 0} hint={sevBadges} />
+      <Stat label="COMPLIANCE" value={summary.totalCompliance || 0} />
+      <Stat label="RATIO" value={complianceRatio(summary.totalViolations || 0, summary.totalCompliance || 0)} />
+      <Stat label="FILES" value={topFilesCount} />
+      <Stat label="PRINCIPLES" value={uniquePrinciples} />
+      <Stat label="DIMENSIONS" value={dimensionCount} />
+    </StatStrip>
   );
 }
 
@@ -237,21 +221,16 @@ export default function ViolationsPage({ data, callbacks, isDirectNav, tabKey = 
   } = useViolationsData({ accumulatedDimensions, selectedProject, onRefresh, savedSubTabRef, savedFilePathRef });
 
   return (
-    <div className="violations-page">
+    <div className="violations-page violations-page--terminal">
       {restoreError && <div className="error-banner">{restoreError}</div>}
-      <div className="map-header">
-        <h2 className="page-title">Violations</h2>
-        <div className="map-pill-group">
-          {[
-            { id: 'dimension', label: 'By Dimension' },
-            { id: 'file', label: 'By File' },
-            { id: 'dismissed', label: dismissed.length > 0 ? `Dismissed (${dismissed.length})` : 'Dismissed' },
-          ].map((tab) => (
-            <button key={tab.id} type="button" className={`map-pill${activeSubTab === tab.id ? ' active' : ''}`} onClick={() => setActiveSubTab(tab.id)}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
+      <TermHeader
+        name="violations"
+        sub={`${summary.totalViolations || 0} total · ${visibleDimensions.length} dimensions · ${uniquePrinciples} principles`}
+      />
+      <div className="violations-flag-row">
+        <FlagPill flag="by-dimension" active={activeSubTab === 'dimension'} onClick={() => setActiveSubTab('dimension')} />
+        <FlagPill flag="by-file"      active={activeSubTab === 'file'}      onClick={() => setActiveSubTab('file')} />
+        <FlagPill flag="dismissed"    active={activeSubTab === 'dismissed'} count={dismissed.length || undefined} onClick={() => setActiveSubTab('dismissed')} />
       </div>
       <ViolationsStatsGrid summary={summary} topFilesCount={topFilesCount} uniquePrinciples={uniquePrinciples} dimensionCount={visibleDimensions.length} />
       <ViolationsSubTabContent

@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Dimensions, Violations, CodeMap, Standards, Settings, SubProjects } from './HelpSections.jsx';
+import { TermHeader } from '../../../components/terminal/index.js';
 
 const SECTIONS = [
   { id: 'philosophy', label: 'Philosophy' },
@@ -196,11 +197,11 @@ export default function HelpPage() {
   const Section = SECTION_COMPONENTS[activeSection] || Philosophy;
 
   return (
-    <div className="help-page">
-      <div className="page-header">
-        <h1 className="page-title">Help</h1>
-        <p className="page-subtitle">Learn how to use Quodeq to evaluate and improve your code quality</p>
-      </div>
+    <div className="help-page help-page--terminal">
+      <TermHeader
+        name="help"
+        sub="learn how to use quodeq to evaluate and improve your code quality"
+      />
       <div className="help-layout">
         <SectionNav active={activeSection} onSelect={setActiveSection} />
         <div className="help-content">
