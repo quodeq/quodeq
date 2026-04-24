@@ -715,7 +715,7 @@
 /* Single breakpoint for the "compact" layout: sidebar becomes a drawer,
    topbar flips to back + title + burger. Desktop shows the full rail
    sidebar and the full breadcrumb above this width. */
-@media (max-width: 1200px) {
+@media (max-width: 900px) {
   /* Mobile: the sidebar disappears entirely from the flow. The TopBar burger
      is the only way to open it, and when open it floats over the content as
      a drawer instead of squeezing layout. */
