@@ -60,6 +60,36 @@ def test_signal_handler_writes_cancelled(tmp_path: Path) -> None:
     assert status["exit_reason"] == "signal_SIGTERM"
 
 
+def test_signal_handler_sets_process_cancel_event(tmp_path: Path) -> None:
+    """SIGTERM must set the shared cancel event so worker threads can unblock."""
+    import os
+    from quodeq.shared import cancellation
+
+    cancellation.reset()
+    try:
+        with pytest.raises(SystemExit):
+            with RunLifecycleContext(run_dir=tmp_path, job_id="ext-cancel-event", dimensions=[]):
+                assert cancellation.is_cancelled() is False
+                os.kill(os.getpid(), signal.SIGTERM)
+        assert cancellation.is_cancelled() is True
+    finally:
+        cancellation.reset()
+
+
+def test_context_enter_resets_stale_cancel_event(tmp_path: Path) -> None:
+    """Entering a new lifecycle context must clear leftover cancel state
+    so a second run in the same process does not see cancellation from the first."""
+    from quodeq.shared import cancellation
+
+    cancellation.request_cancel()
+    assert cancellation.is_cancelled() is True
+    try:
+        with _ctx(tmp_path):
+            assert cancellation.is_cancelled() is False
+    finally:
+        cancellation.reset()
+
+
 def test_restores_previous_signal_handlers(tmp_path: Path) -> None:
     """After __exit__, signal handlers revert to what they were before __enter__."""
     sentinel = signal.getsignal(signal.SIGINT)

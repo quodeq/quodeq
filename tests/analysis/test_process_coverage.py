@@ -113,6 +113,44 @@ class TestRunWithHeartbeat:
             result = _run_with_heartbeat(proc, cfg, stream)
             assert result is True
 
+    def test_cancellation_terminates_mid_wait(self, tmp_path):
+        """When cancellation is requested mid-inference, the subprocess is terminated
+        and the loop exits after that tick — without waiting for max_duration."""
+        from quodeq.analysis._process import _run_with_heartbeat
+        from quodeq.analysis._config import AnalysisConfig
+        from quodeq.shared import cancellation
+
+        cancellation.reset()
+        proc = MagicMock()
+        # Subprocess never exits on its own — without cancel support, the loop hangs.
+        proc.poll.return_value = None
+
+        wait_calls = [0]
+
+        def fake_wait(*args, **kwargs):
+            wait_calls[0] += 1
+            if wait_calls[0] == 1:
+                cancellation.request_cancel()
+                raise subprocess.TimeoutExpired("cmd", 1)
+            # If the loop misbehaves and keeps waiting after cancel, fail fast
+            # instead of hanging the test run.
+            raise AssertionError("heartbeat loop did not exit after cancel")
+
+        proc.wait = fake_wait
+        cfg = AnalysisConfig(
+            heartbeat_interval=1, heartbeat_callback=None,
+            max_duration=None, jsonl_file=None,
+        )
+        stream = tmp_path / "stream.jsonl"
+        stream.write_text("")
+        try:
+            with patch("quodeq.analysis._process._terminate_process") as mock_term:
+                _run_with_heartbeat(proc, cfg, stream)
+                mock_term.assert_called_once_with(proc)
+                assert wait_calls[0] == 1
+        finally:
+            cancellation.reset()
+
 
 class TestCheckProcessResult:
     def test_zero_exit_ok(self, tmp_path):
