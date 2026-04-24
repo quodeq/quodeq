@@ -11,42 +11,30 @@ export function Dimensions() {
       <h2>Quality Dimensions (ISO 25010)</h2>
       <p>Quodeq evaluates code across six dimensions derived from the ISO/IEC 25010 software quality standard.</p>
 
-      <table className="help-table">
-        <thead>
-          <tr><th>Dimension</th><th>Focus</th><th>Examples</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>Security</strong></td><td>Vulnerabilities, authentication, data protection</td><td>SQL injection, hardcoded secrets, missing auth</td></tr>
-          <tr><td><strong>Reliability</strong></td><td>Error handling, fault tolerance, recovery</td><td>Unhandled exceptions, missing retries, resource leaks</td></tr>
-          <tr><td><strong>Maintainability</strong></td><td>Code clarity, modularity, testability</td><td>Long functions, duplicated code, tight coupling</td></tr>
-          <tr><td><strong>Performance</strong></td><td>Efficiency, resource usage, scalability</td><td>N+1 queries, memory leaks, missing caching</td></tr>
-          <tr><td><strong>Flexibility</strong></td><td>Extensibility, configurability, portability</td><td>Hardcoded values, missing interfaces, vendor lock-in</td></tr>
-          <tr><td><strong>Usability</strong></td><td>API design, documentation, developer experience</td><td>Confusing APIs, missing docs, inconsistent naming</td></tr>
-        </tbody>
-      </table>
+      <ul>
+        <li><strong>Security</strong> vulnerabilities, authentication, data protection. Examples: SQL injection, hardcoded secrets, missing auth.</li>
+        <li><strong>Reliability</strong> error handling, fault tolerance, recovery. Examples: unhandled exceptions, missing retries, resource leaks.</li>
+        <li><strong>Maintainability</strong> code clarity, modularity, testability. Examples: long functions, duplicated code, tight coupling.</li>
+        <li><strong>Performance</strong> efficiency, resource usage, scalability. Examples: N+1 queries, memory leaks, missing caching.</li>
+        <li><strong>Flexibility</strong> extensibility, configurability, portability. Examples: hardcoded values, missing interfaces, vendor lock-in.</li>
+        <li><strong>Usability</strong> API design, documentation, developer experience. Examples: confusing APIs, missing docs, inconsistent naming.</li>
+      </ul>
 
-      <p>Each dimension is scored 0-10 and receives a letter grade (A-F). The overall score is a weighted average across all dimensions.</p>
+      <p>Each dimension is scored 0 to 10 and receives a letter grade (A to F). The overall score is a weighted average across all dimensions.</p>
 
       <h3>Quodeq Dimensions</h3>
       <p>In addition to the six ISO dimensions, Quodeq includes two extra dimensions focused on software architecture:</p>
-      <table className="help-table">
-        <thead>
-          <tr><th>Dimension</th><th>Focus</th></tr>
-        </thead>
-        <tbody>
-          <tr><td><strong>Clean Architecture</strong></td><td>Layer separation, dependency rules, import direction, boundary enforcement</td></tr>
-          <tr><td><strong>DDD Design</strong></td><td>Domain modeling, bounded contexts, aggregates, value objects, ubiquitous language</td></tr>
-        </tbody>
-      </table>
-      <div className="help-callout help-callout-info">
-        These dimensions come <strong>disabled by default</strong>. To enable them, go to the <strong>Standards</strong> tab and click the {ICON_EYE_ON} eye icon on the dimension card. Enabled dimensions will appear in the Evaluation and Overview tabs.
-      </div>
+      <ul>
+        <li><strong>Clean Architecture</strong> layer separation, dependency rules, import direction, boundary enforcement.</li>
+        <li><strong>DDD Design</strong> domain modeling, bounded contexts, aggregates, value objects, ubiquitous language.</li>
+      </ul>
+      <p>These dimensions come <strong>disabled by default</strong>. To enable them, go to the <strong>Standards</strong> tab and click the {ICON_EYE_ON} eye icon on the dimension card. Enabled dimensions will appear in the Evaluation and Overview tabs.</p>
 
       <h3>Showing and hiding dimensions</h3>
       <p>Control which dimensions are included in evaluations and displayed in the Overview using the {ICON_EYE_ON} <strong>visibility toggle</strong> on each standard card in the Standards tab:</p>
       <ul>
-        <li>{ICON_EYE_ON} <strong>Eye open</strong> the dimension is active and will be included in evaluations and the Overview</li>
-        <li><strong>Eye closed</strong> the dimension is hidden from evaluations and the Overview</li>
+        <li>{ICON_EYE_ON} <strong>Eye open</strong> the dimension is active and will be included in evaluations and the Overview.</li>
+        <li><strong>Eye closed</strong> the dimension is hidden from evaluations and the Overview.</li>
       </ul>
       <p>This lets you customize which quality aspects matter for your project without deleting any standards.</p>
 
@@ -63,24 +51,19 @@ export function Violations() {
       <p>The <strong>Violations</strong> tab is where you review, explore, and manage all findings from your evaluations.</p>
 
       <h3>Severity levels</h3>
-      <table className="help-table">
-        <thead>
-          <tr><th>Severity</th><th>Impact</th><th>Action</th></tr>
-        </thead>
-        <tbody>
-          <tr><td className="help-severity-critical">Critical</td><td>Immediate security or reliability risk</td><td>Fix immediately</td></tr>
-          <tr><td className="help-severity-major">Major</td><td>Significant quality issue</td><td>Fix before release</td></tr>
-          <tr><td className="help-severity-minor">Minor</td><td>Code improvement opportunity</td><td>Fix when convenient</td></tr>
-          <tr><td className="help-severity-info">Info</td><td>Suggestion or best practice</td><td>Consider for future</td></tr>
-        </tbody>
-      </table>
+      <ul>
+        <li><strong>Critical</strong> immediate security or reliability risk. Fix immediately.</li>
+        <li><strong>Major</strong> significant quality issue. Fix before release.</li>
+        <li><strong>Minor</strong> code improvement opportunity. Fix when convenient.</li>
+        <li><strong>Info</strong> suggestion or best practice. Consider for future.</li>
+      </ul>
 
       <h3>Navigating findings</h3>
       <ul>
-        <li><strong>Click a dimension</strong> to see all findings for that quality area</li>
-        <li><strong>Click a file</strong> to see all violations in that specific file with code context</li>
-        <li><strong>Click a principle</strong> to see all violations for that evaluation rule</li>
-        <li><strong>Severity cells</strong> in the grid are clickable and filter by both dimension and severity</li>
+        <li><strong>Click a dimension</strong> to see all findings for that quality area.</li>
+        <li><strong>Click a file</strong> to see all violations in that specific file with code context.</li>
+        <li><strong>Click a principle</strong> to see all violations for that evaluation rule.</li>
+        <li><strong>Severity cells</strong> in the grid are clickable and filter by both dimension and severity.</li>
       </ul>
 
       <h3>Viewing dimensions and code</h3>
@@ -89,10 +72,10 @@ export function Violations() {
       <h3>Dismissing findings</h3>
       <p>If a finding is a false positive or intentionally accepted, you can dismiss it directly from the violation detail view. Dismissed findings:</p>
       <ul>
-        <li>Are moved to the <strong>Dismissed</strong> sub-tab in the Violations view</li>
-        <li>Are <strong>excluded from scoring</strong>. The dimension score updates immediately after dismissal</li>
-        <li>Are <strong>excluded from future evaluations</strong>. Re-running the evaluation will not report dismissed findings again</li>
-        <li>Can be <strong>restored at any time</strong> from the Dismissed tab, which brings them back into the active results</li>
+        <li>Are moved to the <strong>Dismissed</strong> sub-tab in the Violations view.</li>
+        <li>Are <strong>excluded from scoring</strong>. The dimension score updates immediately after dismissal.</li>
+        <li>Are <strong>excluded from future evaluations</strong>. Re-running the evaluation will not report dismissed findings again.</li>
+        <li>Can be <strong>restored at any time</strong> from the Dismissed tab, which brings them back into the active results.</li>
       </ul>
       <p>Use this to filter out noise and focus on the violations that matter to your team. You can also use <strong>Restore All</strong> to bring back all dismissed findings at once.</p>
     </section>
@@ -133,10 +116,10 @@ export function Standards() {
 
       <h3>Creating your own</h3>
       <ol>
-        <li>Click <strong>New Standard</strong> in the Standards tab</li>
-        <li>Define principles (evaluation categories) and requirements (specific checks)</li>
-        <li>Assign severity levels to each requirement (<code>critical</code>, <code>major</code>, or <code>minor</code>)</li>
-        <li>Save and your standard will be used in the next evaluation</li>
+        <li>Click <strong>New Standard</strong> in the Standards tab.</li>
+        <li>Define principles (evaluation categories) and requirements (specific checks).</li>
+        <li>Assign severity levels to each requirement (<code>critical</code>, <code>major</code>, or <code>minor</code>).</li>
+        <li>Save and your standard will be used in the next evaluation.</li>
       </ol>
 
       <h3>Importing from library</h3>
@@ -144,7 +127,7 @@ export function Standards() {
 
       <h3>Standard schema</h3>
       <p>Every standard follows this JSON structure:</p>
-      <pre className="help-code">{`{
+      <pre className="help-pre">{`{
   "id": "my-standard",
   "name": "My Custom Standard",
   "dimension": "security",
@@ -165,18 +148,16 @@ export function Standards() {
 }`}</pre>
       <p>Key fields:</p>
       <ul>
-        <li><strong>id</strong> unique identifier, used as filename (<code>my-standard.json</code>)</li>
-        <li><strong>dimension</strong> the quality dimension this standard belongs to</li>
-        <li><strong>principles</strong> categories of evaluation (e.g., "Error Handling", "Input Validation")</li>
-        <li><strong>requirements</strong> specific checks within each principle, each with an ID and severity</li>
+        <li><strong>id</strong> unique identifier, used as filename (<code>my-standard.json</code>).</li>
+        <li><strong>dimension</strong> the quality dimension this standard belongs to.</li>
+        <li><strong>principles</strong> categories of evaluation (for example, "Error Handling", "Input Validation").</li>
+        <li><strong>requirements</strong> specific checks within each principle, each with an ID and severity.</li>
       </ul>
 
       <h3>Using AI to generate standards</h3>
-      <div className="help-callout help-callout-tip">
-        <strong>Tip:</strong> You can ask any AI (Claude, ChatGPT, Gemini, etc.) to generate a custom standard for you. Just ask it to produce a <code>.json</code> file following the schema above, then import it into Quodeq.
-      </div>
+      <p>You can ask any AI (Claude, ChatGPT, Gemini, etc.) to generate a custom standard for you. Just ask it to produce a <code>.json</code> file following the schema above, then import it into Quodeq.</p>
       <p>Ask the AI something like:</p>
-      <pre className="help-code">{`Generate a .quodeq JSON file for evaluating React component
+      <pre className="help-pre">{`Generate a .quodeq JSON file for evaluating React component
 best practices. Include principles for accessibility,
 performance, state management, and error boundaries.
 
@@ -195,7 +176,7 @@ Use this structure:
     }
   ]
 }`}</pre>
-      <p>The AI will generate a complete standard JSON file. Save it as a <code>.json</code> file (the <code>.quodeq</code> extension is optional &mdash; it's a regular JSON file), then click the <strong>Import</strong> button in the <strong>Standards</strong> tab to load it into Quodeq.</p>
+      <p>The AI will generate a complete standard JSON file. Save it as a <code>.json</code> file (the <code>.quodeq</code> extension is optional, it's a regular JSON file), then click the <strong>Import</strong> button in the <strong>Standards</strong> tab to load it into Quodeq.</p>
     </section>
   );
 }
@@ -232,7 +213,7 @@ export function SubProjects() {
 
       <h3>Using scope</h3>
       <p>When starting an evaluation, use the <strong>Scope</strong> option to specify a subdirectory:</p>
-      <pre className="help-code">{`Repository: /path/to/monorepo
+      <pre className="help-pre">{`Repository: /path/to/monorepo
 Scope:      packages/frontend`}</pre>
       <p>This evaluates only the files within that subdirectory, producing a focused report for that sub-project.</p>
 

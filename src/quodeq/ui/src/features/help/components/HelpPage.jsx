@@ -50,25 +50,9 @@ function Philosophy() {
       <p>Quodeq reports <strong>violations AND compliance</strong>. The scoring uses the ratio between them. A project with many violations but also strong compliance patterns is scored more fairly than one with the same violations and no evidence of good practices. The AI actively looks for files that follow standards correctly, not just files that break them.</p>
 
       <h3>The Q&#xB2; Scoring Formula</h3>
-      <p>Each principle is scored 0-10 using four independent constraints:</p>
-      <ol>
-        <li><strong>Violation Base</strong> is a hyperbolic curve where the first violations hurt most: <code>10 / (1 + K * weighted_violations)</code>. This prevents 50 minor issues from tanking a score the same way 5 critical ones would.</li>
-        <li><strong>Compliance Lift</strong> fills the gap between the base and 10 with evidence of good practices. More compliance always helps, never hurts.</li>
-        <li><strong>Violation Ceiling</strong> is a log&#x2082;-based cap that prevents compliance from overriding significant violations. You cannot reach Exemplary with critical issues, no matter how much compliance you have.</li>
-        <li><strong>Severity Grade Floor</strong> ensures grade labels match reality. Only actual critical violations can produce a "Critical" grade. 50 minor violations with zero compliance still score Adequate, not Critical.</li>
-      </ol>
-      <pre className="help-code">{'final = max(floor, min(ceiling, base + (10 - base) * lift))'}</pre>
+      <p>Each principle is scored 0 to 10 using four independent constraints that together avoid the typical pitfalls of naive scoring. A hyperbolic <strong>violation base</strong> means the first violations hurt most, preventing fifty minor issues from tanking a score the same way five critical ones would. A <strong>compliance lift</strong> fills the gap between the base and 10 with evidence of good practices, so compliance always helps and never hurts. A log-based <strong>violation ceiling</strong> prevents compliance from overriding significant violations, so you cannot reach Exemplary with critical issues in play. A <strong>severity grade floor</strong> keeps the grade label honest, so only actual critical violations can produce a "Critical" grade.</p>
 
-      <h3>Fair by design</h3>
-      <div className="help-callout help-callout-info">
-        The scoring model addresses specific fairness issues: linear accumulation is unfair (39 minor issues should not score the same as 39 critical flaws), compliance should be additive (not just a discount), grade names should be semantically honest, and reaching the top should require genuinely clean code.
-      </div>
-
-      <h3>Any language, any stack</h3>
-      <p>Quodeq can evaluate <strong>any codebase in any programming language</strong>. The AI analysis engine reads and understands code regardless of the tech stack. Python, TypeScript, Go, Rust, Java, Swift, or anything else. The standards are language-agnostic by design.</p>
-
-      <h3>Your standards, your rules</h3>
-      <p>While Quodeq ships with ISO 25010 dimensions, Clean Architecture, and DDD standards, you can create your own. Define what quality means for your project, whether that is React component best practices, API design guidelines, or your team's internal coding standards, and Quodeq will evaluate against them.</p>
+      <p>Quodeq ships with ISO 25010 dimensions plus Clean Architecture and DDD standards, and evaluates any codebase in any language: Python, TypeScript, Go, Rust, Java, Swift, or anything else. You can also write your own standards for whatever quality means in your project.</p>
     </section>
   );
 }
@@ -101,9 +85,7 @@ function Providers() {
       <p>Quodeq supports multiple AI providers for analysis. Configure them in the <strong>Settings</strong> tab.</p>
 
       <h3>Local Providers (Ollama)</h3>
-      <div className="help-callout help-callout-tip">
-        <strong>Recommended model:</strong> <code>gemma4:26b</code> offers excellent quality-to-cost ratio for local analysis. Even limiting context to 32k tokens, we observed strong results.
-      </div>
+      <p><strong>Recommended model:</strong> <code>gemma4:26b</code> offers an excellent quality-to-cost ratio for local analysis. Even with context limited to 32k tokens, results are strong.</p>
       <p>To use Ollama:</p>
       <ol>
         <li>Install Ollama from <code>ollama.com</code></li>
@@ -114,32 +96,14 @@ function Providers() {
       <p>Local models are <strong>free and private</strong>. Your code never leaves your machine. The trade-off is slower analysis and potentially lower accuracy compared to cloud models.</p>
 
       <h3>Cloud Providers</h3>
-      <div className="help-callout help-callout-warning">
-        <strong>Watch your token usage.</strong> Cloud providers charge per token. A full evaluation of a medium codebase can consume significant tokens. Monitor your usage in your provider's dashboard.
-      </div>
-      <p>Recommended cloud models:</p>
-      <ul>
-        <li><strong>Claude Sonnet</strong> (Anthropic) best balance of speed, quality, and cost</li>
-        <li><strong>GPT-5.3-codex</strong> (OpenAI) strong alternative, good for diverse codebases</li>
-      </ul>
+      <p>Cloud providers charge per token, so watch your usage. A full evaluation of a medium codebase can consume significant tokens, so monitor your usage in your provider's dashboard. <strong>Claude Sonnet</strong> (Anthropic) is the best balance of speed, quality, and cost; <strong>GPT-5.3-codex</strong> (OpenAI) is a strong alternative for diverse codebases.</p>
       <p>To configure a cloud provider:</p>
       <ol>
         <li>In Settings, select the <strong>CLI Provider</strong> tab</li>
         <li>Ensure your AI CLI (Claude Code, Codex, etc.) is installed and authenticated</li>
         <li>Select the model and power level for your evaluation</li>
       </ol>
-
-      <h3>Power levels</h3>
-      <table className="help-table">
-        <thead>
-          <tr><th>Level</th><th>Model tier</th><th>Speed</th><th>Depth</th></tr>
-        </thead>
-        <tbody>
-          <tr><td>1 - Fast</td><td>Haiku / small</td><td>Fastest</td><td>Surface-level</td></tr>
-          <tr><td>2 - Balanced</td><td>Sonnet / medium</td><td>Moderate</td><td>Good coverage</td></tr>
-          <tr><td>3 - Thorough</td><td>Opus / large</td><td>Slowest</td><td>Deep analysis</td></tr>
-        </tbody>
-      </table>
+      <p>Power level trades speed for depth: <strong>fast</strong>, <strong>balanced</strong>, and <strong>thorough</strong> map to small, medium, and large model tiers respectively.</p>
     </section>
   );
 }
@@ -166,12 +130,9 @@ function Evaluations() {
       </ul>
 
       <h3>Scan types</h3>
-      <div className="help-callout help-callout-info">
-        <strong>Incremental scan</strong> only re-evaluates files that changed since the last run. Much faster for iterative development. Enable the <em>Incremental</em> toggle before starting.
-      </div>
       <ul>
         <li><strong>Full scan</strong> evaluates the entire codebase from scratch. Use for first-time analysis or after major refactors.</li>
-        <li><strong>Incremental scan</strong> detects changed files via git diff and only re-evaluates those. Previous findings for unchanged files are carried forward. Significantly faster and cheaper.</li>
+        <li><strong>Incremental scan</strong> detects changed files via git diff and only re-evaluates those. Previous findings for unchanged files are carried forward, making it significantly faster and cheaper. Enable the <em>Incremental</em> toggle before starting.</li>
       </ul>
 
       <h3>Re-evaluate</h3>
@@ -199,18 +160,18 @@ export default function HelpPage() {
 
   return (
     <div className="help-page help-page--terminal">
-      <TermHeader
-        name="help"
-        sub="learn how to use quodeq to evaluate and improve your code quality"
-      />
+      <div className="help-header">
+        <TermHeader
+          name="help"
+          sub="learn how to use quodeq to evaluate and improve your code quality"
+        />
+        <BrandCarousel />
+      </div>
       <div className="help-layout">
         <SectionNav active={activeSection} onSelect={setActiveSection} />
         <div className="help-content">
           <Section />
         </div>
-        <aside className="help-aside">
-          <BrandCarousel />
-        </aside>
       </div>
     </div>
   );
