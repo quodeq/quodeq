@@ -43,11 +43,13 @@ def test_from_evidence_reads_evidence_not_scored(tmp_path: Path) -> None:
 
 
 def test_from_evidence_no_findings_posts_approving_review(tmp_path: Path) -> None:
-    """Empty evidence -> approving review with no comments (not silence).
+    """Empty evidence -> passing-summary COMMENT with no inline comments.
 
     In CI, "no findings" is the success case — PR authors must see that
     Quodeq ran and passed, not an absence of output indistinguishable from
-    a broken job.
+    a broken job. GitHub Actions' default token is not permitted to submit
+    APPROVE reviews (HTTP 422), so clean runs post a COMMENT review; the
+    absence of inline comments + the summary body convey the pass.
     """
     eval_dir = tmp_path / "run"
     eval_dir.mkdir()
@@ -58,7 +60,7 @@ def test_from_evidence_no_findings_posts_approving_review(tmp_path: Path) -> Non
     assert exit_code == 0
     assert posted.call_count == 1
     payload = posted.call_args.kwargs["payload"]
-    assert payload["event"] == "APPROVE"
+    assert payload["event"] == "COMMENT"
     assert payload["comments"] == []
 
 
